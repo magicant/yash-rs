@@ -221,6 +221,7 @@ use builtin::execute_builtin;
 
 mod function;
 use function::execute_function;
+pub use function::execute_function_body;
 
 mod external;
 use external::execute_external_utility;

@@ -23,6 +23,7 @@ use crate::common::report_failure;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_semantics::command::simple_command::execute_function_body;
 use yash_semantics::command_search::search;
 use yash_semantics::command_search::Target;
 
@@ -62,7 +63,10 @@ async fn invoke_target(env: &mut Env, target: Target, mut fields: Vec<Field>) ->
             (builtin.execute)(&mut env, fields).await
         }
 
-        Target::Function(_) => todo!(),
+        Target::Function(function) => {
+            let divert = execute_function_body(env, function, fields, |_| ()).await;
+            crate::Result::with_exit_status_and_divert(env.exit_status, divert)
+        }
 
         Target::External { .. } => todo!(),
     }
@@ -74,15 +78,19 @@ mod tests {
     use super::*;
     use crate::tests::assert_stderr;
     use crate::tests::assert_stdout;
+    use assert_matches::assert_matches;
     use enumset::EnumSet;
     use futures_util::FutureExt as _;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
+    use yash_env::function::Function;
     use yash_env::semantics::Field;
     use yash_env::VirtualSystem;
     use yash_semantics::Divert::Return;
+    use yash_syntax::source::Location;
+    use yash_syntax::syntax::FullCompoundCommand;
 
     #[test]
     fn empty_command_invocation() {
@@ -148,5 +156,36 @@ mod tests {
             .now_or_never()
             .unwrap();
         assert_eq!(result, make_result());
+    }
+
+    #[test]
+    fn invoking_function() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert(
+            ":",
+            Builtin {
+                r#type: Special,
+                execute: |_, args| {
+                    Box::pin(async move {
+                        assert_matches!(args.as_slice(), [bar, baz] => {
+                            assert_eq!(bar.value, "bar");
+                            assert_eq!(baz.value, "baz");
+                        });
+                        crate::Result::with_exit_status_and_divert(
+                            ExitStatus(42),
+                            Break(Return(None)),
+                        )
+                    })
+                },
+            },
+        );
+        let body: FullCompoundCommand = "{ : \"$@\"; }".parse().unwrap();
+        let origin = Location::dummy("some location");
+        let target = Target::Function(Rc::new(Function::new("foo", body, origin)));
+
+        let result = invoke_target(&mut env, target, Field::dummies(["foo", "bar", "baz"]))
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, crate::Result::from(ExitStatus(42)));
     }
 }

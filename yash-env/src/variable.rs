@@ -46,6 +46,7 @@
 //! [`Env::push_context`] returns a [`EnvContextGuard`] that implements
 //! `DerefMut<Target = Env>`.
 
+use crate::semantics::Field;
 #[cfg(doc)]
 use crate::Env;
 use itertools::Itertools;
@@ -88,6 +89,27 @@ pub struct PositionalParams {
     pub values: Vec<String>,
     /// Location of the last modification of positional parameters
     pub last_modified_location: Option<Location>,
+}
+
+impl PositionalParams {
+    /// Creates a `PositionalParams` instance from fields.
+    ///
+    /// The given iterator should be a non-empty sequence of fields. The first
+    /// field is the name of the command whose origin is used as the
+    /// `last_modified_location`. The rest of the fields are the values of
+    /// positional parameters.
+    pub fn from_fields<I>(fields: I) -> Self
+    where
+        I: IntoIterator<Item = Field>,
+    {
+        let mut fields = fields.into_iter();
+        let last_modified_location = fields.next().map(|field| field.origin);
+        let values = fields.map(|field| field.value).collect();
+        Self {
+            values,
+            last_modified_location,
+        }
+    }
 }
 
 /// Variable context

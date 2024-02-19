@@ -48,28 +48,42 @@ pub async fn execute_function(
         return e.handle(env).await;
     };
 
-    let mut outer = env.push_context(Context::Volatile);
-    perform_assignments(&mut outer, assigns, true, xtrace.as_mut()).await?;
+    let mut env = env.push_context(Context::Volatile);
+    perform_assignments(&mut env, assigns, true, xtrace.as_mut()).await?;
 
     trace_fields(xtrace.as_mut(), &fields);
-    print(&mut outer, xtrace).await;
+    print(&mut env, xtrace).await;
 
-    // Prepare positional parameters
-    let mut i = fields.into_iter();
-    let last_modified_location = Some(i.next().unwrap().origin);
-    let values = i.map(|f| f.value).collect();
-    let positional_params = PositionalParams {
-        values,
-        last_modified_location,
-    };
+    execute_function_body(&mut env, function, fields, |_| ()).await
+}
 
-    let mut inner = outer.push_context(Context::Regular { positional_params });
+/// Executes the body of the function.
+///
+/// The given function is executed in the given environment. The fields are
+/// passed as positional parameters to the function except for the first field
+/// which is the name of the function.
+///
+/// The modifier function is called with the environment after the new variable
+/// context is pushed to the environment. This is useful for assigning custom
+/// local variables before the function body is executed.
+pub async fn execute_function_body<F>(
+    env: &mut Env,
+    function: Rc<Function>,
+    fields: Vec<Field>,
+    modifier: F,
+) -> Result
+where
+    F: FnOnce(&mut Env),
+{
+    let positional_params = PositionalParams::from_fields(fields);
+    let mut env = env.push_context(Context::Regular { positional_params });
+    modifier(&mut env);
 
     // TODO Update control flow stack
-    let result = function.body.execute(&mut inner).await;
+    let result = function.body.execute(&mut env).await;
     if let Break(Divert::Return(exit_status)) = result {
         if let Some(exit_status) = exit_status {
-            inner.exit_status = exit_status;
+            env.exit_status = exit_status;
         }
         Continue(())
     } else {
