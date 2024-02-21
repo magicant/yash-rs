@@ -28,6 +28,7 @@ use std::os::unix::ffi::OsStrExt as _;
 use std::os::unix::ffi::OsStringExt as _;
 use std::path::PathBuf;
 use yash_env::builtin::Type;
+use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::Env;
 use yash_env::System;
@@ -248,7 +249,11 @@ impl Identify {
         let output_result = output(env, &result).await;
 
         let error_result = if let Some(message) = to_single_message(&errors) {
-            report_failure(env, message).await
+            if self.verbose {
+                report_failure(env, message).await
+            } else {
+                crate::Result::from(ExitStatus::FAILURE)
+            }
         } else {
             crate::Result::default()
         };

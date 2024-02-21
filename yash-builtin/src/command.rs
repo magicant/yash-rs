@@ -78,6 +78,8 @@
 //!
 //! It is an error if the specified utility is not found or cannot be executed.
 //!
+//! With the `-v` option, no error message is printed for the utility not found.
+//!
 //! # Exit status
 //!
 //! Without the `-v` or `-V` option, the exit status is that of the utility
