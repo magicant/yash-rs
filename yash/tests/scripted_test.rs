@@ -114,6 +114,11 @@ fn cd_builtin() {
 }
 
 #[test]
+fn command_builtin() {
+    run("command-p.sh")
+}
+
+#[test]
 fn command_substitution() {
     run("cmdsub-p.sh")
 }
