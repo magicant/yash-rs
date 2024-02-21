@@ -49,9 +49,6 @@ pub async fn execute_external_utility(
     fields: Vec<Field>,
     redirs: &[Redir],
 ) -> Result {
-    let name = fields[0].clone();
-    let location = name.origin.clone();
-
     let mut xtrace = XTrace::from_options(&env.options);
 
     let env = &mut RedirGuard::new(env);
@@ -66,6 +63,7 @@ pub async fn execute_external_utility(
     print(&mut env, xtrace).await;
 
     if path.to_bytes().is_empty() {
+        let name = &fields[0];
         print_error(
             &mut env,
             format!("cannot execute external utility {:?}", name.value).into(),
@@ -76,6 +74,31 @@ pub async fn execute_external_utility(
         env.exit_status = ExitStatus::NOT_FOUND;
         return Continue(());
     }
+
+    env.exit_status = start_external_utility_in_subshell_and_wait(&mut env, path, fields).await;
+
+    Continue(())
+}
+
+/// Starts an external utility in a subshell and waits for it to finish.
+///
+/// `path` is the path to the external utility. `fields` are the command line
+/// words of the utility. The first field must exist and be the name of the
+/// utility as it is used for error messages.
+///
+/// This function starts the utility in a subshell and waits for it to finish.
+/// The subshell is a foreground job if job control is enabled.
+///
+/// This function returns the exit status of the utility. In case of an error,
+/// it prints an error message to the standard error before returning an
+/// appropriate exit status.
+pub async fn start_external_utility_in_subshell_and_wait(
+    env: &mut Env,
+    path: CString,
+    fields: Vec<Field>,
+) -> ExitStatus {
+    let name = fields[0].clone();
+    let location = name.origin.clone();
 
     let job_name = if env.controls_jobs() {
         to_job_name(&fields)
@@ -91,7 +114,7 @@ pub async fn execute_external_utility(
     })
     .job_control(JobControl::Foreground);
 
-    match subshell.start_and_wait(&mut env).await {
+    match subshell.start_and_wait(env).await {
         Ok((pid, state)) => {
             if let ProcessState::Stopped(_) = state {
                 let mut job = Job::new(pid);
@@ -101,21 +124,19 @@ pub async fn execute_external_utility(
                 env.jobs.add(job);
             }
 
-            env.exit_status = state.try_into().unwrap();
+            state.try_into().unwrap()
         }
         Err(errno) => {
             print_error(
-                &mut env,
+                env,
                 format!("cannot execute external utility {:?}", name.value).into(),
                 errno.desc().into(),
                 &name.origin,
             )
             .await;
-            env.exit_status = ExitStatus::NOEXEC;
+            ExitStatus::NOEXEC
         }
     }
-
-    Continue(())
 }
 
 fn to_job_name(fields: &[Field]) -> String {
