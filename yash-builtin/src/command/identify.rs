@@ -21,9 +21,16 @@ use super::Identify;
 use crate::command::Category;
 use crate::common::{output, report_failure, to_single_message};
 use std::borrow::Cow;
+use std::ffi::CStr;
+use std::ffi::CString;
+use std::ffi::OsStr;
+use std::os::unix::ffi::OsStrExt as _;
+use std::os::unix::ffi::OsStringExt as _;
+use std::path::PathBuf;
 use yash_env::builtin::Type;
 use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::System;
 use yash_quote::quoted;
 use yash_semantics::command_search::search;
 use yash_semantics::command_search::Target;
@@ -51,11 +58,57 @@ impl MessageBase for NotFound<'_> {
     }
 }
 
-/// Identifies the command and appends the description to the result.
+/// Environment for [normalizing a target](normalize_target).
+trait NormalizeEnv {
+    fn is_executable_file(&self, path: &CStr) -> bool;
+    fn pwd(&self) -> Result<PathBuf, ()>;
+}
+
+impl NormalizeEnv for Env {
+    #[inline]
+    fn is_executable_file(&self, path: &CStr) -> bool {
+        self.system.is_executable_file(path)
+    }
+
+    fn pwd(&self) -> Result<PathBuf, ()> {
+        match self.get_pwd_if_correct() {
+            Some(pwd) => Ok(pwd.into()),
+            None => self.system.getcwd().map_err(|_| ()),
+        }
+    }
+}
+
+/// Updates the target to make it suitable for the [description](describe_target).
+///
+/// This function makes sure any path contained in the target is absolute and
+/// names an executable file. If the path cannot be normalized, this function
+/// returns an error.
+fn normalize_target<E: NormalizeEnv>(env: &E, target: &mut Target) -> Result<(), ()> {
+    match target {
+        Target::Function(_) | Target::Builtin { path: None, .. } => Ok(()),
+
+        Target::External { path }
+        | Target::Builtin {
+            path: Some(path), ..
+        } => {
+            if !env.is_executable_file(path) {
+                return Err(());
+            }
+            if !path.as_bytes().starts_with(b"/") {
+                let mut absolute_path = env.pwd()?;
+                absolute_path.push(OsStr::from_bytes(path.as_bytes()));
+                *path = CString::new(absolute_path.into_os_string().into_vec()).map_err(|_| ())?;
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Appends the description of the given target to the result.
 ///
 /// This function is a helper for [`identify`]. It produces the description of
 /// the command search result that is to be printed to the standard output.
-fn identify_target<'f, W>(
+fn describe_target<'f, W>(
     target: &Target,
     name: &'f Field,
     verbose: bool,
@@ -164,8 +217,9 @@ where
         }
     }
 
-    let target = search(env, &name.value).ok_or(NotFound { name })?;
-    identify_target(&target, name, verbose, result)
+    let mut target = search(env, &name.value).ok_or(NotFound { name })?;
+    normalize_target(env.env, &mut target).map_err(|()| NotFound { name })?;
+    describe_target(&target, name, verbose, result)
 }
 
 impl Identify {
@@ -213,6 +267,93 @@ mod tests {
     use yash_syntax::alias::HashEntry;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::FullCompoundCommand;
+
+    #[test]
+    fn normalize_absolute_executable() {
+        struct TestEnv;
+        impl NormalizeEnv for TestEnv {
+            fn is_executable_file(&self, _path: &CStr) -> bool {
+                true
+            }
+            fn pwd(&self) -> Result<PathBuf, ()> {
+                unreachable!()
+            }
+        }
+
+        let mut external_target = Target::External {
+            path: CString::new("/bin/sh").unwrap(),
+        };
+        let result = normalize_target(&TestEnv, &mut external_target);
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            external_target,
+            Target::External {
+                path: CString::new("/bin/sh").unwrap(),
+            }
+        );
+
+        let builtin = Builtin {
+            r#type: Type::Substitutive,
+            execute: |_, _| unreachable!(),
+        };
+        let mut builtin_target = Target::Builtin {
+            builtin,
+            path: Some(CString::new("/usr/bin/echo").unwrap()),
+        };
+        let result = normalize_target(&TestEnv, &mut builtin_target);
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            builtin_target,
+            Target::Builtin {
+                builtin,
+                path: Some(CString::new("/usr/bin/echo").unwrap()),
+            }
+        );
+    }
+
+    #[test]
+    fn normalize_relative_executable() {
+        struct TestEnv;
+        impl NormalizeEnv for TestEnv {
+            fn is_executable_file(&self, _path: &CStr) -> bool {
+                true
+            }
+            fn pwd(&self) -> Result<PathBuf, ()> {
+                Ok(PathBuf::from("/bin"))
+            }
+        }
+
+        let mut external_target = Target::External {
+            path: CString::new("foo/sh").unwrap(),
+        };
+        let result = normalize_target(&TestEnv, &mut external_target);
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            external_target,
+            Target::External {
+                path: CString::new("/bin/foo/sh").unwrap(),
+            }
+        );
+    }
+
+    #[test]
+    fn normalize_non_executable() {
+        struct TestEnv;
+        impl NormalizeEnv for TestEnv {
+            fn is_executable_file(&self, _path: &CStr) -> bool {
+                false
+            }
+            fn pwd(&self) -> Result<PathBuf, ()> {
+                unreachable!()
+            }
+        }
+
+        let mut external_target = Target::External {
+            path: CString::new("/bin/sh").unwrap(),
+        };
+        let result = normalize_target(&TestEnv, &mut external_target);
+        assert_eq!(result, Err(()));
+    }
 
     #[test]
     fn identify_keyword() {
@@ -313,7 +454,7 @@ mod tests {
     }
 
     #[test]
-    fn identify_builtin_without_path() {
+    fn describe_builtin_without_path() {
         let name = &Field::dummy(":");
         let target = &Target::Builtin {
             builtin: Builtin {
@@ -324,16 +465,16 @@ mod tests {
         };
 
         let mut output = String::new();
-        identify_target(target, name, false, &mut output).unwrap();
+        describe_target(target, name, false, &mut output).unwrap();
         assert_eq!(output, ":\n");
 
         let mut output = String::new();
-        identify_target(target, name, true, &mut output).unwrap();
+        describe_target(target, name, true, &mut output).unwrap();
         assert_eq!(output, ":: special built-in\n");
     }
 
     #[test]
-    fn identify_builtin_with_path() {
+    fn describe_builtin_with_path() {
         let name = &Field::dummy("echo");
         let target = &Target::Builtin {
             builtin: Builtin {
@@ -344,16 +485,16 @@ mod tests {
         };
 
         let mut output = String::new();
-        identify_target(target, name, false, &mut output).unwrap();
+        describe_target(target, name, false, &mut output).unwrap();
         assert_eq!(output, "/bin/echo\n");
 
         let mut output = String::new();
-        identify_target(target, name, true, &mut output).unwrap();
+        describe_target(target, name, true, &mut output).unwrap();
         assert_eq!(output, "echo: substitutive built-in at /bin/echo\n");
     }
 
     #[test]
-    fn identify_function() {
+    fn describe_function() {
         let name = &Field::dummy("f");
         let command: FullCompoundCommand = "{ :; }".parse().unwrap();
         let location = Location::dummy("f");
@@ -361,27 +502,27 @@ mod tests {
         let target = &Target::Function(function.into());
 
         let mut output = String::new();
-        identify_target(target, name, false, &mut output).unwrap();
+        describe_target(target, name, false, &mut output).unwrap();
         assert_eq!(output, "f\n");
 
         let mut output = String::new();
-        identify_target(target, name, true, &mut output).unwrap();
+        describe_target(target, name, true, &mut output).unwrap();
         assert_eq!(output, "f: function\n");
     }
 
     #[test]
-    fn identify_external() {
+    fn describe_external() {
         let name = &Field::dummy("ls");
         let target = &Target::External {
             path: CString::new("/bin/ls").unwrap(),
         };
 
         let mut output = String::new();
-        identify_target(target, name, false, &mut output).unwrap();
+        describe_target(target, name, false, &mut output).unwrap();
         assert_eq!(output, "/bin/ls\n");
 
         let mut output = String::new();
-        identify_target(target, name, true, &mut output).unwrap();
+        describe_target(target, name, true, &mut output).unwrap();
         assert_eq!(output, "ls: external utility at /bin/ls\n");
     }
 

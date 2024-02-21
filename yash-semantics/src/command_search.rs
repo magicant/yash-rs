@@ -50,7 +50,7 @@ use yash_env::System;
 /// Target of a simple command execution
 ///
 /// This is the result of the [command search](search).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Target {
     /// Built-in utility
     Builtin {
@@ -168,6 +168,10 @@ impl SearchEnv for Env {
 /// need to update a cache of the results of external utility search (TODO:
 /// which is not yet implemented). The function does not otherwise modify the
 /// environment.
+///
+/// If the given name contains a slash, the function immediately returns an
+/// external utility target, regardless of whether the named external utility
+/// actually exists.
 pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
     if name.contains('/') {
         return if let Ok(path) = CString::new(name) {
