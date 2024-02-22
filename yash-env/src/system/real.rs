@@ -437,8 +437,9 @@ impl System for RealSystem {
             if size == 0 {
                 return Err(Errno::last());
             }
-            let mut buffer = Vec::with_capacity(size);
-            let final_size = nix::libc::confstr(nix::libc::_CS_PATH, buffer.as_mut_ptr(), size);
+            let mut buffer = Vec::<u8>::with_capacity(size);
+            let final_size =
+                nix::libc::confstr(nix::libc::_CS_PATH, buffer.as_mut_ptr() as *mut _, size);
             if final_size == 0 {
                 return Err(Errno::last());
             }
@@ -446,7 +447,7 @@ impl System for RealSystem {
                 return Err(Errno::ERANGE);
             }
             buffer.set_len(final_size - 1); // The last byte is a null terminator.
-            Ok(OsString::from_vec(buffer))
+            return Ok(OsString::from_vec(buffer));
         }
 
         #[allow(unreachable_code)]
