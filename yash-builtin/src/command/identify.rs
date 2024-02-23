@@ -115,6 +115,10 @@ impl NormalizeEnv for Env {
 /// This function makes sure any path contained in the target is absolute and
 /// names an executable file. If the path cannot be normalized, this function
 /// returns an error.
+///
+/// The error returned from this function does not contain any message because
+/// this function is used only by [`categorize`], which only need to report
+/// that the target is not found.
 fn normalize_target<E: NormalizeEnv>(env: &E, target: &mut Target) -> Result<(), ()> {
     match target {
         Target::Function(_) | Target::Builtin { path: None, .. } => Ok(()),
