@@ -109,12 +109,12 @@ fn normalize_target<E: NormalizeEnv>(env: &E, target: &mut Target) -> Result<(),
 ///
 /// This function is a helper for [`identify`]. It produces the description of
 /// the command search result that is to be printed to the standard output.
-fn describe_target<'f, W>(
+fn describe_target<W>(
     target: &Target,
-    name: &'f Field,
+    name: &Field,
     verbose: bool,
     result: &mut W,
-) -> Result<(), NotFound<'f>>
+) -> std::fmt::Result
 where
     W: std::fmt::Write,
 {
@@ -129,23 +129,23 @@ where
                     Type::Extension => "extension built-in",
                     Type::Substitutive => "substitutive built-in",
                 };
-                write!(result, "{}: {}", name.value, desc).unwrap();
+                write!(result, "{}: {}", name.value, desc)?;
                 if let Some(path) = path {
-                    write!(result, " at {}", quoted(&path)).unwrap();
+                    write!(result, " at {}", quoted(&path))?;
                 }
-                writeln!(result).unwrap();
+                writeln!(result)?;
             } else {
                 let output = path.as_deref().unwrap_or(&name.value);
-                writeln!(result, "{}", output).unwrap();
+                writeln!(result, "{}", output)?;
             }
             Ok(())
         }
 
         Target::Function(_) => {
             if verbose {
-                writeln!(result, "{}: function", name.value).unwrap();
+                writeln!(result, "{}: function", name.value)?;
             } else {
-                writeln!(result, "{}", name.value).unwrap();
+                writeln!(result, "{}", name.value)?;
             }
             Ok(())
         }
@@ -158,10 +158,9 @@ where
                     "{}: external utility at {}",
                     name.value,
                     quoted(&path)
-                )
-                .unwrap();
+                )?;
             } else {
-                writeln!(result, "{}", path).unwrap();
+                writeln!(result, "{}", path)?;
             }
             Ok(())
         }
@@ -220,7 +219,8 @@ where
 
     let mut target = search(env, &name.value).ok_or(NotFound { name })?;
     normalize_target(env.env, &mut target).map_err(|()| NotFound { name })?;
-    describe_target(&target, name, verbose, result)
+    describe_target(&target, name, verbose, result).unwrap();
+    Ok(())
 }
 
 impl Identify {
