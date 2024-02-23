@@ -35,7 +35,6 @@
 //! specified in the `$PATH` variable.
 
 use assert_matches::assert_matches;
-use std::collections::HashMap;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::os::unix::ffi::OsStringExt;
@@ -44,23 +43,36 @@ use std::rc::Rc;
 use yash_env::builtin::Builtin;
 use yash_env::builtin::Type::{Elective, Extension, Mandatory, Special, Substitutive};
 use yash_env::function::Function;
-use yash_env::function::FunctionSet;
-use yash_env::variable::Variable;
+use yash_env::variable::Expansion;
 use yash_env::Env;
 use yash_env::System;
 
-/// Target of a simple command execution.
+/// Target of a simple command execution
 ///
 /// This is the result of the [command search](search).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Target {
-    /// Built-in utility.
-    Builtin(Builtin),
-    /// Function.
+    /// Built-in utility
+    Builtin {
+        /// Definition of the built-in
+        builtin: Builtin,
+        /// Path to the external utility that is shadowed by the substitutive
+        /// built-in
+        ///
+        /// The path may not necessarily be absolute. If the `$PATH` variable
+        /// contains a relative directory name and the external utility is found
+        /// in that directory, the path will be relative.
+        ///
+        /// The path will be `None` if the built-in is not substitutive.
+        path: Option<CString>,
+    },
+
+    /// Function
     Function(Rc<Function>),
-    /// External utility.
+
+    /// External utility
     External {
-        /// Path to the external utility.
+        /// Path to the external utility
         ///
         /// The path may not necessarily be absolute. If the `$PATH` variable
         /// contains a relative directory name and the external utility is found
@@ -74,15 +86,17 @@ pub enum Target {
     },
 }
 
-impl From<Builtin> for Target {
-    fn from(builtin: Builtin) -> Target {
-        Target::Builtin(builtin)
+impl From<Rc<Function>> for Target {
+    #[inline]
+    fn from(function: Rc<Function>) -> Target {
+        Target::Function(function)
     }
 }
 
-impl From<Rc<Function>> for Target {
-    fn from(function: Rc<Function>) -> Target {
-        Target::Function(function)
+impl From<Function> for Target {
+    #[inline]
+    fn from(function: Function) -> Target {
+        Target::Function(function.into())
     }
 }
 
@@ -93,35 +107,58 @@ impl From<Rc<Function>> for Target {
 /// Part of the shell execution environment command path search depends on.
 pub trait PathEnv {
     /// Accesses the `$PATH` variable in the environment.
-    fn path(&self) -> Option<&Variable>;
+    ///
+    /// This function returns an `Expansion` rather than a reference to a
+    /// variable value because the path may be dynamically computed in the
+    /// function.
+    #[must_use]
+    fn path(&self) -> Expansion;
+
     /// Whether there is an executable file at the specified path.
+    #[must_use]
     fn is_executable_file(&self, path: &CStr) -> bool;
     // TODO Cache the results of external utility search
 }
 
 /// Part of the shell execution environment command search depends on.
 pub trait SearchEnv: PathEnv {
-    /// Accesses the built-in set in the environment.
-    fn builtins(&self) -> &HashMap<&'static str, Builtin>;
-    /// Accesses the function set in the environment.
-    fn functions(&self) -> &FunctionSet;
+    /// Retrieves the built-in by name.
+    #[must_use]
+    fn builtin(&self, name: &str) -> Option<Builtin>;
+
+    /// Retrieves the function by name.
+    #[must_use]
+    fn function(&self, name: &str) -> Option<&Rc<Function>>;
 }
 
 impl PathEnv for Env {
-    fn path(&self) -> Option<&Variable> {
-        self.variables.get("PATH")
+    /// Returns the value of the `$PATH` variable.
+    ///
+    /// This function assumes that the `$PATH` variable has no quirks. If the
+    /// variable has a quirk, the function panics.
+    fn path(&self) -> Expansion<'_> {
+        self.variables
+            .get("PATH")
+            .and_then(|var| {
+                assert_eq!(var.quirk, None, "PATH does not support quirks");
+                var.value.as_ref()
+            })
+            .into()
     }
+
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.system.is_executable_file(path)
     }
 }
 
 impl SearchEnv for Env {
-    fn builtins(&self) -> &HashMap<&'static str, Builtin> {
-        &self.builtins
+    fn builtin(&self, name: &str) -> Option<Builtin> {
+        self.builtins.get(name).copied()
     }
-    fn functions(&self) -> &FunctionSet {
-        &self.functions
+
+    #[inline]
+    fn function(&self, name: &str) -> Option<&Rc<Function>> {
+        self.functions.get(name)
     }
 }
 
@@ -131,6 +168,10 @@ impl SearchEnv for Env {
 /// need to update a cache of the results of external utility search (TODO:
 /// which is not yet implemented). The function does not otherwise modify the
 /// environment.
+///
+/// If the given name contains a slash, the function immediately returns an
+/// external utility target, regardless of whether the named external utility
+/// actually exists.
 pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
     if name.contains('/') {
         return if let Ok(path) = CString::new(name) {
@@ -140,28 +181,31 @@ pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
         };
     }
 
-    let builtin = env.builtins().get(name).copied();
+    let builtin = env.builtin(name);
     if let Some(builtin) = builtin {
         if builtin.r#type == Special {
-            return Some(builtin.into());
+            let path = None;
+            return Some(Target::Builtin { builtin, path });
         }
     }
 
-    if let Some(function) = env.functions().get(name) {
+    if let Some(function) = env.function(name) {
         return Some(Rc::clone(function).into());
     }
 
     if let Some(builtin) = builtin {
         if builtin.r#type != Substitutive {
             assert_matches!(builtin.r#type, Mandatory | Elective | Extension);
-            return Some(builtin.into());
+            let path = None;
+            return Some(Target::Builtin { builtin, path });
         }
     }
 
     if let Some(path) = search_path(env, name) {
         if let Some(builtin) = builtin {
             assert_eq!(builtin.r#type, Substitutive);
-            return Some(builtin.into());
+            let path = Some(path);
+            return Some(Target::Builtin { builtin, path });
         }
         return Some(Target::External { path });
     }
@@ -171,23 +215,15 @@ pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
 
 /// Searches the `$PATH` for an executable file.
 ///
-/// Returns the path if successful. Note that the returned path may not be
-/// absolute if the `$PATH` contains a relative path.
+/// Returns the path to the executable if found. Note that the returned path may
+/// not be absolute if the `$PATH` contains a relative path.
 pub fn search_path<E: PathEnv>(env: &mut E, name: &str) -> Option<CString> {
-    if let Some(path) = env.path().and_then(|v| v.value.as_ref()) {
-        for dir in path.split() {
-            let mut file = PathBuf::new();
-            file.push(dir);
-            file.push(name);
-            if let Ok(file) = CString::new(file.into_os_string().into_vec()) {
-                if env.is_executable_file(&file) {
-                    return Some(file);
-                }
-            }
-        }
-    }
-
-    None
+    env.path()
+        .split()
+        .filter_map(|dir| {
+            CString::new(PathBuf::from_iter([dir, name]).into_os_string().into_vec()).ok()
+        })
+        .find(|path| env.is_executable_file(path))
 }
 
 #[allow(clippy::field_reassign_with_default)]
@@ -195,7 +231,10 @@ pub fn search_path<E: PathEnv>(env: &mut E, name: &str) -> Option<CString> {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use std::collections::HashMap;
     use std::collections::HashSet;
+    use yash_env::function::FunctionSet;
+    use yash_env::variable::Value;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::CompoundCommand;
     use yash_syntax::syntax::FullCompoundCommand;
@@ -204,12 +243,12 @@ mod tests {
     struct DummyEnv {
         builtins: HashMap<&'static str, Builtin>,
         functions: FunctionSet,
-        path: Option<Variable>,
+        path: Expansion<'static>,
         executables: HashSet<String>,
     }
 
     impl PathEnv for DummyEnv {
-        fn path(&self) -> Option<&Variable> {
+        fn path(&self) -> Expansion {
             self.path.as_ref()
         }
         fn is_executable_file(&self, path: &CStr) -> bool {
@@ -222,11 +261,11 @@ mod tests {
     }
 
     impl SearchEnv for DummyEnv {
-        fn builtins(&self) -> &HashMap<&'static str, Builtin> {
-            &self.builtins
+        fn builtin(&self, name: &str) -> Option<Builtin> {
+            self.builtins.get(name).copied()
         }
-        fn functions(&self) -> &FunctionSet {
-            &self.functions
+        fn function(&self, name: &str) -> Option<&Rc<Function>> {
+            self.functions.get(name)
         }
     }
 
@@ -270,9 +309,12 @@ mod tests {
         };
         env.builtins.insert("foo", builtin);
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
-            assert_eq!(result.r#type, builtin.r#type);
-        });
+        assert_matches!(
+            search(&mut env, "foo"),
+            Some(Target::Builtin { builtin: result, path: None }) => {
+                assert_eq!(result.r#type, builtin.r#type);
+            }
+        );
     }
 
     #[test]
@@ -305,9 +347,12 @@ mod tests {
         );
         env.functions.define(function).unwrap();
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
-            assert_eq!(result.r#type, builtin.r#type);
-        });
+        assert_matches!(
+            search(&mut env, "foo"),
+            Some(Target::Builtin { builtin: result, path: None }) => {
+                assert_eq!(result.r#type, builtin.r#type);
+            }
+        );
     }
 
     #[test]
@@ -319,9 +364,12 @@ mod tests {
         };
         env.builtins.insert("foo", builtin);
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
-            assert_eq!(result.r#type, builtin.r#type);
-        });
+        assert_matches!(
+            search(&mut env, "foo"),
+            Some(Target::Builtin { builtin: result, path: None }) => {
+                assert_eq!(result.r#type, builtin.r#type);
+            }
+        );
     }
 
     #[test]
@@ -333,9 +381,12 @@ mod tests {
         };
         env.builtins.insert("foo", builtin);
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
-            assert_eq!(result.r#type, builtin.r#type);
-        });
+        assert_matches!(
+            search(&mut env, "foo"),
+            Some(Target::Builtin { builtin: result, path: None }) => {
+                assert_eq!(result.r#type, builtin.r#type);
+            }
+        );
     }
 
     #[test]
@@ -347,9 +398,12 @@ mod tests {
         };
         env.builtins.insert("foo", builtin);
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
-            assert_eq!(result.r#type, builtin.r#type);
-        });
+        assert_matches!(
+            search(&mut env, "foo"),
+            Some(Target::Builtin { builtin: result, path: None }) => {
+                assert_eq!(result.r#type, builtin.r#type);
+            }
+        );
     }
 
     #[test]
@@ -429,12 +483,16 @@ mod tests {
             execute: |_, _| unreachable!(),
         };
         env.builtins.insert("foo", builtin);
-        env.path = Some(Variable::new("/bin").export());
+        env.path = Expansion::from("/bin");
         env.executables.insert("/bin/foo".to_string());
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
-            assert_eq!(result.r#type, builtin.r#type);
-        });
+        assert_matches!(
+            search(&mut env, "foo"),
+            Some(Target::Builtin { builtin: result, path: Some(path) }) => {
+                assert_eq!(result.r#type, builtin.r#type);
+                assert_eq!(path.to_bytes(), b"/bin/foo");
+            }
+        );
     }
 
     #[test]
@@ -458,7 +516,7 @@ mod tests {
             execute: |_, _| unreachable!(),
         };
         env.builtins.insert("foo", builtin);
-        env.path = Some(Variable::new("/bin").export());
+        env.path = Expansion::from("/bin");
         env.executables.insert("/bin/foo".to_string());
 
         let function = Rc::new(Function::new(
@@ -476,7 +534,7 @@ mod tests {
     #[test]
     fn external_utility_is_found_if_external_executable_exists() {
         let mut env = DummyEnv::default();
-        env.path = Some(Variable::new("/bin").export());
+        env.path = Expansion::from("/bin");
         env.executables.insert("/bin/foo".to_string());
 
         assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
@@ -496,7 +554,7 @@ mod tests {
     #[test]
     fn external_target_is_first_executable_found_in_path_scalar() {
         let mut env = DummyEnv::default();
-        env.path = Some(Variable::new("/usr/local/bin:/usr/bin:/bin").export());
+        env.path = Expansion::from("/usr/local/bin:/usr/bin:/bin");
         env.executables.insert("/usr/bin/foo".to_string());
         env.executables.insert("/bin/foo".to_string());
 
@@ -514,7 +572,7 @@ mod tests {
     #[test]
     fn external_target_is_first_executable_found_in_path_array() {
         let mut env = DummyEnv::default();
-        env.path = Some(Variable::new_array(["/usr/local/bin", "/usr/bin", "/bin"]).export());
+        env.path = Expansion::from(Value::array(["/usr/local/bin", "/usr/bin", "/bin"]));
         env.executables.insert("/usr/bin/foo".to_string());
         env.executables.insert("/bin/foo".to_string());
 
@@ -532,7 +590,7 @@ mod tests {
     #[test]
     fn empty_string_in_path_names_current_directory() {
         let mut env = DummyEnv::default();
-        env.path = Some(Variable::new("/x::/y").export());
+        env.path = Expansion::from("/x::/y");
         env.executables.insert("foo".to_string());
 
         assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {

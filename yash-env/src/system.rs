@@ -62,6 +62,7 @@ use std::ffi::c_int;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
+use std::ffi::OsString;
 use std::fmt::Debug;
 use std::future::Future;
 use std::io::SeekFrom;
@@ -382,6 +383,12 @@ pub trait System: Debug {
     ///
     /// Returns `Ok(None)` if the user is not found.
     fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<PathBuf>>;
+
+    /// Returns the standard `$PATH` value where all standard utilities are
+    /// expected to be found.
+    ///
+    /// This is a thin wrapper around the `confstr(_CS_PATH, …)`.
+    fn confstr_path(&self) -> nix::Result<OsString>;
 }
 
 /// Sentinel for the current working directory
@@ -946,6 +953,9 @@ impl System for SharedSystem {
     }
     fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<PathBuf>> {
         self.0.borrow().getpwnam_dir(name)
+    }
+    fn confstr_path(&self) -> nix::Result<OsString> {
+        self.0.borrow().confstr_path()
     }
 }
 

@@ -170,7 +170,7 @@ impl Command for syntax::SimpleCommand {
         use crate::command_search::Target::{Builtin, External, Function};
         if let Some(name) = fields.first() {
             match search(env, &name.value) {
-                Some(Builtin(builtin)) => {
+                Some(Builtin { builtin, .. }) => {
                     execute_builtin(env, builtin, &self.assigns, fields, &self.redirs).await
                 }
                 Some(Function(function)) => {
@@ -221,10 +221,12 @@ use builtin::execute_builtin;
 
 mod function;
 use function::execute_function;
+pub use function::execute_function_body;
 
 mod external;
 use external::execute_external_utility;
 pub use external::replace_current_process;
+pub use external::start_external_utility_in_subshell_and_wait;
 pub use external::to_c_strings;
 
 #[cfg(test)]

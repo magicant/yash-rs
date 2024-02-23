@@ -17,9 +17,11 @@ publish = false
 
 [features]
 default = ["yash-semantics"]
+yash-semantics = ["dep:yash-semantics", "dep:enumset"]
 
 [dependencies]
 either = "1.9.0"
+enumset = { version = "1.1.2", optional = true }
 itertools = "0.11.0"
 thiserror = "1.0.47"
 yash-env = { path = "../yash-env", version = "0.1.0" }

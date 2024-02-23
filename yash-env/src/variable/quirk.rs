@@ -18,6 +18,7 @@
 
 use super::Value;
 use super::Variable;
+use either::{Left, Right};
 use std::borrow::Cow;
 use yash_syntax::source::Location;
 use yash_syntax::source::Source;
@@ -58,6 +59,13 @@ pub enum Expansion<'a> {
     Scalar(Cow<'a, str>),
     /// The value is an array of strings.
     Array(Cow<'a, [String]>),
+}
+
+/// Returns `Unset`.
+impl Default for Expansion<'_> {
+    fn default() -> Self {
+        Self::Unset
+    }
 }
 
 impl From<String> for Expansion<'static> {
@@ -144,15 +152,37 @@ where
     }
 }
 
-impl Expansion<'_> {
-    /// Converts into an owned value
-    #[must_use]
-    pub fn into_owned(self) -> Option<Value> {
-        match self {
+impl From<Expansion<'_>> for Option<Value> {
+    fn from(expansion: Expansion<'_>) -> Option<Value> {
+        match expansion {
             Expansion::Unset => None,
             Expansion::Scalar(value) => Some(Value::Scalar(value.into_owned())),
             Expansion::Array(values) => Some(Value::Array(values.into_owned())),
         }
+    }
+}
+
+impl<'a> From<&'a Expansion<'a>> for Expansion<'a> {
+    fn from(expansion: &'a Expansion<'a>) -> Expansion<'a> {
+        match expansion {
+            Expansion::Unset => Expansion::Unset,
+            Expansion::Scalar(value) => value.as_ref().into(),
+            Expansion::Array(values) => values.as_ref().into(),
+        }
+    }
+}
+
+impl Expansion<'_> {
+    /// Converts into an owned value
+    #[must_use]
+    pub fn into_owned(self) -> Option<Value> {
+        self.into()
+    }
+
+    /// Converts to a borrowed value
+    #[must_use]
+    pub fn as_ref(&self) -> Expansion<'_> {
+        self.into()
     }
 
     /// Returns the "length" of the value.
@@ -173,6 +203,40 @@ impl Expansion<'_> {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    /// Splits the expansion by colons.
+    ///
+    /// If this expansion is `Scalar`, the value is separated at each occurrence
+    /// of colon (`:`). For `Array`, each array item is returned without further
+    /// splitting the value. For `Unset`, an empty iterator is returned.
+    ///
+    /// ```
+    /// # use yash_env::variable::Expansion;
+    /// let expansion = Expansion::from("/usr/local/bin:/usr/bin:/bin");
+    /// let values: Vec<&str> = expansion.split().collect();
+    /// assert_eq!(values, ["/usr/local/bin", "/usr/bin", "/bin"]);
+    /// ```
+    ///
+    /// ```
+    /// # use yash_env::variable::Expansion;
+    /// let expansion = Expansion::from(vec!["foo".to_string(), "bar".to_string()]);
+    /// let values: Vec<&str> = expansion.split().collect();
+    /// assert_eq!(values, ["foo", "bar"]);
+    /// ```
+    ///
+    /// ```
+    /// # use yash_env::variable::Expansion;
+    /// let expansion = Expansion::Unset;
+    /// let values: Vec<&str> = expansion.split().collect();
+    /// assert!(values.is_empty());
+    /// ```
+    pub fn split(&self) -> impl Iterator<Item = &str> {
+        match self {
+            Self::Unset => Right([].iter().map(String::as_str)),
+            Self::Scalar(value) => Left(value.split(':')),
+            Self::Array(values) => Right(values.iter().map(String::as_str)),
+        }
     }
 }
 

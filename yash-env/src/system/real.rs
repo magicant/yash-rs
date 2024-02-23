@@ -51,6 +51,7 @@ use std::ffi::c_int;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
+use std::ffi::OsString;
 use std::future::Future;
 use std::io::SeekFrom;
 use std::os::unix::ffi::OsStrExt;
@@ -420,6 +421,37 @@ impl System for RealSystem {
 
     fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<std::path::PathBuf>> {
         nix::unistd::User::from_name(name).map(|o| o.map(|passwd| passwd.dir))
+    }
+
+    fn confstr_path(&self) -> nix::Result<OsString> {
+        // TODO Support other platforms
+        #[cfg(any(
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "tvos",
+            target_os = "watchos"
+        ))]
+        unsafe {
+            use std::os::unix::ffi::OsStringExt as _;
+            let size = nix::libc::confstr(nix::libc::_CS_PATH, std::ptr::null_mut(), 0);
+            if size == 0 {
+                return Err(Errno::last());
+            }
+            let mut buffer = Vec::<u8>::with_capacity(size);
+            let final_size =
+                nix::libc::confstr(nix::libc::_CS_PATH, buffer.as_mut_ptr() as *mut _, size);
+            if final_size == 0 {
+                return Err(Errno::last());
+            }
+            if final_size > size {
+                return Err(Errno::ERANGE);
+            }
+            buffer.set_len(final_size - 1); // The last byte is a null terminator.
+            return Ok(OsString::from_vec(buffer));
+        }
+
+        #[allow(unreachable_code)]
+        Err(Errno::ENOSYS)
     }
 }
 
