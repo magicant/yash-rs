@@ -27,6 +27,7 @@ use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt as _;
 use std::os::unix::ffi::OsStringExt as _;
 use std::path::PathBuf;
+use std::rc::Rc;
 use yash_env::builtin::Type;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -35,10 +36,40 @@ use yash_env::System;
 use yash_quote::quoted;
 use yash_semantics::command_search::search;
 use yash_semantics::command_search::Target;
+use yash_syntax::alias::Alias;
 use yash_syntax::parser::lex::Keyword;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
+
+/// Result of [categorizing](categorize) a command
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Categorization {
+    /// Shell reserved word
+    Keyword,
+    /// Alias
+    Alias(Rc<Alias>),
+    /// Target program that can be executed
+    Target(Target),
+}
+
+impl From<Rc<Alias>> for Categorization {
+    fn from(alias: Rc<Alias>) -> Self {
+        Self::Alias(alias)
+    }
+}
+
+impl From<&Rc<Alias>> for Categorization {
+    fn from(alias: &Rc<Alias>) -> Self {
+        Self::Alias(Rc::clone(alias))
+    }
+}
+
+impl From<Target> for Categorization {
+    fn from(target: Target) -> Self {
+        Self::Target(target)
+    }
+}
 
 /// Error object for the command not found
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -105,11 +136,34 @@ fn normalize_target<E: NormalizeEnv>(env: &E, target: &mut Target) -> Result<(),
     }
 }
 
+/// Determines the category of the given command name.
+pub fn categorize<'f>(
+    name: &'f Field,
+    env: &mut SearchEnv,
+) -> Result<Categorization, NotFound<'f>> {
+    if env.params.categories.contains(Category::Keyword)
+        && Keyword::try_from(name.value.as_str()).is_ok()
+    {
+        return Ok(Categorization::Keyword);
+    }
+
+    if env.params.categories.contains(Category::Alias) {
+        if let Some(alias) = env.env.aliases.get(name.value.as_str()) {
+            return Ok((&alias.0).into());
+        }
+    }
+
+    let mut target = search(env, &name.value).ok_or(NotFound { name })?;
+    normalize_target(env.env, &mut target).map_err(|()| NotFound { name })?;
+    Ok(target.into())
+}
+
 /// Appends the description of the given target to the result.
 ///
-/// This function is a helper for [`identify`]. It produces the description of
-/// the command search result that is to be printed to the standard output.
-fn describe_target<W>(
+/// This function is a specialized helper for [`describe`]. It produces the
+/// description of the command search result that is to be printed to the
+/// standard output.
+pub fn describe_target<W>(
     target: &Target,
     name: &Field,
     verbose: bool,
@@ -167,60 +221,47 @@ where
     }
 }
 
-/// Identifies the command and appends the description to the result.
+/// Appends the description of the given categorization to the result.
 ///
 /// This function produces the description of the command search result that is
 /// to be printed to the standard output.
-pub fn identify<'f, W>(
-    name: &'f Field,
-    env: &mut SearchEnv,
+pub fn describe<W>(
+    categorization: &Categorization,
+    name: &Field,
     verbose: bool,
     result: &mut W,
-) -> Result<(), NotFound<'f>>
+) -> std::fmt::Result
 where
     W: std::fmt::Write,
 {
-    if env.params.categories.contains(Category::Keyword)
-        && Keyword::try_from(name.value.as_str()).is_ok()
-    {
-        if verbose {
-            writeln!(result, "{}: keyword", name.value).unwrap();
-        } else {
-            writeln!(result, "{}", name.value).unwrap();
-        }
-        return Ok(());
-    }
-
-    if env.params.categories.contains(Category::Alias) {
-        if let Some(alias) = env.env.aliases.get(name.value.as_str()) {
+    match categorization {
+        Categorization::Keyword => {
             if verbose {
-                writeln!(
-                    result,
-                    "{}: alias for `{}`",
-                    alias.0.name, alias.0.replacement
-                )
-                .unwrap();
+                writeln!(result, "{}: keyword", name.value)
             } else {
-                write!(result, "alias ").unwrap();
-                if alias.0.name.starts_with('-') {
-                    write!(result, "-- ").unwrap();
+                writeln!(result, "{}", name.value)
+            }
+        }
+
+        Categorization::Alias(alias) => {
+            if verbose {
+                writeln!(result, "{}: alias for `{}`", alias.name, alias.replacement)
+            } else {
+                write!(result, "alias ")?;
+                if alias.name.starts_with('-') {
+                    write!(result, "-- ")?;
                 }
                 writeln!(
                     result,
                     "{}={}",
-                    quoted(&alias.0.name),
-                    quoted(&alias.0.replacement)
+                    quoted(&alias.name),
+                    quoted(&alias.replacement)
                 )
-                .unwrap();
             }
-            return Ok(());
         }
-    }
 
-    let mut target = search(env, &name.value).ok_or(NotFound { name })?;
-    normalize_target(env.env, &mut target).map_err(|()| NotFound { name })?;
-    describe_target(&target, name, verbose, result).unwrap();
-    Ok(())
+        Categorization::Target(target) => describe_target(target, name, verbose, result),
+    }
 }
 
 impl Identify {
@@ -235,8 +276,11 @@ impl Identify {
         let mut result = String::new();
         let mut errors = Vec::new();
         for name in &self.names {
-            if let Err(error) = identify(name, env, self.verbose, &mut result) {
-                errors.push(error);
+            match categorize(name, env) {
+                Ok(categorization) => {
+                    describe(&categorization, name, self.verbose, &mut result).unwrap()
+                }
+                Err(error) => errors.push(error),
             }
         }
         (result, errors)
@@ -361,31 +405,24 @@ mod tests {
     }
 
     #[test]
-    fn identify_keyword() {
+    fn categorize_keyword() {
         let name = &Field::dummy("if");
         let env = &mut Env::new_virtual();
         let params = &Search::default_for_identify();
         let env = &mut SearchEnv { env, params };
 
-        let mut output = String::new();
-        identify(name, env, false, &mut output).unwrap();
-        assert_eq!(output, "if\n");
-
-        let mut output = String::new();
-        identify(name, env, true, &mut output).unwrap();
-        assert_eq!(output, "if: keyword\n");
+        let result = categorize(name, env);
+        assert_eq!(result, Ok(Categorization::Keyword));
     }
 
     #[test]
-    fn identify_non_keyword() {
+    fn categorize_non_keyword() {
         let name = &Field::dummy("foo");
         let env = &mut Env::new_virtual();
         let params = &Search::default_for_identify();
         let env = &mut SearchEnv { env, params };
 
-        let mut output = String::new();
-        let result = identify(name, env, false, &mut output);
-        assert_eq!(output, "");
+        let result = categorize(name, env);
         assert_eq!(result, Err(NotFound { name }));
     }
 
@@ -397,44 +434,37 @@ mod tests {
         params.categories.remove(Category::Keyword);
         let env = &mut SearchEnv { env, params };
 
-        let mut output = String::new();
-        let result = identify(name, env, false, &mut output);
-        assert_eq!(output, "");
+        let result = categorize(name, env);
         assert_eq!(result, Err(NotFound { name }));
     }
 
     #[test]
-    fn identify_alias() {
+    fn categorize_alias() {
         let name = &Field::dummy("a");
         let env = &mut Env::new_virtual();
-        env.aliases.insert(HashEntry::new(
+        let entry = HashEntry::new(
             "a".to_string(),
             "A".to_string(),
             false,
             Location::dummy("a"),
-        ));
+        );
+        let alias = entry.0.clone();
+        env.aliases.insert(entry);
         let params = &Search::default_for_identify();
         let env = &mut SearchEnv { env, params };
 
-        let mut output = String::new();
-        identify(name, env, false, &mut output).unwrap();
-        assert_eq!(output, "alias a=A\n");
-
-        let mut output = String::new();
-        identify(name, env, true, &mut output).unwrap();
-        assert_eq!(output, "a: alias for `A`\n");
+        let result = categorize(name, env);
+        assert_eq!(result, Ok(Categorization::Alias(alias)));
     }
 
     #[test]
-    fn identify_non_alias() {
+    fn categorize_non_alias() {
         let name = &Field::dummy("a");
         let env = &mut Env::new_virtual();
         let params = &Search::default_for_identify();
         let env = &mut SearchEnv { env, params };
 
-        let mut output = String::new();
-        let result = identify(name, env, false, &mut output);
-        assert_eq!(output, "");
+        let result = categorize(name, env);
         assert_eq!(result, Err(NotFound { name }));
     }
 
@@ -452,9 +482,7 @@ mod tests {
         params.categories.remove(Category::Alias);
         let env = &mut SearchEnv { env, params };
 
-        let mut output = String::new();
-        let result = identify(name, env, false, &mut output);
-        assert_eq!(output, "");
+        let result = categorize(name, env);
         assert_eq!(result, Err(NotFound { name }));
     }
 
@@ -529,6 +557,59 @@ mod tests {
         let mut output = String::new();
         describe_target(target, name, true, &mut output).unwrap();
         assert_eq!(output, "ls: external utility at /bin/ls\n");
+    }
+
+    #[test]
+    fn describe_keyword() {
+        let categorization = &Categorization::Keyword;
+        let name = &Field::dummy("if");
+
+        let mut output = String::new();
+        let result = describe(categorization, name, false, &mut output);
+        assert_eq!(result, Ok(()));
+        assert_eq!(output, "if\n");
+
+        let mut output = String::new();
+        let result = describe(categorization, name, true, &mut output);
+        assert_eq!(result, Ok(()));
+        assert_eq!(output, "if: keyword\n");
+    }
+
+    #[test]
+    fn describe_alias() {
+        let categorization = &Categorization::Alias(Rc::new(Alias {
+            name: "foo".to_string(),
+            replacement: "bar".to_string(),
+            global: false,
+            origin: Location::dummy("dummy location"),
+        }));
+        let name = &Field::dummy("foo");
+
+        let mut output = String::new();
+        let result = describe(categorization, name, false, &mut output);
+        assert_eq!(result, Ok(()));
+        assert_eq!(output, "alias foo=bar\n");
+
+        let mut output = String::new();
+        let result = describe(categorization, name, true, &mut output);
+        assert_eq!(result, Ok(()));
+        assert_eq!(output, "foo: alias for `bar`\n");
+    }
+
+    #[test]
+    fn describe_alias_starting_with_hyphen() {
+        let categorization = &Categorization::Alias(Rc::new(Alias {
+            name: "-foo".to_string(),
+            replacement: "bar".to_string(),
+            global: false,
+            origin: Location::dummy("dummy location"),
+        }));
+        let name = &Field::dummy("-foo");
+
+        let mut output = String::new();
+        let result = describe(categorization, name, false, &mut output);
+        assert_eq!(result, Ok(()));
+        assert_eq!(output, "alias -- -foo=bar\n");
     }
 
     #[test]
