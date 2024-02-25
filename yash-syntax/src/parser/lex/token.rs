@@ -22,7 +22,6 @@ use super::core::Token;
 use super::core::TokenId;
 use super::core::WordContext;
 use super::core::WordLexer;
-use super::keyword::Keyword;
 use super::op::is_operator_char;
 use crate::parser::core::Result;
 use crate::syntax::MaybeLiteral;
@@ -46,7 +45,7 @@ impl Lexer<'_> {
         }
 
         if let Some(literal) = word.to_string_if_literal() {
-            if let Ok(keyword) = Keyword::try_from(literal.as_str()) {
+            if let Ok(keyword) = literal.parse() {
                 return Ok(TokenId::Token(Some(keyword)));
             }
 

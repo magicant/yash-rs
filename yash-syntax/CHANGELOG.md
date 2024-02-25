@@ -5,6 +5,17 @@ All notable changes to `yash-syntax` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - Unreleased
+
+### Added
+
+- `parser::lex::ParseKeywordError`
+- `impl FromStr for parser::lex::Keyword`
+
+### Removed
+
+- `impl TryFrom<&str> for parser::lex::Keyword`
+
 ## [0.7.0] - 2023-11-12
 
 ### Added

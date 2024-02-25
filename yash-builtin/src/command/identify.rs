@@ -145,9 +145,7 @@ pub fn categorize<'f>(
     name: &'f Field,
     env: &mut SearchEnv,
 ) -> Result<Categorization, NotFound<'f>> {
-    if env.params.categories.contains(Category::Keyword)
-        && Keyword::try_from(name.value.as_str()).is_ok()
-    {
+    if env.params.categories.contains(Category::Keyword) && name.value.parse::<Keyword>().is_ok() {
         return Ok(Categorization::Keyword);
     }
 

@@ -17,6 +17,21 @@
 //! Types and functions for parsing reserved words.
 
 use std::fmt;
+use std::str::FromStr;
+use thiserror::Error;
+
+/// Error value indicating that a string is not a keyword
+///
+/// This error is returned by [`Keyword::from_str`] when the input string is not
+/// a keyword.
+#[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
+pub struct ParseKeywordError;
+
+impl fmt::Display for ParseKeywordError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("not a keyword")
+    }
+}
 
 /// Token identifier for reserved words.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -85,9 +100,9 @@ impl fmt::Display for Keyword {
     }
 }
 
-impl TryFrom<&str> for Keyword {
-    type Error = ();
-    fn try_from(s: &str) -> Result<Keyword, ()> {
+impl FromStr for Keyword {
+    type Err = ParseKeywordError;
+    fn from_str(s: &str) -> Result<Keyword, ParseKeywordError> {
         use Keyword::*;
         match s {
             "!" => Ok(Bang),
@@ -108,7 +123,7 @@ impl TryFrom<&str> for Keyword {
             "while" => Ok(While),
             "{" => Ok(OpenBrace),
             "}" => Ok(CloseBrace),
-            _ => Err(()),
+            _ => Err(ParseKeywordError),
         }
     }
 }
