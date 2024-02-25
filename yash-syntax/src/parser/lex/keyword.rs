@@ -64,7 +64,8 @@ impl Keyword {
     ///
     /// This function returns `true` for `Do`, `Done`, `Elif`, `Else`, `Esac`,
     /// `Fi`, `Then`, and `CloseBrace`, and `false` for others.
-    pub fn is_clause_delimiter(self) -> bool {
+    #[must_use]
+    pub const fn is_clause_delimiter(self) -> bool {
         use Keyword::*;
         match self {
             Do | Done | Elif | Else | Esac | Fi | Then | CloseBrace => true,

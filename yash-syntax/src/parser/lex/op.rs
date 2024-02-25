@@ -82,7 +82,8 @@ impl Operator {
     ///
     /// This function returns `true` for `CloseParen` and `SemicolonSemicolon`,
     /// and `false` for others.
-    pub fn is_clause_delimiter(self) -> bool {
+    #[must_use]
+    pub const fn is_clause_delimiter(self) -> bool {
         use Operator::*;
         match self {
             CloseParen | SemicolonSemicolon => true,

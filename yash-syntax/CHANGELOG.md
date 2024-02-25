@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `parser::lex::ParseKeywordError`
 - `impl FromStr for parser::lex::Keyword`
 
+### Changed
+
+- `parser::lex::Keyword::is_clause_delimiter` now `const` and `#[must_use]`
+- `parser::lex::Operator::is_clause_delimiter` now `const` and `#[must_use]`
+
 ### Removed
 
 - `impl TryFrom<&str> for parser::lex::Keyword`
