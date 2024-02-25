@@ -60,25 +60,11 @@ pub enum Keyword {
 }
 
 impl Keyword {
-    /// Determines if this token can be a delimiter of a clause.
-    ///
-    /// This function returns `true` for `Do`, `Done`, `Elif`, `Else`, `Esac`,
-    /// `Fi`, `Then`, and `CloseBrace`, and `false` for others.
+    /// Returns the literal string representation of the keyword.
     #[must_use]
-    pub const fn is_clause_delimiter(self) -> bool {
+    pub const fn as_str(&self) -> &'static str {
         use Keyword::*;
         match self {
-            Do | Done | Elif | Else | Esac | Fi | Then | CloseBrace => true,
-            Bang | OpenBracketBracket | Case | For | Function | If | In | Until | While
-            | OpenBrace => false,
-        }
-    }
-}
-
-impl fmt::Display for Keyword {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Keyword::*;
-        f.write_str(match self {
             Bang => "!",
             OpenBracketBracket => "[[",
             Case => "case",
@@ -97,7 +83,27 @@ impl fmt::Display for Keyword {
             While => "while",
             OpenBrace => "{",
             CloseBrace => "}",
-        })
+        }
+    }
+
+    /// Determines if this token can be a delimiter of a clause.
+    ///
+    /// This function returns `true` for `Do`, `Done`, `Elif`, `Else`, `Esac`,
+    /// `Fi`, `Then`, and `CloseBrace`, and `false` for others.
+    #[must_use]
+    pub const fn is_clause_delimiter(self) -> bool {
+        use Keyword::*;
+        match self {
+            Do | Done | Elif | Else | Esac | Fi | Then | CloseBrace => true,
+            Bang | OpenBracketBracket | Case | For | Function | If | In | Until | While
+            | OpenBrace => false,
+        }
+    }
+}
+
+impl fmt::Display for Keyword {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 

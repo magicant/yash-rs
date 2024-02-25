@@ -24,7 +24,6 @@ use crate::syntax::Literal;
 use crate::syntax::Unquoted;
 use crate::syntax::Word;
 use std::fmt;
-use std::fmt::Write;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -78,6 +77,36 @@ pub enum Operator {
 }
 
 impl Operator {
+    /// Returns the literal string representation of the operator.
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
+        use Operator::*;
+        match self {
+            Newline => "\n",
+            And => "&",
+            AndAnd => "&&",
+            OpenParen => "(",
+            CloseParen => ")",
+            Semicolon => ";",
+            SemicolonSemicolon => ";;",
+            Less => "<",
+            LessAnd => "<&",
+            LessOpenParen => "<(",
+            LessLess => "<<",
+            LessLessDash => "<<-",
+            LessLessLess => "<<<",
+            LessGreater => "<>",
+            Greater => ">",
+            GreaterAnd => ">&",
+            GreaterOpenParen => ">(",
+            GreaterGreater => ">>",
+            GreaterGreaterBar => ">>|",
+            GreaterBar => ">|",
+            Bar => "|",
+            BarBar => "||",
+        }
+    }
+
     /// Determines if this token can be a delimiter of a clause.
     ///
     /// This function returns `true` for `CloseParen` and `SemicolonSemicolon`,
@@ -98,31 +127,7 @@ impl Operator {
 
 impl fmt::Display for Operator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Operator::*;
-        match self {
-            Newline => f.write_char('\n'),
-            And => f.write_char('&'),
-            AndAnd => f.write_str("&&"),
-            OpenParen => f.write_char('('),
-            CloseParen => f.write_char(')'),
-            Semicolon => f.write_char(';'),
-            SemicolonSemicolon => f.write_str(";;"),
-            Less => f.write_char('<'),
-            LessAnd => f.write_str("<&"),
-            LessOpenParen => f.write_str("<("),
-            LessLess => f.write_str("<<"),
-            LessLessDash => f.write_str("<<-"),
-            LessLessLess => f.write_str("<<<"),
-            LessGreater => f.write_str("<>"),
-            Greater => f.write_char('>'),
-            GreaterAnd => f.write_str(">&"),
-            GreaterOpenParen => f.write_str(">("),
-            GreaterGreater => f.write_str(">>"),
-            GreaterGreaterBar => f.write_str(">>|"),
-            GreaterBar => f.write_str(">|"),
-            Bar => f.write_char('|'),
-            BarBar => f.write_str("||"),
-        }
+        f.write_str(self.as_str())
     }
 }
 

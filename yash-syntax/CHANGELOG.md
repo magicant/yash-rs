@@ -9,8 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `parser::lex::Keyword::as_str`
 - `parser::lex::ParseKeywordError`
 - `impl FromStr for parser::lex::Keyword`
+- `parser::lex::Operator::as_str`
 
 ### Changed
 
