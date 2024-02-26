@@ -16,6 +16,7 @@
 
 use super::lex::Lexer;
 use super::lex::Operator;
+use super::lex::Token;
 use super::lex::TokenId;
 use super::lex::WordContext;
 use super::lex::WordLexer;
@@ -26,6 +27,7 @@ use crate::source::Source;
 use crate::syntax::*;
 use std::future::Future;
 use std::str::FromStr;
+use thiserror::Error;
 
 // TODO Most FromStr implementations in this file ignore trailing redundant
 // tokens, which should be rejected.
@@ -140,23 +142,40 @@ impl FromStr for Assign {
     }
 }
 
+/// Error value indicating that the input string is not a valid operator.
+///
+/// This error is returned by [`Operator::from_str`] when the input string is
+/// not a valid operator.
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub struct ParseOperatorError {}
+
+impl std::fmt::Display for ParseOperatorError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("not a valid operator")
+    }
+}
+
 impl FromStr for Operator {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Operator, ()> {
+    type Err = ParseOperatorError;
+    fn from_str(s: &str) -> Result<Operator, ParseOperatorError> {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
-        let token = unwrap_ready(lexer.operator()).map_err(drop)?.ok_or(())?;
-        if let TokenId::Operator(op) = token.id {
-            Ok(op)
-        } else {
-            Err(())
+        match unwrap_ready(lexer.operator()) {
+            Ok(Some(Token {
+                id: TokenId::Operator(op),
+                ..
+            })) => Ok(op),
+
+            _ => Err(ParseOperatorError {}),
         }
     }
 }
 
 impl FromStr for RedirOp {
-    type Err = ();
-    fn from_str(s: &str) -> Result<RedirOp, ()> {
-        Operator::from_str(s)?.try_into()
+    type Err = ParseOperatorError;
+    fn from_str(s: &str) -> Result<RedirOp, ParseOperatorError> {
+        Operator::from_str(s)?
+            .try_into()
+            .map_err(|_| ParseOperatorError {})
     }
 }
 
@@ -300,9 +319,11 @@ impl FromStr for Pipeline {
 }
 
 impl FromStr for AndOr {
-    type Err = ();
-    fn from_str(s: &str) -> Result<AndOr, ()> {
-        Operator::from_str(s)?.try_into()
+    type Err = ParseOperatorError;
+    fn from_str(s: &str) -> Result<AndOr, ParseOperatorError> {
+        Operator::from_str(s)?
+            .try_into()
+            .map_err(|_| ParseOperatorError {})
     }
 }
 

@@ -13,11 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `parser::lex::ParseKeywordError`
 - `impl FromStr for parser::lex::Keyword`
 - `parser::lex::Operator::as_str`
+- `parser::lex::ParseOperatorError`
 
 ### Changed
 
 - `parser::lex::Keyword::is_clause_delimiter` now `const` and `#[must_use]`
 - `parser::lex::Operator::is_clause_delimiter` now `const` and `#[must_use]`
+- `<parser::lex::Operator as FromStr>::Err` from `()` to `ParseOperatorError`
+- `<syntax::AndOr as FromStr>::Err` from `()` to `ParseOperatorError`
+- `<syntax::RedirOp as FromStr>::Err` from `()` to `ParseOperatorError`
 
 ### Removed
 
