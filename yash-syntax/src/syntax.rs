@@ -74,6 +74,7 @@
 //! with here-document contents included, you can use ... TODO TBD.
 
 use crate::parser::lex::Operator;
+use crate::parser::lex::TryFromOperatorError;
 use crate::source::Location;
 use itertools::Itertools;
 use std::cell::OnceCell;
@@ -785,8 +786,8 @@ pub enum RedirOp {
 }
 
 impl TryFrom<Operator> for RedirOp {
-    type Error = ();
-    fn try_from(op: Operator) -> Result<RedirOp, ()> {
+    type Error = TryFromOperatorError;
+    fn try_from(op: Operator) -> Result<RedirOp, TryFromOperatorError> {
         use Operator::*;
         use RedirOp::*;
         match op {
@@ -799,7 +800,7 @@ impl TryFrom<Operator> for RedirOp {
             GreaterAnd => Ok(FdOut),
             GreaterGreaterBar => Ok(Pipe),
             LessLessLess => Ok(String),
-            _ => Err(()),
+            _ => Err(TryFromOperatorError {}),
         }
     }
 }
@@ -1177,12 +1178,12 @@ pub enum AndOr {
 }
 
 impl TryFrom<Operator> for AndOr {
-    type Error = ();
-    fn try_from(op: Operator) -> Result<AndOr, ()> {
+    type Error = TryFromOperatorError;
+    fn try_from(op: Operator) -> Result<AndOr, TryFromOperatorError> {
         match op {
             Operator::AndAnd => Ok(AndOr::AndThen),
             Operator::BarBar => Ok(AndOr::OrElse),
-            _ => Err(()),
+            _ => Err(TryFromOperatorError {}),
         }
     }
 }

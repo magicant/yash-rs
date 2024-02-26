@@ -26,6 +26,7 @@ use crate::syntax::Word;
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
+use thiserror::Error;
 
 /// Operator token identifier.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -373,6 +374,16 @@ impl Lexer<'_> {
                 Token { word, id, index }
             })
         })
+    }
+}
+
+/// Error value indicating an operand conversion failure
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+pub struct TryFromOperatorError {}
+
+impl fmt::Display for TryFromOperatorError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("inconvertible operator")
     }
 }
 
