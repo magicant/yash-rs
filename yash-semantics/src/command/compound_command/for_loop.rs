@@ -102,7 +102,7 @@ pub async fn execute(
 
 async fn trace_values(env: &mut Env, name: &Field, values: &[Field]) {
     if let Some(mut xtrace) = XTrace::from_options(&env.options) {
-        write!(xtrace.main(), "for {} in ", quoted(&name.value)).unwrap();
+        write!(xtrace.words(), "for {} in ", quoted(&name.value)).unwrap();
         trace_fields(Some(&mut xtrace), values);
         print(env, xtrace).await;
     }

@@ -38,7 +38,7 @@ use yash_syntax::syntax::Word;
 
 async fn trace_subject(env: &mut Env, value: &str) {
     if let Some(mut xtrace) = XTrace::from_options(&env.options) {
-        write!(xtrace.main(), "case {} in ", quoted(value)).unwrap();
+        write!(xtrace.words(), "case {} in ", quoted(value)).unwrap();
         print(env, xtrace).await;
     }
 }

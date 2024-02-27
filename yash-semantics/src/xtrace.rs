@@ -45,14 +45,6 @@ use yash_env::Env;
 use yash_quote::quoted;
 use yash_syntax::syntax::Text;
 
-fn join(a: String, b: String) -> String {
-    if a.is_empty() {
-        b
-    } else {
-        a + &b
-    }
-}
-
 async fn expand_ps4(env: &mut Env) -> String {
     let value = match env.variables.get("PS4") {
         Some(Variable {
@@ -84,18 +76,20 @@ async fn expand_ps4(env: &mut Env) -> String {
 ///
 /// See the [module documentation](self) for details.
 ///
-/// An `XTrace` contains three string buffers that accumulate each of the
+/// An `XTrace` contains four string buffers that accumulate each of the
 /// following:
 ///
-/// - Command words (assignments, command name, and arguments)
+/// - Command words (command name and arguments)
+/// - Assignments
 /// - Redirections
 /// - Here-document contents
 ///
 /// The [`finish`](Self::finish) function creates the final string to be
 /// printed.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct XTrace {
-    main: String,
+    words: String,
+    assigns: String,
     redirs: String,
     here_doc_contents: String,
 }
@@ -119,14 +113,24 @@ impl XTrace {
         }
     }
 
-    /// Returns a reference to the main buffer.
+    /// Returns a reference to the words buffer.
     ///
-    /// The main buffer is for tracing command words and assignments.
+    /// The words buffer is for tracing command words.
     /// When writing to the buffer, the content should end with a space.
     #[inline]
     #[must_use]
-    pub fn main(&mut self) -> &mut impl Write {
-        &mut self.main
+    pub fn words(&mut self) -> &mut impl Write {
+        &mut self.words
+    }
+
+    /// Returns a reference to the assignments buffer.
+    ///
+    /// The assignments buffer is for tracing assignments.
+    /// When writing to the buffer, the content should end with a space.
+    #[inline]
+    #[must_use]
+    pub fn assigns(&mut self) -> &mut impl Write {
+        &mut self.assigns
     }
 
     /// Returns a reference to the redirections buffer.
@@ -154,9 +158,19 @@ impl XTrace {
 
     /// Clears the buffer contents.
     pub fn clear(&mut self) {
-        self.main.clear();
+        self.words.clear();
+        self.assigns.clear();
         self.redirs.clear();
         self.here_doc_contents.clear();
+    }
+
+    /// Returns whether all the buffers are empty.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.words.is_empty()
+            && self.assigns.is_empty()
+            && self.redirs.is_empty()
+            && self.here_doc_contents.is_empty()
     }
 
     /// Constructs the final trace to be printed to stderr.
@@ -165,32 +179,42 @@ impl XTrace {
     /// is the concatenation of the following:
     ///
     /// - The expansion of `$PS4`
-    /// - The concatenation of the `main` and `redirs` buffers with trailing
-    ///   spaces trimmed and a newline appended
+    /// - The concatenation of the `assigns`, `words`, and `redirs` buffers with
+    ///   trailing spaces trimmed and a newline appended
     /// - The `here_doc_contents` buffer
     ///
     /// If `$PS4` fails to expand, this function prints an error message and
     /// uses the variable value intact.
-    pub async fn finish(self, env: &mut Env) -> String {
-        let mut result = join(self.main, self.redirs);
-        if !result.is_empty() || !self.here_doc_contents.is_empty() {
-            let ps4 = expand_ps4(env).await;
-            // TODO Support $YASH_PS4 and $YASH_PS4S
-            result.truncate(result.trim_end_matches(' ').len());
-            result = join(ps4, result);
-            result.push('\n');
+    pub async fn finish(&self, env: &mut Env) -> String {
+        let len = self.assigns.len()
+            + self.words.len()
+            + self.redirs.len()
+            + self.here_doc_contents.len();
+        if len == 0 {
+            return String::new();
         }
-        join(result, self.here_doc_contents)
+
+        // TODO Support $YASH_PS4 and $YASH_PS4S
+        let mut result = expand_ps4(env).await;
+        let ps4_len = result.len();
+        result.reserve_exact(len);
+        result += &self.assigns;
+        result += &self.words;
+        result += &self.redirs;
+        result.truncate(ps4_len + result[ps4_len..].trim_end_matches(' ').len());
+        result.push('\n');
+        result += &self.here_doc_contents;
+        result
     }
 }
 
 /// Convenience function for tracing fields.
 ///
-/// This function writes the field values to the main buffer of the `XTrace`.
+/// This function writes the field values to the words buffer of the `XTrace`.
 pub fn trace_fields(xtrace: Option<&mut XTrace>, fields: &[Field]) {
     if let Some(xtrace) = xtrace {
         for field in fields {
-            write!(xtrace.main(), "{} ", quoted(&field.value)).unwrap();
+            write!(xtrace.words(), "{} ", quoted(&field.value)).unwrap();
         }
     }
 }
@@ -221,19 +245,12 @@ mod tests {
     use yash_env::variable::Scope::Global;
 
     #[test]
-    fn joining() {
-        assert_eq!(join(String::new(), String::new()), "");
-        assert_eq!(join("foo".to_owned(), String::new()), "foo");
-        assert_eq!(join(String::new(), "bar".to_owned()), "bar");
-        assert_eq!(join("to".to_owned(), "night".to_owned()), "tonight");
-    }
-
-    #[test]
     fn tracing_some_fields() {
         let mut xtrace = XTrace::new();
         let fields = Field::dummies(["one", "two", "'three'"]);
         trace_fields(Some(&mut xtrace), &fields);
-        assert_eq!(xtrace.main, r#"one two "'three'" "#);
+        assert_eq!(xtrace.words, r#"one two "'three'" "#);
+        assert_eq!(xtrace.assigns, "");
         assert_eq!(xtrace.redirs, "");
         assert_eq!(xtrace.here_doc_contents, "");
     }
@@ -258,11 +275,24 @@ mod tests {
     }
 
     #[test]
-    fn finish_with_main() {
+    fn finish_with_assigns() {
         let mut env = fixture();
 
         let mut xtrace = XTrace::new();
-        xtrace.main.push_str("abc '~' foo ");
+        xtrace.assigns.push_str("VAR=VALUE FOO=BAR ");
+        let result = xtrace.finish(&mut env).now_or_never().unwrap();
+        assert_eq!(result, "+x+ VAR=VALUE FOO=BAR\n");
+
+        // $PS4 should have been expanded
+        assert_ne!(env.variables.get("X"), None);
+    }
+
+    #[test]
+    fn finish_with_words() {
+        let mut env = fixture();
+
+        let mut xtrace = XTrace::new();
+        xtrace.words.push_str("abc '~' foo ");
         let result = xtrace.finish(&mut env).now_or_never().unwrap();
         assert_eq!(result, "+x+ abc '~' foo\n");
 
@@ -281,17 +311,34 @@ mod tests {
     }
 
     #[test]
-    fn finish_with_main_and_redirs() {
+    fn finish_with_assigns_and_words() {
         let mut env = fixture();
 
         let mut xtrace = XTrace::new();
-        xtrace.main.push_str("VAR=X echo argument ");
-        xtrace.redirs.push_str("2> errors ");
+        xtrace.assigns.push_str("VAR=VALUE ");
+        xtrace.words.push_str("echo argument ");
         let result = xtrace.finish(&mut env).now_or_never().unwrap();
-        assert_eq!(result, "+x+ VAR=X echo argument 2> errors\n");
+        assert_eq!(result, "+x+ VAR=VALUE echo argument\n");
 
         let mut xtrace = XTrace::new();
-        xtrace.main.push(' ');
+        xtrace.assigns.push(' ');
+        xtrace.words.push(' ');
+        let result = xtrace.finish(&mut env).now_or_never().unwrap();
+        assert_eq!(result, "+x+ \n");
+    }
+
+    #[test]
+    fn finish_with_words_and_redirs() {
+        let mut env = fixture();
+
+        let mut xtrace = XTrace::new();
+        xtrace.words.push_str("echo argument ");
+        xtrace.redirs.push_str("2> errors ");
+        let result = xtrace.finish(&mut env).now_or_never().unwrap();
+        assert_eq!(result, "+x+ echo argument 2> errors\n");
+
+        let mut xtrace = XTrace::new();
+        xtrace.words.push(' ');
         xtrace.redirs.push(' ');
         let result = xtrace.finish(&mut env).now_or_never().unwrap();
         assert_eq!(result, "+x+ \n");

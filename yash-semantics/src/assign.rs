@@ -38,7 +38,7 @@ pub use yash_syntax::syntax::Assign;
 /// performed during the expansion of the assigned value, if any
 ///
 /// If `xtrace` is `Some` instance of `XTrace`, the expanded assignment word is
-/// written to its main buffer.
+/// written to its assignments buffer.
 pub async fn perform_assignment(
     env: &mut Env,
     assign: &Assign,
@@ -51,7 +51,7 @@ pub async fn perform_assignment(
 
     if let Some(xtrace) = xtrace {
         write!(
-            xtrace.main(),
+            xtrace.assigns(),
             "{}={} ",
             yash_quote::quoted(&name),
             value.quote()
@@ -83,7 +83,7 @@ pub async fn perform_assignment(
 /// performed during the expansion of the assigned values, if any
 ///
 /// If `xtrace` is `Some` instance of `XTrace`, the expanded assignment words
-/// are written to its main buffer.
+/// are written to its assignments buffer.
 pub async fn perform_assignments(
     env: &mut Env,
     assigns: &[Assign],

@@ -22,15 +22,12 @@ use crate::xtrace::print;
 use crate::xtrace::trace_fields;
 use crate::xtrace::XTrace;
 use crate::Handle;
-use assert_matches::assert_matches;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::builtin::Builtin;
-use yash_env::builtin::Main;
 use yash_env::semantics::Divert;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::stack::Builtin as FrameBuiltin;
-use yash_env::stack::Frame;
 use yash_env::variable::Context;
 use yash_env::Env;
 use yash_syntax::syntax::Assign;
@@ -44,11 +41,15 @@ pub async fn execute_builtin(
     redirs: &[Redir],
 ) -> Result {
     use yash_env::builtin::Type::*;
+
+    let mut xtrace = XTrace::from_options(&env.options);
+    trace_fields(xtrace.as_mut(), &fields);
+
     let name = fields.remove(0);
     let is_special = builtin.r#type == Special;
     let env = &mut env.push_frame(FrameBuiltin { name, is_special }.into());
+
     let env = &mut RedirGuard::new(env);
-    let mut xtrace = XTrace::from_options(&env.options);
     if let Err(e) = env.perform_redirs(redirs, xtrace.as_mut()).await {
         e.handle(env).await?;
         return match builtin.r#type {
@@ -57,30 +58,18 @@ pub async fn execute_builtin(
         };
     };
 
-    async fn trace_and_execute(
-        env: &mut Env,
-        fields: Vec<Field>,
-        main: Main,
-        mut xtrace: Option<XTrace>,
-    ) -> yash_env::builtin::Result {
-        let builtin = assert_matches!(env.stack.last(), Some(Frame::Builtin(builtin)) => builtin);
-        trace_fields(xtrace.as_mut(), std::slice::from_ref(&builtin.name));
-        trace_fields(xtrace.as_mut(), &fields);
-        print(env, xtrace).await;
-
-        main(env, fields).await
-    }
-
     let result = match builtin.r#type {
         Special => {
             perform_assignments(env, assigns, false, xtrace.as_mut()).await?;
-            trace_and_execute(env, fields, builtin.execute, xtrace).await
+            print(env, xtrace).await;
+            (builtin.execute)(env, fields).await
         }
         // TODO Reject elective and extension built-ins in POSIX mode
         Mandatory | Elective | Extension | Substitutive => {
             let mut env = env.push_context(Context::Volatile);
             perform_assignments(&mut env, assigns, true, xtrace.as_mut()).await?;
-            trace_and_execute(&mut env, fields, builtin.execute, xtrace).await
+            print(&mut env, xtrace).await;
+            (builtin.execute)(&mut env, fields).await
         }
     };
 
@@ -108,6 +97,7 @@ mod tests {
     use std::str::from_utf8;
     use yash_env::option::State::On;
     use yash_env::semantics::ExitStatus;
+    use yash_env::stack::Frame;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::Errno;
     use yash_env::variable::Value;
