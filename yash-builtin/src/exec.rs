@@ -90,6 +90,7 @@
 use std::ffi::CString;
 use std::ops::ControlFlow::Break;
 use yash_env::builtin::Result;
+use yash_env::io::print_error;
 use yash_env::semantics::Field;
 use yash_env::Env;
 use yash_semantics::command::simple_command::{replace_current_process, to_c_strings};
@@ -109,20 +110,26 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
         result.set_divert(Break(Abort(None)));
 
         let path = if name.value.contains('/') {
-            CString::new(name.value.clone()).unwrap_or_default()
+            CString::new(name.value.clone()).ok()
         } else {
-            match search_path(env, name.value.as_str()) {
-                Some(path) => path,
-                None => {
-                    result.set_exit_status(ExitStatus::NOT_FOUND);
-                    return result;
-                }
-            }
+            search_path(env, name.value.as_str())
         };
-        let location = name.origin.clone();
-        let args = to_c_strings(args);
-        replace_current_process(env, path, args, location).await;
-        result.set_exit_status(env.exit_status);
+
+        if let Some(path) = path {
+            let location = name.origin.clone();
+            let args = to_c_strings(args);
+            replace_current_process(env, path, args, location).await;
+            result.set_exit_status(env.exit_status);
+        } else {
+            print_error(
+                env,
+                format!("cannot execute external utility {:?}", name.value).into(),
+                "utility not found".into(),
+                &name.origin,
+            )
+            .await;
+            result.set_exit_status(ExitStatus::NOT_FOUND);
+        }
     }
 
     result
