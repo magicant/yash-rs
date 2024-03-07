@@ -106,6 +106,11 @@
 //!
 //! The `-p` option depends on [`System::confstr_path`] to obtain the standard
 //! search path. See [`RealSystem::confstr_path`] for the supported platforms.
+//!
+//! The [`type`] built-in is equivalent to the `command` built-in with the `-V`
+//! option.
+//!
+//! [`type`]: crate::type
 
 use crate::common::report_error;
 use enumset::EnumSet;
