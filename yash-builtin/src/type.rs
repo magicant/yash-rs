@@ -78,6 +78,9 @@ const OPTION_SPECS: &[OptionSpec] = &[
 
 fn parse(env: &mut Env, args: Vec<Field>) -> Result<Command, crate::command::syntax::Error> {
     let (mut options, operands) = parse_arguments(OPTION_SPECS, Mode::with_env(env), args)?;
+
+    // `type` is equivalent to `command -V`, so add the `-V` option and delegate
+    // to the `command` built-in.
     let spec = OptionSpec::new().short('V').long("verbose-identify");
     let location = env.stack.current_builtin().map_or_else(
         || Location::dummy(""),
@@ -88,6 +91,7 @@ fn parse(env: &mut Env, args: Vec<Field>) -> Result<Command, crate::command::syn
         location,
         argument: None,
     });
+
     interpret(options, operands)
 }
 
