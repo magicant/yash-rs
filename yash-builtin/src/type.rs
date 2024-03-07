@@ -61,12 +61,40 @@
 //!
 //! [`command`]: crate::command
 
+use crate::command::syntax::interpret;
+use crate::command::Command;
+use crate::common::report_error;
+use crate::common::syntax::parse_arguments;
+use crate::common::syntax::Mode;
+use crate::common::syntax::OptionOccurrence;
+use crate::common::syntax::OptionSpec;
 use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_syntax::source::Location;
+
+const OPTION_SPECS: &[OptionSpec] = &[
+    // TODO: Non-standard options
+];
+
+fn parse(env: &mut Env, args: Vec<Field>) -> Result<Command, crate::command::syntax::Error> {
+    let (mut options, operands) = parse_arguments(OPTION_SPECS, Mode::with_env(env), args)?;
+    let spec = OptionSpec::new().short('V').long("verbose-identify");
+    let location = env.stack.current_builtin().map_or_else(
+        || Location::dummy(""),
+        |builtin| builtin.name.origin.clone(),
+    );
+    options.push(OptionOccurrence {
+        spec: &spec,
+        location,
+        argument: None,
+    });
+    interpret(options, operands)
+}
 
 /// Entry point of the `type` built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
-    _ = env;
-    _ = args;
-    todo!()
+    match parse(env, args) {
+        Ok(command) => command.execute(env).await,
+        Err(error) => report_error(env, &error).await,
+    }
 }

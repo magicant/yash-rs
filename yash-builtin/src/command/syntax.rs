@@ -22,6 +22,7 @@ use super::Invoke;
 use super::Search;
 use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
+use crate::common::syntax::OptionOccurrence;
 use crate::common::syntax::OptionSpec;
 use crate::common::syntax::ParseError;
 use thiserror::Error;
@@ -55,9 +56,13 @@ const OPTION_SPECS: &[OptionSpec] = &[
     OptionSpec::new().short('V').long("verbose-identify"),
 ];
 
-pub fn parse(env: &Env, args: Vec<Field>) -> Result<Command, Error> {
-    let (options, operands) = parse_arguments(OPTION_SPECS, Mode::with_env(env), args)?;
-
+/// Interprets the parsed command line arguments
+///
+/// This function converts the result of [`parse_arguments`] into a `Command`.
+pub fn interpret(
+    options: Vec<OptionOccurrence<'_>>,
+    operands: Vec<Field>,
+) -> Result<Command, Error> {
     // Interpret options
     let mut standard_path = false;
     let mut verbose_identify = None;
@@ -87,6 +92,12 @@ pub fn parse(env: &Env, args: Vec<Field>) -> Result<Command, Error> {
         let invoke = Invoke { fields, search };
         Ok(invoke.into())
     }
+}
+
+/// Parses command line arguments of the `command` built-in
+pub fn parse(env: &Env, args: Vec<Field>) -> Result<Command, Error> {
+    let (options, operands) = parse_arguments(OPTION_SPECS, Mode::with_env(env), args)?;
+    interpret(options, operands)
 }
 
 #[cfg(test)]
