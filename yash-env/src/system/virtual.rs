@@ -65,6 +65,7 @@ use super::SigSet;
 use super::SigmaskHow;
 use super::Signal;
 use super::TimeSpec;
+use super::Times;
 use super::AT_FDCWD;
 use crate::io::Fd;
 use crate::job::Pid;
@@ -615,6 +616,11 @@ impl System for VirtualSystem {
             .expect("SystemState::now not assigned")
     }
 
+    /// Returns `times` in [`SystemState`].
+    fn times(&self) -> nix::Result<Times> {
+        Ok(self.state.borrow().times)
+    }
+
     fn sigmask(
         &mut self,
         how: SigmaskHow,
@@ -1042,16 +1048,19 @@ fn raise_sigchld(state: &mut SystemState, target_pid: Pid) {
 /// State of the virtual system.
 #[derive(Clone, Debug, Default)]
 pub struct SystemState {
-    /// Current time.
+    /// Current time
     pub now: Option<Instant>,
 
-    /// Task manager that can execute asynchronous tasks.
+    /// Consumed CPU time
+    pub times: Times,
+
+    /// Task manager that can execute asynchronous tasks
     ///
     /// The virtual system uses this executor to run (virtual) child processes.
     /// If `executor` is `None`, [`VirtualSystem::new_child_process`] will fail.
     pub executor: Option<Rc<dyn Executor>>,
 
-    /// Processes running in the system.
+    /// Processes running in the system
     pub processes: BTreeMap<Pid, Process>,
 
     /// Process group ID of the foreground process group
@@ -1061,10 +1070,10 @@ pub struct SystemState {
     /// more _correct_ implementation in the future.
     pub foreground: Option<Pid>,
 
-    /// Collection of files existing in the virtual system.
+    /// Collection of files existing in the virtual system
     pub file_system: FileSystem,
 
-    /// Map from user names to their home directory paths.
+    /// Map from user names to their home directory paths
     ///
     /// [`VirtualSystem::getpwnam_dir`] looks up its argument in this
     /// dictionary.
