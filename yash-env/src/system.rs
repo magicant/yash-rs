@@ -402,26 +402,19 @@ pub const AT_FDCWD: Fd = Fd(nix::libc::AT_FDCWD);
 
 /// Set of consumed CPU time
 ///
-/// This structure contains four CPU time values, all in clock ticks. To convert
-/// them to seconds, divide each value by the number of clock ticks per second
-/// (`ticks_per_second`).
+/// This structure contains four CPU time values, all in seconds.
 ///
 /// This structure is returned by [`System::times`].
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Times {
     /// User CPU time consumed by the current process
-    pub self_user: u64,
+    pub self_user: f64,
     /// System CPU time consumed by the current process
-    pub self_system: u64,
+    pub self_system: f64,
     /// User CPU time consumed by the children of the current process
-    pub children_user: u64,
+    pub children_user: f64,
     /// System CPU time consumed by the children of the current process
-    pub children_system: u64,
-
-    /// Number of clock ticks per second
-    ///
-    /// This value is used to convert the consumed CPU time to seconds.
-    pub ticks_per_second: u64,
+    pub children_system: f64,
 }
 
 /// How to handle a signal.

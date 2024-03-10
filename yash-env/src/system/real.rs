@@ -265,7 +265,7 @@ impl System for RealSystem {
     fn times(&self) -> nix::Result<Times> {
         let mut tms = MaybeUninit::<nix::libc::tms>::uninit();
         let raw_result = unsafe { nix::libc::times(tms.as_mut_ptr()) };
-        if raw_result == -1 {
+        if raw_result == (-1) as _ {
             return Err(Errno::last());
         }
         let tms = unsafe { tms.assume_init() };
@@ -274,14 +274,12 @@ impl System for RealSystem {
         if ticks_per_second <= 0 {
             return Err(Errno::last());
         }
-        let ticks_per_second: u64 = ticks_per_second.try_into().map_err(|_| Errno::EOVERFLOW)?;
 
         Ok(Times {
-            self_user: tms.tms_utime.try_into().map_err(|_| Errno::EOVERFLOW)?,
-            self_system: tms.tms_stime.try_into().map_err(|_| Errno::EOVERFLOW)?,
-            children_user: tms.tms_cutime.try_into().map_err(|_| Errno::EOVERFLOW)?,
-            children_system: tms.tms_cstime.try_into().map_err(|_| Errno::EOVERFLOW)?,
-            ticks_per_second,
+            self_user: tms.tms_utime as f64 / ticks_per_second as f64,
+            self_system: tms.tms_stime as f64 / ticks_per_second as f64,
+            children_user: tms.tms_cutime as f64 / ticks_per_second as f64,
+            children_system: tms.tms_cstime as f64 / ticks_per_second as f64,
         })
     }
 
