@@ -40,6 +40,7 @@ where
 pub fn format(times: &Times) -> String {
     let mut result = String::with_capacity(64);
 
+    // The Write impl for String never returns an error, so unwrap is safe here.
     format_one_time(times.self_user, &mut result).unwrap();
     result.push(' ');
     format_one_time(times.self_system, &mut result).unwrap();
