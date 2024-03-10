@@ -68,12 +68,28 @@
 //! point, but many implementations print less. Note that the number of digits
 //! does not necessarily indicate the precision of the times.
 
+use crate::common::output;
+use crate::common::report_error;
+use crate::common::report_simple_failure;
 use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::System;
+
+mod format;
+mod syntax;
 
 /// Entry point of the `times` built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
-    _ = env;
-    _ = args;
-    todo!()
+    match syntax::parse(env, args) {
+        Ok(()) => match env.system.times() {
+            Ok(times) => {
+                let result = format::format(&times);
+                output(env, &result).await
+            }
+            Err(error) => {
+                report_simple_failure(env, &format!("cannot obtain times: {error}")).await
+            }
+        },
+        Err(error) => report_error(env, &error).await,
+    }
 }
