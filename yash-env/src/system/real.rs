@@ -33,6 +33,7 @@ use super::SigmaskHow;
 use super::Signal;
 use super::System;
 use super::TimeSpec;
+use super::Times;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessState;
@@ -54,6 +55,7 @@ use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::future::Future;
 use std::io::SeekFrom;
+use std::mem::MaybeUninit;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::IntoRawFd;
 use std::path::Path;
@@ -258,6 +260,27 @@ impl System for RealSystem {
 
     fn now(&self) -> Instant {
         Instant::now()
+    }
+
+    fn times(&self) -> nix::Result<Times> {
+        let mut tms = MaybeUninit::<nix::libc::tms>::uninit();
+        let raw_result = unsafe { nix::libc::times(tms.as_mut_ptr()) };
+        if raw_result == (-1) as _ {
+            return Err(Errno::last());
+        }
+        let tms = unsafe { tms.assume_init() };
+
+        let ticks_per_second = unsafe { nix::libc::sysconf(nix::libc::_SC_CLK_TCK) };
+        if ticks_per_second <= 0 {
+            return Err(Errno::last());
+        }
+
+        Ok(Times {
+            self_user: tms.tms_utime as f64 / ticks_per_second as f64,
+            self_system: tms.tms_stime as f64 / ticks_per_second as f64,
+            children_user: tms.tms_cutime as f64 / ticks_per_second as f64,
+            children_system: tms.tms_cstime as f64 / ticks_per_second as f64,
+        })
     }
 
     fn sigmask(

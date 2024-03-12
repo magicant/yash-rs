@@ -196,6 +196,9 @@ pub trait System: Debug {
     #[must_use]
     fn now(&self) -> Instant;
 
+    /// Returns consumed CPU times.
+    fn times(&self) -> nix::Result<Times>;
+
     /// Gets and/or sets the signal blocking mask.
     ///
     /// This is a low-level function used internally by
@@ -396,6 +399,23 @@ pub trait System: Debug {
 /// This value can be passed to system calls named "*at" such as
 /// [`System::fstatat`].
 pub const AT_FDCWD: Fd = Fd(nix::libc::AT_FDCWD);
+
+/// Set of consumed CPU time
+///
+/// This structure contains four CPU time values, all in seconds.
+///
+/// This structure is returned by [`System::times`].
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Times {
+    /// User CPU time consumed by the current process
+    pub self_user: f64,
+    /// System CPU time consumed by the current process
+    pub self_system: f64,
+    /// User CPU time consumed by the children of the current process
+    pub children_user: f64,
+    /// System CPU time consumed by the children of the current process
+    pub children_system: f64,
+}
 
 /// How to handle a signal.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -882,6 +902,9 @@ impl System for SharedSystem {
     }
     fn now(&self) -> Instant {
         self.0.borrow().now()
+    }
+    fn times(&self) -> nix::Result<Times> {
+        self.0.borrow().times()
     }
     fn sigmask(
         &mut self,
