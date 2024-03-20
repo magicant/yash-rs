@@ -18,6 +18,7 @@
 
 use super::io::FdBody;
 use super::signal::SignalEffect;
+use super::Mode;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessState;
@@ -51,6 +52,9 @@ pub struct Process {
 
     /// Set of file descriptors open in this process.
     pub(crate) fds: BTreeMap<Fd, FdBody>,
+
+    /// File creation mask
+    pub(crate) umask: Mode,
 
     /// Working directory path
     pub(crate) cwd: PathBuf,
@@ -123,6 +127,7 @@ impl Process {
             ppid,
             pgid,
             fds: BTreeMap::new(),
+            umask: Mode::default(),
             cwd: PathBuf::new(),
             state: ProcessState::Running,
             state_has_changed: false,

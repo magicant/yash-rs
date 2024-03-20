@@ -606,6 +606,12 @@ impl System for VirtualSystem {
         self.fdopendir(fd)
     }
 
+    fn umask(&mut self, mask: nix::sys::stat::Mode) -> nix::sys::stat::Mode {
+        let new_mask = Mode(mask.bits());
+        let old_mask = std::mem::replace(&mut self.current_process_mut().umask, new_mask);
+        nix::sys::stat::Mode::from_bits_retain(old_mask.0)
+    }
+
     /// Returns `now` in [`SystemState`].
     ///
     /// Panics if it is `None`.
