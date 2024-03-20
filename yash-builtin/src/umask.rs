@@ -107,10 +107,12 @@
 //! as well as many others. However, this may not be strictly true to the POSIX
 //! specification.
 
+use crate::common::report_error;
 use yash_env::semantics::Field;
 use yash_env::Env;
 
 pub mod symbol;
+pub mod syntax;
 
 /// Interpretation of command-line arguments that determine the behavior of the
 /// `umask` built-in
@@ -122,9 +124,33 @@ pub enum Command {
     Set(Vec<symbol::Clause>),
 }
 
+impl Command {
+    /// Creates a `Command::Set` variant from a raw mask.
+    ///
+    /// This is a convenience method for creating a `Command::Set` variant from
+    /// a raw mask. The result contains a single clause that sets the mask to
+    /// the given value for all bits.
+    #[must_use]
+    pub fn set_from_raw_mask(mask: u16) -> Self {
+        use symbol::{Action, Clause, Operator, Permission, Who};
+        Self::Set(vec![Clause {
+            who: Who { mask: 0o777 },
+            actions: vec![Action {
+                operator: Operator::Set,
+                permission: Permission::Literal {
+                    // Negate because the Operator applies to the negation of the mask
+                    mask: !mask,
+                    conditional_executable: false,
+                },
+            }],
+        }])
+    }
+}
+
 /// Entry point of the `umask` built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
-    _ = env;
-    _ = args;
-    todo!()
+    match syntax::parse(env, args) {
+        Ok(command) => todo!("umask: {command:?}"),
+        Err(e) => report_error(env, &e).await,
+    }
 }
