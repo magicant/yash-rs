@@ -102,9 +102,25 @@
 //! This implementation ignores the `-S` option if *mode* is given. However,
 //! bash prints the new mask in symbolic notation if the `-S` option and *mode*
 //! are both given.
+//!
+//! An empty sequence of who symbols is equivalent to `a` in this implementation
+//! as well as many others. However, this may not be strictly true to the POSIX
+//! specification.
 
 use yash_env::semantics::Field;
 use yash_env::Env;
+
+pub mod symbol;
+
+/// Interpretation of command-line arguments that determine the behavior of the
+/// `umask` built-in
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum Command {
+    /// Show the current file mode creation mask
+    Show { symbolic: bool },
+    /// Set the file mode creation mask
+    Set(Vec<symbol::Clause>),
+}
 
 /// Entry point of the `umask` built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
