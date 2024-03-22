@@ -291,6 +291,11 @@ fn typeset_builtin() {
 }
 
 #[test]
+fn umask_builtin() {
+    run("umask-p.sh")
+}
+
+#[test]
 fn unset_builtin() {
     run("unset-p.sh")
 }
