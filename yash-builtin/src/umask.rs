@@ -106,11 +106,15 @@
 //! An empty sequence of who symbols is equivalent to `a` in this implementation
 //! as well as many others. However, this may not be strictly true to the POSIX
 //! specification.
+//!
+//! The permission symbols other than `r`, `w`, and `x` are not widely supported.
+//! This implementation currently ignores the `s` symbol.
 
 use crate::common::report_error;
 use yash_env::semantics::Field;
 use yash_env::Env;
 
+pub mod eval;
 pub mod symbol;
 pub mod syntax;
 
