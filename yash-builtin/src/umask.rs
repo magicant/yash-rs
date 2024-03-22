@@ -116,6 +116,7 @@ use yash_env::system::Mode;
 use yash_env::{Env, System};
 
 pub mod eval;
+pub mod format;
 pub mod symbol;
 pub mod syntax;
 
@@ -164,9 +165,15 @@ impl Command {
         let current = !env.system.umask(Mode::empty()).bits();
         let new_mask = eval::new_mask(current as _, self);
         env.system.umask(Mode::from_bits_retain(!new_mask as _));
-        match self {
-            &Self::Show { symbolic } => todo!("Show (symbolic={symbolic}, new_mask={new_mask:#o})"),
-            &Self::Set(_) => String::new(),
+
+        match *self {
+            Self::Show { symbolic: false } => format!("{:03o}\n", !new_mask),
+            Self::Show { symbolic: true } => {
+                let mut output = format::format_symbolic(new_mask);
+                output.push('\n');
+                output
+            }
+            Self::Set(_) => String::new(),
         }
     }
 }
