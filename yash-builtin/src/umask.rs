@@ -110,9 +110,10 @@
 //! The permission symbols other than `r`, `w`, and `x` are not widely supported.
 //! This implementation currently ignores the `s` symbol.
 
-use crate::common::report_error;
+use crate::common::{output, report_error};
 use yash_env::semantics::Field;
-use yash_env::Env;
+use yash_env::system::Mode;
+use yash_env::{Env, System};
 
 pub mod eval;
 pub mod symbol;
@@ -149,12 +150,34 @@ impl Command {
             }],
         }])
     }
+
+    /// Executes the `umask` built-in.
+    ///
+    /// Regardless of the command type, this function performs the following steps:
+    ///
+    /// 1. Obtain the current mask from the environment. ([`System::umask`])
+    /// 1. Compute a new mask to be set. ([`eval::new_mask`])
+    /// 1. Set the new mask. ([`System::umask`])
+    ///
+    /// Returns the string that should be printed to the standard output.
+    pub fn execute(&self, env: &mut Env) -> String {
+        let current = !env.system.umask(Mode::empty()).bits();
+        let new_mask = eval::new_mask(current as _, self);
+        env.system.umask(Mode::from_bits_retain(!new_mask as _));
+        match self {
+            &Self::Show { symbolic } => todo!("Show (symbolic={symbolic}, new_mask={new_mask:#o})"),
+            &Self::Set(_) => String::new(),
+        }
+    }
 }
 
 /// Entry point of the `umask` built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     match syntax::parse(env, args) {
-        Ok(command) => todo!("umask: {command:?}"),
+        Ok(command) => {
+            let result = command.execute(env);
+            output(env, &result).await
+        }
         Err(e) => report_error(env, &e).await,
     }
 }
