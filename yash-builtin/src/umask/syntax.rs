@@ -217,4 +217,17 @@ mod tests {
             Err(Error::InvalidMode(arg, ParseClausesError::InvalidChar('0')))
         );
     }
+
+    #[test]
+    fn invalid_option() {
+        // Though "-x" may look like a valid symbolic mode,
+        // it is regarded as an invalid option without the "--" separator.
+        let env = Env::new_virtual();
+        let arg = Field::dummy("-x");
+        let result = parse(&env, vec![arg.clone()]);
+        assert_eq!(
+            result,
+            Err(Error::CommonError(ParseError::UnknownShortOption('x', arg)))
+        );
+    }
 }
