@@ -42,14 +42,17 @@ pub enum ParseClausesError {
 /// returns an error indicating the reason for the failure.
 pub fn parse_clauses(mut s: &str) -> Result<Vec<Clause>, ParseClausesError> {
     let mut clauses = vec![Clause::parse(&mut s)?];
-    while !s.is_empty() {
-        if !s.starts_with(',') {
-            return Err(ParseClausesError::InvalidChar(s.chars().next().unwrap()));
+    loop {
+        let mut chars = s.chars();
+        let Some(next) = chars.next() else {
+            return Ok(clauses);
+        };
+        if next != ',' {
+            return Err(ParseClausesError::InvalidChar(next));
         }
-        s = &s[1..];
+        s = chars.as_str();
         clauses.push(Clause::parse(&mut s)?);
     }
-    Ok(clauses)
 }
 
 /// Clause in the symbolic notation of the file mode creation mask
