@@ -57,8 +57,8 @@ test_restore_symbolic "$LINENO" 017
 test_symbolic_operand() {
     testcase "$1" "symbolic operand $3" 3<<__IN__ 4<<__OUT__ 5</dev/null
 umask "$3"
-mkdir "dir.$1"
-ls -dl "dir.$1" | cut -c 1-10
+mkdir "dir.\$TEST_NO"
+ls -dl "dir.\$TEST_NO" | cut -c 1-10
 __IN__
 $2
 __OUT__
