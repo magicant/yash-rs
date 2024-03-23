@@ -69,3 +69,9 @@ fn combination() {
     assert_eq!(format_symbolic(0o241), "u=w,g=r,o=x");
     assert_eq!(format_symbolic(0o412), "u=r,g=x,o=w");
 }
+
+#[test]
+fn bits_outside_permission_range() {
+    // POSIX requires us to ignore bits other than the nine permission bits.
+    assert_eq!(format_symbolic(0o1000), "u=,g=,o=");
+}
