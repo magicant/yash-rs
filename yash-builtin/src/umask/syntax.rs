@@ -20,6 +20,7 @@ use super::symbol::{parse_clauses, ParseClausesError};
 use super::Command;
 use crate::common::syntax::{parse_arguments, Mode, OptionSpec, ParseError};
 use std::borrow::Cow;
+use std::num::ParseIntError;
 use thiserror::Error;
 use yash_env::semantics::Field;
 use yash_env::Env;
@@ -38,9 +39,13 @@ pub enum Error {
     #[error("too many operands")]
     TooManyOperands(Vec<Field>),
 
-    /// An operand is not a valid mode.
+    /// An operand starts with a digit and is not a valid mode.
     #[error("invalid mask notation")]
-    InvalidMode(Field, ParseClausesError),
+    InvalidNumericMode(Field, ParseIntError),
+
+    /// An operand does not start with a digit and is not a valid mode.
+    #[error("invalid mask notation")]
+    InvalidSymbolicMode(Field, ParseClausesError),
 }
 
 impl MessageBase for Error {
@@ -56,7 +61,12 @@ impl MessageBase for Error {
                 format!("{}: redundant operand", operands[1].value).into(),
                 &operands[1].origin,
             ),
-            Self::InvalidMode(operand, e) => Annotation::new(
+            Self::InvalidNumericMode(operand, e) => Annotation::new(
+                AnnotationType::Error,
+                format!("{}: {}", operand.value, e).into(),
+                &operand.origin,
+            ),
+            Self::InvalidSymbolicMode(operand, e) => Annotation::new(
                 AnnotationType::Error,
                 format!("{}: {}", operand.value, e).into(),
                 &operand.origin,
@@ -86,14 +96,15 @@ pub fn parse(env: &Env, args: Vec<Field>) -> Result {
 
             // TODO Use char::is_ascii_octdigit
             if field.value.starts_with(|c: char| c.is_ascii_digit()) {
-                if let Ok(mask) = u16::from_str_radix(&field.value, 8) {
-                    return Ok(Command::set_from_raw_mask(mask));
-                }
+                return match u16::from_str_radix(&field.value, 8) {
+                    Ok(mask) => Ok(Command::set_from_raw_mask(mask)),
+                    Err(e) => Err(Error::InvalidNumericMode(field, e)),
+                };
             }
 
             match parse_clauses(&field.value) {
                 Ok(clauses) => Ok(Command::Set(clauses)),
-                Err(e) => Err(Error::InvalidMode(field, e)),
+                Err(e) => Err(Error::InvalidSymbolicMode(field, e)),
             }
         }
 
@@ -105,6 +116,7 @@ pub fn parse(env: &Env, args: Vec<Field>) -> Result {
 mod tests {
     use super::*;
     use crate::umask::symbol::{Action, Clause, Operator, Permission, Who};
+    use assert_matches::assert_matches;
 
     #[test]
     fn no_arguments() {
@@ -208,13 +220,27 @@ mod tests {
     }
 
     #[test]
+    fn invalid_numeric_mask() {
+        let env = Env::new_virtual();
+        let arg = Field::dummy("02x2");
+        let result = parse(&env, vec![arg.clone()]);
+        assert_matches!(result, Err(Error::InvalidNumericMode(field, e)) => {
+            assert_eq!(field, arg);
+            assert_eq!(e.kind(), &std::num::IntErrorKind::InvalidDigit);
+        });
+    }
+
+    #[test]
     fn numeric_mask_starting_with_plus() {
         let env = Env::new_virtual();
         let arg = Field::dummy("+022");
         let result = parse(&env, vec![arg.clone()]);
         assert_eq!(
             result,
-            Err(Error::InvalidMode(arg, ParseClausesError::InvalidChar('0')))
+            Err(Error::InvalidSymbolicMode(
+                arg,
+                ParseClausesError::InvalidChar('0')
+            ))
         );
     }
 
