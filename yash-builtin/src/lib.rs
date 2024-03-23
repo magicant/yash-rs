@@ -80,6 +80,7 @@ pub mod trap;
 #[cfg(feature = "yash-semantics")]
 pub mod r#type;
 pub mod typeset;
+pub mod umask;
 pub mod unalias;
 pub mod unset;
 #[cfg(feature = "yash-semantics")]
@@ -293,6 +294,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Elective,
             execute: |env, args| Box::pin(typeset::main(env, args)),
+        },
+    ),
+    (
+        "umask",
+        Builtin {
+            r#type: Mandatory,
+            execute: |env, args| Box::pin(umask::main(env, args)),
         },
     ),
     (

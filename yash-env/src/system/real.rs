@@ -258,6 +258,10 @@ impl System for RealSystem {
         Ok(Box::new(RealDir(dir)))
     }
 
+    fn umask(&mut self, mask: Mode) -> Mode {
+        nix::sys::stat::umask(mask)
+    }
+
     fn now(&self) -> Instant {
         Instant::now()
     }

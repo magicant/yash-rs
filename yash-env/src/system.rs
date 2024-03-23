@@ -192,6 +192,16 @@ pub trait System: Debug {
     /// Opens a directory for enumerating entries.
     fn opendir(&mut self, path: &CStr) -> nix::Result<Box<dyn Dir>>;
 
+    /// Gets and sets the file creation mode mask.
+    ///
+    /// This is a thin wrapper around the `umask` system call. It sets the mask
+    /// to the given value and returns the previous mask.
+    ///
+    /// You cannot tell the current mask without setting a new one. If you only
+    /// want to get the current mask, you need to set it back to the original
+    /// value after getting it.
+    fn umask(&mut self, mask: Mode) -> Mode;
+
     /// Returns the current time.
     #[must_use]
     fn now(&self) -> Instant;
@@ -899,6 +909,9 @@ impl System for SharedSystem {
     }
     fn opendir(&mut self, path: &CStr) -> nix::Result<Box<dyn Dir>> {
         self.0.borrow_mut().opendir(path)
+    }
+    fn umask(&mut self, mask: Mode) -> Mode {
+        self.0.borrow_mut().umask(mask)
     }
     fn now(&self) -> Instant {
         self.0.borrow().now()

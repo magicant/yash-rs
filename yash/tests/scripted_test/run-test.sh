@@ -167,6 +167,9 @@ exec_testee() {
         testee="$testee_sh"
         export TESTEE="$testee"
     fi
+    if [ "${test_lineno:+set}" = set ]; then
+        export TEST_NO="$test_lineno"
+    fi
     if ! "$use_valgrind"; then
         exec "$testee" "$@"
     else
