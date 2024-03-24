@@ -54,6 +54,9 @@ pub enum Command {
     Set(Resource, SetLimitType, rlim_t),
 }
 
+mod resource;
+pub use resource::ResourceExt;
+
 pub mod set;
 pub mod show;
 pub mod syntax;
