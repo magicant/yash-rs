@@ -54,6 +54,9 @@ pub use self::file_system::*;
 pub use self::io::*;
 pub use self::process::*;
 pub use self::signal::*;
+use super::resource::LimitPair;
+use super::resource::Resource;
+use super::resource::RLIM_INFINITY;
 use super::AtFlags;
 use super::Dir;
 use super::Errno;
@@ -1012,6 +1015,32 @@ impl System for VirtualSystem {
             Err(Errno::ENOSYS)
         } else {
             Ok(path)
+        }
+    }
+
+    /// Currently, this function only supports `RLIMIT_NOFILE`.
+    fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair> {
+        match resource {
+            Resource::NOFILE => {
+                let process = self.current_process();
+                Ok(LimitPair {
+                    soft: process.rlimit_nofile as _,
+                    hard: RLIM_INFINITY,
+                })
+            }
+            _ => Err(std::io::Error::from_raw_os_error(nix::libc::EINVAL as _)),
+        }
+    }
+
+    /// Currently, this function only supports `RLIMIT_NOFILE`.
+    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> std::io::Result<()> {
+        match resource {
+            Resource::NOFILE => {
+                let mut process = self.current_process_mut();
+                process.rlimit_nofile = limits.soft as _;
+                Ok(())
+            }
+            _ => Err(std::io::Error::from_raw_os_error(nix::libc::EINVAL as _)),
         }
     }
 }
