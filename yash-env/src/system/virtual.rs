@@ -1018,30 +1018,38 @@ impl System for VirtualSystem {
         }
     }
 
-    /// Currently, this function only supports `RLIMIT_NOFILE`.
     fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair> {
-        match resource {
-            Resource::NOFILE => {
-                let process = self.current_process();
-                Ok(LimitPair {
-                    soft: process.rlimit_nofile as _,
-                    hard: RLIM_INFINITY,
-                })
-            }
-            _ => Err(std::io::Error::from_raw_os_error(nix::libc::EINVAL as _)),
-        }
+        let process = self.current_process();
+        Ok(process
+            .resource_limits
+            .get(&resource)
+            .copied()
+            .unwrap_or(LimitPair {
+                soft: RLIM_INFINITY,
+                hard: RLIM_INFINITY,
+            }))
     }
 
-    /// Currently, this function only supports `RLIMIT_NOFILE`.
     fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> std::io::Result<()> {
-        match resource {
-            Resource::NOFILE => {
-                let mut process = self.current_process_mut();
-                process.rlimit_nofile = limits.soft as _;
-                Ok(())
-            }
-            _ => Err(std::io::Error::from_raw_os_error(nix::libc::EINVAL as _)),
+        if limits.soft > limits.hard {
+            return Err(std::io::Error::from_raw_os_error(nix::libc::EINVAL));
         }
+
+        let mut process = self.current_process_mut();
+        use std::collections::hash_map::Entry::{Occupied, Vacant};
+        match process.resource_limits.entry(resource) {
+            Occupied(occupied) => {
+                let occupied = occupied.into_mut();
+                if limits.hard > occupied.hard {
+                    return Err(std::io::Error::from_raw_os_error(nix::libc::EPERM));
+                }
+                *occupied = limits;
+            }
+            Vacant(vacant) => {
+                vacant.insert(limits);
+            }
+        }
+        Ok(())
     }
 }
 
@@ -2655,5 +2663,79 @@ mod tests {
 
         let result = system.chdir(CStr::from_bytes_with_nul(b"/dir/file\0").unwrap());
         assert_eq!(result, Err(Errno::ENOTDIR));
+    }
+
+    #[test]
+    fn getrlimit_for_unset_resource_returns_infinity() {
+        let system = VirtualSystem::new();
+        let result = system.getrlimit(Resource::CPU).unwrap();
+        assert_eq!(
+            result,
+            LimitPair {
+                soft: RLIM_INFINITY,
+                hard: RLIM_INFINITY,
+            },
+        );
+    }
+
+    #[test]
+    fn setrlimit_and_getrlimit_with_finite_limits() {
+        let mut system = VirtualSystem::new();
+        system
+            .setrlimit(
+                Resource::CORE,
+                LimitPair {
+                    soft: 4096,
+                    hard: 8192,
+                },
+            )
+            .unwrap();
+        system
+            .setrlimit(Resource::CPU, LimitPair { soft: 10, hard: 30 })
+            .unwrap();
+
+        let result = system.getrlimit(Resource::CORE).unwrap();
+        assert_eq!(
+            result,
+            LimitPair {
+                soft: 4096,
+                hard: 8192,
+            },
+        );
+        let result = system.getrlimit(Resource::CPU).unwrap();
+        assert_eq!(result, LimitPair { soft: 10, hard: 30 },);
+    }
+
+    #[test]
+    fn setrlimit_rejects_soft_limit_higher_than_hard_limit() {
+        let mut system = VirtualSystem::new();
+        let result = system.setrlimit(Resource::CPU, LimitPair { soft: 2, hard: 1 });
+        let error = result.unwrap_err();
+        assert_eq!(error.raw_os_error(), Some(nix::libc::EINVAL));
+
+        // The limits should not have been changed
+        let result = system.getrlimit(Resource::CPU).unwrap();
+        assert_eq!(
+            result,
+            LimitPair {
+                soft: RLIM_INFINITY,
+                hard: RLIM_INFINITY,
+            },
+        );
+    }
+
+    #[test]
+    fn setrlimit_refuses_raising_hard_limit() {
+        let mut system = VirtualSystem::new();
+        system
+            .setrlimit(Resource::CPU, LimitPair { soft: 1, hard: 1 })
+            .unwrap();
+        let result = system.setrlimit(Resource::CPU, LimitPair { soft: 1, hard: 2 });
+        let error = result.unwrap_err();
+        assert_eq!(error.raw_os_error(), Some(nix::libc::EPERM));
+
+        // The limits should not have been changed
+        let result = system.getrlimit(Resource::CPU).unwrap();
+        assert_eq!(result, LimitPair { soft: 1, hard: 1 });
     }
 }
