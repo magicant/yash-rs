@@ -1031,7 +1031,7 @@ impl System for VirtualSystem {
     }
 
     fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> std::io::Result<()> {
-        if limits.soft > limits.hard {
+        if limits.soft_exceeds_hard() {
             return Err(std::io::Error::from_raw_os_error(nix::libc::EINVAL));
         }
 

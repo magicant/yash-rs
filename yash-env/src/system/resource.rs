@@ -180,6 +180,14 @@ pub struct LimitPair {
     pub hard: rlim_t,
 }
 
+impl LimitPair {
+    /// Returns `true` if the soft limit exceeds the hard limit
+    #[must_use]
+    pub fn soft_exceeds_hard(&self) -> bool {
+        self.hard != RLIM_INFINITY && (self.soft == RLIM_INFINITY || self.soft > self.hard)
+    }
+}
+
 impl From<LimitPair> for nix::libc::rlimit {
     fn from(limits: LimitPair) -> Self {
         Self {

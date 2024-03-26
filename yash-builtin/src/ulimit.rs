@@ -91,7 +91,10 @@ impl Command {
             Command::ShowOne(resource, limit_type) => {
                 show::show_one(getrlimit, *resource, *limit_type)
             }
-            Command::Set(_, _, _) => todo!(),
+            Command::Set(resource, limit_type, limit) => {
+                set::set(&mut env.system, *resource, *limit_type, *limit)?;
+                Ok(String::new())
+            }
         }
     }
 }
