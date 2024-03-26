@@ -36,6 +36,8 @@ pub const RLIM_INFINITY: rlim_t = nix::libc::RLIM_INFINITY;
 // No platforms are known to define `RLIM_SAVED_CUR` and `RLIM_SAVED_MAX` that
 // have different values from `RLIM_INFINITY`, so they are not defined here.
 
+// When adding a new resource type, also update the yash_builtin::ulimit::resource module.
+
 /// Resource type definition
 ///
 /// A `Resource` value represents a resource whose limit can be retrieved or
@@ -92,6 +94,29 @@ pub enum Resource {
 }
 
 impl Resource {
+    /// Slice of all resource types (including those not available on the current platform)
+    pub const ALL: &'static [Resource] = &[
+        Self::AS,
+        Self::CORE,
+        Self::CPU,
+        Self::DATA,
+        Self::FSIZE,
+        Self::KQUEUES,
+        // Self::LOCKS,
+        Self::MEMLOCK,
+        Self::MSGQUEUE,
+        Self::NICE,
+        Self::NOFILE,
+        Self::NPROC,
+        Self::RSS,
+        Self::RTPRIO,
+        Self::RTTIME,
+        Self::SBSIZE,
+        Self::SIGPENDING,
+        Self::STACK,
+        Self::SWAP,
+    ];
+
     /// Returns the platform-specific constant value of this resource type.
     ///
     /// This method returns `None` if the resource type is not available on the

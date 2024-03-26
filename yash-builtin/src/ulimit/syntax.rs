@@ -16,7 +16,7 @@
 
 //! Command-line argument parser for the `ulimit` built-in
 
-use super::Command;
+use super::{Command, ShowLimitType};
 use crate::common::syntax::ParseError;
 use std::borrow::Cow;
 use std::num::ParseIntError;
@@ -58,5 +58,6 @@ pub type Result = std::result::Result<Command, Error>;
 
 /// Parses command line arguments.
 pub fn parse(env: &Env, args: Vec<Field>) -> Result {
-    todo!()
+    // TODO
+    Ok(Command::ShowAll(ShowLimitType::Soft))
 }

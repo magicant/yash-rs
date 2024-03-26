@@ -22,6 +22,7 @@ use crate::common::{output, report_error, report_simple_failure};
 use yash_env::semantics::Field;
 use yash_env::system::resource::{rlim_t, Resource};
 use yash_env::Env;
+use yash_env::System as _;
 
 /// Type of limit to show
 ///
@@ -84,9 +85,12 @@ impl Command {
     ///
     /// If successful, returns the string to be printed to the standard output.
     pub async fn execute(&self, env: &mut Env) -> Result<String, Error> {
+        let getrlimit = |resource| env.system.getrlimit(resource);
         match self {
-            Command::ShowAll(_) => todo!(),
-            Command::ShowOne(_, _) => todo!(),
+            Command::ShowAll(limit_type) => Ok(show::show_all(getrlimit, *limit_type)),
+            Command::ShowOne(resource, limit_type) => {
+                show::show_one(getrlimit, *resource, *limit_type)
+            }
             Command::Set(_, _, _) => todo!(),
         }
     }
