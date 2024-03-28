@@ -18,6 +18,7 @@
 
 pub mod fd_set;
 pub mod real;
+pub mod resource;
 pub mod r#virtual;
 
 use self::fd_set::FdSet;
@@ -25,6 +26,8 @@ use self::fd_set::FdSet;
 use self::r#virtual::VirtualSystem;
 #[cfg(doc)]
 use self::real::RealSystem;
+use self::resource::LimitPair;
+use self::resource::Resource;
 use crate::io::Fd;
 use crate::io::MIN_INTERNAL_FD;
 use crate::job::Pid;
@@ -402,6 +405,28 @@ pub trait System: Debug {
     ///
     /// This is a thin wrapper around the `confstr(_CS_PATH, …)`.
     fn confstr_path(&self) -> nix::Result<OsString>;
+
+    /// Returns the limits for the specified resource.
+    ///
+    /// This function returns a pair of the soft and hard limits for the given
+    /// resource. The soft limit is the current limit, and the hard limit is the
+    /// maximum value that the soft limit can be set to.
+    ///
+    /// When no limit is set, the limit value is [`RLIM_INFINITY`].
+    ///
+    /// This is a thin wrapper around the `getrlimit` system call.
+    ///
+    /// [`RLIM_INFINITY`]: self::resource::RLIM_INFINITY
+    fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair>;
+
+    /// Sets the limits for the specified resource.
+    ///
+    /// Specify [`RLIM_INFINITY`] as the limit value to remove the limit.
+    ///
+    /// This is a thin wrapper around the `setrlimit` system call.
+    ///
+    /// [`RLIM_INFINITY`]: self::resource::RLIM_INFINITY
+    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> std::io::Result<()>;
 }
 
 /// Sentinel for the current working directory
@@ -992,6 +1017,12 @@ impl System for SharedSystem {
     }
     fn confstr_path(&self) -> nix::Result<OsString> {
         self.0.borrow().confstr_path()
+    }
+    fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair> {
+        self.0.borrow().getrlimit(resource)
+    }
+    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> std::io::Result<()> {
+        self.0.borrow_mut().setrlimit(resource, limits)
     }
 }
 

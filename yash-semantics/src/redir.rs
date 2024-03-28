@@ -668,13 +668,30 @@ mod tests {
     use std::rc::Rc;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::INode;
+    use yash_env::system::resource::LimitPair;
+    use yash_env::system::resource::Resource;
     use yash_env::Env;
     use yash_env::VirtualSystem;
     use yash_syntax::syntax::Text;
 
+    /// Returns a virtual system with a file descriptor limit.
+    fn system_with_nofile_limit() -> VirtualSystem {
+        let mut system = VirtualSystem::new();
+        system
+            .setrlimit(
+                Resource::NOFILE,
+                LimitPair {
+                    soft: 1024,
+                    hard: 1024,
+                },
+            )
+            .unwrap();
+        system
+    }
+
     #[test]
     fn basic_file_in_redirection() {
-        let system = VirtualSystem::new();
+        let system = system_with_nofile_limit();
         let file = Rc::new(RefCell::new(INode::new([42, 123, 254])));
         let mut state = system.state.borrow_mut();
         state.file_system.save("foo", file).unwrap();
@@ -697,7 +714,7 @@ mod tests {
 
     #[test]
     fn moving_fd() {
-        let system = VirtualSystem::new();
+        let system = system_with_nofile_limit();
         let file = Rc::new(RefCell::new(INode::new([42, 123, 254])));
         let mut state = system.state.borrow_mut();
         state.file_system.save("foo", file).unwrap();
@@ -721,7 +738,7 @@ mod tests {
 
     #[test]
     fn saving_and_undoing_fd() {
-        let system = VirtualSystem::new();
+        let system = system_with_nofile_limit();
         let mut state = system.state.borrow_mut();
         state.file_system.save("file", Rc::default()).unwrap();
         state
@@ -750,7 +767,7 @@ mod tests {
 
     #[test]
     fn preserving_fd() {
-        let system = VirtualSystem::new();
+        let system = system_with_nofile_limit();
         let mut state = system.state.borrow_mut();
         state.file_system.save("file", Rc::default()).unwrap();
         state
@@ -780,7 +797,7 @@ mod tests {
 
     #[test]
     fn undoing_without_initial_fd() {
-        let system = VirtualSystem::new();
+        let system = system_with_nofile_limit();
         let mut state = system.state.borrow_mut();
         state.file_system.save("input", Rc::default()).unwrap();
         drop(state);
@@ -802,7 +819,7 @@ mod tests {
 
     #[test]
     fn unreadable_file() {
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let mut env = RedirGuard::new(&mut env);
         let redir = "< no_such_file".parse().unwrap();
         let e = env
@@ -819,7 +836,7 @@ mod tests {
 
     #[test]
     fn multiple_redirections() {
-        let system = VirtualSystem::new();
+        let system = system_with_nofile_limit();
         let mut state = system.state.borrow_mut();
         let file = Rc::new(RefCell::new(INode::new([100])));
         state.file_system.save("foo", file).unwrap();
@@ -848,7 +865,7 @@ mod tests {
 
     #[test]
     fn later_redirection_wins() {
-        let system = VirtualSystem::new();
+        let system = system_with_nofile_limit();
         let mut state = system.state.borrow_mut();
         let file = Rc::new(RefCell::new(INode::new([100])));
         state.file_system.save("foo", file).unwrap();
@@ -875,7 +892,7 @@ mod tests {
 
     #[test]
     fn target_with_cloexec() {
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let fd = env
             .system
             .open(
@@ -941,7 +958,7 @@ mod tests {
     #[test]
     fn xtrace_normal() {
         let mut xtrace = XTrace::new();
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let mut env = RedirGuard::new(&mut env);
         env.perform_redir(&"> foo${unset-&}".parse().unwrap(), Some(&mut xtrace))
             .now_or_never()
@@ -958,7 +975,7 @@ mod tests {
     #[test]
     fn xtrace_here_doc() {
         let mut xtrace = XTrace::new();
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let mut env = RedirGuard::new(&mut env);
 
         let redir = Redir {
@@ -993,7 +1010,7 @@ mod tests {
 
     #[test]
     fn file_in_closes_opened_file_on_error() {
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let mut env = RedirGuard::new(&mut env);
         let redir = "999999999</dev/stdin".parse().unwrap();
         let e = env
@@ -1014,7 +1031,7 @@ mod tests {
 
     #[test]
     fn file_out_creates_empty_file() {
-        let system = VirtualSystem::new();
+        let system = system_with_nofile_limit();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
@@ -1035,7 +1052,7 @@ mod tests {
     #[test]
     fn file_out_truncates_existing_file() {
         let file = Rc::new(RefCell::new(INode::new([42, 123, 254])));
-        let system = VirtualSystem::new();
+        let system = system_with_nofile_limit();
         let mut state = system.state.borrow_mut();
         state.file_system.save("foo", Rc::clone(&file)).unwrap();
         drop(state);
@@ -1057,7 +1074,7 @@ mod tests {
     #[test]
     fn file_out_noclobber_with_regular_file() {
         let file = Rc::new(RefCell::new(INode::new([42, 123, 254])));
-        let system = VirtualSystem::new();
+        let system = system_with_nofile_limit();
         let mut state = system.state.borrow_mut();
         state.file_system.save("foo", Rc::clone(&file)).unwrap();
         drop(state);
@@ -1094,7 +1111,7 @@ mod tests {
             permissions: Default::default(),
         };
         let file = Rc::new(RefCell::new(inode));
-        let system = VirtualSystem::new();
+        let system = system_with_nofile_limit();
         let mut state = system.state.borrow_mut();
         state.file_system.save("foo", Rc::clone(&file)).unwrap();
         drop(state);
@@ -1109,7 +1126,7 @@ mod tests {
 
     #[test]
     fn file_out_closes_opened_file_on_error() {
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let mut env = RedirGuard::new(&mut env);
         let redir = "999999999>foo".parse().unwrap();
         let e = env
@@ -1129,7 +1146,7 @@ mod tests {
 
     #[test]
     fn file_clobber_creates_empty_file() {
-        let system = VirtualSystem::new();
+        let system = system_with_nofile_limit();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
@@ -1151,7 +1168,7 @@ mod tests {
     #[test]
     fn file_clobber_by_default_truncates_existing_file() {
         let file = Rc::new(RefCell::new(INode::new([42, 123, 254])));
-        let system = VirtualSystem::new();
+        let system = system_with_nofile_limit();
         let mut state = system.state.borrow_mut();
         state.file_system.save("foo", Rc::clone(&file)).unwrap();
         drop(state);
@@ -1174,7 +1191,7 @@ mod tests {
 
     #[test]
     fn file_clobber_closes_opened_file_on_error() {
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let mut env = RedirGuard::new(&mut env);
         let redir = "999999999>|foo".parse().unwrap();
         let e = env
@@ -1194,7 +1211,7 @@ mod tests {
 
     #[test]
     fn file_append_creates_empty_file() {
-        let system = VirtualSystem::new();
+        let system = system_with_nofile_limit();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
@@ -1216,7 +1233,7 @@ mod tests {
     #[test]
     fn file_append_appends_to_existing_file() {
         let file = Rc::new(RefCell::new(INode::new(*b"one\n")));
-        let system = VirtualSystem::new();
+        let system = system_with_nofile_limit();
         let mut state = system.state.borrow_mut();
         state.file_system.save("foo", Rc::clone(&file)).unwrap();
         drop(state);
@@ -1238,7 +1255,7 @@ mod tests {
 
     #[test]
     fn file_append_closes_opened_file_on_error() {
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let mut env = RedirGuard::new(&mut env);
         let redir = "999999999>>foo".parse().unwrap();
         let e = env
@@ -1258,7 +1275,7 @@ mod tests {
 
     #[test]
     fn file_in_out_creates_empty_file() {
-        let system = VirtualSystem::new();
+        let system = system_with_nofile_limit();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
@@ -1278,7 +1295,7 @@ mod tests {
 
     #[test]
     fn file_in_out_leaves_existing_file_content() {
-        let system = VirtualSystem::new();
+        let system = system_with_nofile_limit();
         let file = Rc::new(RefCell::new(INode::new([132, 79, 210])));
         let mut state = system.state.borrow_mut();
         state.file_system.save("foo", file).unwrap();
@@ -1299,7 +1316,7 @@ mod tests {
 
     #[test]
     fn file_in_out_closes_opened_file_on_error() {
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let mut env = RedirGuard::new(&mut env);
         let redir = "999999999<>foo".parse().unwrap();
         let e = env
@@ -1320,7 +1337,7 @@ mod tests {
     #[test]
     fn fd_in_copies_fd() {
         for fd in [Fd(0), Fd(3)] {
-            let system = VirtualSystem::new();
+            let system = system_with_nofile_limit();
             let state = Rc::clone(&system.state);
             state
                 .borrow_mut()
@@ -1346,7 +1363,7 @@ mod tests {
 
     #[test]
     fn fd_in_closes_fd() {
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let mut env = RedirGuard::new(&mut env);
         let redir = "<& -".parse().unwrap();
         env.perform_redir(&redir, None)
@@ -1361,7 +1378,7 @@ mod tests {
 
     #[test]
     fn fd_in_rejects_unreadable_fd() {
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let mut env = RedirGuard::new(&mut env);
         let redir = "3>foo".parse().unwrap();
         env.perform_redir(&redir, None)
@@ -1381,7 +1398,7 @@ mod tests {
 
     #[test]
     fn fd_in_rejects_unopened_fd() {
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let mut env = RedirGuard::new(&mut env);
 
         let redir = "3<&3".parse().unwrap();
@@ -1396,7 +1413,7 @@ mod tests {
 
     #[test]
     fn fd_in_rejects_fd_with_cloexec() {
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         env.system.fcntl_setfd(Fd(0), FdFlag::FD_CLOEXEC).unwrap();
 
         let mut env = RedirGuard::new(&mut env);
@@ -1412,7 +1429,7 @@ mod tests {
 
     #[test]
     fn keep_target_fd_open_on_error_in_fd_in() {
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let mut env = RedirGuard::new(&mut env);
         let redir = "999999999<&0".parse().unwrap();
         let e = env
@@ -1434,7 +1451,7 @@ mod tests {
     #[test]
     fn fd_out_copies_fd() {
         for fd in [Fd(1), Fd(4)] {
-            let system = VirtualSystem::new();
+            let system = system_with_nofile_limit();
             let state = Rc::clone(&system.state);
             let mut env = Env::with_system(Box::new(system));
             let mut env = RedirGuard::new(&mut env);
@@ -1455,7 +1472,7 @@ mod tests {
 
     #[test]
     fn fd_out_closes_fd() {
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let mut env = RedirGuard::new(&mut env);
         let redir = ">& -".parse().unwrap();
         env.perform_redir(&redir, None)
@@ -1470,7 +1487,7 @@ mod tests {
 
     #[test]
     fn fd_out_rejects_unwritable_fd() {
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let mut env = RedirGuard::new(&mut env);
         let redir = "3</dev/stdin".parse().unwrap();
         env.perform_redir(&redir, None)
@@ -1490,7 +1507,7 @@ mod tests {
 
     #[test]
     fn fd_out_rejects_unopened_fd() {
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let mut env = RedirGuard::new(&mut env);
 
         let redir = "3>&3".parse().unwrap();
@@ -1505,7 +1522,7 @@ mod tests {
 
     #[test]
     fn fd_out_rejects_fd_with_cloexec() {
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         env.system.fcntl_setfd(Fd(1), FdFlag::FD_CLOEXEC).unwrap();
 
         let mut env = RedirGuard::new(&mut env);
@@ -1521,7 +1538,7 @@ mod tests {
 
     #[test]
     fn keep_target_fd_open_on_error_in_fd_out() {
-        let mut env = Env::new_virtual();
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let mut env = RedirGuard::new(&mut env);
         let redir = "999999999>&1".parse().unwrap();
         let e = env

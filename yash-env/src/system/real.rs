@@ -16,6 +16,8 @@
 
 //! Implementation of `System` that actually interacts with the system.
 
+use super::resource::LimitPair;
+use super::resource::Resource;
 use super::AtFlags;
 use super::ChildProcessStarter;
 use super::Dir;
@@ -65,6 +67,38 @@ use std::sync::atomic::compiler_fence;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering;
 use std::time::Instant;
+
+trait ErrnoIfM1: PartialEq + Sized {
+    const MINUS_1: Self;
+
+    /// Convenience function to convert a result of -1 to an `Error` with the
+    /// current `errno`.
+    ///
+    /// This function is intended to be used just after calling a function that
+    /// returns -1 on error and sets `errno` to the error number. This function
+    /// filters out the `-1` result and returns an error containing the current
+    /// `errno`.
+    fn errno_if_m1(self) -> std::io::Result<Self> {
+        if self == Self::MINUS_1 {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok(self)
+        }
+    }
+}
+
+impl ErrnoIfM1 for i8 {
+    const MINUS_1: Self = -1;
+}
+impl ErrnoIfM1 for i16 {
+    const MINUS_1: Self = -1;
+}
+impl ErrnoIfM1 for i32 {
+    const MINUS_1: Self = -1;
+}
+impl ErrnoIfM1 for i64 {
+    const MINUS_1: Self = -1;
+}
 
 fn is_executable(path: &CStr) -> bool {
     let flags = AccessFlags::X_OK;
@@ -479,6 +513,28 @@ impl System for RealSystem {
 
         #[allow(unreachable_code)]
         Err(Errno::ENOSYS)
+    }
+
+    fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair> {
+        let raw_resource = resource
+            .as_raw_type()
+            .ok_or_else(|| std::io::Error::from_raw_os_error(nix::libc::EINVAL as _))?;
+
+        let mut limits = MaybeUninit::<nix::libc::rlimit>::uninit();
+        unsafe { nix::libc::getrlimit(raw_resource as _, limits.as_mut_ptr()) }.errno_if_m1()?;
+        let limits = unsafe { limits.assume_init() };
+        Ok(limits.into())
+    }
+
+    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> std::io::Result<()> {
+        let raw_resource = resource
+            .as_raw_type()
+            .ok_or_else(|| std::io::Error::from_raw_os_error(nix::libc::EINVAL as _))?;
+
+        let limits = limits.into();
+        unsafe { nix::libc::setrlimit(raw_resource as _, &limits) }
+            .errno_if_m1()
+            .map(drop)
     }
 }
 
