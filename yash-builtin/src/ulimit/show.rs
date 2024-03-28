@@ -118,19 +118,20 @@ mod tests {
              -t: CPU time (seconds)               unlimited\n\
              -d: data segment size (KiB)          unlimited\n\
              -f: file size (512-byte blocks)      unlimited\n\
-             -\0: unknown resource                 unlimited\n\
+             -k: number of kqueues                unlimited\n\
+             -x: number of file locks             unlimited\n\
              -l: locked memory size (KiB)         unlimited\n\
              -q: message queue size (bytes)       unlimited\n\
              -e: process priority (20 - nice)     unlimited\n\
              -n: number of open files             unlimited\n\
              -u: number of processes              unlimited\n\
              -m: resident set size (KiB)          unlimited\n\
-             -\0: unknown resource                 unlimited\n\
-             -\0: unknown resource                 unlimited\n\
-             -\0: unknown resource                 unlimited\n\
-             -\0: unknown resource                 unlimited\n\
-             -\0: unknown resource                 unlimited\n\
-             -\0: unknown resource                 unlimited\n"
+             -r: real-time priority               unlimited\n\
+             -R: real-time timeout (microseconds) unlimited\n\
+             -b: socket buffer size (bytes)       unlimited\n\
+             -i: number of pending signals        unlimited\n\
+             -s: stack size (KiB)                 unlimited\n\
+             -w: swap space size (KiB)            unlimited\n"
         );
     }
 

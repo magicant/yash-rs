@@ -60,9 +60,10 @@ pub enum Resource {
     DATA,
     /// Maximum size of a file the process can create
     FSIZE,
-    /// TODO
+    /// Maximum number of kernel event queues (kqueues)
     KQUEUES,
-    // LOCKS,
+    /// Maximum number of file locks the process can hold
+    LOCKS,
     /// Maximum size of memory locked into RAM
     MEMLOCK,
     /// Maximum total size of POSIX message queues
@@ -79,17 +80,18 @@ pub enum Resource {
     NPROC,
     /// Maximum physical memory size of the process
     RSS,
-    ///
+    /// Maximum real-time priority
     RTPRIO,
-    ///
+    /// Maximum amount of CPU time the process can consume in real-time
+    /// scheduling mode without a blocking system call (microseconds)
     RTTIME,
-    ///
+    /// Maximum size of the socket buffer
     SBSIZE,
-    ///
+    /// Maximum number of signals that can be queued to the process
     SIGPENDING,
     /// Maximum size of the process stack
     STACK,
-    ///
+    /// Maximum size of the swap space that can be used by the user
     SWAP,
 }
 
@@ -102,7 +104,7 @@ impl Resource {
         Self::DATA,
         Self::FSIZE,
         Self::KQUEUES,
-        // Self::LOCKS,
+        Self::LOCKS,
         Self::MEMLOCK,
         Self::MSGQUEUE,
         Self::NICE,
@@ -130,9 +132,19 @@ impl Resource {
             Self::CPU => Some(nix::libc::RLIMIT_CPU as _),
             Self::DATA => Some(nix::libc::RLIMIT_DATA as _),
             Self::FSIZE => Some(nix::libc::RLIMIT_FSIZE as _),
-            // TODO Self::KQUEUES => Some(nix::libc::RLIMIT_KQUEUES as _),
+            #[cfg(target_os = "freebsd")]
+            Self::KQUEUES => Some(nix::libc::RLIMIT_KQUEUES as _),
+            #[cfg(any(target_os = "linux", target_os = "android", target_os = "emscripten"))]
+            Self::LOCKS => Some(nix::libc::RLIMIT_LOCKS as _),
             #[cfg(any(
-                target_os = "bsd",
+                target_os = "macos",
+                target_os = "ios",
+                target_os = "tvos",
+                target_os = "watchos",
+                target_os = "freebsd",
+                target_os = "dragonfly",
+                target_os = "openbsd",
+                target_os = "netbsd",
                 target_os = "linux",
                 target_os = "android",
                 target_os = "emscripten",
@@ -146,7 +158,14 @@ impl Resource {
             Self::NOFILE => Some(nix::libc::RLIMIT_NOFILE as _),
             #[cfg(any(
                 target_os = "aix",
-                target_os = "bsd",
+                target_os = "macos",
+                target_os = "ios",
+                target_os = "tvos",
+                target_os = "watchos",
+                target_os = "freebsd",
+                target_os = "dragonfly",
+                target_os = "openbsd",
+                target_os = "netbsd",
                 target_os = "linux",
                 target_os = "android",
                 target_os = "emscripten",
@@ -155,19 +174,31 @@ impl Resource {
             Self::NPROC => Some(nix::libc::RLIMIT_NPROC as _),
             #[cfg(any(
                 target_os = "aix",
-                target_os = "bsd",
+                target_os = "macos",
+                target_os = "ios",
+                target_os = "tvos",
+                target_os = "watchos",
+                target_os = "freebsd",
+                target_os = "dragonfly",
+                target_os = "openbsd",
+                target_os = "netbsd",
                 target_os = "linux",
                 target_os = "android",
                 target_os = "emscripten",
                 target_os = "nto"
             ))]
             Self::RSS => Some(nix::libc::RLIMIT_RSS as _),
-            // TODO Self::RTPRIO => Some(nix::libc::RLIMIT_RTPRIO as _),
-            // TODO Self::RTTIME => Some(nix::libc::RLIMIT_RTTIME as _),
-            // TODO Self::SBSIZE => Some(nix::libc::RLIMIT_SBSIZE as _),
-            // TODO Self::SIGPENDING => Some(nix::libc::RLIMIT_SIGPENDING as _),
+            #[cfg(any(target_os = "linux", target_os = "android", target_os = "emscripten"))]
+            Self::RTPRIO => Some(nix::libc::RLIMIT_RTPRIO as _),
+            #[cfg(target_os = "linux")]
+            Self::RTTIME => Some(nix::libc::RLIMIT_RTTIME as _),
+            #[cfg(any(target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd"))]
+            Self::SBSIZE => Some(nix::libc::RLIMIT_SBSIZE as _),
+            #[cfg(any(target_os = "linux", target_os = "android", target_os = "emscripten"))]
+            Self::SIGPENDING => Some(nix::libc::RLIMIT_SIGPENDING as _),
             Self::STACK => Some(nix::libc::RLIMIT_STACK as _),
-            // TODO Self::SWAP => Some(nix::libc::RLIMIT_SWAP as _),
+            #[cfg(target_os = "freebsd")]
+            Self::SWAP => Some(nix::libc::RLIMIT_SWAP as _),
             _ => None,
         }
     }
