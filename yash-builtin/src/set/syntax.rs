@@ -16,6 +16,7 @@
 
 //! Command line argument parser for the set built-in
 
+use super::Command;
 use std::iter::Peekable;
 use thiserror::Error;
 use yash_env::option::canonicalize;
@@ -27,27 +28,6 @@ use yash_env::semantics::Field;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
-
-/// Parse result
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Parse {
-    /// No arguments: print all variables
-    PrintVariables,
-
-    /// Single argument `-o`: print options (human-readable)
-    PrintOptionsHumanReadable,
-
-    /// Single argument `+o`: print options (machine-readable)
-    PrintOptionsMachineReadable,
-
-    /// Other: modify options and/or positional parameters
-    Modify {
-        /// Options to be modified
-        options: Vec<(yash_env::option::Option, State)>,
-        /// New positional parameters (unless `None`)
-        positional_params: std::option::Option<Vec<Field>>,
-    },
-}
 
 /// Error in command line parsing
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -201,12 +181,12 @@ fn try_parse_long<I: Iterator<Item = Field>>(
 }
 
 /// Parses command line arguments.
-pub fn parse(args: Vec<Field>) -> Result<Parse, Error> {
+pub fn parse(args: Vec<Field>) -> Result<Command, Error> {
     match args.len() {
-        0 => return Ok(Parse::PrintVariables),
+        0 => return Ok(Command::PrintVariables),
         1 => match args[0].value.as_str() {
-            "-o" => return Ok(Parse::PrintOptionsHumanReadable),
-            "+o" => return Ok(Parse::PrintOptionsMachineReadable),
+            "-o" => return Ok(Command::PrintOptionsHumanReadable),
+            "+o" => return Ok(Command::PrintOptionsMachineReadable),
             _ => (),
         },
         _ => (),
@@ -235,7 +215,7 @@ pub fn parse(args: Vec<Field>) -> Result<Parse, Error> {
 
     let positional_params = (separated || args.peek().is_some()).then(|| args.collect());
 
-    Ok(Parse::Modify {
+    Ok(Command::Modify {
         options,
         positional_params,
     })
@@ -250,14 +230,14 @@ mod tests {
 
     #[test]
     fn simple_cases() {
-        assert_eq!(parse(vec![]), Ok(Parse::PrintVariables));
+        assert_eq!(parse(vec![]), Ok(Command::PrintVariables));
         assert_eq!(
             parse(Field::dummies(["-o"])),
-            Ok(Parse::PrintOptionsHumanReadable)
+            Ok(Command::PrintOptionsHumanReadable)
         );
         assert_eq!(
             parse(Field::dummies(["+o"])),
-            Ok(Parse::PrintOptionsMachineReadable)
+            Ok(Command::PrintOptionsMachineReadable)
         );
     }
 
@@ -265,7 +245,7 @@ mod tests {
     fn positional_params_only() {
         assert_matches!(
             parse(Field::dummies(["foo"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -278,7 +258,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies([""])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -291,7 +271,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["a", "b", "c"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -309,7 +289,7 @@ mod tests {
     fn double_hyphen_separator_and_positional_params() {
         assert_matches!(
             parse(Field::dummies(["--"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -320,7 +300,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["--", "foo", "bar"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -334,7 +314,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["--", "--"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -347,7 +327,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["--", "-"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -360,7 +340,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["--", "-a"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -376,7 +356,7 @@ mod tests {
     fn single_hyphen_separator_and_positional_params() {
         assert_matches!(
             parse(Field::dummies(["-"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -387,7 +367,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-", "foo", "bar"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -401,7 +381,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-", "-"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -414,7 +394,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-", "--"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -427,7 +407,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-", "-a"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -443,7 +423,7 @@ mod tests {
     fn short_options() {
         assert_matches!(
             parse(Field::dummies(["-a"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -454,7 +434,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-uv"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -465,7 +445,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-u", "-v"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -479,7 +459,7 @@ mod tests {
     fn negated_short_options() {
         assert_matches!(
             parse(Field::dummies(["+a"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -490,7 +470,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["+uv"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -501,7 +481,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["+u", "-v"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -515,7 +495,7 @@ mod tests {
     fn o_options() {
         assert_matches!(
             parse(Field::dummies(["-oallexpo"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -526,7 +506,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-o all-Expo"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -537,7 +517,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-onounset"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -548,7 +528,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-o","NO_unset"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -562,7 +542,7 @@ mod tests {
     fn negated_o_options() {
         assert_matches!(
             parse(Field::dummies(["+oallexpo"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -573,7 +553,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["+o all-Expo"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -584,7 +564,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["+onounset"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -595,7 +575,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["+o","NO+unset"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -609,7 +589,7 @@ mod tests {
     fn long_options() {
         assert_matches!(
             parse(Field::dummies(["--allexpo"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -620,7 +600,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-- all-Expo"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -631,7 +611,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["--nounset"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -645,7 +625,7 @@ mod tests {
     fn negated_long_options() {
         assert_matches!(
             parse(Field::dummies(["++allexpo"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -656,7 +636,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["++ all-Expo"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -667,7 +647,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["++nounset"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -681,7 +661,7 @@ mod tests {
     fn options_and_separator() {
         assert_matches!(
             parse(Field::dummies(["-a", "--"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -692,7 +672,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-uv", "--", "-a"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -705,7 +685,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-n", "-", "--"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -721,7 +701,7 @@ mod tests {
     fn combinations() {
         assert_matches!(
             parse(Field::dummies(["+nononotify", "a", "-a"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {
@@ -735,7 +715,7 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-uno", "-notify", "++log", "--", "foo", "-v"])),
-            Ok(Parse::Modify {
+            Ok(Command::Modify {
                 options,
                 positional_params
             }) => {

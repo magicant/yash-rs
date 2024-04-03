@@ -139,6 +139,28 @@ use yash_env::semantics::Field;
 use yash_env::variable::Scope::Global;
 use yash_env::Env;
 
+/// Interpretation of command-line arguments that determine the behavior of the
+/// set built-in
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Command {
+    /// No arguments: print all variables
+    PrintVariables,
+
+    /// Single argument `-o`: print options (human-readable)
+    PrintOptionsHumanReadable,
+
+    /// Single argument `+o`: print options (machine-readable)
+    PrintOptionsMachineReadable,
+
+    /// Other: modify options and/or positional parameters
+    Modify {
+        /// Options to be modified
+        options: Vec<(yash_env::option::Option, State)>,
+        /// New positional parameters (unless `None`)
+        positional_params: std::option::Option<Vec<Field>>,
+    },
+}
+
 pub mod syntax;
 // TODO pub mod semantics;
 
@@ -175,7 +197,7 @@ fn modify(
 /// Entry point for executing the `set` built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     match syntax::parse(args) {
-        Ok(syntax::Parse::PrintVariables) => {
+        Ok(Command::PrintVariables) => {
             let mut vars: Vec<_> = env.variables.iter(Global).collect();
             // TODO apply current locale's collation
             vars.sort_unstable_by_key(|&(name, _)| name);
@@ -190,7 +212,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             output(env, &print).await
         }
 
-        Ok(syntax::Parse::PrintOptionsHumanReadable) => {
+        Ok(Command::PrintOptionsHumanReadable) => {
             let mut print = String::new();
             for option in yash_env::option::Option::iter() {
                 let state = env.options.get(option);
@@ -199,7 +221,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             output(env, &print).await
         }
 
-        Ok(syntax::Parse::PrintOptionsMachineReadable) => {
+        Ok(Command::PrintOptionsMachineReadable) => {
             let mut print = String::new();
             for option in yash_env::option::Option::iter() {
                 let skip = if option.is_modifiable() { "" } else { "#" };
@@ -212,7 +234,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             output(env, &print).await
         }
 
-        Ok(syntax::Parse::Modify {
+        Ok(Command::Modify {
             options,
             positional_params,
         }) => {
@@ -242,7 +264,7 @@ mod tests {
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
     use yash_env::VirtualSystem;
-    use yash_semantics::command::Command;
+    use yash_semantics::command::Command as _;
     use yash_syntax::syntax::List;
 
     #[test]
