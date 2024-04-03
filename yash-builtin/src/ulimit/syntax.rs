@@ -16,13 +16,14 @@
 
 //! Command-line argument parser for the `ulimit` built-in
 
-use super::{Command, ResourceExt as _, SetLimitType, ShowLimitType};
+use super::{Command, ResourceExt as _, SetLimitType, SetLimitValue, ShowLimitType};
 use crate::common::syntax::{parse_arguments, Mode, OptionSpec, ParseError};
 use std::borrow::Cow;
 use std::num::ParseIntError;
+use std::str::FromStr;
 use thiserror::Error;
 use yash_env::semantics::Field;
-use yash_env::system::resource::{rlim_t, Resource, RLIM_INFINITY};
+use yash_env::system::resource::Resource;
 use yash_env::Env;
 use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_syntax::source::Location;
@@ -177,7 +178,7 @@ pub fn parse(env: &Env, args: Vec<Field>) -> Result {
 
     if let Some(operand) = { operands }.pop() {
         let limit_type = set_limit_type(hard, soft);
-        let value = parse_value(operand, resource.scale())?;
+        let value = parse_value(operand)?;
         return Ok(Command::Set(resource, limit_type, value));
     }
 
@@ -203,30 +204,29 @@ fn set_limit_type(hard: Option<Location>, soft: Option<Location>) -> SetLimitTyp
     }
 }
 
-fn parse_value(operand: Field, scale: rlim_t) -> std::result::Result<rlim_t, Error> {
-    let value = &operand.value;
-    if value == "unlimited" {
-        return Ok(RLIM_INFINITY);
-    }
+fn parse_value(operand: Field) -> std::result::Result<SetLimitValue, Error> {
+    operand
+        .value
+        .parse()
+        .map_err(|e| Error::InvalidLimit(operand, e))
+}
 
-    match value.parse::<rlim_t>() {
-        Ok(value) => match value.checked_mul(scale) {
-            Some(limit) if limit != RLIM_INFINITY => Ok(limit),
+impl FromStr for SetLimitValue {
+    type Err = ParseIntError;
 
-            _ => {
-                let e = "999".parse::<u8>().unwrap_err();
-                Err(Error::InvalidLimit(operand, e))
-            }
-        },
-
-        Err(e) => Err(Error::InvalidLimit(operand, e)),
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "unlimited" => Ok(Self::Unlimited),
+            "soft" => Ok(Self::CurrentSoft),
+            "hard" => Ok(Self::CurrentHard),
+            _ => Ok(Self::Number(s.parse()?)),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
 
     #[test]
     fn show_default_soft_default_fsize() {
@@ -305,7 +305,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(Resource::FSIZE, SetLimitType::Both, 0))
+            Ok(Command::Set(
+                Resource::FSIZE,
+                SetLimitType::Both,
+                SetLimitValue::Number(0)
+            ))
         );
     }
 
@@ -315,7 +319,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-S", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(Resource::FSIZE, SetLimitType::Soft, 0))
+            Ok(Command::Set(
+                Resource::FSIZE,
+                SetLimitType::Soft,
+                SetLimitValue::Number(0)
+            ))
         );
     }
 
@@ -325,17 +333,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-H", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(Resource::FSIZE, SetLimitType::Hard, 0))
-        );
-    }
-
-    #[test]
-    fn set_scale() {
-        let env = Env::new_virtual();
-        let result = parse(&env, Field::dummies(["10"]));
-        assert_eq!(
-            result,
-            Ok(Command::Set(Resource::FSIZE, SetLimitType::Both, 5120))
+            Ok(Command::Set(
+                Resource::FSIZE,
+                SetLimitType::Hard,
+                SetLimitValue::Number(0)
+            ))
         );
     }
 
@@ -345,7 +347,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-d", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(Resource::DATA, SetLimitType::Both, 0))
+            Ok(Command::Set(
+                Resource::DATA,
+                SetLimitType::Both,
+                SetLimitValue::Number(0)
+            ))
         );
     }
 
@@ -355,7 +361,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-Sd", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(Resource::DATA, SetLimitType::Soft, 0))
+            Ok(Command::Set(
+                Resource::DATA,
+                SetLimitType::Soft,
+                SetLimitValue::Number(0)
+            ))
         );
     }
 
@@ -365,7 +375,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-Hd", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(Resource::DATA, SetLimitType::Hard, 0))
+            Ok(Command::Set(
+                Resource::DATA,
+                SetLimitType::Hard,
+                SetLimitValue::Number(0)
+            ))
         );
     }
 
@@ -378,7 +392,7 @@ mod tests {
             Ok(Command::Set(
                 Resource::FSIZE,
                 SetLimitType::Both,
-                RLIM_INFINITY
+                SetLimitValue::Unlimited
             ))
         );
     }
@@ -409,7 +423,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-HS", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(Resource::FSIZE, SetLimitType::Both, 0))
+            Ok(Command::Set(
+                Resource::FSIZE,
+                SetLimitType::Both,
+                SetLimitValue::Number(0)
+            ))
         );
     }
 
@@ -419,7 +437,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-H", "-H", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(Resource::FSIZE, SetLimitType::Hard, 0))
+            Ok(Command::Set(
+                Resource::FSIZE,
+                SetLimitType::Hard,
+                SetLimitValue::Number(0)
+            ))
         );
     }
 
@@ -436,30 +458,12 @@ mod tests {
         let result = parse(&env, Field::dummies(["-dd", "-d", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(Resource::DATA, SetLimitType::Both, 0))
+            Ok(Command::Set(
+                Resource::DATA,
+                SetLimitType::Both,
+                SetLimitValue::Number(0)
+            ))
         );
-    }
-
-    #[test]
-    fn too_large_limit() {
-        let env = Env::new_virtual();
-        let arg = Field::dummy(rlim_t::MAX.to_string());
-        let result = parse(&env, vec![arg.clone()]);
-        assert_matches!(result, Err(Error::InvalidLimit(a, e)) => {
-            assert_eq!(a, arg);
-            assert_eq!(e.kind(), &std::num::IntErrorKind::PosOverflow);
-        });
-    }
-
-    #[test]
-    fn limit_equal_to_rlim_infinity_not_acceptable() {
-        let env = Env::new_virtual();
-        let arg = Field::dummy(RLIM_INFINITY.to_string());
-        let result = parse(&env, vec![Field::dummy("-t"), arg.clone()]);
-        assert_matches!(result, Err(Error::InvalidLimit(a, e)) => {
-            assert_eq!(a, arg);
-            assert_eq!(e.kind(), &std::num::IntErrorKind::PosOverflow);
-        });
     }
 
     #[test]
@@ -468,5 +472,27 @@ mod tests {
         let args = Field::dummies(["0", "1"]);
         let result = parse(&env, args.clone());
         assert_eq!(result, Err(Error::TooManyOperands(args)));
+    }
+
+    #[test]
+    fn set_limit_value_from_str_number() {
+        assert_eq!("0".parse(), Ok(SetLimitValue::Number(0)));
+        assert_eq!("1".parse(), Ok(SetLimitValue::Number(1)));
+        assert_eq!("100".parse(), Ok(SetLimitValue::Number(100)));
+    }
+
+    #[test]
+    fn set_limit_value_from_str_unlimited() {
+        assert_eq!("unlimited".parse(), Ok(SetLimitValue::Unlimited));
+    }
+
+    #[test]
+    fn set_limit_value_from_str_soft() {
+        assert_eq!("soft".parse(), Ok(SetLimitValue::CurrentSoft));
+    }
+
+    #[test]
+    fn set_limit_value_from_str_hard() {
+        assert_eq!("hard".parse(), Ok(SetLimitValue::CurrentHard));
     }
 }

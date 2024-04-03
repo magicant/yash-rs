@@ -168,6 +168,21 @@ pub enum SetLimitType {
     Both,
 }
 
+/// Value of the limit to set
+///
+/// See [`Command`].
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum SetLimitValue {
+    /// Numeric value (not scaled)
+    Number(rlim_t),
+    /// No limit
+    Unlimited,
+    /// Current soft limit
+    CurrentSoft,
+    /// Current hard limit
+    CurrentHard,
+}
+
 /// Interpretation of command-line arguments that determine the behavior of the
 /// `ulimit` built-in
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -177,7 +192,7 @@ pub enum Command {
     /// Show the current limit for a specific resource
     ShowOne(Resource, ShowLimitType),
     /// Set the limit for a specific resource
-    Set(Resource, SetLimitType, rlim_t),
+    Set(Resource, SetLimitType, SetLimitValue),
 }
 
 mod resource;
@@ -200,6 +215,9 @@ pub enum Error {
     /// does not have permission to raise the hard limit.
     #[error("no permission to raise hard limit")]
     NoPermissionToRaiseHardLimit,
+    /// The specified limit is out of range.
+    #[error("limit out of range")]
+    Overflow,
     /// Other error
     #[error(transparent)]
     Unknown(std::io::Error),
