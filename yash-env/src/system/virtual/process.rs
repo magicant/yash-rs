@@ -22,6 +22,9 @@ use super::Mode;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessState;
+use crate::system::resource::LimitPair;
+use crate::system::resource::Resource;
+use crate::system::resource::RLIM_INFINITY;
 use crate::system::SelectSystem;
 use crate::SignalHandling;
 use nix::sys::signal::SigSet;
@@ -35,22 +38,21 @@ use std::ffi::CString;
 use std::fmt::Debug;
 use std::ops::BitOr;
 use std::ops::BitOrAssign;
-use std::os::unix::io::RawFd;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Weak;
 use std::task::Waker;
 
-/// Process in a virtual system.
+/// Process in a virtual system
 #[derive(Clone, Debug)]
 pub struct Process {
-    /// Process ID of the parent process.
+    /// Process ID of the parent process
     pub(crate) ppid: Pid,
 
     /// Process group ID of this process
     pub(crate) pgid: Pid,
 
-    /// Set of file descriptors open in this process.
+    /// Set of file descriptors open in this process
     pub(crate) fds: BTreeMap<Fd, FdBody>,
 
     /// File creation mask
@@ -59,7 +61,7 @@ pub struct Process {
     /// Working directory path
     pub(crate) cwd: PathBuf,
 
-    /// Execution state of the process.
+    /// Execution state of the process
     pub(crate) state: ProcessState,
 
     /// True when `state` has changed but not yet reported to the parent
@@ -69,35 +71,35 @@ pub struct Process {
     /// process.
     state_has_changed: bool,
 
-    /// Wakers waiting for the state of this process to change to `Running`.
+    /// Wakers waiting for the state of this process to change to `Running`
     resumption_awaiters: Vec<Weak<Cell<Option<Waker>>>>,
 
-    /// Currently set signal handlers.
+    /// Currently set signal handlers
     ///
     /// For signals not contained in this hash map, the default handler is
     /// assumed.
     signal_handlings: HashMap<Signal, SignalHandling>,
 
-    /// Set of blocked signals.
+    /// Set of blocked signals
     blocked_signals: SigSet,
 
-    /// Set of pending signals.
+    /// Set of pending signals
     pending_signals: SigSet,
 
-    /// List of signals that have been delivered and caught.
+    /// List of signals that have been delivered and caught
     pub(crate) caught_signals: Vec<Signal>,
 
-    /// Maximum number of open file descriptors.
-    pub(crate) rlimit_nofile: RawFd,
+    /// Limits for system resources
+    pub(crate) resource_limits: HashMap<Resource, LimitPair>,
 
-    /// Weak reference to the `SelectSystem` for this process.
+    /// Weak reference to the `SelectSystem` for this process
     ///
     /// This weak reference is empty for the initial process of a
     /// `VirtualSystem`.  When a new child process is created, a weak reference
     /// to the `SelectSystem` for the child is set.
     pub(crate) selector: Weak<RefCell<SelectSystem>>,
 
-    /// Copy of arguments passed to [`execve`](crate::System::execve).
+    /// Copy of arguments passed to [`execve`](crate::System::execve)
     pub(crate) last_exec: Option<(CString, Vec<CString>, Vec<CString>)>,
 }
 
@@ -136,7 +138,7 @@ impl Process {
             blocked_signals: SigSet::empty(),
             pending_signals: SigSet::empty(),
             caught_signals: Vec::new(),
-            rlimit_nofile: 1 << 10,
+            resource_limits: HashMap::new(),
             selector: Weak::new(),
             last_exec: None,
         }
@@ -192,10 +194,17 @@ impl Process {
     /// Assigns the given FD to the body.
     ///
     /// If successful, returns an `Ok` value containing the previous body for
-    /// the FD. If the FD is equal to or greater than `rlimit_nofile`, returns
-    /// `Err(body)`.
+    /// the FD. If the FD is equal to or greater than the current soft limit for
+    /// `Resource::NOFILE`, returns `Err(body)`.
     pub fn set_fd(&mut self, fd: Fd, body: FdBody) -> Result<Option<FdBody>, FdBody> {
-        if fd.0 < self.rlimit_nofile {
+        let limit = self
+            .resource_limits
+            .get(&Resource::NOFILE)
+            .map(|l| l.soft)
+            .unwrap_or(RLIM_INFINITY);
+
+        #[allow(clippy::unnecessary_cast)]
+        if limit == RLIM_INFINITY || (fd.0 as u64) < limit as u64 {
             Ok(self.fds.insert(fd, body))
         } else {
             Err(body)

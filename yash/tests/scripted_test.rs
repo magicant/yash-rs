@@ -291,6 +291,11 @@ fn typeset_builtin() {
 }
 
 #[test]
+fn ulimit_builtin() {
+    run("ulimit-y.sh")
+}
+
+#[test]
 fn umask_builtin() {
     run("umask-p.sh")
 }

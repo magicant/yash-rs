@@ -80,6 +80,7 @@ pub mod trap;
 #[cfg(feature = "yash-semantics")]
 pub mod r#type;
 pub mod typeset;
+pub mod ulimit;
 pub mod umask;
 pub mod unalias;
 pub mod unset;
@@ -294,6 +295,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Elective,
             execute: |env, args| Box::pin(typeset::main(env, args)),
+        },
+    ),
+    (
+        "ulimit",
+        Builtin {
+            r#type: Mandatory,
+            execute: |env, args| Box::pin(ulimit::main(env, args)),
         },
     ),
     (
