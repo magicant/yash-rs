@@ -399,6 +399,27 @@ mod tests {
 
     #[test]
     fn set_unsupported_resource() {
-        // TODO
+        struct ResourcelessSystem;
+        impl Env for ResourcelessSystem {
+            fn getrlimit(&self, _resource: Resource) -> Result<LimitPair, std::io::Error> {
+                Err(ErrorKind::InvalidInput.into())
+            }
+            fn setrlimit(
+                &mut self,
+                _resource: Resource,
+                _limits: LimitPair,
+            ) -> Result<(), std::io::Error> {
+                Err(ErrorKind::InvalidInput.into())
+            }
+        }
+
+        let mut system = ResourcelessSystem;
+        let result = set(
+            &mut system,
+            Resource::CPU,
+            SetLimitType::Both,
+            SetLimitValue::Number(0),
+        );
+        assert_matches!(result, Err(Error::UnsupportedResource));
     }
 }
