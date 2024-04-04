@@ -45,6 +45,7 @@
 //! - `exec`
 //! - `read`
 //! - `source`
+//! - `type`
 //! - `wait`
 
 pub mod alias;
