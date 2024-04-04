@@ -78,6 +78,7 @@ pub mod shift;
 pub mod source;
 pub mod times;
 pub mod trap;
+pub mod r#true;
 #[cfg(feature = "yash-semantics")]
 pub mod r#type;
 pub mod typeset;
@@ -281,6 +282,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(trap::main(env, args)),
+        },
+    ),
+    (
+        "true",
+        Builtin {
+            r#type: Mandatory,
+            execute: |env, args| Box::pin(r#true::main(env, args)),
         },
     ),
     #[cfg(feature = "yash-semantics")]

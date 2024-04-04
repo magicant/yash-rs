@@ -286,6 +286,11 @@ fn trap_builtin() {
 }
 
 #[test]
+fn true_builtin() {
+    run("true-p.sh")
+}
+
+#[test]
 fn typeset_builtin() {
     run("typeset-y.sh")
 }
