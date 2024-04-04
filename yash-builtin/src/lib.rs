@@ -63,6 +63,7 @@ pub mod eval;
 pub mod exec;
 pub mod exit;
 pub mod export;
+pub mod r#false;
 pub mod fg;
 pub mod getopts;
 pub mod jobs;
@@ -189,6 +190,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(export::main(env, args)),
+        },
+    ),
+    (
+        "false",
+        Builtin {
+            r#type: Mandatory,
+            execute: |env, args| Box::pin(r#false::main(env, args)),
         },
     ),
     (

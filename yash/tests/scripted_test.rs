@@ -154,6 +154,11 @@ fn export_builtin() {
 }
 
 #[test]
+fn false_builtin() {
+    run("false-p.sh")
+}
+
+#[test]
 fn fg_builtin() {
     run_with_pty("fg-p.sh")
 }
