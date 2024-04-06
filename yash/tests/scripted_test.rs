@@ -104,6 +104,11 @@ fn break_builtin() {
 }
 
 #[test]
+fn builtins() {
+    run("builtins-p.sh")
+}
+
+#[test]
 fn case_command() {
     run("case-p.sh")
 }
@@ -131,6 +136,16 @@ fn comment() {
 #[test]
 fn continue_builtin() {
     run("continue-p.sh")
+}
+
+#[test]
+fn errexit_option() {
+    run("errexit-p.sh")
+}
+
+#[test]
+fn error_consequences() {
+    run("error-p.sh")
 }
 
 #[test]
@@ -174,6 +189,11 @@ fn field_splitting() {
 }
 
 #[test]
+fn for_loop() {
+    run("for-p.sh")
+}
+
+#[test]
 fn function() {
     run("function-p.sh")
 }
@@ -191,6 +211,16 @@ fn grouping() {
 #[test]
 fn if_command() {
     run("if-p.sh")
+}
+
+#[test]
+fn input() {
+    run("input-p.sh")
+}
+
+#[test]
+fn job_control() {
+    run_with_pty("job-p.sh")
 }
 
 #[test]
@@ -214,8 +244,23 @@ fn kill_builtin_4() {
 }
 
 #[test]
+fn lineno() {
+    run("lineno-p.sh")
+}
+
+#[test]
 fn nop_builtins() {
     run("nop-p.sh")
+}
+
+#[test]
+fn options() {
+    run("option-p.sh")
+}
+
+#[test]
+fn parameter_expansion() {
+    run("param-p.sh")
 }
 
 // a.k.a. globbing
@@ -257,6 +302,11 @@ fn redirection() {
 #[test]
 fn return_builtin() {
     run("return-p.sh")
+}
+
+#[test]
+fn set_builtin() {
+    run("set-p.sh")
 }
 
 #[test]
