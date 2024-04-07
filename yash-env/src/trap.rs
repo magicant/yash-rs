@@ -39,7 +39,7 @@ mod state;
 pub use self::cond::{Condition, ParseConditionError, Signal};
 pub use self::state::{Action, SetActionError, TrapState};
 use self::state::{EnterSubshellOption, GrandState};
-use crate::system::{NixErrno, SignalHandling};
+use crate::system::{Errno, SignalHandling};
 #[cfg(doc)]
 use crate::system::{SharedSystem, System};
 use std::collections::btree_map::Entry;
@@ -56,7 +56,7 @@ pub trait SignalSystem {
         &mut self,
         signal: Signal,
         handling: SignalHandling,
-    ) -> Result<SignalHandling, NixErrno>;
+    ) -> Result<SignalHandling, Errno>;
 }
 
 /// Iterator of trap actions configured in a [trap set](TrapSet).
@@ -291,10 +291,7 @@ impl TrapSet {
     ///
     /// This function remembers that the handler has been installed, so a second
     /// call to the function will be a no-op.
-    pub fn enable_sigchld_handler<S: SignalSystem>(
-        &mut self,
-        system: &mut S,
-    ) -> Result<(), NixErrno> {
+    pub fn enable_sigchld_handler<S: SignalSystem>(&mut self, system: &mut S) -> Result<(), Errno> {
         let entry = self.traps.entry(Condition::Signal(Signal::SIGCHLD));
         GrandState::set_internal_handler(system, entry, SignalHandling::Catch)
     }
@@ -310,7 +307,7 @@ impl TrapSet {
     pub fn enable_terminator_handlers<S: SignalSystem>(
         &mut self,
         system: &mut S,
-    ) -> Result<(), NixErrno> {
+    ) -> Result<(), Errno> {
         let entry = self.traps.entry(Condition::Signal(Signal::SIGINT));
         GrandState::set_internal_handler(system, entry, SignalHandling::Catch)?;
 
@@ -331,7 +328,7 @@ impl TrapSet {
     pub fn enable_stopper_handlers<S: SignalSystem>(
         &mut self,
         system: &mut S,
-    ) -> Result<(), NixErrno> {
+    ) -> Result<(), Errno> {
         let entry = self.traps.entry(Condition::Signal(Signal::SIGTSTP));
         GrandState::set_internal_handler(system, entry, SignalHandling::Ignore)?;
 
@@ -346,7 +343,7 @@ impl TrapSet {
         &mut self,
         signal: Signal,
         system: &mut S,
-    ) -> Result<(), NixErrno> {
+    ) -> Result<(), Errno> {
         let entry = self.traps.entry(Condition::Signal(signal));
         GrandState::set_internal_handler(system, entry, SignalHandling::Default)
     }
@@ -355,7 +352,7 @@ impl TrapSet {
     pub fn disable_terminator_handlers<S: SignalSystem>(
         &mut self,
         system: &mut S,
-    ) -> Result<(), NixErrno> {
+    ) -> Result<(), Errno> {
         self.disable_internal_handler(Signal::SIGINT, system)?;
         self.disable_internal_handler(Signal::SIGTERM, system)?;
         self.disable_internal_handler(Signal::SIGQUIT, system)
@@ -365,7 +362,7 @@ impl TrapSet {
     pub fn disable_stopper_handlers<S: SignalSystem>(
         &mut self,
         system: &mut S,
-    ) -> Result<(), NixErrno> {
+    ) -> Result<(), Errno> {
         self.disable_internal_handler(Signal::SIGTSTP, system)?;
         self.disable_internal_handler(Signal::SIGTTIN, system)?;
         self.disable_internal_handler(Signal::SIGTTOU, system)
@@ -379,7 +376,7 @@ impl TrapSet {
     pub fn disable_internal_handlers<S: SignalSystem>(
         &mut self,
         system: &mut S,
-    ) -> Result<(), NixErrno> {
+    ) -> Result<(), Errno> {
         self.disable_internal_handler(Signal::SIGCHLD, system)?;
         self.disable_terminator_handlers(system)?;
         self.disable_stopper_handlers(system)
@@ -412,7 +409,7 @@ mod tests {
             &mut self,
             signal: Signal,
             handling: SignalHandling,
-        ) -> Result<SignalHandling, NixErrno> {
+        ) -> Result<SignalHandling, Errno> {
             Ok(self
                 .0
                 .insert(signal, handling)

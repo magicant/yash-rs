@@ -20,7 +20,7 @@
 //!
 //! [`select`]: crate::system::System::select
 
-use nix::errno::Errno;
+use super::Errno;
 use nix::libc;
 use std::os::fd::RawFd;
 use thiserror::Error;

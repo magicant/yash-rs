@@ -24,12 +24,13 @@ use super::Dir;
 use super::DirEntry;
 #[cfg(doc)]
 use super::Env;
+use super::Errno;
 use super::FdFlag;
 use super::FdSet;
 use super::FileStat;
 use super::Mode;
-use super::NixErrno;
 use super::OFlag;
+use super::Result;
 use super::SigSet;
 use super::SigmaskHow;
 use super::Signal;
@@ -40,6 +41,7 @@ use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessState;
 use crate::SignalHandling;
+use nix::errno::Errno as NixErrno;
 use nix::libc::DIR;
 use nix::libc::{S_IFDIR, S_IFMT, S_IFREG};
 use nix::sys::signal::SaFlags;
@@ -78,9 +80,9 @@ trait ErrnoIfM1: PartialEq + Sized {
     /// returns -1 on error and sets `errno` to the error number. This function
     /// filters out the `-1` result and returns an error containing the current
     /// `errno`.
-    fn errno_if_m1(self) -> std::io::Result<Self> {
+    fn errno_if_m1(self) -> Result<Self> {
         if self == Self::MINUS_1 {
-            Err(std::io::Error::last_os_error())
+            Err(Errno::last())
         } else {
             Ok(self)
         }
@@ -97,6 +99,9 @@ impl ErrnoIfM1 for i32 {
     const MINUS_1: Self = -1;
 }
 impl ErrnoIfM1 for i64 {
+    const MINUS_1: Self = -1;
+}
+impl ErrnoIfM1 for isize {
     const MINUS_1: Self = -1;
 }
 
@@ -166,12 +171,12 @@ impl RealSystem {
 }
 
 impl System for RealSystem {
-    fn fstat(&self, fd: Fd) -> nix::Result<FileStat> {
-        nix::sys::stat::fstat(fd.0)
+    fn fstat(&self, fd: Fd) -> Result<FileStat> {
+        Ok(nix::sys::stat::fstat(fd.0)?)
     }
 
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat> {
-        nix::sys::stat::fstatat(dir_fd.0, path, flags)
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> Result<FileStat> {
+        Ok(nix::sys::stat::fstatat(dir_fd.0, path, flags)?)
     }
 
     fn is_executable_file(&self, path: &CStr) -> bool {
@@ -182,92 +187,94 @@ impl System for RealSystem {
         is_directory(path)
     }
 
-    fn pipe(&mut self) -> nix::Result<(Fd, Fd)> {
-        nix::unistd::pipe().map(|(reader, writer)| (Fd(reader), Fd(writer)))
+    fn pipe(&mut self) -> Result<(Fd, Fd)> {
+        let (reader, writer) = nix::unistd::pipe()?;
+        Ok((Fd(reader), Fd(writer)))
     }
 
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> nix::Result<Fd> {
+    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> Result<Fd> {
         let arg = if flags.contains(FdFlag::FD_CLOEXEC) {
             nix::fcntl::FcntlArg::F_DUPFD_CLOEXEC
         } else {
             nix::fcntl::FcntlArg::F_DUPFD
         };
-        nix::fcntl::fcntl(from.0, arg(to_min.0)).map(Fd)
+        Ok(Fd(nix::fcntl::fcntl(from.0, arg(to_min.0))?))
     }
 
-    fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd> {
+    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
         loop {
             match nix::unistd::dup2(from.0, to.0) {
                 Ok(fd) => return Ok(Fd(fd)),
                 Err(NixErrno::EINTR) => (),
-                Err(e) => return Err(e),
+                Err(e) => return Err(e.into()),
             }
         }
     }
 
-    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> nix::Result<Fd> {
-        nix::fcntl::open(path, option, mode).map(Fd)
+    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd> {
+        Ok(Fd(nix::fcntl::open(path, option, mode)?))
     }
 
-    fn open_tmpfile(&mut self, parent_dir: &Path) -> nix::Result<Fd> {
+    fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
         match tempfile::tempfile_in(parent_dir) {
             Ok(file) => Ok(Fd(file.into_raw_fd())),
-            Err(error) => {
-                let errno = error.raw_os_error().unwrap_or(0);
-                Err(NixErrno::from_i32(errno))
-            }
+            Err(error) => Err(Errno(error.raw_os_error().unwrap_or(0))),
         }
     }
 
-    fn close(&mut self, fd: Fd) -> nix::Result<()> {
+    fn close(&mut self, fd: Fd) -> Result<()> {
         loop {
             match nix::unistd::close(fd.0) {
                 Err(NixErrno::EBADF) => return Ok(()),
                 Err(NixErrno::EINTR) => (),
-                other => return other,
+                other => return Ok(other?),
             }
         }
     }
 
-    fn fcntl_getfl(&self, fd: Fd) -> nix::Result<OFlag> {
-        nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_GETFL).map(OFlag::from_bits_truncate)
+    fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag> {
+        let bits = nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_GETFL)?;
+        Ok(OFlag::from_bits_truncate(bits))
     }
 
-    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> nix::Result<()> {
-        nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_SETFL(flags)).map(drop)
+    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> Result<()> {
+        let _ = nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_SETFL(flags))?;
+        Ok(())
     }
 
-    fn fcntl_getfd(&self, fd: Fd) -> nix::Result<FdFlag> {
-        nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_GETFD).map(FdFlag::from_bits_truncate)
+    fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag> {
+        let bits = nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_GETFD)?;
+        Ok(FdFlag::from_bits_truncate(bits))
     }
 
-    fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> nix::Result<()> {
-        nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_SETFD(flags)).map(drop)
+    fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> Result<()> {
+        let _ = nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_SETFD(flags))?;
+        Ok(())
     }
 
-    fn isatty(&self, fd: Fd) -> nix::Result<bool> {
-        nix::unistd::isatty(fd.0)
+    fn isatty(&self, fd: Fd) -> Result<bool> {
+        Ok(nix::unistd::isatty(fd.0)?)
     }
 
-    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
+    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
         loop {
             let result = nix::unistd::read(fd.0, buffer);
             if result != Err(NixErrno::EINTR) {
-                return result;
+                return Ok(result?);
             }
         }
     }
 
-    fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
+    fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {
         loop {
             let result = nix::unistd::write(fd.0, buffer);
             if result != Err(NixErrno::EINTR) {
-                return result;
+                return Ok(result?);
             }
         }
     }
 
-    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> nix::Result<u64> {
+    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
         use nix::unistd::Whence::*;
         let (offset, whence) = match position {
             SeekFrom::Start(offset) => {
@@ -277,16 +284,17 @@ impl System for RealSystem {
             SeekFrom::End(offset) => (offset, SeekEnd),
             SeekFrom::Current(offset) => (offset, SeekCur),
         };
-        nix::unistd::lseek(fd.0, offset, whence).map(|new_offset| new_offset as u64)
+        let new_offset = nix::unistd::lseek(fd.0, offset, whence)?;
+        Ok(new_offset as u64)
     }
 
-    fn fdopendir(&mut self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
+    fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
         let dir = unsafe { nix::libc::fdopendir(fd.0) };
         let dir = NonNull::new(dir).ok_or_else(NixErrno::last)?;
         Ok(Box::new(RealDir(dir)))
     }
 
-    fn opendir(&mut self, path: &CStr) -> nix::Result<Box<dyn Dir>> {
+    fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
         let dir = unsafe { nix::libc::opendir(path.as_ptr()) };
         let dir = NonNull::new(dir).ok_or_else(NixErrno::last)?;
         Ok(Box::new(RealDir(dir)))
@@ -300,17 +308,17 @@ impl System for RealSystem {
         Instant::now()
     }
 
-    fn times(&self) -> nix::Result<Times> {
+    fn times(&self) -> Result<Times> {
         let mut tms = MaybeUninit::<nix::libc::tms>::uninit();
         let raw_result = unsafe { nix::libc::times(tms.as_mut_ptr()) };
         if raw_result == (-1) as _ {
-            return Err(NixErrno::last());
+            return Err(Errno::last());
         }
         let tms = unsafe { tms.assume_init() };
 
         let ticks_per_second = unsafe { nix::libc::sysconf(nix::libc::_SC_CLK_TCK) };
         if ticks_per_second <= 0 {
-            return Err(NixErrno::last());
+            return Err(Errno::last());
         }
 
         Ok(Times {
@@ -326,15 +334,12 @@ impl System for RealSystem {
         how: SigmaskHow,
         set: Option<&SigSet>,
         oldset: Option<&mut SigSet>,
-    ) -> nix::Result<()> {
-        nix::sys::signal::sigprocmask(how, set, oldset)
+    ) -> Result<()> {
+        nix::sys::signal::sigprocmask(how, set, oldset)?;
+        Ok(())
     }
 
-    fn sigaction(
-        &mut self,
-        signal: Signal,
-        handling: SignalHandling,
-    ) -> nix::Result<SignalHandling> {
+    fn sigaction(&mut self, signal: Signal, handling: SignalHandling) -> Result<SignalHandling> {
         let handler = match handling {
             SignalHandling::Default => SigHandler::SigDfl,
             SignalHandling::Ignore => SigHandler::SigIgn,
@@ -378,9 +383,11 @@ impl System for RealSystem {
         &mut self,
         target: Pid,
         signal: Option<Signal>,
-    ) -> Pin<Box<(dyn Future<Output = nix::Result<()>>)>> {
-        let result = nix::sys::signal::kill(target.into(), signal);
-        Box::pin(std::future::ready(result))
+    ) -> Pin<Box<(dyn Future<Output = Result<()>>)>> {
+        Box::pin(async move {
+            nix::sys::signal::kill(target.into(), signal)?;
+            Ok(())
+        })
     }
 
     fn select(
@@ -389,7 +396,7 @@ impl System for RealSystem {
         writers: &mut FdSet,
         timeout: Option<&TimeSpec>,
         signal_mask: Option<&SigSet>,
-    ) -> nix::Result<c_int> {
+    ) -> Result<c_int> {
         use std::ptr::{null, null_mut};
         let nfds = readers.upper_bound().max(writers.upper_bound()).0;
         let readers = &mut readers.inner;
@@ -399,7 +406,7 @@ impl System for RealSystem {
         let signal_mask = signal_mask.map_or(null(), |mask| mask.as_ref());
         let raw_result =
             unsafe { nix::libc::pselect(nfds, readers, writers, errors, timeout, signal_mask) };
-        NixErrno::result(raw_result)
+        raw_result.errno_if_m1()
     }
 
     fn getpid(&self) -> Pid {
@@ -414,16 +421,19 @@ impl System for RealSystem {
         nix::unistd::getpgrp().into()
     }
 
-    fn setpgid(&mut self, pid: Pid, pgid: Pid) -> nix::Result<()> {
-        nix::unistd::setpgid(pid.into(), pgid.into())
+    fn setpgid(&mut self, pid: Pid, pgid: Pid) -> Result<()> {
+        nix::unistd::setpgid(pid.into(), pgid.into())?;
+        Ok(())
     }
 
-    fn tcgetpgrp(&self, fd: Fd) -> nix::Result<Pid> {
-        nix::unistd::tcgetpgrp(fd.0).map(Into::into)
+    fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
+        let pgrp = nix::unistd::tcgetpgrp(fd.0)?;
+        Ok(pgrp.into())
     }
 
-    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()> {
-        nix::unistd::tcsetpgrp(fd.0, pgid.into())
+    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> Result<()> {
+        nix::unistd::tcsetpgrp(fd.0, pgid.into())?;
+        Ok(())
     }
 
     /// Creates a new child process.
@@ -433,7 +443,7 @@ impl System for RealSystem {
     /// `ChildProcessStarter` ignores any arguments and returns the child
     /// process ID. In the child, the starter runs the task and exits the
     /// process.
-    fn new_child_process(&mut self) -> nix::Result<ChildProcessStarter> {
+    fn new_child_process(&mut self) -> Result<ChildProcessStarter> {
         use nix::unistd::ForkResult::*;
         // SAFETY: As stated on RealSystem::new, the caller is responsible for
         // making only one instance of RealSystem in the process.
@@ -450,41 +460,38 @@ impl System for RealSystem {
         }
     }
 
-    fn wait(&mut self, target: Pid) -> nix::Result<Option<(Pid, ProcessState)>> {
+    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         use nix::sys::wait::WaitPidFlag;
         let options = WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED | WaitPidFlag::WNOHANG;
-        nix::sys::wait::waitpid(Some(target.into()), options.into())
-            .map(ProcessState::from_wait_status)
+        let status = nix::sys::wait::waitpid(Some(target.into()), options.into())?;
+        Ok(ProcessState::from_wait_status(status))
     }
 
-    fn execve(
-        &mut self,
-        path: &CStr,
-        args: &[CString],
-        envs: &[CString],
-    ) -> nix::Result<Infallible> {
+    fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {
         loop {
             // TODO Use Result::into_err
             let result = nix::unistd::execve(path, args, envs);
             if result != Err(NixErrno::EINTR) {
-                return result;
+                return Ok(result?);
             }
         }
     }
 
-    fn getcwd(&self) -> nix::Result<std::path::PathBuf> {
-        nix::unistd::getcwd()
+    fn getcwd(&self) -> Result<std::path::PathBuf> {
+        Ok(nix::unistd::getcwd()?)
     }
 
-    fn chdir(&mut self, path: &CStr) -> nix::Result<()> {
-        nix::unistd::chdir(path)
+    fn chdir(&mut self, path: &CStr) -> Result<()> {
+        nix::unistd::chdir(path)?;
+        Ok(())
     }
 
-    fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<std::path::PathBuf>> {
-        nix::unistd::User::from_name(name).map(|o| o.map(|passwd| passwd.dir))
+    fn getpwnam_dir(&self, name: &str) -> Result<Option<std::path::PathBuf>> {
+        let user = nix::unistd::User::from_name(name)?;
+        Ok(user.map(|user| user.dir))
     }
 
-    fn confstr_path(&self) -> nix::Result<OsString> {
+    fn confstr_path(&self) -> Result<OsString> {
         // TODO Support other platforms
         #[cfg(any(
             target_os = "macos",
@@ -496,23 +503,23 @@ impl System for RealSystem {
             use std::os::unix::ffi::OsStringExt as _;
             let size = nix::libc::confstr(nix::libc::_CS_PATH, std::ptr::null_mut(), 0);
             if size == 0 {
-                return Err(NixErrno::last());
+                return Err(Errno::last());
             }
             let mut buffer = Vec::<u8>::with_capacity(size);
             let final_size =
                 nix::libc::confstr(nix::libc::_CS_PATH, buffer.as_mut_ptr() as *mut _, size);
             if final_size == 0 {
-                return Err(NixErrno::last());
+                return Err(Errno::last());
             }
             if final_size > size {
-                return Err(NixErrno::ERANGE);
+                return Err(Errno::ERANGE);
             }
             buffer.set_len(final_size - 1); // The last byte is a null terminator.
             return Ok(OsString::from_vec(buffer));
         }
 
         #[allow(unreachable_code)]
-        Err(NixErrno::ENOSYS)
+        Err(Errno::ENOSYS)
     }
 
     fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair> {
@@ -532,9 +539,8 @@ impl System for RealSystem {
             .ok_or_else(|| std::io::Error::from_raw_os_error(nix::libc::EINVAL as _))?;
 
         let limits = limits.into();
-        unsafe { nix::libc::setrlimit(raw_resource as _, &limits) }
-            .errno_if_m1()
-            .map(drop)
+        unsafe { nix::libc::setrlimit(raw_resource as _, &limits) }.errno_if_m1()?;
+        Ok(())
     }
 }
 
@@ -551,12 +557,12 @@ impl Drop for RealDir {
 }
 
 impl Dir for RealDir {
-    fn next(&mut self) -> nix::Result<Option<DirEntry>> {
-        NixErrno::clear();
+    fn next(&mut self) -> Result<Option<DirEntry>> {
+        Errno::clear();
         let entry = unsafe { nix::libc::readdir(self.0.as_ptr()) };
-        let errno = NixErrno::last();
+        let errno = Errno::last();
         match NonNull::new(entry) {
-            None if errno != NixErrno::UnknownErrno => Err(errno),
+            None if errno != Errno::NO_ERROR => Err(errno),
             None => Ok(None),
             Some(mut entry) => unsafe {
                 let entry = entry.as_mut();

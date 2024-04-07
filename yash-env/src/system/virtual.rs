@@ -59,11 +59,12 @@ use super::resource::Resource;
 use super::resource::RLIM_INFINITY;
 use super::AtFlags;
 use super::Dir;
+use super::Errno;
 use super::FdFlag;
 use super::FdSet;
 use super::FileStat;
-use super::NixErrno;
 use super::OFlag;
+use super::Result;
 use super::SigSet;
 use super::SigmaskHow;
 use super::Signal;
@@ -215,12 +216,12 @@ impl VirtualSystem {
     /// Calls the given closure passing the open file description for the FD.
     ///
     /// Returns `Err(Errno::EBADF)` if the FD is not open.
-    pub fn with_open_file_description<F, R>(&self, fd: Fd, f: F) -> nix::Result<R>
+    pub fn with_open_file_description<F, R>(&self, fd: Fd, f: F) -> Result<R>
     where
-        F: FnOnce(&OpenFileDescription) -> nix::Result<R>,
+        F: FnOnce(&OpenFileDescription) -> Result<R>,
     {
         let process = self.current_process();
-        let body = process.get_fd(fd).ok_or(NixErrno::EBADF)?;
+        let body = process.get_fd(fd).ok_or(Errno::EBADF)?;
         let ofd = body.open_file_description.borrow();
         f(&ofd)
     }
@@ -228,12 +229,12 @@ impl VirtualSystem {
     /// Calls the given closure passing the open file description for the FD.
     ///
     /// Returns `Err(Errno::EBADF)` if the FD is not open.
-    pub fn with_open_file_description_mut<F, R>(&mut self, fd: Fd, f: F) -> nix::Result<R>
+    pub fn with_open_file_description_mut<F, R>(&mut self, fd: Fd, f: F) -> Result<R>
     where
-        F: FnOnce(&mut OpenFileDescription) -> nix::Result<R>,
+        F: FnOnce(&mut OpenFileDescription) -> Result<R>,
     {
         let mut process = self.current_process_mut();
-        let body = process.get_fd_mut(fd).ok_or(NixErrno::EBADF)?;
+        let body = process.get_fd_mut(fd).ok_or(Errno::EBADF)?;
         let mut ofd = body.open_file_description.borrow_mut();
         f(&mut ofd)
     }
@@ -251,7 +252,7 @@ impl VirtualSystem {
         _dir_fd: Fd,
         path: &Path,
         flags: AtFlags,
-    ) -> nix::Result<Rc<RefCell<INode>>> {
+    ) -> Result<Rc<RefCell<INode>>> {
         // TODO Resolve relative to dir_fd
         // TODO Support AT_FDCWD
         const _POSIX_SYMLOOP_MAX: i32 = 8;
@@ -276,7 +277,7 @@ impl VirtualSystem {
             }
         }
 
-        Err(NixErrno::ELOOP)
+        Err(Errno::ELOOP)
     }
 
     /// Blocks the calling thread until the current process is running.
@@ -309,7 +310,7 @@ impl Default for VirtualSystem {
     }
 }
 
-fn stat(inode: &INode) -> Result<FileStat, NixErrno> {
+fn stat(inode: &INode) -> Result<FileStat> {
     let (type_flag, size) = match &inode.body {
         FileBody::Regular { content, .. } => (SFlag::S_IFREG, content.len()),
         FileBody::Directory { files } => (SFlag::S_IFDIR, files.len()),
@@ -334,7 +335,7 @@ impl System for VirtualSystem {
     /// - `st_size`
     /// - `st_dev` (always 1)
     /// - `st_ino` (computed from the address of `INode`)
-    fn fstat(&self, fd: Fd) -> nix::Result<FileStat> {
+    fn fstat(&self, fd: Fd) -> Result<FileStat> {
         self.with_open_file_description(fd, |ofd| stat(&ofd.file.borrow()))
     }
 
@@ -347,7 +348,7 @@ impl System for VirtualSystem {
     /// - `st_size`
     /// - `st_dev` (always 1)
     /// - `st_ino` (computed from the address of `INode`)
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat> {
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> Result<FileStat> {
         let path = Path::new(OsStr::from_bytes(path.to_bytes()));
         let inode = self.resolve_existing_file(dir_fd, path, flags)?;
         let inode = inode.borrow();
@@ -376,7 +377,7 @@ impl System for VirtualSystem {
         matches!(inode.body, FileBody::Directory { .. })
     }
 
-    fn pipe(&mut self) -> nix::Result<(Fd, Fd)> {
+    fn pipe(&mut self) -> Result<(Fd, Fd)> {
         let file = Rc::new(RefCell::new(INode {
             body: FileBody::Fifo {
                 content: VecDeque::new(),
@@ -410,43 +411,41 @@ impl System for VirtualSystem {
         };
 
         let mut process = self.current_process_mut();
-        let reader = process.open_fd(reader).map_err(|_| NixErrno::EMFILE)?;
+        let reader = process.open_fd(reader).map_err(|_| Errno::EMFILE)?;
         let writer = process.open_fd(writer).map_err(|_| {
             process.close_fd(reader);
-            NixErrno::EMFILE
+            Errno::EMFILE
         })?;
         Ok((reader, writer))
     }
 
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> nix::Result<Fd> {
+    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> Result<Fd> {
         let mut process = self.current_process_mut();
-        let mut body = process.fds.get(&from).ok_or(NixErrno::EBADF)?.clone();
+        let mut body = process.fds.get(&from).ok_or(Errno::EBADF)?.clone();
         body.flag = flags;
-        process
-            .open_fd_ge(to_min, body)
-            .map_err(|_| NixErrno::EMFILE)
+        process.open_fd_ge(to_min, body).map_err(|_| Errno::EMFILE)
     }
 
-    fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd> {
+    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
         let mut process = self.current_process_mut();
-        let mut body = process.fds.get(&from).ok_or(NixErrno::EBADF)?.clone();
+        let mut body = process.fds.get(&from).ok_or(Errno::EBADF)?.clone();
         body.flag = FdFlag::empty();
-        process.set_fd(to, body).map_err(|_| NixErrno::EBADF)?;
+        process.set_fd(to, body).map_err(|_| Errno::EBADF)?;
         Ok(to)
     }
 
-    fn open(&mut self, path: &CStr, option: OFlag, mode: nix::sys::stat::Mode) -> nix::Result<Fd> {
+    fn open(&mut self, path: &CStr, option: OFlag, mode: nix::sys::stat::Mode) -> Result<Fd> {
         let path = self.resolve_relative_path(Path::new(OsStr::from_bytes(path.to_bytes())));
         let mut state = self.state.borrow_mut();
         let file = match state.file_system.get(&path) {
             Ok(inode) => {
                 if option.contains(OFlag::O_EXCL) {
-                    return Err(NixErrno::EEXIST);
+                    return Err(Errno::EEXIST);
                 }
                 if option.contains(OFlag::O_DIRECTORY)
                     && !matches!(inode.borrow().body, FileBody::Directory { .. })
                 {
-                    return Err(NixErrno::ENOTDIR);
+                    return Err(Errno::ENOTDIR);
                 }
                 if option.contains(OFlag::O_TRUNC) {
                     if let FileBody::Regular { content, .. } = &mut inode.borrow_mut().body {
@@ -455,7 +454,7 @@ impl System for VirtualSystem {
                 }
                 inode
             }
-            Err(NixErrno::ENOENT) if option.contains(OFlag::O_CREAT) => {
+            Err(Errno::ENOENT) if option.contains(OFlag::O_CREAT) => {
                 let mut inode = INode::new([]);
                 // TODO Apply umask
                 inode.permissions = Mode(mode.bits());
@@ -501,10 +500,10 @@ impl System for VirtualSystem {
             },
         };
         let process = state.processes.get_mut(&self.process_id).unwrap();
-        process.open_fd(body).map_err(|_| NixErrno::EMFILE)
+        process.open_fd(body).map_err(|_| Errno::EMFILE)
     }
 
-    fn open_tmpfile(&mut self, _parent_dir: &Path) -> nix::Result<Fd> {
+    fn open_tmpfile(&mut self, _parent_dir: &Path) -> Result<Fd> {
         let file = Rc::new(RefCell::new(INode::new([])));
         let open_file_description = Rc::new(RefCell::new(OpenFileDescription {
             file,
@@ -519,15 +518,15 @@ impl System for VirtualSystem {
         };
         let mut state = self.state.borrow_mut();
         let process = state.processes.get_mut(&self.process_id).unwrap();
-        process.open_fd(body).map_err(|_| NixErrno::EMFILE)
+        process.open_fd(body).map_err(|_| Errno::EMFILE)
     }
 
-    fn close(&mut self, fd: Fd) -> nix::Result<()> {
+    fn close(&mut self, fd: Fd) -> Result<()> {
         self.current_process_mut().close_fd(fd);
         Ok(())
     }
 
-    fn fcntl_getfl(&self, fd: Fd) -> nix::Result<OFlag> {
+    fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag> {
         self.with_open_file_description(fd, |ofd| {
             let mut mode = match (ofd.is_readable, ofd.is_writable) {
                 (true, true) => OFlag::O_RDWR,
@@ -543,57 +542,57 @@ impl System for VirtualSystem {
     }
 
     /// Current implementation does nothing but return `Ok(())`.
-    fn fcntl_setfl(&mut self, _fd: Fd, _flags: OFlag) -> nix::Result<()> {
+    fn fcntl_setfl(&mut self, _fd: Fd, _flags: OFlag) -> Result<()> {
         // TODO do what this function should do
         Ok(())
     }
 
-    fn fcntl_getfd(&self, fd: Fd) -> nix::Result<FdFlag> {
+    fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag> {
         let process = self.current_process();
-        let body = process.get_fd(fd).ok_or(NixErrno::EBADF)?;
+        let body = process.get_fd(fd).ok_or(Errno::EBADF)?;
         Ok(body.flag)
     }
 
-    fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> nix::Result<()> {
+    fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> Result<()> {
         let mut process = self.current_process_mut();
-        let body = process.get_fd_mut(fd).ok_or(NixErrno::EBADF)?;
+        let body = process.get_fd_mut(fd).ok_or(Errno::EBADF)?;
         body.flag = flags;
         Ok(())
     }
 
-    fn isatty(&self, _fd: Fd) -> nix::Result<bool> {
+    fn isatty(&self, _fd: Fd) -> Result<bool> {
         Ok(false)
     }
 
-    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
+    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
         self.with_open_file_description_mut(fd, |ofd| ofd.read(buffer))
     }
 
-    fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
+    fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {
         self.with_open_file_description_mut(fd, |ofd| ofd.write(buffer))
     }
 
-    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> nix::Result<u64> {
+    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
         use nix::unistd::Whence::*;
         let (offset, whence) = match position {
             SeekFrom::Start(offset) => {
-                let offset = offset.try_into().map_err(|_| NixErrno::EOVERFLOW)?;
+                let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
                 (offset, SeekSet)
             }
             SeekFrom::End(offset) => {
-                let offset = offset.try_into().map_err(|_| NixErrno::EOVERFLOW)?;
+                let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
                 (offset, SeekEnd)
             }
             SeekFrom::Current(offset) => {
-                let offset = offset.try_into().map_err(|_| NixErrno::EOVERFLOW)?;
+                let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
                 (offset, SeekCur)
             }
         };
         self.with_open_file_description_mut(fd, |ofd| ofd.seek(offset, whence))
-            .and_then(|new_offset| new_offset.try_into().map_err(|_| NixErrno::EOVERFLOW))
+            .and_then(|new_offset| new_offset.try_into().map_err(|_| Errno::EOVERFLOW))
     }
 
-    fn fdopendir(&mut self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
+    fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
         self.with_open_file_description(fd, |ofd| {
             let inode = ofd.i_node();
             let dir = VirtualDir::try_from(&inode.borrow().body)?;
@@ -601,7 +600,7 @@ impl System for VirtualSystem {
         })
     }
 
-    fn opendir(&mut self, path: &CStr) -> nix::Result<Box<dyn Dir>> {
+    fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
         // TODO Should use O_SEARCH, but currently it is only supported on netbsd
         let fd = self.open(
             path,
@@ -628,7 +627,7 @@ impl System for VirtualSystem {
     }
 
     /// Returns `times` in [`SystemState`].
-    fn times(&self) -> nix::Result<Times> {
+    fn times(&self) -> Result<Times> {
         Ok(self.state.borrow().times)
     }
 
@@ -637,7 +636,7 @@ impl System for VirtualSystem {
         how: SigmaskHow,
         set: Option<&SigSet>,
         oldset: Option<&mut SigSet>,
-    ) -> nix::Result<()> {
+    ) -> Result<()> {
         let mut state = self.state.borrow_mut();
         let process = state
             .processes
@@ -659,7 +658,7 @@ impl System for VirtualSystem {
         Ok(())
     }
 
-    fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> nix::Result<SignalHandling> {
+    fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> Result<SignalHandling> {
         let mut process = self.current_process_mut();
         Ok(process.set_signal_handling(signal, action))
     }
@@ -680,7 +679,7 @@ impl System for VirtualSystem {
         &mut self,
         target: Pid,
         signal: Option<Signal>,
-    ) -> Pin<Box<(dyn Future<Output = nix::Result<()>>)>> {
+    ) -> Pin<Box<(dyn Future<Output = Result<()>>)>> {
         let result = match target {
             Pid::MY_PROCESS_GROUP => {
                 let target_pgid = self.current_process().pgid;
@@ -702,7 +701,7 @@ impl System for VirtualSystem {
                         }
                         Ok(())
                     }
-                    None => Err(NixErrno::ESRCH),
+                    None => Err(Errno::ESRCH),
                 }
             }
 
@@ -733,7 +732,7 @@ impl System for VirtualSystem {
         writers: &mut FdSet,
         timeout: Option<&TimeSpec>,
         signal_mask: Option<&SigSet>,
-    ) -> nix::Result<c_int> {
+    ) -> Result<c_int> {
         let mut process = self.current_process_mut();
 
         if let Some(signal_mask) = signal_mask {
@@ -742,25 +741,25 @@ impl System for VirtualSystem {
             let result_2 = process.block_signals(SigmaskHow::SIG_SETMASK, &save_mask);
             assert!(!result_2.delivered);
             if result_1.caught {
-                return Err(NixErrno::EINTR);
+                return Err(Errno::EINTR);
             }
         }
 
         for fd in &readers.clone() {
-            let body = process.fds().get(&fd).ok_or(NixErrno::EBADF)?;
+            let body = process.fds().get(&fd).ok_or(Errno::EBADF)?;
             let ofd = body.open_file_description.borrow();
             if !ofd.is_readable() {
-                return Err(NixErrno::EBADF);
+                return Err(Errno::EBADF);
             }
             if !ofd.is_ready_for_reading() {
                 readers.remove(fd);
             }
         }
         for fd in &writers.clone() {
-            let body = process.fds().get(&fd).ok_or(NixErrno::EBADF)?;
+            let body = process.fds().get(&fd).ok_or(Errno::EBADF)?;
             let ofd = body.open_file_description.borrow();
             if !ofd.is_writable() {
-                return Err(NixErrno::EBADF);
+                return Err(Errno::EBADF);
             }
             if !ofd.is_ready_for_writing() {
                 writers.remove(fd);
@@ -801,9 +800,9 @@ impl System for VirtualSystem {
     /// Modifies the process group ID of a process.
     ///
     /// The current implementation does not yet support the concept of sessions.
-    fn setpgid(&mut self, mut pid: Pid, mut pgid: Pid) -> nix::Result<()> {
+    fn setpgid(&mut self, mut pid: Pid, mut pgid: Pid) -> Result<()> {
         if pgid.0 < 0 {
-            return Err(NixErrno::EINVAL);
+            return Err(Errno::EINVAL);
         }
         if pid.0 == 0 {
             pid = self.process_id;
@@ -814,14 +813,14 @@ impl System for VirtualSystem {
 
         let mut state = self.state.borrow_mut();
         if pgid != pid && !state.processes.values().any(|p| p.pgid == pgid) {
-            return Err(NixErrno::EPERM);
+            return Err(Errno::EPERM);
         }
-        let process = state.processes.get_mut(&pid).ok_or(NixErrno::ESRCH)?;
+        let process = state.processes.get_mut(&pid).ok_or(Errno::ESRCH)?;
         if pid != self.process_id && process.ppid != self.process_id {
-            return Err(NixErrno::ESRCH);
+            return Err(Errno::ESRCH);
         }
         if process.last_exec.is_some() {
-            return Err(NixErrno::EACCES);
+            return Err(Errno::EACCES);
         }
 
         process.pgid = pgid;
@@ -833,25 +832,25 @@ impl System for VirtualSystem {
     ///
     /// The current implementation does not yet support the concept of
     /// controlling terminals and sessions. It accepts any open file descriptor.
-    fn tcgetpgrp(&self, fd: Fd) -> nix::Result<Pid> {
+    fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
         // Make sure the FD is open
         self.with_open_file_description(fd, |_| Ok(()))?;
 
-        self.state.borrow().foreground.ok_or(NixErrno::ENOTTY)
+        self.state.borrow().foreground.ok_or(Errno::ENOTTY)
     }
 
     /// Switches the foreground process.
     ///
     /// The current implementation does not yet support the concept of
     /// controlling terminals and sessions. It accepts any open file descriptor.
-    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()> {
+    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> Result<()> {
         // Make sure the FD is open
         self.with_open_file_description(fd, |_| Ok(()))?;
 
         // Make sure the process group exists
         let mut state = self.state.borrow_mut();
         if !state.processes.values().any(|p| p.pgid == pgid) {
-            return Err(NixErrno::EPERM);
+            return Err(Errno::EPERM);
         }
 
         state.foreground = Some(pgid);
@@ -870,9 +869,9 @@ impl System for VirtualSystem {
     ///
     /// The process ID of the child will be the maximum of existing process IDs
     /// plus 1. If there are no other processes, it will be 2.
-    fn new_child_process(&mut self) -> nix::Result<ChildProcessStarter> {
+    fn new_child_process(&mut self) -> Result<ChildProcessStarter> {
         let mut state = self.state.borrow_mut();
-        let executor = state.executor.clone().ok_or(NixErrno::ENOSYS)?;
+        let executor = state.executor.clone().ok_or(Errno::ENOSYS)?;
         let process_id = state
             .processes
             .keys()
@@ -928,7 +927,7 @@ impl System for VirtualSystem {
     /// Waits for a child.
     ///
     /// TODO: Currently, this function only supports `target == -1 || target > 0`.
-    fn wait(&mut self, target: Pid) -> nix::Result<Option<(Pid, ProcessState)>> {
+    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         let parent_pid = self.process_id;
         let mut state = self.state.borrow_mut();
         if let Some((pid, process)) = state.child_to_wait_for(parent_pid, target) {
@@ -937,10 +936,10 @@ impl System for VirtualSystem {
             } else if process.state().is_alive() {
                 Ok(None)
             } else {
-                Err(NixErrno::ECHILD)
+                Err(Errno::ECHILD)
             }
         } else {
-            Err(NixErrno::ECHILD)
+            Err(Errno::ECHILD)
         }
     }
 
@@ -949,12 +948,7 @@ impl System for VirtualSystem {
     /// The `execve` system call cannot be simulated in the userland. This
     /// function returns `ENOSYS` if the file at `path` is a native executable,
     /// `ENOEXEC` if a non-executable file, and `ENOENT` otherwise.
-    fn execve(
-        &mut self,
-        path: &CStr,
-        args: &[CString],
-        envs: &[CString],
-    ) -> nix::Result<Infallible> {
+    fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {
         let os_path = OsStr::from_bytes(path.to_bytes());
         let mut state = self.state.borrow_mut();
         let fs = &state.file_system;
@@ -975,13 +969,13 @@ impl System for VirtualSystem {
             let envs = envs.to_owned();
             process.last_exec = Some((path, args, envs));
 
-            Err(NixErrno::ENOSYS)
+            Err(Errno::ENOSYS)
         } else {
-            Err(NixErrno::ENOEXEC)
+            Err(Errno::ENOEXEC)
         }
     }
 
-    fn getcwd(&self) -> nix::Result<PathBuf> {
+    fn getcwd(&self) -> Result<PathBuf> {
         Ok(self.current_process().cwd.clone())
     }
 
@@ -989,7 +983,7 @@ impl System for VirtualSystem {
     ///
     /// The current implementation does not canonicalize ".", "..", or symbolic
     /// links in the new path set to the process.
-    fn chdir(&mut self, path: &CStr) -> nix::Result<()> {
+    fn chdir(&mut self, path: &CStr) -> Result<()> {
         let path = Path::new(OsStr::from_bytes(path.to_bytes()));
         let inode = self.resolve_existing_file(AT_FDCWD, path, AtFlags::empty())?;
         if matches!(&inode.borrow().body, FileBody::Directory { .. }) {
@@ -998,11 +992,11 @@ impl System for VirtualSystem {
             process.chdir(new_path);
             Ok(())
         } else {
-            Err(NixErrno::ENOTDIR)
+            Err(Errno::ENOTDIR)
         }
     }
 
-    fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<PathBuf>> {
+    fn getpwnam_dir(&self, name: &str) -> Result<Option<PathBuf>> {
         let state = self.state.borrow();
         Ok(state.home_dirs.get(name).cloned())
     }
@@ -1011,10 +1005,10 @@ impl System for VirtualSystem {
     ///
     /// This function returns the value of [`SystemState::path`]. If it is empty,
     /// it returns the `ENOSYS` error.
-    fn confstr_path(&self) -> nix::Result<OsString> {
+    fn confstr_path(&self) -> Result<OsString> {
         let path = self.state.borrow().path.clone();
         if path.is_empty() {
-            Err(NixErrno::ENOSYS)
+            Err(Errno::ENOSYS)
         } else {
             Ok(path)
         }
@@ -1059,7 +1053,7 @@ fn send_signal_to_processes(
     state: &mut SystemState,
     target_pgid: Option<Pid>,
     signal: Option<Signal>,
-) -> nix::Result<()> {
+) -> Result<()> {
     let mut results = Vec::new();
 
     if let Some(signal) = signal {
@@ -1072,7 +1066,7 @@ fn send_signal_to_processes(
     }
 
     if results.is_empty() {
-        Err(NixErrno::ESRCH)
+        Err(Errno::ESRCH)
     } else {
         for (result, ppid) in results {
             if result.process_state_changed {
@@ -1199,7 +1193,7 @@ pub trait Executor: Debug {
     fn spawn(
         &self,
         task: Pin<Box<dyn Future<Output = ()>>>,
-    ) -> Result<(), Box<dyn std::error::Error>>;
+    ) -> std::result::Result<(), Box<dyn std::error::Error>>;
 }
 
 /// Concurrent task that manages the execution of a process.
@@ -1259,7 +1253,7 @@ mod tests {
         fn spawn(
             &self,
             task: Pin<Box<dyn Future<Output = ()>>>,
-        ) -> Result<(), Box<dyn std::error::Error>> {
+        ) -> std::result::Result<(), Box<dyn std::error::Error>> {
             use futures_util::task::LocalSpawnExt;
             self.spawn_local(task)
                 .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
@@ -1275,7 +1269,7 @@ mod tests {
                 &CString::new("/no/such/file").unwrap(),
                 AtFlags::empty()
             ),
-            Err(NixErrno::ENOENT)
+            Err(Errno::ENOENT)
         );
     }
 
@@ -1495,7 +1489,7 @@ mod tests {
             OFlag::O_RDONLY,
             nix::sys::stat::Mode::empty(),
         );
-        assert_eq!(result, Err(NixErrno::ENOENT));
+        assert_eq!(result, Err(Errno::ENOENT));
     }
 
     #[test]
@@ -1558,7 +1552,7 @@ mod tests {
             OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_EXCL,
             nix::sys::stat::Mode::empty(),
         );
-        assert_eq!(second, Err(NixErrno::EEXIST));
+        assert_eq!(second, Err(Errno::EEXIST));
     }
 
     #[test]
@@ -1659,7 +1653,7 @@ mod tests {
             OFlag::O_WRONLY | OFlag::O_CREAT,
             nix::sys::stat::Mode::empty(),
         );
-        assert_eq!(result, Err(NixErrno::ENOTDIR));
+        assert_eq!(result, Err(Errno::ENOTDIR));
     }
 
     #[test]
@@ -1678,7 +1672,7 @@ mod tests {
             OFlag::O_RDONLY | OFlag::O_DIRECTORY,
             nix::sys::stat::Mode::empty(),
         );
-        assert_eq!(result, Err(NixErrno::ENOTDIR));
+        assert_eq!(result, Err(Errno::ENOTDIR));
     }
 
     #[test]
@@ -1752,7 +1746,7 @@ mod tests {
             system.fcntl_getfl(appender),
             Ok(OFlag::O_RDWR | OFlag::O_APPEND)
         );
-        assert_eq!(system.fcntl_getfl(Fd(100)), Err(NixErrno::EBADF));
+        assert_eq!(system.fcntl_getfl(Fd(100)), Err(Errno::EBADF));
     }
 
     #[test]
@@ -1837,7 +1831,7 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap_err();
-        assert_eq!(e, NixErrno::ESRCH);
+        assert_eq!(e, Errno::ESRCH);
     }
 
     #[test]
@@ -2074,7 +2068,7 @@ mod tests {
         let mut fds = FdSet::new();
         fds.insert(writer).unwrap();
         let result = system.select(&mut fds, &mut FdSet::new(), None, None);
-        assert_eq!(result, Err(NixErrno::EBADF));
+        assert_eq!(result, Err(Errno::EBADF));
     }
 
     #[test]
@@ -2084,7 +2078,7 @@ mod tests {
         let mut fds = FdSet::new();
         fds.insert(reader).unwrap();
         let result = system.select(&mut FdSet::new(), &mut fds, None, None);
-        assert_eq!(result, Err(NixErrno::EBADF));
+        assert_eq!(result, Err(Errno::EBADF));
     }
 
     #[test]
@@ -2093,10 +2087,10 @@ mod tests {
         let mut fds = FdSet::new();
         fds.insert(Fd(17)).unwrap();
         let result = system.select(&mut fds, &mut FdSet::new(), None, None);
-        assert_eq!(result, Err(NixErrno::EBADF));
+        assert_eq!(result, Err(Errno::EBADF));
 
         let result = system.select(&mut FdSet::new(), &mut fds, None, None);
-        assert_eq!(result, Err(NixErrno::EBADF));
+        assert_eq!(result, Err(Errno::EBADF));
     }
 
     fn system_for_catching_sigchld() -> VirtualSystem {
@@ -2135,7 +2129,7 @@ mod tests {
             None,
             Some(&SigSet::empty()),
         );
-        assert_eq!(result, Err(NixErrno::EINTR));
+        assert_eq!(result, Err(Errno::EINTR));
         assert_eq!(system.caught_signals(), [Signal::SIGCHLD]);
     }
 
@@ -2240,7 +2234,7 @@ mod tests {
 
         let dummy_pid = Pid(123);
         let result = env.system.setpgid(dummy_pid, dummy_pid);
-        assert_eq!(result, Err(NixErrno::ESRCH));
+        assert_eq!(result, Err(Errno::ESRCH));
 
         let pgid = state.borrow().processes[&pid].pgid();
         assert_eq!(pgid, Pid(1));
@@ -2258,7 +2252,7 @@ mod tests {
             Box::new(move |child_env| {
                 Box::pin(async move {
                     let result = child_env.system.setpgid(parent_pid, Pid(0));
-                    assert_eq!(result, Err(NixErrno::ESRCH));
+                    assert_eq!(result, Err(Errno::ESRCH));
                 })
             }),
         );
@@ -2297,7 +2291,7 @@ mod tests {
         executor.run_until_stalled();
 
         let result = env.system.setpgid(pid, pid);
-        assert_eq!(result, Err(NixErrno::EACCES));
+        assert_eq!(result, Err(Errno::EACCES));
 
         let pgid = state.borrow().processes[&pid].pgid();
         assert_eq!(pgid, Pid(1));
@@ -2318,7 +2312,7 @@ mod tests {
         executor.run_until_stalled();
 
         let result = env.system.setpgid(pid_2, pid_1);
-        assert_eq!(result, Err(NixErrno::EPERM));
+        assert_eq!(result, Err(Errno::EPERM));
 
         let pgid = state.borrow().processes[&pid_2].pgid();
         assert_eq!(pgid, Pid(1));
@@ -2346,14 +2340,14 @@ mod tests {
     fn tcsetpgrp_with_invalid_fd() {
         let mut system = VirtualSystem::new();
         let result = system.tcsetpgrp(Fd(100), Pid(2));
-        assert_eq!(result, Err(NixErrno::EBADF));
+        assert_eq!(result, Err(Errno::EBADF));
     }
 
     #[test]
     fn tcsetpgrp_with_nonexisting_pgrp() {
         let mut system = VirtualSystem::new();
         let result = system.tcsetpgrp(Fd::STDIN, Pid(100));
-        assert_eq!(result, Err(NixErrno::EPERM));
+        assert_eq!(result, Err(Errno::EPERM));
     }
 
     #[test]
@@ -2362,7 +2356,7 @@ mod tests {
         let result = system.new_child_process();
         match result {
             Ok(_) => panic!("unexpected Ok value"),
-            Err(e) => assert_eq!(e, NixErrno::ENOSYS),
+            Err(e) => assert_eq!(e, Errno::ENOSYS),
         }
     }
 
@@ -2527,17 +2521,17 @@ mod tests {
     fn wait_without_child() {
         let mut system = VirtualSystem::new();
         let result = system.wait(Pid::ALL);
-        assert_eq!(result, Err(NixErrno::ECHILD));
+        assert_eq!(result, Err(Errno::ECHILD));
         // TODO
         // let result = system.wait(Pid::MY_PROCESS_GROUP);
-        // assert_eq!(result, Err(NixErrno::ECHILD));
+        // assert_eq!(result, Err(Errno::ECHILD));
         let result = system.wait(system.process_id);
-        assert_eq!(result, Err(NixErrno::ECHILD));
+        assert_eq!(result, Err(Errno::ECHILD));
         let result = system.wait(Pid(1234));
-        assert_eq!(result, Err(NixErrno::ECHILD));
+        assert_eq!(result, Err(Errno::ECHILD));
         // TODO
         // let result = system.wait(Pid(-1234));
-        // assert_eq!(result, Err(NixErrno::ECHILD));
+        // assert_eq!(result, Err(Errno::ECHILD));
     }
 
     #[test]
@@ -2573,7 +2567,7 @@ mod tests {
         drop(state);
         let path = CString::new(path).unwrap();
         let result = system.execve(&path, &[], &[]);
-        assert_eq!(result, Err(NixErrno::ENOSYS));
+        assert_eq!(result, Err(Errno::ENOSYS));
     }
 
     #[test]
@@ -2617,7 +2611,7 @@ mod tests {
         drop(state);
         let path = CString::new(path).unwrap();
         let result = system.execve(&path, &[], &[]);
-        assert_eq!(result, Err(NixErrno::ENOEXEC));
+        assert_eq!(result, Err(Errno::ENOEXEC));
     }
 
     #[test]
@@ -2625,7 +2619,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         let path = CString::new("/no/such/file").unwrap();
         let result = system.execve(&path, &[], &[]);
-        assert_eq!(result, Err(NixErrno::ENOENT));
+        assert_eq!(result, Err(Errno::ENOENT));
     }
 
     #[test]
@@ -2649,7 +2643,7 @@ mod tests {
         let mut system = VirtualSystem::new();
 
         let result = system.chdir(CStr::from_bytes_with_nul(b"/no/such/dir\0").unwrap());
-        assert_eq!(result, Err(NixErrno::ENOENT));
+        assert_eq!(result, Err(Errno::ENOENT));
     }
 
     #[test]
@@ -2664,7 +2658,7 @@ mod tests {
         );
 
         let result = system.chdir(CStr::from_bytes_with_nul(b"/dir/file\0").unwrap());
-        assert_eq!(result, Err(NixErrno::ENOTDIR));
+        assert_eq!(result, Err(Errno::ENOTDIR));
     }
 
     #[test]

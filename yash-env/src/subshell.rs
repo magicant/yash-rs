@@ -30,6 +30,7 @@ use crate::job::Pid;
 use crate::job::ProcessState;
 use crate::stack::Frame;
 use crate::system::ChildProcessTask;
+use crate::system::Errno;
 use crate::system::SigSet;
 use crate::system::SigmaskHow::{SIG_BLOCK, SIG_SETMASK};
 use crate::system::System;
@@ -150,7 +151,7 @@ where
     /// If the subshell started successfully, the return value is a pair of the
     /// child process ID and the actual job control. Otherwise, it indicates the
     /// error.
-    pub async fn start(self, env: &mut Env) -> nix::Result<(Pid, Option<JobControl>)> {
+    pub async fn start(self, env: &mut Env) -> Result<(Pid, Option<JobControl>), Errno> {
         // Do some preparation before starting a child process
         let job_control = env.controls_jobs().then_some(self.job_control).flatten();
         let tty = match job_control {
@@ -238,7 +239,7 @@ where
     ///
     /// When a job-controlled subshell suspends, this function does not add it
     /// to `env.jobs`. You have to do it for yourself if necessary.
-    pub async fn start_and_wait(self, env: &mut Env) -> nix::Result<(Pid, ProcessState)> {
+    pub async fn start_and_wait(self, env: &mut Env) -> Result<(Pid, ProcessState), Errno> {
         let (pid, job_control) = self.start(env).await?;
         let result = loop {
             let (pid, state) = env.wait_for_subshell(pid).await?;

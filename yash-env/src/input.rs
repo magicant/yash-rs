@@ -98,7 +98,7 @@ impl Input for FdReader {
                     }
                 }
 
-                Err(errno) => return Err(std::io::Error::from_raw_os_error(errno as i32)),
+                Err(errno) => return Err(errno.into()),
             }
         }
 
@@ -245,7 +245,7 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap_err();
-        assert_eq!(error.raw_os_error(), Some(Errno::EBADF as i32));
+        assert_eq!(error.raw_os_error(), Some(Errno::EBADF.0));
     }
 
     #[test]

@@ -20,7 +20,7 @@ use super::cond::Condition;
 use super::SignalSystem;
 #[cfg(doc)]
 use super::TrapSet;
-use crate::system::{NixErrno, SignalHandling};
+use crate::system::{Errno, SignalHandling};
 use std::collections::btree_map::{Entry, VacantEntry};
 use std::rc::Rc;
 use thiserror::Error;
@@ -70,7 +70,7 @@ pub enum SetActionError {
 
     /// Error from the underlying system interface.
     #[error(transparent)]
-    SystemError(#[from] NixErrno),
+    SystemError(#[from] Errno),
 }
 
 /// State of the trap action for a condition.
@@ -262,7 +262,7 @@ impl GrandState {
         system: &mut S,
         entry: Entry<Condition, GrandState>,
         handling: SignalHandling,
-    ) -> Result<(), NixErrno> {
+    ) -> Result<(), Errno> {
         let signal = match *entry.key() {
             Condition::Signal(signal) => signal,
             Condition::Exit => panic!("exit condition cannot have an internal handler"),
@@ -307,7 +307,7 @@ impl GrandState {
         system: &mut S,
         cond: Condition,
         option: EnterSubshellOption,
-    ) -> Result<(), NixErrno> {
+    ) -> Result<(), Errno> {
         let old_setting = (&self.current_setting).into();
         let old_handler = self.internal_handler.max(old_setting);
 
@@ -350,7 +350,7 @@ impl GrandState {
     pub fn ignore<S: SignalSystem>(
         system: &mut S,
         vacant: VacantEntry<Condition, GrandState>,
-    ) -> Result<(), NixErrno> {
+    ) -> Result<(), Errno> {
         let signal = match *vacant.key() {
             Condition::Signal(signal) => signal,
             Condition::Exit => panic!("exit condition cannot be ignored"),
