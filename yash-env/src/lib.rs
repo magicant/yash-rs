@@ -455,7 +455,7 @@ mod tests {
     use crate::subshell::Subshell;
     use crate::system::r#virtual::INode;
     use crate::system::r#virtual::SystemState;
-    use crate::system::Errno;
+    use crate::system::NixErrno;
     use crate::trap::Action;
     use futures_executor::LocalPool;
     use futures_util::task::LocalSpawnExt as _;
@@ -630,7 +630,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         executor.run_until(async move {
             let result = env.wait_for_subshell(Pid::ALL).await;
-            assert_eq!(result, Err(Errno::ECHILD));
+            assert_eq!(result, Err(NixErrno::ECHILD));
         });
     }
 

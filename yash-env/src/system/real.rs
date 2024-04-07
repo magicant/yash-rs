@@ -24,11 +24,11 @@ use super::Dir;
 use super::DirEntry;
 #[cfg(doc)]
 use super::Env;
-use super::Errno;
 use super::FdFlag;
 use super::FdSet;
 use super::FileStat;
 use super::Mode;
+use super::NixErrno;
 use super::OFlag;
 use super::SigSet;
 use super::SigmaskHow;
@@ -199,7 +199,7 @@ impl System for RealSystem {
         loop {
             match nix::unistd::dup2(from.0, to.0) {
                 Ok(fd) => return Ok(Fd(fd)),
-                Err(Errno::EINTR) => (),
+                Err(NixErrno::EINTR) => (),
                 Err(e) => return Err(e),
             }
         }
@@ -214,7 +214,7 @@ impl System for RealSystem {
             Ok(file) => Ok(Fd(file.into_raw_fd())),
             Err(error) => {
                 let errno = error.raw_os_error().unwrap_or(0);
-                Err(Errno::from_i32(errno))
+                Err(NixErrno::from_i32(errno))
             }
         }
     }
@@ -222,8 +222,8 @@ impl System for RealSystem {
     fn close(&mut self, fd: Fd) -> nix::Result<()> {
         loop {
             match nix::unistd::close(fd.0) {
-                Err(Errno::EBADF) => return Ok(()),
-                Err(Errno::EINTR) => (),
+                Err(NixErrno::EBADF) => return Ok(()),
+                Err(NixErrno::EINTR) => (),
                 other => return other,
             }
         }
@@ -252,7 +252,7 @@ impl System for RealSystem {
     fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
         loop {
             let result = nix::unistd::read(fd.0, buffer);
-            if result != Err(Errno::EINTR) {
+            if result != Err(NixErrno::EINTR) {
                 return result;
             }
         }
@@ -261,7 +261,7 @@ impl System for RealSystem {
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
         loop {
             let result = nix::unistd::write(fd.0, buffer);
-            if result != Err(Errno::EINTR) {
+            if result != Err(NixErrno::EINTR) {
                 return result;
             }
         }
@@ -271,7 +271,7 @@ impl System for RealSystem {
         use nix::unistd::Whence::*;
         let (offset, whence) = match position {
             SeekFrom::Start(offset) => {
-                let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
+                let offset = offset.try_into().map_err(|_| NixErrno::EOVERFLOW)?;
                 (offset, SeekSet)
             }
             SeekFrom::End(offset) => (offset, SeekEnd),
@@ -282,13 +282,13 @@ impl System for RealSystem {
 
     fn fdopendir(&mut self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
         let dir = unsafe { nix::libc::fdopendir(fd.0) };
-        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
+        let dir = NonNull::new(dir).ok_or_else(NixErrno::last)?;
         Ok(Box::new(RealDir(dir)))
     }
 
     fn opendir(&mut self, path: &CStr) -> nix::Result<Box<dyn Dir>> {
         let dir = unsafe { nix::libc::opendir(path.as_ptr()) };
-        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
+        let dir = NonNull::new(dir).ok_or_else(NixErrno::last)?;
         Ok(Box::new(RealDir(dir)))
     }
 
@@ -304,13 +304,13 @@ impl System for RealSystem {
         let mut tms = MaybeUninit::<nix::libc::tms>::uninit();
         let raw_result = unsafe { nix::libc::times(tms.as_mut_ptr()) };
         if raw_result == (-1) as _ {
-            return Err(Errno::last());
+            return Err(NixErrno::last());
         }
         let tms = unsafe { tms.assume_init() };
 
         let ticks_per_second = unsafe { nix::libc::sysconf(nix::libc::_SC_CLK_TCK) };
         if ticks_per_second <= 0 {
-            return Err(Errno::last());
+            return Err(NixErrno::last());
         }
 
         Ok(Times {
@@ -399,7 +399,7 @@ impl System for RealSystem {
         let signal_mask = signal_mask.map_or(null(), |mask| mask.as_ref());
         let raw_result =
             unsafe { nix::libc::pselect(nfds, readers, writers, errors, timeout, signal_mask) };
-        Errno::result(raw_result)
+        NixErrno::result(raw_result)
     }
 
     fn getpid(&self) -> Pid {
@@ -466,7 +466,7 @@ impl System for RealSystem {
         loop {
             // TODO Use Result::into_err
             let result = nix::unistd::execve(path, args, envs);
-            if result != Err(Errno::EINTR) {
+            if result != Err(NixErrno::EINTR) {
                 return result;
             }
         }
@@ -496,23 +496,23 @@ impl System for RealSystem {
             use std::os::unix::ffi::OsStringExt as _;
             let size = nix::libc::confstr(nix::libc::_CS_PATH, std::ptr::null_mut(), 0);
             if size == 0 {
-                return Err(Errno::last());
+                return Err(NixErrno::last());
             }
             let mut buffer = Vec::<u8>::with_capacity(size);
             let final_size =
                 nix::libc::confstr(nix::libc::_CS_PATH, buffer.as_mut_ptr() as *mut _, size);
             if final_size == 0 {
-                return Err(Errno::last());
+                return Err(NixErrno::last());
             }
             if final_size > size {
-                return Err(Errno::ERANGE);
+                return Err(NixErrno::ERANGE);
             }
             buffer.set_len(final_size - 1); // The last byte is a null terminator.
             return Ok(OsString::from_vec(buffer));
         }
 
         #[allow(unreachable_code)]
-        Err(Errno::ENOSYS)
+        Err(NixErrno::ENOSYS)
     }
 
     fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair> {
@@ -552,11 +552,11 @@ impl Drop for RealDir {
 
 impl Dir for RealDir {
     fn next(&mut self) -> nix::Result<Option<DirEntry>> {
-        Errno::clear();
+        NixErrno::clear();
         let entry = unsafe { nix::libc::readdir(self.0.as_ptr()) };
-        let errno = Errno::last();
+        let errno = NixErrno::last();
         match NonNull::new(entry) {
-            None if errno != Errno::UnknownErrno => Err(errno),
+            None if errno != NixErrno::UnknownErrno => Err(errno),
             None => Ok(None),
             Some(mut entry) => unsafe {
                 let entry = entry.as_mut();

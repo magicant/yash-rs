@@ -40,8 +40,11 @@ use crate::trap::SignalSystem;
 use crate::Env;
 use futures_util::future::poll_fn;
 use futures_util::task::Poll;
+// FIXME
 #[doc(no_inline)]
 pub use nix::errno::Errno;
+#[doc(no_inline)]
+pub(crate) use nix::errno::Errno as NixErrno;
 #[doc(no_inline)]
 pub use nix::fcntl::AtFlags;
 #[doc(no_inline)]
@@ -724,7 +727,7 @@ impl SharedSystem {
         let result = poll_fn(|context| {
             let mut inner = self.0.borrow_mut();
             match inner.system.read(fd, buffer) {
-                Err(Errno::EAGAIN) => {
+                Err(NixErrno::EAGAIN) => {
                     *waker.borrow_mut() = Some(context.waker().clone());
                     inner.io.wait_for_reading(fd, &waker);
                     Poll::Pending
@@ -771,7 +774,7 @@ impl SharedSystem {
                         return Poll::Ready(Ok(written));
                     }
                 }
-                Err(Errno::EAGAIN | Errno::EINTR) => (),
+                Err(NixErrno::EAGAIN | NixErrno::EINTR) => (),
                 Err(error) => return Poll::Ready(Err(error)),
             }
 
@@ -1032,7 +1035,7 @@ impl SignalSystem for SharedSystem {
         &mut self,
         signal: nix::sys::signal::Signal,
         handling: SignalHandling,
-    ) -> Result<SignalHandling, Errno> {
+    ) -> Result<SignalHandling, NixErrno> {
         self.0.borrow_mut().set_signal_handling(signal, handling)
     }
 }
@@ -1161,13 +1164,13 @@ impl SelectSystem {
                 self.io.wake(readers, writers);
                 Ok(())
             }
-            Err(Errno::EBADF) => {
+            Err(NixErrno::EBADF) => {
                 // Some of the readers and writers are invalid but we cannot
                 // tell which, so we wake up everything.
                 self.io.wake_all();
-                Err(Errno::EBADF)
+                Err(NixErrno::EBADF)
             }
-            Err(Errno::EINTR) => Ok(()),
+            Err(NixErrno::EINTR) => Ok(()),
             Err(error) => Err(error),
         };
         self.io.gc();
