@@ -191,13 +191,13 @@ impl ErrorCause {
         match self {
             Expansion(e) => e.label(),
             NulByte(_) => "pathname should not contain a nul byte".into(),
-            FdNotOverwritten(_, errno) => errno.desc().into(),
+            FdNotOverwritten(_, errno) => errno.to_string().into(),
             ReservedFd(fd) => format!("file descriptor {fd} reserved by shell").into(),
-            OpenFile(path, errno) => format!("{}: {}", path.to_string_lossy(), errno.desc()).into(),
+            OpenFile(path, errno) => format!("{}: {}", path.to_string_lossy(), errno).into(),
             MalformedFd(value, error) => format!("{value}: {error}").into(),
             UnreadableFd(fd) => format!("{fd}: not a readable file descriptor").into(),
             UnwritableFd(fd) => format!("{fd}: not a writable file descriptor").into(),
-            TemporaryFileUnavailable(errno) => errno.desc().into(),
+            TemporaryFileUnavailable(errno) => errno.to_string().into(),
         }
     }
 }

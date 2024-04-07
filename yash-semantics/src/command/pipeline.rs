@@ -143,12 +143,8 @@ async fn execute_job_controlled_pipeline(
         }
         Err(errno) => {
             // TODO print error location using yash_env::io::print_error
-            env.system
-                .print_error(&format!(
-                    "cannot start a subshell in the pipeline: {}\n",
-                    errno.desc()
-                ))
-                .await;
+            let message = format!("cannot start a subshell in the pipeline: {}\n", errno);
+            env.system.print_error(&message).await;
             Break(Divert::Interrupt(Some(ExitStatus::NOEXEC)))
         }
     }
@@ -197,12 +193,8 @@ async fn shift_or_fail(env: &mut Env, pipes: &mut PipeSet, has_next: bool) -> Re
         Ok(()) => Continue(()),
         Err(errno) => {
             // TODO print error location using yash_env::io::print_error
-            env.system
-                .print_error(&format!(
-                    "cannot connect pipes in the pipeline: {}\n",
-                    errno.desc()
-                ))
-                .await;
+            let message = format!("cannot connect pipes in the pipeline: {}\n", errno);
+            env.system.print_error(&message).await;
             Break(Divert::Interrupt(Some(ExitStatus::NOEXEC)))
         }
     }
@@ -217,12 +209,8 @@ async fn connect_pipe_and_execute_command(
         Ok(()) => (),
         Err(errno) => {
             // TODO print error location using yash_env::io::print_error
-            env.system
-                .print_error(&format!(
-                    "cannot connect pipes in the pipeline: {}\n",
-                    errno.desc()
-                ))
-                .await;
+            let message = format!("cannot connect pipes in the pipeline: {}\n", errno);
+            env.system.print_error(&message).await;
             return Break(Divert::Interrupt(Some(ExitStatus::NOEXEC)));
         }
     }
@@ -244,7 +232,7 @@ async fn pid_or_fail(
             env.system
                 .print_error(&format!(
                     "cannot start a subshell in the pipeline: {}\n",
-                    errno.desc()
+                    errno
                 ))
                 .await;
             Break(Divert::Interrupt(Some(ExitStatus::NOEXEC)))
