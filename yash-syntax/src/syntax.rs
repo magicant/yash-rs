@@ -80,8 +80,12 @@ use itertools::Itertools;
 use std::cell::OnceCell;
 use std::fmt;
 use std::fmt::Write;
+#[cfg(unix)]
 use std::os::unix::io::RawFd;
 use std::rc::Rc;
+
+#[cfg(not(unix))]
+type RawFd = i32;
 
 /// Result of [`Unquote::write_unquoted`].
 ///
