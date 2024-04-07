@@ -18,6 +18,7 @@
 
 use super::Env;
 use crate::system::AtFlags;
+use crate::system::Errno;
 use crate::system::AT_FDCWD;
 use crate::variable::AssignError;
 use crate::variable::Scope::Global;
@@ -49,7 +50,7 @@ pub enum PreparePwdError {
 
     /// Error obtaining the current working directory path
     #[error("cannot obtain the current working directory path: {0}")]
-    GetCwdError(#[from] nix::Error),
+    GetCwdError(#[from] Errno),
 }
 
 impl Env {
@@ -101,7 +102,7 @@ impl Env {
                 .getcwd()?
                 .into_os_string()
                 .into_string()
-                .map_err(|_| nix::Error::EILSEQ)?;
+                .map_err(|_| Errno::EILSEQ)?;
             let mut var = self.variables.get_or_new("PWD", Global);
             var.assign(dir, None)?;
             var.export(true);

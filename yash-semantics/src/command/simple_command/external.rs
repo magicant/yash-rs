@@ -130,7 +130,7 @@ pub async fn start_external_utility_in_subshell_and_wait(
             print_error(
                 env,
                 format!("cannot execute external utility {:?}", name.value).into(),
-                errno.desc().into(),
+                errno.to_string().into(),
                 &name.origin,
             )
             .await;
@@ -191,7 +191,7 @@ pub async fn replace_current_process(
     print_error(
         env,
         format!("cannot execute external utility {path:?}").into(),
-        errno.desc().into(),
+        errno.to_string().into(),
         &location,
     )
     .await;

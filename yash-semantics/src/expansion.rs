@@ -164,7 +164,7 @@ impl ErrorCause {
         // TODO Localize
         use ErrorCause::*;
         match self {
-            CommandSubstError(e) => e.desc().into(),
+            CommandSubstError(e) => e.to_string().into(),
             ArithError(e) => e.to_string().into(),
             AssignReadOnly(e) => e.to_string().into(),
             UnsetParameter => "unset parameter disallowed by the nounset option".into(),

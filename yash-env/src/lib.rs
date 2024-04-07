@@ -47,6 +47,7 @@ use self::stack::Frame;
 use self::stack::Stack;
 pub use self::system::r#virtual::VirtualSystem;
 pub use self::system::real::RealSystem;
+use self::system::Errno;
 pub use self::system::SharedSystem;
 use self::system::SignalHandling;
 pub use self::system::System;
@@ -286,7 +287,7 @@ impl Env {
     ///
     /// This function returns `self.tty` if it is `Some` FD. Otherwise, it
     /// opens `/dev/tty` and saves the new FD to `self.tty` before returning it.
-    pub fn get_tty(&mut self) -> nix::Result<Fd> {
+    pub fn get_tty(&mut self) -> Result<Fd, Errno> {
         if let Some(fd) = self.tty {
             return Ok(fd);
         }
@@ -332,7 +333,7 @@ impl Env {
     /// If the target subshell is not job-controlled, you may want to use
     /// [`wait_for_subshell_to_finish`](Self::wait_for_subshell_to_finish)
     /// instead.
-    pub async fn wait_for_subshell(&mut self, target: Pid) -> nix::Result<(Pid, ProcessState)> {
+    pub async fn wait_for_subshell(&mut self, target: Pid) -> Result<(Pid, ProcessState), Errno> {
         // We need to set the signal handling before calling `wait` so we don't
         // miss any `SIGCHLD` that may arrive between `wait` and `wait_for_signal`.
         self.traps.enable_sigchld_handler(&mut self.system)?;
@@ -356,7 +357,7 @@ impl Env {
     pub async fn wait_for_subshell_to_finish(
         &mut self,
         target: Pid,
-    ) -> nix::Result<(Pid, ExitStatus)> {
+    ) -> Result<(Pid, ExitStatus), Errno> {
         loop {
             let (pid, state) = self.wait_for_subshell(target).await?;
             if !state.is_alive() {
@@ -455,7 +456,6 @@ mod tests {
     use crate::subshell::Subshell;
     use crate::system::r#virtual::INode;
     use crate::system::r#virtual::SystemState;
-    use crate::system::Errno;
     use crate::trap::Action;
     use futures_executor::LocalPool;
     use futures_util::task::LocalSpawnExt as _;

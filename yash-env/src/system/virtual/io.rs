@@ -16,10 +16,10 @@
 
 //! I/O within a virtual system.
 
+use super::super::Errno;
 use super::FdFlag;
 use super::FileBody;
 use super::INode;
-use nix::errno::Errno;
 use nix::unistd::Whence;
 use std::cell::RefCell;
 use std::fmt::Debug;
@@ -110,7 +110,7 @@ impl OpenFileDescription {
     /// Reads from this open file description.
     ///
     /// Returns the number of bytes successfully read.
-    pub fn read(&mut self, mut buffer: &mut [u8]) -> nix::Result<usize> {
+    pub fn read(&mut self, mut buffer: &mut [u8]) -> Result<usize, Errno> {
         if !self.is_readable {
             return Err(Errno::EBADF);
         }
@@ -156,7 +156,7 @@ impl OpenFileDescription {
     /// Writes to this open file description.
     ///
     /// Returns the number of bytes successfully written.
-    pub fn write(&mut self, mut buffer: &[u8]) -> nix::Result<usize> {
+    pub fn write(&mut self, mut buffer: &[u8]) -> Result<usize, Errno> {
         if !self.is_writable {
             return Err(Errno::EBADF);
         }
@@ -207,7 +207,7 @@ impl OpenFileDescription {
     ///
     /// The current implementation for `OpenFileDescription` does not support
     /// `Whence::SeekHole` or `Whence::SeekData`.
-    pub fn seek(&mut self, offset: isize, whence: Whence) -> nix::Result<usize> {
+    pub fn seek(&mut self, offset: isize, whence: Whence) -> Result<usize, Errno> {
         let len = match &self.file.borrow().body {
             FileBody::Regular { content, .. } => content.len(),
             FileBody::Directory { files, .. } => files.len(),

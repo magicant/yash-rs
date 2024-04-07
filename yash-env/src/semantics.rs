@@ -16,6 +16,7 @@
 
 //! Type definitions for command execution.
 
+use crate::system::Errno;
 use crate::Env;
 use nix::sys::signal::Signal;
 use std::ffi::c_int;
@@ -128,11 +129,12 @@ impl Termination for ExitStatus {
 /// The signal is also returned if the exit status is a signal number itself.
 /// Otherwise, an error is returned.
 impl TryFrom<ExitStatus> for Signal {
-    type Error = nix::Error;
-    fn try_from(exit_status: ExitStatus) -> nix::Result<Signal> {
+    type Error = Errno;
+    fn try_from(exit_status: ExitStatus) -> std::result::Result<Signal, Errno> {
         Signal::try_from(exit_status.0 - 0x180)
             .or_else(|_| Signal::try_from(exit_status.0 - 0x80))
             .or_else(|_| Signal::try_from(exit_status.0))
+            .map_err(Errno::from)
     }
 }
 

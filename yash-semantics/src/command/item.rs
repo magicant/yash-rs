@@ -89,7 +89,7 @@ async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Locat
             print_error(
                 env,
                 "cannot start a subshell to run an asynchronous command".into(),
-                errno.desc().into(),
+                errno.to_string().into(),
                 async_flag,
             )
             .await;

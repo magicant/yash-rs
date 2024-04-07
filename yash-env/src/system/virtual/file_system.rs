@@ -18,7 +18,7 @@
 
 use super::super::Dir;
 use super::super::DirEntry;
-use nix::errno::Errno;
+use super::super::Errno;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::VecDeque;
@@ -63,7 +63,7 @@ impl FileSystem {
         &mut self,
         path: P,
         content: Rc<RefCell<INode>>,
-    ) -> nix::Result<Option<Rc<RefCell<INode>>>> {
+    ) -> Result<Option<Rc<RefCell<INode>>>, Errno> {
         fn ensure_dir(body: &mut FileBody) -> &mut HashMap<Rc<OsStr>, Rc<RefCell<INode>>> {
             match body {
                 FileBody::Directory { files } => files,
@@ -82,7 +82,7 @@ impl FileSystem {
             fs: &mut FileSystem,
             path: &Path,
             content: Rc<RefCell<INode>>,
-        ) -> nix::Result<Option<Rc<RefCell<INode>>>> {
+        ) -> Result<Option<Rc<RefCell<INode>>>, Errno> {
             let mut components = path.components();
             let file_name = match components.next_back().ok_or(Errno::ENOENT)? {
                 Component::Normal(name) => name,
@@ -127,8 +127,8 @@ impl FileSystem {
     /// Returns a reference to the existing file at the specified path.
     ///
     /// TODO Reject relative path
-    pub fn get<P: AsRef<Path>>(&self, path: P) -> nix::Result<Rc<RefCell<INode>>> {
-        fn main(fs: &FileSystem, path: &Path) -> nix::Result<Rc<RefCell<INode>>> {
+    pub fn get<P: AsRef<Path>>(&self, path: P) -> Result<Rc<RefCell<INode>>, Errno> {
+        fn main(fs: &FileSystem, path: &Path) -> Result<Rc<RefCell<INode>>, Errno> {
             let components = path.components();
             let mut nodes = vec![Rc::clone(&fs.root)];
             for component in components {
@@ -282,7 +282,7 @@ impl<I> VirtualDir<I> {
 /// This function will fail if the given file body is not a directory.
 impl TryFrom<&FileBody> for VirtualDir<std::vec::IntoIter<Rc<OsStr>>> {
     type Error = Errno;
-    fn try_from(file: &FileBody) -> nix::Result<Self> {
+    fn try_from(file: &FileBody) -> Result<Self, Errno> {
         if let FileBody::Directory { files } = file {
             let mut entries = Vec::with_capacity(files.len() + 2);
             entries.push(Rc::from(OsStr::new(".")));
@@ -307,7 +307,7 @@ where
     I: Debug,
     I: Iterator<Item = Rc<OsStr>>,
 {
-    fn next(&mut self) -> nix::Result<Option<DirEntry>> {
+    fn next(&mut self) -> Result<Option<DirEntry>, Errno> {
         match self.iter.next() {
             Some(name) => {
                 self.current = name;

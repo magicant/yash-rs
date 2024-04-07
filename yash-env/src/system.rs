@@ -16,11 +16,15 @@
 
 //! [System] and its implementors.
 
+mod errno;
 pub mod fd_set;
 pub mod real;
 pub mod resource;
 pub mod r#virtual;
 
+pub use self::errno::Errno;
+pub use self::errno::RawErrno;
+pub use self::errno::Result;
 use self::fd_set::FdSet;
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
@@ -39,8 +43,6 @@ use crate::trap::SignalSystem;
 use crate::Env;
 use futures_util::future::poll_fn;
 use futures_util::task::Poll;
-#[doc(no_inline)]
-pub use nix::errno::Errno;
 #[doc(no_inline)]
 pub use nix::fcntl::AtFlags;
 #[doc(no_inline)]
@@ -89,10 +91,10 @@ use std::time::Instant;
 /// `System` instance to extend the interface with asynchronous methods.
 pub trait System: Debug {
     /// Retrieves metadata of a file.
-    fn fstat(&self, fd: Fd) -> nix::Result<FileStat>;
+    fn fstat(&self, fd: Fd) -> Result<FileStat>;
 
     /// Retrieves metadata of a file.
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat>;
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> Result<FileStat>;
 
     /// Whether there is an executable file at the specified path.
     #[must_use]
@@ -106,7 +108,7 @@ pub trait System: Debug {
     ///
     /// This is a thin wrapper around the `pipe` system call.
     /// If successful, returns the reading and writing ends of the pipe.
-    fn pipe(&mut self) -> nix::Result<(Fd, Fd)>;
+    fn pipe(&mut self) -> Result<(Fd, Fd)>;
 
     /// Duplicates a file descriptor.
     ///
@@ -116,54 +118,54 @@ pub trait System: Debug {
     /// new FD.
     ///
     /// If successful, returns `Ok(new_fd)`. On error, returns `Err(_)`.
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> nix::Result<Fd>;
+    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> Result<Fd>;
 
     /// Duplicates a file descriptor.
     ///
     /// This is a thin wrapper around the `dup2` system call. If successful,
     /// returns `Ok(to)`. On error, returns `Err(_)`.
-    fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd>;
+    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd>;
 
     /// Opens a file descriptor.
     ///
     /// This is a thin wrapper around the `open` system call.
-    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> nix::Result<Fd>;
+    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd>;
 
     /// Opens a file descriptor associated with an anonymous temporary file.
     ///
     /// This function works similarly to the `O_TMPFILE` flag specified to the
     /// `open` function.
-    fn open_tmpfile(&mut self, parent_dir: &Path) -> nix::Result<Fd>;
+    fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd>;
 
     /// Closes a file descriptor.
     ///
     /// This is a thin wrapper around the `close` system call.
     ///
     /// This function returns `Ok(())` when the FD is already closed.
-    fn close(&mut self, fd: Fd) -> nix::Result<()>;
+    fn close(&mut self, fd: Fd) -> Result<()>;
 
     /// Returns the file status flags for the open file description.
     ///
     /// This is a thin wrapper around the `fcntl` system call.
-    fn fcntl_getfl(&self, fd: Fd) -> nix::Result<OFlag>;
+    fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag>;
 
     /// Sets the file status flags for the open file description.
     ///
     /// This is a thin wrapper around the `fcntl` system call.
-    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> nix::Result<()>;
+    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> Result<()>;
 
     /// Returns the attributes for the file descriptor.
     ///
     /// This is a thin wrapper around the `fcntl` system call.
-    fn fcntl_getfd(&self, fd: Fd) -> nix::Result<FdFlag>;
+    fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag>;
 
     /// Sets attributes for the file descriptor.
     ///
     /// This is a thin wrapper around the `fcntl` system call.
-    fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> nix::Result<()>;
+    fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> Result<()>;
 
     /// Tests if a file descriptor is associated with a terminal device.
-    fn isatty(&self, fd: Fd) -> nix::Result<bool>;
+    fn isatty(&self, fd: Fd) -> Result<bool>;
 
     /// Reads from the file descriptor.
     ///
@@ -173,7 +175,7 @@ pub trait System: Debug {
     /// This function may perform blocking I/O, especially if the `O_NONBLOCK`
     /// flag is not set for the FD. Use [`SharedSystem::read_async`] to support
     /// concurrent I/O in an `async` function context.
-    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize>;
+    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize>;
 
     /// Writes to the file descriptor.
     ///
@@ -184,16 +186,16 @@ pub trait System: Debug {
     /// `O_NONBLOCK` flag is not set for the FD. Use [`SharedSystem::write_all`]
     /// to support concurrent I/O in an `async` function context and ensure the
     /// whole `buffer` is written.
-    fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize>;
+    fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize>;
 
     /// Moves the position of the open file description.
-    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> nix::Result<u64>;
+    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64>;
 
     /// Opens a directory for enumerating entries.
-    fn fdopendir(&mut self, fd: Fd) -> nix::Result<Box<dyn Dir>>;
+    fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>>;
 
     /// Opens a directory for enumerating entries.
-    fn opendir(&mut self, path: &CStr) -> nix::Result<Box<dyn Dir>>;
+    fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>>;
 
     /// Gets and sets the file creation mode mask.
     ///
@@ -210,7 +212,7 @@ pub trait System: Debug {
     fn now(&self) -> Instant;
 
     /// Returns consumed CPU times.
-    fn times(&self) -> nix::Result<Times>;
+    fn times(&self) -> Result<Times>;
 
     /// Gets and/or sets the signal blocking mask.
     ///
@@ -229,7 +231,7 @@ pub trait System: Debug {
         how: SigmaskHow,
         set: Option<&SigSet>,
         oldset: Option<&mut SigSet>,
-    ) -> nix::Result<()>;
+    ) -> Result<()>;
 
     /// Gets and sets the handler for a signal.
     ///
@@ -245,7 +247,7 @@ pub trait System: Debug {
     /// When you set the handler to `SignalHandling::Catch`, signals sent to
     /// this process are accumulated in the `System` instance and made available
     /// from [`caught_signals`](Self::caught_signals).
-    fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> nix::Result<SignalHandling>;
+    fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> Result<SignalHandling>;
 
     /// Returns signals this process has caught, if any.
     ///
@@ -283,7 +285,7 @@ pub trait System: Debug {
         &mut self,
         target: Pid,
         signal: Option<Signal>,
-    ) -> Pin<Box<dyn Future<Output = nix::Result<()>>>>;
+    ) -> Pin<Box<dyn Future<Output = Result<()>>>>;
 
     /// Waits for a next event.
     ///
@@ -318,7 +320,7 @@ pub trait System: Debug {
         writers: &mut FdSet,
         timeout: Option<&TimeSpec>,
         signal_mask: Option<&SigSet>,
-    ) -> nix::Result<c_int>;
+    ) -> Result<c_int>;
 
     /// Returns the process ID of the current process.
     #[must_use]
@@ -335,17 +337,17 @@ pub trait System: Debug {
     /// Modifies the process group ID of a process.
     ///
     /// This is a thin wrapper around the `setpgid` system call.
-    fn setpgid(&mut self, pid: Pid, pgid: Pid) -> nix::Result<()>;
+    fn setpgid(&mut self, pid: Pid, pgid: Pid) -> Result<()>;
 
     /// Returns the current foreground process group ID.
     ///
     /// This is a thin wrapper around the `tcgetpgrp` system call.
-    fn tcgetpgrp(&self, fd: Fd) -> nix::Result<Pid>;
+    fn tcgetpgrp(&self, fd: Fd) -> Result<Pid>;
 
     /// Switches the foreground process group.
     ///
     /// This is a thin wrapper around the `tcsetpgrp` system call.
-    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()>;
+    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> Result<()>;
 
     /// Creates a new child process.
     ///
@@ -357,7 +359,7 @@ pub trait System: Debug {
     /// If successful, this function returns a [`ChildProcessStarter`] function. The
     /// caller must call the starter exactly once to make sure the parent and
     /// child processes perform correctly after forking.
-    fn new_child_process(&mut self) -> nix::Result<ChildProcessStarter>;
+    fn new_child_process(&mut self) -> Result<ChildProcessStarter>;
 
     /// Reports updated status of a child process.
     ///
@@ -376,35 +378,30 @@ pub trait System: Debug {
     /// the processes matching `target` have not changed their states, this
     /// function returns `Ok(None)`. If an error occurs, this function returns
     /// `Err(_)`.
-    fn wait(&mut self, target: Pid) -> nix::Result<Option<(Pid, ProcessState)>>;
+    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>>;
 
     // TODO Consider passing raw pointers for optimization
     /// Replaces the current process with an external utility.
     ///
     /// This is a thin wrapper around the `execve` system call.
-    fn execve(
-        &mut self,
-        path: &CStr,
-        args: &[CString],
-        envs: &[CString],
-    ) -> nix::Result<Infallible>;
+    fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible>;
 
     /// Returns the current working directory path.
-    fn getcwd(&self) -> nix::Result<PathBuf>;
+    fn getcwd(&self) -> Result<PathBuf>;
 
     /// Changes the working directory.
-    fn chdir(&mut self, path: &CStr) -> nix::Result<()>;
+    fn chdir(&mut self, path: &CStr) -> Result<()>;
 
     /// Returns the home directory path of the given user.
     ///
     /// Returns `Ok(None)` if the user is not found.
-    fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<PathBuf>>;
+    fn getpwnam_dir(&self, name: &str) -> Result<Option<PathBuf>>;
 
     /// Returns the standard `$PATH` value where all standard utilities are
     /// expected to be found.
     ///
     /// This is a thin wrapper around the `confstr(_CS_PATH, …)`.
-    fn confstr_path(&self) -> nix::Result<OsString>;
+    fn confstr_path(&self) -> Result<OsString>;
 
     /// Returns the limits for the specified resource.
     ///
@@ -514,7 +511,7 @@ pub struct DirEntry<'a> {
 /// file descriptor is released when the implementor object is dropped.
 pub trait Dir: Debug {
     /// Returns the next directory entry.
-    fn next(&mut self) -> nix::Result<Option<DirEntry>>;
+    fn next(&mut self) -> Result<Option<DirEntry>>;
 }
 
 /// Extension for [`System`]
@@ -540,7 +537,7 @@ pub trait SystemEx: System {
     ///
     /// This function returns the new file descriptor on success. On error, it
     /// closes the original file descriptor and returns the error.
-    fn move_fd_internal(&mut self, from: Fd) -> nix::Result<Fd> {
+    fn move_fd_internal(&mut self, from: Fd) -> Result<Fd> {
         if from >= MIN_INTERNAL_FD {
             return Ok(from);
         }
@@ -563,7 +560,7 @@ pub trait SystemEx: System {
     /// Use [`tcsetpgrp_without_block`](Self::tcsetpgrp_without_block) if you
     /// need to make sure the shell is in the foreground before changing the
     /// foreground job.
-    fn tcsetpgrp_with_block(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()> {
+    fn tcsetpgrp_with_block(&mut self, fd: Fd, pgid: Pid) -> Result<()> {
         let mut sigttou = SigSet::empty();
         let mut old_set = SigSet::empty();
         sigttou.add(Signal::SIGTTOU);
@@ -595,7 +592,7 @@ pub trait SystemEx: System {
     ///
     /// Use [`tcsetpgrp_with_block`](Self::tcsetpgrp_with_block) to change the
     /// job even if the current shell is not in the foreground.
-    fn tcsetpgrp_without_block(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()> {
+    fn tcsetpgrp_without_block(&mut self, fd: Fd, pgid: Pid) -> Result<()> {
         match self.sigaction(Signal::SIGTTOU, SignalHandling::Default) {
             Err(e) => Err(e),
             Ok(old_handling) => {
@@ -692,7 +689,7 @@ impl SharedSystem {
         SharedSystem(Rc::new(RefCell::new(SelectSystem::new(system))))
     }
 
-    fn set_nonblocking(&mut self, fd: Fd) -> nix::Result<OFlag> {
+    fn set_nonblocking(&mut self, fd: Fd) -> Result<OFlag> {
         let mut inner = self.0.borrow_mut();
         let flags = inner.system.fcntl_getfl(fd)?;
         if !flags.contains(OFlag::O_NONBLOCK) {
@@ -703,7 +700,7 @@ impl SharedSystem {
 
     fn reset_nonblocking(&mut self, fd: Fd, old_flags: OFlag) {
         if !old_flags.contains(OFlag::O_NONBLOCK) {
-            let _: Result<(), _> = self.0.borrow_mut().system.fcntl_setfl(fd, old_flags);
+            let _: Result<()> = self.0.borrow_mut().system.fcntl_setfl(fd, old_flags);
         }
     }
 
@@ -711,7 +708,7 @@ impl SharedSystem {
     ///
     /// This function waits for one or more bytes to be available for reading.
     /// If successful, returns the number of bytes read.
-    pub async fn read_async(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
+    pub async fn read_async(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
         let flags = self.set_nonblocking(fd)?;
 
         // We need to retain a strong reference to the waker outside the poll_fn
@@ -746,7 +743,7 @@ impl SharedSystem {
     /// returned.
     ///
     /// This function silently ignores signals that may interrupt writes.
-    pub async fn write_all(&mut self, fd: Fd, mut buffer: &[u8]) -> nix::Result<usize> {
+    pub async fn write_all(&mut self, fd: Fd, mut buffer: &[u8]) -> Result<usize> {
         if buffer.is_empty() {
             return Ok(0);
         }
@@ -869,16 +866,16 @@ impl SharedSystem {
     ///
     /// This function may wake up a task even if the condition it is expecting
     /// has not yet been met.
-    pub fn select(&self, poll: bool) -> nix::Result<()> {
+    pub fn select(&self, poll: bool) -> Result<()> {
         self.0.borrow_mut().select(poll)
     }
 }
 
 impl System for SharedSystem {
-    fn fstat(&self, fd: Fd) -> nix::Result<FileStat> {
+    fn fstat(&self, fd: Fd) -> Result<FileStat> {
         self.0.borrow().fstat(fd)
     }
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat> {
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> Result<FileStat> {
         self.0.borrow().fstatat(dir_fd, path, flags)
     }
     fn is_executable_file(&self, path: &CStr) -> bool {
@@ -887,52 +884,52 @@ impl System for SharedSystem {
     fn is_directory(&self, path: &CStr) -> bool {
         self.0.borrow().is_directory(path)
     }
-    fn pipe(&mut self) -> nix::Result<(Fd, Fd)> {
+    fn pipe(&mut self) -> Result<(Fd, Fd)> {
         self.0.borrow_mut().pipe()
     }
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> nix::Result<Fd> {
+    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> Result<Fd> {
         self.0.borrow_mut().dup(from, to_min, flags)
     }
-    fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd> {
+    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
         self.0.borrow_mut().dup2(from, to)
     }
-    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> nix::Result<Fd> {
+    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd> {
         self.0.borrow_mut().open(path, option, mode)
     }
-    fn open_tmpfile(&mut self, parent_dir: &Path) -> nix::Result<Fd> {
+    fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
         self.0.borrow_mut().open_tmpfile(parent_dir)
     }
-    fn close(&mut self, fd: Fd) -> nix::Result<()> {
+    fn close(&mut self, fd: Fd) -> Result<()> {
         self.0.borrow_mut().close(fd)
     }
-    fn fcntl_getfl(&self, fd: Fd) -> nix::Result<OFlag> {
+    fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag> {
         self.0.borrow().fcntl_getfl(fd)
     }
-    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> nix::Result<()> {
+    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> Result<()> {
         self.0.borrow_mut().fcntl_setfl(fd, flags)
     }
-    fn fcntl_getfd(&self, fd: Fd) -> nix::Result<FdFlag> {
+    fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag> {
         self.0.borrow().fcntl_getfd(fd)
     }
-    fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> nix::Result<()> {
+    fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> Result<()> {
         self.0.borrow_mut().fcntl_setfd(fd, flags)
     }
-    fn isatty(&self, fd: Fd) -> nix::Result<bool> {
+    fn isatty(&self, fd: Fd) -> Result<bool> {
         self.0.borrow().isatty(fd)
     }
-    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
+    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
         self.0.borrow_mut().read(fd, buffer)
     }
-    fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
+    fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {
         self.0.borrow_mut().write(fd, buffer)
     }
-    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> nix::Result<u64> {
+    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
         self.0.borrow_mut().lseek(fd, position)
     }
-    fn fdopendir(&mut self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
+    fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
         self.0.borrow_mut().fdopendir(fd)
     }
-    fn opendir(&mut self, path: &CStr) -> nix::Result<Box<dyn Dir>> {
+    fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
         self.0.borrow_mut().opendir(path)
     }
     fn umask(&mut self, mask: Mode) -> Mode {
@@ -941,7 +938,7 @@ impl System for SharedSystem {
     fn now(&self) -> Instant {
         self.0.borrow().now()
     }
-    fn times(&self) -> nix::Result<Times> {
+    fn times(&self) -> Result<Times> {
         self.0.borrow().times()
     }
     fn sigmask(
@@ -949,10 +946,10 @@ impl System for SharedSystem {
         how: SigmaskHow,
         set: Option<&SigSet>,
         old_set: Option<&mut SigSet>,
-    ) -> nix::Result<()> {
+    ) -> Result<()> {
         (**self.0.borrow_mut()).sigmask(how, set, old_set)
     }
-    fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> nix::Result<SignalHandling> {
+    fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> Result<SignalHandling> {
         self.0.borrow_mut().sigaction(signal, action)
     }
     fn caught_signals(&mut self) -> Vec<Signal> {
@@ -962,7 +959,7 @@ impl System for SharedSystem {
         &mut self,
         target: Pid,
         signal: Option<Signal>,
-    ) -> Pin<Box<(dyn Future<Output = nix::Result<()>>)>> {
+    ) -> Pin<Box<(dyn Future<Output = Result<()>>)>> {
         self.0.borrow_mut().kill(target, signal)
     }
     fn select(
@@ -971,7 +968,7 @@ impl System for SharedSystem {
         writers: &mut FdSet,
         timeout: Option<&TimeSpec>,
         signal_mask: Option<&SigSet>,
-    ) -> nix::Result<c_int> {
+    ) -> Result<c_int> {
         (**self.0.borrow_mut()).select(readers, writers, timeout, signal_mask)
     }
     fn getpid(&self) -> Pid {
@@ -983,39 +980,34 @@ impl System for SharedSystem {
     fn getpgrp(&self) -> Pid {
         self.0.borrow().getpgrp()
     }
-    fn setpgid(&mut self, pid: Pid, pgid: Pid) -> nix::Result<()> {
+    fn setpgid(&mut self, pid: Pid, pgid: Pid) -> Result<()> {
         self.0.borrow_mut().setpgid(pid, pgid)
     }
-    fn tcgetpgrp(&self, fd: Fd) -> nix::Result<Pid> {
+    fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
         self.0.borrow().tcgetpgrp(fd)
     }
-    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()> {
+    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> Result<()> {
         self.0.borrow_mut().tcsetpgrp(fd, pgid)
     }
-    fn new_child_process(&mut self) -> nix::Result<ChildProcessStarter> {
+    fn new_child_process(&mut self) -> Result<ChildProcessStarter> {
         self.0.borrow_mut().new_child_process()
     }
-    fn wait(&mut self, target: Pid) -> nix::Result<Option<(Pid, ProcessState)>> {
+    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         self.0.borrow_mut().wait(target)
     }
-    fn execve(
-        &mut self,
-        path: &CStr,
-        args: &[CString],
-        envs: &[CString],
-    ) -> nix::Result<Infallible> {
+    fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {
         self.0.borrow_mut().execve(path, args, envs)
     }
-    fn getcwd(&self) -> nix::Result<PathBuf> {
+    fn getcwd(&self) -> Result<PathBuf> {
         self.0.borrow().getcwd()
     }
-    fn chdir(&mut self, path: &CStr) -> nix::Result<()> {
+    fn chdir(&mut self, path: &CStr) -> Result<()> {
         self.0.borrow_mut().chdir(path)
     }
-    fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<PathBuf>> {
+    fn getpwnam_dir(&self, name: &str) -> Result<Option<PathBuf>> {
         self.0.borrow().getpwnam_dir(name)
     }
-    fn confstr_path(&self) -> nix::Result<OsString> {
+    fn confstr_path(&self) -> Result<OsString> {
         self.0.borrow().confstr_path()
     }
     fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair> {
@@ -1031,7 +1023,7 @@ impl SignalSystem for SharedSystem {
         &mut self,
         signal: nix::sys::signal::Signal,
         handling: SignalHandling,
-    ) -> Result<SignalHandling, Errno> {
+    ) -> Result<SignalHandling> {
         self.0.borrow_mut().set_signal_handling(signal, handling)
     }
 }
@@ -1079,7 +1071,7 @@ impl SelectSystem {
     }
 
     /// Calls `sigmask` and updates `self.wait_mask`.
-    fn sigmask(&mut self, how: SigmaskHow, signal: Signal) -> nix::Result<()> {
+    fn sigmask(&mut self, how: SigmaskHow, signal: Signal) -> Result<()> {
         let mut set = SigSet::empty();
         let mut old_set = SigSet::empty();
         set.add(signal);
@@ -1098,7 +1090,7 @@ impl SelectSystem {
         &mut self,
         signal: Signal,
         handling: SignalHandling,
-    ) -> nix::Result<SignalHandling> {
+    ) -> Result<SignalHandling> {
         // The order of sigmask and sigaction is important to prevent the signal
         // from being caught. The signal must be caught only when the select
         // function temporarily unblocks the signal. This is to avoid race
@@ -1136,7 +1128,7 @@ impl SelectSystem {
     /// Implements the select function for `SharedSystem`.
     ///
     /// See [`SharedSystem::select`].
-    pub fn select(&mut self, poll: bool) -> nix::Result<()> {
+    pub fn select(&mut self, poll: bool) -> Result<()> {
         let mut readers = self.io.readers();
         let mut writers = self.io.writers();
         let timeout = if poll {
