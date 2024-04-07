@@ -16,6 +16,7 @@
 
 //! [System] and its implementors.
 
+pub mod errno;
 pub mod fd_set;
 pub mod real;
 pub mod resource;
