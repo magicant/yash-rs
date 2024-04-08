@@ -5,10 +5,18 @@ All notable changes to `yash-syntax` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.0] - Unreleased
+## [0.8.0] - 2024-04-09
+
+Starting from this version, the `yash-syntax` crate can be compiled on non-Unix
+platforms, where `RawFd` falls back to `i32`.
 
 ### Added
 
+- `source::Source::Eval`
+- `source::Source::DotScript`
+- `source::pretty::Footer`
+- `source::pretty::Message::footers`
+- `source::pretty::MessageBase::footers`
 - `parser::lex::Keyword::as_str`
 - `parser::lex::ParseKeywordError`
 - `impl FromStr for parser::lex::Keyword`
@@ -28,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- `impl TryFrom<&str> for parser::lex::Keyword`
+- `impl TryFrom<&str> for parser::lex::Keyword` in favor of `FromStr`
 
 ## [0.7.0] - 2023-11-12
 
@@ -199,6 +207,7 @@ command.
 - Functionalities to parse POSIX shell scripts
 - Alias substitution support
 
+[0.8.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.8.0
 [0.7.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.7.0
 [0.6.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.6.1
 [0.6.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.6.0

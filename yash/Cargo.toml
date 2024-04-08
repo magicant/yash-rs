@@ -22,7 +22,7 @@ thiserror = "1.0.47"
 yash-builtin = { path = "../yash-builtin", version = "0.1.0" }
 yash-env = { path = "../yash-env", version = "0.1.0" }
 yash-semantics = { path = "../yash-semantics", version = "0.1.0" }
-yash-syntax = { path = "../yash-syntax", version = "0.7.0" }
+yash-syntax = { path = "../yash-syntax", version = "0.8.0" }
 
 [dev-dependencies]
 assert_matches = "1.5.0"
