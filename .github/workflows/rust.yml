@@ -55,3 +55,16 @@ jobs:
     - uses: Swatinem/rust-cache@v2
     - name: Run tests with MSRV
       run: ./check-msrv.sh -v
+  windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: Swatinem/rust-cache@v2
+    - name: Test yash-arith
+      run: cargo test --package yash-arith
+    - name: Test yash-fnmatch
+      run: cargo test --package yash-fnmatch
+    - name: Test yash-quote
+      run: cargo test --package yash-quote
+    - name: Test yash-syntax
+      run: cargo test --package yash-syntax
