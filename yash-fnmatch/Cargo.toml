@@ -1,6 +1,6 @@
 [package]
 name = "yash-fnmatch"
-version = "1.1.0"
+version = "1.1.1"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2021"
 rust-version = "1.65.0"
