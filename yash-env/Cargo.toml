@@ -6,14 +6,12 @@ edition = "2021"
 rust-version = "1.70.0"
 description = "Yash shell execution environment interface"
 # documentation = "https://yash.osdn.jp/doc/"
-# readme = "README.md"
+readme = "README.md"
 # homepage = "https://yash.osdn.jp/"
 repository = "https://github.com/magicant/yash-rs"
 license = "GPL-3.0-or-later"
-# license-file = "../LICENSE"
 keywords = ["posix", "shell"]
 categories = ["command-line-utilities"]
-publish = false
 
 [dependencies]
 annotate-snippets = "0.10.0"
