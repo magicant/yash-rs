@@ -15,7 +15,7 @@ Many features are still yet to be implemented.
 
 ## License
 
-Yash is distributed under [GPLv3](yash/LICENSE-GPL).
+Yash is distributed under [GPLv3](yash-cli/LICENSE-GPL).
 
 Exceptionally, you can reuse the `yash-fnmatch` and `yash-quote` crate in your
 software under the [MIT License](yash-quote/LICENSE-MIT) or [Apache License

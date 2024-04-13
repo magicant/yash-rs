@@ -1,5 +1,5 @@
 [package]
-name = "yash"
+name = "yash-cli"
 version = "0.1.0"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2021"

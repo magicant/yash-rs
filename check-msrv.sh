@@ -24,6 +24,10 @@ update_workspace_member yash-builtin
 cargo +nightly update -Z direct-minimal-versions
 cargo +1.75.0 test --package yash-builtin -- $quiet
 
+update_workspace_member yash-cli
+cargo +nightly update -Z direct-minimal-versions
+cargo +1.75.0 test --package yash-cli -- $quiet
+
 update_workspace_member yash-env
 cargo +nightly update -Z direct-minimal-versions
 cargo +1.70.0 test --package yash-env -- $quiet
@@ -44,7 +48,3 @@ update_workspace_member yash-syntax
 cargo +nightly update -Z direct-minimal-versions
 cargo +1.70.0 test --package yash-syntax -- $quiet
 cargo +1.70.0 test --package yash-syntax --features annotate-snippets -- $quiet
-
-update_workspace_member yash
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.75.0 test --package yash -- $quiet

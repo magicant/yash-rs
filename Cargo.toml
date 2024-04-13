@@ -1,3 +1,3 @@
 [workspace]
-members = ["yash", "yash-*"]
+members = ["yash-*"]
 resolver = "2"
