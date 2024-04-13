@@ -14,7 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! TODO Elaborate
+//! This is a library crate that implements the command-line frontend for the
+//! yash shell. It is used by the `yash3` binary crate to provide the shell
+//! functionality. Currently, this crate is not intended to be used as a library
+//! by other crates.
+//!
+//! The main entry point for the shell is the [`bin_main`] function, which is
+//! called by the `main` function in the binary crate. The `bin_main` function
+//! sets up the shell environment and runs the main read-eval loop.
 
 pub mod startup;
 // mod runner;
