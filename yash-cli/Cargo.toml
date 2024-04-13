@@ -15,6 +15,10 @@ keywords = ["posix", "shell"]
 categories = ["command-line-utilities"]
 publish = false
 
+[[bin]]
+name = "yash3"
+path = "src/main.rs"
+
 [dependencies]
 futures-executor = "0.3.28"
 futures-util = { version = "0.3.28", features = ["channel"] }

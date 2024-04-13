@@ -27,7 +27,7 @@ use std::process::Stdio;
 
 mod pty;
 
-const BIN: &str = env!("CARGO_BIN_EXE_yash-cli");
+const BIN: &str = env!("CARGO_BIN_EXE_yash3");
 const TMPDIR: &str = env!("CARGO_TARGET_TMPDIR");
 
 /// Runs a test subject.
