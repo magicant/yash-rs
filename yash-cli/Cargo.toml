@@ -1,6 +1,6 @@
 [package]
 name = "yash-cli"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2021"
 rust-version = "1.75.0"
@@ -10,10 +10,8 @@ readme = "README.md"
 # homepage = "https://yash.osdn.jp/"
 repository = "https://github.com/magicant/yash-rs"
 license = "GPL-3.0-or-later"
-# license-file = "LICENSE"
 keywords = ["posix", "shell"]
 categories = ["command-line-utilities"]
-publish = false
 
 [[bin]]
 name = "yash3"
