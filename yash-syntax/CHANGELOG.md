@@ -5,12 +5,21 @@ All notable changes to `yash-syntax` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.1] - Unreleased
+## [0.9.0] - Unreleased
+
+### Changed
+
+- `Lexer::source_string` is no longer generic. The argument type is now
+  `Range<usize>` instead of a generic implementor of
+  `SliceIndex<[SourceChar], Output = [SourceChar]>`.
 
 ### Fixed
 
 - A newline after a bar in a pipeline was not parsed correctly if it appeared as
   a result of alias substitution.
+- Alias substitution was not performed as expected for a token that follows a
+  result of blank-ending alias substitution if there is a line continuation
+  between them.
 
 ## [0.8.0] - 2024-04-09
 

@@ -542,7 +542,6 @@ __IN__
 ok
 __OUT__
 
-: TODO yash is broken <<\__OUT__
 test_oE 'line continuation between alias names (1)'
 alias echo='\
 echo\

@@ -39,7 +39,6 @@ use std::ops::DerefMut;
 use std::ops::Range;
 use std::pin::Pin;
 use std::rc::Rc;
-use std::slice::SliceIndex;
 
 /// Returns true if the character is a blank character.
 pub fn is_blank(c: char) -> bool {
@@ -137,12 +136,26 @@ enum InputState {
     Error(Error),
 }
 
+/// Source character with additional attribute
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct SourceCharEx {
+    value: SourceChar,
+    is_line_continuation: bool,
+}
+
+fn ex<I: IntoIterator<Item = SourceChar>>(i: I) -> impl Iterator<Item = SourceCharEx> {
+    i.into_iter().map(|sc| SourceCharEx {
+        value: sc,
+        is_line_continuation: false,
+    })
+}
+
 /// Core part of the lexical analyzer.
 struct LexerCore<'a> {
     input: Box<dyn Input + 'a>,
     state: InputState,
     raw_code: Rc<Code>,
-    source: Vec<SourceChar>,
+    source: Vec<SourceCharEx>,
     index: usize,
 }
 
@@ -170,8 +183,10 @@ impl<'a> LexerCore<'a> {
     /// Peeks the next character, reading the next line if necessary.
     async fn peek_char(&mut self) -> Result<PeekChar<'_>> {
         loop {
+            // if let Some(sc) = self.source.get(self.index) {
+            //     return Ok(PeekChar::Char(&sc.value));
             if self.index < self.source.len() {
-                return Ok(PeekChar::Char(&self.source[self.index]));
+                return Ok(PeekChar::Char(&self.source[self.index].value));
             }
 
             match self.state {
@@ -193,7 +208,7 @@ impl<'a> LexerCore<'a> {
                         // Successful read
                         self.raw_code.value.borrow_mut().push_str(&line);
                         self.source
-                            .extend(source_chars(&line, &self.raw_code, self.index));
+                            .extend(ex(source_chars(&line, &self.raw_code, self.index)));
                     }
                 }
                 Err(io_error) => {
@@ -232,7 +247,7 @@ impl<'a> LexerCore<'a> {
             index,
             self.index
         );
-        &self.source[index]
+        &self.source[index].value
     }
 
     /// Returns the current index.
@@ -287,12 +302,9 @@ impl<'a> LexerCore<'a> {
         self.flush();
     }
 
-    /// Extracts a string from the source code.
-    fn source_string<I>(&self, i: I) -> String
-    where
-        I: SliceIndex<[SourceChar], Output = [SourceChar]>,
-    {
-        self.source[i].iter().map(|c| c.value).collect()
+    /// Extracts a string from the source code range.
+    fn source_string(&self, range: Range<usize>) -> String {
+        self.source[range].iter().map(|c| c.value.value).collect()
     }
 
     /// Returns a location for a given range of the source code.
@@ -315,7 +327,28 @@ impl<'a> LexerCore<'a> {
         Location { code, range }
     }
 
+    /// Marks the characters in the given range as line continuation.
+    ///
+    /// This function sets the `is_line_continuation` flag of the characters in
+    /// the range to true. The characters must have been read before calling
+    /// this function.
+    fn mark_line_continuation(&mut self, range: Range<usize>) {
+        assert!(
+            range.end <= self.index,
+            "characters must have been read (range = {:?}, current index = {})",
+            range,
+            self.index
+        );
+        for sc in &mut self.source[range] {
+            sc.is_line_continuation = true;
+        }
+    }
+
     /// Performs alias substitution.
+    ///
+    /// This function replaces the characters starting from the `begin` index up
+    /// to the current position with the alias value. The resulting part of code
+    /// will be characters with a [`Source::Alias`] origin.
     fn substitute_alias(&mut self, begin: usize, alias: &Rc<Alias>) {
         let end = self.index;
         assert!(
@@ -332,7 +365,7 @@ impl<'a> LexerCore<'a> {
             start_line_number: NonZeroU64::new(1).unwrap(),
             source,
         });
-        let repl = source_chars(&alias.replacement, &code, 0);
+        let repl = ex(source_chars(&alias.replacement, &code, 0));
 
         self.source.splice(begin..end, repl);
         self.index = begin;
@@ -348,21 +381,18 @@ impl<'a> LexerCore<'a> {
         fn ends_with_blank(s: &str) -> bool {
             s.chars().next_back().map_or(false, is_blank)
         }
-        fn is_same_alias(alias: &Alias, sc: Option<&SourceChar>) -> bool {
-            match sc {
-                None => false,
-                Some(sc) => sc.location.code.source.is_alias_for(&alias.name),
-            }
+        fn is_same_alias(alias: &Alias, sc: Option<&SourceCharEx>) -> bool {
+            sc.is_some_and(|sc| sc.value.location.code.source.is_alias_for(&alias.name))
         }
 
         for index in (0..index).rev() {
             let sc = &self.source[index];
 
-            if !is_blank(sc.value) {
+            if !sc.is_line_continuation && !is_blank(sc.value.value) {
                 return false;
             }
 
-            if let Source::Alias { ref alias, .. } = sc.location.code.source {
+            if let Source::Alias { ref alias, .. } = sc.value.location.code.source {
                 #[allow(clippy::collapsible_if)]
                 if ends_with_blank(&alias.replacement) {
                     if !is_same_alias(alias, self.source.get(index + 1)) {
@@ -455,6 +485,13 @@ impl<'a> Lexer<'a> {
 
     /// Skips line continuation, i.e., a backslash followed by a newline.
     ///
+    /// If there is a line continuation at the current position, this function
+    /// consumes the backslash and the newline and returns `Ok(true)`. The
+    /// characters are marked as line continuation.
+    ///
+    /// If there is no line continuation, this function does nothing and returns
+    /// `Ok(false)`.
+    ///
     /// This function does nothing if line continuation has been
     /// [disabled](Self::disable_line_continuation).
     async fn line_continuation(&mut self) -> Result<bool> {
@@ -475,6 +512,8 @@ impl<'a> Lexer<'a> {
                 return Ok(false);
             }
         }
+
+        self.core.mark_line_continuation(index..index + 2);
 
         Ok(true)
     }
@@ -618,7 +657,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Extracts a string from the source code.
+    /// Extracts a string from the source code range.
     ///
     /// This function returns the source code string for the range specified by
     /// the argument. The range must specify a valid index. If the index points
@@ -628,11 +667,9 @@ impl<'a> Lexer<'a> {
     ///
     /// If the argument index is out of bounds, i.e., pointing to an unread
     /// character.
-    pub fn source_string<I>(&self, i: I) -> String
-    where
-        I: SliceIndex<[SourceChar], Output = [SourceChar]>,
-    {
-        self.core.source_string(i)
+    #[inline]
+    pub fn source_string(&self, range: Range<usize>) -> String {
+        self.core.source_string(range)
     }
 
     /// Returns a location for a given range of the source code.
@@ -1240,6 +1277,34 @@ mod tests {
         assert!(!lexer.is_after_blank_ending_alias(2));
         assert!(lexer.is_after_blank_ending_alias(3));
         assert!(lexer.is_after_blank_ending_alias(4));
+    }
+
+    #[test]
+    fn lexer_core_is_after_blank_ending_alias_after_line_continuation() {
+        let input = Memory::new("a\\\n x");
+        let line = NonZeroU64::new(1).unwrap();
+        let mut lexer = LexerCore::new(Box::new(input), line, Source::Unknown);
+        let alias = Rc::new(Alias {
+            name: "a".to_string(),
+            replacement: " b ".to_string(),
+            global: false,
+            origin: Location::dummy("dummy"),
+        });
+
+        lexer.peek_char().now_or_never().unwrap().unwrap();
+        lexer.consume_char();
+        lexer.substitute_alias(0, &alias);
+
+        while let Ok(PeekChar::Char(_)) = lexer.peek_char().now_or_never().unwrap() {
+            lexer.consume_char();
+        }
+        lexer.mark_line_continuation(3..5);
+
+        assert!(!lexer.is_after_blank_ending_alias(0));
+        assert!(!lexer.is_after_blank_ending_alias(1));
+        assert!(!lexer.is_after_blank_ending_alias(2));
+        assert!(lexer.is_after_blank_ending_alias(5));
+        assert!(lexer.is_after_blank_ending_alias(6));
     }
 
     #[test]
