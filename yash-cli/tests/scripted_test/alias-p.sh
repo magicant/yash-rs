@@ -170,7 +170,6 @@ __IN__
 ABC
 __OUT__
 
-: TODO yash is broken <<\__OUT__
 test_oE 'alias substitution to empty string'
 alias a=
 a
@@ -195,7 +194,6 @@ false
 b
 __IN__
 
-: TODO yash is broken <<\__OUT__
 test_oE 'alias substitution to blank before newline'
 (
 echo ok | b

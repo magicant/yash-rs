@@ -72,9 +72,9 @@ impl Parser<'_, '_> {
         while self.peek_token().await?.id == Operator(Bar) {
             self.take_token_raw().await?;
 
-            while self.newline_and_here_doc_contents().await? {}
-
             commands.push(loop {
+                while self.newline_and_here_doc_contents().await? {}
+
                 // Parse the next command
                 if let Rec::Parsed(option) = self.command().await? {
                     if let Some(next) = option {
@@ -240,5 +240,25 @@ mod tests {
         assert_eq!(p.negation, true);
         assert_eq!(p.commands.len(), 1);
         assert_eq!(p.commands[0].to_string(), "ok");
+    }
+
+    #[test]
+    fn parser_alias_substitution_to_newline_after_bar() {
+        let mut lexer = Lexer::from_memory("foo | X\n bar", Source::Unknown);
+        let mut aliases = AliasSet::new();
+        aliases.insert(HashEntry::new(
+            "X".to_string(),
+            "\n".to_string(),
+            false,
+            Location::dummy(""),
+        ));
+        let mut parser = Parser::new(&mut lexer, &aliases);
+
+        let result = parser.pipeline().now_or_never().unwrap();
+        let p = result.unwrap().unwrap().unwrap();
+        assert_eq!(p.negation, false);
+        assert_eq!(p.commands.len(), 2);
+        assert_eq!(p.commands[0].to_string(), "foo");
+        assert_eq!(p.commands[1].to_string(), "bar");
     }
 }
