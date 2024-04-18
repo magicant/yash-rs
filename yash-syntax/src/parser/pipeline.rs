@@ -39,17 +39,19 @@ impl Parser<'_, '_> {
             Rec::Parsed(Some(first)) => (first, false),
             Rec::Parsed(None) => {
                 // Parse the `!` reserved word
-                if let Token(Some(Bang)) = self.peek_token().await?.id {
-                    self.take_token_raw().await?;
-                    // TODO Warn if `!` is immediately followed by `(`, which is
-                    // not POSIXly portable.
-                    loop {
-                        // Parse the command after the `!`
-                        if let Rec::Parsed(option) = self.command().await? {
-                            if let Some(first) = option {
-                                break (first, true);
-                            }
+                if self.peek_token().await?.id != Token(Some(Bang)) {
+                    return Ok(Rec::Parsed(None));
+                }
+                self.take_token_raw().await?;
+                // TODO Warn if `!` is immediately followed by `(`, which is
+                // not POSIXly portable.
 
+                // Parse the command after the `!`
+                loop {
+                    match self.command().await? {
+                        Rec::AliasSubstituted => continue,
+                        Rec::Parsed(Some(first)) => break (first, true),
+                        Rec::Parsed(None) => {
                             // Error: the command is missing
                             let next = self.take_token_raw().await?;
                             let cause = if next.id == Token(Some(Bang)) {
@@ -61,8 +63,6 @@ impl Parser<'_, '_> {
                             return Err(Error { cause, location });
                         }
                     }
-                } else {
-                    return Ok(Rec::Parsed(None));
                 }
             }
         };
@@ -72,26 +72,27 @@ impl Parser<'_, '_> {
         while self.peek_token().await?.id == Operator(Bar) {
             self.take_token_raw().await?;
 
-            commands.push(loop {
+            // Parse the next command
+            let next = loop {
                 while self.newline_and_here_doc_contents().await? {}
 
-                // Parse the next command
-                if let Rec::Parsed(option) = self.command().await? {
-                    if let Some(next) = option {
-                        break Rc::new(next);
+                match self.command().await? {
+                    Rec::AliasSubstituted => continue,
+                    Rec::Parsed(Some(next)) => break next,
+                    Rec::Parsed(None) => {
+                        // Error: the command is missing
+                        let next = self.take_token_raw().await?;
+                        let cause = if next.id == Token(Some(Bang)) {
+                            SyntaxError::BangAfterBar.into()
+                        } else {
+                            SyntaxError::MissingCommandAfterBar.into()
+                        };
+                        let location = next.word.location;
+                        return Err(Error { cause, location });
                     }
-
-                    // Error: the command is missing
-                    let next = self.take_token_raw().await?;
-                    let cause = if next.id == Token(Some(Bang)) {
-                        SyntaxError::BangAfterBar.into()
-                    } else {
-                        SyntaxError::MissingCommandAfterBar.into()
-                    };
-                    let location = next.word.location;
-                    return Err(Error { cause, location });
                 }
-            });
+            };
+            commands.push(Rc::new(next));
         }
 
         Ok(Rec::Parsed(Some(Pipeline { commands, negation })))
