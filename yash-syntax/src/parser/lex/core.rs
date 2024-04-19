@@ -180,6 +180,20 @@ impl<'a> LexerCore<'a> {
         }
     }
 
+    /// Computes the start index of the location at the current position.
+    #[must_use]
+    fn next_index(&self) -> usize {
+        let Some(last) = self.source.last() else {
+            return 0;
+        };
+
+        let mut location = &last.value.location;
+        while let Source::Alias { original, .. } = &location.code.source {
+            location = original;
+        }
+        location.range.end
+    }
+
     /// Peeks the next character, reading the next line if necessary.
     async fn peek_char(&mut self) -> Result<PeekChar<'_>> {
         loop {
@@ -196,19 +210,20 @@ impl<'a> LexerCore<'a> {
             }
 
             // Read more input
+            let index = self.next_index();
             match self.input.next_line(&Context).await {
                 Ok(line) => {
                     if line.is_empty() {
                         // End of input
                         self.state = InputState::EndOfInput(Location {
                             code: Rc::clone(&self.raw_code),
-                            range: self.index..self.index,
+                            range: index..index,
                         });
                     } else {
                         // Successful read
                         self.raw_code.value.borrow_mut().push_str(&line);
                         self.source
-                            .extend(ex(source_chars(&line, &self.raw_code, self.index)));
+                            .extend(ex(source_chars(&line, &self.raw_code, index)));
                     }
                 }
                 Err(io_error) => {
@@ -216,7 +231,7 @@ impl<'a> LexerCore<'a> {
                         cause: io_error.into(),
                         location: Location {
                             code: Rc::clone(&self.raw_code),
-                            range: self.index..self.index,
+                            range: index..index,
                         },
                     });
                 }
@@ -1213,6 +1228,52 @@ mod tests {
             assert_eq!(c.location.code.start_line_number, line);
             assert_eq!(c.location.code.source, Source::Unknown);
             assert_eq!(c.location.range, 1..2);
+        });
+    }
+
+    #[test]
+    fn lexer_core_peek_char_after_alias_substitution() {
+        let input = Memory::new("a\nb");
+        let line = NonZeroU64::new(1).unwrap();
+        let mut lexer = LexerCore::new(Box::new(input), line, Source::Unknown);
+
+        lexer.peek_char().now_or_never().unwrap().unwrap();
+        lexer.consume_char();
+
+        let alias = Rc::new(Alias {
+            name: "a".to_string(),
+            replacement: "".to_string(),
+            global: false,
+            origin: Location::dummy("dummy"),
+        });
+        lexer.substitute_alias(0, &alias);
+
+        let result = lexer.peek_char().now_or_never().unwrap();
+        assert_matches!(result, Ok(PeekChar::Char(c)) => {
+            assert_eq!(c.value, '\n');
+            assert_eq!(*c.location.code.value.borrow(), "a\n");
+            assert_eq!(c.location.code.start_line_number, line);
+            assert_eq!(c.location.code.source, Source::Unknown);
+            assert_eq!(c.location.range, 1..2);
+        });
+        lexer.consume_char();
+
+        let result = lexer.peek_char().now_or_never().unwrap();
+        assert_matches!(result, Ok(PeekChar::Char(c)) => {
+            assert_eq!(c.value, 'b');
+            assert_eq!(*c.location.code.value.borrow(), "a\nb");
+            assert_eq!(c.location.code.start_line_number.get(), 1);
+            assert_eq!(c.location.code.source, Source::Unknown);
+            assert_eq!(c.location.range, 2..3);
+        });
+        lexer.consume_char();
+
+        let result = lexer.peek_char().now_or_never().unwrap();
+        assert_matches!(result, Ok(PeekChar::EndOfInput(location)) => {
+            assert_eq!(*location.code.value.borrow(), "a\nb");
+            assert_eq!(location.code.start_line_number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(location.range, 3..3);
         });
     }
 

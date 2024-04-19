@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Alias substitution was not performed as expected for a token that follows a
   result of blank-ending alias substitution if there is a line continuation
   between them.
+- Character location indexes were not calculated correctly after an alias
+  substitution changed the length of the source code.
 
 ## [0.8.0] - 2024-04-09
 
