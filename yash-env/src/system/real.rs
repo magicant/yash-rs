@@ -216,10 +216,14 @@ impl System for RealSystem {
     }
 
     fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
-        match tempfile::tempfile_in(parent_dir) {
-            Ok(file) => Ok(Fd(file.into_raw_fd())),
-            Err(error) => Err(Errno(error.raw_os_error().unwrap_or(0))),
-        }
+        let file = tempfile::tempfile_in(parent_dir)
+            .map_err(|errno| Errno(errno.raw_os_error().unwrap_or(0)))?;
+        let fd = Fd(file.into_raw_fd());
+
+        // Clear the CLOEXEC flag
+        _ = self.fcntl_setfd(fd, FdFlag::empty());
+
+        Ok(fd)
     }
 
     fn close(&mut self, fd: Fd) -> Result<()> {

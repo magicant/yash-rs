@@ -39,7 +39,6 @@ cat () { false; }
 command cat </dev/null
 __IN__
 
-: TODO yash is broken <<\__OUT__
 test_oE -e 0 'command exec retains redirection'
 command exec 3<<\__END__
 here
