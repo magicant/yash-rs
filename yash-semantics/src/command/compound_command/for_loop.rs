@@ -28,7 +28,6 @@ use crate::xtrace::XTrace;
 use crate::Handle;
 use std::fmt::Write;
 use std::ops::ControlFlow::{Break, Continue};
-use yash_env::semantics::apply_errexit;
 use yash_env::semantics::Divert;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
@@ -48,13 +47,13 @@ pub async fn execute(
 ) -> Result {
     let (name, _) = match expand_word(env, name).await {
         Ok(word) => word,
-        Err(error) => return apply_errexit(error.handle(env).await, env),
+        Err(error) => return error.handle(env).await,
     };
 
     let values = if let Some(words) = values {
         match expand_words(env, words).await {
             Ok((fields, _)) => fields,
-            Err(error) => return apply_errexit(error.handle(env).await, env),
+            Err(error) => return error.handle(env).await,
         }
     } else {
         env.variables
@@ -92,7 +91,7 @@ pub async fn execute(
                 });
                 let location = name.origin;
                 let error = Error { cause, location };
-                return apply_errexit(error.handle(env).await, env);
+                return error.handle(env).await;
             }
         };
     }

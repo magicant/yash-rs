@@ -400,16 +400,23 @@ impl Env {
         variable
     }
 
-    pub(crate) fn errexit_is_applicable(&self) -> bool {
+    /// Tests whether the [`ErrExit`] option is applicable in the current context.
+    ///
+    /// This function returns true if and only if:
+    /// - the [`ErrExit`] option is on, and
+    /// - the current stack has no [`Condition`] frame.
+    ///
+    /// [`Condition`]: Frame::Condition
+    pub fn errexit_is_applicable(&self) -> bool {
         self.options.get(ErrExit) == On && !self.stack.contains(&Frame::Condition)
     }
 
-    /// Returns a `Divert` if the shell should exit because of the `ErrExit`
-    /// [shell option](self::option::Option).
+    /// Returns a `Divert` if the shell should exit because of the [`ErrExit`]
+    /// shell option.
     ///
-    /// The function returns `Break(Divert::Exit)` if the `ErrExit` option is
-    /// on, the current `self.exit_status` is non-zero, and the current stack
-    /// has no `Condition` [frame](Frame); otherwise, `Continue(())`.
+    /// The function returns `Break(Divert::Exit(None))` if the [`errexit`
+    /// option is applicable](Self::errexit_is_applicable) and the current
+    /// `self.exit_status` is non-zero. Otherwise, it returns `Continue(())`.
     pub fn apply_errexit(&self) -> ControlFlow<Divert> {
         if !self.exit_status.is_successful() && self.errexit_is_applicable() {
             Break(Divert::Exit(None))

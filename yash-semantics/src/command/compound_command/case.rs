@@ -26,7 +26,6 @@ use crate::xtrace::XTrace;
 use crate::Handle;
 use std::fmt::Write;
 use std::ops::ControlFlow::Continue;
-use yash_env::semantics::apply_errexit;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::Env;
@@ -56,7 +55,7 @@ fn config() -> Config {
 pub async fn execute(env: &mut Env, subject: &Word, items: &[CaseItem]) -> Result {
     let subject = match expand_word(env, subject).await {
         Ok((expansion, _exit_status)) => expansion,
-        Err(error) => return apply_errexit(error.handle(env).await, env),
+        Err(error) => return error.handle(env).await,
     };
     trace_subject(env, &subject.value).await;
 
@@ -64,7 +63,7 @@ pub async fn execute(env: &mut Env, subject: &Word, items: &[CaseItem]) -> Resul
         for pattern in &item.patterns {
             let mut pattern = match expand_word_attr(env, pattern).await {
                 Ok((expansion, _exit_status)) => expansion,
-                Err(error) => return apply_errexit(error.handle(env).await, env),
+                Err(error) => return error.handle(env).await,
             };
 
             // Unquoted backslashes should act as quoting, as required by POSIX XCU 2.13.1
