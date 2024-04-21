@@ -46,16 +46,27 @@ impl Handle for yash_syntax::parser::Error {
     }
 }
 
-/// Prints an error message and sets the exit status to non-zero.
+/// Prints an error message and returns a divert result indicating a non-zero
+/// exit status.
 ///
 /// This implementation handles the error by printing an error message to the
 /// standard error and returning `Divert::Interrupt(Some(ExitStatus::ERROR))`.
+/// If the [`ErrExit`] option is set, `Divert::Exit(Some(ExitStatus::ERROR))` is
+/// returned instead.
+///
 /// Note that other POSIX-compliant implementations may use different non-zero
 /// exit statuses.
+///
+/// [`ErrExit`]: yash_env::option::Option::ErrExit
 impl Handle for crate::expansion::Error {
     async fn handle(&self, env: &mut Env) -> super::Result {
         print_message(env, self).await;
-        Break(Divert::Interrupt(Some(ExitStatus::ERROR)))
+
+        if env.errexit_is_applicable() {
+            Break(Divert::Exit(Some(ExitStatus::ERROR)))
+        } else {
+            Break(Divert::Interrupt(Some(ExitStatus::ERROR)))
+        }
     }
 }
 
