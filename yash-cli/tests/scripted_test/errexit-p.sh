@@ -73,7 +73,6 @@ __IN__
 reached
 __OUT__
 
-: TODO yash is broken <<\__IN__
 test_O -e n 'errexit: last of pipeline' -e
 true | true | false
 echo not reached

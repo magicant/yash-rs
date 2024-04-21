@@ -112,9 +112,17 @@ async fn execute_commands_in_pipeline(env: &mut Env, commands: &[Rc<syntax::Comm
             env.exit_status = ExitStatus::SUCCESS;
             Continue(())
         }
+
         1 => commands[0].execute(env).await,
-        _ if env.controls_jobs() => execute_job_controlled_pipeline(env, commands).await,
-        _ => execute_multi_command_pipeline(env, commands).await,
+
+        _ => {
+            if env.controls_jobs() {
+                execute_job_controlled_pipeline(env, commands).await?
+            } else {
+                execute_multi_command_pipeline(env, commands).await?
+            }
+            env.apply_errexit()
+        }
     }
 }
 
@@ -322,6 +330,7 @@ mod tests {
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
     use yash_env::job::ProcessState;
+    use yash_env::option::Option::ErrExit;
     use yash_env::option::Option::Monitor;
     use yash_env::option::State::On;
     use yash_env::semantics::Field;
@@ -493,6 +502,20 @@ mod tests {
         let result = pipeline.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+    }
+
+    #[test]
+    fn errexit_option() {
+        in_virtual_system(|mut env, _state| async move {
+            env.builtins.insert("return", return_builtin());
+            env.options.set(ErrExit, On);
+
+            let pipeline: syntax::Pipeline = "return -n 0 | return -n 93".parse().unwrap();
+            let result = pipeline.execute(&mut env).await;
+
+            assert_eq!(result, Break(Divert::Exit(None)));
+            assert_eq!(env.exit_status, ExitStatus(93));
+        });
     }
 
     #[test]

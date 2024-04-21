@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.0] - Unreleased
 
+### Added
+
+- Support for the `ErrExit` shell option in multi-command pipelines
+
 ### Changed
 
 - `<expansion::Error as handle::Handle>::handle` now returns `Divert::Exit`
