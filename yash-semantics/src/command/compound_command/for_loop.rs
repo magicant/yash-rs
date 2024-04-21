@@ -29,6 +29,7 @@ use crate::Handle;
 use std::fmt::Write;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::semantics::Divert;
+use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
@@ -70,6 +71,11 @@ pub async fn execute(
     trace_values(env, &name, &values).await;
 
     let env = &mut env.push_frame(Frame::Loop);
+
+    if values.is_empty() && !body.0.is_empty() {
+        env.exit_status = ExitStatus::SUCCESS;
+        return Continue(());
+    }
 
     for Field { value, origin } in values {
         let mut var = env.get_or_create_variable(name.value.clone(), Scope::Global);
@@ -123,7 +129,6 @@ mod tests {
     use yash_env::builtin::Builtin;
     use yash_env::option::Option::ErrExit;
     use yash_env::option::State::On;
-    use yash_env::semantics::ExitStatus;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::CompoundCommand;
@@ -131,6 +136,7 @@ mod tests {
     #[test]
     fn without_words_without_positional_parameters() {
         let mut env = Env::new_virtual();
+        env.exit_status = ExitStatus(123);
         let command: CompoundCommand = "for v do unreached; done".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();

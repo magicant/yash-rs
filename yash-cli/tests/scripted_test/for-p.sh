@@ -136,7 +136,6 @@ A
 B
 __OUT__
 
-: TODO yash is broken <<\__IN__
 test_x -e 0 'exit status with no words'
 false
 for i do

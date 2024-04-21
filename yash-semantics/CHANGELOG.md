@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `<expansion::Error as handle::Handle>::handle` now returns `Divert::Exit`
   instead of `Divert::Interrupt` when the `ErrExit` shell option is applicable.
 
+### Fixed
+
+- A `for` loop without any words after `in` now correctly returns an exit status
+  of `0` rather than keeping the previous exit status.
+
 ## [0.1.0] - 2024-04-13
 
 ### Added
