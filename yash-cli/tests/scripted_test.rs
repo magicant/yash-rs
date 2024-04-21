@@ -62,7 +62,8 @@ where
     // is a failed test case. Check the log file to see if there is one.
 
     let log = std::fs::read_to_string(&log_file).unwrap();
-    assert!(!log.contains("FAILED"), "{}", log);
+    let failures = failures(&log);
+    assert!(failures.is_empty(), "{failures}");
 }
 
 /// Runs a test subject.
@@ -71,6 +72,42 @@ where
 /// separate session, use [`run_with_pty`].
 fn run(name: &str) {
     unsafe { run_with_preexec(name, || Ok(())) }
+}
+
+/// Extracts the failed test cases from the log file.
+fn failures(log: &str) -> String {
+    let mut lines = log.lines();
+    let mut test_case = Vec::new();
+    let mut result = String::new();
+
+    // Each test case in the log file is enclosed by the "%%% START: " and
+    // "%%% PASSED: " or "%%% FAILED: " lines. We extract lines between these
+    // markers and append them to the result string.
+    while let Some(start) = lines.find(|line| line.starts_with("%%% START: ")) {
+        test_case.clear();
+        test_case.push(start);
+        for line in lines.by_ref() {
+            if line.starts_with("%%% PASSED: ") {
+                // Discard this test case
+                break;
+            } else if line.starts_with("%%% FAILED: ") {
+                test_case.push(line);
+
+                // Add this test case to the result
+                for line in test_case.drain(..) {
+                    result.push_str(line);
+                    result.push('\n');
+                }
+                result.push('\n');
+
+                break;
+            } else {
+                test_case.push(line);
+            }
+        }
+    }
+
+    result
 }
 
 #[test]
