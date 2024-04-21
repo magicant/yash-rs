@@ -63,7 +63,7 @@ use yash_syntax::syntax;
 /// In POSIX, the expected exit status is unclear when an inverted pipeline
 /// performs a jump as in `! return 42`. The behavior disagrees among existing
 /// shells. This implementation does not invert the exit status when the return
-/// value is `Err(Divert::...)`, which is different from yash 2.
+/// value is `Err(Divert::...)`.
 ///
 /// # `noexec` option
 ///
