@@ -56,7 +56,7 @@ mod trim;
 
 pub use switch::EmptyError;
 pub use switch::NonassignableError;
-pub use switch::ValueState;
+pub use switch::Vacancy;
 
 impl Expand for ParamRef<'_> {
     /// Performs parameter expansion.

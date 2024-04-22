@@ -35,10 +35,10 @@ use yash_syntax::syntax::SwitchCondition;
 use yash_syntax::syntax::SwitchType;
 use yash_syntax::syntax::Word;
 
-/// Physical state of a [value](Value) that may be considered as "not set"
+/// Subdivision of [value](Value) states that may be considered as "not set"
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum ValueState {
+pub enum Vacancy {
     /// The variable is not set.
     Unset,
     /// The value is a scalar with no characters.
@@ -49,15 +49,16 @@ pub enum ValueState {
     EmptyValueArray,
 }
 
-impl ValueState {
-    /// Computes the state of a value.
+impl Vacancy {
+    /// Evaluates the vacancy of a value.
     ///
-    /// Returns `None` if the value does not fall under any of the `ValueState`
-    /// variants.
+    /// Returns `None` if the value does not fall into any of the `Vacancy`
+    /// categories.
+    #[inline]
     #[must_use]
-    pub fn of<'a, I: Into<Option<&'a Value>>>(value: I) -> Option<ValueState> {
-        fn inner(value: Option<&Value>) -> Option<ValueState> {
-            use ValueState::*;
+    pub fn of<'a, I: Into<Option<&'a Value>>>(value: I) -> Option<Vacancy> {
+        fn inner(value: Option<&Value>) -> Option<Vacancy> {
+            use Vacancy::*;
             match value {
                 None => Some(Unset),
                 Some(Value::Scalar(scalar)) if scalar.is_empty() => Some(EmptyScalar),
@@ -72,7 +73,7 @@ impl ValueState {
     }
 
     pub fn description(&self) -> &'static str {
-        use ValueState::*;
+        use Vacancy::*;
         match self {
             Unset => "unset variable",
             EmptyScalar => "empty string",
@@ -82,7 +83,7 @@ impl ValueState {
     }
 }
 
-impl std::fmt::Display for ValueState {
+impl std::fmt::Display for Vacancy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.description().fmt(f)
     }
@@ -97,7 +98,7 @@ impl std::fmt::Display for ValueState {
 #[non_exhaustive]
 pub struct EmptyError {
     /// State of the variable value that caused this error
-    pub state: ValueState,
+    pub state: Vacancy,
     /// Error message specified in the switch
     pub message: Option<String>,
 }
@@ -136,22 +137,22 @@ pub enum NonassignableError {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum ValueCondition {
     Set,
-    Unset(ValueState),
+    Unset(Vacancy),
 }
 
 impl ValueCondition {
-    fn with<S: Into<Option<ValueState>>>(cond: SwitchCondition, state: S) -> Self {
-        fn inner(cond: SwitchCondition, state: Option<ValueState>) -> ValueCondition {
-            match (cond, state) {
+    fn with<V: Into<Option<Vacancy>>>(cond: SwitchCondition, vacancy: V) -> Self {
+        fn inner(cond: SwitchCondition, vacancy: Option<Vacancy>) -> ValueCondition {
+            match (cond, vacancy) {
                 (_, None) => ValueCondition::Set,
-                (SwitchCondition::UnsetOrEmpty, Some(state)) => ValueCondition::Unset(state),
-                (_, Some(ValueState::Unset)) => ValueCondition::Unset(ValueState::Unset),
-                (SwitchCondition::Unset, Some(ValueState::EmptyScalar)) => ValueCondition::Set,
-                (SwitchCondition::Unset, Some(ValueState::ValuelessArray)) => ValueCondition::Set,
-                (SwitchCondition::Unset, Some(ValueState::EmptyValueArray)) => ValueCondition::Set,
+                (SwitchCondition::UnsetOrEmpty, Some(vacancy)) => ValueCondition::Unset(vacancy),
+                (_, Some(Vacancy::Unset)) => ValueCondition::Unset(Vacancy::Unset),
+                (SwitchCondition::Unset, Some(Vacancy::EmptyScalar)) => ValueCondition::Set,
+                (SwitchCondition::Unset, Some(Vacancy::ValuelessArray)) => ValueCondition::Set,
+                (SwitchCondition::Unset, Some(Vacancy::EmptyValueArray)) => ValueCondition::Set,
             }
         }
-        inner(cond, state.into())
+        inner(cond, vacancy.into())
     }
 }
 
@@ -220,7 +221,7 @@ async fn empty_expansion_error_message(
 /// Constructs an empty expansion error.
 async fn empty_expansion_error(
     env: &mut Env<'_>,
-    state: ValueState,
+    vacancy: Vacancy,
     message_word: &Word,
     location: Location,
 ) -> Error {
@@ -228,7 +229,10 @@ async fn empty_expansion_error(
         Ok(message) => message,
         Err(error) => return error,
     };
-    let cause = ErrorCause::EmptyExpansion(EmptyError { state, message });
+    let cause = ErrorCause::EmptyExpansion(EmptyError {
+        state: vacancy,
+        message,
+    });
     Error { cause, location }
 }
 
@@ -246,14 +250,14 @@ pub async fn apply(
 ) -> Option<Result<Phrase, Error>> {
     use SwitchType::*;
     use ValueCondition::*;
-    let cond = ValueCondition::with(switch.condition, ValueState::of(&*value));
+    let cond = ValueCondition::with(switch.condition, Vacancy::of(&*value));
     match (switch.r#type, cond) {
         (Alter, Unset(_)) | (Default, Set) | (Assign, Set) | (Error, Set) => None,
         (Alter, Set) | (Default, Unset(_)) => Some(switch.word.expand(env).await.map(attribute)),
         (Assign, Unset(_)) => Some(assign(env, name, &switch.word, location.clone()).await),
-        (Error, Unset(state)) => Some(Err(empty_expansion_error(
+        (Error, Unset(vacancy)) => Some(Err(empty_expansion_error(
             env,
-            state,
+            vacancy,
             &switch.word,
             location.clone(),
         )
@@ -273,21 +277,21 @@ mod tests {
     use yash_syntax::syntax::SwitchType::*;
 
     #[test]
-    fn value_state_from_value() {
-        let state = ValueState::of(&None);
-        assert_eq!(state, Some(ValueState::Unset));
-        let state = ValueState::of(&Some(Value::scalar("")));
-        assert_eq!(state, Some(ValueState::EmptyScalar));
-        let state = ValueState::of(&Some(Value::scalar(".")));
-        assert_eq!(state, None);
-        let state = ValueState::of(&Some(Value::Array(vec![])));
-        assert_eq!(state, Some(ValueState::ValuelessArray));
-        let state = ValueState::of(&Some(Value::array([""])));
-        assert_eq!(state, Some(ValueState::EmptyValueArray));
-        let state = ValueState::of(&Some(Value::array(["."])));
-        assert_eq!(state, None);
-        let state = ValueState::of(&Some(Value::array(["", ""])));
-        assert_eq!(state, None);
+    fn vacancy_of_values() {
+        let vacancy = Vacancy::of(&None);
+        assert_eq!(vacancy, Some(Vacancy::Unset));
+        let vacancy = Vacancy::of(&Some(Value::scalar("")));
+        assert_eq!(vacancy, Some(Vacancy::EmptyScalar));
+        let vacancy = Vacancy::of(&Some(Value::scalar(".")));
+        assert_eq!(vacancy, None);
+        let vacancy = Vacancy::of(&Some(Value::Array(vec![])));
+        assert_eq!(vacancy, Some(Vacancy::ValuelessArray));
+        let vacancy = Vacancy::of(&Some(Value::array([""])));
+        assert_eq!(vacancy, Some(Vacancy::EmptyValueArray));
+        let vacancy = Vacancy::of(&Some(Value::array(["."])));
+        assert_eq!(vacancy, None);
+        let vacancy = Vacancy::of(&Some(Value::array(["", ""])));
+        assert_eq!(vacancy, None);
     }
 
     #[test]
@@ -594,7 +598,7 @@ mod tests {
         let error = result.unwrap().unwrap_err();
         assert_matches!(error.cause, ErrorCause::EmptyExpansion(e) => {
             assert_eq!(e.message, Some("foo".to_string()));
-            assert_eq!(e.state, ValueState::Unset);
+            assert_eq!(e.state, Vacancy::Unset);
         });
     }
 
@@ -616,7 +620,7 @@ mod tests {
         let error = result.unwrap().unwrap_err();
         assert_matches!(error.cause, ErrorCause::EmptyExpansion(e) => {
             assert_eq!(e.message, Some("bar".to_string()));
-            assert_eq!(e.state, ValueState::EmptyScalar);
+            assert_eq!(e.state, Vacancy::EmptyScalar);
         });
     }
 
@@ -638,7 +642,7 @@ mod tests {
         let error = result.unwrap().unwrap_err();
         assert_matches!(error.cause, ErrorCause::EmptyExpansion(e) => {
             assert_eq!(e.message, None);
-            assert_eq!(e.state, ValueState::ValuelessArray);
+            assert_eq!(e.state, Vacancy::ValuelessArray);
         });
         assert_eq!(error.location, location);
     }
