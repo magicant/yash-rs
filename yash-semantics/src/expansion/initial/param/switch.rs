@@ -202,8 +202,8 @@ async fn assign(
     Ok(value_phrase)
 }
 
-/// Expands a word to be used as an empty expansion error message.
-async fn empty_expansion_error_message(
+/// Expands a word to be used as a vacant expansion error message.
+async fn vacant_expansion_error_message(
     env: &mut Env<'_>,
     message_word: &Word,
 ) -> Result<Option<String>, Error> {
@@ -218,18 +218,18 @@ async fn empty_expansion_error_message(
     Ok(Some(message_field.value))
 }
 
-/// Constructs an empty expansion error.
-async fn empty_expansion_error(
+/// Constructs a vacant expansion error.
+async fn vacant_expansion_error(
     env: &mut Env<'_>,
     vacancy: Vacancy,
     message_word: &Word,
     location: Location,
 ) -> Error {
-    let message = match empty_expansion_error_message(env, message_word).await {
+    let message = match vacant_expansion_error_message(env, message_word).await {
         Ok(message) => message,
         Err(error) => return error,
     };
-    let cause = ErrorCause::EmptyExpansion(VacantError { vacancy, message });
+    let cause = ErrorCause::VacantExpansion(VacantError { vacancy, message });
     Error { cause, location }
 }
 
@@ -252,7 +252,7 @@ pub async fn apply(
         (Alter, Unset(_)) | (Default, Set) | (Assign, Set) | (Error, Set) => None,
         (Alter, Set) | (Default, Unset(_)) => Some(switch.word.expand(env).await.map(attribute)),
         (Assign, Unset(_)) => Some(assign(env, name, &switch.word, location.clone()).await),
-        (Error, Unset(vacancy)) => Some(Err(empty_expansion_error(
+        (Error, Unset(vacancy)) => Some(Err(vacant_expansion_error(
             env,
             vacancy,
             &switch.word,
@@ -593,7 +593,7 @@ mod tests {
             .now_or_never()
             .unwrap();
         let error = result.unwrap().unwrap_err();
-        assert_matches!(error.cause, ErrorCause::EmptyExpansion(e) => {
+        assert_matches!(error.cause, ErrorCause::VacantExpansion(e) => {
             assert_eq!(e.message, Some("foo".to_string()));
             assert_eq!(e.vacancy, Vacancy::Unset);
         });
@@ -615,7 +615,7 @@ mod tests {
             .now_or_never()
             .unwrap();
         let error = result.unwrap().unwrap_err();
-        assert_matches!(error.cause, ErrorCause::EmptyExpansion(e) => {
+        assert_matches!(error.cause, ErrorCause::VacantExpansion(e) => {
             assert_eq!(e.message, Some("bar".to_string()));
             assert_eq!(e.vacancy, Vacancy::EmptyScalar);
         });
@@ -637,7 +637,7 @@ mod tests {
             .now_or_never()
             .unwrap();
         let error = result.unwrap().unwrap_err();
-        assert_matches!(error.cause, ErrorCause::EmptyExpansion(e) => {
+        assert_matches!(error.cause, ErrorCause::VacantExpansion(e) => {
             assert_eq!(e.message, None);
             assert_eq!(e.vacancy, Vacancy::ValuelessArray);
         });

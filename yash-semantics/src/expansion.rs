@@ -135,7 +135,7 @@ pub enum ErrorCause {
 
     /// Expansion of an empty value with an error switch
     #[error(transparent)]
-    EmptyExpansion(#[from] VacantError),
+    VacantExpansion(#[from] VacantError),
 
     /// Assignment to a nonassignable parameter
     #[error(transparent)]
@@ -153,7 +153,7 @@ impl ErrorCause {
             ArithError(_) => "error evaluating the arithmetic expansion",
             AssignReadOnly(_) => "error assigning to variable",
             UnsetParameter => "unset parameter",
-            EmptyExpansion(error) => error.message_or_default(),
+            VacantExpansion(error) => error.message_or_default(),
             NonassignableParameter(_) => "cannot assign to parameter",
         }
     }
@@ -168,7 +168,7 @@ impl ErrorCause {
             ArithError(e) => e.to_string().into(),
             AssignReadOnly(e) => e.to_string().into(),
             UnsetParameter => "unset parameter disallowed by the nounset option".into(),
-            EmptyExpansion(e) => e.vacancy.description().into(),
+            VacantExpansion(e) => e.vacancy.description().into(),
             NonassignableParameter(e) => e.to_string().into(),
         }
     }
@@ -187,7 +187,7 @@ impl ErrorCause {
                 "the variable was made read-only here",
             )),
             UnsetParameter => None,
-            EmptyExpansion(_) => None,
+            VacantExpansion(_) => None,
             NonassignableParameter(_) => None,
         }
     }
