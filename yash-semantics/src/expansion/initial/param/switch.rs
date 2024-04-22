@@ -94,11 +94,11 @@ impl std::fmt::Display for Vacancy {
 /// `UnsetError` is an error that occurs when you apply a switch with
 /// `SwitchCondition::Error` to an empty value.
 #[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
-#[error("{} ({})", self.message_or_default(), .state.description())]
+#[error("{} ({})", self.message_or_default(), .vacancy.description())]
 #[non_exhaustive]
 pub struct EmptyError {
     /// State of the variable value that caused this error
-    pub state: Vacancy,
+    pub vacancy: Vacancy,
     /// Error message specified in the switch
     pub message: Option<String>,
 }
@@ -229,10 +229,7 @@ async fn empty_expansion_error(
         Ok(message) => message,
         Err(error) => return error,
     };
-    let cause = ErrorCause::EmptyExpansion(EmptyError {
-        state: vacancy,
-        message,
-    });
+    let cause = ErrorCause::EmptyExpansion(EmptyError { vacancy, message });
     Error { cause, location }
 }
 
@@ -598,7 +595,7 @@ mod tests {
         let error = result.unwrap().unwrap_err();
         assert_matches!(error.cause, ErrorCause::EmptyExpansion(e) => {
             assert_eq!(e.message, Some("foo".to_string()));
-            assert_eq!(e.state, Vacancy::Unset);
+            assert_eq!(e.vacancy, Vacancy::Unset);
         });
     }
 
@@ -620,7 +617,7 @@ mod tests {
         let error = result.unwrap().unwrap_err();
         assert_matches!(error.cause, ErrorCause::EmptyExpansion(e) => {
             assert_eq!(e.message, Some("bar".to_string()));
-            assert_eq!(e.state, Vacancy::EmptyScalar);
+            assert_eq!(e.vacancy, Vacancy::EmptyScalar);
         });
     }
 
@@ -642,7 +639,7 @@ mod tests {
         let error = result.unwrap().unwrap_err();
         assert_matches!(error.cause, ErrorCause::EmptyExpansion(e) => {
             assert_eq!(e.message, None);
-            assert_eq!(e.state, Vacancy::ValuelessArray);
+            assert_eq!(e.vacancy, Vacancy::ValuelessArray);
         });
         assert_eq!(error.location, location);
     }

@@ -168,7 +168,7 @@ impl ErrorCause {
             ArithError(e) => e.to_string().into(),
             AssignReadOnly(e) => e.to_string().into(),
             UnsetParameter => "unset parameter disallowed by the nounset option".into(),
-            EmptyExpansion(e) => e.state.description().into(),
+            EmptyExpansion(e) => e.vacancy.description().into(),
             NonassignableParameter(e) => e.to_string().into(),
         }
     }
