@@ -286,14 +286,12 @@ __IN__
 [unset]
 __OUT__
 
-: TODO yash is broken <<\__OUT__
 test_oE -e 0 'nounset on: unset variable ${foo+bar}' -u
 bracket "${x+set}"
 __IN__
 []
 __OUT__
 
-: TODO yash is broken <<\__OUT__
 test_oE -e 0 'nounset on: unset variable ${foo:+bar}' -u
 bracket "${x:+set}"
 __IN__

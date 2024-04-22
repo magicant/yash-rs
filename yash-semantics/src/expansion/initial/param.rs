@@ -80,14 +80,14 @@ impl Expand for ParamRef<'_> {
             {
                 return result;
             }
-        }
-
-        // Check for nounset option error //
-        if value.is_none() && env.inner.options.get(Unset) == Off {
-            return Err(Error {
-                cause: ErrorCause::UnsetParameter,
-                location: self.location.clone(),
-            });
+        } else {
+            // Check for nounset option error //
+            if value.is_none() && env.inner.options.get(Unset) == Off {
+                return Err(Error {
+                    cause: ErrorCause::UnsetParameter,
+                    location: self.location.clone(),
+                });
+            }
         }
 
         // TODO Reject POSIXly unspecified combinations of name and modifier
@@ -154,6 +154,7 @@ pub mod tests {
     use super::*;
     use futures_util::FutureExt;
     use yash_env::variable::Scope;
+    use yash_syntax::syntax::{Switch, SwitchCondition, SwitchType};
 
     pub fn env_with_positional_params_and_ifs() -> yash_env::Env {
         let mut env = yash_env::Env::new_virtual();
@@ -312,6 +313,23 @@ pub mod tests {
         let e = param.expand(&mut env).now_or_never().unwrap().unwrap_err();
         assert_eq!(e.cause, ErrorCause::UnsetParameter);
         assert_eq!(e.location, Location::dummy(""));
+    }
+
+    #[test]
+    fn nounset_option_is_ignored_if_there_is_switch() {
+        let mut env = yash_env::Env::new_virtual();
+        env.options.set(Unset, Off);
+        let mut env = Env::new(&mut env);
+        let mut param = param("foo");
+        param.modifier = Modifier::Switch(Switch {
+            r#type: SwitchType::Alter,
+            condition: SwitchCondition::Unset,
+            word: "".parse().unwrap(),
+        });
+        let param = ParamRef::from(&param);
+
+        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
+        assert_eq!(phrase, Phrase::one_empty_field());
     }
 
     #[test]

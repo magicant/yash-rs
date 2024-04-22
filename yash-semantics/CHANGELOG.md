@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A `for` loop without any words after `in` now correctly returns an exit status
   of `0` rather than keeping the previous exit status.
+- `<TextUnit as Expand>::expand` now correctly expands an unset parameter with a
+  switch to an empty string regardless of the `Unset` shell option. Previously,
+  it would expand to an empty string only if the `Unset` shell option was on.
 
 ## [0.1.0] - 2024-04-13
 
