@@ -79,6 +79,6 @@ mod tilde;
 mod word;
 
 pub use arith::ArithError;
-pub use param::EmptyError;
 pub use param::NonassignableError;
 pub use param::Vacancy;
+pub use param::VacantError;

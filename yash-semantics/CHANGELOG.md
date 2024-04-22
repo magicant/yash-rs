@@ -15,7 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - In the `expansion::initial` module:
     - `ValueState` was renamed to `Vacancy`.
-    - `EmptyError::state` was renamed to `EmptyError::vacancy`.
+    - `EmptyError` was renamed to `VacantError`.
+    - `EmptyError::state` was renamed to `VacantError::vacancy`.
 - `<expansion::Error as handle::Handle>::handle` now returns `Divert::Exit`
   instead of `Divert::Interrupt` when the `ErrExit` shell option is applicable.
 

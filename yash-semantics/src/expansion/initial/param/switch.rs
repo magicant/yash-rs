@@ -89,21 +89,21 @@ impl std::fmt::Display for Vacancy {
     }
 }
 
-/// Error caused by an error switch
+/// Error caused by a [`Switch`] of [`SwitchType::Error`]
 ///
-/// `UnsetError` is an error that occurs when you apply a switch with
-/// `SwitchCondition::Error` to an empty value.
+/// `VacantError` is an error that is returned when you apply an error switch to
+/// a [vacant](Vacancy) value.
 #[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
 #[error("{} ({})", self.message_or_default(), .vacancy.description())]
 #[non_exhaustive]
-pub struct EmptyError {
+pub struct VacantError {
     /// State of the variable value that caused this error
     pub vacancy: Vacancy,
     /// Error message specified in the switch
     pub message: Option<String>,
 }
 
-impl EmptyError {
+impl VacantError {
     /// Returns the message.
     ///
     /// If `self.message` is `Some(_)`, its content is returned. Otherwise, the
@@ -229,7 +229,7 @@ async fn empty_expansion_error(
         Ok(message) => message,
         Err(error) => return error,
     };
-    let cause = ErrorCause::EmptyExpansion(EmptyError { vacancy, message });
+    let cause = ErrorCause::EmptyExpansion(VacantError { vacancy, message });
     Error { cause, location }
 }
 

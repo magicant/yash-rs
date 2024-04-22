@@ -79,11 +79,11 @@ use self::attr::Origin;
 use self::attr_strip::Strip;
 use self::glob::glob;
 use self::initial::ArithError;
-use self::initial::EmptyError;
 #[cfg(doc)]
 use self::initial::Expand;
 use self::initial::Expand as _;
 use self::initial::NonassignableError;
+use self::initial::VacantError;
 use self::quote_removal::skip_quotes;
 use self::split::Ifs;
 use std::borrow::Cow;
@@ -135,7 +135,7 @@ pub enum ErrorCause {
 
     /// Expansion of an empty value with an error switch
     #[error(transparent)]
-    EmptyExpansion(#[from] EmptyError),
+    EmptyExpansion(#[from] VacantError),
 
     /// Assignment to a nonassignable parameter
     #[error(transparent)]
