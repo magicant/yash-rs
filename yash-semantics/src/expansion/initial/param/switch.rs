@@ -136,20 +136,24 @@ pub enum NonassignableError {
 /// Abstract state of a [value](Value) that determines the effect of a switch
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum ValueCondition {
-    Set,
-    Unset(Vacancy),
+    Occupied,
+    Vacant(Vacancy),
 }
 
 impl ValueCondition {
     fn with<V: Into<Option<Vacancy>>>(cond: SwitchCondition, vacancy: V) -> Self {
         fn inner(cond: SwitchCondition, vacancy: Option<Vacancy>) -> ValueCondition {
             match (cond, vacancy) {
-                (_, None) => ValueCondition::Set,
-                (SwitchCondition::UnsetOrEmpty, Some(vacancy)) => ValueCondition::Unset(vacancy),
-                (_, Some(Vacancy::Unset)) => ValueCondition::Unset(Vacancy::Unset),
-                (SwitchCondition::Unset, Some(Vacancy::EmptyScalar)) => ValueCondition::Set,
-                (SwitchCondition::Unset, Some(Vacancy::ValuelessArray)) => ValueCondition::Set,
-                (SwitchCondition::Unset, Some(Vacancy::EmptyValueArray)) => ValueCondition::Set,
+                (_, None) => ValueCondition::Occupied,
+
+                (SwitchCondition::UnsetOrEmpty, Some(vacancy)) => ValueCondition::Vacant(vacancy),
+
+                (_, Some(Vacancy::Unset)) => ValueCondition::Vacant(Vacancy::Unset),
+
+                (
+                    SwitchCondition::Unset,
+                    Some(Vacancy::EmptyScalar | Vacancy::ValuelessArray | Vacancy::EmptyValueArray),
+                ) => ValueCondition::Occupied,
             }
         }
         inner(cond, vacancy.into())
@@ -249,10 +253,12 @@ pub async fn apply(
     use ValueCondition::*;
     let cond = ValueCondition::with(switch.condition, Vacancy::of(&*value));
     match (switch.r#type, cond) {
-        (Alter, Unset(_)) | (Default, Set) | (Assign, Set) | (Error, Set) => None,
-        (Alter, Set) | (Default, Unset(_)) => Some(switch.word.expand(env).await.map(attribute)),
-        (Assign, Unset(_)) => Some(assign(env, name, &switch.word, location.clone()).await),
-        (Error, Unset(vacancy)) => Some(Err(vacant_expansion_error(
+        (Alter, Vacant(_)) | (Default, Occupied) | (Assign, Occupied) | (Error, Occupied) => None,
+        (Alter, Occupied) | (Default, Vacant(_)) => {
+            Some(switch.word.expand(env).await.map(attribute))
+        }
+        (Assign, Vacant(_)) => Some(assign(env, name, &switch.word, location.clone()).await),
+        (Error, Vacant(vacancy)) => Some(Err(vacant_expansion_error(
             env,
             vacancy,
             &switch.word,
@@ -341,7 +347,7 @@ mod tests {
     }
 
     #[test]
-    fn alter_with_unset_value() {
+    fn alter_with_vacant_value() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -360,7 +366,7 @@ mod tests {
     }
 
     #[test]
-    fn alter_with_non_empty_value() {
+    fn alter_with_occupied_value() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -378,7 +384,7 @@ mod tests {
     }
 
     #[test]
-    fn default_with_unset_value() {
+    fn default_with_vacant_value() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -396,7 +402,7 @@ mod tests {
     }
 
     #[test]
-    fn default_with_non_empty_value() {
+    fn default_with_occupied_value() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -415,7 +421,7 @@ mod tests {
     }
 
     #[test]
-    fn assign_with_unset_value() {
+    fn assign_with_vacant_value() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -504,7 +510,7 @@ mod tests {
     // TODO assign_with_array_index
 
     #[test]
-    fn assign_with_non_empty_value() {
+    fn assign_with_occupied_value() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -578,7 +584,7 @@ mod tests {
     }
 
     #[test]
-    fn error_with_unset_value_and_non_empty_word() {
+    fn error_with_vacant_value_and_non_empty_word() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
