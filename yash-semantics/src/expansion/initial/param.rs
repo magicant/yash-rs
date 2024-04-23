@@ -99,7 +99,7 @@ impl Expand for ParamRef<'_> {
             Modifier::Length => {
                 // TODO Reject ${#*} and ${#@} in POSIX mode
                 match &mut value {
-                    None => (),
+                    None => value = Some(Value::scalar("0")),
                     Some(Value::Scalar(v)) => to_length(v),
                     Some(Value::Array(vs)) => vs.iter_mut().for_each(to_length),
                 }
@@ -187,6 +187,18 @@ pub mod tests {
 
         let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
         assert_eq!(phrase, Phrase::Field(to_field("a1\u{30A4}")));
+    }
+
+    #[test]
+    fn length_of_unset() {
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let mut param = param("foo");
+        param.modifier = Modifier::Length;
+        let param = ParamRef::from(&param);
+
+        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
+        assert_eq!(phrase, Phrase::Field(to_field("0")));
     }
 
     #[test]

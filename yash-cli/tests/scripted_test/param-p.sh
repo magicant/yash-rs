@@ -253,7 +253,6 @@ __IN__
 ${#?} 1
 __OUT__
 
-: TODO yash is broken <<\__OUT__
 test_oE -e 0 'length of unset variables, success'
 unset u
 echoraw ${#u}
