@@ -13,8 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- In the `expansion::initial` module:
+    - `ValueState` was renamed to `Vacancy`.
+    - `EmptyError` was renamed to `VacantError`.
+    - `EmptyError::state` was renamed to `VacantError::vacancy`.
+- `expansion::ErrorCause::EmptyExpansion` was renamed to `expansion::ErrorCause::VacantExpansion`.
 - `<expansion::Error as handle::Handle>::handle` now returns `Divert::Exit`
   instead of `Divert::Interrupt` when the `ErrExit` shell option is applicable.
+
+### Fixed
+
+- A `for` loop without any words after `in` now correctly returns an exit status
+  of `0` rather than keeping the previous exit status.
+- `<TextUnit as Expand>::expand` now correctly expands an unset parameter with a
+  switch to an empty string regardless of the `Unset` shell option. Previously,
+  it would expand to an empty string only if the `Unset` shell option was on.
+- The parameter expansion of an unset variable with a `Length` modifier now
+  correctly expands to `0` rather than an empty string.
 
 ## [0.1.0] - 2024-04-13
 

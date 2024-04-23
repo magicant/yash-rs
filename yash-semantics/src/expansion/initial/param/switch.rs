@@ -35,10 +35,10 @@ use yash_syntax::syntax::SwitchCondition;
 use yash_syntax::syntax::SwitchType;
 use yash_syntax::syntax::Word;
 
-/// Physical state of a [value](Value) that may be considered as "not set"
+/// Subdivision of [value](Value) states that may be considered as "not set"
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum ValueState {
+pub enum Vacancy {
     /// The variable is not set.
     Unset,
     /// The value is a scalar with no characters.
@@ -49,15 +49,16 @@ pub enum ValueState {
     EmptyValueArray,
 }
 
-impl ValueState {
-    /// Computes the state of a value.
+impl Vacancy {
+    /// Evaluates the vacancy of a value.
     ///
-    /// Returns `None` if the value does not fall under any of the `ValueState`
-    /// variants.
+    /// Returns `None` if the value does not fall into any of the `Vacancy`
+    /// categories.
+    #[inline]
     #[must_use]
-    pub fn of<'a, I: Into<Option<&'a Value>>>(value: I) -> Option<ValueState> {
-        fn inner(value: Option<&Value>) -> Option<ValueState> {
-            use ValueState::*;
+    pub fn of<'a, I: Into<Option<&'a Value>>>(value: I) -> Option<Vacancy> {
+        fn inner(value: Option<&Value>) -> Option<Vacancy> {
+            use Vacancy::*;
             match value {
                 None => Some(Unset),
                 Some(Value::Scalar(scalar)) if scalar.is_empty() => Some(EmptyScalar),
@@ -72,7 +73,7 @@ impl ValueState {
     }
 
     pub fn description(&self) -> &'static str {
-        use ValueState::*;
+        use Vacancy::*;
         match self {
             Unset => "unset variable",
             EmptyScalar => "empty string",
@@ -82,27 +83,27 @@ impl ValueState {
     }
 }
 
-impl std::fmt::Display for ValueState {
+impl std::fmt::Display for Vacancy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.description().fmt(f)
     }
 }
 
-/// Error caused by an error switch
+/// Error caused by a [`Switch`] of [`SwitchType::Error`]
 ///
-/// `UnsetError` is an error that occurs when you apply a switch with
-/// `SwitchCondition::Error` to an empty value.
+/// `VacantError` is an error that is returned when you apply an error switch to
+/// a [vacant](Vacancy) value.
 #[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
-#[error("{} ({})", self.message_or_default(), .state.description())]
+#[error("{} ({})", self.message_or_default(), .vacancy.description())]
 #[non_exhaustive]
-pub struct EmptyError {
+pub struct VacantError {
     /// State of the variable value that caused this error
-    pub state: ValueState,
+    pub vacancy: Vacancy,
     /// Error message specified in the switch
     pub message: Option<String>,
 }
 
-impl EmptyError {
+impl VacantError {
     /// Returns the message.
     ///
     /// If `self.message` is `Some(_)`, its content is returned. Otherwise, the
@@ -135,23 +136,27 @@ pub enum NonassignableError {
 /// Abstract state of a [value](Value) that determines the effect of a switch
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum ValueCondition {
-    Set,
-    Unset(ValueState),
+    Occupied,
+    Vacant(Vacancy),
 }
 
 impl ValueCondition {
-    fn with<S: Into<Option<ValueState>>>(cond: SwitchCondition, state: S) -> Self {
-        fn inner(cond: SwitchCondition, state: Option<ValueState>) -> ValueCondition {
-            match (cond, state) {
-                (_, None) => ValueCondition::Set,
-                (SwitchCondition::UnsetOrEmpty, Some(state)) => ValueCondition::Unset(state),
-                (_, Some(ValueState::Unset)) => ValueCondition::Unset(ValueState::Unset),
-                (SwitchCondition::Unset, Some(ValueState::EmptyScalar)) => ValueCondition::Set,
-                (SwitchCondition::Unset, Some(ValueState::ValuelessArray)) => ValueCondition::Set,
-                (SwitchCondition::Unset, Some(ValueState::EmptyValueArray)) => ValueCondition::Set,
+    fn with<V: Into<Option<Vacancy>>>(cond: SwitchCondition, vacancy: V) -> Self {
+        fn inner(cond: SwitchCondition, vacancy: Option<Vacancy>) -> ValueCondition {
+            match (cond, vacancy) {
+                (_, None) => ValueCondition::Occupied,
+
+                (SwitchCondition::UnsetOrEmpty, Some(vacancy)) => ValueCondition::Vacant(vacancy),
+
+                (_, Some(Vacancy::Unset)) => ValueCondition::Vacant(Vacancy::Unset),
+
+                (
+                    SwitchCondition::Unset,
+                    Some(Vacancy::EmptyScalar | Vacancy::ValuelessArray | Vacancy::EmptyValueArray),
+                ) => ValueCondition::Occupied,
             }
         }
-        inner(cond, state.into())
+        inner(cond, vacancy.into())
     }
 }
 
@@ -201,8 +206,8 @@ async fn assign(
     Ok(value_phrase)
 }
 
-/// Expands a word to be used as an empty expansion error message.
-async fn empty_expansion_error_message(
+/// Expands a word to be used as a vacant expansion error message.
+async fn vacant_expansion_error_message(
     env: &mut Env<'_>,
     message_word: &Word,
 ) -> Result<Option<String>, Error> {
@@ -217,18 +222,18 @@ async fn empty_expansion_error_message(
     Ok(Some(message_field.value))
 }
 
-/// Constructs an empty expansion error.
-async fn empty_expansion_error(
+/// Constructs a vacant expansion error.
+async fn vacant_expansion_error(
     env: &mut Env<'_>,
-    state: ValueState,
+    vacancy: Vacancy,
     message_word: &Word,
     location: Location,
 ) -> Error {
-    let message = match empty_expansion_error_message(env, message_word).await {
+    let message = match vacant_expansion_error_message(env, message_word).await {
         Ok(message) => message,
         Err(error) => return error,
     };
-    let cause = ErrorCause::EmptyExpansion(EmptyError { state, message });
+    let cause = ErrorCause::VacantExpansion(VacantError { vacancy, message });
     Error { cause, location }
 }
 
@@ -246,14 +251,16 @@ pub async fn apply(
 ) -> Option<Result<Phrase, Error>> {
     use SwitchType::*;
     use ValueCondition::*;
-    let cond = ValueCondition::with(switch.condition, ValueState::of(&*value));
+    let cond = ValueCondition::with(switch.condition, Vacancy::of(&*value));
     match (switch.r#type, cond) {
-        (Alter, Unset(_)) | (Default, Set) | (Assign, Set) | (Error, Set) => None,
-        (Alter, Set) | (Default, Unset(_)) => Some(switch.word.expand(env).await.map(attribute)),
-        (Assign, Unset(_)) => Some(assign(env, name, &switch.word, location.clone()).await),
-        (Error, Unset(state)) => Some(Err(empty_expansion_error(
+        (Alter, Vacant(_)) | (Default, Occupied) | (Assign, Occupied) | (Error, Occupied) => None,
+        (Alter, Occupied) | (Default, Vacant(_)) => {
+            Some(switch.word.expand(env).await.map(attribute))
+        }
+        (Assign, Vacant(_)) => Some(assign(env, name, &switch.word, location.clone()).await),
+        (Error, Vacant(vacancy)) => Some(Err(vacant_expansion_error(
             env,
-            state,
+            vacancy,
             &switch.word,
             location.clone(),
         )
@@ -273,21 +280,21 @@ mod tests {
     use yash_syntax::syntax::SwitchType::*;
 
     #[test]
-    fn value_state_from_value() {
-        let state = ValueState::of(&None);
-        assert_eq!(state, Some(ValueState::Unset));
-        let state = ValueState::of(&Some(Value::scalar("")));
-        assert_eq!(state, Some(ValueState::EmptyScalar));
-        let state = ValueState::of(&Some(Value::scalar(".")));
-        assert_eq!(state, None);
-        let state = ValueState::of(&Some(Value::Array(vec![])));
-        assert_eq!(state, Some(ValueState::ValuelessArray));
-        let state = ValueState::of(&Some(Value::array([""])));
-        assert_eq!(state, Some(ValueState::EmptyValueArray));
-        let state = ValueState::of(&Some(Value::array(["."])));
-        assert_eq!(state, None);
-        let state = ValueState::of(&Some(Value::array(["", ""])));
-        assert_eq!(state, None);
+    fn vacancy_of_values() {
+        let vacancy = Vacancy::of(&None);
+        assert_eq!(vacancy, Some(Vacancy::Unset));
+        let vacancy = Vacancy::of(&Some(Value::scalar("")));
+        assert_eq!(vacancy, Some(Vacancy::EmptyScalar));
+        let vacancy = Vacancy::of(&Some(Value::scalar(".")));
+        assert_eq!(vacancy, None);
+        let vacancy = Vacancy::of(&Some(Value::Array(vec![])));
+        assert_eq!(vacancy, Some(Vacancy::ValuelessArray));
+        let vacancy = Vacancy::of(&Some(Value::array([""])));
+        assert_eq!(vacancy, Some(Vacancy::EmptyValueArray));
+        let vacancy = Vacancy::of(&Some(Value::array(["."])));
+        assert_eq!(vacancy, None);
+        let vacancy = Vacancy::of(&Some(Value::array(["", ""])));
+        assert_eq!(vacancy, None);
     }
 
     #[test]
@@ -340,7 +347,7 @@ mod tests {
     }
 
     #[test]
-    fn alter_with_unset_value() {
+    fn alter_with_vacant_value() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -359,7 +366,7 @@ mod tests {
     }
 
     #[test]
-    fn alter_with_non_empty_value() {
+    fn alter_with_occupied_value() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -377,7 +384,7 @@ mod tests {
     }
 
     #[test]
-    fn default_with_unset_value() {
+    fn default_with_vacant_value() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -395,7 +402,7 @@ mod tests {
     }
 
     #[test]
-    fn default_with_non_empty_value() {
+    fn default_with_occupied_value() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -414,7 +421,7 @@ mod tests {
     }
 
     #[test]
-    fn assign_with_unset_value() {
+    fn assign_with_vacant_value() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -503,7 +510,7 @@ mod tests {
     // TODO assign_with_array_index
 
     #[test]
-    fn assign_with_non_empty_value() {
+    fn assign_with_occupied_value() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -577,7 +584,7 @@ mod tests {
     }
 
     #[test]
-    fn error_with_unset_value_and_non_empty_word() {
+    fn error_with_vacant_value_and_non_empty_word() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -592,9 +599,9 @@ mod tests {
             .now_or_never()
             .unwrap();
         let error = result.unwrap().unwrap_err();
-        assert_matches!(error.cause, ErrorCause::EmptyExpansion(e) => {
+        assert_matches!(error.cause, ErrorCause::VacantExpansion(e) => {
             assert_eq!(e.message, Some("foo".to_string()));
-            assert_eq!(e.state, ValueState::Unset);
+            assert_eq!(e.vacancy, Vacancy::Unset);
         });
     }
 
@@ -614,9 +621,9 @@ mod tests {
             .now_or_never()
             .unwrap();
         let error = result.unwrap().unwrap_err();
-        assert_matches!(error.cause, ErrorCause::EmptyExpansion(e) => {
+        assert_matches!(error.cause, ErrorCause::VacantExpansion(e) => {
             assert_eq!(e.message, Some("bar".to_string()));
-            assert_eq!(e.state, ValueState::EmptyScalar);
+            assert_eq!(e.vacancy, Vacancy::EmptyScalar);
         });
     }
 
@@ -636,9 +643,9 @@ mod tests {
             .now_or_never()
             .unwrap();
         let error = result.unwrap().unwrap_err();
-        assert_matches!(error.cause, ErrorCause::EmptyExpansion(e) => {
+        assert_matches!(error.cause, ErrorCause::VacantExpansion(e) => {
             assert_eq!(e.message, None);
-            assert_eq!(e.state, ValueState::ValuelessArray);
+            assert_eq!(e.vacancy, Vacancy::ValuelessArray);
         });
         assert_eq!(error.location, location);
     }
