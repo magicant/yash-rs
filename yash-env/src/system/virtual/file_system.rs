@@ -143,11 +143,17 @@ impl FileSystem {
                     }
                     _ => return Err(Errno::ENOENT),
                 };
+
                 let node_ref = nodes.last().unwrap().borrow();
                 let children = match &node_ref.body {
                     FileBody::Directory { files } => files,
                     _ => return Err(Errno::ENOTDIR),
                 };
+
+                if node_ref.permissions.0 & 0o100 == 0 {
+                    return Err(Errno::EACCES);
+                }
+
                 let child = Rc::clone(children.get(name).ok_or(Errno::ENOENT)?);
                 drop(node_ref);
                 nodes.push(child);
@@ -404,6 +410,18 @@ mod tests {
         assert_eq!(result, Err(Errno::ENOTDIR));
         let result = fs.get("/file/foo");
         assert_eq!(result, Err(Errno::ENOTDIR));
+    }
+
+    #[test]
+    fn file_system_get_no_search_permission() {
+        let mut fs = FileSystem::default();
+        let _ = fs.save("/dir/file", Rc::default());
+        {
+            let dir = fs.get("/dir").unwrap();
+            dir.borrow_mut().permissions = Mode(0o666);
+        }
+        let result = fs.get("/dir/file");
+        assert_eq!(result, Err(Errno::EACCES));
     }
 
     #[test]

@@ -77,7 +77,6 @@ foo/no_read_dir/f*e
 foo/no_read_d*r/f*e
 __OUT__
 
-: TODO yash is broken <<\__OUT__
 test_oE 'expansion with unsearchable directory'
 echo f*o/no_search_dir
 echo foo/no_search_d*r

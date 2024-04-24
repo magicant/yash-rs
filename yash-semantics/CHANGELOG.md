@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `expansion::ErrorCause::EmptyExpansion` was renamed to `expansion::ErrorCause::VacantExpansion`.
 - `<expansion::Error as handle::Handle>::handle` now returns `Divert::Exit`
   instead of `Divert::Interrupt` when the `ErrExit` shell option is applicable.
+- `expansion::glob::glob` no longer requires search permission for the parent
+  directory of the last pathname component in the pattern when the last
+  component contains a pattern character.
 
 ### Fixed
 

@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Env::errexit_is_applicable`
 
+### Changed
+
+- `system::virtual::FileSystem::get` now fails with `EACCES` when search
+  permission is denied for any directory component of the path.
+
 ### Removed
 
 - `semantics::apply_errexit`
