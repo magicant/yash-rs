@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it would expand to an empty string only if the `Unset` shell option was on.
 - The parameter expansion of an unset variable with a `Length` modifier now
   correctly expands to `0` rather than an empty string.
+- `expansion::glob::glob` now handles backslash escapes in glob patterns
+  correctly.
 
 ## [0.1.0] - 2024-04-13
 

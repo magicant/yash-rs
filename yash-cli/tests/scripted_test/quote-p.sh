@@ -580,7 +580,6 @@ __OUT__
 (
 (> '\' > '\*') 2>/dev/null || skip="true"
 
-: TODO Yash-rs is broken <<\__OUT__
 test_oE 'backslashes resulting from expansions (a pattern)'
 # This backslash escapes the asterisk, so pathname expansion does not match
 # with '\' or '\*'.

@@ -27,6 +27,7 @@
 //! - `?`
 //! - `*`
 //! - Bracket expression (a set of characters enclosed in brackets)
+//! - `\`
 //!
 //! Refer to the [`yash-fnmatch`](yash_fnmatch) crate for pattern syntax and
 //! semantics details.
@@ -116,15 +117,33 @@ impl Iterator for Glob<'_> {
 
 /// Converts a field to a glob pattern.
 fn to_pattern(field: &[AttrChar]) -> Option<Pattern> {
-    let chars = field.iter().filter_map(|c| {
-        if c.is_quoting {
+    #[derive(Clone, Debug)]
+    struct Chars<'a> {
+        inner: std::slice::Iter<'a, AttrChar>,
+        next_quoted: bool,
+    }
+    impl Iterator for Chars<'_> {
+        type Item = PatternChar;
+        fn next(&mut self) -> Option<PatternChar> {
+            for c in &mut self.inner {
+                let quoted = std::mem::replace(&mut self.next_quoted, false);
+                if c.is_quoting {
+                    continue;
+                } else if quoted || c.is_quoted || c.origin == Origin::HardExpansion {
+                    return Some(PatternChar::Literal(c.value));
+                } else {
+                    self.next_quoted = c.value == '\\';
+                    return Some(PatternChar::Normal(c.value));
+                }
+            }
             None
-        } else if c.is_quoted || c.origin == Origin::HardExpansion {
-            Some(PatternChar::Literal(c.value))
-        } else {
-            Some(PatternChar::Normal(c.value))
         }
-    });
+    }
+
+    let chars = Chars {
+        inner: field.iter(),
+        next_quoted: false,
+    };
     let mut config = Config::default();
     config.anchor_begin = true;
     config.anchor_end = true;
@@ -312,6 +331,16 @@ mod tests {
         let f = dummy_attr_field("abc");
         let mut i = glob(&mut env, f);
         assert_eq!(i.next().unwrap().value, "abc");
+        assert_eq!(i.next(), None);
+    }
+
+    #[test]
+    fn backslash_escapes_next_char() {
+        let mut env = env_with_dummy_files(["a", r"\a"]);
+        // The backslash escapes the '?', so this is not a pattern.
+        let f = dummy_attr_field(r"\?");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, r"\?");
         assert_eq!(i.next(), None);
     }
 
