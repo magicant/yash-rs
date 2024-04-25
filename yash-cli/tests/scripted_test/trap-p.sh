@@ -119,7 +119,6 @@ __IN__
 ok
 __OUT__
 
-: TODO yash is broken <<\__IN__
 test_O -e n 'fatal shell error in trap'
 trap 'set <_no_such_file_' INT
 kill -s INT $$

@@ -18,9 +18,10 @@
 
 use crate::ReadEvalLoop;
 use std::future::Future;
-use std::ops::ControlFlow::Continue;
+use std::ops::ControlFlow::{Break, Continue};
 use std::pin::Pin;
 use std::rc::Rc;
+use yash_env::semantics::Divert;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 use yash_env::trap::Action;
@@ -42,12 +43,24 @@ async fn run_trap(env: &mut Env, signal: Signal, code: Rc<str>, origin: Location
     let condition = signal.to_string();
     let mut lexer = Lexer::from_memory(&code, Source::Trap { condition, origin });
     let mut env = env.push_frame(Frame::Trap(Condition::Signal(signal)));
+
     let previous_exit_status = env.exit_status;
+
     // Boxing needed for recursion
     let future: Pin<Box<dyn Future<Output = Result>>> =
         Box::pin(ReadEvalLoop::new(&mut env, &mut lexer).run());
-    let result = future.await;
-    env.exit_status = previous_exit_status;
+    let mut result = future.await;
+
+    if let Break(Divert::Interrupt(ref mut exit_status)) = result {
+        if let Some(exit_status) = exit_status {
+            // Propagate the exit status of the error that interrupted the trap
+            *exit_status = env.exit_status
+        }
+    } else {
+        // Restore the exit status of the calling context
+        env.exit_status = previous_exit_status
+    }
+
     result
 }
 
@@ -85,6 +98,11 @@ fn in_trap(env: &Env) -> bool {
 /// [`TrapSet::take_caught_signal`]. See the [module doc](super) for more
 /// details.
 ///
+/// The exit status of trap actions does not affect the exit status of the
+/// current environment except when the trap action is interrupted with
+/// `Result::Break(Divert::Interrupt(_))`. In that case, the exit status of the
+/// trap action is left as is in the environment.
+///
 /// If we are already running a trap, this function does not run any traps to
 /// prevent unintended behavior of trap actions. Most shell script writers do
 /// not care for the reentrance of trap actions, so we should not assume they
@@ -118,10 +136,8 @@ mod tests {
     use crate::tests::exit_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
-    use std::ops::ControlFlow::Break;
     use std::pin::Pin;
     use yash_env::builtin::Builtin;
-    use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
     use yash_env::trap::Action;
