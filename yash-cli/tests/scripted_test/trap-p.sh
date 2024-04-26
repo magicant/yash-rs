@@ -125,13 +125,17 @@ kill -s INT $$
 echo not reached
 __IN__
 
-test_oE -e 0 '$? is restored after trap is executed'
+test_oE -e 0 '$? is restored after signal trap is executed'
 trap 'false' USR1
 kill -s USR1 $$
 echo $?
 __IN__
 0
 __OUT__
+
+test_E -e 0 'exit status of EXIT trap does not affect exit status of shell'
+trap 'false' EXIT
+__IN__
 
 test_oE 'trap command is not affected by assignment in same simple command' \
     -c 'foo=1 trap "echo EXIT \$foo" EXIT; foo=2; foo=3 echo $foo'
