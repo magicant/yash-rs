@@ -119,10 +119,14 @@ __IN__
 ok
 __OUT__
 
-test_O -e n 'fatal shell error in trap'
+test_O -e n 'fatal shell error in signal trap'
 trap 'set <_no_such_file_' INT
 kill -s INT $$
 echo not reached
+__IN__
+
+test_O -e n 'fatal shell error in EXIT trap'
+trap 'set <_no_such_file_' EXIT
 __IN__
 
 test_oE -e 0 '$? is restored after signal trap is executed'

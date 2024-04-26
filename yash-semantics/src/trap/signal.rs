@@ -16,12 +16,9 @@
 
 //! Running signal traps
 
-use crate::ReadEvalLoop;
-use std::future::Future;
-use std::ops::ControlFlow::{Break, Continue};
-use std::pin::Pin;
+use super::run_trap;
+use std::ops::ControlFlow::Continue;
 use std::rc::Rc;
-use yash_env::semantics::Divert;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 use yash_env::trap::Action;
@@ -30,39 +27,6 @@ use yash_env::trap::Signal;
 #[cfg(doc)]
 use yash_env::trap::TrapSet;
 use yash_env::Env;
-use yash_syntax::parser::lex::Lexer;
-use yash_syntax::source::Location;
-use yash_syntax::source::Source;
-
-/// Runs a trap action for a signal.
-///
-/// This function is a helper function for [`run_trap_if_caught`] and
-/// [`run_traps_for_caught_signals`].
-#[must_use]
-async fn run_trap(env: &mut Env, signal: Signal, code: Rc<str>, origin: Location) -> Result {
-    let condition = signal.to_string();
-    let mut lexer = Lexer::from_memory(&code, Source::Trap { condition, origin });
-    let mut env = env.push_frame(Frame::Trap(Condition::Signal(signal)));
-
-    let previous_exit_status = env.exit_status;
-
-    // Boxing needed for recursion
-    let future: Pin<Box<dyn Future<Output = Result>>> =
-        Box::pin(ReadEvalLoop::new(&mut env, &mut lexer).run());
-    let mut result = future.await;
-
-    if let Break(Divert::Interrupt(ref mut exit_status)) = result {
-        if let Some(exit_status) = exit_status {
-            // Propagate the exit status of the error that interrupted the trap
-            *exit_status = env.exit_status
-        }
-    } else {
-        // Restore the exit status of the calling context
-        env.exit_status = previous_exit_status
-    }
-
-    result
-}
 
 /// Runs a trap action for a signal if it has been caught.
 ///
@@ -81,7 +45,7 @@ pub async fn run_trap_if_caught(env: &mut Env, signal: Signal) -> Option<Result>
     };
     let code = Rc::clone(command);
     let origin = trap_state.origin.clone();
-    Some(run_trap(env, signal, code, origin).await)
+    Some(run_trap(env, signal.into(), code, origin).await)
 }
 
 fn in_trap(env: &Env) -> bool {
@@ -122,7 +86,7 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
         };
         let code = Rc::clone(command);
         let origin = state.origin.clone();
-        run_trap(env, signal, code, origin).await?;
+        run_trap(env, signal.into(), code, origin).await?;
     }
 
     Continue(())
@@ -136,8 +100,11 @@ mod tests {
     use crate::tests::exit_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
+    use std::future::Future;
+    use std::ops::ControlFlow::Break;
     use std::pin::Pin;
     use yash_env::builtin::Builtin;
+    use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
     use yash_env::trap::Action;

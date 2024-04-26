@@ -16,17 +16,11 @@
 
 //! Running the EXIT trap
 
-use crate::ReadEvalLoop;
-use std::future::Future;
-use std::pin::Pin;
+use super::run_trap;
 use std::rc::Rc;
-use yash_env::semantics::Result;
-use yash_env::stack::Frame;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
 use yash_env::Env;
-use yash_syntax::parser::lex::Lexer;
-use yash_syntax::source::Source;
 
 /// Executes the EXIT trap.
 ///
@@ -46,16 +40,8 @@ pub async fn run_exit_trap(env: &mut Env) {
     };
 
     let command = Rc::clone(command);
-    let condition = Condition::Exit.to_string();
     let origin = state.origin.clone();
-    let mut lexer = Lexer::from_memory(&command, Source::Trap { condition, origin });
-    let mut env = env.push_frame(Frame::Trap(Condition::Exit));
-    let previous_exit_status = env.exit_status;
-    // Boxing needed for recursion
-    let future: Pin<Box<dyn Future<Output = Result>>> =
-        Box::pin(ReadEvalLoop::new(&mut env, &mut lexer).run());
-    let result = future.await;
-    env.exit_status = previous_exit_status;
+    let result = run_trap(env, Condition::Exit, command, origin).await;
     env.apply_result(result);
 }
 
@@ -68,9 +54,12 @@ mod tests {
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
+    use std::future::Future;
+    use std::pin::Pin;
     use yash_env::builtin::Builtin;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
+    use yash_env::stack::Frame;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_syntax::source::Location;
 

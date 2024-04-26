@@ -35,9 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   correctly expands to `0` rather than an empty string.
 - `expansion::glob::glob` now handles backslash escapes in glob patterns
   correctly.
-- `trap::run_traps_for_caught_signals` and `trap::run_trap_if_caught` now
-  propagate the exit status of the executed trap action if it is interrupted by
-  a shell error raising `Divert::Interrupt(_)`.
+- `trap::run_traps_for_caught_signals`, `trap::run_trap_if_caught`, and
+  `trap::run_exit_trap` now propagate the exit status of the executed trap
+  action if it is interrupted by a shell error raising `Divert::Interrupt(_)`.
 
 ## [0.1.0] - 2024-04-13
 
