@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `RealSystem::open_tmpfile` no longer returns a file descriptor with the
   `O_CLOEXEC` flag set.
+- `<RealSystem as System>::is_executable_file` now uses `eaccess` instead of
+  `access` to check execute permission.
 
 ## [0.1.0] - 2024-04-13
 

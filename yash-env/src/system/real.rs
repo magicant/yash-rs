@@ -48,7 +48,6 @@ use nix::sys::signal::SaFlags;
 use nix::sys::signal::SigAction;
 use nix::sys::signal::SigHandler;
 use nix::sys::stat::stat;
-use nix::unistd::access;
 use nix::unistd::AccessFlags;
 use std::convert::Infallible;
 use std::convert::TryInto;
@@ -107,8 +106,7 @@ impl ErrnoIfM1 for isize {
 
 fn is_executable(path: &CStr) -> bool {
     let flags = AccessFlags::X_OK;
-    access(path, flags).is_ok()
-    // TODO Should use eaccess
+    nix::unistd::eaccess(path, flags).is_ok()
 }
 
 fn is_regular_file(path: &CStr) -> bool {
