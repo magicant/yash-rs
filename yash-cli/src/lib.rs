@@ -91,8 +91,6 @@ async fn parse_and_print(mut env: Env) -> i32 {
     env.variables.extend_env(std::env::vars());
     env.init_variables();
 
-    // TODO disable non-blocking I/O on stdin
-
     // TODO run profile if login
     // TODO run rcfile if interactive
 

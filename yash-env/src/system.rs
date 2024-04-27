@@ -547,6 +547,22 @@ pub trait SystemEx: System {
         new
     }
 
+    /// Tests if a file descriptor is a pipe.
+    fn fd_is_pipe(&self, fd: Fd) -> bool {
+        matches!(self.fstat(fd), Ok(stat)
+            if SFlag::from_bits_truncate(stat.st_mode) & SFlag::S_IFMT == SFlag::S_IFIFO)
+    }
+
+    /// Clears the `O_NONBLOCK` flag for the file descriptor.
+    fn set_blocking(&mut self, fd: Fd) -> Result<()> {
+        let flags = self.fcntl_getfl(fd)?;
+        let new_flags = flags & !OFlag::O_NONBLOCK;
+        if new_flags == flags {
+            return Ok(());
+        }
+        self.fcntl_setfl(fd, new_flags)
+    }
+
     /// Switches the foreground process group with SIGTTOU blocked.
     ///
     /// This is a convenience function to change the foreground process group

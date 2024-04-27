@@ -85,6 +85,14 @@ pub fn prepare_input<'a>(
 ) -> Result<SourceInput<'a>, PrepareInputError<'a>> {
     match source {
         Source::Stdin => {
+            if system.isatty(Fd::STDIN).unwrap_or(false) || system.fd_is_pipe(Fd::STDIN) {
+                // It makes virtually no sense to make it blocking here
+                // since we will be doing non-blocking reads anyway,
+                // but POSIX requires us to do it.
+                // https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/utilities/sh.html#tag_20_117_06
+                system.set_blocking(Fd::STDIN).ok();
+            }
+
             let mut input = Box::new(FdReader::new(Fd::STDIN, system.clone()));
             let echo = Rc::new(Cell::new(State::Off));
             input.set_echo(Some(Rc::clone(&echo)));

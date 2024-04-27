@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `Env::errexit_is_applicable`
+- `SystemEx::fd_is_pipe`
+- `SystemEx::set_blocking`
 
 ### Changed
 
