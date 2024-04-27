@@ -99,11 +99,13 @@ async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Locat
     }
 }
 
-async fn async_body(env: &mut Env, job_control: Option<JobControl>, and_or: &AndOrList) -> Result {
+async fn async_body(env: &mut Env, job_control: Option<JobControl>, and_or: &AndOrList) {
     if job_control.is_none() {
         nullify_stdin(env).ok();
     }
-    and_or.execute(env).await
+    let result = and_or.execute(env).await;
+    env.apply_result(result);
+    // TODO Run EXIT trap
 }
 
 fn nullify_stdin(env: &mut Env) -> std::result::Result<(), yash_env::system::Errno> {

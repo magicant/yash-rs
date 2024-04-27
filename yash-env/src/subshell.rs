@@ -67,10 +67,7 @@ impl<F> std::fmt::Debug for Subshell<F> {
 
 impl<F> Subshell<F>
 where
-    F: for<'a> FnOnce(
-            &'a mut Env,
-            Option<JobControl>,
-        ) -> Pin<Box<dyn Future<Output = crate::semantics::Result> + 'a>>
+    F: for<'a> FnOnce(&'a mut Env, Option<JobControl>) -> Pin<Box<dyn Future<Output = ()> + 'a>>
         + 'static,
     // TODO Revisit to simplify this function type when impl Future is allowed in return type
 {
@@ -196,8 +193,7 @@ where
                     keeps_stopper_handlers,
                 );
 
-                let result = (self.task)(env, job_control).await;
-                env.apply_result(result);
+                (self.task)(env, job_control).await
             })
         });
 
@@ -329,7 +325,6 @@ mod tests {
     use nix::sys::signal::Signal::{SIGTSTP, SIGTTIN, SIGTTOU};
     use std::cell::Cell;
     use std::cell::RefCell;
-    use std::ops::ControlFlow::Continue;
     use std::rc::Rc;
     use yash_syntax::source::Location;
 
@@ -351,7 +346,6 @@ mod tests {
                 Box::pin(async move {
                     child_pid_2.set(Some(env.system.getpid()));
                     assert_eq!(env.system.getppid(), parent_pid);
-                    Continue(())
                 })
             });
             let result = subshell.start(&mut env).await.unwrap().0;
@@ -374,10 +368,7 @@ mod tests {
     fn stack_frame_in_subshell() {
         in_virtual_system(|mut env, _state| async move {
             let subshell = Subshell::new(|env, _job_control| {
-                Box::pin(async move {
-                    assert_eq!(env.stack[..], [Frame::Subshell]);
-                    Continue(())
-                })
+                Box::pin(async { assert_eq!(env.stack[..], [Frame::Subshell]) })
             });
             let pid = subshell.start(&mut env).await.unwrap().0;
             assert_eq!(env.stack[..], []);
@@ -391,10 +382,7 @@ mod tests {
         in_virtual_system(|mut env, _state| async move {
             let index = env.jobs.add(Job::new(Pid(123)));
             let subshell = Subshell::new(move |env, _job_control| {
-                Box::pin(async move {
-                    assert!(!env.jobs[index].is_owned);
-                    Continue(())
-                })
+                Box::pin(async move { assert!(!env.jobs[index].is_owned) })
             });
             let pid = subshell.start(&mut env).await.unwrap().0;
             env.wait_for_subshell(pid).await.unwrap();
@@ -416,7 +404,7 @@ mod tests {
                 )
                 .unwrap();
             let subshell = Subshell::new(|env, _job_control| {
-                Box::pin(async move {
+                Box::pin(async {
                     let trap_state = assert_matches!(
                         env.traps.get_state(SIGCHLD),
                         (None, Some(trap_state)) => trap_state
@@ -425,7 +413,6 @@ mod tests {
                         &trap_state.action,
                         Action::Command(body) => assert_eq!(&**body, "echo foo")
                     );
-                    Continue(())
                 })
             });
             let pid = subshell.start(&mut env).await.unwrap().0;
@@ -446,7 +433,6 @@ mod tests {
                     assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
                     assert_eq!(state_2.borrow().foreground, None);
                     assert_eq!(job_control, None);
-                    Continue(())
                 })
             })
             .job_control(None)
@@ -475,7 +461,6 @@ mod tests {
                     assert_eq!(state_2.borrow().processes[&child_pid].pgid, child_pid);
                     assert_eq!(state_2.borrow().foreground, None);
                     assert_eq!(job_control, Some(JobControl::Background));
-                    Continue(())
                 })
             })
             .job_control(JobControl::Background)
@@ -505,7 +490,6 @@ mod tests {
                     assert_eq!(state_2.borrow().processes[&child_pid].pgid, child_pid);
                     assert_eq!(state_2.borrow().foreground, Some(child_pid));
                     assert_eq!(job_control, Some(JobControl::Foreground));
-                    Continue(())
                 })
             })
             .job_control(JobControl::Foreground)
@@ -529,7 +513,7 @@ mod tests {
             parent_env.options.set(Monitor, On);
             stub_tty(&state);
 
-            let _ = Subshell::new(move |_, _| Box::pin(std::future::ready(Continue(()))))
+            let _ = Subshell::new(move |_, _| Box::pin(std::future::ready(())))
                 .job_control(JobControl::Foreground)
                 .start(&mut parent_env)
                 .await
@@ -550,7 +534,6 @@ mod tests {
                     let child_pid = child_env.system.getpid();
                     assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
                     assert_eq!(state_2.borrow().foreground, None);
-                    Continue(())
                 })
             })
             .job_control(JobControl::Foreground)
@@ -581,7 +564,6 @@ mod tests {
                     let child_pid = child_env.system.getpid();
                     assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
                     assert_eq!(state_2.borrow().foreground, None);
-                    Continue(())
                 })
             })
             .job_control(JobControl::Foreground)
@@ -602,10 +584,7 @@ mod tests {
     fn wait_without_job_control() {
         in_virtual_system(|mut env, _state| async move {
             let subshell = Subshell::new(|env, _job_control| {
-                Box::pin(async move {
-                    env.exit_status = ExitStatus(42);
-                    Continue(())
-                })
+                Box::pin(async { env.exit_status = ExitStatus(42) })
             });
             let (_pid, process_state) = subshell.start_and_wait(&mut env).await.unwrap();
             assert_eq!(process_state, ProcessState::Exited(ExitStatus(42)));
@@ -619,10 +598,7 @@ mod tests {
             stub_tty(&state);
 
             let subshell = Subshell::new(|env, _job_control| {
-                Box::pin(async move {
-                    env.exit_status = ExitStatus(123);
-                    Continue(())
-                })
+                Box::pin(async { env.exit_status = ExitStatus(123) })
             })
             .job_control(JobControl::Foreground);
             let (_pid, process_state) = subshell.start_and_wait(&mut env).await.unwrap();
@@ -638,10 +614,7 @@ mod tests {
     fn sigint_sigquit_not_ignored_by_default() {
         in_virtual_system(|mut parent_env, state| async move {
             let (child_pid, _) = Subshell::new(|env, _job_control| {
-                Box::pin(async move {
-                    env.exit_status = ExitStatus(123);
-                    Continue(())
-                })
+                Box::pin(async { env.exit_status = ExitStatus(123) })
             })
             .job_control(JobControl::Background)
             .start(&mut parent_env)
@@ -660,10 +633,7 @@ mod tests {
     fn sigint_sigquit_ignored_in_uncontrolled_job() {
         in_virtual_system(|mut parent_env, state| async move {
             let (child_pid, _) = Subshell::new(|env, _job_control| {
-                Box::pin(async move {
-                    env.exit_status = ExitStatus(123);
-                    Continue(())
-                })
+                Box::pin(async { env.exit_status = ExitStatus(123) })
             })
             .job_control(JobControl::Background)
             .ignore_sigint_sigquit(true)
@@ -711,10 +681,7 @@ mod tests {
             stub_tty(&state);
 
             let (child_pid, _) = Subshell::new(|env, _job_control| {
-                Box::pin(async move {
-                    env.exit_status = ExitStatus(123);
-                    Continue(())
-                })
+                Box::pin(async { env.exit_status = ExitStatus(123) })
             })
             .job_control(JobControl::Background)
             .ignore_sigint_sigquit(true)
@@ -742,10 +709,7 @@ mod tests {
             stub_tty(&state);
 
             let (child_pid, _) = Subshell::new(|env, _job_control| {
-                Box::pin(async move {
-                    env.exit_status = ExitStatus(123);
-                    Continue(())
-                })
+                Box::pin(async { env.exit_status = ExitStatus(123) })
             })
             .start(&mut parent_env)
             .await
@@ -786,10 +750,7 @@ mod tests {
             stub_tty(&state);
 
             let (child_pid, _) = Subshell::new(|env, _job_control| {
-                Box::pin(async move {
-                    env.exit_status = ExitStatus(123);
-                    Continue(())
-                })
+                Box::pin(async { env.exit_status = ExitStatus(123) })
             })
             .job_control(JobControl::Background)
             .start(&mut parent_env)
@@ -826,10 +787,7 @@ mod tests {
             stub_tty(&state);
 
             let (child_pid, _) = Subshell::new(|env, _job_control| {
-                Box::pin(async move {
-                    env.exit_status = ExitStatus(123);
-                    Continue(())
-                })
+                Box::pin(async { env.exit_status = ExitStatus(123) })
             })
             .start(&mut parent_env)
             .await
@@ -865,10 +823,7 @@ mod tests {
             stub_tty(&state);
 
             let (child_pid, _) = Subshell::new(|env, _job_control| {
-                Box::pin(async move {
-                    env.exit_status = ExitStatus(123);
-                    Continue(())
-                })
+                Box::pin(async { env.exit_status = ExitStatus(123) })
             })
             .start(&mut parent_env)
             .await

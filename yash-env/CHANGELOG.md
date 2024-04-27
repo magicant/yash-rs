@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `system::virtual::FileSystem::get` now fails with `EACCES` when search
   permission is denied for any directory component of the path.
+- The type parameter constraint for `subshell::Subshell` is now
+  `F: for<'a> FnOnce(&'a mut Env, Option<JobControl>) -> Pin<Box<dyn Future<Output = ()> + 'a>> + 'static`.
+  The `Output` type of the returned future has been changed from
+  `semantics::Result` to `()`.
 
 ### Removed
 

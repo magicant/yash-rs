@@ -598,10 +598,7 @@ mod tests {
     fn start_and_wait_for_subshell() {
         in_virtual_system(|mut env, _state| async move {
             let subshell = Subshell::new(|env, _job_control| {
-                Box::pin(async move {
-                    env.exit_status = ExitStatus(42);
-                    Continue(())
-                })
+                Box::pin(async { env.exit_status = ExitStatus(42) })
             });
             let (pid, _) = subshell.start(&mut env).await.unwrap();
             let result = env.wait_for_subshell(pid).await;
@@ -613,10 +610,7 @@ mod tests {
     fn start_and_wait_for_subshell_with_job_list() {
         in_virtual_system(|mut env, _state| async move {
             let subshell = Subshell::new(|env, _job_control| {
-                Box::pin(async move {
-                    env.exit_status = ExitStatus(42);
-                    Continue(())
-                })
+                Box::pin(async { env.exit_status = ExitStatus(42) })
             });
             let (pid, _) = subshell.start(&mut env).await.unwrap();
             let mut job = Job::new(pid);
@@ -658,19 +652,13 @@ mod tests {
         let [job_1, job_2, job_3] = executor.run_until(async {
             // Run a subshell.
             let subshell_1 = Subshell::new(|env, _job_control| {
-                Box::pin(async move {
-                    env.exit_status = ExitStatus(12);
-                    Continue(())
-                })
+                Box::pin(async { env.exit_status = ExitStatus(12) })
             });
             let (pid_1, _) = subshell_1.start(&mut env).await.unwrap();
 
             // Run another subshell.
             let subshell_2 = Subshell::new(|env, _job_control| {
-                Box::pin(async move {
-                    env.exit_status = ExitStatus(35);
-                    Continue(())
-                })
+                Box::pin(async { env.exit_status = ExitStatus(35) })
             });
             let (pid_2, _) = subshell_2.start(&mut env).await.unwrap();
 
@@ -681,10 +669,7 @@ mod tests {
 
             // Yet another subshell. We don't make this into a job.
             let subshell_4 = Subshell::new(|env, _job_control| {
-                Box::pin(async move {
-                    env.exit_status = ExitStatus(100);
-                    Continue(())
-                })
+                Box::pin(async { env.exit_status = ExitStatus(100) })
             });
             let (_pid_4, _) = subshell_4.start(&mut env).await.unwrap();
 

@@ -203,7 +203,6 @@ mod tests {
     use crate::tests::stub_tty;
     use futures_util::FutureExt as _;
     use std::cell::Cell;
-    use std::ops::ControlFlow::Continue;
     use std::rc::Rc;
     use yash_env::job::Job;
     use yash_env::job::ProcessState;
@@ -236,7 +235,6 @@ mod tests {
                     let tty = env.get_tty().unwrap();
                     assert_eq!(env.system.tcgetpgrp(tty).unwrap(), env.system.getpid());
                     reached2.set(true);
-                    Continue(())
                 })
             })
             .job_control(JobControl::Foreground);
@@ -258,13 +256,8 @@ mod tests {
         in_virtual_system(|mut env, state| async move {
             stub_tty(&state);
             env.options.set(Monitor, On);
-            let subshell = Subshell::new(|env, _| {
-                Box::pin(async move {
-                    suspend(env).await;
-                    Continue(())
-                })
-            })
-            .job_control(JobControl::Foreground);
+            let subshell =
+                Subshell::new(|env, _| Box::pin(suspend(env))).job_control(JobControl::Foreground);
             let (pid, subshell_state) = subshell.start_and_wait(&mut env).await.unwrap();
             assert_eq!(subshell_state, ProcessState::Stopped(Signal::SIGSTOP));
             let mut job = Job::new(pid);
@@ -288,7 +281,6 @@ mod tests {
                 Box::pin(async move {
                     suspend(env).await;
                     env.exit_status = ExitStatus(42);
-                    Continue(())
                 })
             })
             .job_control(JobControl::Foreground);
@@ -344,13 +336,8 @@ mod tests {
         in_virtual_system(|mut env, state| async move {
             stub_tty(&state);
             env.options.set(Monitor, On);
-            let subshell = Subshell::new(|env, _| {
-                Box::pin(async move {
-                    suspend(env).await;
-                    Continue(())
-                })
-            })
-            .job_control(JobControl::Foreground);
+            let subshell =
+                Subshell::new(|env, _| Box::pin(suspend(env))).job_control(JobControl::Foreground);
             let (pid, subshell_state) = subshell.start_and_wait(&mut env).await.unwrap();
             assert_eq!(subshell_state, ProcessState::Stopped(Signal::SIGSTOP));
             let mut job = Job::new(pid);
@@ -442,13 +429,8 @@ mod tests {
             job.state = subshell_state1;
             env.jobs.add(job);
             // current job
-            let subshell = Subshell::new(|env, _| {
-                Box::pin(async move {
-                    suspend(env).await;
-                    Continue(())
-                })
-            })
-            .job_control(JobControl::Foreground);
+            let subshell =
+                Subshell::new(|env, _| Box::pin(suspend(env))).job_control(JobControl::Foreground);
             let (pid2, subshell_state2) = subshell.start_and_wait(&mut env).await.unwrap();
             assert_eq!(subshell_state2, ProcessState::Stopped(Signal::SIGSTOP));
             let mut job = Job::new(pid2);
@@ -487,13 +469,8 @@ mod tests {
             stub_tty(&state);
             env.options.set(Monitor, On);
             // previous job
-            let subshell = Subshell::new(|env, _| {
-                Box::pin(async move {
-                    suspend(env).await;
-                    Continue(())
-                })
-            })
-            .job_control(JobControl::Foreground);
+            let subshell =
+                Subshell::new(|env, _| Box::pin(suspend(env))).job_control(JobControl::Foreground);
             let (pid1, subshell_state1) = subshell.start_and_wait(&mut env).await.unwrap();
             assert_eq!(subshell_state1, ProcessState::Stopped(Signal::SIGSTOP));
             let mut job = Job::new(pid1);

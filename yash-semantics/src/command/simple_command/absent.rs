@@ -54,16 +54,16 @@ pub async fn execute_absent_target(
                 let redir_exit_status =
                     match env.perform_redirs(redirs_2.iter(), xtrace.as_mut()).await {
                         Ok(exit_status) => exit_status,
-                        Err(e) => {
-                            e.handle(env).await?;
-                            return Break(Divert::Exit(None));
+                        Err(error) => {
+                            let result = error.handle(env).await;
+                            env.apply_result(result);
+                            return;
                         }
                     };
 
                 print(env, xtrace).await;
 
                 env.exit_status = redir_exit_status.unwrap_or(exit_status);
-                Continue(())
             })
         })
         .job_control(JobControl::Foreground);
