@@ -104,9 +104,14 @@ impl ErrnoIfM1 for isize {
     const MINUS_1: Self = -1;
 }
 
+// TODO Should use AT_EACCESS on all platforms
+#[cfg(not(target_os = "redox"))]
 fn is_executable(path: &CStr) -> bool {
-    let flags = AccessFlags::X_OK;
-    nix::unistd::eaccess(path, flags).is_ok()
+    nix::unistd::faccessat(None, path, AccessFlags::X_OK, AtFlags::AT_EACCESS).is_ok()
+}
+#[cfg(target_os = "redox")]
+fn is_executable(path: &CStr) -> bool {
+    nix::unistd::access(path, AccessFlags::X_OK).is_ok()
 }
 
 fn is_regular_file(path: &CStr) -> bool {
