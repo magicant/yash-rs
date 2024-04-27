@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `expansion::ErrorCause::EmptyExpansion` was renamed to `expansion::ErrorCause::VacantExpansion`.
 - `<expansion::Error as handle::Handle>::handle` now returns `Divert::Exit`
   instead of `Divert::Interrupt` when the `ErrExit` shell option is applicable.
+- `expansion::glob::glob` no longer requires search permission for the parent
+  directory of the last pathname component in the pattern when the last
+  component contains a pattern character.
 
 ### Fixed
 
@@ -30,6 +33,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it would expand to an empty string only if the `Unset` shell option was on.
 - The parameter expansion of an unset variable with a `Length` modifier now
   correctly expands to `0` rather than an empty string.
+- `expansion::glob::glob` now handles backslash escapes in glob patterns
+  correctly.
+- `trap::run_traps_for_caught_signals`, `trap::run_trap_if_caught`, and
+  `trap::run_exit_trap` now propagate the exit status of the executed trap
+  action if it is interrupted by a shell error raising `Divert::Interrupt(_)`.
+- `trap::run_exit_trap` is now called on the exit of a subshell that is running
+  a command substitution, an asynchronous and-or list, or a job-controlled
+  pipeline.
 
 ## [0.1.0] - 2024-04-13
 

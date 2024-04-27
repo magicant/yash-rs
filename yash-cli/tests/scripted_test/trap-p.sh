@@ -119,20 +119,27 @@ __IN__
 ok
 __OUT__
 
-: TODO yash is broken <<\__IN__
-test_O -e n 'fatal shell error in trap'
+test_O -e n 'fatal shell error in signal trap'
 trap 'set <_no_such_file_' INT
 kill -s INT $$
 echo not reached
 __IN__
 
-test_oE -e 0 '$? is restored after trap is executed'
+test_O -e n 'fatal shell error in EXIT trap'
+trap 'set <_no_such_file_' EXIT
+__IN__
+
+test_oE -e 0 '$? is restored after signal trap is executed'
 trap 'false' USR1
 kill -s USR1 $$
 echo $?
 __IN__
 0
 __OUT__
+
+test_E -e 0 'exit status of EXIT trap does not affect exit status of shell'
+trap 'false' EXIT
+__IN__
 
 test_oE 'trap command is not affected by assignment in same simple command' \
     -c 'foo=1 trap "echo EXIT \$foo" EXIT; foo=2; foo=3 echo $foo'
@@ -166,7 +173,6 @@ __IN__
 foo
 __OUT__
 
-: TODO yash is broken <<\__OUT__
 test_oE 'trap command is not affected by redirections effective when set (4)' \
     -c 'trap "echo foo" EXIT >/dev/null & wait $!'
 __IN__

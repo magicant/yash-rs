@@ -107,10 +107,7 @@ pub async fn start_external_utility_in_subshell_and_wait(
     };
     let args = to_c_strings(fields);
     let subshell = Subshell::new(move |env, _job_control| {
-        Box::pin(async move {
-            replace_current_process(env, path, args, location).await;
-            Continue(())
-        })
+        Box::pin(replace_current_process(env, path, args, location))
     })
     .job_control(JobControl::Foreground);
 

@@ -18,7 +18,7 @@
 
 use crate::command::Command;
 use crate::trap::run_exit_trap;
-use std::ops::ControlFlow::{Break, Continue};
+use std::ops::ControlFlow::Break;
 use std::rc::Rc;
 use yash_env::io::print_error;
 use yash_env::job::Job;
@@ -64,13 +64,11 @@ pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Resu
 }
 
 /// Executes the content of the shell.
-async fn subshell_main(env: &mut Env, body: Rc<List>) -> Result {
+async fn subshell_main(env: &mut Env, body: Rc<List>) {
     let result = body.execute(env).await;
     env.apply_result(result);
 
     run_exit_trap(env).await;
-
-    Continue(())
 }
 
 #[cfg(test)]
@@ -85,6 +83,7 @@ mod tests {
     use crate::tests::suspend_builtin;
     use futures_util::FutureExt;
     use std::future::Future;
+    use std::ops::ControlFlow::Continue;
     use std::pin::Pin;
     use std::rc::Rc;
     use yash_env::job::ProcessState;

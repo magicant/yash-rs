@@ -16,10 +16,8 @@
 
 //! Running signal traps
 
-use crate::ReadEvalLoop;
-use std::future::Future;
+use super::run_trap;
 use std::ops::ControlFlow::Continue;
-use std::pin::Pin;
 use std::rc::Rc;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
@@ -29,27 +27,6 @@ use yash_env::trap::Signal;
 #[cfg(doc)]
 use yash_env::trap::TrapSet;
 use yash_env::Env;
-use yash_syntax::parser::lex::Lexer;
-use yash_syntax::source::Location;
-use yash_syntax::source::Source;
-
-/// Runs a trap action for a signal.
-///
-/// This function is a helper function for [`run_trap_if_caught`] and
-/// [`run_traps_for_caught_signals`].
-#[must_use]
-async fn run_trap(env: &mut Env, signal: Signal, code: Rc<str>, origin: Location) -> Result {
-    let condition = signal.to_string();
-    let mut lexer = Lexer::from_memory(&code, Source::Trap { condition, origin });
-    let mut env = env.push_frame(Frame::Trap(Condition::Signal(signal)));
-    let previous_exit_status = env.exit_status;
-    // Boxing needed for recursion
-    let future: Pin<Box<dyn Future<Output = Result>>> =
-        Box::pin(ReadEvalLoop::new(&mut env, &mut lexer).run());
-    let result = future.await;
-    env.exit_status = previous_exit_status;
-    result
-}
 
 /// Runs a trap action for a signal if it has been caught.
 ///
@@ -68,7 +45,7 @@ pub async fn run_trap_if_caught(env: &mut Env, signal: Signal) -> Option<Result>
     };
     let code = Rc::clone(command);
     let origin = trap_state.origin.clone();
-    Some(run_trap(env, signal, code, origin).await)
+    Some(run_trap(env, signal.into(), code, origin).await)
 }
 
 fn in_trap(env: &Env) -> bool {
@@ -84,6 +61,11 @@ fn in_trap(env: &Env) -> bool {
 /// This function resets the `pending` flag of caught signals by calling
 /// [`TrapSet::take_caught_signal`]. See the [module doc](super) for more
 /// details.
+///
+/// The exit status of trap actions does not affect the exit status of the
+/// current environment except when the trap action is interrupted with
+/// `Result::Break(Divert::Interrupt(_))`. In that case, the exit status of the
+/// trap action is left as is in the environment.
 ///
 /// If we are already running a trap, this function does not run any traps to
 /// prevent unintended behavior of trap actions. Most shell script writers do
@@ -104,7 +86,7 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
         };
         let code = Rc::clone(command);
         let origin = state.origin.clone();
-        run_trap(env, signal, code, origin).await?;
+        run_trap(env, signal.into(), code, origin).await?;
     }
 
     Continue(())
@@ -118,6 +100,7 @@ mod tests {
     use crate::tests::exit_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
+    use std::future::Future;
     use std::ops::ControlFlow::Break;
     use std::pin::Pin;
     use yash_env::builtin::Builtin;

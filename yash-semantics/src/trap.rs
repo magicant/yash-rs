@@ -44,10 +44,55 @@
 //! built-in or reaching the end of the script. The [`run_exit_trap`] function,
 //! which should be called before exiting, runs the trap.
 
+use crate::ReadEvalLoop;
+use std::future::Future;
+use std::ops::ControlFlow::Break;
+use std::pin::Pin;
+use std::rc::Rc;
+use yash_env::semantics::Divert;
+use yash_env::semantics::Result;
+use yash_env::stack::Frame;
+use yash_env::trap::Condition;
 #[cfg(doc)]
 use yash_env::trap::TrapSet;
-#[cfg(doc)]
 use yash_env::Env;
+use yash_syntax::parser::lex::Lexer;
+use yash_syntax::source::Location;
+use yash_syntax::source::Source;
+
+/// Helper function for running a trap action.
+///
+/// This function pushes a temporary frame `Frame::Trap(cond)` to the
+/// environment stack and runs the trap action by parsing the `code` with the
+/// given `origin`. The exit status of the trap action does not affect the exit
+/// status of the current environment except when the trap action is interrupted
+/// with `Result::Break(Divert::Interrupt(_))`. In that case, the exit status of
+/// the trap action is left as is in the environment.
+#[must_use]
+async fn run_trap(env: &mut Env, cond: Condition, code: Rc<str>, origin: Location) -> Result {
+    let condition = cond.to_string();
+    let mut lexer = Lexer::from_memory(&code, Source::Trap { condition, origin });
+    let mut env = env.push_frame(Frame::Trap(cond));
+
+    let previous_exit_status = env.exit_status;
+
+    // Boxing needed for recursion
+    let future: Pin<Box<dyn Future<Output = Result>>> =
+        Box::pin(ReadEvalLoop::new(&mut env, &mut lexer).run());
+    let mut result = future.await;
+
+    if let Break(Divert::Interrupt(ref mut exit_status)) = result {
+        if let Some(exit_status) = exit_status {
+            // Propagate the exit status of the error that interrupted the trap
+            *exit_status = env.exit_status
+        }
+    } else {
+        // Restore the exit status of the calling context
+        env.exit_status = previous_exit_status
+    }
+
+    result
+}
 
 mod signal;
 pub use signal::run_trap_if_caught;

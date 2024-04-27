@@ -128,7 +128,7 @@ mod tests {
     fn finished_job() {
         in_virtual_system(|mut env, _| async move {
             // Start a child process that exits immediately.
-            let subshell = Subshell::new(|_, _| Box::pin(ready(Continue(()))));
+            let subshell = Subshell::new(|_, _| Box::pin(ready(())));
             let pid = subshell.start(&mut env).await.unwrap().0;
             let index = env.jobs.add(Job::new(pid));
 

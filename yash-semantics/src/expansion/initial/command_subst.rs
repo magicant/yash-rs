@@ -22,6 +22,7 @@ use super::super::phrase::Phrase;
 use super::Env;
 use super::Error;
 use crate::expansion::ErrorCause;
+use crate::trap::run_exit_trap;
 use crate::Handle;
 use crate::ReadEvalLoop;
 use yash_env::io::Fd;
@@ -55,25 +56,42 @@ where
     // Start a subshell to run the command
     let subshell = Subshell::new(move |env, _job_control| {
         Box::pin(async move {
-            env.system.close(reader).ok();
-            if writer != Fd::STDOUT {
-                if let Err(errno) = env.system.dup2(writer, Fd::STDOUT) {
-                    let error = Error {
-                        cause: ErrorCause::CommandSubstError(errno),
-                        location: original,
-                    };
-                    return error.handle(env).await;
-                }
-                env.system.close(writer).ok();
-            }
-
-            let mut lexer = Lexer::from_memory(command.as_ref(), Source::CommandSubst { original });
-            ReadEvalLoop::new(env, &mut lexer).run().await
+            let result = subshell_body(env, reader, writer, original, command).await;
+            env.apply_result(result);
+            run_exit_trap(env).await;
         })
     });
     let subshell_result = subshell.start(env.inner).await;
 
     expand_common(reader, writer, subshell_result, location, env).await
+}
+
+async fn subshell_body<C>(
+    env: &mut yash_env::Env,
+    reader: Fd,
+    writer: Fd,
+    original: Location,
+    command: C,
+) -> yash_env::semantics::Result
+where
+    C: AsRef<str> + 'static,
+{
+    // Arrange the file descriptors
+    env.system.close(reader).ok();
+    if writer != Fd::STDOUT {
+        if let Err(errno) = env.system.dup2(writer, Fd::STDOUT) {
+            let error = Error {
+                cause: ErrorCause::CommandSubstError(errno),
+                location: original,
+            };
+            return error.handle(env).await;
+        }
+        env.system.close(writer).ok();
+    }
+
+    // Run the command
+    let mut lexer = Lexer::from_memory(command.as_ref(), Source::CommandSubst { original });
+    ReadEvalLoop::new(env, &mut lexer).run().await
 }
 
 /// The second half of [`expand`] that does not depend on type parameter `C`.

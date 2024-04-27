@@ -315,7 +315,6 @@ here
 	document
 __OUT__
 
-: TODO Yash-rs is broken <<\__OUT__
 test_oE -e 0 'here-document with non-default file descriptor'
 cat 3<<END <&3
 foo
@@ -476,7 +475,6 @@ foo
 END
 __OUT__
 
-: TODO Yash-rs is broken <<\__OUT__
 test_oE -e 0 'multiple here-documents on single command'
 foo=bar
 {

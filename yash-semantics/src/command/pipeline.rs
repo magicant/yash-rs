@@ -16,6 +16,8 @@
 
 //! Implementation of pipeline semantics.
 
+use crate::trap::run_exit_trap;
+
 use super::Command;
 use itertools::Itertools;
 use std::ops::ControlFlow::{Break, Continue};
@@ -132,7 +134,11 @@ async fn execute_job_controlled_pipeline(
 ) -> Result {
     let commands_2 = commands.to_vec();
     let subshell = Subshell::new(|sub_env, _job_control| {
-        Box::pin(async move { execute_multi_command_pipeline(sub_env, &commands_2).await })
+        Box::pin(async move {
+            let result = execute_multi_command_pipeline(sub_env, &commands_2).await;
+            sub_env.apply_result(result);
+            run_exit_trap(sub_env).await;
+        })
     })
     .job_control(JobControl::Foreground);
 
@@ -174,9 +180,13 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
         let has_next = commands.peek().is_some();
         shift_or_fail(env, &mut pipes, has_next).await?;
 
-        let pipes2 = pipes;
+        let pipes = pipes;
         let subshell = Subshell::new(move |env, _job_control| {
-            Box::pin(connect_pipe_and_execute_command(env, pipes2, command))
+            Box::pin(async move {
+                let result = connect_pipe_and_execute_command(env, pipes, command).await;
+                env.apply_result(result);
+                run_exit_trap(env).await;
+            })
         });
         let start_result = subshell.start(env).await;
         pids.push(pid_or_fail(env, start_result).await?);

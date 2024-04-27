@@ -27,6 +27,7 @@
 //! - `?`
 //! - `*`
 //! - Bracket expression (a set of characters enclosed in brackets)
+//! - `\`
 //!
 //! Refer to the [`yash-fnmatch`](yash_fnmatch) crate for pattern syntax and
 //! semantics details.
@@ -116,15 +117,33 @@ impl Iterator for Glob<'_> {
 
 /// Converts a field to a glob pattern.
 fn to_pattern(field: &[AttrChar]) -> Option<Pattern> {
-    let chars = field.iter().filter_map(|c| {
-        if c.is_quoting {
+    #[derive(Clone, Debug)]
+    struct Chars<'a> {
+        inner: std::slice::Iter<'a, AttrChar>,
+        next_quoted: bool,
+    }
+    impl Iterator for Chars<'_> {
+        type Item = PatternChar;
+        fn next(&mut self) -> Option<PatternChar> {
+            for c in &mut self.inner {
+                let quoted = std::mem::replace(&mut self.next_quoted, false);
+                if c.is_quoting {
+                    continue;
+                } else if quoted || c.is_quoted || c.origin == Origin::HardExpansion {
+                    return Some(PatternChar::Literal(c.value));
+                } else {
+                    self.next_quoted = c.value == '\\';
+                    return Some(PatternChar::Normal(c.value));
+                }
+            }
             None
-        } else if c.is_quoted || c.origin == Origin::HardExpansion {
-            Some(PatternChar::Literal(c.value))
-        } else {
-            Some(PatternChar::Normal(c.value))
         }
-    });
+    }
+
+    let chars = Chars {
+        inner: field.iter(),
+        next_quoted: false,
+    };
     let mut config = Config::default();
     config.anchor_begin = true;
     config.anchor_end = true;
@@ -156,12 +175,12 @@ impl SearchEnv<'_> {
 
         match to_pattern(this).map(Pattern::into_literal) {
             None => {
-                self.push_component(new_suffix, |prefix| {
+                self.push_component(new_suffix, false, |prefix| {
                     prefix.extend(remove_quotes_and_strip(this))
                 });
             }
             Some(Ok(literal)) => {
-                self.push_component(new_suffix, |prefix| prefix.push_str(&literal));
+                self.push_component(new_suffix, false, |prefix| prefix.push_str(&literal));
             }
             Some(Err(pattern)) => {
                 let dir_path = if self.prefix.is_empty() {
@@ -176,7 +195,9 @@ impl SearchEnv<'_> {
                     while let Ok(Some(entry)) = dir.next() {
                         if let Some(name) = entry.name.to_str() {
                             if pattern.is_match(name) {
-                                self.push_component(new_suffix, |prefix| prefix.push_str(name));
+                                self.push_component(new_suffix, true, |prefix| {
+                                    prefix.push_str(name)
+                                });
                             }
                         }
                     }
@@ -196,9 +217,15 @@ impl SearchEnv<'_> {
             .is_ok()
     }
 
-    /// Pushes a pathname component to `prefix` and start processing the next suffix
-    /// component.
-    fn push_component<F>(&mut self, suffix: Option<&[AttrChar]>, push: F)
+    /// Pushes a pathname component to `prefix` and starts processing the next
+    /// suffix component.
+    ///
+    /// If `suffix` is `None`, the pathname is checked for existence and added
+    /// to the results if it exists. If `file_exists` is `true`, the pathname is
+    /// assumed to exist.
+    ///
+    /// `push` is a closure that appends the suffix to the prefix.
+    fn push_component<F>(&mut self, suffix: Option<&[AttrChar]>, file_exists: bool, push: F)
     where
         F: FnOnce(&mut String),
     {
@@ -207,9 +234,7 @@ impl SearchEnv<'_> {
 
         match suffix {
             None => {
-                // TODO Don't need to check the file existence if the last path
-                // component comes from a directory entry
-                if self.file_exists() {
+                if file_exists || self.file_exists() {
                     self.results.push(Field {
                         value: self.prefix.clone(),
                         origin: self.origin.clone(),
@@ -306,6 +331,16 @@ mod tests {
         let f = dummy_attr_field("abc");
         let mut i = glob(&mut env, f);
         assert_eq!(i.next().unwrap().value, "abc");
+        assert_eq!(i.next(), None);
+    }
+
+    #[test]
+    fn backslash_escapes_next_char() {
+        let mut env = env_with_dummy_files(["a", r"\a"]);
+        // The backslash escapes the '?', so this is not a pattern.
+        let f = dummy_attr_field(r"\?");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, r"\?");
         assert_eq!(i.next(), None);
     }
 
@@ -433,6 +468,25 @@ mod tests {
         let mut i = glob(&mut env, f);
         assert_eq!(i.next().unwrap().value, "a//b");
         assert_eq!(i.next().unwrap().value, "b//a");
+        assert_eq!(i.next(), None);
+    }
+
+    #[test]
+    fn no_search_permission_needed_if_last_component_is_pattern() {
+        let system = VirtualSystem::new();
+        {
+            let mut state = system.state.borrow_mut();
+            state
+                .file_system
+                .save("foo/bar", Default::default())
+                .unwrap();
+            let dir = state.file_system.get("foo").unwrap();
+            dir.borrow_mut().permissions.0 = 0o666;
+        }
+        let mut env = Env::with_system(Box::new(system));
+        let f = dummy_attr_field("foo/*");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, "foo/bar");
         assert_eq!(i.next(), None);
     }
 
