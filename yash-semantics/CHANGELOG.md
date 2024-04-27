@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `trap::run_traps_for_caught_signals`, `trap::run_trap_if_caught`, and
   `trap::run_exit_trap` now propagate the exit status of the executed trap
   action if it is interrupted by a shell error raising `Divert::Interrupt(_)`.
+- `trap::run_exit_trap` is now called on the exit of a subshell that is running
+  a command substitution, an asynchronous and-or list, or a job-controlled
+  pipeline.
 
 ## [0.1.0] - 2024-04-13
 

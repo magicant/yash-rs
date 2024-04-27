@@ -22,6 +22,7 @@ use super::super::phrase::Phrase;
 use super::Env;
 use super::Error;
 use crate::expansion::ErrorCause;
+use crate::trap::run_exit_trap;
 use crate::Handle;
 use crate::ReadEvalLoop;
 use yash_env::io::Fd;
@@ -56,8 +57,8 @@ where
     let subshell = Subshell::new(move |env, _job_control| {
         Box::pin(async move {
             let result = subshell_body(env, reader, writer, original, command).await;
-            env.apply_result(result)
-            // TODO Run EXIT trap
+            env.apply_result(result);
+            run_exit_trap(env).await;
         })
     });
     let subshell_result = subshell.start(env.inner).await;

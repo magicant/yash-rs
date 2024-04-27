@@ -16,6 +16,8 @@
 
 //! Implementation for Item.
 
+use crate::trap::run_exit_trap;
+
 use super::Command;
 use std::ffi::CStr;
 use std::ops::ControlFlow::{Break, Continue};
@@ -105,7 +107,8 @@ async fn async_body(env: &mut Env, job_control: Option<JobControl>, and_or: &And
     }
     let result = and_or.execute(env).await;
     env.apply_result(result);
-    // TODO Run EXIT trap
+
+    run_exit_trap(env).await;
 }
 
 fn nullify_stdin(env: &mut Env) -> std::result::Result<(), yash_env::system::Errno> {

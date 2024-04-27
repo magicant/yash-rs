@@ -173,7 +173,6 @@ __IN__
 foo
 __OUT__
 
-: TODO yash is broken <<\__OUT__
 test_oE 'trap command is not affected by redirections effective when set (4)' \
     -c 'trap "echo foo" EXIT >/dev/null & wait $!'
 __IN__

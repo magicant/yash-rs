@@ -16,6 +16,8 @@
 
 //! Implementation of pipeline semantics.
 
+use crate::trap::run_exit_trap;
+
 use super::Command;
 use itertools::Itertools;
 use std::ops::ControlFlow::{Break, Continue};
@@ -134,8 +136,8 @@ async fn execute_job_controlled_pipeline(
     let subshell = Subshell::new(|sub_env, _job_control| {
         Box::pin(async move {
             let result = execute_multi_command_pipeline(sub_env, &commands_2).await;
-            sub_env.apply_result(result)
-            // TODO Run EXIT trap
+            sub_env.apply_result(result);
+            run_exit_trap(sub_env).await;
         })
     })
     .job_control(JobControl::Foreground);
@@ -182,8 +184,8 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
         let subshell = Subshell::new(move |env, _job_control| {
             Box::pin(async move {
                 let result = connect_pipe_and_execute_command(env, pipes, command).await;
-                env.apply_result(result)
-                // TODO Run EXIT trap
+                env.apply_result(result);
+                run_exit_trap(env).await;
             })
         });
         let start_result = subshell.start(env).await;
