@@ -141,7 +141,6 @@ impl Variable {
         self.read_only_location.is_some()
     }
 
-    // TODO Should require mutable self
     /// Returns the value of this variable, applying any quirk.
     ///
     /// If this variable has no [`Quirk`], this function just returns
@@ -151,6 +150,7 @@ impl Variable {
     /// This function requires the location of the parameter expanding this
     /// variable, so that `Quirk::LineNumber` can yield the line number of the
     /// location.
+    #[inline]
     pub fn expand(&self, location: &Location) -> Expansion {
         super::quirk::expand(self, location)
     }

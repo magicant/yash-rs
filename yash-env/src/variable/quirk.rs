@@ -42,8 +42,8 @@ pub enum Quirk {
     /// the location of the parameter expansion. This `Quirk` is lost when an
     /// assignment sets a new value to the variable.
     LineNumber,
-    // TODO $RANDOM
-    // TODO $PATH
+    // TODO Random(RefCell<RandomState>)
+    // TODO Path(...)
 }
 
 /// Expanded value of a variable
