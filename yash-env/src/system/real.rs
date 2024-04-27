@@ -117,6 +117,11 @@ fn is_directory(path: &CStr) -> bool {
     matches!(stat(path), Ok(stat) if stat.st_mode & S_IFMT == S_IFDIR)
 }
 
+/// Array of slots to store caught signals.
+///
+/// This array is used to store caught signals. All slots are initialized with
+/// 0, which indicates that the slot is available. When a signal is caught, the
+/// signal number is written into one of unoccupied slots.
 static CAUGHT_SIGNALS: [AtomicIsize; 8] = {
     // In the array creation, the repeat operand must be const.
     #[allow(clippy::declare_interior_mutable_const)]
@@ -126,7 +131,9 @@ static CAUGHT_SIGNALS: [AtomicIsize; 8] = {
 
 /// Signal catching function.
 ///
-/// TODO Elaborate
+/// This function is set as a signal handler for all signals that the shell
+/// wants to catch. When a signal is caught, the signal number is written into
+/// one of the slots in [`CAUGHT_SIGNALS`].
 extern "C" fn catch_signal(signal: c_int) {
     // This function can only perform async-signal-safe operations.
     // Performing unsafe operations is undefined behavior!
