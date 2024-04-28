@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `stack::Frame` is now `non_exhaustive`.
 - `system::virtual::FileSystem::get` now fails with `EACCES` when search
   permission is denied for any directory component of the path.
 - The type parameter constraint for `subshell::Subshell` is now

@@ -54,6 +54,7 @@ pub struct Builtin {
 
 /// Element of runtime execution context stack
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum Frame {
     /// For, while, or until loop
     Loop,
