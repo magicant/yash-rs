@@ -102,7 +102,7 @@ impl Input for FdReader {
             }
         }
 
-        // TODO Maybe we should report invalid UTF-8 bytes rather than ignoring them
+        // TODO Reject invalid UTF-8 sequence if strict POSIX mode is on
         let line = String::from_utf8(bytes)
             .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).into());
 
