@@ -159,8 +159,9 @@ impl Variable {
 /// Managed mutable reference to a variable.
 ///
 /// This type allows you to mutate a variable in a variable set while
-/// maintaining the invariants of the variable set. To obtain an instance of
-/// `VariableRefMut`, use (TODO TBD).
+/// maintaining the invariants of the variable set.
+/// To obtain an instance of `VariableRefMut`, use
+/// [`VariableSet::get_or_new`](super::VariableSet::get_or_new).
 #[derive(Debug, Eq, PartialEq)]
 pub struct VariableRefMut<'a>(&'a mut Variable);
 
