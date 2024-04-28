@@ -85,6 +85,12 @@ impl From<Builtin> for Frame {
     }
 }
 
+impl From<crate::trap::Condition> for Frame {
+    fn from(condition: crate::trap::Condition) -> Self {
+        Frame::Trap(condition)
+    }
+}
+
 /// Runtime execution context stack
 ///
 /// You can access the inner vector of the stack via the `Deref` implementation.
