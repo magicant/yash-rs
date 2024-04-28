@@ -144,7 +144,7 @@ async fn expand_common(
 
     // TODO Reject invalid UTF-8 sequence if strict POSIX mode is on
     let mut result = String::from_utf8(result)
-        .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).to_string());
+        .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).into());
 
     // Remove trailing newlines
     let len = result.trim_end_matches('\n').len();
