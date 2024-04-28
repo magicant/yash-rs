@@ -1046,18 +1046,25 @@ impl SignalSystem for SharedSystem {
 
 /// [System] extended with internal state to support asynchronous functions.
 ///
-/// A `SelectSystem` is a container of a `System` and internal data a
-/// [`SharedSystem`] uses to implement asynchronous I/O, signal handling, and
-/// timer function. The contained `System` can be accessed via the `Deref` and
-/// `DerefMut` implementations.
-///
-/// TODO Elaborate
+/// `SelectSystem` wraps a `System` instance and manages the internal state for
+/// asynchronous I/O, signal handling, and timer functions. It coordinates
+/// wakers for asynchronous I/O, signals, and timers to call `select` with the
+/// appropriate arguments and wake up the wakers when the corresponding events
+/// occur.
 #[derive(Debug)]
 pub(crate) struct SelectSystem {
+    /// System instance that performs actual system calls
     system: Box<dyn System>,
+    /// Helper for `select`ing on file descriptors
     io: AsyncIo,
+    /// Helper for `select`ing on time
     time: AsyncTime,
+    /// Helper for `select`ing on signals
     signal: AsyncSignal,
+    /// Set of signals passed to `select`
+    ///
+    /// This is the mask the shell inherited from the parent shell minus the
+    /// signals the shell wants to catch.
     wait_mask: Option<SigSet>,
 }
 
@@ -1184,12 +1191,11 @@ impl SelectSystem {
     }
 }
 
-/// Helper for `select`ing on FDs.
+/// Helper for `select`ing on file descriptors
 ///
-/// An `AsyncIo` is a set of [Waker]s that are waiting for an FD to be ready for
-/// reading or writing.
-///
-/// TODO Elaborate
+/// An `AsyncIo` is a set of [`Waker`]s that are waiting for an FD to be ready for
+/// reading or writing. It computes the set of FDs to pass to the `select` system
+/// call and wakes the corresponding wakers when the FDs are ready.
 #[derive(Clone, Debug, Default)]
 struct AsyncIo {
     readers: Vec<FdAwaiter>,
@@ -1280,10 +1286,10 @@ impl AsyncIo {
     }
 }
 
-/// Helper for `select`ing on time.
+/// Helper for `select`ing on time
 ///
-/// An `AsyncTime` is a set of [Waker]s that are waiting for a specific time to
-/// come.
+/// An `AsyncTime` is a set of [`Waker`]s that are waiting for a specific time
+/// to come. It wakes the wakers when the time is reached.
 #[derive(Clone, Debug, Default)]
 struct AsyncTime {
     timeouts: BinaryHeap<Reverse<Timeout>>,
@@ -1366,12 +1372,10 @@ impl Timeout {
     }
 }
 
-/// Helper for `select`ing on signals.
+/// Helper for `select`ing on signals
 ///
-/// An `AsyncSignal` is a set of [Waker]s that are waiting for a signal to be
-/// caught by the current process.
-///
-/// TODO Elaborate
+/// An `AsyncSignal` is a set of [`Waker`]s that are waiting for a signal to be
+/// caught by the current process. It wakes the wakers when signals are caught.
 #[derive(Clone, Debug, Default)]
 struct AsyncSignal {
     awaiters: Vec<Weak<RefCell<SignalStatus>>>,
