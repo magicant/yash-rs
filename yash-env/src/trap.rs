@@ -89,7 +89,6 @@ pub struct TrapSet {
     traps: BTreeMap<Condition, GrandState>,
 }
 
-// TODO Extend internal handlers for other signals
 impl TrapSet {
     /// Returns the current state for a condition.
     ///
