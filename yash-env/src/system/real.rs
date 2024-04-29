@@ -60,8 +60,10 @@ use std::future::Future;
 use std::io::SeekFrom;
 use std::mem::MaybeUninit;
 use std::os::unix::ffi::OsStrExt;
+use std::os::unix::ffi::OsStringExt as _;
 use std::os::unix::io::IntoRawFd;
 use std::path::Path;
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::compiler_fence;
@@ -491,7 +493,7 @@ impl System for RealSystem {
         }
     }
 
-    fn getcwd(&self) -> Result<std::path::PathBuf> {
+    fn getcwd(&self) -> Result<PathBuf> {
         Ok(nix::unistd::getcwd()?)
     }
 
@@ -500,7 +502,7 @@ impl System for RealSystem {
         Ok(())
     }
 
-    fn getpwnam_dir(&self, name: &str) -> Result<Option<std::path::PathBuf>> {
+    fn getpwnam_dir(&self, name: &str) -> Result<Option<PathBuf>> {
         let user = nix::unistd::User::from_name(name)?;
         Ok(user.map(|user| user.dir))
     }
@@ -534,6 +536,36 @@ impl System for RealSystem {
 
         #[allow(unreachable_code)]
         Err(Errno::ENOSYS)
+    }
+
+    /// Returns the path to the shell.
+    ///
+    /// On Linux, this function returns `/proc/self/exe`. On other platforms, it
+    /// searches for an executable `sh` from the default PATH returned by
+    /// [`confstr_path`](Self::confstr_path).
+    fn shell_path(&self) -> CString {
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if self.is_executable_file(CStr::from_bytes_with_nul(b"/proc/self/exe\0").unwrap()) {
+            return CString::new("/proc/self/exe").unwrap();
+        }
+        // TODO Add optimization for other targets
+
+        // Find an executable "sh" from the default PATH
+        if let Ok(path) = self.confstr_path() {
+            if let Some(full_path) = path
+                .as_bytes()
+                .split(|b| *b == b':')
+                .map(|dir| PathBuf::from_iter([OsStr::from_bytes(dir), OsStr::from_bytes(b"sh")]))
+                .filter(|full_path| full_path.is_absolute())
+                .filter_map(|full_path| CString::new(full_path.into_os_string().into_vec()).ok())
+                .find(|full_path| self.is_executable_file(full_path))
+            {
+                return full_path;
+            }
+        }
+
+        // The last resort
+        CString::new("/bin/sh").unwrap()
     }
 
     fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair> {

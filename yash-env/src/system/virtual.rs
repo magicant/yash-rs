@@ -1014,6 +1014,13 @@ impl System for VirtualSystem {
         }
     }
 
+    /// Returns the path to the shell.
+    ///
+    /// The current implementation returns "/bin/sh".
+    fn shell_path(&self) -> CString {
+        CString::new("/bin/sh").unwrap()
+    }
+
     fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair> {
         let process = self.current_process();
         Ok(process

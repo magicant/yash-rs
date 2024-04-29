@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `expansion::glob::glob` no longer requires search permission for the parent
   directory of the last pathname component in the pattern when the last
   component contains a pattern character.
+- `command::simple_command::replace_current_process` now uses `System::shell_path`
+  to find the shell executable when it needs to fall back to the shell.
 
 ### Fixed
 

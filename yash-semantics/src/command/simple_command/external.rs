@@ -23,7 +23,6 @@ use crate::xtrace::trace_fields;
 use crate::xtrace::XTrace;
 use crate::Handle;
 use itertools::Itertools;
-use std::ffi::CStr;
 use std::ffi::CString;
 use std::ops::ControlFlow::Continue;
 use yash_env::io::print_error;
@@ -161,6 +160,11 @@ pub fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
 /// If the call fails, it prints an error message to the standard error and
 /// updates `env.exit_status`, in which case the caller should immediately exit
 /// the current process with the exit status.
+///
+/// If the `execve` call fails with `ENOEXEC`, this function falls back on
+/// invoking the shell with the given arguments, so that the shell can interpret
+/// the script. The path to the shell executable is taken from
+/// [`System::shell_path`].
 pub async fn replace_current_process(
     env: &mut Env,
     path: CString,
@@ -214,17 +218,8 @@ fn fall_back_on_sh<S: System>(
     // We set it to "sh" for the maximum portability.
     args[0] = CString::new("sh").unwrap();
 
-    // TODO Uncomment after we implement command line argument support
-    // #[cfg(any(target_os = "linux", target_os = "android", target_os = "emscripten"))]
-    // {
-    //     let sh_path = CStr::from_bytes_with_nul(b"/proc/self/exe\0").unwrap();
-    //     let _ = system.execve(sh_path, &args, &envs);
-    // }
-    // TODO Add optimization for other targets
-
-    // TODO Use confstr(_CS_PATH) to find a correct path to sh
-    let sh_path = CStr::from_bytes_with_nul(b"/bin/sh\0").unwrap();
-    let _ = system.execve(sh_path, &args, &envs);
+    let sh_path = system.shell_path();
+    let _ = system.execve(&sh_path, &args, &envs);
 }
 
 #[cfg(test)]

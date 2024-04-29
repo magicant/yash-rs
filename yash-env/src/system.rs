@@ -403,6 +403,13 @@ pub trait System: Debug {
     /// This is a thin wrapper around the `confstr(_CS_PATH, …)`.
     fn confstr_path(&self) -> Result<OsString>;
 
+    /// Returns the path to the shell executable.
+    ///
+    /// If possible, this function should return the path to the current shell
+    /// executable. Otherwise, it should return the path to the default POSIX
+    /// shell.
+    fn shell_path(&self) -> CString;
+
     /// Returns the limits for the specified resource.
     ///
     /// This function returns a pair of the soft and hard limits for the given
@@ -1025,6 +1032,9 @@ impl System for SharedSystem {
     }
     fn confstr_path(&self) -> Result<OsString> {
         self.0.borrow().confstr_path()
+    }
+    fn shell_path(&self) -> CString {
+        self.0.borrow().shell_path()
     }
     fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair> {
         self.0.borrow().getrlimit(resource)
