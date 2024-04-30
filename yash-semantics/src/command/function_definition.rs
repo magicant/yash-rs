@@ -22,10 +22,14 @@ use crate::expansion::Field;
 use crate::Handle;
 use std::ops::ControlFlow::Continue;
 use std::rc::Rc;
+use yash_env::function::DefineError;
 use yash_env::function::Function;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::Env;
+use yash_syntax::source::pretty::Annotation;
+use yash_syntax::source::pretty::AnnotationType;
+use yash_syntax::source::pretty::Message;
 use yash_syntax::syntax;
 
 /// Executes the function definition command.
@@ -62,12 +66,41 @@ async fn define_function(env: &mut Env, def: &syntax::FunctionDefinition) -> Res
             env.exit_status = ExitStatus::SUCCESS;
         }
         Err(error) => {
-            // TODO Use pretty::Message and annotate_snippet
-            env.system.print_error(&error.to_string()).await;
+            report_define_error(env, &error).await;
             env.exit_status = ExitStatus::ERROR;
         }
     }
     Continue(())
+}
+
+/// Reports a function definition error.
+///
+/// This function assumes `error.existing.read_only_location.is_some()`.
+async fn report_define_error(env: &mut Env, error: &DefineError) {
+    let message = Message {
+        r#type: AnnotationType::Error,
+        title: error.to_string().into(),
+        annotations: vec![
+            Annotation::new(
+                AnnotationType::Error,
+                "failed function redefinition".into(),
+                &error.new.origin,
+            ),
+            Annotation::new(
+                AnnotationType::Info,
+                "existing function was defined here".into(),
+                &error.existing.origin,
+            ),
+            Annotation::new(
+                AnnotationType::Info,
+                "existing function was made read-only here".into(),
+                error.existing.read_only_location.as_ref().unwrap(),
+            ),
+        ],
+        footers: vec![],
+    };
+
+    yash_env::io::print_message(env, message).await;
 }
 
 #[cfg(test)]
