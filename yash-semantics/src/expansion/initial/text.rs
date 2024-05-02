@@ -61,13 +61,11 @@ use yash_syntax::syntax::Unquote;
 ///   as in `"${@}"`, it produces the correct number of fields exactly matching
 ///   the current positional parameters. Especially if there are zero positional
 ///   parameters, it expands to zero fields.
-///   (TODO: Elaborate on how that works in this function)
 /// - `*` expands to all positional parameters. When expanded in double-quotes
 ///   as in `"${*}"`, the result is a concatenation of all the positional
 ///   parameters, each separated by the first character of the `IFS` variable
 ///   (or by a space if the variable is unset, or by nothing if it is an empty
 ///   string). When expanded outside double-quotes, `*` expands the same as `@`.
-///   (TODO: Elaborate on how that works in this function)
 /// - `#` expands to the number of positional parameters.
 /// - `-` expands to a string that is a concatenation of the short names of
 ///   options matching the current option states in the environment.

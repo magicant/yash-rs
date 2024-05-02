@@ -34,7 +34,8 @@ use yash_syntax::syntax;
 pub trait Command {
     /// Executes this command.
     ///
-    /// TODO Elaborate: The exit status must be updated during execution.
+    /// Implementations of this method is expected to update `env.exit_status`
+    /// reflecting the result of the command execution.
     #[allow(async_fn_in_trait)] // We don't support Send
     async fn execute(&self, env: &mut Env) -> Result;
 }
