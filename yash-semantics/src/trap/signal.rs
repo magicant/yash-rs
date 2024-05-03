@@ -65,7 +65,8 @@ fn in_trap(env: &Env) -> bool {
 /// The exit status of trap actions does not affect the exit status of the
 /// current environment except when the trap action is interrupted with
 /// `Result::Break(Divert::Interrupt(_))`. In that case, the exit status of the
-/// trap action is left as is in the environment.
+/// trap action is left as is in the environment. Other variants of `Divert` a
+/// trap action may result in are passed on to the caller.
 ///
 /// If we are already running a trap, this function does not run any traps to
 /// prevent unintended behavior of trap actions. Most shell script writers do
@@ -308,7 +309,4 @@ mod tests {
         assert_eq!(result, Break(Divert::Exit(None)));
         assert_eq!(env.exit_status, ExitStatus(42));
     }
-
-    // TODO Should we suppress return/break/continue from trap?
-    // // TODO exit status on return/exit from trap
 }

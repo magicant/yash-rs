@@ -68,6 +68,13 @@ use yash_syntax::source::Source;
 /// status of the current environment except when the trap action is interrupted
 /// with `Result::Break(Divert::Interrupt(_))`. In that case, the exit status of
 /// the trap action is left as is in the environment.
+///
+/// Other variants of `Result::Break(Divert::…)` are simply passed on to the
+/// caller. (It is unclear whether POSIX intends to require this behavior for
+/// `Divert::Break` and `Divert::Continue`, but it is implemented this way for
+/// simplicity. The exit status section of the POSIX return built-in
+/// specification mentions the intended behavior for the `Divert::Return` case,
+/// implying that the diversion should be passed on to the caller.)
 #[must_use]
 async fn run_trap(env: &mut Env, cond: Condition, code: Rc<str>, origin: Location) -> Result {
     let condition = cond.to_string();
