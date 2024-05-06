@@ -21,63 +21,50 @@
 use crate::syntax::TextUnit::Literal;
 use crate::syntax::Word;
 use crate::syntax::WordUnit::{self, Tilde, Unquoted};
-use std::iter::Peekable;
 
-/// Parses a tilde expansion except the initial tilde.
+/// Parses a tilde expansion.
 ///
-/// Returns the literal string up to the next non-applicable word unit.
-fn parse_name<I: Iterator<Item = WordUnit>>(i: &mut Peekable<I>, delimit_at_colon: bool) -> String {
-    let mut name = String::new();
-
-    while let Some(Unquoted(Literal(c))) = i.next_if(
-        |unit| matches!(unit, &Unquoted(Literal(c)) if c != '/' && (!delimit_at_colon || c != ':')),
-    ) {
-        name.push(c)
+/// This function expects the first word unit to be an unquoted tilde character.
+/// Following the tilde character, a sequence of unquoted literal characters is
+/// parsed as the name of the tilde expansion. The sequence is terminated by a
+/// slash character (or a colon character if `delimit_at_colon` is `true`).
+///
+/// If successful, this function returns a tuple of the length of the parsed
+/// word units (including the tilde character) and the name of the tilde
+/// expansion (excluding the tilde character and the delimiter). Note that the
+/// name may be empty.
+///
+/// If the first word unit is not an unquoted tilde character or the name is
+/// delimited by a word unit other than an unquoted literal character, this
+/// function returns `None`.
+fn parse_tilde<'a, I>(units: I, delimit_at_colon: bool) -> Option<(usize, String)>
+where
+    I: IntoIterator<Item = &'a WordUnit>,
+{
+    let mut units = units.into_iter();
+    if units.next() != Some(&Unquoted(Literal('~'))) {
+        return None;
     }
 
-    name
+    let mut name = String::new();
+    let mut count = 1;
+
+    for unit in units {
+        match unit {
+            Unquoted(Literal('/')) => break,
+            Unquoted(Literal(':')) if delimit_at_colon => break,
+            Unquoted(Literal(c)) => {
+                name.push(*c);
+                count += 1;
+            }
+            _ => return None,
+        }
+    }
+
+    Some((count, name))
 }
 
 impl Word {
-    fn parse_tilde(&mut self, everywhere: bool) {
-        let mut i = self.units.drain(..).peekable();
-        let mut is_after_colon = true;
-        let mut units = vec![];
-
-        loop {
-            is_after_colon = match i.next() {
-                Some(Unquoted(Literal('~'))) if is_after_colon => {
-                    let name = parse_name(&mut i, everywhere);
-
-                    // Check the delimiter and push the result.
-                    match i.peek() {
-                        None | Some(Unquoted(Literal(_))) => units.push(Tilde(name)),
-                        Some(_) => {
-                            // The next word unit is not applicable for tilde expansion.
-                            // Revert to the original literals.
-                            units.push(Unquoted(Literal('~')));
-                            units.extend(name.chars().map(|c| Unquoted(Literal(c))));
-                        }
-                    }
-
-                    false
-                }
-                Some(unit @ Unquoted(Literal(':'))) if everywhere => {
-                    units.push(unit);
-                    true
-                }
-                Some(unit) => {
-                    units.push(unit);
-                    false
-                }
-                None => break,
-            }
-        }
-
-        drop(i);
-        self.units = units;
-    }
-
     /// Parses a tilde expansion at the beginning of the word.
     ///
     /// This function checks if `self.units` begins with an unquoted tilde
@@ -128,7 +115,9 @@ impl Word {
     /// delimiters.
     #[inline]
     pub fn parse_tilde_front(&mut self) {
-        self.parse_tilde(false)
+        if let Some((len, name)) = parse_tilde(&self.units, false) {
+            self.units.splice(..len, std::iter::once(Tilde(name)));
+        }
     }
 
     /// Parses tilde expansions in the word.
@@ -158,7 +147,23 @@ impl Word {
     /// ```
     #[inline]
     pub fn parse_tilde_everywhere(&mut self) {
-        self.parse_tilde(true)
+        let mut i = 0;
+        loop {
+            // Parse a tilde expansion at index `i`.
+            if let Some((len, name)) = parse_tilde(&self.units[i..], true) {
+                self.units.splice(i..i + len, std::iter::once(Tilde(name)));
+                i += 1;
+            }
+
+            // Find the next colon separator.
+            let Some(colon) = self.units[i..]
+                .iter()
+                .position(|unit| unit == &Unquoted(Literal(':')))
+            else {
+                break;
+            };
+            i += colon + 1;
+        }
     }
 }
 
@@ -463,7 +468,7 @@ mod tests {
             ]
         );
 
-        let input = Word::from_str("~a/b:~c/d").unwrap();
+        let input = Word::from_str("~a/b:~c/d::~").unwrap();
         let result = parse_tilde_everywhere(&input);
         assert_eq!(result.location, input.location);
         assert_eq!(
@@ -476,6 +481,9 @@ mod tests {
                 Tilde("c".to_string()),
                 Unquoted(Literal('/')),
                 Unquoted(Literal('d')),
+                Unquoted(Literal(':')),
+                Unquoted(Literal(':')),
+                Tilde("".to_string()),
             ]
         );
     }
