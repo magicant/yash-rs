@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is not followed by any name characters. Previously, it returned
   `Err(SyntaxError::UnclosedParam{…})` if `{` was followed by a non-name
   character other than `}`.
+- `impl std::fmt::Display for SimpleCommand` now prints the command words
+  after the redirections if there are no assignments and the first word looks
+  like a keyword.
 
 ### Fixed
 

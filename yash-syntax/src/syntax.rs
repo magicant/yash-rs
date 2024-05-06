@@ -73,6 +73,7 @@
 //! here-document contents omitted. To pretty-format an AST in multiple lines
 //! with here-document contents included, you can use ... TODO TBD.
 
+use crate::parser::lex::Keyword;
 use crate::parser::lex::Operator;
 use crate::parser::lex::TryFromOperatorError;
 use crate::source::Location;
@@ -964,6 +965,18 @@ impl SimpleCommand {
     pub fn is_one_word(&self) -> bool {
         self.assigns.is_empty() && self.words.len() == 1 && self.redirs.is_empty()
     }
+
+    /// Tests whether the first word of the simple command is a keyword.
+    #[must_use]
+    fn first_word_is_keyword(&self) -> bool {
+        let Some(word) = self.words.first() else {
+            return false;
+        };
+        let Some(literal) = word.to_string_if_literal() else {
+            return false;
+        };
+        literal.parse::<Keyword>().is_ok()
+    }
 }
 
 impl fmt::Display for SimpleCommand {
@@ -971,8 +984,16 @@ impl fmt::Display for SimpleCommand {
         let i1 = self.assigns.iter().map(|x| x as &dyn fmt::Display);
         let i2 = self.words.iter().map(|x| x as &dyn fmt::Display);
         let i3 = self.redirs.iter().map(|x| x as &dyn fmt::Display);
-        write!(f, "{}", i1.chain(i2).chain(i3).format(" "))
-        // TODO Avoid printing a keyword as the first word
+
+        if !self.assigns.is_empty() || !self.first_word_is_keyword() {
+            write!(f, "{}", i1.chain(i2).chain(i3).format(" "))
+        } else {
+            // If the simple command starts with an assignment or redirection,
+            // the first word may be a keyword which is treated as a plain word.
+            // In this case, we need to avoid the word being interpreted as a
+            // keyword by printing the assignment or redirection first.
+            write!(f, "{}", i3.chain(i2).format(" "))
+        }
     }
 }
 
@@ -1923,6 +1944,16 @@ mod tests {
 
         command.assigns.push(Assign::from_str("foo=bar").unwrap());
         assert_eq!(command.to_string(), "foo=bar <<END 1<<-here");
+    }
+
+    #[test]
+    fn simple_command_display_with_keyword() {
+        let command = SimpleCommand {
+            assigns: vec![],
+            words: vec!["if".parse().unwrap()],
+            redirs: vec!["<foo".parse().unwrap()].into(),
+        };
+        assert_eq!(command.to_string(), "<foo if");
     }
 
     #[test]
