@@ -60,7 +60,6 @@ pub enum SyntaxError {
     MissingRedirOperand,
     /// A here-document operator is missing its delimiter token.
     MissingHereDocDelimiter,
-    // TODO Include the corresponding here-doc operator.
     /// A here-document operator is missing its corresponding content.
     MissingHereDocContent,
     /// A here-document content is missing its delimiter.
