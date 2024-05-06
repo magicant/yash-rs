@@ -28,7 +28,33 @@
 //! like to use another formatter instead, you can provide your own conversion
 //! for yourself.
 //!
-//! TODO Elaborate
+//! ## Printing an error
+//!
+//! This example shows how to format an [`Error`](crate::parser::Error) instance
+//! into a human-readable string.
+//!
+//! ```
+//! # use yash_syntax::parser::{Error, ErrorCause, SyntaxError};
+//! # use yash_syntax::source::Location;
+//! # use yash_syntax::source::pretty::Message;
+//! let error = Error {
+//!     cause: ErrorCause::Syntax(SyntaxError::EmptyParam),
+//!     location: Location::dummy(""),
+//! };
+//! let message = Message::from(&error);
+//! // The lines below require the `annotate-snippets` feature.
+//! # #[cfg(feature = "annotate-snippets")]
+//! # {
+//! let snippet = annotate_snippets::Snippet::from(&message);
+//! eprint!("{}", annotate_snippets::Renderer::plain().render(snippet));
+//! # }
+//! ```
+//!
+//! You can also implement conversion from your custom error object to a
+//! [`Message`], which then can be used in the same way to format a diagnostic
+//! message. To do this, you can either directly implement `From<YourError>` for
+//! `Message`, or implement [`MessageBase`] for `YourError` thereby deriving
+//! `From<&YourError>` for `Message`.
 
 use super::Location;
 use std::borrow::Cow;

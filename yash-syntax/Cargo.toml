@@ -21,5 +21,6 @@ itertools = "0.11.0"
 thiserror = "1.0.47"
 
 [dev-dependencies]
+annotate-snippets = "0.10.0"
 assert_matches = "1.5.0"
 futures-executor = "0.3.28"
