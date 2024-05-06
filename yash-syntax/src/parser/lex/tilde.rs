@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Tilde expansion parser.
+//! Tilde expansion parser
 //!
-//! TODO Elaborate
+//! This module defines additional functions to parse tilde expansions in a word.
 
 use crate::syntax::TextUnit::Literal;
 use crate::syntax::Word;
