@@ -131,14 +131,7 @@ mod tests {
         let mut lexer = Lexer::from_memory("~a:~", Source::Unknown);
 
         let t = lexer.token().now_or_never().unwrap().unwrap();
-        assert_eq!(
-            t.word.units,
-            [
-                WordUnit::Tilde("a".to_string()),
-                WordUnit::Unquoted(TextUnit::Literal(':')),
-                WordUnit::Unquoted(TextUnit::Literal('~'))
-            ]
-        );
+        assert_eq!(t.word.units, [WordUnit::Tilde("a:~".to_string())]);
     }
 
     #[test]

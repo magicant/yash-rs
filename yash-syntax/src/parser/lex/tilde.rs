@@ -26,12 +26,12 @@ use std::iter::Peekable;
 /// Parses a tilde expansion except the initial tilde.
 ///
 /// Returns the literal string up to the next non-applicable word unit.
-fn parse_name<I: Iterator<Item = WordUnit>>(i: &mut Peekable<I>) -> String {
+fn parse_name<I: Iterator<Item = WordUnit>>(i: &mut Peekable<I>, delimit_at_colon: bool) -> String {
     let mut name = String::new();
 
-    while let Some(Unquoted(Literal(c))) =
-        i.next_if(|unit| matches!(unit, Unquoted(Literal(c)) if !matches!(*c, '/' | ':')))
-    {
+    while let Some(Unquoted(Literal(c))) = i.next_if(
+        |unit| matches!(unit, &Unquoted(Literal(c)) if c != '/' && (!delimit_at_colon || c != ':')),
+    ) {
         name.push(c)
     }
 
@@ -47,7 +47,7 @@ impl Word {
         loop {
             is_after_colon = match i.next() {
                 Some(Unquoted(Literal('~'))) if is_after_colon => {
-                    let name = parse_name(&mut i);
+                    let name = parse_name(&mut i, everywhere);
 
                     // Check the delimiter and push the result.
                     match i.peek() {
@@ -119,13 +119,13 @@ impl Word {
     /// `~$()` to be regarded as a tilde expansion, but this function does not
     /// convert it to `WordUnit::Tilde("$()".to_string())`.
     ///
-    /// The tilde expansion are delimited by an unquoted slash or colon. This is
-    /// also not strictly POSIX-conforming since POSIX allows colons to be
-    /// included in the tilde expansion.
-    ///
     /// This function only parses a tilde expansion at the beginning of the word.
     /// If the word is a colon-separated list of paths, you might want to use
     /// [`parse_tilde_everywhere`](Self::parse_tilde_everywhere) instead.
+    ///
+    /// The tilde expansion is delimited by an unquoted slash. Unlike
+    /// `parse_tilde_everywhere`, unquoted colons are not considered as
+    /// delimiters.
     #[inline]
     pub fn parse_tilde_front(&mut self) {
         self.parse_tilde(false)
@@ -229,18 +229,11 @@ mod tests {
     }
 
     #[test]
-    fn word_parse_tilde_front_ending_with_colon() {
-        let input = Word::from_str("~bar:\"\"").unwrap();
+    fn word_parse_tilde_front_including_colon() {
+        let input = Word::from_str("~bar:baz").unwrap();
         let result = parse_tilde_front(&input);
         assert_eq!(result.location, input.location);
-        assert_eq!(
-            result.units,
-            [
-                Tilde("bar".to_string()),
-                Unquoted(Literal(':')),
-                DoubleQuote(Text(vec![])),
-            ]
-        );
+        assert_eq!(result.units, [Tilde("bar:baz".to_string())]);
     }
 
     #[test]
