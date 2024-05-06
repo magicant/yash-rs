@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Lexer::source_string` is no longer generic. The argument type is now
   `Range<usize>` instead of a generic implementor of
   `SliceIndex<[SourceChar], Output = [SourceChar]>`.
+- `WordLexer::braced_param` now returns `Err(SyntaxError::EmptyParam)` if `{`
+  is not followed by any name characters. Previously, it returned
+  `Err(SyntaxError::UnclosedParam{…})` if `{` was followed by a non-name
+  character other than `}`.
 
 ### Fixed
 

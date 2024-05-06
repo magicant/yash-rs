@@ -111,13 +111,8 @@ impl WordLexer<'_, '_> {
                 name.push(c.value);
             }
             name
-        } else if c == '}' {
-            // TODO Consider merging EmptyParam & UnclosedParam into InvalidParamName
-            let cause = SyntaxError::EmptyParam.into();
-            let location = self.location().await?.clone();
-            return Err(Error { cause, location });
         } else {
-            let cause = SyntaxError::UnclosedParam { opening_location }.into();
+            let cause = SyntaxError::EmptyParam.into();
             let location = self.location().await?.clone();
             return Err(Error { cause, location });
         };
@@ -299,13 +294,7 @@ mod tests {
         lexer.consume_char();
 
         let e = lexer.braced_param(0).now_or_never().unwrap().unwrap_err();
-        assert_matches!(e.cause,
-            ErrorCause::Syntax(SyntaxError::UnclosedParam { opening_location }) => {
-            assert_eq!(*opening_location.code.value.borrow(), "${;");
-            assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.range, 0..2);
-        });
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyParam));
         assert_eq!(*e.location.code.value.borrow(), "${;");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
