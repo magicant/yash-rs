@@ -377,6 +377,19 @@ impl Lexer<'_> {
     }
 }
 
+/// Error value indicating that the input string is not a valid operator
+///
+/// This error is returned by [`FromStr`](std::str::FromStr) when the input
+/// string is not a valid operator.
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+pub struct ParseOperatorError;
+
+impl std::fmt::Display for ParseOperatorError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("not a valid operator")
+    }
+}
+
 /// Error value indicating an operand conversion failure
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub struct TryFromOperatorError {}

@@ -43,6 +43,7 @@ pub use self::keyword::Keyword;
 pub use self::keyword::ParseKeywordError;
 pub use self::op::is_operator_char;
 pub use self::op::Operator;
+pub use self::op::ParseOperatorError;
 pub use self::op::TryFromOperatorError;
 pub use self::raw_param::is_portable_name_char;
 pub use self::raw_param::is_special_parameter_char;

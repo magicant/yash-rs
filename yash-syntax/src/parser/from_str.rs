@@ -16,6 +16,7 @@
 
 use super::lex::Lexer;
 use super::lex::Operator;
+use super::lex::ParseOperatorError;
 use super::lex::Token;
 use super::lex::TokenId;
 use super::lex::WordContext;
@@ -28,7 +29,6 @@ use crate::source::Source;
 use crate::syntax::*;
 use std::future::Future;
 use std::str::FromStr;
-use thiserror::Error;
 
 /// Polls the given future, assuming it returns `Ready`.
 fn unwrap_ready<F: Future>(f: F) -> <F as Future>::Output {
@@ -175,19 +175,6 @@ impl FromStr for Assign {
     }
 }
 
-/// Error value indicating that the input string is not a valid operator.
-///
-/// This error is returned by [`Operator::from_str`] when the input string is
-/// not a valid operator.
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
-pub struct ParseOperatorError {}
-
-impl std::fmt::Display for ParseOperatorError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("not a valid operator")
-    }
-}
-
 impl FromStr for Operator {
     type Err = ParseOperatorError;
     fn from_str(s: &str) -> Result<Operator, ParseOperatorError> {
@@ -198,7 +185,7 @@ impl FromStr for Operator {
                 ..
             })) => Ok(op),
 
-            _ => Err(ParseOperatorError {}),
+            _ => Err(ParseOperatorError),
         }
     }
 }
@@ -208,7 +195,7 @@ impl FromStr for RedirOp {
     fn from_str(s: &str) -> Result<RedirOp, ParseOperatorError> {
         Operator::from_str(s)?
             .try_into()
-            .map_err(|_| ParseOperatorError {})
+            .map_err(|_| ParseOperatorError)
     }
 }
 
@@ -400,7 +387,7 @@ impl FromStr for AndOr {
     fn from_str(s: &str) -> Result<AndOr, ParseOperatorError> {
         Operator::from_str(s)?
             .try_into()
-            .map_err(|_| ParseOperatorError {})
+            .map_err(|_| ParseOperatorError)
     }
 }
 
