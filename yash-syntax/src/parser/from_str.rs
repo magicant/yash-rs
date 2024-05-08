@@ -21,22 +21,33 @@ use super::lex::TokenId;
 use super::lex::WordContext;
 use super::lex::WordLexer;
 use super::Error;
+use super::ErrorCause;
 use super::Parser;
-use super::Rec;
+use super::SyntaxError;
 use crate::source::Source;
 use crate::syntax::*;
 use std::future::Future;
 use std::str::FromStr;
 use thiserror::Error;
 
-// TODO Most FromStr implementations in this file ignore trailing redundant
-// tokens, which should be rejected.
-
 /// Polls the given future, assuming it returns `Ready`.
 fn unwrap_ready<F: Future>(f: F) -> <F as Future>::Output {
     use futures_util::future::FutureExt;
     f.now_or_never()
         .expect("Expected Ready but received Pending")
+}
+
+/// Returns an error if the parser has a remaining token.
+async fn reject_redundant_token(parser: &mut Parser<'_, '_>) -> Result<(), Error> {
+    let token = parser.take_token_raw().await?;
+    if token.id == TokenId::EndOfInput {
+        Ok(())
+    } else {
+        Err(Error {
+            cause: ErrorCause::Syntax(SyntaxError::RedundantToken),
+            location: token.word.location,
+        })
+    }
 }
 
 /// Helper for implementing FromStr.
@@ -123,7 +134,7 @@ impl FromStr for Value {
     type Err = Error;
     fn from_str(s: &str) -> Result<Value, Error> {
         let s = format!("x={s}");
-        let a = Assign::from_str(&s).map_err(Option::unwrap)?;
+        let a = s.parse::<Assign>().map_err(Option::unwrap)?;
         Ok(a.value)
     }
 }
@@ -137,8 +148,30 @@ impl FromStr for Assign {
     type Err = Option<Error>;
 
     fn from_str(s: &str) -> Result<Assign, Option<Error>> {
-        let c: SimpleCommand = s.parse()?;
-        Ok(c.assigns.into_iter().next()).shift()
+        let mut c = s.parse::<SimpleCommand>()?;
+
+        match c.assigns.pop() {
+            Some(last) if c.assigns.is_empty() => {
+                if let Some(word) = c.words.pop() {
+                    Err(Some(Error {
+                        cause: ErrorCause::Syntax(SyntaxError::RedundantToken),
+                        location: word.location,
+                    }))
+                } else if let Some(redir) = c.redirs.first() {
+                    Err(Some(Error {
+                        cause: ErrorCause::Syntax(SyntaxError::RedundantToken),
+                        location: redir.body.operand().location.clone(),
+                    }))
+                } else {
+                    Ok(last)
+                }
+            }
+            Some(last) => Err(Some(Error {
+                cause: ErrorCause::Syntax(SyntaxError::RedundantToken),
+                location: last.location,
+            })),
+            None => Err(None),
+        }
     }
 }
 
@@ -193,12 +226,18 @@ impl FromStr for Redir {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
-        let redir = unwrap_ready(parser.redirection()).shift()?;
-        parser.ensure_no_unread_here_doc()?;
-        // If this redirection is a here-document, its content cannot be filled
-        // because there is no newline token that would make the content to be
-        // read.
-        Ok(redir)
+        unwrap_ready(async {
+            let redir = parser.redirection().await?;
+            if redir.is_some() {
+                reject_redundant_token(&mut parser).await?;
+                // If this redirection is a here-document, its content cannot be
+                // filled because there is no newline token that would make the
+                // content to be read.
+                parser.ensure_no_unread_here_doc()?;
+            }
+            Ok(redir)
+        })
+        .shift()
     }
 }
 
@@ -217,14 +256,18 @@ impl FromStr for SimpleCommand {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
-        let command = unwrap_ready(parser.simple_command())
-            .map(Rec::unwrap)
-            .shift()?;
-        parser.ensure_no_unread_here_doc()?;
-        // If the simple command contains a here-document, its content cannot be
-        // filled because there is no newline token that would make the content
-        // to be read.
-        Ok(command)
+        unwrap_ready(async {
+            let command = parser.simple_command().await?.unwrap();
+            if command.is_some() {
+                reject_redundant_token(&mut parser).await?;
+                // If the simple command contains a here-document, its content
+                // cannot be filled because there is no newline token that would
+                // make the content to be read.
+                parser.ensure_no_unread_here_doc()?;
+            }
+            Ok(command)
+        })
+        .shift()
     }
 }
 
@@ -240,9 +283,19 @@ impl FromStr for CaseItem {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
-        let item = unwrap_ready(parser.case_item()).shift()?;
-        parser.ensure_no_unread_here_doc()?;
-        Ok(item)
+        unwrap_ready(async {
+            let item = parser.case_item().await?;
+            if item.is_some() {
+                if parser.peek_token().await?.id == TokenId::Operator(Operator::SemicolonSemicolon)
+                {
+                    parser.take_token_raw().await?;
+                }
+                reject_redundant_token(&mut parser).await?;
+                parser.ensure_no_unread_here_doc()?;
+            }
+            Ok(item)
+        })
+        .shift()
     }
 }
 
@@ -258,9 +311,15 @@ impl FromStr for CompoundCommand {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
-        let command = unwrap_ready(parser.compound_command()).shift()?;
-        parser.ensure_no_unread_here_doc()?;
-        Ok(command)
+        unwrap_ready(async {
+            let command = parser.compound_command().await?;
+            if command.is_some() {
+                reject_redundant_token(&mut parser).await?;
+                parser.ensure_no_unread_here_doc()?;
+            }
+            Ok(command)
+        })
+        .shift()
     }
 }
 
@@ -276,9 +335,15 @@ impl FromStr for FullCompoundCommand {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
-        let command = unwrap_ready(parser.full_compound_command()).shift()?;
-        parser.ensure_no_unread_here_doc()?;
-        Ok(command)
+        unwrap_ready(async {
+            let command = parser.full_compound_command().await?;
+            if command.is_some() {
+                reject_redundant_token(&mut parser).await?;
+                parser.ensure_no_unread_here_doc()?;
+            }
+            Ok(command)
+        })
+        .shift()
     }
 }
 
@@ -294,9 +359,15 @@ impl FromStr for Command {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
-        let command = unwrap_ready(parser.command()).map(Rec::unwrap).shift()?;
-        parser.ensure_no_unread_here_doc()?;
-        Ok(command)
+        unwrap_ready(async {
+            let command = parser.command().await?.unwrap();
+            if command.is_some() {
+                reject_redundant_token(&mut parser).await?;
+                parser.ensure_no_unread_here_doc()?;
+            }
+            Ok(command)
+        })
+        .shift()
     }
 }
 
@@ -312,9 +383,15 @@ impl FromStr for Pipeline {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
-        let pipeline = unwrap_ready(parser.pipeline()).map(Rec::unwrap).shift()?;
-        parser.ensure_no_unread_here_doc()?;
-        Ok(pipeline)
+        unwrap_ready(async {
+            let pipeline = parser.pipeline().await?.unwrap();
+            if pipeline.is_some() {
+                reject_redundant_token(&mut parser).await?;
+                parser.ensure_no_unread_here_doc()?;
+            }
+            Ok(pipeline)
+        })
+        .shift()
     }
 }
 
@@ -339,11 +416,15 @@ impl FromStr for AndOrList {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
-        let list = unwrap_ready(parser.and_or_list())
-            .map(Rec::unwrap)
-            .shift()?;
-        parser.ensure_no_unread_here_doc()?;
-        Ok(list)
+        unwrap_ready(async {
+            let list = parser.and_or_list().await?.unwrap();
+            if list.is_some() {
+                reject_redundant_token(&mut parser).await?;
+                parser.ensure_no_unread_here_doc()?;
+            }
+            Ok(list)
+        })
+        .shift()
     }
 }
 
@@ -363,8 +444,6 @@ impl FromStr for List {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::ErrorCause;
-    use crate::parser::SyntaxError;
     use assert_matches::assert_matches;
     use futures_executor::block_on;
 
@@ -439,6 +518,44 @@ mod tests {
     }
 
     #[test]
+    fn assign_from_str_empty() {
+        block_on(async {
+            let e = "".parse::<Assign>().unwrap_err();
+            assert!(e.is_none(), "{e:?}");
+        })
+    }
+
+    #[test]
+    fn assign_from_str_redundant_word() {
+        block_on(async {
+            let e = "a=b c".parse::<Assign>().unwrap_err().unwrap();
+            assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::RedundantToken));
+            assert_eq!(*e.location.code.value.borrow(), "a=b c");
+            assert_eq!(e.location.range, 4..5);
+        })
+    }
+
+    #[test]
+    fn assign_from_str_redundant_redir() {
+        block_on(async {
+            let e = "a=b <c".parse::<Assign>().unwrap_err().unwrap();
+            assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::RedundantToken));
+            assert_eq!(*e.location.code.value.borrow(), "a=b <c");
+            assert_eq!(e.location.range, 5..6);
+        })
+    }
+
+    #[test]
+    fn assign_from_str_redundant_assign() {
+        block_on(async {
+            let e = "a=b c=".parse::<Assign>().unwrap_err().unwrap();
+            assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::RedundantToken));
+            assert_eq!(*e.location.code.value.borrow(), "a=b c=");
+            assert_eq!(e.location.range, 4..6);
+        })
+    }
+
+    #[test]
     fn operator_from_str() {
         block_on(async {
             let parse: Operator = "<<".parse().unwrap();
@@ -467,6 +584,16 @@ mod tests {
     }
 
     #[test]
+    fn redir_from_str_redundant_token() {
+        block_on(async {
+            let e = "2> /dev/null x".parse::<Redir>().unwrap_err().unwrap();
+            assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::RedundantToken));
+            assert_eq!(*e.location.code.value.borrow(), "2> /dev/null x");
+            assert_eq!(e.location.range, 13..14);
+        })
+    }
+
+    #[test]
     fn redir_from_str_unfillable_here_doc_content() {
         block_on(async {
             let result: Result<Redir, _> = "<<FOO".parse();
@@ -487,6 +614,17 @@ mod tests {
     }
 
     #[test]
+    fn simple_command_from_str_empty() {
+        block_on(async {
+            let e = "".parse::<SimpleCommand>().unwrap_err();
+            assert_eq!(e, None);
+
+            let e = "if".parse::<SimpleCommand>().unwrap_err();
+            assert_eq!(e, None);
+        })
+    }
+
+    #[test]
     fn simple_command_from_str_unfillable_here_doc_content() {
         block_on(async {
             let result: Result<SimpleCommand, _> = "<<FOO".parse();
@@ -499,10 +637,39 @@ mod tests {
     }
 
     #[test]
+    fn simple_command_from_str_redundant_token() {
+        block_on(async {
+            let e = "x\n".parse::<SimpleCommand>().unwrap_err().unwrap();
+            assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::RedundantToken));
+            assert_eq!(*e.location.code.value.borrow(), "x\n");
+            assert_eq!(e.location.range, 1..2);
+        })
+    }
+
+    #[test]
     fn case_item_from_str() {
         block_on(async {
             let parse: CaseItem = " foo) ".parse().unwrap();
             assert_eq!(parse.to_string(), "(foo) ;;");
+        })
+    }
+
+    #[test]
+    fn case_item_from_str_with_double_semicolon() {
+        block_on(async {
+            let parse: CaseItem = " foo) ;; ".parse().unwrap();
+            assert_eq!(parse.to_string(), "(foo) ;;");
+
+            let parse: CaseItem = " foo) echo;; ".parse().unwrap();
+            assert_eq!(parse.to_string(), "(foo) echo;;");
+        })
+    }
+
+    #[test]
+    fn case_item_from_str_empty() {
+        block_on(async {
+            let e = "esac".parse::<CaseItem>().unwrap_err();
+            assert_eq!(e, None);
         })
     }
 
@@ -519,10 +686,30 @@ mod tests {
     }
 
     #[test]
+    fn case_item_from_str_redundant_token() {
+        block_on(async {
+            let e = "foo)fi".parse::<CaseItem>().unwrap_err().unwrap();
+            assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::RedundantToken));
+            assert_eq!(*e.location.code.value.borrow(), "foo)fi");
+            assert_eq!(e.location.range, 4..6);
+        })
+    }
+
+    #[test]
     fn compound_command_from_str() {
         block_on(async {
             let parse: CompoundCommand = " { :; } ".parse().unwrap();
             assert_eq!(parse.to_string(), "{ :; }");
+        })
+    }
+
+    #[test]
+    fn compound_command_from_str_redundant_token() {
+        block_on(async {
+            let e = " { :; } x".parse::<CompoundCommand>().unwrap_err().unwrap();
+            assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::RedundantToken));
+            assert_eq!(*e.location.code.value.borrow(), " { :; } x");
+            assert_eq!(e.location.range, 8..9);
         })
     }
 
@@ -547,6 +734,19 @@ mod tests {
     }
 
     #[test]
+    fn full_compound_command_from_str_redundant_token() {
+        block_on(async {
+            let e = " { :; } <&- ;"
+                .parse::<FullCompoundCommand>()
+                .unwrap_err()
+                .unwrap();
+            assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::RedundantToken));
+            assert_eq!(*e.location.code.value.borrow(), " { :; } <&- ;");
+            assert_eq!(e.location.range, 12..13);
+        })
+    }
+
+    #[test]
     fn full_compound_command_from_str_unfillable_here_doc_content() {
         block_on(async {
             let result: Result<FullCompoundCommand, _> = "{ :; } <<FOO".parse();
@@ -567,6 +767,16 @@ mod tests {
     }
 
     #[test]
+    fn command_from_str_redundant_token() {
+        block_on(async {
+            let e = "f(){ :; }>&2 ;".parse::<Command>().unwrap_err().unwrap();
+            assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::RedundantToken));
+            assert_eq!(*e.location.code.value.borrow(), "f(){ :; }>&2 ;");
+            assert_eq!(e.location.range, 13..14);
+        })
+    }
+
+    #[test]
     fn command_from_str_unfillable_here_doc_content() {
         block_on(async {
             let result: Result<Command, _> = "<<FOO".parse();
@@ -583,6 +793,16 @@ mod tests {
         block_on(async {
             let parse: Pipeline = " ! a|b|c".parse().unwrap();
             assert_eq!(parse.to_string(), "! a | b | c");
+        })
+    }
+
+    #[test]
+    fn pipeline_from_str_redundant_token() {
+        block_on(async {
+            let e = "a|b|c ;".parse::<Pipeline>().unwrap_err().unwrap();
+            assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::RedundantToken));
+            assert_eq!(*e.location.code.value.borrow(), "a|b|c ;");
+            assert_eq!(e.location.range, 6..7);
         })
     }
 
@@ -609,6 +829,16 @@ mod tests {
         block_on(async {
             let parse: AndOrList = " a|b&&! c||d|e ".parse().unwrap();
             assert_eq!(parse.to_string(), "a | b && ! c || d | e");
+        })
+    }
+
+    #[test]
+    fn and_or_list_from_str_redundant_token() {
+        block_on(async {
+            let e = "a||b;".parse::<AndOrList>().unwrap_err().unwrap();
+            assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::RedundantToken));
+            assert_eq!(*e.location.code.value.borrow(), "a||b;");
+            assert_eq!(e.location.range, 4..5);
         })
     }
 

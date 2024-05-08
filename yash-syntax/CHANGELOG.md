@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.0] - Unreleased
 
+### Added
+
+- `SyntaxError::RedundantToken` variant
+
 ### Changed
 
+- Implementations of `FromStr` for syntactic elements like `Assign` and
+  `SimpleCommand` now fails with `SyntaxError::RedundantToken` if the input
+  string contains a token that is not part of the element.
 - `Lexer::source_string` is no longer generic. The argument type is now
   `Range<usize>` instead of a generic implementor of
   `SliceIndex<[SourceChar], Output = [SourceChar]>`.

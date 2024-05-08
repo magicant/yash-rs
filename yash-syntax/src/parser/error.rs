@@ -156,6 +156,8 @@ pub enum SyntaxError {
     MissingCommandAfterBang,
     /// A command is missing after a `|` token.
     MissingCommandAfterBar,
+    /// There is a redundant token.
+    RedundantToken,
 }
 
 impl SyntaxError {
@@ -225,6 +227,7 @@ impl SyntaxError {
             BangAfterBar => "`!` cannot be used in the middle of a pipeline",
             MissingCommandAfterBang => "A command is missing after `!`",
             MissingCommandAfterBar => "A command is missing after `|`",
+            RedundantToken => "There is a redundant token",
         }
     }
 
@@ -290,6 +293,7 @@ impl SyntaxError {
             InAsCommandName => "cannot be used as a command name",
             DoubleNegation => "only one `!` allowed",
             BangAfterBar => "`!` not allowed here",
+            RedundantToken => "unexpected token",
         }
     }
 
