@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `impl std::fmt::Display for SimpleCommand` now prints the command words
   after the redirections if there are no assignments and the first word looks
   like a keyword.
+- `TryFromOperatorError` is now a unit struct rather than an empty normal
+  struct.
 
 ### Fixed
 

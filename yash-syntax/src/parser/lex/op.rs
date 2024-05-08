@@ -392,7 +392,7 @@ impl std::fmt::Display for ParseOperatorError {
 
 /// Error value indicating an operand conversion failure
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
-pub struct TryFromOperatorError {}
+pub struct TryFromOperatorError;
 
 impl fmt::Display for TryFromOperatorError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
