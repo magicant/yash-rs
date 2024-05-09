@@ -240,7 +240,7 @@ where
     } else {
         // No -c or -s
         if let Some(operand) = args.next_if(|_| true) {
-            result.arg0 = operand.clone();
+            result.arg0.clone_from(&operand);
             result.source = Source::File { path: operand };
         }
     }

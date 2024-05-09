@@ -150,7 +150,7 @@ impl Process {
     pub fn fork_from(ppid: Pid, parent: &Process) -> Process {
         let mut child = Self::with_parent_and_group(ppid, parent.pgid);
         child.fds = parent.fds.clone();
-        child.signal_handlings = parent.signal_handlings.clone();
+        child.signal_handlings.clone_from(&parent.signal_handlings);
         child.blocked_signals = parent.blocked_signals;
         child.pending_signals = SigSet::empty();
         child

@@ -124,7 +124,10 @@ mod tests {
         assert_eq!(result, Expansion::Array([].as_slice().into()));
 
         let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
-        env.variables.positional_params_mut().values = params.clone();
+        env.variables
+            .positional_params_mut()
+            .values
+            .clone_from(&params);
         let result = resolve(Name::Special('@'), &env, &loc);
         assert_eq!(result, Expansion::Array(params.into()));
     }
@@ -137,7 +140,10 @@ mod tests {
         assert_eq!(result, Expansion::Array([].as_slice().into()));
 
         let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
-        env.variables.positional_params_mut().values = params.clone();
+        env.variables
+            .positional_params_mut()
+            .values
+            .clone_from(&params);
         let result = resolve(Name::Special('*'), &env, &loc);
         assert_eq!(result, Expansion::Array(params.into()));
     }

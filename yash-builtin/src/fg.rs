@@ -263,7 +263,7 @@ mod tests {
             let mut job = Job::new(pid);
             job.job_controlled = true;
             job.state = subshell_state;
-            job.name = "my job name".to_owned();
+            "my job name".clone_into(&mut job.name);
             let index = env.jobs.add(job);
 
             resume_job_by_index(&mut env, index).await.unwrap();
