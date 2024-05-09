@@ -95,7 +95,7 @@ pub enum OptionArgumentSpec {
 ///
 /// All of these are optional, but either or both of the short and long names
 /// should be set for the option spec to have meaningful effect.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct OptionSpec<'a> {
     short: Option<char>,
     long: Option<&'a str>,
@@ -111,6 +111,11 @@ impl OptionSpec<'static> {
             argument: OptionArgumentSpec::None,
         }
     }
+}
+
+#[test]
+fn new_option_spec_eq_default() {
+    assert_eq!(OptionSpec::new(), OptionSpec::default());
 }
 
 impl OptionSpec<'_> {
