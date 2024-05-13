@@ -34,9 +34,11 @@ use super::Result;
 use super::SigSet;
 use super::SigmaskHow;
 use super::Signal;
+use super::Signal2;
 use super::System;
 use super::TimeSpec;
 use super::Times;
+use super::UnknownSignalError;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessState;
@@ -343,6 +345,22 @@ impl System for RealSystem {
             children_user: tms.tms_cutime as f64 / ticks_per_second as f64,
             children_system: tms.tms_cstime as f64 / ticks_per_second as f64,
         })
+    }
+
+    #[inline]
+    fn signal_to_raw_number(
+        &self,
+        signal: Signal2,
+    ) -> std::result::Result<c_int, UnknownSignalError> {
+        signal.to_raw()
+    }
+
+    #[inline]
+    fn raw_number_to_signal(
+        &self,
+        number: c_int,
+    ) -> std::result::Result<Signal2, UnknownSignalError> {
+        Signal2::try_from_raw(number)
     }
 
     fn sigmask(

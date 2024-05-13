@@ -68,8 +68,10 @@ use super::Result;
 use super::SigSet;
 use super::SigmaskHow;
 use super::Signal;
+use super::Signal2;
 use super::TimeSpec;
 use super::Times;
+use super::UnknownSignalError;
 use super::AT_FDCWD;
 use crate::io::Fd;
 use crate::job::Pid;
@@ -629,6 +631,104 @@ impl System for VirtualSystem {
     /// Returns `times` in [`SystemState`].
     fn times(&self) -> Result<Times> {
         Ok(self.state.borrow().times)
+    }
+
+    fn signal_to_raw_number(
+        &self,
+        signal: Signal2,
+    ) -> std::result::Result<c_int, UnknownSignalError> {
+        match signal {
+            Signal2::Abrt => Ok(1),
+            Signal2::Alrm => Ok(2),
+            Signal2::Bus => Ok(3),
+            Signal2::Chld => Ok(4),
+            Signal2::Cld => Ok(5),
+            Signal2::Cont => Ok(6),
+            Signal2::Emt => Ok(7),
+            Signal2::Fpe => Ok(8),
+            Signal2::Hup => Ok(9),
+            Signal2::Ill => Ok(10),
+            Signal2::Info => Ok(11),
+            Signal2::Int => Ok(12),
+            Signal2::Io => Ok(13),
+            Signal2::Iot => Ok(14),
+            Signal2::Kill => Ok(15),
+            Signal2::Lost => Ok(16),
+            Signal2::Pipe => Ok(17),
+            Signal2::Poll => Ok(18),
+            Signal2::Prof => Ok(19),
+            Signal2::Pwr => Ok(20),
+            Signal2::Quit => Ok(21),
+            Signal2::Segv => Ok(22),
+            Signal2::Stkflt => Ok(23),
+            Signal2::Stop => Ok(24),
+            Signal2::Sys => Ok(25),
+            Signal2::Term => Ok(26),
+            Signal2::Thr => Ok(27),
+            Signal2::Trap => Ok(28),
+            Signal2::Tstp => Ok(29),
+            Signal2::Ttin => Ok(30),
+            Signal2::Ttou => Ok(31),
+            Signal2::Urg => Ok(32),
+            Signal2::Usr1 => Ok(33),
+            Signal2::Usr2 => Ok(34),
+            Signal2::Vtalrm => Ok(35),
+            Signal2::Winch => Ok(36),
+            Signal2::Xcpu => Ok(37),
+            Signal2::Xfsz => Ok(38),
+            Signal2::Rtmin(0) | Signal2::Rtmax(-1) => Ok(39),
+            Signal2::Rtmin(1) | Signal2::Rtmax(0) => Ok(40),
+            _ => Err(UnknownSignalError),
+        }
+    }
+
+    fn raw_number_to_signal(
+        &self,
+        number: c_int,
+    ) -> std::result::Result<Signal2, UnknownSignalError> {
+        match number {
+            1 => Ok(Signal2::Abrt),
+            2 => Ok(Signal2::Alrm),
+            3 => Ok(Signal2::Bus),
+            4 => Ok(Signal2::Chld),
+            5 => Ok(Signal2::Cld),
+            6 => Ok(Signal2::Cont),
+            7 => Ok(Signal2::Emt),
+            8 => Ok(Signal2::Fpe),
+            9 => Ok(Signal2::Hup),
+            10 => Ok(Signal2::Ill),
+            11 => Ok(Signal2::Info),
+            12 => Ok(Signal2::Int),
+            13 => Ok(Signal2::Io),
+            14 => Ok(Signal2::Iot),
+            15 => Ok(Signal2::Kill),
+            16 => Ok(Signal2::Lost),
+            17 => Ok(Signal2::Pipe),
+            18 => Ok(Signal2::Poll),
+            19 => Ok(Signal2::Prof),
+            20 => Ok(Signal2::Pwr),
+            21 => Ok(Signal2::Quit),
+            22 => Ok(Signal2::Segv),
+            23 => Ok(Signal2::Stkflt),
+            24 => Ok(Signal2::Stop),
+            25 => Ok(Signal2::Sys),
+            26 => Ok(Signal2::Term),
+            27 => Ok(Signal2::Thr),
+            28 => Ok(Signal2::Trap),
+            29 => Ok(Signal2::Tstp),
+            30 => Ok(Signal2::Ttin),
+            31 => Ok(Signal2::Ttou),
+            32 => Ok(Signal2::Urg),
+            33 => Ok(Signal2::Usr1),
+            34 => Ok(Signal2::Usr2),
+            35 => Ok(Signal2::Vtalrm),
+            36 => Ok(Signal2::Winch),
+            37 => Ok(Signal2::Xcpu),
+            38 => Ok(Signal2::Xfsz),
+            39 => Ok(Signal2::Rtmin(0)),
+            40 => Ok(Signal2::Rtmax(0)),
+            _ => Err(UnknownSignalError),
+        }
     }
 
     fn sigmask(

@@ -39,7 +39,9 @@ use crate::job::ProcessState;
 #[cfg(doc)]
 use crate::subshell::Subshell;
 use crate::trap::Signal;
+use crate::trap::Signal2;
 use crate::trap::SignalSystem;
+use crate::trap::UnknownSignalError;
 use crate::Env;
 use futures_util::future::poll_fn;
 use futures_util::task::Poll;
@@ -213,6 +215,24 @@ pub trait System: Debug {
 
     /// Returns consumed CPU times.
     fn times(&self) -> Result<Times>;
+
+    /// Returns the raw signal number for the given signal.
+    ///
+    /// If the signal is not supported by the system, this function returns
+    /// `None`.
+    fn signal_to_raw_number(
+        &self,
+        signal: Signal2,
+    ) -> std::result::Result<c_int, UnknownSignalError>;
+
+    /// Returns the signal for the given raw signal number.
+    ///
+    /// If the number does not correspond to any signal, this function returns
+    /// `None`.
+    fn raw_number_to_signal(
+        &self,
+        number: c_int,
+    ) -> std::result::Result<Signal2, UnknownSignalError>;
 
     /// Gets and/or sets the signal blocking mask.
     ///
@@ -568,6 +588,18 @@ pub trait SystemEx: System {
             return Ok(());
         }
         self.fcntl_setfl(fd, new_flags)
+    }
+
+    /// Normalizes a signal.
+    ///
+    /// Different signal names may refer to the same signal number. This
+    /// function normalizes the signal to a canonical name.
+    fn normalize_signal(
+        &self,
+        signal: Signal2,
+    ) -> std::result::Result<Signal2, UnknownSignalError> {
+        let number = self.signal_to_raw_number(signal)?;
+        self.raw_number_to_signal(number)
     }
 
     /// Switches the foreground process group with SIGTTOU blocked.
@@ -963,6 +995,18 @@ impl System for SharedSystem {
     }
     fn times(&self) -> Result<Times> {
         self.0.borrow().times()
+    }
+    fn signal_to_raw_number(
+        &self,
+        signal: Signal2,
+    ) -> std::result::Result<c_int, UnknownSignalError> {
+        self.0.borrow().signal_to_raw_number(signal)
+    }
+    fn raw_number_to_signal(
+        &self,
+        number: c_int,
+    ) -> std::result::Result<Signal2, UnknownSignalError> {
+        self.0.borrow().raw_number_to_signal(number)
     }
     fn sigmask(
         &mut self,
