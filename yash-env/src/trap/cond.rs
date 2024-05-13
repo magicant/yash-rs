@@ -16,12 +16,13 @@
 
 //! Items that define trap conditions
 
+pub mod signal;
+
 #[cfg(doc)]
 use super::state::Action;
-use std::ffi::c_int;
-// TODO Support real-time signals
 #[doc(no_inline)]
 pub use nix::sys::signal::Signal;
+use std::ffi::c_int;
 
 /// Condition under which an [`Action`] is executed
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
