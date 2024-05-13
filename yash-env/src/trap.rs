@@ -36,6 +36,7 @@
 mod cond;
 mod state;
 
+pub use self::cond::signal::{Signal as Signal2, UnknownSignalError, SIGNALS};
 pub use self::cond::{Condition, ParseConditionError, Signal};
 pub use self::state::{Action, SetActionError, TrapState};
 use self::state::{EnterSubshellOption, GrandState};

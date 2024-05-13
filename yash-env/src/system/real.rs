@@ -620,6 +620,8 @@ impl Dir for RealDir {
     }
 }
 
+mod signal;
+
 #[cfg(test)]
 mod tests {
     use super::*;
