@@ -678,6 +678,7 @@ impl System for VirtualSystem {
             Signal2::Xfsz => Ok(38),
             Signal2::Rtmin(0) | Signal2::Rtmax(-1) => Ok(39),
             Signal2::Rtmin(1) | Signal2::Rtmax(0) => Ok(40),
+            Signal2::Number(n) if self.raw_number_to_signal(n).is_ok() => Ok(n),
             _ => Err(UnknownSignalError),
         }
     }

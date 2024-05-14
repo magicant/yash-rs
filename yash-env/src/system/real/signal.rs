@@ -249,10 +249,22 @@ impl Signal2 {
                 }
                 Err(UnknownSignalError)
             }
+
+            Signal2::Number(n) => {
+                // Check if the number is valid
+                if Self::try_from_raw(n).is_ok() {
+                    Ok(n)
+                } else {
+                    Err(UnknownSignalError)
+                }
+            }
         }
     }
 
     /// Returns the signal for the raw signal number for the real system.
+    ///
+    /// This function returns `UnknownSignalError` if the given number is not a
+    /// valid signal.
     pub(super) fn try_from_raw(number: c_int) -> Result<Self, UnknownSignalError> {
         // Some signals share the same number on some systems. This function
         // returns the signal that is considered the most common or standard one.

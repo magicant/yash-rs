@@ -137,9 +137,17 @@ pub enum Signal {
     /// expected to be a non-positive integer between `SIGRTMIN - SIGRTMAX` and
     /// `0`.
     Rtmax(c_int),
+
+    /// Signal specified by a raw signal number
+    ///
+    /// This variant is a "backdoor" to allow specifying any signal by its raw
+    /// signal number.
+    Number(c_int),
 }
 
-/// List of all signals except real-time signals
+/// List of all named signals
+///
+/// This list does not include the `Rtmin`, `Rtmax`, and `Number` variants.
 pub const SIGNALS: &[Signal] = &[
     Signal::Abrt,
     Signal::Alrm,
@@ -188,8 +196,10 @@ impl Signal {
     /// signal name in uppercase without the `"SIG"` prefix. For real-time
     /// signals `RTMIN(n)` and `RTMAX(n)` where `n` is non-zero, this function
     /// returns a dynamically allocated string that is `RTMIN` or `RTMAX`
-    /// followed by the relative number `n`. Examples of the returned strings
-    /// are `"TERM"`, `"RTMIN"` and `"RTMAX-5"`.
+    /// followed by the relative number `n`. For the `Number` variant, this
+    /// function returns a dynamically allocated string that is the raw signal
+    /// number. Examples of the returned strings are `"TERM"`, `"RTMIN"`,
+    /// `"RTMAX-5"`, and `"42"`.
     ///
     /// The returned name can be converted back to the signal using the
     /// `FromStr` implementation for `Signal`.
@@ -238,6 +248,7 @@ impl Signal {
             Signal::Rtmax(0) => Cow::Borrowed("RTMAX"),
             Signal::Rtmin(n) => Cow::Owned(format!("RTMIN{n:+}")),
             Signal::Rtmax(n) => Cow::Owned(format!("RTMAX{n:+}")),
+            Signal::Number(n) => Cow::Owned(n.to_string()),
         }
     }
 }
@@ -252,6 +263,7 @@ fn test_name() {
     assert_eq!(Signal::Rtmin(20).name(), "RTMIN+20");
     assert_eq!(Signal::Rtmax(-1).name(), "RTMAX-1");
     assert_eq!(Signal::Rtmax(-20).name(), "RTMAX-20");
+    assert_eq!(Signal::Number(42).name(), "42");
 }
 
 /// Prints the signal name.
@@ -275,8 +287,11 @@ pub struct UnknownSignalError;
 ///
 /// This implementation supports parsing signal names in uppercase without the
 /// `"SIG"` prefix. It also supports parsing real-time signals with relative
-/// numbers. See [`Signal::name`] for the format of the signal names that can be
-/// parsed.
+/// numbers, and raw signal numbers. See [`Signal::name`] for the format of the
+/// signal names that can be parsed.
+///
+/// For raw signal numbers, this implementation accepts any non-negative
+/// integer regardless of whether it is a valid signal number.
 impl std::str::FromStr for Signal {
     type Err = UnknownSignalError;
 
@@ -338,6 +353,13 @@ impl std::str::FromStr for Signal {
                         }
                     }
                 }
+                if let Ok(n) = s.parse() {
+                    // Any valid signal number is positive, but we also accept
+                    // zero to help parsing the alias `0` for `EXIT`.
+                    if n >= 0 {
+                        return Ok(Signal::Number(n));
+                    }
+                }
                 Err(UnknownSignalError)
             }
         }
@@ -358,6 +380,10 @@ fn test_from_str() {
     assert_eq!("RTMAX-0".parse(), Ok(Signal::Rtmax(0)));
     assert_eq!("RTMAX-1".parse(), Ok(Signal::Rtmax(-1)));
 
+    assert_eq!("000".parse(), Ok(Signal::Number(0)));
+    assert_eq!("1".parse(), Ok(Signal::Number(1)));
+    assert_eq!("42".parse(), Ok(Signal::Number(42)));
+
     assert_eq!("".parse::<Signal>(), Err(UnknownSignalError));
     assert_eq!("FOO".parse::<Signal>(), Err(UnknownSignalError));
     assert_eq!("int".parse::<Signal>(), Err(UnknownSignalError));
@@ -365,4 +391,5 @@ fn test_from_str() {
     assert_eq!("RTMIN+".parse::<Signal>(), Err(UnknownSignalError));
     assert_eq!("RTMAX0".parse::<Signal>(), Err(UnknownSignalError));
     assert_eq!("RTMAX-".parse::<Signal>(), Err(UnknownSignalError));
+    assert_eq!("-1".parse::<Signal>(), Err(UnknownSignalError));
 }
