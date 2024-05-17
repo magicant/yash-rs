@@ -366,11 +366,55 @@ impl System for RealSystem {
     fn sigmask(
         &mut self,
         how: SigmaskHow,
-        set: Option<&SigSet>,
-        oldset: Option<&mut SigSet>,
+        set: Option<&[Signal]>,
+        old_set: Option<&mut Vec<Signal>>,
     ) -> Result<()> {
-        nix::sys::signal::sigprocmask(how, set, oldset)?;
-        Ok(())
+        unsafe {
+            let raw_set = match set {
+                None => None,
+                Some(set) => {
+                    let mut raw_set = MaybeUninit::<nix::libc::sigset_t>::uninit();
+                    nix::libc::sigemptyset(raw_set.as_mut_ptr()).errno_if_m1()?;
+                    for &signal in set {
+                        let number = signal as _; //self.signal_to_raw_number(signal)?;
+                        nix::libc::sigaddset(raw_set.as_mut_ptr(), number).errno_if_m1()?;
+                    }
+                    Some(raw_set.assume_init())
+                }
+            };
+            let mut old_set_pair = match old_set {
+                None => None,
+                Some(old_set) => {
+                    let mut raw_old_set = MaybeUninit::<nix::libc::sigset_t>::uninit();
+                    nix::libc::sigemptyset(raw_old_set.as_mut_ptr()).errno_if_m1()?;
+                    Some((old_set, raw_old_set.assume_init()))
+                }
+            };
+
+            let raw_set_ptr = raw_set
+                .as_ref()
+                .map_or(std::ptr::null(), |raw_set| raw_set as *const _);
+            let raw_old_set_ptr = old_set_pair
+                .as_mut()
+                .map_or(std::ptr::null_mut(), |(_, raw_old_set)| {
+                    raw_old_set as *mut _
+                });
+
+            let result = nix::libc::sigprocmask(how as _, raw_set_ptr, raw_old_set_ptr);
+            result.errno_if_m1().map(drop)?;
+
+            if let Some((old_set, raw_old_set)) = old_set_pair {
+                old_set.clear();
+                for signal in Signal::iterator() {
+                    let number = signal as _; //self.signal_to_raw_number(signal)?;
+                    if nix::libc::sigismember(&raw_old_set, number) == 1 {
+                        old_set.push(signal);
+                    }
+                }
+            }
+
+            Ok(())
+        }
     }
 
     fn sigaction(&mut self, signal: Signal, handling: SignalHandling) -> Result<SignalHandling> {
@@ -429,7 +473,7 @@ impl System for RealSystem {
         readers: &mut FdSet,
         writers: &mut FdSet,
         timeout: Option<&TimeSpec>,
-        signal_mask: Option<&SigSet>,
+        signal_mask: Option<&[Signal]>,
     ) -> Result<c_int> {
         use std::ptr::{null, null_mut};
         let nfds = readers.upper_bound().max(writers.upper_bound()).0;
@@ -437,6 +481,7 @@ impl System for RealSystem {
         let writers = &mut writers.inner;
         let errors = null_mut();
         let timeout = timeout.map_or(null(), |timeout| timeout.as_ref());
+        let signal_mask = signal_mask.map(|mask| mask.iter().copied().collect::<SigSet>());
         let signal_mask = signal_mask.map_or(null(), |mask| mask.as_ref());
         let raw_result =
             unsafe { nix::libc::pselect(nfds, readers, writers, errors, timeout, signal_mask) };

@@ -511,7 +511,7 @@ mod tests {
             {
                 let mut state = state.borrow_mut();
                 let process = state.processes.get_mut(&env.main_pid).unwrap();
-                assert!(process.blocked_signals().contains(Signal::SIGCHLD));
+                assert!(process.blocked_signals().contains(&Signal::SIGCHLD));
                 let _ = process.raise_signal(Signal::SIGCHLD);
             }
             env.wait_for_signal(Signal::SIGCHLD).await;
@@ -550,7 +550,7 @@ mod tests {
         {
             let mut state = system.state.borrow_mut();
             let process = state.processes.get_mut(&system.process_id).unwrap();
-            assert!(process.blocked_signals().contains(Signal::SIGCHLD));
+            assert!(process.blocked_signals().contains(&Signal::SIGCHLD));
             let _ = process.raise_signal(Signal::SIGCHLD);
         }
 

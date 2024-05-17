@@ -51,6 +51,7 @@ pub use nix::fcntl::AtFlags;
 pub use nix::fcntl::FdFlag;
 #[doc(no_inline)]
 pub use nix::fcntl::OFlag;
+// TODO Remove this
 #[doc(no_inline)]
 pub use nix::sys::signal::SigSet;
 #[doc(no_inline)]
@@ -249,8 +250,8 @@ pub trait System: Debug {
     fn sigmask(
         &mut self,
         how: SigmaskHow,
-        set: Option<&SigSet>,
-        oldset: Option<&mut SigSet>,
+        set: Option<&[Signal]>,
+        old_set: Option<&mut Vec<Signal>>,
     ) -> Result<()>;
 
     /// Gets and sets the handler for a signal.
@@ -339,7 +340,7 @@ pub trait System: Debug {
         readers: &mut FdSet,
         writers: &mut FdSet,
         timeout: Option<&TimeSpec>,
-        signal_mask: Option<&SigSet>,
+        signal_mask: Option<&[Signal]>,
     ) -> Result<c_int>;
 
     /// Returns the process ID of the current process.
@@ -616,10 +617,12 @@ pub trait SystemEx: System {
     /// need to make sure the shell is in the foreground before changing the
     /// foreground job.
     fn tcsetpgrp_with_block(&mut self, fd: Fd, pgid: Pid) -> Result<()> {
-        let mut sigttou = SigSet::empty();
-        let mut old_set = SigSet::empty();
-        sigttou.add(Signal::SIGTTOU);
-        self.sigmask(SigmaskHow::SIG_BLOCK, Some(&sigttou), Some(&mut old_set))?;
+        let mut old_set = Vec::new();
+        self.sigmask(
+            SigmaskHow::SIG_BLOCK,
+            Some(&[Signal::SIGTTOU]),
+            Some(&mut old_set),
+        )?;
 
         let result = self.tcsetpgrp(fd, pgid);
 
@@ -651,22 +654,21 @@ pub trait SystemEx: System {
         match self.sigaction(Signal::SIGTTOU, SignalHandling::Default) {
             Err(e) => Err(e),
             Ok(old_handling) => {
-                let mut sigttou = SigSet::empty();
-                let mut old_set = SigSet::empty();
-                sigttou.add(Signal::SIGTTOU);
-                let result =
-                    match self.sigmask(SigmaskHow::SIG_UNBLOCK, Some(&sigttou), Some(&mut old_set))
-                    {
-                        Err(e) => Err(e),
-                        Ok(()) => {
-                            let result = self.tcsetpgrp(fd, pgid);
+                let mut old_set = Vec::new();
+                let result = match self.sigmask(
+                    SigmaskHow::SIG_UNBLOCK,
+                    Some(&[Signal::SIGTTOU]),
+                    Some(&mut old_set),
+                ) {
+                    Err(e) => Err(e),
+                    Ok(()) => {
+                        let result = self.tcsetpgrp(fd, pgid);
 
-                            let result_2 =
-                                self.sigmask(SigmaskHow::SIG_SETMASK, Some(&old_set), None);
+                        let result_2 = self.sigmask(SigmaskHow::SIG_SETMASK, Some(&old_set), None);
 
-                            result.or(result_2)
-                        }
-                    };
+                        result.or(result_2)
+                    }
+                };
 
                 let result_2 = self.sigaction(Signal::SIGTTOU, old_handling).map(drop);
 
@@ -1011,8 +1013,8 @@ impl System for SharedSystem {
     fn sigmask(
         &mut self,
         how: SigmaskHow,
-        set: Option<&SigSet>,
-        old_set: Option<&mut SigSet>,
+        set: Option<&[Signal]>,
+        old_set: Option<&mut Vec<Signal>>,
     ) -> Result<()> {
         (**self.0.borrow_mut()).sigmask(how, set, old_set)
     }
@@ -1034,7 +1036,7 @@ impl System for SharedSystem {
         readers: &mut FdSet,
         writers: &mut FdSet,
         timeout: Option<&TimeSpec>,
-        signal_mask: Option<&SigSet>,
+        signal_mask: Option<&[Signal]>,
     ) -> Result<c_int> {
         (**self.0.borrow_mut()).select(readers, writers, timeout, signal_mask)
     }
@@ -1119,7 +1121,7 @@ pub(crate) struct SelectSystem {
     ///
     /// This is the mask the shell inherited from the parent shell minus the
     /// signals the shell wants to catch.
-    wait_mask: Option<SigSet>,
+    wait_mask: Option<Vec<Signal>>,
 }
 
 impl Deref for SelectSystem {
@@ -1149,14 +1151,19 @@ impl SelectSystem {
 
     /// Calls `sigmask` and updates `self.wait_mask`.
     fn sigmask(&mut self, how: SigmaskHow, signal: Signal) -> Result<()> {
-        let mut set = SigSet::empty();
-        let mut old_set = SigSet::empty();
-        set.add(signal);
-
-        self.system.sigmask(how, Some(&set), Some(&mut old_set))?;
-
-        self.wait_mask.get_or_insert(old_set).remove(signal);
-
+        match &mut self.wait_mask {
+            None => {
+                let mut old_set = Vec::new();
+                self.system
+                    .sigmask(how, Some(&[signal]), Some(&mut old_set))?;
+                old_set.retain(|&s| s != signal);
+                self.wait_mask = Some(old_set);
+            }
+            Some(wait_mask) => {
+                self.system.sigmask(how, Some(&[signal]), None)?;
+                wait_mask.retain(|&s| s != signal);
+            }
+        }
         Ok(())
     }
 
@@ -1222,7 +1229,7 @@ impl SelectSystem {
             &mut readers,
             &mut writers,
             timeout.as_ref(),
-            self.wait_mask.as_ref(),
+            self.wait_mask.as_deref(),
         );
         let final_result = match inner_result {
             Ok(_) => {
@@ -1685,9 +1692,9 @@ mod tests {
         {
             let mut state = state.borrow_mut();
             let process = state.processes.get_mut(&process_id).unwrap();
-            assert!(process.blocked_signals().contains(Signal::SIGCHLD));
-            assert!(process.blocked_signals().contains(Signal::SIGINT));
-            assert!(process.blocked_signals().contains(Signal::SIGUSR1));
+            assert!(process.blocked_signals().contains(&Signal::SIGCHLD));
+            assert!(process.blocked_signals().contains(&Signal::SIGINT));
+            assert!(process.blocked_signals().contains(&Signal::SIGUSR1));
             let _ = process.raise_signal(Signal::SIGCHLD);
             let _ = process.raise_signal(Signal::SIGINT);
         }
@@ -1721,7 +1728,7 @@ mod tests {
         {
             let mut state = state.borrow_mut();
             let process = state.processes.get_mut(&process_id).unwrap();
-            assert!(process.blocked_signals().contains(Signal::SIGCHLD));
+            assert!(process.blocked_signals().contains(&Signal::SIGCHLD));
             let _ = process.raise_signal(Signal::SIGCHLD);
         }
         let result = future.as_mut().poll(&mut context);
@@ -1786,11 +1793,11 @@ mod tests {
         let state = state.borrow();
         let process = state.processes.get(&process_id).unwrap();
         let blocked = process.blocked_signals();
-        assert!(blocked.contains(Signal::SIGINT));
-        assert!(blocked.contains(Signal::SIGTERM));
+        assert!(blocked.contains(&Signal::SIGINT));
+        assert!(blocked.contains(&Signal::SIGTERM));
         let pending = process.pending_signals();
-        assert!(!pending.contains(Signal::SIGINT));
-        assert!(!pending.contains(Signal::SIGTERM));
+        assert!(!pending.contains(&Signal::SIGINT));
+        assert!(!pending.contains(&Signal::SIGTERM));
     }
 
     #[test]
