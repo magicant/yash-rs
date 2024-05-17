@@ -18,6 +18,8 @@
 
 use crate::trap::Signal2;
 use crate::trap::UnknownSignalError;
+use crate::trap::SIGNALS;
+use crate::SystemEx;
 use std::ffi::c_int;
 use std::ops::RangeInclusive;
 
@@ -378,15 +380,7 @@ impl Signal2 {
                 // Real-time signals
                 if let Some(range) = rt_range() {
                     if range.contains(&number) {
-                        let incr = number - range.start();
-                        debug_assert!(incr >= 0);
-                        let decr = number - range.end();
-                        debug_assert!(decr <= 0);
-                        return if incr <= -decr {
-                            Ok(Signal2::Rtmin(incr))
-                        } else {
-                            Ok(Signal2::Rtmax(decr))
-                        };
+                        return Ok(rt(number, range));
                     }
                 }
 
@@ -394,4 +388,30 @@ impl Signal2 {
             }
         }
     }
+}
+
+fn rt(number: c_int, range: RangeInclusive<c_int>) -> Signal2 {
+    let incr = number - range.start();
+    debug_assert!(incr >= 0);
+    let decr = number - range.end();
+    debug_assert!(decr <= 0);
+    if incr <= -decr {
+        Signal2::Rtmin(incr)
+    } else {
+        Signal2::Rtmax(decr)
+    }
+}
+
+/// Creates an iterator that yields all signals available in the real system.
+pub fn all_signals() -> impl DoubleEndedIterator<Item = Signal2> {
+    let named = SIGNALS
+        .iter()
+        .copied()
+        .filter(|&signal| super::RealSystem(()).normalize_signal(signal) == Ok(signal));
+
+    #[allow(clippy::reversed_empty_ranges)]
+    let range = rt_range().unwrap_or(0..=-1);
+    let rt = range.clone().map(move |number| rt(number, range.clone()));
+
+    named.chain(rt)
 }
