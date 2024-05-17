@@ -25,11 +25,12 @@ use std::ops::RangeInclusive;
 
 /// Returns the range of real-time signals supported by the real system.
 ///
-/// If the real system does not support real-time signals, `None` is returned.
+/// If the real system does not support real-time signals, this function returns
+/// an empty range.
 #[must_use]
-fn rt_range() -> Option<RangeInclusive<c_int>> {
+fn rt_range() -> RangeInclusive<c_int> {
     #[cfg(target_os = "aix")]
-    return Some(nix::libc::SIGRTMIN..=nix::libc::SIGRTMAX);
+    return nix::libc::SIGRTMIN..=nix::libc::SIGRTMAX;
 
     #[cfg(any(
         target_os = "android",
@@ -37,10 +38,13 @@ fn rt_range() -> Option<RangeInclusive<c_int>> {
         target_os = "l4re",
         target_os = "linux",
     ))]
-    return Some(nix::libc::SIGRTMIN()..=nix::libc::SIGRTMAX());
+    return nix::libc::SIGRTMIN()..=nix::libc::SIGRTMAX();
 
     #[allow(unreachable_code)]
-    None
+    {
+        #[allow(clippy::reversed_empty_ranges)]
+        return 0..=-1;
+    }
 }
 
 impl Signal2 {
@@ -232,21 +236,19 @@ impl Signal2 {
             Signal2::Xfsz => Ok(nix::libc::SIGXFSZ),
 
             Signal2::Rtmin(n) => {
-                if let Some(range) = rt_range() {
-                    if let Some(number) = range.start().checked_add(n) {
-                        if range.contains(&number) {
-                            return Ok(number);
-                        }
+                let range = rt_range();
+                if let Some(number) = range.start().checked_add(n) {
+                    if range.contains(&number) {
+                        return Ok(number);
                     }
                 }
                 Err(UnknownSignalError)
             }
             Signal2::Rtmax(n) => {
-                if let Some(range) = rt_range() {
-                    if let Some(number) = range.end().checked_add(n) {
-                        if range.contains(&number) {
-                            return Ok(number);
-                        }
+                let range = rt_range();
+                if let Some(number) = range.end().checked_add(n) {
+                    if range.contains(&number) {
+                        return Ok(number);
                     }
                 }
                 Err(UnknownSignalError)
@@ -378,18 +380,21 @@ impl Signal2 {
 
             _ => {
                 // Real-time signals
-                if let Some(range) = rt_range() {
-                    if range.contains(&number) {
-                        return Ok(rt(number, range));
-                    }
+                let range = rt_range();
+                if range.contains(&number) {
+                    Ok(rt(number, range))
+                } else {
+                    Err(UnknownSignalError)
                 }
-
-                Err(UnknownSignalError)
             }
         }
     }
 }
 
+/// Returns the real-time signal for the given number.
+///
+/// `number` must be in `range`, and `range` must be the return value of
+/// [`rt_range`].
 fn rt(number: c_int, range: RangeInclusive<c_int>) -> Signal2 {
     let incr = number - range.start();
     debug_assert!(incr >= 0);
@@ -410,7 +415,7 @@ pub fn all_signals() -> impl DoubleEndedIterator<Item = Signal2> {
         .filter(|&signal| super::RealSystem(()).normalize_signal(signal) == Ok(signal));
 
     #[allow(clippy::reversed_empty_ranges)]
-    let range = rt_range().unwrap_or(0..=-1);
+    let range = rt_range();
     let rt = range.clone().map(move |number| rt(number, range.clone()));
 
     named.chain(rt)
