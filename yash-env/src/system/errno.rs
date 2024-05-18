@@ -278,6 +278,13 @@ impl From<nix::Error> for Errno {
     }
 }
 
+impl From<crate::system::UnknownSignalError> for Errno {
+    #[inline]
+    fn from(_: crate::system::UnknownSignalError) -> Self {
+        Self::EINVAL
+    }
+}
+
 impl From<Errno> for std::io::Error {
     #[inline]
     fn from(errno: Errno) -> Self {
