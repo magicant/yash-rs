@@ -145,6 +145,48 @@ pub enum Signal {
     Number(c_int),
 }
 
+// TODO Remove these aliases
+impl Signal {
+    pub const SIGABRT: Self = Self::Abrt;
+    pub const SIGALRM: Self = Self::Alrm;
+    pub const SIGBUS: Self = Self::Bus;
+    pub const SIGCHLD: Self = Self::Chld;
+    pub const SIGCLD: Self = Self::Cld;
+    pub const SIGCONT: Self = Self::Cont;
+    pub const SIGEMT: Self = Self::Emt;
+    pub const SIGFPE: Self = Self::Fpe;
+    pub const SIGHUP: Self = Self::Hup;
+    pub const SIGILL: Self = Self::Ill;
+    pub const SIGINFO: Self = Self::Info;
+    pub const SIGINT: Self = Self::Int;
+    pub const SIGIO: Self = Self::Io;
+    pub const SIGIOT: Self = Self::Iot;
+    pub const SIGKILL: Self = Self::Kill;
+    pub const SIGLOST: Self = Self::Lost;
+    pub const SIGPIPE: Self = Self::Pipe;
+    pub const SIGPOLL: Self = Self::Poll;
+    pub const SIGPROF: Self = Self::Prof;
+    pub const SIGPWR: Self = Self::Pwr;
+    pub const SIGQUIT: Self = Self::Quit;
+    pub const SIGSEGV: Self = Self::Segv;
+    pub const SIGSTKFLT: Self = Self::Stkflt;
+    pub const SIGSTOP: Self = Self::Stop;
+    pub const SIGSYS: Self = Self::Sys;
+    pub const SIGTERM: Self = Self::Term;
+    pub const SIGTHR: Self = Self::Thr;
+    pub const SIGTRAP: Self = Self::Trap;
+    pub const SIGTSTP: Self = Self::Tstp;
+    pub const SIGTTIN: Self = Self::Ttin;
+    pub const SIGTTOU: Self = Self::Ttou;
+    pub const SIGURG: Self = Self::Urg;
+    pub const SIGUSR1: Self = Self::Usr1;
+    pub const SIGUSR2: Self = Self::Usr2;
+    pub const SIGVTALRM: Self = Self::Vtalrm;
+    pub const SIGWINCH: Self = Self::Winch;
+    pub const SIGXCPU: Self = Self::Xcpu;
+    pub const SIGXFSZ: Self = Self::Xfsz;
+}
+
 /// List of all named signals
 ///
 /// This list does not include the `Rtmin`, `Rtmax`, and `Number` variants.
