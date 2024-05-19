@@ -34,6 +34,7 @@ use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
+use yash_env::system::SystemEx as _;
 use yash_env::variable::Context;
 use yash_env::Env;
 use yash_env::System;
@@ -120,7 +121,7 @@ pub async fn start_external_utility_in_subshell_and_wait(
                 env.jobs.add(job);
             }
 
-            state.try_into().unwrap()
+            env.system.exit_status_for_process_state(state).unwrap()
         }
         Err(errno) => {
             print_error(

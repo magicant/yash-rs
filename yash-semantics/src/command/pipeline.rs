@@ -36,7 +36,7 @@ use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
 use yash_env::system::FdFlag;
-use yash_env::system::SystemEx;
+use yash_env::system::SystemEx as _;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::syntax;
@@ -152,7 +152,7 @@ async fn execute_job_controlled_pipeline(
                 env.jobs.add(job);
             }
 
-            env.exit_status = state.try_into().unwrap();
+            env.exit_status = env.system.exit_status_for_process_state(state).unwrap();
             Continue(())
         }
         Err(errno) => {

@@ -32,20 +32,21 @@ use yash_env::job::JobList;
 use yash_env::job::ProcessState;
 use yash_env::option::State;
 use yash_env::semantics::ExitStatus;
+use yash_env::system::SystemEx as _;
 use yash_env::Env;
 
 /// Waits while the given job is running.
 ///
 /// This function keeps calling [`wait_for_any_job_or_trap`] until the given
-/// closure returns [`ControlFlow::Break`], whose value is returned from this
-/// function.
+/// closure returns [`ControlFlow::Break`], then returns the exit status
+/// corresponding to the final state of the job.
 pub async fn wait_while_running(
     env: &mut Env,
-    job_status: &mut dyn FnMut(&mut JobList) -> ControlFlow<ExitStatus>,
+    job_status: &mut dyn FnMut(&mut JobList) -> ControlFlow<ProcessState>,
 ) -> Result<ExitStatus, Error> {
     loop {
-        if let ControlFlow::Break(exit_status) = job_status(&mut env.jobs) {
-            return Ok(exit_status);
+        if let ControlFlow::Break(state) = job_status(&mut env.jobs) {
+            return Ok(env.system.exit_status_for_process_state(state).unwrap());
         }
         wait_for_any_job_or_trap(env).await?;
     }
@@ -58,37 +59,30 @@ pub async fn wait_while_running(
 /// The disowned job is removed from the job list.
 ///
 /// If the job has finished (either exited or signaled), the closure removes the
-/// job from the job list and returns [`ControlFlow::Break`] with the job's exit
-/// status. If `job_control` is `On` and the job has been stopped, the closure
-/// returns [`ControlFlow::Break`] with an exit status that indicates the signal
-/// that stopped the job.
-/// Otherwise, the closure returns [`ControlFlow::Continue`].
+/// job from the job list and returns [`ControlFlow::Break`] with the job's
+/// final state. The closure returns also if `job_control` is `On` and the job
+/// has been stopped. Otherwise, the closure returns [`ControlFlow::Continue`].
 pub fn job_status(
     index: usize,
     job_control: State,
-) -> impl FnMut(&mut JobList) -> ControlFlow<ExitStatus> {
+) -> impl FnMut(&mut JobList) -> ControlFlow<ProcessState> {
     move |jobs| {
         let Some(job) = jobs.get(index) else {
-            return ControlFlow::Break(ExitStatus::NOT_FOUND);
+            return ControlFlow::Break(ProcessState::Exited(ExitStatus::NOT_FOUND));
         };
 
         if !job.is_owned {
             jobs.remove(index);
-            return ControlFlow::Break(ExitStatus::NOT_FOUND);
+            return ControlFlow::Break(ProcessState::Exited(ExitStatus::NOT_FOUND));
         }
 
-        match job.state {
-            ProcessState::Exited(exit_status) => {
+        let state = job.state;
+        match state {
+            ProcessState::Exited(_) | ProcessState::Signaled { .. } => {
                 jobs.remove(index);
-                ControlFlow::Break(exit_status)
+                ControlFlow::Break(state)
             }
-            ProcessState::Signaled { signal, .. } => {
-                jobs.remove(index);
-                ControlFlow::Break(ExitStatus::from(signal))
-            }
-            ProcessState::Stopped(signal) if job_control.into() => {
-                ControlFlow::Break(ExitStatus::from(signal))
-            }
+            ProcessState::Stopped(_) if job_control.into() => ControlFlow::Break(state),
             _ => ControlFlow::Continue(()),
         }
     }
@@ -101,14 +95,14 @@ pub fn job_status(
 /// status of 0. Otherwise, the closure returns [`ControlFlow::Continue`].
 pub fn any_job_is_running(
     job_control: State,
-) -> impl FnMut(&mut JobList) -> ControlFlow<ExitStatus> {
+) -> impl FnMut(&mut JobList) -> ControlFlow<ProcessState> {
     move |jobs| {
         let Some((max_index, _)) = jobs.iter().next_back() else {
-            return ControlFlow::Break(ExitStatus::SUCCESS);
+            return ControlFlow::Break(ProcessState::Exited(ExitStatus::SUCCESS));
         };
 
         if (0..=max_index).all(|index| job_status(index, job_control)(jobs).is_break()) {
-            ControlFlow::Break(ExitStatus::SUCCESS)
+            ControlFlow::Break(ProcessState::Exited(ExitStatus::SUCCESS))
         } else {
             ControlFlow::Continue(())
         }
@@ -127,15 +121,15 @@ mod tests {
         let mut jobs = JobList::new();
         assert_eq!(
             job_status(0, Off)(&mut jobs),
-            ControlFlow::Break(ExitStatus::NOT_FOUND),
+            ControlFlow::Break(ProcessState::Exited(ExitStatus::NOT_FOUND)),
         );
         assert_eq!(
             job_status(1, Off)(&mut jobs),
-            ControlFlow::Break(ExitStatus::NOT_FOUND),
+            ControlFlow::Break(ProcessState::Exited(ExitStatus::NOT_FOUND)),
         );
         assert_eq!(
             job_status(0, On)(&mut jobs),
-            ControlFlow::Break(ExitStatus::NOT_FOUND),
+            ControlFlow::Break(ProcessState::Exited(ExitStatus::NOT_FOUND)),
         );
         assert_eq!(jobs.len(), 0);
     }
@@ -149,7 +143,7 @@ mod tests {
 
         assert_eq!(
             job_status(index, Off)(&mut jobs),
-            ControlFlow::Break(ExitStatus::SUCCESS),
+            ControlFlow::Break(ProcessState::Exited(ExitStatus::SUCCESS)),
         );
         assert_eq!(jobs.get(index), None);
 
@@ -159,7 +153,7 @@ mod tests {
 
         assert_eq!(
             job_status(index, On)(&mut jobs),
-            ControlFlow::Break(ExitStatus(42)),
+            ControlFlow::Break(ProcessState::Exited(ExitStatus(42))),
         );
         assert_eq!(jobs.get(index), None);
     }
@@ -176,7 +170,10 @@ mod tests {
 
         assert_eq!(
             job_status(index, Off)(&mut jobs),
-            ControlFlow::Break(ExitStatus::from(Signal::SIGHUP)),
+            ControlFlow::Break(ProcessState::Signaled {
+                signal: Signal::SIGHUP,
+                core_dump: false
+            }),
         );
         assert_eq!(jobs.get(index), None);
 
@@ -189,7 +186,10 @@ mod tests {
 
         assert_eq!(
             job_status(index, On)(&mut jobs),
-            ControlFlow::Break(ExitStatus::from(Signal::SIGABRT)),
+            ControlFlow::Break(ProcessState::Signaled {
+                signal: Signal::SIGABRT,
+                core_dump: true,
+            }),
         );
         assert_eq!(jobs.get(index), None);
     }
@@ -221,7 +221,7 @@ mod tests {
 
         assert_eq!(
             job_status(index, On)(&mut jobs),
-            ControlFlow::Break(ExitStatus::from(Signal::SIGTSTP)),
+            ControlFlow::Break(ProcessState::Stopped(Signal::SIGTSTP)),
         );
         assert_eq!(jobs[index].pid, Pid(123));
 
@@ -231,7 +231,7 @@ mod tests {
 
         assert_eq!(
             job_status(index, On)(&mut jobs),
-            ControlFlow::Break(ExitStatus::from(Signal::SIGSTOP)),
+            ControlFlow::Break(ProcessState::Stopped(Signal::SIGSTOP)),
         );
         assert_eq!(jobs[index].pid, Pid(456));
     }
@@ -263,7 +263,7 @@ mod tests {
 
         assert_eq!(
             job_status(index, Off)(&mut jobs),
-            ControlFlow::Break(ExitStatus::NOT_FOUND),
+            ControlFlow::Break(ProcessState::Exited(ExitStatus::NOT_FOUND)),
         );
         assert_eq!(jobs.get(index), None);
     }
@@ -273,11 +273,11 @@ mod tests {
         let mut jobs = JobList::new();
         assert_eq!(
             any_job_is_running(Off)(&mut jobs),
-            ControlFlow::Break(ExitStatus::SUCCESS),
+            ControlFlow::Break(ProcessState::Exited(ExitStatus::SUCCESS)),
         );
         assert_eq!(
             any_job_is_running(On)(&mut jobs),
-            ControlFlow::Break(ExitStatus::SUCCESS),
+            ControlFlow::Break(ProcessState::Exited(ExitStatus::SUCCESS)),
         );
     }
 
@@ -290,7 +290,7 @@ mod tests {
 
         assert_eq!(
             any_job_is_running(Off)(&mut jobs),
-            ControlFlow::Break(ExitStatus::SUCCESS),
+            ControlFlow::Break(ProcessState::Exited(ExitStatus::SUCCESS)),
         );
 
         let mut job = Job::new(Pid(456));
@@ -299,7 +299,7 @@ mod tests {
 
         assert_eq!(
             any_job_is_running(On)(&mut jobs),
-            ControlFlow::Break(ExitStatus::SUCCESS),
+            ControlFlow::Break(ProcessState::Exited(ExitStatus::SUCCESS)),
         );
     }
 

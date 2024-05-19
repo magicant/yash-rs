@@ -141,28 +141,6 @@ impl ProcessState {
     }
 }
 
-/// Error value indicating that the process is running.
-///
-/// This error value may be returned by [`TryFrom<ProcessState>::try_from`].
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct RunningProcess;
-
-/// Converts `ProcessState` to `ExitStatus`.
-///
-/// For the `Running` state, the conversion fails with [`RunningProcess`].
-impl TryFrom<ProcessState> for ExitStatus {
-    type Error = RunningProcess;
-    fn try_from(state: ProcessState) -> Result<Self, RunningProcess> {
-        match state {
-            ProcessState::Exited(exit_status) => Ok(exit_status),
-            ProcessState::Signaled { signal, .. } | ProcessState::Stopped(signal) => {
-                Ok(ExitStatus::from(signal))
-            }
-            ProcessState::Running => Err(RunningProcess),
-        }
-    }
-}
-
 /// Set of one or more processes executing a pipeline
 ///
 /// In the current implementation, a job contains the process ID of one child

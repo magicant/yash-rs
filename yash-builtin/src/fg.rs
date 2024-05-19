@@ -92,7 +92,6 @@ use yash_env::job::id::parse;
 use yash_env::job::JobList;
 use yash_env::job::Pid;
 use yash_env::job::ProcessState;
-use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::Errno;
 use yash_env::system::System as _;
@@ -189,7 +188,11 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     };
 
     match result {
-        Ok(state) => ExitStatus::try_from(state).unwrap().into(),
+        Ok(state) => env
+            .system
+            .exit_status_for_process_state(state)
+            .unwrap()
+            .into(),
         Err(error) => report_simple_failure(env, &error.to_string()).await,
     }
 }
@@ -208,6 +211,7 @@ mod tests {
     use yash_env::job::ProcessState;
     use yash_env::option::Option::Monitor;
     use yash_env::option::State::On;
+    use yash_env::semantics::ExitStatus;
     use yash_env::subshell::JobControl;
     use yash_env::subshell::Subshell;
     use yash_env::system::r#virtual::Process;

@@ -28,6 +28,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
+use yash_env::system::SystemEx as _;
 use yash_env::Env;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::List;
@@ -47,7 +48,7 @@ pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Resu
                 env.jobs.add(job);
             }
 
-            env.exit_status = state.try_into().unwrap();
+            env.exit_status = env.system.exit_status_for_process_state(state).unwrap();
             env.apply_errexit()
         }
         Err(errno) => {

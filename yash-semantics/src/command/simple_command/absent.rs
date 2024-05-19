@@ -32,6 +32,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
+use yash_env::system::SystemEx as _;
 use yash_env::Env;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
@@ -81,7 +82,7 @@ pub async fn execute_absent_target(
                     env.jobs.add(job);
                 }
 
-                state.try_into().unwrap()
+                env.system.exit_status_for_process_state(state).unwrap()
             }
             Err(errno) => {
                 print_error(
