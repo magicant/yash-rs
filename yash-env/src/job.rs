@@ -43,7 +43,6 @@
 
 use crate::semantics::ExitStatus;
 use crate::trap::Signal;
-use nix::sys::wait::WaitStatus;
 use slab::Slab;
 use std::collections::HashMap;
 use std::iter::FusedIterator;
@@ -138,45 +137,6 @@ impl ProcessState {
         match self {
             ProcessState::Running | ProcessState::Stopped(_) => true,
             ProcessState::Exited(_) | ProcessState::Signaled { .. } => false,
-        }
-    }
-
-    /// Converts `ProcessState` to `WaitStatus`.
-    ///
-    /// This function returns a type defined in the `nix` crate, which is not
-    /// covered by the semantic versioning policy of this crate.
-    #[must_use]
-    pub fn to_wait_status(self, pid: Pid) -> WaitStatus {
-        match self {
-            ProcessState::Running => WaitStatus::Continued(pid.into()),
-            ProcessState::Exited(exit_status) => WaitStatus::Exited(pid.into(), exit_status.0),
-            ProcessState::Stopped(signal) => WaitStatus::Stopped(pid.into(), signal),
-            ProcessState::Signaled { signal, core_dump } => {
-                WaitStatus::Signaled(pid.into(), signal, core_dump)
-            }
-        }
-    }
-
-    /// Converts `WaitStatus` to `ProcessState`.
-    ///
-    /// If the given `WaitStatus` represents a change in the process state, this
-    /// function returns the new state with the process ID. Otherwise, it
-    /// returns `None`.
-    ///
-    /// The `WaitStatus` type is defined in the `nix` crate, which is not
-    /// covered by the semantic versioning policy of this crate.
-    #[must_use]
-    pub fn from_wait_status(status: WaitStatus) -> Option<(Pid, Self)> {
-        match status {
-            WaitStatus::Continued(pid) => Some((pid.into(), ProcessState::Running)),
-            WaitStatus::Exited(pid, exit_status) => {
-                Some((pid.into(), ProcessState::Exited(ExitStatus(exit_status))))
-            }
-            WaitStatus::Stopped(pid, signal) => Some((pid.into(), ProcessState::Stopped(signal))),
-            WaitStatus::Signaled(pid, signal, core_dump) => {
-                Some((pid.into(), ProcessState::Signaled { signal, core_dump }))
-            }
-            _ => None,
         }
     }
 }

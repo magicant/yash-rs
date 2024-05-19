@@ -42,6 +42,7 @@ use super::UnknownSignalError;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessState;
+use crate::semantics::ExitStatus;
 use crate::SignalHandling;
 use nix::errno::Errno as NixErrno;
 use nix::libc::DIR;
@@ -50,6 +51,7 @@ use nix::sys::signal::SaFlags;
 use nix::sys::signal::SigAction;
 use nix::sys::signal::SigHandler;
 use nix::sys::stat::stat;
+use nix::sys::wait::WaitStatus;
 use nix::unistd::AccessFlags;
 use std::convert::Infallible;
 use std::convert::TryInto;
@@ -543,7 +545,18 @@ impl System for RealSystem {
         use nix::sys::wait::WaitPidFlag;
         let options = WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED | WaitPidFlag::WNOHANG;
         let status = nix::sys::wait::waitpid(Some(target.into()), options.into())?;
-        Ok(ProcessState::from_wait_status(status))
+        let result = match status {
+            WaitStatus::Continued(pid) => Some((pid.into(), ProcessState::Running)),
+            WaitStatus::Exited(pid, exit_status) => {
+                Some((pid.into(), ProcessState::Exited(ExitStatus(exit_status))))
+            }
+            WaitStatus::Stopped(pid, signal) => Some((pid.into(), ProcessState::Stopped(signal))),
+            WaitStatus::Signaled(pid, signal, core_dump) => {
+                Some((pid.into(), ProcessState::Signaled { signal, core_dump }))
+            }
+            _ => None,
+        };
+        Ok(result)
     }
 
     fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {
