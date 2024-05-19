@@ -36,6 +36,7 @@ use crate::io::Fd;
 use crate::io::MIN_INTERNAL_FD;
 use crate::job::Pid;
 use crate::job::ProcessState;
+use crate::semantics::ExitStatus;
 #[cfg(doc)]
 use crate::subshell::Subshell;
 use crate::trap::Signal;
@@ -601,6 +602,52 @@ pub trait SystemEx: System {
     ) -> std::result::Result<Signal2, UnknownSignalError> {
         let number = self.signal_to_raw_number(signal)?;
         self.raw_number_to_signal(number)
+    }
+
+    /// Returns the exit status for a process that was terminated by the
+    /// specified signal.
+    ///
+    /// If the signal is not supported by the system, this function returns
+    /// `ExitStatus(i32::MAX)`
+    #[must_use]
+    fn exit_status_for_signal(&self, signal: Signal2) -> ExitStatus {
+        let raw_exit_status = match self.signal_to_raw_number(signal) {
+            // POSIX requires the offset to be 0x80 or greater. We additionally
+            // add 0x100 to make sure the exit status is distinguishable from those
+            // of processes that exited normally.
+            Ok(number) => number.saturating_add(0x180),
+            Err(UnknownSignalError) => i32::MAX,
+        };
+        ExitStatus(raw_exit_status)
+    }
+
+    /// Infers the signal that caused the process to exit or stop from the exit
+    /// status.
+    #[must_use]
+    fn signal_for_exit_status(&self, status: ExitStatus) -> Option<Signal2> {
+        for offset in [0x180, 0x80, 0] {
+            if status.0 > offset {
+                if let Ok(signal) = self.raw_number_to_signal(status.0 - offset) {
+                    return Some(signal);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns the exit status for a process that has the specified state.
+    ///
+    /// This function returns `None` if the state is `Running`.
+    #[must_use]
+    fn exit_status_for_process_state(&self, state: ProcessState) -> Option<ExitStatus> {
+        match state {
+            ProcessState::Exited(exit_status) => Some(exit_status),
+            ProcessState::Signaled { signal, .. } | ProcessState::Stopped(signal) => {
+                // TODO Some(self.exit_status_for_signal(signal))
+                Some(ExitStatus::from(signal))
+            }
+            ProcessState::Running => None,
+        }
     }
 
     /// Switches the foreground process group with SIGTTOU blocked.
