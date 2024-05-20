@@ -118,11 +118,42 @@ impl Pid {
     pub const ALL: Self = Pid(-1);
 }
 
+/// Execution state of a process from which the exit status can be computed
+///
+/// This type is used to represent the result of a process execution. It is
+/// similar to the `WaitStatus` type defined in the `nix` crate, but it is
+/// simplified to represent only the states that are relevant to the shell.
+///
+/// This type only contains the states the process's exit status can be computed
+/// from. See also [`ProcessState`], which is a more general type that includes
+/// the states that are not directly related to the exit status.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ProcessResult {
+    /// The process has been stopped by a signal.
+    Stopped(Signal),
+    /// The process has exited.
+    Exited(ExitStatus),
+    /// The process has been terminated by a signal.
+    Signaled { signal: Signal, core_dump: bool },
+}
+
+impl ProcessResult {
+    /// Whether the process is not yet terminated
+    #[must_use]
+    pub fn is_alive(&self) -> bool {
+        match self {
+            ProcessResult::Stopped(_) => true,
+            ProcessResult::Exited(_) | ProcessResult::Signaled { .. } => false,
+        }
+    }
+}
+
 /// Execution state of a process
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProcessState {
     /// The process is running.
     Running,
+    // TODO Redefine in terms of ProcessResult
     /// The process is stopped by a signal.
     Stopped(Signal),
     /// The process has exited.

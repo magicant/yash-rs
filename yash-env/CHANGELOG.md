@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `System::shell_path`
 - `SystemEx::fd_is_pipe`
 - `SystemEx::set_blocking`
+- `job::ProcessResult`
+- `job::ProcessResult::is_alive`
 - `impl From<trap::Condition> for stack::Frame`
 
 ### Changed
