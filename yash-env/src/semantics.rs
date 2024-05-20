@@ -16,8 +16,6 @@
 
 //! Type definitions for command execution.
 
-use crate::system::Errno;
-use nix::sys::signal::Signal;
 use std::ffi::c_int;
 use std::ops::ControlFlow;
 use std::process::ExitCode;
@@ -106,24 +104,6 @@ impl From<ExitStatus> for c_int {
 impl Termination for ExitStatus {
     fn report(self) -> ExitCode {
         (self.0 as u8).into()
-    }
-}
-
-/// Converts an exit status to the corresponding signal.
-///
-/// If there is a signal such that
-/// `exit_status == ExitStatus::from(signal)`,
-/// the signal is returned.
-/// The same if the exit status is the lowest 8 bits of such an exit status.
-/// The signal is also returned if the exit status is a signal number itself.
-/// Otherwise, an error is returned.
-impl TryFrom<ExitStatus> for Signal {
-    type Error = Errno;
-    fn try_from(exit_status: ExitStatus) -> std::result::Result<Signal, Errno> {
-        Signal::try_from(exit_status.0 - 0x180)
-            .or_else(|_| Signal::try_from(exit_status.0 - 0x80))
-            .or_else(|_| Signal::try_from(exit_status.0))
-            .map_err(Errno::from)
     }
 }
 

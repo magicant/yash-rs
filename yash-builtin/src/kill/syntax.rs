@@ -24,7 +24,6 @@
 use super::Command;
 use std::ffi::c_int;
 use thiserror::Error;
-use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::trap::Signal;
 use yash_env::Env;
@@ -238,8 +237,12 @@ fn parse_signals<I: Iterator<Item = Field>>(
     allow_sig_prefix: bool,
 ) -> Result<Vec<Signal>, Error> {
     let parse_one = move |operand: Field| {
-        if let Some(exit_status) = operand.value.parse().ok().map(ExitStatus) {
-            exit_status.try_into().ok()
+        if let Ok(exit_status) = operand.value.parse::<c_int>() {
+            [0x180, 0x80, 0].into_iter().find_map(|offset| {
+                (exit_status > offset)
+                    .then(|| (exit_status - offset).try_into().ok())
+                    .flatten()
+            })
         } else {
             parse_signal_name(&operand.value, allow_sig_prefix)
         }

@@ -621,20 +621,6 @@ pub trait SystemEx: System {
         ExitStatus(raw_exit_status)
     }
 
-    /// Infers the signal that caused the process to exit or stop from the exit
-    /// status.
-    #[must_use]
-    fn signal_for_exit_status(&self, status: ExitStatus) -> Option<Signal2> {
-        for offset in [0x180, 0x80, 0] {
-            if status.0 > offset {
-                if let Ok(signal) = self.raw_number_to_signal(status.0 - offset) {
-                    return Some(signal);
-                }
-            }
-        }
-        None
-    }
-
     /// Returns the exit status for a process that has the specified state.
     ///
     /// This function returns `None` if the state is `Running`.
