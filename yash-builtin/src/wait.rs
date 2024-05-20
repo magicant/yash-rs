@@ -97,6 +97,8 @@ use yash_env::option::Option::Monitor;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::System as _;
+use yash_env::SystemEx as _;
 
 /// Job specification (job ID or process ID)
 ///
@@ -168,7 +170,10 @@ impl Command {
         match Self::await_jobs(env, indexes).await {
             Ok(exit_status) => exit_status.into(),
             Err(core::Error::Trapped(signal, divert)) => {
-                crate::Result::with_exit_status_and_divert(ExitStatus::from(signal), divert)
+                let signal = env.system.raw_number_to_signal(signal as _);
+                let signal = signal.unwrap_or(yash_env::trap::Signal2::Number(0));
+                let exit_status = env.system.exit_status_for_signal(signal);
+                crate::Result::with_exit_status_and_divert(exit_status, divert)
             }
             Err(error) => report_simple_failure(env, &error.to_string()).await,
         }

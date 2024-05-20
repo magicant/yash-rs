@@ -51,7 +51,7 @@ use self::system::Errno;
 pub use self::system::SharedSystem;
 use self::system::SignalHandling;
 pub use self::system::System;
-use self::system::SystemEx;
+pub use self::system::SystemEx;
 use self::trap::Signal;
 use self::trap::TrapSet;
 use self::variable::Scope;

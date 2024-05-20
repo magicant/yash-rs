@@ -643,8 +643,7 @@ pub trait SystemEx: System {
         match state {
             ProcessState::Exited(exit_status) => Some(exit_status),
             ProcessState::Signaled { signal, .. } | ProcessState::Stopped(signal) => {
-                // TODO Some(self.exit_status_for_signal(signal))
-                Some(ExitStatus::from(signal))
+                Some(self.exit_status_for_signal(self.raw_number_to_signal(signal as _).unwrap()))
             }
             ProcessState::Running => None,
         }
