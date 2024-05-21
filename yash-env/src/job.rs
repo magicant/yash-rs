@@ -152,6 +152,18 @@ impl ProcessResult {
     }
 }
 
+/// Converts `ProcessResult` to `ExitStatus`.
+impl From<ProcessResult> for ExitStatus {
+    fn from(result: ProcessResult) -> Self {
+        match result {
+            ProcessResult::Exited(exit_status) => exit_status,
+            ProcessResult::Stopped(signal) | ProcessResult::Signaled { signal, .. } => {
+                ExitStatus::from(signal)
+            }
+        }
+    }
+}
+
 /// Execution state of a process, either running or halted
 ///
 /// This type is used to represent the current state of a process. It is similar
@@ -248,12 +260,8 @@ impl TryFrom<ProcessState> for ExitStatus {
     type Error = RunningProcess;
     fn try_from(state: ProcessState) -> Result<Self, RunningProcess> {
         match state {
-            // ProcessState::Exited(exit_status) => Ok(exit_status),
-            // ProcessState::Signaled { signal, .. } | ProcessState::Stopped(signal) => {
-            //     Ok(ExitStatus::from(signal))
-            // }
+            ProcessState::Halted(result) => Ok(result.into()),
             ProcessState::Running => Err(RunningProcess),
-            _ => todo!(),
         }
     }
 }
@@ -320,8 +328,10 @@ impl Job {
         }
     }
 
+    /// Whether the job is suspended
+    #[must_use]
     fn is_suspended(&self) -> bool {
-        todo!() // matches!(self.state, ProcessState::Stopped(_))
+        self.state.is_stopped()
     }
 }
 
