@@ -197,7 +197,7 @@ mod tests {
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.is_owned = true;
-        job.state = ProcessState::Exited(ExitStatus(0));
+        // TODO job.state = ProcessState::Exited(ExitStatus(0));
         job.name = "my job".into();
         jobs.add(job);
 

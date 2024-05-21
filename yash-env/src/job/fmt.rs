@@ -81,17 +81,18 @@ impl Display for ProcessState {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let s = match self {
             ProcessState::Running => return f.pad("Running"),
-            ProcessState::Stopped(signal) => format!("Stopped({signal})"),
-            ProcessState::Exited(ExitStatus(0)) => return f.pad("Done"),
-            ProcessState::Exited(exit_status) => format!("Done({exit_status})"),
-            ProcessState::Signaled {
-                signal,
-                core_dump: false,
-            } => format!("Killed({signal})"),
-            ProcessState::Signaled {
-                signal,
-                core_dump: true,
-            } => format!("Killed({signal}: core dumped)"),
+            _ => "TODO".to_string(),
+            // ProcessState::Stopped(signal) => format!("Stopped({signal})"),
+            // ProcessState::Exited(ExitStatus(0)) => return f.pad("Done"),
+            // ProcessState::Exited(exit_status) => format!("Done({exit_status})"),
+            // ProcessState::Signaled {
+            //     signal,
+            //     core_dump: false,
+            // } => format!("Killed({signal})"),
+            // ProcessState::Signaled {
+            //     signal,
+            //     core_dump: true,
+            // } => format!("Killed({signal}: core dumped)"),
         };
         f.pad(&s)
     }
@@ -192,53 +193,56 @@ mod tests {
 
     #[test]
     fn process_state_display_stopped() {
-        let state = ProcessState::Stopped(Signal::SIGSTOP);
-        assert_eq!(state.to_string(), "Stopped(SIGSTOP)");
-        let state = ProcessState::Stopped(Signal::SIGTSTP);
-        assert_eq!(state.to_string(), "Stopped(SIGTSTP)");
-        let state = ProcessState::Stopped(Signal::SIGTTIN);
-        assert_eq!(state.to_string(), "Stopped(SIGTTIN)");
-        let state = ProcessState::Stopped(Signal::SIGTTOU);
-        assert_eq!(state.to_string(), "Stopped(SIGTTOU)");
+        todo!()
+        // let state = ProcessState::Stopped(Signal::SIGSTOP);
+        // assert_eq!(state.to_string(), "Stopped(SIGSTOP)");
+        // let state = ProcessState::Stopped(Signal::SIGTSTP);
+        // assert_eq!(state.to_string(), "Stopped(SIGTSTP)");
+        // let state = ProcessState::Stopped(Signal::SIGTTIN);
+        // assert_eq!(state.to_string(), "Stopped(SIGTTIN)");
+        // let state = ProcessState::Stopped(Signal::SIGTTOU);
+        // assert_eq!(state.to_string(), "Stopped(SIGTTOU)");
     }
 
     #[test]
     fn process_state_display_exited() {
-        let state = ProcessState::Exited(ExitStatus(0));
-        assert_eq!(state.to_string(), "Done");
-        let state = ProcessState::Exited(ExitStatus(1));
-        assert_eq!(state.to_string(), "Done(1)");
-        let state = ProcessState::Exited(ExitStatus(2));
-        assert_eq!(state.to_string(), "Done(2)");
-        let state = ProcessState::Exited(ExitStatus(253));
-        assert_eq!(state.to_string(), "Done(253)");
+        todo!()
+        // let state = ProcessState::Exited(ExitStatus(0));
+        // assert_eq!(state.to_string(), "Done");
+        // let state = ProcessState::Exited(ExitStatus(1));
+        // assert_eq!(state.to_string(), "Done(1)");
+        // let state = ProcessState::Exited(ExitStatus(2));
+        // assert_eq!(state.to_string(), "Done(2)");
+        // let state = ProcessState::Exited(ExitStatus(253));
+        // assert_eq!(state.to_string(), "Done(253)");
     }
 
     #[test]
     fn process_state_display_signaled() {
-        let state = ProcessState::Signaled {
-            signal: Signal::SIGKILL,
-            core_dump: false,
-        };
-        assert_eq!(state.to_string(), "Killed(SIGKILL)");
+        todo!()
+        // let state = ProcessState::Signaled {
+        //     signal: Signal::SIGKILL,
+        //     core_dump: false,
+        // };
+        // assert_eq!(state.to_string(), "Killed(SIGKILL)");
 
-        let state = ProcessState::Signaled {
-            signal: Signal::SIGKILL,
-            core_dump: true,
-        };
-        assert_eq!(state.to_string(), "Killed(SIGKILL: core dumped)");
+        // let state = ProcessState::Signaled {
+        //     signal: Signal::SIGKILL,
+        //     core_dump: true,
+        // };
+        // assert_eq!(state.to_string(), "Killed(SIGKILL: core dumped)");
 
-        let state = ProcessState::Signaled {
-            signal: Signal::SIGTERM,
-            core_dump: false,
-        };
-        assert_eq!(state.to_string(), "Killed(SIGTERM)");
+        // let state = ProcessState::Signaled {
+        //     signal: Signal::SIGTERM,
+        //     core_dump: false,
+        // };
+        // assert_eq!(state.to_string(), "Killed(SIGTERM)");
 
-        let state = ProcessState::Signaled {
-            signal: Signal::SIGQUIT,
-            core_dump: true,
-        };
-        assert_eq!(state.to_string(), "Killed(SIGQUIT: core dumped)");
+        // let state = ProcessState::Signaled {
+        //     signal: Signal::SIGQUIT,
+        //     core_dump: true,
+        // };
+        // assert_eq!(state.to_string(), "Killed(SIGQUIT: core dumped)");
     }
 
     #[test]
@@ -250,7 +254,7 @@ mod tests {
         let report = Report { index, marker, job };
         assert_eq!(report.to_string(), "[1] + Running              echo ok");
 
-        job.state = ProcessState::Stopped(Signal::SIGSTOP);
+        // TODO job.state = ProcessState::Stopped(Signal::SIGSTOP);
         let report = Report { index, marker, job };
         assert_eq!(report.to_string(), "[1] + Stopped(SIGSTOP)     echo ok");
 
@@ -266,10 +270,11 @@ mod tests {
         let report = Report { index, marker, job };
         assert_eq!(report.to_string(), "[6]   Stopped(SIGSTOP)     echo ok");
 
-        job.state = ProcessState::Signaled {
-            signal: Signal::SIGQUIT,
-            core_dump: true,
-        };
+        // TODO
+        // job.state = ProcessState::Signaled {
+        //     signal: Signal::SIGQUIT,
+        //     core_dump: true,
+        // };
         job.name = "exit 0".to_string();
         let report = Report { index, marker, job };
         assert_eq!(

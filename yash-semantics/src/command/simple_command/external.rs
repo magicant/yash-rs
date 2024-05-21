@@ -112,13 +112,14 @@ pub async fn start_external_utility_in_subshell_and_wait(
 
     match subshell.start_and_wait(env).await {
         Ok((pid, state)) => {
-            if let ProcessState::Stopped(_) = state {
-                let mut job = Job::new(pid);
-                job.job_controlled = true;
-                job.state = state;
-                job.name = job_name;
-                env.jobs.add(job);
-            }
+            // TODO
+            // if let ProcessState::Stopped(_) = state {
+            //     let mut job = Job::new(pid);
+            //     job.job_controlled = true;
+            //     job.state = state;
+            //     job.name = job_name;
+            //     env.jobs.add(job);
+            // }
 
             state.try_into().unwrap()
         }

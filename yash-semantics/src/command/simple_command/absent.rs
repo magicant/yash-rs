@@ -70,16 +70,17 @@ pub async fn execute_absent_target(
 
         match subshell.start_and_wait(env).await {
             Ok((pid, state)) => {
-                if let ProcessState::Stopped(_) = state {
-                    let mut job = Job::new(pid);
-                    job.job_controlled = true;
-                    job.state = state;
-                    job.name = redirs
-                        .iter()
-                        .format_with(" ", |redir, f| f(&format_args!("{redir}")))
-                        .to_string();
-                    env.jobs.add(job);
-                }
+                // TODO
+                // if let ProcessState::Stopped(_) = state {
+                //     let mut job = Job::new(pid);
+                //     job.job_controlled = true;
+                //     job.state = state;
+                //     job.name = redirs
+                //         .iter()
+                //         .format_with(" ", |redir, f| f(&format_args!("{redir}")))
+                //         .to_string();
+                //     env.jobs.add(job);
+                // }
 
                 state.try_into().unwrap()
             }
