@@ -1057,7 +1057,7 @@ mod tests {
     #[allow(clippy::bool_assert_comparison)]
     fn updating_job_status_without_expected_state() {
         let mut list = JobList::default();
-        let state = todo!(); //ProcessState::Exited(ExitStatus(15));
+        let state = ProcessState::exited(15);
         assert_eq!(list.update_status(Pid(20), state), None);
 
         let i10 = list.add(Job::new(Pid(10)));
@@ -1069,7 +1069,7 @@ mod tests {
         assert_eq!(list[i20].state_changed, false);
 
         assert_eq!(list.update_status(Pid(20), state), Some(i20));
-        // TODO assert_eq!(list[i20].state, ProcessState::Exited(ExitStatus(15)));
+        assert_eq!(list[i20].state, ProcessState::exited(15));
         assert_eq!(list[i20].state_changed, true);
 
         assert_eq!(list[i10].state, ProcessState::Running);
@@ -1104,11 +1104,11 @@ mod tests {
         job.state_changed = false;
         let i20 = list.add(job);
 
-        let result = todo!(); // list.update_status(pid, ProcessState::Exited(ExitStatus(0)));
-        // TODO assert_eq!(result, Some(i20));
+        let result = list.update_status(pid, ProcessState::exited(0));
+        assert_eq!(result, Some(i20));
 
         let job = &list[i20];
-        // TODO assert_eq!(job.state, ProcessState::Exited(ExitStatus(0)));
+        assert_eq!(job.state, ProcessState::exited(0));
         assert_eq!(job.expected_state, None);
         assert_eq!(job.state_changed, true);
     }
@@ -1149,7 +1149,7 @@ mod tests {
         // suspended one.
         let mut list = JobList::default();
         let mut suspended = Job::new(Pid(10));
-        suspended.state = todo!(); // ProcessState::Stopped(Signal::SIGSTOP);
+        suspended.state = ProcessState::stopped(Signal::SIGSTOP);
         let running = Job::new(Pid(20));
         let i10 = list.add(suspended.clone());
         let i20 = list.add(running.clone());
@@ -1176,7 +1176,7 @@ mod tests {
         assert_ne!(ex_current_job_index, ex_previous_job_index);
 
         let mut suspended = Job::new(Pid(20));
-        suspended.state = todo!(); // ProcessState::Stopped(Signal::SIGSTOP);
+        suspended.state = ProcessState::stopped(Signal::SIGSTOP);
         let i20 = list.add(suspended);
         let now_current_job_index = list.current_job().unwrap();
         let now_previous_job_index = list.previous_job().unwrap();
@@ -1192,7 +1192,7 @@ mod tests {
         let i18 = list.add(running);
 
         let mut suspended_1 = Job::new(Pid(19));
-        suspended_1.state = todo!(); // ProcessState::Stopped(Signal::SIGSTOP);
+        suspended_1.state = ProcessState::stopped(Signal::SIGSTOP);
         let i19 = list.add(suspended_1);
 
         let ex_current_job_index = list.current_job().unwrap();
@@ -1201,7 +1201,7 @@ mod tests {
         assert_eq!(ex_previous_job_index, i18);
 
         let mut suspended_2 = Job::new(Pid(20));
-        suspended_2.state = todo!(); // ProcessState::Stopped(Signal::SIGSTOP);
+        suspended_2.state = ProcessState::stopped(Signal::SIGSTOP);
         let i20 = list.add(suspended_2);
 
         let now_current_job_index = list.current_job().unwrap();
@@ -1220,9 +1220,9 @@ mod tests {
         let mut suspended_1 = Job::new(Pid(11));
         let mut suspended_2 = Job::new(Pid(12));
         let mut suspended_3 = Job::new(Pid(13));
-        suspended_1.state = todo!(); // ProcessState::Stopped(Signal::SIGSTOP);
-        suspended_2.state = todo!(); // ProcessState::Stopped(Signal::SIGSTOP);
-        suspended_3.state = todo!(); // ProcessState::Stopped(Signal::SIGSTOP);
+        suspended_1.state = ProcessState::stopped(Signal::SIGSTOP);
+        suspended_2.state = ProcessState::stopped(Signal::SIGSTOP);
+        suspended_3.state = ProcessState::stopped(Signal::SIGSTOP);
         list.add(suspended_1);
         list.add(suspended_2);
         list.add(suspended_3);
@@ -1268,9 +1268,9 @@ mod tests {
         let mut suspended_1 = Job::new(Pid(11));
         let mut suspended_2 = Job::new(Pid(12));
         let mut suspended_3 = Job::new(Pid(13));
-        suspended_1.state = todo!(); // ProcessState::Stopped(Signal::SIGSTOP);
-        suspended_2.state = todo!(); // ProcessState::Stopped(Signal::SIGSTOP);
-        suspended_3.state = todo!(); // ProcessState::Stopped(Signal::SIGSTOP);
+        suspended_1.state = ProcessState::stopped(Signal::SIGSTOP);
+        suspended_2.state = ProcessState::stopped(Signal::SIGSTOP);
+        suspended_3.state = ProcessState::stopped(Signal::SIGSTOP);
         list.add(suspended_1);
         list.add(suspended_2);
         list.add(suspended_3);
@@ -1302,8 +1302,8 @@ mod tests {
 
         let mut suspended_1 = Job::new(Pid(11));
         let mut suspended_2 = Job::new(Pid(12));
-        suspended_1.state = todo!(); // ProcessState::Stopped(Signal::SIGSTOP);
-        suspended_2.state = todo!(); // ProcessState::Stopped(Signal::SIGSTOP);
+        suspended_1.state = ProcessState::stopped(Signal::SIGSTOP);
+        suspended_2.state = ProcessState::stopped(Signal::SIGSTOP);
         list.add(suspended_1);
         list.add(suspended_2);
 
@@ -1341,8 +1341,8 @@ mod tests {
 
         let mut suspended_1 = Job::new(Pid(21));
         let mut suspended_2 = Job::new(Pid(22));
-        suspended_1.state = todo!(); // ProcessState::Stopped(Signal::SIGSTOP);
-        suspended_2.state = todo!(); // ProcessState::Stopped(Signal::SIGSTOP);
+        suspended_1.state = ProcessState::stopped(Signal::SIGSTOP);
+        suspended_2.state = ProcessState::stopped(Signal::SIGSTOP);
         let i21 = list.add(suspended_1);
         let i22 = list.add(suspended_2);
 
@@ -1365,7 +1365,7 @@ mod tests {
     fn set_current_job_not_suspended() {
         let mut list = JobList::default();
         let mut suspended = Job::new(Pid(10));
-        suspended.state = todo!(); // ProcessState::Stopped(Signal::SIGTSTP);
+        suspended.state = ProcessState::stopped(Signal::SIGTSTP);
         let running = Job::new(Pid(20));
         let i10 = list.add(suspended);
         let i20 = list.add(running);
@@ -1394,7 +1394,7 @@ mod tests {
     fn resuming_current_job_without_other_suspended_jobs() {
         let mut list = JobList::default();
         let mut suspended = Job::new(Pid(10));
-        suspended.state = todo!(); // ProcessState::Stopped(Signal::SIGTSTP);
+        suspended.state = ProcessState::stopped(Signal::SIGTSTP);
         let running = Job::new(Pid(20));
         let i10 = list.add(suspended);
         let i20 = list.add(running);
@@ -1408,8 +1408,8 @@ mod tests {
         let mut list = JobList::default();
         let mut suspended_1 = Job::new(Pid(10));
         let mut suspended_2 = Job::new(Pid(20));
-        suspended_1.state = todo!(); // ProcessState::Stopped(Signal::SIGTSTP);
-        suspended_2.state = todo!(); // ProcessState::Stopped(Signal::SIGTSTP);
+        suspended_1.state = ProcessState::stopped(Signal::SIGTSTP);
+        suspended_2.state = ProcessState::stopped(Signal::SIGTSTP);
         let i10 = list.add(suspended_1);
         let i20 = list.add(suspended_2);
         list.set_current_job(i10).unwrap();
@@ -1425,9 +1425,9 @@ mod tests {
         let mut suspended_1 = Job::new(Pid(10));
         let mut suspended_2 = Job::new(Pid(20));
         let mut suspended_3 = Job::new(Pid(30));
-        suspended_1.state = todo!(); // ProcessState::Stopped(Signal::SIGTSTP);
-        suspended_2.state = todo!(); // ProcessState::Stopped(Signal::SIGTSTP);
-        suspended_3.state = todo!(); // ProcessState::Stopped(Signal::SIGTSTP);
+        suspended_1.state = ProcessState::stopped(Signal::SIGTSTP);
+        suspended_2.state = ProcessState::stopped(Signal::SIGTSTP);
+        suspended_3.state = ProcessState::stopped(Signal::SIGTSTP);
         list.add(suspended_1);
         list.add(suspended_2);
         list.add(suspended_3);
@@ -1453,9 +1453,9 @@ mod tests {
         let mut suspended_1 = Job::new(Pid(10));
         let mut suspended_2 = Job::new(Pid(20));
         let mut suspended_3 = Job::new(Pid(30));
-        suspended_1.state = todo!(); // ProcessState::Stopped(Signal::SIGTSTP);
-        suspended_2.state = todo!(); // ProcessState::Stopped(Signal::SIGTSTP);
-        suspended_3.state = todo!(); // ProcessState::Stopped(Signal::SIGTSTP);
+        suspended_1.state = ProcessState::stopped(Signal::SIGTSTP);
+        suspended_2.state = ProcessState::stopped(Signal::SIGTSTP);
+        suspended_3.state = ProcessState::stopped(Signal::SIGTSTP);
         list.add(suspended_1);
         list.add(suspended_2);
         list.add(suspended_3);
@@ -1481,9 +1481,9 @@ mod tests {
         let mut suspended_1 = Job::new(Pid(10));
         let mut suspended_2 = Job::new(Pid(20));
         let mut suspended_3 = Job::new(Pid(30));
-        suspended_1.state = todo!(); // ProcessState::Stopped(Signal::SIGTSTP);
-        suspended_2.state = todo!(); // ProcessState::Stopped(Signal::SIGTSTP);
-        suspended_3.state = todo!(); // ProcessState::Stopped(Signal::SIGTSTP);
+        suspended_1.state = ProcessState::stopped(Signal::SIGTSTP);
+        suspended_2.state = ProcessState::stopped(Signal::SIGTSTP);
+        suspended_3.state = ProcessState::stopped(Signal::SIGTSTP);
         let i10 = list.add(suspended_1);
         let i20 = list.add(suspended_2);
         let _i30 = list.add(suspended_3);
@@ -1500,7 +1500,7 @@ mod tests {
         let i11 = list.add(Job::new(Pid(11)));
         let i12 = list.add(Job::new(Pid(12)));
         list.set_current_job(i11).unwrap();
-        // TODO list.update_status(Pid(11), ProcessState::Stopped(Signal::SIGTTOU));
+        list.update_status(Pid(11), ProcessState::stopped(Signal::SIGTTOU));
         assert_eq!(list.current_job(), Some(i11));
         assert_eq!(list.previous_job(), Some(i12));
     }
@@ -1511,7 +1511,7 @@ mod tests {
         let i11 = list.add(Job::new(Pid(11)));
         let i12 = list.add(Job::new(Pid(12)));
         list.set_current_job(i11).unwrap();
-        // TODO list.update_status(Pid(12), ProcessState::Stopped(Signal::SIGTTOU));
+        list.update_status(Pid(12), ProcessState::stopped(Signal::SIGTTOU));
         assert_eq!(list.current_job(), Some(i12));
         assert_eq!(list.previous_job(), Some(i11));
     }
@@ -1523,7 +1523,7 @@ mod tests {
         let _i11 = list.add(Job::new(Pid(11)));
         let i12 = list.add(Job::new(Pid(12)));
         list.set_current_job(i10).unwrap();
-        // TODO list.update_status(Pid(12), ProcessState::Stopped(Signal::SIGTTIN));
+        list.update_status(Pid(12), ProcessState::stopped(Signal::SIGTTIN));
         assert_eq!(list.current_job(), Some(i12));
         assert_eq!(list.previous_job(), Some(i10));
     }
@@ -1534,12 +1534,12 @@ mod tests {
         let i11 = list.add(Job::new(Pid(11)));
         let i12 = list.add(Job::new(Pid(12)));
         let mut suspended = Job::new(Pid(10));
-        suspended.state = todo!(); // ProcessState::Stopped(Signal::SIGTTIN);
+        suspended.state = ProcessState::stopped(Signal::SIGTTIN);
         let i10 = list.add(suspended);
         assert_eq!(list.current_job(), Some(i10));
         assert_eq!(list.previous_job(), Some(i11));
 
-        // TODO list.update_status(Pid(12), ProcessState::Stopped(Signal::SIGTTOU));
+        list.update_status(Pid(12), ProcessState::stopped(Signal::SIGTTOU));
         assert_eq!(list.current_job(), Some(i12));
         assert_eq!(list.previous_job(), Some(i10));
     }
