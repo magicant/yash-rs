@@ -14,8 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SystemEx::fd_is_pipe`
 - `SystemEx::set_blocking`
 - `job::ProcessResult`
-- `job::ProcessResult::is_alive`
+- `job::ProcessResult::{exited, is_stopped}`
 - `job::ProcessState::Halted`
+- `job::ProcessState::{stopped, exited, is_stopped}`
 - `impl From<trap::Condition> for stack::Frame`
 
 ### Changed

@@ -138,13 +138,17 @@ pub enum ProcessResult {
 }
 
 impl ProcessResult {
-    /// Whether the process is not yet terminated
+    /// Creates a new `ProcessResult` instance representing an exited process.
+    #[inline]
     #[must_use]
-    pub fn is_alive(&self) -> bool {
-        match self {
-            ProcessResult::Stopped(_) => true,
-            ProcessResult::Exited(_) | ProcessResult::Signaled { .. } => false,
-        }
+    pub fn exited<S: Into<ExitStatus>>(exit_status: S) -> Self {
+        Self::Exited(exit_status.into())
+    }
+
+    /// Whether the process is stopped
+    #[must_use]
+    pub fn is_stopped(&self) -> bool {
+        matches!(self, ProcessResult::Stopped(_))
     }
 }
 
@@ -166,7 +170,21 @@ pub enum ProcessState {
 }
 
 impl ProcessState {
-    /// Whether the process is not yet terminated.
+    /// Creates a new `ProcessState` instance representing a stopped process.
+    #[inline]
+    #[must_use]
+    pub fn stopped(signal: Signal) -> Self {
+        Self::Halted(ProcessResult::Stopped(signal))
+    }
+
+    /// Creates a new `ProcessState` instance representing an exited process.
+    #[inline]
+    #[must_use]
+    pub fn exited<S: Into<ExitStatus>>(exit_status: S) -> Self {
+        Self::Halted(ProcessResult::exited(exit_status))
+    }
+
+    /// Whether the process is not yet terminated
     #[must_use]
     pub fn is_alive(&self) -> bool {
         match self {
@@ -174,6 +192,12 @@ impl ProcessState {
             // ProcessState::Running | ProcessState::Stopped(_) => true,
             // ProcessState::Exited(_) | ProcessState::Signaled { .. } => false,
         }
+    }
+
+    /// Whether the process is stopped
+    #[must_use]
+    pub fn is_stopped(&self) -> bool {
+        matches!(self, Self::Halted(result) if result.is_stopped())
     }
 
     /// Converts `ProcessState` to `WaitStatus`.
