@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - `job::ProcessState::{Exited, Signaled, Stopped}` in favor of `job::ProcessResult`
+- `job::ProcessState::to_wait_status`
 - `semantics::apply_errexit`
 
 ### Fixed

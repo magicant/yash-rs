@@ -188,9 +188,8 @@ impl ProcessState {
     #[must_use]
     pub fn is_alive(&self) -> bool {
         match self {
-            _ => todo!(),
-            // ProcessState::Running | ProcessState::Stopped(_) => true,
-            // ProcessState::Exited(_) | ProcessState::Signaled { .. } => false,
+            ProcessState::Running => true,
+            ProcessState::Halted(result) => result.is_stopped(),
         }
     }
 
@@ -198,23 +197,6 @@ impl ProcessState {
     #[must_use]
     pub fn is_stopped(&self) -> bool {
         matches!(self, Self::Halted(result) if result.is_stopped())
-    }
-
-    /// Converts `ProcessState` to `WaitStatus`.
-    ///
-    /// This function returns a type defined in the `nix` crate, which is not
-    /// covered by the semantic versioning policy of this crate.
-    #[must_use]
-    pub fn to_wait_status(self, pid: Pid) -> WaitStatus {
-        match self {
-            _ => todo!(),
-            // ProcessState::Running => WaitStatus::Continued(pid.into()),
-            // ProcessState::Exited(exit_status) => WaitStatus::Exited(pid.into(), exit_status.0),
-            // ProcessState::Stopped(signal) => WaitStatus::Stopped(pid.into(), signal),
-            // ProcessState::Signaled { signal, core_dump } => {
-            //     WaitStatus::Signaled(pid.into(), signal, core_dump)
-            // }
-        }
     }
 
     /// Converts `WaitStatus` to `ProcessState`.
@@ -229,14 +211,18 @@ impl ProcessState {
     pub fn from_wait_status(status: WaitStatus) -> Option<(Pid, Self)> {
         match status {
             WaitStatus::Continued(pid) => Some((pid.into(), ProcessState::Running)),
-            // TODO
-            // WaitStatus::Exited(pid, exit_status) => {
-            //     Some((pid.into(), ProcessState::Exited(ExitStatus(exit_status))))
-            // }
-            // WaitStatus::Stopped(pid, signal) => Some((pid.into(), ProcessState::Stopped(signal))),
-            // WaitStatus::Signaled(pid, signal, core_dump) => {
-            //     Some((pid.into(), ProcessState::Signaled { signal, core_dump }))
-            // }
+
+            WaitStatus::Exited(pid, exit_status) => {
+                Some((pid.into(), ProcessState::exited(exit_status)))
+            }
+
+            WaitStatus::Stopped(pid, signal) => Some((pid.into(), ProcessState::stopped(signal))),
+
+            WaitStatus::Signaled(pid, signal, core_dump) => Some((
+                pid.into(),
+                ProcessState::Halted(ProcessResult::Signaled { signal, core_dump }),
+            )),
+
             _ => None,
         }
     }
