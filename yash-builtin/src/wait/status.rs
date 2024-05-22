@@ -29,6 +29,7 @@ use super::core::wait_for_any_job_or_trap;
 use super::core::Error;
 use std::ops::ControlFlow;
 use yash_env::job::JobList;
+use yash_env::job::ProcessResult;
 use yash_env::job::ProcessState;
 use yash_env::option::State;
 use yash_env::semantics::ExitStatus;
@@ -77,21 +78,21 @@ pub fn job_status(
             return ControlFlow::Break(ExitStatus::NOT_FOUND);
         }
 
-        match job.state {
-            // TODO
-            // ProcessState::Exited(exit_status) => {
-            //     jobs.remove(index);
-            //     ControlFlow::Break(exit_status)
-            // }
-            // ProcessState::Signaled { signal, .. } => {
-            //     jobs.remove(index);
-            //     ControlFlow::Break(ExitStatus::from(signal))
-            // }
-            // ProcessState::Stopped(signal) if job_control.into() => {
-            //     ControlFlow::Break(ExitStatus::from(signal))
-            // }
-            _ => ControlFlow::Continue(()),
+        if let ProcessState::Halted(result) = job.state {
+            match result {
+                ProcessResult::Exited(_) | ProcessResult::Signaled { .. } => {
+                    jobs.remove(index);
+                    return ControlFlow::Break(result.into());
+                }
+                ProcessResult::Stopped(_) => {
+                    if job_control.into() {
+                        return ControlFlow::Break(result.into());
+                    }
+                }
+            }
         }
+
+        ControlFlow::Continue(())
     }
 }
 
@@ -145,7 +146,7 @@ mod tests {
     fn status_of_exited_job() {
         let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
-        // TODO job.state = ProcessState::Exited(ExitStatus(0));
+        job.state = ProcessState::exited(0);
         let index = jobs.add(job);
 
         assert_eq!(
@@ -155,7 +156,7 @@ mod tests {
         assert_eq!(jobs.get(index), None);
 
         let mut job = Job::new(Pid(456));
-        // TODO job.state = ProcessState::Exited(ExitStatus(42));
+        job.state = ProcessState::exited(42);
         let index = jobs.add(job);
 
         assert_eq!(
@@ -169,11 +170,10 @@ mod tests {
     fn status_of_signaled_job() {
         let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
-        // TODO
-        // job.state = ProcessState::Signaled {
-        //     signal: Signal::SIGHUP,
-        //     core_dump: false,
-        // };
+        job.state = ProcessState::Halted(ProcessResult::Signaled {
+            signal: Signal::SIGHUP,
+            core_dump: false,
+        });
         let index = jobs.add(job);
 
         assert_eq!(
@@ -183,11 +183,10 @@ mod tests {
         assert_eq!(jobs.get(index), None);
 
         let mut job = Job::new(Pid(456));
-        // TODO
-        // job.state = ProcessState::Signaled {
-        //     signal: Signal::SIGABRT,
-        //     core_dump: true,
-        // };
+        job.state = ProcessState::Halted(ProcessResult::Signaled {
+            signal: Signal::SIGABRT,
+            core_dump: true,
+        });
         let index = jobs.add(job);
 
         assert_eq!(
@@ -201,14 +200,14 @@ mod tests {
     fn status_of_stopped_job_without_job_control() {
         let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
-        // TODO job.state = ProcessState::Stopped(Signal::SIGTSTP);
+        job.state = ProcessState::stopped(Signal::SIGTSTP);
         let index = jobs.add(job);
 
         assert_eq!(job_status(index, Off)(&mut jobs), ControlFlow::Continue(()),);
         assert_eq!(jobs[index].pid, Pid(123));
 
         let mut job = Job::new(Pid(456));
-        // TODO job.state = ProcessState::Stopped(Signal::SIGSTOP);
+        job.state = ProcessState::stopped(Signal::SIGSTOP);
         let index = jobs.add(job);
 
         assert_eq!(job_status(index, Off)(&mut jobs), ControlFlow::Continue(()),);
@@ -219,7 +218,7 @@ mod tests {
     fn status_of_stopped_job_with_job_control() {
         let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
-        // TODO job.state = ProcessState::Stopped(Signal::SIGTSTP);
+        job.state = ProcessState::stopped(Signal::SIGTSTP);
         let index = jobs.add(job);
 
         assert_eq!(
@@ -229,7 +228,7 @@ mod tests {
         assert_eq!(jobs[index].pid, Pid(123));
 
         let mut job = Job::new(Pid(456));
-        // TODO job.state = ProcessState::Stopped(Signal::SIGSTOP);
+        job.state = ProcessState::stopped(Signal::SIGSTOP);
         let index = jobs.add(job);
 
         assert_eq!(
@@ -288,7 +287,7 @@ mod tests {
     fn any_job_is_running_with_exited_jobs() {
         let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
-        // TODO job.state = ProcessState::Exited(ExitStatus(0));
+        job.state = ProcessState::exited(0);
         jobs.add(job);
 
         assert_eq!(
@@ -297,7 +296,7 @@ mod tests {
         );
 
         let mut job = Job::new(Pid(456));
-        // TODO job.state = ProcessState::Exited(ExitStatus(42));
+        job.state = ProcessState::exited(42);
         jobs.add(job);
 
         assert_eq!(
@@ -318,13 +317,13 @@ mod tests {
 
         jobs.add(Job::new(Pid(456)));
 
-        assert_eq!(any_job_is_running(On)(&mut jobs), ControlFlow::Continue(()),);
+        assert_eq!(any_job_is_running(On)(&mut jobs), ControlFlow::Continue(()));
 
         // Exited jobs are ignored
         let mut job = Job::new(Pid(789));
-        // TODO job.state = ProcessState::Exited(ExitStatus(0));
+        job.state = ProcessState::exited(0);
         jobs.add(job);
 
-        assert_eq!(any_job_is_running(On)(&mut jobs), ControlFlow::Continue(()),);
+        assert_eq!(any_job_is_running(On)(&mut jobs), ControlFlow::Continue(()));
     }
 }

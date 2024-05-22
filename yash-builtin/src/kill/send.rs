@@ -129,7 +129,6 @@ mod tests {
     use assert_matches::assert_matches;
     use yash_env::job::Job;
     use yash_env::job::ProcessState;
-    use yash_semantics::ExitStatus;
 
     #[test]
     fn resolve_target_process_ids() {
@@ -197,7 +196,7 @@ mod tests {
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.is_owned = true;
-        // TODO job.state = ProcessState::Exited(ExitStatus(0));
+        job.state = ProcessState::exited(0);
         job.name = "my job".into();
         jobs.add(job);
 

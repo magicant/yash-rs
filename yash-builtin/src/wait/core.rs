@@ -136,11 +136,10 @@ mod tests {
             let result = wait_for_any_job_or_trap(&mut env).await;
             assert_eq!(result, Ok(()));
             // The job state is updated.
-            // TODO
-            // assert_eq!(
-            //     env.jobs[index].state,
-            //     ProcessState::Exited(ExitStatus::default()),
-            // );
+            assert_eq!(
+                env.jobs[index].state,
+                ProcessState::exited(ExitStatus::default()),
+            );
         });
     }
 
@@ -158,11 +157,10 @@ mod tests {
             let result = wait_for_any_job_or_trap(&mut env).await;
             assert_eq!(result, Ok(()));
             // The job state is updated.
-            // TODO
-            // assert_eq!(
-            //     env.jobs[index].state,
-            //     ProcessState::Stopped(Signal::SIGSTOP),
-            // );
+            assert_eq!(
+                env.jobs[index].state,
+                ProcessState::stopped(Signal::SIGSTOP),
+            );
         });
     }
 
