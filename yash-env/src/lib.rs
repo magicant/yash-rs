@@ -360,8 +360,10 @@ impl Env {
     ) -> Result<(Pid, ExitStatus), Errno> {
         loop {
             let (pid, state) = self.wait_for_subshell(target).await?;
-            if !state.is_alive() {
-                return Ok((pid, state.try_into().unwrap()));
+            if let Ok(exit_status) = state.try_into() {
+                if !state.is_alive() {
+                    return Ok((pid, exit_status));
+                }
             }
         }
     }
