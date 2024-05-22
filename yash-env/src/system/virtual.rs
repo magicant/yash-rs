@@ -292,11 +292,11 @@ impl VirtualSystem {
 
             match process.state {
                 ProcessState::Running => Poll::Ready(()),
-                _ => todo!(),
-                // ProcessState::Exited(_) | ProcessState::Signaled { .. } => Poll::Pending,
-                _ /* TODO ProcessState::Stopped(_) */ => {
-                    waker.set(Some(cx.waker().clone()));
-                    process.wake_on_resumption(Rc::downgrade(&waker));
+                ProcessState::Halted(result) => {
+                    if result.is_stopped() {
+                        waker.set(Some(cx.waker().clone()));
+                        process.wake_on_resumption(Rc::downgrade(&waker));
+                    }
                     Poll::Pending
                 }
             }
@@ -908,13 +908,12 @@ impl System for VirtualSystem {
                         .processes
                         .get_mut(&process_id)
                         .expect("missing child process");
-                    // TODO
-                    // if process.state == ProcessState::Running
-                    //     && process.set_state(ProcessState::Exited(child_env.exit_status))
-                    // {
-                    //     let ppid = process.ppid;
-                    //     raise_sigchld(&mut state, ppid);
-                    // }
+                    if process.state == ProcessState::Running
+                        && process.set_state(ProcessState::exited(child_env.exit_status))
+                    {
+                        let ppid = process.ppid;
+                        raise_sigchld(&mut state, ppid);
+                    }
                 });
 
                 executor
@@ -1236,13 +1235,15 @@ impl Future for ProcessRunner<'_> {
         let mut process = this.system.current_process_mut();
         match process.state {
             ProcessState::Running => Poll::Pending,
-            _ => todo!(),
-            // ProcessState::Exited(_) | ProcessState::Signaled { .. } => Poll::Ready(()),
-            // ProcessState::Stopped(_) => {
-            //     this.waker.set(Some(cx.waker().clone()));
-            //     process.wake_on_resumption(Rc::downgrade(&this.waker));
-            //     Poll::Pending
-            // }
+            ProcessState::Halted(result) => {
+                if result.is_stopped() {
+                    this.waker.set(Some(cx.waker().clone()));
+                    process.wake_on_resumption(Rc::downgrade(&this.waker));
+                    Poll::Pending
+                } else {
+                    Poll::Ready(())
+                }
+            }
         }
     }
 }
@@ -1250,6 +1251,7 @@ impl Future for ProcessRunner<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::job::ProcessResult;
     use crate::semantics::ExitStatus;
     use crate::Env;
     use assert_matches::assert_matches;
@@ -1824,14 +1826,13 @@ mod tests {
             .now_or_never();
         // The future should be pending because the current process has been killed
         assert_eq!(result, None);
-        // TODO
-        // assert_eq!(
-        //     system.current_process().state(),
-        //     ProcessState::Signaled {
-        //         signal: Signal::SIGINT,
-        //         core_dump: false
-        //     }
-        // );
+        assert_eq!(
+            system.current_process().state(),
+            ProcessState::Halted(ProcessResult::Signaled {
+                signal: Signal::SIGINT,
+                core_dump: false
+            })
+        );
 
         let mut system = VirtualSystem::new();
         let state = system.state.borrow();
@@ -1868,14 +1869,13 @@ mod tests {
         assert_eq!(result, None);
         let state = system.state.borrow();
         for process in state.processes.values() {
-            // TODO
-            // assert_eq!(
-            //     process.state,
-            //     ProcessState::Signaled {
-            //         signal: Signal::SIGTERM,
-            //         core_dump: false
-            //     }
-            // );
+            assert_eq!(
+                process.state,
+                ProcessState::Halted(ProcessResult::Signaled {
+                    signal: Signal::SIGTERM,
+                    core_dump: false
+                })
+            );
         }
     }
 
@@ -1903,28 +1903,27 @@ mod tests {
         // The future should be pending because the current process has been killed
         assert_eq!(result, None);
         let state = system.state.borrow();
-        // TODO
-        // assert_eq!(
-        //     state.processes[&system.process_id].state,
-        //     ProcessState::Signaled {
-        //         signal: Signal::SIGQUIT,
-        //         core_dump: true
-        //     }
-        // );
-        // assert_eq!(
-        //     state.processes[&Pid(10)].state,
-        //     ProcessState::Signaled {
-        //         signal: Signal::SIGQUIT,
-        //         core_dump: true
-        //     }
-        // );
-        // assert_eq!(
-        //     state.processes[&Pid(11)].state,
-        //     ProcessState::Signaled {
-        //         signal: Signal::SIGQUIT,
-        //         core_dump: true
-        //     }
-        // );
+        assert_eq!(
+            state.processes[&system.process_id].state,
+            ProcessState::Halted(ProcessResult::Signaled {
+                signal: Signal::SIGQUIT,
+                core_dump: true
+            })
+        );
+        assert_eq!(
+            state.processes[&Pid(10)].state,
+            ProcessState::Halted(ProcessResult::Signaled {
+                signal: Signal::SIGQUIT,
+                core_dump: true
+            })
+        );
+        assert_eq!(
+            state.processes[&Pid(11)].state,
+            ProcessState::Halted(ProcessResult::Signaled {
+                signal: Signal::SIGQUIT,
+                core_dump: true
+            })
+        );
         assert_eq!(state.processes[&Pid(21)].state, ProcessState::Running);
     }
 
@@ -1957,21 +1956,20 @@ mod tests {
             ProcessState::Running
         );
         assert_eq!(state.processes[&Pid(10)].state, ProcessState::Running);
-        // TODO
-        // assert_eq!(
-        //     state.processes[&Pid(11)].state,
-        //     ProcessState::Signaled {
-        //         signal: Signal::SIGHUP,
-        //         core_dump: false
-        //     }
-        // );
-        // assert_eq!(
-        //     state.processes[&Pid(21)].state,
-        //     ProcessState::Signaled {
-        //         signal: Signal::SIGHUP,
-        //         core_dump: false
-        //     }
-        // );
+        assert_eq!(
+            state.processes[&Pid(11)].state,
+            ProcessState::Halted(ProcessResult::Signaled {
+                signal: Signal::SIGHUP,
+                core_dump: false
+            })
+        );
+        assert_eq!(
+            state.processes[&Pid(21)].state,
+            ProcessState::Halted(ProcessResult::Signaled {
+                signal: Signal::SIGHUP,
+                core_dump: false
+            })
+        );
     }
 
     #[test]
@@ -2426,7 +2424,7 @@ mod tests {
         executor.run_until_stalled();
 
         let result = env.system.wait(pid);
-        // TODO assert_eq!(result, Ok(Some((pid, ProcessState::Exited(ExitStatus(5))))));
+        assert_eq!(result, Ok(Some((pid, ProcessState::exited(5)))));
     }
 
     #[test]
@@ -2451,17 +2449,16 @@ mod tests {
         executor.run_until_stalled();
 
         let result = env.system.wait(pid);
-        // TODO
-        // assert_eq!(
-        //     result,
-        //     Ok(Some((
-        //         pid,
-        //         ProcessState::Signaled {
-        //             signal: Signal::SIGKILL,
-        //             core_dump: false
-        //         }
-        //     )))
-        // );
+        assert_eq!(
+            result,
+            Ok(Some((
+                pid,
+                ProcessState::Halted(ProcessResult::Signaled {
+                    signal: Signal::SIGKILL,
+                    core_dump: false
+                })
+            )))
+        );
     }
 
     #[test]
@@ -2486,11 +2483,10 @@ mod tests {
         executor.run_until_stalled();
 
         let result = env.system.wait(pid);
-        // TODO
-        // assert_eq!(
-        //     result,
-        //     Ok(Some((pid, ProcessState::Stopped(Signal::SIGSTOP))))
-        // );
+        assert_eq!(
+            result,
+            Ok(Some((pid, ProcessState::stopped(Signal::SIGSTOP))))
+        );
     }
 
     #[test]
@@ -2527,11 +2523,7 @@ mod tests {
         executor.run_until_stalled();
 
         let result = env.system.wait(pid);
-        // TODO
-        // assert_eq!(
-        //     result,
-        //     Ok(Some((pid, ProcessState::Exited(ExitStatus(123)))))
-        // );
+        assert_eq!(result, Ok(Some((pid, ProcessState::exited(123)))));
     }
 
     #[test]

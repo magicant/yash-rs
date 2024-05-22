@@ -21,6 +21,7 @@ use super::signal::SignalEffect;
 use super::Mode;
 use crate::io::Fd;
 use crate::job::Pid;
+use crate::job::ProcessResult;
 use crate::job::ProcessState;
 use crate::system::resource::LimitPair;
 use crate::system::resource::Resource;
@@ -267,10 +268,9 @@ impl Process {
     ///
     /// This function does nothing if the process is not stopped.
     pub fn wake_on_resumption(&mut self, waker: Weak<Cell<Option<Waker>>>) {
-        // TODO
-        // if matches!(self.state, ProcessState::Stopped(_)) {
-        //     self.resumption_awaiters.push(waker);
-        // }
+        if self.state.is_stopped() {
+            self.resumption_awaiters.push(waker);
+        }
     }
 
     /// Returns the process state.
@@ -306,9 +306,11 @@ impl Process {
                         }
                     }
                 }
-                // ProcessState::Exited(_) | ProcessState::Signaled { .. } => self.close_fds(),
-                // ProcessState::Stopped(_) => (),
-                _ => todo!(),
+                ProcessState::Halted(result) => {
+                    if !result.is_stopped() {
+                        self.close_fds()
+                    }
+                }
             }
             self.state_has_changed = true;
             true
@@ -418,9 +420,10 @@ impl Process {
                 let process_state_changed = match SignalEffect::of(signal) {
                     SignalEffect::None | SignalEffect::Resume => false,
                     SignalEffect::Terminate { core_dump } => {
-                        todo!() // self.set_state(ProcessState::Signaled { signal, core_dump })
+                        let result = ProcessResult::Signaled { signal, core_dump };
+                        self.set_state(ProcessState::Halted(result))
                     }
-                    SignalEffect::Suspend => todo!(), // self.set_state(ProcessState::Stopped(signal)),
+                    SignalEffect::Suspend => self.set_state(ProcessState::stopped(signal)),
                 };
                 SignalResult {
                     delivered: true,
@@ -517,7 +520,6 @@ impl BitOrAssign for SignalResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::semantics::ExitStatus;
     use crate::system::r#virtual::file_system::{FileBody, INode, Mode};
     use crate::system::r#virtual::io::OpenFileDescription;
     use crate::system::FdFlag;
@@ -594,7 +596,7 @@ mod tests {
     #[test]
     fn process_set_state_wakes_on_resumed() {
         let mut process = Process::with_parent_and_group(Pid(1), Pid(2));
-        // TODO process.state = ProcessState::Stopped(Signal::SIGTSTP);
+        process.state = ProcessState::stopped(Signal::SIGTSTP);
         let process = Rc::new(RefCell::new(process));
         let process2 = Rc::clone(&process);
         let waker = Rc::new(Cell::new(None));
@@ -621,18 +623,19 @@ mod tests {
     #[test]
     fn process_set_state_closes_all_fds_on_exit() {
         let (mut process, _reader, _writer) = process_with_pipe();
-        // TODO assert!(process.set_state(ProcessState::Exited(ExitStatus(3))));
+        assert!(process.set_state(ProcessState::exited(3)));
         assert!(process.fds().is_empty(), "{:?}", process.fds());
     }
 
     #[test]
     fn process_set_state_closes_all_fds_on_signaled() {
         let (mut process, _reader, _writer) = process_with_pipe();
-        // TODO
-        // assert!(process.set_state(ProcessState::Signaled {
-        //     signal: Signal::SIGINT,
-        //     core_dump: false
-        // }));
+        assert!(
+            process.set_state(ProcessState::Halted(ProcessResult::Signaled {
+                signal: Signal::SIGINT,
+                core_dump: false
+            }))
+        );
         assert!(process.fds().is_empty(), "{:?}", process.fds());
     }
 
@@ -766,14 +769,13 @@ mod tests {
                 process_state_changed: true,
             }
         );
-        // TODO
-        // assert_eq!(
-        //     process.state(),
-        //     ProcessState::Signaled {
-        //         signal: Signal::SIGTERM,
-        //         core_dump: false
-        //     }
-        // );
+        assert_eq!(
+            process.state(),
+            ProcessState::Halted(ProcessResult::Signaled {
+                signal: Signal::SIGTERM,
+                core_dump: false
+            })
+        );
         assert_eq!(process.caught_signals, []);
     }
 
@@ -789,14 +791,13 @@ mod tests {
                 process_state_changed: true,
             }
         );
-        // TODO
-        // assert_eq!(
-        //     process.state(),
-        //     ProcessState::Signaled {
-        //         signal: Signal::SIGABRT,
-        //         core_dump: true
-        //     }
-        // );
+        assert_eq!(
+            process.state(),
+            ProcessState::Halted(ProcessResult::Signaled {
+                signal: Signal::SIGABRT,
+                core_dump: true
+            })
+        );
         assert_eq!(process.caught_signals, []);
         // TODO Check if core dump file has been created
     }
@@ -813,14 +814,14 @@ mod tests {
                 process_state_changed: true,
             }
         );
-        // TODO assert_eq!(process.state(), ProcessState::Stopped(Signal::SIGTSTP));
+        assert_eq!(process.state(), ProcessState::stopped(Signal::SIGTSTP));
         assert_eq!(process.caught_signals, []);
     }
 
     #[test]
     fn process_raise_signal_default_continuing() {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
-        // TODO let _ = process.set_state(ProcessState::Stopped(Signal::SIGTTOU));
+        let _ = process.set_state(ProcessState::stopped(Signal::SIGTTOU));
         let result = process.raise_signal(Signal::SIGCONT);
         assert_eq!(
             result,
@@ -854,7 +855,7 @@ mod tests {
     #[test]
     fn process_raise_signal_ignored_and_blocked_sigcont() {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
-        // TODO let _ = process.set_state(ProcessState::Stopped(Signal::SIGTTOU));
+        let _ = process.set_state(ProcessState::stopped(Signal::SIGTTOU));
         let _ = process.set_signal_handling(Signal::SIGCONT, SignalHandling::Ignore);
         let _ = process.block_signals(SigmaskHow::SIG_BLOCK, &to_set([Signal::SIGCONT]));
         let result = process.raise_signal(Signal::SIGCONT);
