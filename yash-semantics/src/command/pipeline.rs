@@ -25,7 +25,6 @@ use std::rc::Rc;
 use yash_env::io::Fd;
 use yash_env::job::Job;
 use yash_env::job::Pid;
-use yash_env::job::ProcessState;
 use yash_env::option::Option::Exec;
 use yash_env::option::State::Off;
 use yash_env::semantics::Divert;
@@ -144,14 +143,13 @@ async fn execute_job_controlled_pipeline(
 
     match subshell.start_and_wait(env).await {
         Ok((pid, state)) => {
-            // TODO
-            // if let ProcessState::Stopped(_) = state {
-            //     let mut job = Job::new(pid);
-            //     job.job_controlled = true;
-            //     job.state = state;
-            //     job.name = to_job_name(commands);
-            //     env.jobs.add(job);
-            // }
+            if state.is_stopped() {
+                let mut job = Job::new(pid);
+                job.job_controlled = true;
+                job.state = state;
+                job.name = to_job_name(commands);
+                env.jobs.add(job);
+            }
 
             env.exit_status = state.try_into().unwrap();
             Continue(())
@@ -340,6 +338,7 @@ mod tests {
     use std::rc::Rc;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
+    use yash_env::job::ProcessResult;
     use yash_env::job::ProcessState;
     use yash_env::option::Option::ErrExit;
     use yash_env::option::Option::Monitor;
@@ -406,7 +405,10 @@ mod tests {
                 if *pid == env.main_pid {
                     assert_eq!(process.state(), ProcessState::Running);
                 } else {
-                    // TODO assert_matches!(process.state(), ProcessState::Exited(_));
+                    assert_matches!(
+                        process.state(),
+                        ProcessState::Halted(ProcessResult::Exited(_))
+                    );
                 }
             }
         });
@@ -434,7 +436,7 @@ mod tests {
 
             let state = state.borrow();
             let process = &state.processes[&async_pid];
-            // TODO assert_eq!(process.state(), ProcessState::Exited(ExitStatus(7)));
+            assert_eq!(process.state(), ProcessState::exited(7));
             assert!(process.state_has_changed());
         });
     }
@@ -630,7 +632,7 @@ mod tests {
             assert_eq!(env.jobs.len(), 1);
             let job = env.jobs.iter().next().unwrap().1;
             assert!(job.job_controlled);
-            // TODO assert_eq!(job.state, ProcessState::Stopped(Signal::SIGSTOP));
+            assert_eq!(job.state, ProcessState::stopped(Signal::SIGSTOP));
             assert!(job.state_changed);
             assert_eq!(job.name, "return -n 0 | suspend x");
         })
