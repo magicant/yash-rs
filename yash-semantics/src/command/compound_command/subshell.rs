@@ -37,16 +37,16 @@ pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Resu
     let subshell = Subshell::new(|sub_env, _job_control| Box::pin(subshell_main(sub_env, body_2)));
     let subshell = subshell.job_control(JobControl::Foreground);
     match subshell.start_and_wait(env).await {
-        Ok((pid, state)) => {
-            if state.is_stopped() {
+        Ok((pid, result)) => {
+            if result.is_stopped() {
                 let mut job = Job::new(pid);
                 job.job_controlled = true;
-                job.state = state;
+                job.state = result.into();
                 job.name = body.to_string();
                 env.jobs.add(job);
             }
 
-            env.exit_status = state.try_into().unwrap();
+            env.exit_status = result.into();
             env.apply_errexit()
         }
         Err(errno) => {

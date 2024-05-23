@@ -68,11 +68,11 @@ pub async fn execute_absent_target(
         .job_control(JobControl::Foreground);
 
         match subshell.start_and_wait(env).await {
-            Ok((pid, state)) => {
-                if state.is_stopped() {
+            Ok((pid, result)) => {
+                if result.is_stopped() {
                     let mut job = Job::new(pid);
                     job.job_controlled = true;
-                    job.state = state;
+                    job.state = result.into();
                     job.name = redirs
                         .iter()
                         .format_with(" ", |redir, f| f(&format_args!("{redir}")))
@@ -80,7 +80,7 @@ pub async fn execute_absent_target(
                     env.jobs.add(job);
                 }
 
-                state.try_into().unwrap()
+                result.into()
             }
             Err(errno) => {
                 print_error(

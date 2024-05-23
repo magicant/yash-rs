@@ -142,16 +142,16 @@ async fn execute_job_controlled_pipeline(
     .job_control(JobControl::Foreground);
 
     match subshell.start_and_wait(env).await {
-        Ok((pid, state)) => {
-            if state.is_stopped() {
+        Ok((pid, result)) => {
+            if result.is_stopped() {
                 let mut job = Job::new(pid);
                 job.job_controlled = true;
-                job.state = state;
+                job.state = result.into();
                 job.name = to_job_name(commands);
                 env.jobs.add(job);
             }
 
-            env.exit_status = state.try_into().unwrap();
+            env.exit_status = result.into();
             Continue(())
         }
         Err(errno) => {
