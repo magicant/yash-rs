@@ -292,10 +292,11 @@ impl VirtualSystem {
 
             match process.state {
                 ProcessState::Running => Poll::Ready(()),
-                ProcessState::Exited(_) | ProcessState::Signaled { .. } => Poll::Pending,
-                ProcessState::Stopped(_) => {
-                    waker.set(Some(cx.waker().clone()));
-                    process.wake_on_resumption(Rc::downgrade(&waker));
+                ProcessState::Halted(result) => {
+                    if result.is_stopped() {
+                        waker.set(Some(cx.waker().clone()));
+                        process.wake_on_resumption(Rc::downgrade(&waker));
+                    }
                     Poll::Pending
                 }
             }
@@ -908,7 +909,7 @@ impl System for VirtualSystem {
                         .get_mut(&process_id)
                         .expect("missing child process");
                     if process.state == ProcessState::Running
-                        && process.set_state(ProcessState::Exited(child_env.exit_status))
+                        && process.set_state(ProcessState::exited(child_env.exit_status))
                     {
                         let ppid = process.ppid;
                         raise_sigchld(&mut state, ppid);
@@ -1234,11 +1235,14 @@ impl Future for ProcessRunner<'_> {
         let mut process = this.system.current_process_mut();
         match process.state {
             ProcessState::Running => Poll::Pending,
-            ProcessState::Exited(_) | ProcessState::Signaled { .. } => Poll::Ready(()),
-            ProcessState::Stopped(_) => {
-                this.waker.set(Some(cx.waker().clone()));
-                process.wake_on_resumption(Rc::downgrade(&this.waker));
-                Poll::Pending
+            ProcessState::Halted(result) => {
+                if result.is_stopped() {
+                    this.waker.set(Some(cx.waker().clone()));
+                    process.wake_on_resumption(Rc::downgrade(&this.waker));
+                    Poll::Pending
+                } else {
+                    Poll::Ready(())
+                }
             }
         }
     }
@@ -1247,6 +1251,7 @@ impl Future for ProcessRunner<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::job::ProcessResult;
     use crate::semantics::ExitStatus;
     use crate::Env;
     use assert_matches::assert_matches;
@@ -1823,10 +1828,10 @@ mod tests {
         assert_eq!(result, None);
         assert_eq!(
             system.current_process().state(),
-            ProcessState::Signaled {
+            ProcessState::Halted(ProcessResult::Signaled {
                 signal: Signal::SIGINT,
                 core_dump: false
-            }
+            })
         );
 
         let mut system = VirtualSystem::new();
@@ -1866,10 +1871,10 @@ mod tests {
         for process in state.processes.values() {
             assert_eq!(
                 process.state,
-                ProcessState::Signaled {
+                ProcessState::Halted(ProcessResult::Signaled {
                     signal: Signal::SIGTERM,
                     core_dump: false
-                }
+                })
             );
         }
     }
@@ -1900,24 +1905,24 @@ mod tests {
         let state = system.state.borrow();
         assert_eq!(
             state.processes[&system.process_id].state,
-            ProcessState::Signaled {
+            ProcessState::Halted(ProcessResult::Signaled {
                 signal: Signal::SIGQUIT,
                 core_dump: true
-            }
+            })
         );
         assert_eq!(
             state.processes[&Pid(10)].state,
-            ProcessState::Signaled {
+            ProcessState::Halted(ProcessResult::Signaled {
                 signal: Signal::SIGQUIT,
                 core_dump: true
-            }
+            })
         );
         assert_eq!(
             state.processes[&Pid(11)].state,
-            ProcessState::Signaled {
+            ProcessState::Halted(ProcessResult::Signaled {
                 signal: Signal::SIGQUIT,
                 core_dump: true
-            }
+            })
         );
         assert_eq!(state.processes[&Pid(21)].state, ProcessState::Running);
     }
@@ -1953,17 +1958,17 @@ mod tests {
         assert_eq!(state.processes[&Pid(10)].state, ProcessState::Running);
         assert_eq!(
             state.processes[&Pid(11)].state,
-            ProcessState::Signaled {
+            ProcessState::Halted(ProcessResult::Signaled {
                 signal: Signal::SIGHUP,
                 core_dump: false
-            }
+            })
         );
         assert_eq!(
             state.processes[&Pid(21)].state,
-            ProcessState::Signaled {
+            ProcessState::Halted(ProcessResult::Signaled {
                 signal: Signal::SIGHUP,
                 core_dump: false
-            }
+            })
         );
     }
 
@@ -2419,7 +2424,7 @@ mod tests {
         executor.run_until_stalled();
 
         let result = env.system.wait(pid);
-        assert_eq!(result, Ok(Some((pid, ProcessState::Exited(ExitStatus(5))))));
+        assert_eq!(result, Ok(Some((pid, ProcessState::exited(5)))));
     }
 
     #[test]
@@ -2448,10 +2453,10 @@ mod tests {
             result,
             Ok(Some((
                 pid,
-                ProcessState::Signaled {
+                ProcessState::Halted(ProcessResult::Signaled {
                     signal: Signal::SIGKILL,
                     core_dump: false
-                }
+                })
             )))
         );
     }
@@ -2480,7 +2485,7 @@ mod tests {
         let result = env.system.wait(pid);
         assert_eq!(
             result,
-            Ok(Some((pid, ProcessState::Stopped(Signal::SIGSTOP))))
+            Ok(Some((pid, ProcessState::stopped(Signal::SIGSTOP))))
         );
     }
 
@@ -2518,10 +2523,7 @@ mod tests {
         executor.run_until_stalled();
 
         let result = env.system.wait(pid);
-        assert_eq!(
-            result,
-            Ok(Some((pid, ProcessState::Exited(ExitStatus(123)))))
-        );
+        assert_eq!(result, Ok(Some((pid, ProcessState::exited(123)))));
     }
 
     #[test]

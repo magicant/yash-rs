@@ -27,6 +27,7 @@
 //! properly.
 
 use crate::job::Pid;
+use crate::job::ProcessResult;
 use crate::job::ProcessState;
 use crate::stack::Frame;
 use crate::system::ChildProcessTask;
@@ -224,9 +225,8 @@ where
     /// suspended.
     ///
     /// If the subshell started successfully, the return value is the process ID
-    /// and the process state of the subshell, which is `Exited`, `Signaled`, or
-    /// `Stopped`. If there was an error starting the subshell, this function
-    /// returns the error.
+    /// and the process result of the subshell. If there was an error starting
+    /// the subshell, this function returns the error.
     ///
     /// If you set [`job_control`](Self::job_control) to
     /// `JobControl::Foreground` and job control is effective as per
@@ -235,17 +235,14 @@ where
     ///
     /// When a job-controlled subshell suspends, this function does not add it
     /// to `env.jobs`. You have to do it for yourself if necessary.
-    pub async fn start_and_wait(self, env: &mut Env) -> Result<(Pid, ProcessState), Errno> {
+    pub async fn start_and_wait(self, env: &mut Env) -> Result<(Pid, ProcessResult), Errno> {
         let (pid, job_control) = self.start(env).await?;
         let result = loop {
-            let (pid, state) = env.wait_for_subshell(pid).await?;
-            let is_done = match state {
-                ProcessState::Running => false,
-                ProcessState::Stopped(_) => job_control.is_some(),
-                ProcessState::Exited(_) | ProcessState::Signaled { .. } => true,
-            };
-            if is_done {
-                break Ok((pid, state));
+            let state = env.wait_for_subshell(pid).await?.1;
+            if let ProcessState::Halted(result) = state {
+                if !result.is_stopped() || job_control.is_some() {
+                    break result;
+                }
             }
         };
 
@@ -255,7 +252,7 @@ where
             }
         }
 
-        result
+        Ok((pid, result))
     }
 }
 
@@ -586,8 +583,8 @@ mod tests {
             let subshell = Subshell::new(|env, _job_control| {
                 Box::pin(async { env.exit_status = ExitStatus(42) })
             });
-            let (_pid, process_state) = subshell.start_and_wait(&mut env).await.unwrap();
-            assert_eq!(process_state, ProcessState::Exited(ExitStatus(42)));
+            let (_pid, process_result) = subshell.start_and_wait(&mut env).await.unwrap();
+            assert_eq!(process_result, ProcessResult::exited(42));
         });
     }
 
@@ -601,8 +598,8 @@ mod tests {
                 Box::pin(async { env.exit_status = ExitStatus(123) })
             })
             .job_control(JobControl::Foreground);
-            let (_pid, process_state) = subshell.start_and_wait(&mut env).await.unwrap();
-            assert_eq!(process_state, ProcessState::Exited(ExitStatus(123)));
+            let (_pid, process_result) = subshell.start_and_wait(&mut env).await.unwrap();
+            assert_eq!(process_result, ProcessResult::exited(123));
             assert_eq!(state.borrow().foreground, Some(env.main_pgid));
         });
     }
@@ -653,10 +650,7 @@ mod tests {
                 .unwrap();
 
             let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
-            assert_eq!(
-                child_result,
-                (child_pid, ProcessState::Exited(ExitStatus(123)))
-            );
+            assert_eq!(child_result, (child_pid, ProcessState::exited(123)));
 
             let state = state.borrow();
             let parent_process = &state.processes[&parent_env.main_pid];
@@ -716,10 +710,7 @@ mod tests {
             .unwrap();
 
             let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
-            assert_eq!(
-                child_result,
-                (child_pid, ProcessState::Exited(ExitStatus(123)))
-            );
+            assert_eq!(child_result, (child_pid, ProcessState::exited(123)));
 
             let state = state.borrow();
             let child_process = &state.processes[&child_pid];
@@ -758,10 +749,7 @@ mod tests {
             .unwrap();
 
             let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
-            assert_eq!(
-                child_result,
-                (child_pid, ProcessState::Exited(ExitStatus(123)))
-            );
+            assert_eq!(child_result, (child_pid, ProcessState::exited(123)));
 
             let state = state.borrow();
             let child_process = &state.processes[&child_pid];
@@ -794,10 +782,7 @@ mod tests {
             .unwrap();
 
             let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
-            assert_eq!(
-                child_result,
-                (child_pid, ProcessState::Exited(ExitStatus(123)))
-            );
+            assert_eq!(child_result, (child_pid, ProcessState::exited(123)));
 
             let state = state.borrow();
             let child_process = &state.processes[&child_pid];
@@ -830,10 +815,7 @@ mod tests {
             .unwrap();
 
             let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
-            assert_eq!(
-                child_result,
-                (child_pid, ProcessState::Exited(ExitStatus(123)))
-            );
+            assert_eq!(child_result, (child_pid, ProcessState::exited(123)));
 
             let state = state.borrow();
             let child_process = &state.processes[&child_pid];

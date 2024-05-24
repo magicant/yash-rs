@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `System::shell_path`
 - `SystemEx::fd_is_pipe`
 - `SystemEx::set_blocking`
+- `job::ProcessResult`
+- `job::ProcessResult::{exited, is_stopped}`
+- `impl From<job::ProcessResult> for ExitStatus`
+- `job::ProcessState::Halted`
+- `job::ProcessState::{stopped, exited, is_stopped}`
 - `impl From<trap::Condition> for stack::Frame`
 
 ### Changed
@@ -27,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- `job::ProcessState::{Exited, Signaled, Stopped}` in favor of `job::ProcessResult`
+- `job::ProcessState::to_wait_status`
 - `semantics::apply_errexit`
 
 ### Fixed

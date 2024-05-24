@@ -26,7 +26,6 @@ use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::io::print_error;
 use yash_env::job::Job;
-use yash_env::job::ProcessState;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
@@ -69,11 +68,11 @@ pub async fn execute_absent_target(
         .job_control(JobControl::Foreground);
 
         match subshell.start_and_wait(env).await {
-            Ok((pid, state)) => {
-                if let ProcessState::Stopped(_) = state {
+            Ok((pid, result)) => {
+                if result.is_stopped() {
                     let mut job = Job::new(pid);
                     job.job_controlled = true;
-                    job.state = state;
+                    job.state = result.into();
                     job.name = redirs
                         .iter()
                         .format_with(" ", |redir, f| f(&format_args!("{redir}")))
@@ -81,7 +80,7 @@ pub async fn execute_absent_target(
                     env.jobs.add(job);
                 }
 
-                state.try_into().unwrap()
+                result.into()
             }
             Err(errno) => {
                 print_error(
