@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Env::errexit_is_applicable`
 - `System::shell_path`
+- `System::{validate_signal, signal_number_from_name}`
+- `SystemEx::signal_name_from_number`
 - `SystemEx::fd_is_pipe`
 - `SystemEx::set_blocking`
 - `job::ProcessResult`
@@ -19,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `job::ProcessState::Halted`
 - `job::ProcessState::{stopped, exited, is_stopped}`
 - `impl From<trap::Condition> for stack::Frame`
+- `signal::{Number, RawNumber, Name, NameIter, UnknownNameError}`
 
 ### Changed
 

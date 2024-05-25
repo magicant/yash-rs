@@ -632,6 +632,15 @@ impl System for VirtualSystem {
         Ok(self.state.borrow().times)
     }
 
+    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
+        let _ = number;
+        todo!()
+    }
+
+    fn signal_number_from_name(&self, _name: signal::Name) -> Option<signal::Number> {
+        todo!()
+    }
+
     fn sigmask(
         &mut self,
         how: SigmaskHow,

@@ -36,6 +36,7 @@ use crate::io::Fd;
 use crate::io::MIN_INTERNAL_FD;
 use crate::job::Pid;
 use crate::job::ProcessState;
+use crate::signal;
 #[cfg(doc)]
 use crate::subshell::Subshell;
 use crate::trap::Signal;
@@ -213,6 +214,20 @@ pub trait System: Debug {
 
     /// Returns consumed CPU times.
     fn times(&self) -> Result<Times>;
+
+    /// Tests if a signal number is valid.
+    ///
+    /// This function returns `Some((name, number))` if the signal number refers
+    /// to a valid signal supported by the system. Otherwise, it returns `None`.
+    ///
+    /// Note that one signal number can have multiple names, in which case this
+    /// function returns the name that is considered the most common.
+    #[must_use]
+    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)>;
+
+    /// Gets the signal number from the signal name.
+    #[must_use]
+    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number>;
 
     /// Gets and/or sets the signal blocking mask.
     ///
@@ -642,6 +657,18 @@ pub trait SystemEx: System {
             }
         }
     }
+
+    /// Returns the signal name for the signal number.
+    ///
+    /// This function returns the signal name for the given signal number.
+    ///
+    /// If the signal number is invalid, this function panics. It may occur if
+    /// the number is from a different system or was created without checking
+    /// the validity.
+    #[must_use]
+    fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
+        self.validate_signal(number.as_raw()).unwrap().0
+    }
 }
 
 impl<T: System + ?Sized> SystemEx for T {}
@@ -963,6 +990,12 @@ impl System for SharedSystem {
     }
     fn times(&self) -> Result<Times> {
         self.0.borrow().times()
+    }
+    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
+        self.0.borrow().validate_signal(number)
+    }
+    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
+        self.0.borrow().signal_number_from_name(name)
     }
     fn sigmask(
         &mut self,

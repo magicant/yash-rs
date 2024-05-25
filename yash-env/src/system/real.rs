@@ -18,6 +18,7 @@
 
 use super::resource::LimitPair;
 use super::resource::Resource;
+use super::signal;
 use super::AtFlags;
 use super::ChildProcessStarter;
 use super::Dir;
@@ -343,6 +344,15 @@ impl System for RealSystem {
             children_user: tms.tms_cutime as f64 / ticks_per_second as f64,
             children_system: tms.tms_cstime as f64 / ticks_per_second as f64,
         })
+    }
+
+    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
+        let _ = number;
+        todo!()
+    }
+
+    fn signal_number_from_name(&self, _name: signal::Name) -> Option<signal::Number> {
+        todo!()
     }
 
     fn sigmask(

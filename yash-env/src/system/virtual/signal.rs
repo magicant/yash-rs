@@ -17,6 +17,7 @@
 //! Functions about signals
 
 use super::super::Signal::{self, *};
+pub use crate::signal::*;
 
 /// Default effect of a signal delivered to a process.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

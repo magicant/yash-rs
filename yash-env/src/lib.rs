@@ -451,6 +451,7 @@ pub mod job;
 pub mod option;
 pub mod pwd;
 pub mod semantics;
+pub mod signal;
 pub mod stack;
 pub mod subshell;
 pub mod system;

@@ -22,6 +22,7 @@ futures-util = "0.3.28"
 itertools = "0.11.0"
 nix = { version = "0.27.0", features = ["fs", "poll", "process", "signal", "term", "user"] }
 slab = "0.4.9"
+strum = { version = "0.26.2", features = ["derive"] }
 tempfile = "3.8.0"
 thiserror = "1.0.47"
 yash-quote = { path = "../yash-quote", version = "1.1.1" }
