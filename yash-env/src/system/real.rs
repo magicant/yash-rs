@@ -16,9 +16,10 @@
 
 //! Implementation of `System` that actually interacts with the system.
 
+mod signal;
+
 use super::resource::LimitPair;
 use super::resource::Resource;
-use super::signal;
 use super::AtFlags;
 use super::ChildProcessStarter;
 use super::Dir;
@@ -351,8 +352,9 @@ impl System for RealSystem {
         todo!()
     }
 
-    fn signal_number_from_name(&self, _name: signal::Name) -> Option<signal::Number> {
-        todo!()
+    #[inline(always)]
+    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
+        name.to_raw()
     }
 
     fn sigmask(
