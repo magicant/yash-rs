@@ -16,6 +16,7 @@
 
 //! Type definitions for command execution.
 
+use crate::signal;
 use crate::system::Errno;
 use nix::sys::signal::Signal;
 use std::ffi::c_int;
@@ -96,6 +97,16 @@ impl From<c_int> for ExitStatus {
 impl From<ExitStatus> for c_int {
     fn from(exit_status: ExitStatus) -> c_int {
         exit_status.0
+    }
+}
+
+/// Converts a signal number to the corresponding exit status.
+///
+/// POSIX requires the exit status to be greater than 128. The current
+/// implementation returns `signal_number + 384`.
+impl From<signal::Number> for ExitStatus {
+    fn from(number: signal::Number) -> Self {
+        Self::from(number.as_raw() + 0x180)
     }
 }
 
