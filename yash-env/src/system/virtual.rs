@@ -98,6 +98,7 @@ use std::future::poll_fn;
 use std::future::Future;
 use std::io::SeekFrom;
 use std::mem::MaybeUninit;
+use std::num::NonZeroI32;
 use std::ops::DerefMut as _;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
@@ -633,12 +634,14 @@ impl System for VirtualSystem {
     }
 
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
-        let _ = number;
-        todo!()
+        let non_zero = NonZeroI32::new(number)?;
+        let name = signal::Name::try_from_raw_virtual(number)?;
+        Some((name, signal::Number::from_raw_unchecked(non_zero)))
     }
 
-    fn signal_number_from_name(&self, _name: signal::Name) -> Option<signal::Number> {
-        todo!()
+    #[inline(always)]
+    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
+        name.to_raw_virtual()
     }
 
     fn sigmask(

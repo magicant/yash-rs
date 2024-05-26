@@ -410,14 +410,14 @@ impl Number {
     /// Returns the raw signal number.
     #[inline(always)]
     #[must_use]
-    pub fn as_raw(self) -> RawNumber {
+    pub const fn as_raw(self) -> RawNumber {
         self.0.get()
     }
 
     /// Returns the raw signal number as a `NonZeroI32`.
     #[inline(always)]
     #[must_use]
-    pub fn as_raw_non_zero(self) -> NonZeroI32 {
+    pub const fn as_raw_non_zero(self) -> NonZeroI32 {
         self.0
     }
 
@@ -435,7 +435,7 @@ impl Number {
     /// methods instead.
     #[inline(always)]
     #[must_use]
-    pub fn from_raw_unchecked(raw: NonZeroI32) -> Self {
+    pub const fn from_raw_unchecked(raw: NonZeroI32) -> Self {
         Self(raw)
     }
 }

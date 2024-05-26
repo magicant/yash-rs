@@ -46,7 +46,7 @@ fn rt_range() -> RangeInclusive<RawNumber> {
 
 impl Name {
     /// Returns the raw signal number for the real system.
-    pub(super) fn to_raw(self) -> Option<Number> {
+    pub(super) fn to_raw_real(self) -> Option<Number> {
         #[inline]
         fn wrap(number: RawNumber) -> Option<Number> {
             NonZeroI32::new(number).map(Number::from_raw_unchecked)
@@ -261,7 +261,7 @@ impl Name {
     /// Returns the signal for the raw signal number for the real system.
     ///
     /// This function returns `None` if the given number is not a valid signal.
-    pub(super) fn try_from_raw(number: RawNumber) -> Option<Self> {
+    pub(super) fn try_from_raw_real(number: RawNumber) -> Option<Self> {
         // Some signals share the same number on some systems. This function
         // returns the signal that is considered the most common or standard one.
         #[allow(unreachable_patterns)]
