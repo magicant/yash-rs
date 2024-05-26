@@ -40,6 +40,7 @@
 //! All proper signal names start with `"SIG"`. However, the names defined,
 //! parsed, and displayed in this module do not include the `"SIG"` prefix.
 
+use crate::system::Errno;
 #[cfg(doc)]
 use crate::system::System;
 use std::borrow::Cow;
@@ -283,6 +284,14 @@ pub struct UnknownNameError;
 impl std::fmt::Display for UnknownNameError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("unknown signal name")
+    }
+}
+
+/// Converts an unknown signal name error to `Errno::EINVAL`.
+impl From<UnknownNameError> for Errno {
+    #[inline]
+    fn from(UnknownNameError: UnknownNameError) -> Self {
+        Errno::EINVAL
     }
 }
 

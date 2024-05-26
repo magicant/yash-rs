@@ -394,3 +394,16 @@ impl Name {
         }
     }
 }
+
+// TODO Remove this
+/// Temporary implementation of conversion
+impl TryFrom<Signal> for Number {
+    type Error = UnknownNameError;
+    fn try_from(signal: Signal) -> Result<Self, Self::Error> {
+        use crate::system::System as _;
+        unsafe { crate::RealSystem::new() }
+            .validate_signal(signal as RawNumber)
+            .and_then(|(name, _real_number)| name.to_raw_virtual())
+            .ok_or(UnknownNameError)
+    }
+}

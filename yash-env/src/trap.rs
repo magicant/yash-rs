@@ -396,6 +396,7 @@ impl<'a> IntoIterator for &'a TrapSet {
 mod tests {
     use super::*;
     use crate::job::ProcessState;
+    use crate::system::r#virtual::{SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU};
     use crate::tests::in_virtual_system;
     use crate::System;
     use std::collections::HashMap;
@@ -1018,10 +1019,7 @@ mod tests {
 
             let state = state.borrow();
             let process = &state.processes[&env.main_pid];
-            assert_eq!(
-                process.signal_handling(Signal::SIGINT),
-                SignalHandling::Ignore
-            );
+            assert_eq!(process.signal_handling(SIGINT), SignalHandling::Ignore);
             assert_eq!(process.state(), ProcessState::Running);
         })
     }
@@ -1046,10 +1044,7 @@ mod tests {
 
             let state = state.borrow();
             let process = &state.processes[&env.main_pid];
-            assert_eq!(
-                process.signal_handling(Signal::SIGQUIT),
-                SignalHandling::Ignore
-            );
+            assert_eq!(process.signal_handling(SIGQUIT), SignalHandling::Ignore);
             assert_eq!(process.state(), ProcessState::Running);
         })
     }
@@ -1085,18 +1080,9 @@ mod tests {
 
             let state = state.borrow();
             let process = &state.processes[&env.main_pid];
-            assert_eq!(
-                process.signal_handling(Signal::SIGTSTP),
-                SignalHandling::Ignore
-            );
-            assert_eq!(
-                process.signal_handling(Signal::SIGTTIN),
-                SignalHandling::Ignore
-            );
-            assert_eq!(
-                process.signal_handling(Signal::SIGTTOU),
-                SignalHandling::Ignore
-            );
+            assert_eq!(process.signal_handling(SIGTSTP), SignalHandling::Ignore);
+            assert_eq!(process.signal_handling(SIGTTIN), SignalHandling::Ignore);
+            assert_eq!(process.signal_handling(SIGTTOU), SignalHandling::Ignore);
             assert_eq!(process.state(), ProcessState::Running);
         })
     }
@@ -1119,18 +1105,9 @@ mod tests {
 
             let state = state.borrow();
             let process = &state.processes[&env.main_pid];
-            assert_eq!(
-                process.signal_handling(Signal::SIGTSTP),
-                SignalHandling::Default
-            );
-            assert_eq!(
-                process.signal_handling(Signal::SIGTTIN),
-                SignalHandling::Default
-            );
-            assert_eq!(
-                process.signal_handling(Signal::SIGTTOU),
-                SignalHandling::Default
-            );
+            assert_eq!(process.signal_handling(SIGTSTP), SignalHandling::Default);
+            assert_eq!(process.signal_handling(SIGTTIN), SignalHandling::Default);
+            assert_eq!(process.signal_handling(SIGTTOU), SignalHandling::Default);
         })
     }
 

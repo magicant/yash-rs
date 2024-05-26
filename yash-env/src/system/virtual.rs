@@ -673,7 +673,8 @@ impl System for VirtualSystem {
 
     fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> Result<SignalHandling> {
         let mut process = self.current_process_mut();
-        Ok(process.set_signal_handling(signal, action))
+        let number = signal.try_into()?;
+        Ok(process.set_signal_handling(number, action))
     }
 
     fn caught_signals(&mut self) -> Vec<Signal> {

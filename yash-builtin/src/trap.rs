@@ -284,8 +284,8 @@ mod tests {
     use yash_env::semantics::Divert;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
+    use yash_env::system::r#virtual::{SIGINT, SIGPIPE, SIGUSR1, SIGUSR2};
     use yash_env::system::SignalHandling;
-    use yash_env::trap::Signal;
     use yash_env::Env;
     use yash_env::VirtualSystem;
 
@@ -299,10 +299,7 @@ mod tests {
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let process = &state.borrow().processes[&pid];
-        assert_eq!(
-            process.signal_handling(Signal::SIGUSR1),
-            SignalHandling::Ignore
-        );
+        assert_eq!(process.signal_handling(SIGUSR1), SignalHandling::Ignore);
     }
 
     #[test]
@@ -315,10 +312,7 @@ mod tests {
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let process = &state.borrow().processes[&pid];
-        assert_eq!(
-            process.signal_handling(Signal::SIGUSR2),
-            SignalHandling::Catch
-        );
+        assert_eq!(process.signal_handling(SIGUSR2), SignalHandling::Catch);
     }
 
     #[test]
@@ -331,10 +325,7 @@ mod tests {
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let process = &state.borrow().processes[&pid];
-        assert_eq!(
-            process.signal_handling(Signal::SIGPIPE),
-            SignalHandling::Default
-        );
+        assert_eq!(process.signal_handling(SIGPIPE), SignalHandling::Default);
     }
 
     #[test]
@@ -441,7 +432,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         system
             .current_process_mut()
-            .set_signal_handling(Signal::SIGINT, SignalHandling::Ignore);
+            .set_signal_handling(SIGINT, SignalHandling::Ignore);
         let mut env = Env::with_system(Box::new(system.clone()));
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("trap"),
@@ -453,7 +444,7 @@ mod tests {
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stderr(&system.state, |stderr| assert_eq!(stderr, ""));
         assert_eq!(
-            system.current_process().signal_handling(Signal::SIGINT),
+            system.current_process().signal_handling(SIGINT),
             SignalHandling::Ignore
         );
     }
