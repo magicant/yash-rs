@@ -257,4 +257,140 @@ impl Name {
             }
         }
     }
+
+    /// Returns the signal for the raw signal number for the real system.
+    ///
+    /// This function returns `None` if the given number is not a valid signal.
+    pub(super) fn try_from_raw(number: RawNumber) -> Option<Self> {
+        // Some signals share the same number on some systems. This function
+        // returns the signal that is considered the most common or standard one.
+        #[allow(unreachable_patterns)]
+        match number {
+            // Standard signals
+            nix::libc::SIGABRT => Some(Self::Abrt),
+            nix::libc::SIGALRM => Some(Self::Alrm),
+            nix::libc::SIGBUS => Some(Self::Bus),
+            nix::libc::SIGCHLD => Some(Self::Chld),
+            nix::libc::SIGCONT => Some(Self::Cont),
+            nix::libc::SIGFPE => Some(Self::Fpe),
+            nix::libc::SIGHUP => Some(Self::Hup),
+            nix::libc::SIGILL => Some(Self::Ill),
+            nix::libc::SIGINT => Some(Self::Int),
+            nix::libc::SIGKILL => Some(Self::Kill),
+            nix::libc::SIGPIPE => Some(Self::Pipe),
+            nix::libc::SIGQUIT => Some(Self::Quit),
+            nix::libc::SIGSEGV => Some(Self::Segv),
+            nix::libc::SIGSTOP => Some(Self::Stop),
+            nix::libc::SIGTERM => Some(Self::Term),
+            nix::libc::SIGTSTP => Some(Self::Tstp),
+            nix::libc::SIGTTIN => Some(Self::Ttin),
+            nix::libc::SIGTTOU => Some(Self::Ttou),
+            nix::libc::SIGUSR1 => Some(Self::Usr1),
+            nix::libc::SIGUSR2 => Some(Self::Usr2),
+
+            // Non-standard but common signals
+            #[cfg(any(
+                target_os = "aix",
+                target_os = "android",
+                target_os = "emscripten",
+                target_os = "fuchsia",
+                target_os = "haiku",
+                target_os = "horizon",
+                target_os = "illumos",
+                target_os = "linux",
+                target_os = "nto",
+                target_os = "solaris",
+            ))]
+            nix::libc::SIGPOLL => Some(Self::Poll),
+            nix::libc::SIGPROF => Some(Self::Prof),
+            nix::libc::SIGSYS => Some(Self::Sys),
+            nix::libc::SIGTRAP => Some(Self::Trap),
+            nix::libc::SIGURG => Some(Self::Urg),
+            nix::libc::SIGVTALRM => Some(Self::Vtalrm),
+            nix::libc::SIGWINCH => Some(Self::Winch),
+            nix::libc::SIGXCPU => Some(Self::Xcpu),
+            nix::libc::SIGXFSZ => Some(Self::Xfsz),
+
+            // other signals
+            #[cfg(not(any(
+                target_os = "android",
+                target_os = "emscripten",
+                target_os = "fuchsia",
+                target_os = "haiku",
+                target_os = "linux",
+                target_os = "redox",
+            )))]
+            nix::libc::SIGEMT => Some(Self::Emt),
+            #[cfg(not(any(
+                target_os = "aix",
+                target_os = "android",
+                target_os = "emscripten",
+                target_os = "fuchsia",
+                target_os = "haiku",
+                target_os = "linux",
+                target_os = "redox",
+            )))]
+            nix::libc::SIGINFO => Some(Self::Info),
+            #[cfg(any(
+                target_os = "aix",
+                target_os = "android",
+                target_os = "emscripten",
+                target_os = "fuchsia",
+                target_os = "horizon",
+                target_os = "illumos",
+                target_os = "linux",
+                target_os = "nto",
+                target_os = "solaris",
+            ))]
+            nix::libc::SIGIO => Some(Self::Io),
+            #[cfg(target_os = "horizon")]
+            nix::libc::SIGLOST => Some(Self::Lost),
+            #[cfg(any(
+                target_os = "aix",
+                target_os = "android",
+                target_os = "emscripten",
+                target_os = "fuchsia",
+                target_os = "illumos",
+                target_os = "linux",
+                target_os = "nto",
+                target_os = "redox",
+                target_os = "solaris",
+            ))]
+            nix::libc::SIGPWR => Some(Self::Pwr),
+            #[cfg(all(
+                any(
+                    target_os = "android",
+                    target_os = "emscripten",
+                    target_os = "fuchsia",
+                    target_os = "linux"
+                ),
+                not(any(target_arch = "mips", target_arch = "mips64", target_arch = "sparc64"))
+            ))]
+            nix::libc::SIGSTKFLT => Some(Self::Stkflt),
+            #[cfg(target_os = "freebsd")]
+            nix::libc::SIGTHR => Some(Self::Thr),
+
+            // Real-time signals
+            _ => {
+                let range = rt_range();
+                if !range.contains(&number) {
+                    return None;
+                }
+
+                // Return a name relative to `Rtmin` or `Rtmax`,
+                // whichever is closer to the given number.
+                debug_assert!(*range.start() > 0);
+                let incr = number - *range.start();
+                debug_assert!(incr >= 0);
+                let decr = number - *range.end();
+                debug_assert!(decr <= 0);
+                debug_assert!(decr > RawNumber::MIN);
+                if incr <= -decr {
+                    Some(Self::Rtmin(incr))
+                } else {
+                    Some(Self::Rtmax(decr))
+                }
+            }
+        }
+    }
 }

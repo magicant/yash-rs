@@ -61,6 +61,7 @@ use std::ffi::OsString;
 use std::future::Future;
 use std::io::SeekFrom;
 use std::mem::MaybeUninit;
+use std::num::NonZeroI32;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::ffi::OsStringExt as _;
 use std::os::unix::io::IntoRawFd;
@@ -348,8 +349,9 @@ impl System for RealSystem {
     }
 
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
-        let _ = number;
-        todo!()
+        let non_zero = NonZeroI32::new(number)?;
+        let name = signal::Name::try_from_raw(number)?;
+        Some((name, signal::Number::from_raw_unchecked(non_zero)))
     }
 
     #[inline(always)]
