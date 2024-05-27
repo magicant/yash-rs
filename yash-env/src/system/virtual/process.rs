@@ -371,7 +371,7 @@ impl Process {
         for signal in Signal::iterator() {
             if self.pending_signals.contains(signal) && !self.blocked_signals.contains(signal) {
                 self.pending_signals.remove(signal);
-                result |= self.deliver_signal(signal);
+                result |= self.deliver_signal(signal::Number::from_signal_virtual(signal));
             }
         }
         result
@@ -408,8 +408,8 @@ impl Process {
     /// that case, the caller must send a SIGCHLD to the parent process of this
     /// process.
     #[must_use = "send SIGCHLD if process state has changed"]
-    fn deliver_signal(&mut self, signal: Signal) -> SignalResult {
-        let number = signal::Number::from_signal_virtual(signal);
+    fn deliver_signal(&mut self, number: signal::Number) -> SignalResult {
+        let signal = number.to_signal_virtual().unwrap_or(Signal::SIGSYS);
         let handling = if signal == Signal::SIGKILL || signal == Signal::SIGSTOP {
             SignalHandling::Default
         } else {
@@ -469,7 +469,7 @@ impl Process {
             self.pending_signals.add(signal);
             SignalResult::default()
         } else {
-            self.deliver_signal(signal)
+            self.deliver_signal(signal::Number::from_signal_virtual(signal))
         };
 
         result.process_state_changed |= process_state_changed;
