@@ -396,14 +396,23 @@ impl Name {
 }
 
 // TODO Remove this
-/// Temporary implementation of conversion
-impl TryFrom<Signal> for Number {
-    type Error = UnknownNameError;
-    fn try_from(signal: Signal) -> Result<Self, Self::Error> {
+impl Number {
+    /// Converts a signal number in the real system to a signal number in the virtual system.
+    pub(super) fn from_signal_virtual(signal: Signal) -> Self {
         use crate::system::System as _;
         unsafe { crate::RealSystem::new() }
             .validate_signal(signal as RawNumber)
             .and_then(|(name, _real_number)| name.to_raw_virtual())
-            .ok_or(UnknownNameError)
+            .unwrap()
+    }
+
+    /// Converts a signal number in the virtual system to a signal number in the real system.
+    pub(super) fn to_signal_virtual(self) -> Option<Signal> {
+        use crate::system::System as _;
+        unsafe { crate::RealSystem::new() }
+            .signal_number_from_name(Name::try_from_raw_virtual(self.as_raw())?)?
+            .as_raw()
+            .try_into()
+            .ok()
     }
 }

@@ -88,7 +88,7 @@ pub struct Process {
     pending_signals: SigSet,
 
     /// List of signals that have been delivered and caught
-    pub(crate) caught_signals: Vec<Signal>,
+    pub(crate) caught_signals: Vec<signal::Number>,
 
     /// Limits for system resources
     pub(crate) resource_limits: HashMap<Resource, LimitPair>,
@@ -409,12 +409,11 @@ impl Process {
     /// process.
     #[must_use = "send SIGCHLD if process state has changed"]
     fn deliver_signal(&mut self, signal: Signal) -> SignalResult {
+        let number = signal::Number::from_signal_virtual(signal);
         let handling = if signal == Signal::SIGKILL || signal == Signal::SIGSTOP {
             SignalHandling::Default
-        } else if let Ok(number) = signal.try_into() {
-            self.signal_handling(number)
         } else {
-            SignalHandling::Default
+            self.signal_handling(number)
         };
 
         match handling {
@@ -439,7 +438,7 @@ impl Process {
                 process_state_changed: false,
             },
             SignalHandling::Catch => {
-                self.caught_signals.push(signal);
+                self.caught_signals.push(number);
                 SignalResult {
                     delivered: true,
                     caught: true,
@@ -888,7 +887,7 @@ mod tests {
             }
         );
         assert_eq!(process.state(), ProcessState::Running);
-        assert_eq!(process.caught_signals, [Signal::SIGCHLD]);
+        assert_eq!(process.caught_signals, [signal::SIGCHLD]);
     }
 
     fn to_set<I: IntoIterator<Item = Signal>>(signals: I) -> SigSet {
@@ -936,6 +935,6 @@ mod tests {
             }
         );
         assert_eq!(process.state(), ProcessState::Running);
-        assert_eq!(process.caught_signals, [Signal::SIGCHLD]);
+        assert_eq!(process.caught_signals, [signal::SIGCHLD]);
     }
 }

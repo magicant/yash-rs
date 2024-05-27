@@ -673,12 +673,15 @@ impl System for VirtualSystem {
 
     fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> Result<SignalHandling> {
         let mut process = self.current_process_mut();
-        let number = signal.try_into()?;
+        let number = signal::Number::from_signal_virtual(signal);
         Ok(process.set_signal_handling(number, action))
     }
 
     fn caught_signals(&mut self) -> Vec<Signal> {
         std::mem::take(&mut self.current_process_mut().caught_signals)
+            .into_iter()
+            .filter_map(signal::Number::to_signal_virtual)
+            .collect()
     }
 
     /// Sends a signal to the target process.
