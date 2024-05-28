@@ -458,18 +458,19 @@ impl Process {
     /// that case, the caller must send a SIGCHLD to the parent process of this
     /// process.
     #[must_use = "send SIGCHLD if process state has changed"]
-    pub fn raise_signal(&mut self, signal: Signal) -> SignalResult {
+    pub fn raise_signal(&mut self, number: signal::Number) -> SignalResult {
+        let signal = number.to_signal_virtual().unwrap_or(Signal::SIGSYS);
         let process_state_changed =
-            signal == Signal::SIGCONT && self.set_state(ProcessState::Running);
+            number == signal::SIGCONT && self.set_state(ProcessState::Running);
 
-        let mut result = if signal != Signal::SIGKILL
-            && signal != Signal::SIGSTOP
+        let mut result = if number != signal::SIGKILL
+            && number != signal::SIGSTOP
             && self.blocked_signals().contains(signal)
         {
             self.pending_signals.add(signal);
             SignalResult::default()
         } else {
-            self.deliver_signal(signal::Number::from_signal_virtual(signal))
+            self.deliver_signal(number)
         };
 
         result.process_state_changed |= process_state_changed;
@@ -746,7 +747,7 @@ mod tests {
     #[test]
     fn process_raise_signal_default_nop() {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
-        let result = process.raise_signal(Signal::SIGCHLD);
+        let result = process.raise_signal(signal::SIGCHLD);
         assert_eq!(
             result,
             SignalResult {
@@ -761,7 +762,7 @@ mod tests {
     #[test]
     fn process_raise_signal_default_terminating() {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
-        let result = process.raise_signal(Signal::SIGTERM);
+        let result = process.raise_signal(signal::SIGTERM);
         assert_eq!(
             result,
             SignalResult {
@@ -783,7 +784,7 @@ mod tests {
     #[test]
     fn process_raise_signal_default_aborting() {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
-        let result = process.raise_signal(Signal::SIGABRT);
+        let result = process.raise_signal(signal::SIGABRT);
         assert_eq!(
             result,
             SignalResult {
@@ -806,7 +807,7 @@ mod tests {
     #[test]
     fn process_raise_signal_default_stopping() {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
-        let result = process.raise_signal(Signal::SIGTSTP);
+        let result = process.raise_signal(signal::SIGTSTP);
         assert_eq!(
             result,
             SignalResult {
@@ -823,7 +824,7 @@ mod tests {
     fn process_raise_signal_default_continuing() {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
         let _ = process.set_state(ProcessState::stopped(Signal::SIGTTOU));
-        let result = process.raise_signal(Signal::SIGCONT);
+        let result = process.raise_signal(signal::SIGCONT);
         assert_eq!(
             result,
             SignalResult {
@@ -840,7 +841,7 @@ mod tests {
     fn process_raise_signal_ignored() {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
         process.set_signal_handling(signal::SIGCHLD, SignalHandling::Ignore);
-        let result = process.raise_signal(Signal::SIGCHLD);
+        let result = process.raise_signal(signal::SIGCHLD);
         assert_eq!(
             result,
             SignalResult {
@@ -859,7 +860,7 @@ mod tests {
         let _ = process.set_state(ProcessState::stopped(Signal::SIGTTOU));
         let _ = process.set_signal_handling(signal::SIGCONT, SignalHandling::Ignore);
         let _ = process.block_signals(SigmaskHow::SIG_BLOCK, &to_set([Signal::SIGCONT]));
-        let result = process.raise_signal(Signal::SIGCONT);
+        let result = process.raise_signal(signal::SIGCONT);
         assert_eq!(
             result,
             SignalResult {
@@ -877,7 +878,7 @@ mod tests {
     fn process_raise_signal_caught() {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
         process.set_signal_handling(signal::SIGCHLD, SignalHandling::Catch);
-        let result = process.raise_signal(Signal::SIGCHLD);
+        let result = process.raise_signal(signal::SIGCHLD);
         assert_eq!(
             result,
             SignalResult {
@@ -913,7 +914,7 @@ mod tests {
             }
         );
 
-        let result = process.raise_signal(Signal::SIGCHLD);
+        let result = process.raise_signal(signal::SIGCHLD);
         assert_eq!(
             result,
             SignalResult {

@@ -108,9 +108,11 @@ mod tests {
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
+    use yash_env::signal;
+    use yash_env::system::r#virtual::VirtualSystem;
+    use yash_env::system::r#virtual::{SIGINT, SIGUSR1, SIGUSR2};
     use yash_env::trap::Action;
     use yash_env::trap::Signal;
-    use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
 
     fn signal_env() -> (Env, VirtualSystem) {
@@ -129,7 +131,7 @@ mod tests {
         (env, system)
     }
 
-    fn raise_signal(system: &VirtualSystem, signal: Signal) {
+    fn raise_signal(system: &VirtualSystem, signal: signal::Number) {
         let _ = system
             .state
             .borrow_mut()
@@ -152,7 +154,7 @@ mod tests {
     #[test]
     fn running_trap() {
         let (mut env, system) = signal_env();
-        raise_signal(&system, Signal::SIGINT);
+        raise_signal(&system, SIGINT);
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()
             .unwrap();
@@ -163,7 +165,7 @@ mod tests {
     #[test]
     fn no_reentrance() {
         let (mut env, system) = signal_env();
-        raise_signal(&system, Signal::SIGINT);
+        raise_signal(&system, SIGINT);
         let mut env = env.push_frame(Frame::Trap(Condition::Signal(Signal::SIGTERM)));
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()
@@ -175,7 +177,7 @@ mod tests {
     #[test]
     fn allow_reentrance_in_exit_trap() {
         let (mut env, system) = signal_env();
-        raise_signal(&system, Signal::SIGINT);
+        raise_signal(&system, SIGINT);
         let mut env = env.push_frame(Frame::Trap(Condition::Exit));
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()
@@ -187,7 +189,7 @@ mod tests {
     #[test]
     fn allow_reentrance_in_subshell() {
         let (mut env, system) = signal_env();
-        raise_signal(&system, Signal::SIGINT);
+        raise_signal(&system, SIGINT);
         let mut env = env.push_frame(Frame::Trap(Condition::Signal(Signal::SIGTERM)));
         let mut env = env.push_frame(Frame::Subshell);
         let result = run_traps_for_caught_signals(&mut env)
@@ -224,7 +226,7 @@ mod tests {
                 false,
             )
             .unwrap();
-        raise_signal(&system, Signal::SIGINT);
+        raise_signal(&system, SIGINT);
         let _ = run_traps_for_caught_signals(&mut env)
             .now_or_never()
             .unwrap();
@@ -234,7 +236,7 @@ mod tests {
     fn exit_status_is_restored_after_running_trap() {
         let (mut env, system) = signal_env();
         env.exit_status = ExitStatus(42);
-        raise_signal(&system, Signal::SIGINT);
+        raise_signal(&system, SIGINT);
         let _ = run_traps_for_caught_signals(&mut env)
             .now_or_never()
             .unwrap();
@@ -256,8 +258,8 @@ mod tests {
                 .unwrap();
         }
         env.exit_status = ExitStatus(123);
-        raise_signal(&system, Signal::SIGUSR1);
-        raise_signal(&system, Signal::SIGUSR2);
+        raise_signal(&system, SIGUSR1);
+        raise_signal(&system, SIGUSR2);
         let _ = run_traps_for_caught_signals(&mut env)
             .now_or_never()
             .unwrap();
@@ -279,7 +281,7 @@ mod tests {
                 false,
             )
             .unwrap();
-        raise_signal(&system, Signal::SIGUSR1);
+        raise_signal(&system, SIGUSR1);
         env.exit_status = ExitStatus(42);
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()
@@ -301,7 +303,7 @@ mod tests {
                 false,
             )
             .unwrap();
-        raise_signal(&system, Signal::SIGUSR1);
+        raise_signal(&system, SIGUSR1);
         env.exit_status = ExitStatus(42);
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()

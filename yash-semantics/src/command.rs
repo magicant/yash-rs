@@ -92,9 +92,10 @@ mod tests {
     use futures_util::FutureExt;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
+    use yash_env::system::r#virtual::VirtualSystem;
+    use yash_env::system::r#virtual::SIGUSR1;
     use yash_env::trap::Action;
     use yash_env::trap::Signal;
-    use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
 
     #[test]
@@ -117,7 +118,7 @@ mod tests {
             .processes
             .get_mut(&system.process_id)
             .unwrap()
-            .raise_signal(Signal::SIGUSR1);
+            .raise_signal(SIGUSR1);
 
         let command: syntax::Command = "echo main".parse().unwrap();
         let result = command.execute(&mut env).now_or_never().unwrap();

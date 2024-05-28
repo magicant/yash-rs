@@ -1494,9 +1494,10 @@ impl AsyncSignal {
 
 #[cfg(test)]
 mod tests {
+    use super::r#virtual::VirtualSystem;
+    use super::r#virtual::PIPE_SIZE;
+    use super::r#virtual::{SIGCHLD, SIGINT, SIGTERM};
     use super::*;
-    use crate::system::r#virtual::VirtualSystem;
-    use crate::system::r#virtual::PIPE_SIZE;
     use assert_matches::assert_matches;
     use futures_util::task::noop_waker;
     use futures_util::task::noop_waker_ref;
@@ -1692,8 +1693,8 @@ mod tests {
             assert!(process.blocked_signals().contains(Signal::SIGCHLD));
             assert!(process.blocked_signals().contains(Signal::SIGINT));
             assert!(process.blocked_signals().contains(Signal::SIGUSR1));
-            let _ = process.raise_signal(Signal::SIGCHLD);
-            let _ = process.raise_signal(Signal::SIGINT);
+            let _ = process.raise_signal(SIGCHLD);
+            let _ = process.raise_signal(SIGINT);
         }
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
@@ -1726,7 +1727,7 @@ mod tests {
             let mut state = state.borrow_mut();
             let process = state.processes.get_mut(&process_id).unwrap();
             assert!(process.blocked_signals().contains(Signal::SIGCHLD));
-            let _ = process.raise_signal(Signal::SIGCHLD);
+            let _ = process.raise_signal(SIGCHLD);
         }
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
@@ -1757,8 +1758,8 @@ mod tests {
         {
             let mut state = state.borrow_mut();
             let process = state.processes.get_mut(&process_id).unwrap();
-            let _ = process.raise_signal(Signal::SIGCHLD);
-            let _ = process.raise_signal(Signal::SIGTERM);
+            let _ = process.raise_signal(SIGCHLD);
+            let _ = process.raise_signal(SIGTERM);
         }
         system.select(false).unwrap();
 
@@ -1782,8 +1783,8 @@ mod tests {
         {
             let mut state = state.borrow_mut();
             let process = state.processes.get_mut(&process_id).unwrap();
-            let _ = process.raise_signal(Signal::SIGINT);
-            let _ = process.raise_signal(Signal::SIGTERM);
+            let _ = process.raise_signal(SIGINT);
+            let _ = process.raise_signal(SIGTERM);
         }
         system.select(false).unwrap();
 

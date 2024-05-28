@@ -466,6 +466,7 @@ mod tests {
     use crate::subshell::Subshell;
     use crate::system::r#virtual::INode;
     use crate::system::r#virtual::SystemState;
+    use crate::system::r#virtual::SIGCHLD;
     use crate::trap::Action;
     use futures_executor::LocalPool;
     use futures_util::task::LocalSpawnExt as _;
@@ -515,7 +516,7 @@ mod tests {
                 let mut state = state.borrow_mut();
                 let process = state.processes.get_mut(&env.main_pid).unwrap();
                 assert!(process.blocked_signals().contains(Signal::SIGCHLD));
-                let _ = process.raise_signal(Signal::SIGCHLD);
+                let _ = process.raise_signal(SIGCHLD);
             }
             env.wait_for_signal(Signal::SIGCHLD).await;
 
@@ -554,7 +555,7 @@ mod tests {
             let mut state = system.state.borrow_mut();
             let process = state.processes.get_mut(&system.process_id).unwrap();
             assert!(process.blocked_signals().contains(Signal::SIGCHLD));
-            let _ = process.raise_signal(Signal::SIGCHLD);
+            let _ = process.raise_signal(SIGCHLD);
         }
 
         let result = env.poll_signals().unwrap();

@@ -710,7 +710,8 @@ impl System for VirtualSystem {
                 match state.processes.get_mut(&target) {
                     Some(process) => {
                         if let Some(signal) = signal {
-                            let result = process.raise_signal(signal);
+                            let result =
+                                process.raise_signal(signal::Number::from_signal_virtual(signal));
                             if result.process_state_changed {
                                 let parent_pid = process.ppid;
                                 raise_sigchld(&mut state, parent_pid);
@@ -1081,9 +1082,10 @@ fn send_signal_to_processes(
     let mut results = Vec::new();
 
     if let Some(signal) = signal {
+        let number = signal::Number::from_signal_virtual(signal);
         for (&_pid, process) in &mut state.processes {
             if target_pgid.map_or(true, |target_pgid| process.pgid == target_pgid) {
-                let result = process.raise_signal(signal);
+                let result = process.raise_signal(number);
                 results.push((result, process.ppid));
             }
         }
@@ -1103,7 +1105,7 @@ fn send_signal_to_processes(
 
 fn raise_sigchld(state: &mut SystemState, target_pid: Pid) {
     if let Some(target) = state.processes.get_mut(&target_pid) {
-        let result = target.raise_signal(Signal::SIGCHLD);
+        let result = target.raise_signal(signal::SIGCHLD);
         assert!(!result.process_state_changed);
     }
 }
@@ -2150,7 +2152,7 @@ mod tests {
     #[test]
     fn select_on_pending_signal() {
         let mut system = system_for_catching_sigchld();
-        let _ = system.current_process_mut().raise_signal(Signal::SIGCHLD);
+        let _ = system.current_process_mut().raise_signal(signal::SIGCHLD);
         let result = system.select(
             &mut FdSet::new(),
             &mut FdSet::new(),

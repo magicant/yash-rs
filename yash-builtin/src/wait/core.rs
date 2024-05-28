@@ -106,6 +106,7 @@ mod tests {
     use yash_env::job::ProcessState;
     use yash_env::semantics::ExitStatus;
     use yash_env::subshell::Subshell;
+    use yash_env::system::r#virtual::SIGTERM;
     use yash_env::trap::Action;
     use yash_env::variable::Value;
     use yash_env::VirtualSystem;
@@ -193,7 +194,7 @@ mod tests {
                 assert_eq!(poll!(&mut future), Poll::Pending);
 
                 // Trigger the trap.
-                _ = system.current_process_mut().raise_signal(Signal::SIGTERM);
+                _ = system.current_process_mut().raise_signal(SIGTERM);
 
                 // Now the function should return.
                 let result = future.await;

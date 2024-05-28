@@ -177,6 +177,7 @@ mod tests {
     use yash_env::semantics::Divert;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::VirtualSystem;
+    use yash_env::system::r#virtual::SIGUSR1;
     use yash_env::trap::Action;
     use yash_env::trap::Signal;
     use yash_syntax::source::Location;
@@ -316,7 +317,7 @@ mod tests {
             .processes
             .get_mut(&system.process_id)
             .unwrap()
-            .raise_signal(Signal::SIGUSR1);
+            .raise_signal(SIGUSR1);
         let mut lexer = Lexer::from_memory("echo $?", Source::Unknown);
         let rel = ReadEvalLoop::new(&mut env, &mut lexer);
         let result = rel.run().now_or_never().unwrap();
