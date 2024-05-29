@@ -20,12 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `impl From<job::ProcessResult> for ExitStatus`
 - `job::ProcessState::Halted`
 - `job::ProcessState::{stopped, exited, is_stopped}`
+- `impl Hash for job::fmt::Marker`
+- `job::fmt::State`
 - `impl From<trap::Condition> for stack::Frame`
 - `signal::{Number, RawNumber, Name, NameIter, UnknownNameError}`
 
 ### Changed
 
 - `stack::Frame` is now `non_exhaustive`.
+- `job::fmt::Report` has been totally rewritten.
 - `system::virtual::FileSystem::get` now fails with `EACCES` when search
   permission is denied for any directory component of the path.
 - The following methods of `system::virtual::Process` now operate on
