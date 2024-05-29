@@ -124,8 +124,8 @@ impl Accumulator {
     /// 1. Remembers the job index in `self.indices_reported` so the job can be
     ///    removed later.
     fn report(&mut self, index: usize, job: &Job) {
-        use yash_env::job::fmt::{Marker, Report};
-        let report = Report {
+        use yash_env::job::fmt::{Marker, OldReport};
+        let report = OldReport {
             index,
             marker: if self.current_job_index == Some(index) {
                 Marker::CurrentJob

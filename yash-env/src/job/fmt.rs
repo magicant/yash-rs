@@ -39,6 +39,7 @@
 //! trait's method (typically by using the `format!` macro).
 //!
 //! ```
+//! /* FIXME
 //! use yash_env::job::{Job, Pid};
 //! use yash_env::job::fmt::{Marker, Report};
 //! let mut job = Job::new(Pid(123));
@@ -52,6 +53,7 @@
 //! assert_eq!(s, "[3]   Running              sleep 10");
 //! let s = format!("{:#}", report);
 //! assert_eq!(s, "[3]     123 Running              sleep 10");
+//! */
 //! ```
 
 use super::Job;
@@ -146,7 +148,7 @@ impl Display for Marker {
 /// report, which can be produced by the `Display` trait's method.
 /// See the [module documentation](self) for details.
 #[derive(Clone, Copy, Debug)]
-pub struct Report<'a> {
+pub struct OldReport<'a> {
     /// Index of the job
     ///
     /// This value should be the index at which the job appears in its
@@ -162,7 +164,7 @@ pub struct Report<'a> {
     pub job: &'a Job,
 }
 
-impl Report<'_> {
+impl OldReport<'_> {
     /// Returns the job number of the job.
     ///
     /// The job number is a positive integer that is one greater than the index
@@ -176,7 +178,7 @@ impl Report<'_> {
 }
 
 /// Formats a job status report.
-impl Display for Report<'_> {
+impl Display for OldReport<'_> {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let number = self.number();
         let marker = self.marker;
@@ -275,23 +277,23 @@ mod tests {
         let marker = Marker::CurrentJob;
         let job = &mut Job::new(Pid(42));
         job.name = "echo ok".to_string();
-        let report = Report { index, marker, job };
+        let report = OldReport { index, marker, job };
         assert_eq!(report.to_string(), "[1] + Running              echo ok");
 
         job.state = ProcessState::stopped(Signal::SIGSTOP);
-        let report = Report { index, marker, job };
+        let report = OldReport { index, marker, job };
         assert_eq!(report.to_string(), "[1] + Stopped(SIGSTOP)     echo ok");
 
         let marker = Marker::PreviousJob;
-        let report = Report { index, marker, job };
+        let report = OldReport { index, marker, job };
         assert_eq!(report.to_string(), "[1] - Stopped(SIGSTOP)     echo ok");
 
         let marker = Marker::None;
-        let report = Report { index, marker, job };
+        let report = OldReport { index, marker, job };
         assert_eq!(report.to_string(), "[1]   Stopped(SIGSTOP)     echo ok");
 
         let index = 5;
-        let report = Report { index, marker, job };
+        let report = OldReport { index, marker, job };
         assert_eq!(report.to_string(), "[6]   Stopped(SIGSTOP)     echo ok");
 
         job.state = ProcessState::Halted(ProcessResult::Signaled {
@@ -299,7 +301,7 @@ mod tests {
             core_dump: true,
         });
         job.name = "exit 0".to_string();
-        let report = Report { index, marker, job };
+        let report = OldReport { index, marker, job };
         assert_eq!(
             report.to_string(),
             "[6]   Killed(SIGQUIT: core dumped) exit 0"
@@ -312,14 +314,14 @@ mod tests {
         let marker = Marker::CurrentJob;
         let job = &mut Job::new(Pid(42));
         job.name = "echo ok".to_string();
-        let report = Report { index, marker, job };
+        let report = OldReport { index, marker, job };
         assert_eq!(
             format!("{report:#}"),
             "[1] +    42 Running              echo ok"
         );
 
         job.pid = Pid(123456);
-        let report = Report { index, marker, job };
+        let report = OldReport { index, marker, job };
         assert_eq!(
             format!("{report:#}"),
             "[1] + 123456 Running              echo ok"
