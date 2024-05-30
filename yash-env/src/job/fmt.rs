@@ -44,7 +44,6 @@
 //! assert_eq!(report.to_string(), "[3]   Running              sleep 10");
 //! ```
 
-use super::Job;
 #[cfg(doc)]
 use super::JobList;
 use super::Pid;
@@ -252,60 +251,8 @@ impl std::fmt::Display for Report<'_> {
     }
 }
 
-/// Wrapper for implementing job status formatting
-///
-/// This wrapper contains the information necessary to format a job status
-/// report, which can be produced by the `Display` trait's method.
-/// See the [module documentation](self) for details.
-#[derive(Clone, Copy, Debug)]
-pub struct OldReport<'a> {
-    /// Index of the job
-    ///
-    /// This value should be the index at which the job appears in its
-    /// containing [`JobList`].
-    ///
-    /// Note that the index is the job number minus one.
-    pub index: usize,
-
-    /// Type of the marker indicating the current and previous job
-    pub marker: Marker,
-
-    /// Job to be reported
-    pub job: &'a Job,
-}
-
-impl OldReport<'_> {
-    /// Returns the job number of the job.
-    ///
-    /// The job number is a positive integer that is one greater than the index
-    /// of the job in its containing [`JobList`]. Rather than the raw index, the
-    /// job number is included in the formatted report.
-    #[inline]
-    #[must_use]
-    pub const fn number(&self) -> usize {
-        self.index + 1
-    }
-}
-
-/// Formats a job status report.
-impl Display for OldReport<'_> {
-    fn fmt(&self, f: &mut Formatter) -> Result {
-        let number = self.number();
-        let marker = self.marker;
-        let status = self.job.state;
-        let name = &self.job.name;
-        if f.alternate() {
-            let pid = self.job.pid;
-            write!(f, "[{number}] {marker} {pid:5} {status:20} {name}")
-        } else {
-            write!(f, "[{number}] {marker} {status:20} {name}")
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::super::Job;
     use super::super::Pid;
     use super::*;
     use crate::job::ProcessState;
@@ -431,63 +378,6 @@ mod tests {
         assert_eq!(
             report.to_string(),
             "[2] + 123456 Running              foo | bar"
-        );
-    }
-
-    #[test]
-    fn report_standard() {
-        let index = 0;
-        let marker = Marker::CurrentJob;
-        let job = &mut Job::new(Pid(42));
-        job.name = "echo ok".to_string();
-        let report = OldReport { index, marker, job };
-        assert_eq!(report.to_string(), "[1] + Running              echo ok");
-
-        job.state = ProcessState::stopped(Signal::SIGSTOP);
-        let report = OldReport { index, marker, job };
-        assert_eq!(report.to_string(), "[1] + Stopped(SIGSTOP)     echo ok");
-
-        let marker = Marker::PreviousJob;
-        let report = OldReport { index, marker, job };
-        assert_eq!(report.to_string(), "[1] - Stopped(SIGSTOP)     echo ok");
-
-        let marker = Marker::None;
-        let report = OldReport { index, marker, job };
-        assert_eq!(report.to_string(), "[1]   Stopped(SIGSTOP)     echo ok");
-
-        let index = 5;
-        let report = OldReport { index, marker, job };
-        assert_eq!(report.to_string(), "[6]   Stopped(SIGSTOP)     echo ok");
-
-        job.state = ProcessState::Halted(ProcessResult::Signaled {
-            signal: Signal::SIGQUIT,
-            core_dump: true,
-        });
-        job.name = "exit 0".to_string();
-        let report = OldReport { index, marker, job };
-        assert_eq!(
-            report.to_string(),
-            "[6]   Killed(SIGQUIT: core dumped) exit 0"
-        );
-    }
-
-    #[test]
-    fn report_alternate() {
-        let index = 0;
-        let marker = Marker::CurrentJob;
-        let job = &mut Job::new(Pid(42));
-        job.name = "echo ok".to_string();
-        let report = OldReport { index, marker, job };
-        assert_eq!(
-            format!("{report:#}"),
-            "[1] +    42 Running              echo ok"
-        );
-
-        job.pid = Pid(123456);
-        let report = OldReport { index, marker, job };
-        assert_eq!(
-            format!("{report:#}"),
-            "[1] + 123456 Running              echo ok"
         );
     }
 }

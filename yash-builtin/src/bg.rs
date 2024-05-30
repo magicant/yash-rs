@@ -87,8 +87,6 @@ use std::borrow::Cow;
 use std::fmt::Display;
 use thiserror::Error;
 use yash_env::io::Fd;
-use yash_env::job::fmt::Marker;
-use yash_env::job::fmt::OldReport;
 use yash_env::job::id::parse;
 use yash_env::job::id::FindError;
 use yash_env::job::id::ParseError;
@@ -164,12 +162,7 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<(), ResumeEr
         return Err(ResumeError::Unmonitored);
     }
 
-    let report = OldReport {
-        index,
-        marker: Marker::None,
-        job: &job,
-    };
-    let line = format!("[{}] {}\n", report.number(), job.name);
+    let line = format!("[{}] {}\n", index + 1, job.name);
     env.system.write_all(Fd::STDOUT, line.as_bytes()).await?;
     drop(line);
 
