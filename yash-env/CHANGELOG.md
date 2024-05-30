@@ -44,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `job::ProcessState::{Exited, Signaled, Stopped}` in favor of `job::ProcessResult`
 - `job::ProcessState::to_wait_status`
+- `impl std::fmt::Display for job::ProcessResult`
+- `impl std::fmt::Display for job::ProcessState`
 - `semantics::apply_errexit`
 
 ### Fixed

@@ -57,55 +57,6 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
 
-// TODO Remove these impls
-/// Formats a process result into a string.
-///
-/// Process results are formatted as follows:
-///
-/// - `Stopped(SIG…)` for a stopped process that has been stopped by the signal
-///   `SIG…`
-/// - `Done` for a process that exited with exit status 0
-/// - `Done(…)` for a process that exited with a non-zero exit status where
-///   `…` is the exit status
-/// - `Killed(SIG…)` for a process that was terminated by the signal `SIG…`
-///   without a core dump
-/// - `Killed(SIG…: core dumped)` for a process that was terminated by the
-///   signal `SIG…` with a core dump
-impl Display for ProcessResult {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match self {
-            Self::Exited(ExitStatus::SUCCESS) => "Done".fmt(f),
-
-            Self::Exited(exit_status) => format!("Done({exit_status})").fmt(f),
-
-            Self::Stopped(signal) => format!("Stopped({signal})").fmt(f),
-
-            Self::Signaled {
-                signal,
-                core_dump: false,
-            } => format!("Killed({signal})").fmt(f),
-
-            Self::Signaled {
-                signal,
-                core_dump: true,
-            } => format!("Killed({signal}: core dumped)").fmt(f),
-        }
-    }
-}
-
-/// Formats a process state into a string.
-///
-/// The `Running` state is formatted as `"Running"`. The `Halted` state
-/// delegates to the formatting of the [`ProcessResult`] that it contains.
-impl Display for ProcessState {
-    fn fmt(&self, f: &mut Formatter) -> Result {
-        match self {
-            ProcessState::Running => "Running".fmt(f),
-            ProcessState::Halted(result) => result.fmt(f),
-        }
-    }
-}
-
 /// Type of a marker indicating the current and previous job
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Marker {
@@ -255,78 +206,6 @@ impl std::fmt::Display for Report<'_> {
 mod tests {
     use super::super::Pid;
     use super::*;
-    use crate::job::ProcessState;
-    use crate::trap::Signal;
-
-    #[test]
-    fn process_result_display_stopped() {
-        let result = ProcessResult::Stopped(Signal::SIGSTOP);
-        assert_eq!(result.to_string(), "Stopped(SIGSTOP)");
-        let result = ProcessResult::Stopped(Signal::SIGTSTP);
-        assert_eq!(result.to_string(), "Stopped(SIGTSTP)");
-        let result = ProcessResult::Stopped(Signal::SIGTTIN);
-        assert_eq!(result.to_string(), "Stopped(SIGTTIN)");
-        let result = ProcessResult::Stopped(Signal::SIGTTOU);
-        assert_eq!(result.to_string(), "Stopped(SIGTTOU)");
-    }
-
-    #[test]
-    fn process_result_display_exited() {
-        let result = ProcessResult::exited(0);
-        assert_eq!(result.to_string(), "Done");
-        let result = ProcessResult::exited(1);
-        assert_eq!(result.to_string(), "Done(1)");
-        let result = ProcessResult::exited(2);
-        assert_eq!(result.to_string(), "Done(2)");
-        let result = ProcessResult::exited(253);
-        assert_eq!(result.to_string(), "Done(253)");
-    }
-
-    #[test]
-    fn process_result_display_signaled() {
-        let result = ProcessResult::Signaled {
-            signal: Signal::SIGKILL,
-            core_dump: false,
-        };
-        assert_eq!(result.to_string(), "Killed(SIGKILL)");
-
-        let result = ProcessResult::Signaled {
-            signal: Signal::SIGKILL,
-            core_dump: true,
-        };
-        assert_eq!(result.to_string(), "Killed(SIGKILL: core dumped)");
-
-        let result = ProcessResult::Signaled {
-            signal: Signal::SIGTERM,
-            core_dump: false,
-        };
-        assert_eq!(result.to_string(), "Killed(SIGTERM)");
-
-        let result = ProcessResult::Signaled {
-            signal: Signal::SIGQUIT,
-            core_dump: true,
-        };
-        assert_eq!(result.to_string(), "Killed(SIGQUIT: core dumped)");
-    }
-
-    #[test]
-    fn process_state_display_running() {
-        let state = ProcessState::Running;
-        assert_eq!(state.to_string(), "Running");
-    }
-
-    #[test]
-    fn process_state_display_halted() {
-        let state = ProcessState::stopped(Signal::SIGSTOP);
-        assert_eq!(state.to_string(), "Stopped(SIGSTOP)");
-        let state = ProcessState::exited(0);
-        assert_eq!(state.to_string(), "Done");
-        let state = ProcessState::Halted(ProcessResult::Signaled {
-            signal: Signal::SIGKILL,
-            core_dump: false,
-        });
-        assert_eq!(state.to_string(), "Killed(SIGKILL)");
-    }
 
     #[test]
     fn state_display() {
@@ -343,6 +222,11 @@ mod tests {
             core_dump: false,
         };
         assert_eq!(state.to_string(), "Killed(SIGKILL)");
+        let state = State::Signaled {
+            signal: signal::Name::Quit,
+            core_dump: true,
+        };
+        assert_eq!(state.to_string(), "Killed(SIGQUIT: core dumped)");
     }
 
     #[test]
