@@ -20,62 +20,6 @@ use super::super::Signal;
 pub(super) use crate::signal::*;
 use std::num::NonZeroI32;
 
-/// Default effect of a signal delivered to a process.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum SignalEffect {
-    /// Does nothing.
-    None,
-    /// Terminates the process.
-    Terminate { core_dump: bool },
-    /// Suspends the process.
-    Suspend,
-    /// Resumes the process.
-    Resume,
-}
-
-impl SignalEffect {
-    /// Returns the default effect for the specified signal.
-    #[must_use]
-    pub fn of(signal: Signal) -> Self {
-        match signal {
-            Signal::SIGHUP => Self::Terminate { core_dump: false },
-            Signal::SIGINT => Self::Terminate { core_dump: false },
-            Signal::SIGQUIT => Self::Terminate { core_dump: true },
-            Signal::SIGILL => Self::Terminate { core_dump: true },
-            Signal::SIGTRAP => Self::Terminate { core_dump: true },
-            Signal::SIGABRT => Self::Terminate { core_dump: true },
-            Signal::SIGBUS => Self::Terminate { core_dump: true },
-            // Signal::SIGEMT => Self::Terminate { core_dump: false },
-            Signal::SIGFPE => Self::Terminate { core_dump: true },
-            Signal::SIGKILL => Self::Terminate { core_dump: false },
-            Signal::SIGUSR1 => Self::Terminate { core_dump: false },
-            Signal::SIGSEGV => Self::Terminate { core_dump: true },
-            Signal::SIGUSR2 => Self::Terminate { core_dump: false },
-            Signal::SIGPIPE => Self::Terminate { core_dump: false },
-            Signal::SIGALRM => Self::Terminate { core_dump: false },
-            Signal::SIGTERM => Self::Terminate { core_dump: false },
-            // Signal::SIGSTKFLT => Self::Terminate { core_dump: false },
-            Signal::SIGCHLD => Self::None,
-            Signal::SIGCONT => Self::Resume,
-            Signal::SIGSTOP => Self::Suspend,
-            Signal::SIGTSTP => Self::Suspend,
-            Signal::SIGTTIN => Self::Suspend,
-            Signal::SIGTTOU => Self::Suspend,
-            Signal::SIGURG => Self::None,
-            Signal::SIGXCPU => Self::Terminate { core_dump: true },
-            Signal::SIGXFSZ => Self::Terminate { core_dump: true },
-            Signal::SIGVTALRM => Self::Terminate { core_dump: false },
-            Signal::SIGPROF => Self::Terminate { core_dump: false },
-            Signal::SIGWINCH => Self::None,
-            Signal::SIGIO => Self::Terminate { core_dump: false },
-            // Signal::SIGPWR => Self::Terminate { core_dump: false },
-            // Signal::SIGINFO => Self::Terminate { core_dump: false },
-            Signal::SIGSYS => Self::Terminate { core_dump: true },
-            _ => Self::Terminate { core_dump: false },
-        }
-    }
-}
-
 /// Signal number for `SIGABRT` in the virtual system
 ///
 /// POSIX effectively requires that the signal number for `SIGABRT` is 6.
@@ -414,5 +358,65 @@ impl Number {
             .as_raw()
             .try_into()
             .ok()
+    }
+}
+
+/// Default effect of a signal delivered to a process.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum SignalEffect {
+    /// Does nothing.
+    None,
+    /// Terminates the process.
+    Terminate { core_dump: bool },
+    /// Suspends the process.
+    Suspend,
+    /// Resumes the process.
+    Resume,
+}
+
+impl SignalEffect {
+    /// Returns the default effect for the specified signal.
+    ///
+    /// This function returns `Terminate { core_dump: true }` for `Rtmin(n)` and
+    /// `Rtmax(n)` whatever `n` is.
+    #[must_use]
+    pub const fn of(signal: Name) -> Self {
+        match signal {
+            Name::Abrt => Self::Terminate { core_dump: true },
+            Name::Alrm => Self::Terminate { core_dump: false },
+            Name::Bus => Self::Terminate { core_dump: true },
+            Name::Chld | Name::Cld => Self::None,
+            Name::Cont => Self::Resume,
+            Name::Emt => Self::Terminate { core_dump: false },
+            Name::Fpe => Self::Terminate { core_dump: true },
+            Name::Hup => Self::Terminate { core_dump: false },
+            Name::Ill => Self::Terminate { core_dump: true },
+            Name::Info => Self::Terminate { core_dump: false },
+            Name::Int => Self::Terminate { core_dump: false },
+            Name::Io => Self::Terminate { core_dump: false },
+            Name::Iot => Self::Terminate { core_dump: true },
+            Name::Kill => Self::Terminate { core_dump: false },
+            Name::Lost => Self::Terminate { core_dump: false },
+            Name::Pipe => Self::Terminate { core_dump: false },
+            Name::Poll => Self::Terminate { core_dump: false },
+            Name::Prof => Self::Terminate { core_dump: false },
+            Name::Pwr => Self::Terminate { core_dump: false },
+            Name::Quit => Self::Terminate { core_dump: true },
+            Name::Segv => Self::Terminate { core_dump: true },
+            Name::Stkflt => Self::Terminate { core_dump: false },
+            Name::Stop => Self::Suspend,
+            Name::Sys => Self::Terminate { core_dump: true },
+            Name::Term => Self::Terminate { core_dump: false },
+            Name::Thr => Self::Terminate { core_dump: false },
+            Name::Trap => Self::Terminate { core_dump: true },
+            Name::Tstp | Name::Ttin | Name::Ttou => Self::Suspend,
+            Name::Urg => Self::None,
+            Name::Usr1 | Name::Usr2 => Self::Terminate { core_dump: false },
+            Name::Vtalrm => Self::Terminate { core_dump: false },
+            Name::Winch => Self::None,
+            Name::Xcpu => Self::Terminate { core_dump: true },
+            Name::Xfsz => Self::Terminate { core_dump: true },
+            Name::Rtmin(_) | Name::Rtmax(_) => Self::Terminate { core_dump: false },
+        }
     }
 }

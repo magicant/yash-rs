@@ -234,6 +234,7 @@ mod tests {
     use yash_env::job::ProcessState;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::r#virtual::Process;
+    use yash_env::system::r#virtual::{SIGSTOP, SIGTSTP, SIGTTIN};
     use yash_env::VirtualSystem;
 
     #[test]
@@ -252,9 +253,9 @@ mod tests {
         let mut leader = Process::with_parent_and_group(system.process_id, pgid);
         let mut child = Process::fork_from(pgid, &leader);
         let mut orphan = Process::with_parent_and_group(system.process_id, orphan_id);
-        _ = leader.set_state(ProcessState::stopped(Signal::SIGTTIN));
-        _ = child.set_state(ProcessState::stopped(Signal::SIGTSTP));
-        _ = orphan.set_state(ProcessState::stopped(Signal::SIGSTOP));
+        _ = leader.set_state(ProcessState::stopped(SIGTTIN));
+        _ = child.set_state(ProcessState::stopped(SIGTSTP));
+        _ = orphan.set_state(ProcessState::stopped(SIGSTOP));
         {
             let mut state = system.state.borrow_mut();
             state.processes.insert(pgid, leader);
@@ -275,7 +276,7 @@ mod tests {
         // Unrelated processes should not be resumed.
         assert_eq!(
             state.processes[&orphan_id].state(),
-            ProcessState::stopped(Signal::SIGSTOP),
+            ProcessState::stopped(SIGSTOP),
         );
     }
 
@@ -305,7 +306,7 @@ mod tests {
         job.job_controlled = true;
         let index = env.jobs.add(job);
         let mut process = Process::with_parent_and_group(system.process_id, pid);
-        _ = process.set_state(ProcessState::stopped(Signal::SIGSTOP));
+        _ = process.set_state(ProcessState::stopped(SIGSTOP));
         {
             let mut state = system.state.borrow_mut();
             state.processes.insert(pid, process);
@@ -331,7 +332,7 @@ mod tests {
         env.jobs.set_current_job(orphan_index).unwrap();
         let mut leader = Process::with_parent_and_group(system.process_id, pgid);
         let mut orphan = Process::with_parent_and_group(system.process_id, orphan_id);
-        _ = leader.set_state(ProcessState::stopped(Signal::SIGTTIN));
+        _ = leader.set_state(ProcessState::stopped(SIGTTIN));
         _ = orphan.set_state(ProcessState::Running);
         {
             let mut state = system.state.borrow_mut();
@@ -358,7 +359,7 @@ mod tests {
         let index = env.jobs.add(job);
         // This process (irrelevant to the job) happens to have the same PID as the job.
         let mut process = Process::with_parent_and_group(system.process_id, pid);
-        _ = process.set_state(ProcessState::stopped(Signal::SIGSTOP));
+        _ = process.set_state(ProcessState::stopped(SIGSTOP));
         {
             let mut state = system.state.borrow_mut();
             state.processes.insert(pid, process);
@@ -373,7 +374,7 @@ mod tests {
         // The process should not be resumed.
         assert_eq!(
             state.processes[&pid].state(),
-            ProcessState::stopped(Signal::SIGSTOP),
+            ProcessState::stopped(SIGSTOP),
         );
     }
 
@@ -413,8 +414,8 @@ mod tests {
         env.jobs.set_current_job(index).unwrap();
         let mut leader = Process::with_parent_and_group(system.process_id, pgid);
         let mut orphan = Process::with_parent_and_group(system.process_id, orphan_id);
-        _ = leader.set_state(ProcessState::stopped(Signal::SIGSTOP));
-        _ = orphan.set_state(ProcessState::stopped(Signal::SIGTTIN));
+        _ = leader.set_state(ProcessState::stopped(SIGSTOP));
+        _ = orphan.set_state(ProcessState::stopped(SIGTTIN));
         {
             let mut state = system.state.borrow_mut();
             state.processes.insert(pgid, leader);
@@ -430,7 +431,7 @@ mod tests {
         // Unrelated processes should not be resumed.
         assert_eq!(
             state.processes[&orphan_id].state(),
-            ProcessState::stopped(Signal::SIGTTIN),
+            ProcessState::stopped(SIGTTIN),
         );
         // No error message should be printed on success.
         assert_stderr(&system.state, |stderr| assert_eq!(stderr, ""));
@@ -468,9 +469,9 @@ mod tests {
         let mut process1 = Process::with_parent_and_group(system.process_id, pgid1);
         let mut process2 = Process::with_parent_and_group(system.process_id, pgid2);
         let mut process3 = Process::with_parent_and_group(system.process_id, pgid3);
-        _ = process1.set_state(ProcessState::stopped(Signal::SIGSTOP));
-        _ = process2.set_state(ProcessState::stopped(Signal::SIGSTOP));
-        _ = process3.set_state(ProcessState::stopped(Signal::SIGSTOP));
+        _ = process1.set_state(ProcessState::stopped(SIGSTOP));
+        _ = process2.set_state(ProcessState::stopped(SIGSTOP));
+        _ = process3.set_state(ProcessState::stopped(SIGSTOP));
         {
             let mut state = system.state.borrow_mut();
             state.processes.insert(pgid1, process1);
@@ -490,7 +491,7 @@ mod tests {
         // Unrelated processes should not be resumed.
         assert_eq!(
             state.processes[&pgid2].state(),
-            ProcessState::stopped(Signal::SIGSTOP),
+            ProcessState::stopped(SIGSTOP),
         );
         // No error message should be printed on success.
         assert_stderr(&system.state, |stderr| assert_eq!(stderr, ""));
@@ -509,7 +510,7 @@ mod tests {
         let index = env.jobs.add(job);
         env.jobs.set_current_job(index).unwrap();
         let mut leader = Process::with_parent_and_group(system.process_id, pgid);
-        _ = leader.set_state(ProcessState::stopped(Signal::SIGSTOP));
+        _ = leader.set_state(ProcessState::stopped(SIGSTOP));
         {
             let mut state = system.state.borrow_mut();
             state.processes.insert(pgid, leader);

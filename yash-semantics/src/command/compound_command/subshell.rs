@@ -88,8 +88,8 @@ mod tests {
     use yash_env::job::ProcessState;
     use yash_env::option::Option::{ErrExit, Monitor};
     use yash_env::option::State::On;
-    use yash_env::trap::Signal;
-    use yash_env::VirtualSystem;
+    use yash_env::system::r#virtual::VirtualSystem;
+    use yash_env::system::r#virtual::SIGSTOP;
     use yash_syntax::syntax::CompoundCommand;
 
     #[test]
@@ -193,19 +193,19 @@ mod tests {
             let command: CompoundCommand = "(suspend foo)".parse().unwrap();
             let result = command.execute(&mut env).await;
             assert_eq!(result, Continue(()));
-            assert_eq!(env.exit_status, ExitStatus::from(Signal::SIGSTOP));
+            assert_eq!(env.exit_status, ExitStatus::from(SIGSTOP));
 
             let state = state.borrow();
             let (&pid, process) = state.processes.last_key_value().unwrap();
             assert_ne!(pid, env.main_pid);
             assert_ne!(process.pgid(), env.main_pgid);
-            assert_eq!(process.state(), ProcessState::stopped(Signal::SIGSTOP));
+            assert_eq!(process.state(), ProcessState::stopped(SIGSTOP));
 
             assert_eq!(env.jobs.len(), 1);
             let job = env.jobs.iter().next().unwrap().1;
             assert_eq!(job.pid, pid);
             assert!(job.job_controlled);
-            assert_eq!(job.state, ProcessState::stopped(Signal::SIGSTOP));
+            assert_eq!(job.state, ProcessState::stopped(SIGSTOP));
             assert!(job.state_changed);
             assert_eq!(job.name, "suspend foo");
         })

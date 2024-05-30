@@ -31,10 +31,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `job::fmt::Report` has been totally rewritten.
 - `system::virtual::FileSystem::get` now fails with `EACCES` when search
   permission is denied for any directory component of the path.
+- `job::ProcessResult::{Stopped, Signaled}` now have associated values of type
+  `signal::Number` instead of `trap::Signal`.
+- `job::ProcessState::stopped` now takes a `signal::Number` parameter instead of
+  a `trap::Signal`.
 - The following methods of `system::virtual::Process` now operate on
   `signal::Number` instead of `trap::Signal`:
     - `signal_handling`
     - `set_signal_handling`
+- `system::virtual::SignalEffect::of` now takes a `signal::Number` parameter
+  instead of a `trap::Signal`. This function is now `const`.
 - The type parameter constraint for `subshell::Subshell` is now
   `F: for<'a> FnOnce(&'a mut Env, Option<JobControl>) -> Pin<Box<dyn Future<Output = ()> + 'a>> + 'static`.
   The `Output` type of the returned future has been changed from
@@ -43,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - `job::ProcessState::{Exited, Signaled, Stopped}` in favor of `job::ProcessResult`
-- `job::ProcessState::to_wait_status`
+- `job::ProcessState::{from_wait_status, to_wait_status}`
 - `impl std::fmt::Display for job::ProcessResult`
 - `impl std::fmt::Display for job::ProcessState`
 - `semantics::apply_errexit`

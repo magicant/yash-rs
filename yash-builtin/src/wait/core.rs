@@ -106,7 +106,7 @@ mod tests {
     use yash_env::job::ProcessState;
     use yash_env::semantics::ExitStatus;
     use yash_env::subshell::Subshell;
-    use yash_env::system::r#virtual::SIGTERM;
+    use yash_env::system::r#virtual::{SIGSTOP, SIGTERM};
     use yash_env::trap::Action;
     use yash_env::variable::Value;
     use yash_env::VirtualSystem;
@@ -158,10 +158,7 @@ mod tests {
             let result = wait_for_any_job_or_trap(&mut env).await;
             assert_eq!(result, Ok(()));
             // The job state is updated.
-            assert_eq!(
-                env.jobs[index].state,
-                ProcessState::stopped(Signal::SIGSTOP),
-            );
+            assert_eq!(env.jobs[index].state, ProcessState::stopped(SIGSTOP),);
         });
     }
 

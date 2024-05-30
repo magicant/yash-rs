@@ -141,23 +141,15 @@ impl State {
     /// used as a fallback replacement.
     #[must_use]
     pub fn from_process_state<S: System>(state: ProcessState, system: &S) -> Self {
-        fn convert<S: System>(signal: nix::sys::signal::Signal, _system: &S) -> signal::Name {
-            let non_zero = std::num::NonZeroI32::new(signal as _).unwrap();
-            let number = signal::Number::from_raw_unchecked(non_zero);
-            unsafe { crate::RealSystem::new() }.signal_name_from_number(number)
-            // match system.validate_signal(number as _) {
-            //     Some((name, _number)) => name,
-            //     None => signal::Name::Rtmin(-1),
-            // }
-        }
-
         match state {
             ProcessState::Running => Self::Running,
             ProcessState::Halted(result) => match result {
                 ProcessResult::Exited(status) => Self::Exited(status),
-                ProcessResult::Stopped(signal) => Self::Stopped(convert(signal, system)),
+                ProcessResult::Stopped(signal) => {
+                    Self::Stopped(system.signal_name_from_number(signal))
+                }
                 ProcessResult::Signaled { signal, core_dump } => {
-                    let signal = convert(signal, system);
+                    let signal = system.signal_name_from_number(signal);
                     Self::Signaled { signal, core_dump }
                 }
             },

@@ -1847,7 +1847,7 @@ mod tests {
         assert_eq!(
             system.current_process().state(),
             ProcessState::Halted(ProcessResult::Signaled {
-                signal: Signal::SIGINT,
+                signal: SIGINT,
                 core_dump: false
             })
         );
@@ -1890,7 +1890,7 @@ mod tests {
             assert_eq!(
                 process.state,
                 ProcessState::Halted(ProcessResult::Signaled {
-                    signal: Signal::SIGTERM,
+                    signal: SIGTERM,
                     core_dump: false
                 })
             );
@@ -1924,21 +1924,21 @@ mod tests {
         assert_eq!(
             state.processes[&system.process_id].state,
             ProcessState::Halted(ProcessResult::Signaled {
-                signal: Signal::SIGQUIT,
+                signal: SIGQUIT,
                 core_dump: true
             })
         );
         assert_eq!(
             state.processes[&Pid(10)].state,
             ProcessState::Halted(ProcessResult::Signaled {
-                signal: Signal::SIGQUIT,
+                signal: SIGQUIT,
                 core_dump: true
             })
         );
         assert_eq!(
             state.processes[&Pid(11)].state,
             ProcessState::Halted(ProcessResult::Signaled {
-                signal: Signal::SIGQUIT,
+                signal: SIGQUIT,
                 core_dump: true
             })
         );
@@ -1977,14 +1977,14 @@ mod tests {
         assert_eq!(
             state.processes[&Pid(11)].state,
             ProcessState::Halted(ProcessResult::Signaled {
-                signal: Signal::SIGHUP,
+                signal: SIGHUP,
                 core_dump: false
             })
         );
         assert_eq!(
             state.processes[&Pid(21)].state,
             ProcessState::Halted(ProcessResult::Signaled {
-                signal: Signal::SIGHUP,
+                signal: SIGHUP,
                 core_dump: false
             })
         );
@@ -2472,7 +2472,7 @@ mod tests {
             Ok(Some((
                 pid,
                 ProcessState::Halted(ProcessResult::Signaled {
-                    signal: Signal::SIGKILL,
+                    signal: SIGKILL,
                     core_dump: false
                 })
             )))
@@ -2501,10 +2501,7 @@ mod tests {
         executor.run_until_stalled();
 
         let result = env.system.wait(pid);
-        assert_eq!(
-            result,
-            Ok(Some((pid, ProcessState::stopped(Signal::SIGSTOP))))
-        );
+        assert_eq!(result, Ok(Some((pid, ProcessState::stopped(SIGSTOP)))));
     }
 
     #[test]

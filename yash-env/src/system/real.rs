@@ -41,6 +41,7 @@ use super::TimeSpec;
 use super::Times;
 use crate::io::Fd;
 use crate::job::Pid;
+use crate::job::ProcessResult;
 use crate::job::ProcessState;
 use crate::SignalHandling;
 use nix::errno::Errno as NixErrno;
@@ -491,10 +492,29 @@ impl System for RealSystem {
     }
 
     fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
-        use nix::sys::wait::WaitPidFlag;
+        use nix::sys::wait::{WaitPidFlag, WaitStatus::*};
         let options = WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED | WaitPidFlag::WNOHANG;
         let status = nix::sys::wait::waitpid(Some(target.into()), options.into())?;
-        Ok(ProcessState::from_wait_status(status))
+        match status {
+            StillAlive => Ok(None),
+            Continued(pid) => Ok(Some((pid.into(), ProcessState::Running))),
+            Exited(pid, exit_status) => Ok(Some((pid.into(), ProcessState::exited(exit_status)))),
+            Signaled(pid, signal, core_dump) => {
+                // SAFETY: The signal number is always a valid signal number, which is non-zero.
+                let raw_number = unsafe { NonZeroI32::new_unchecked(signal as _) };
+                let signal = signal::Number::from_raw_unchecked(raw_number);
+                let process_result = ProcessResult::Signaled { signal, core_dump };
+                Ok(Some((pid.into(), process_result.into())))
+            }
+            Stopped(pid, signal) => {
+                // SAFETY: The signal number is always a valid signal number, which is non-zero.
+                let raw_number = unsafe { NonZeroI32::new_unchecked(signal as _) };
+                let signal = signal::Number::from_raw_unchecked(raw_number);
+                Ok(Some((pid.into(), ProcessState::stopped(signal))))
+            }
+            #[allow(unreachable_patterns)]
+            _ => unreachable!(),
+        }
     }
 
     fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {

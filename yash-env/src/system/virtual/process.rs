@@ -408,17 +408,18 @@ impl Process {
     /// that case, the caller must send a SIGCHLD to the parent process of this
     /// process.
     #[must_use = "send SIGCHLD if process state has changed"]
-    fn deliver_signal(&mut self, number: signal::Number) -> SignalResult {
-        let signal = number.to_signal_virtual().unwrap_or(Signal::SIGSYS);
-        let handling = if signal == Signal::SIGKILL || signal == Signal::SIGSTOP {
+    fn deliver_signal(&mut self, signal: signal::Number) -> SignalResult {
+        let handling = if signal == signal::SIGKILL || signal == signal::SIGSTOP {
             SignalHandling::Default
         } else {
-            self.signal_handling(number)
+            self.signal_handling(signal)
         };
 
         match handling {
             SignalHandling::Default => {
-                let process_state_changed = match SignalEffect::of(signal) {
+                let name = signal::Name::try_from_raw_virtual(signal.as_raw())
+                    .unwrap_or(signal::Name::Sys);
+                let process_state_changed = match SignalEffect::of(name) {
                     SignalEffect::None | SignalEffect::Resume => false,
                     SignalEffect::Terminate { core_dump } => {
                         let result = ProcessResult::Signaled { signal, core_dump };
@@ -438,7 +439,7 @@ impl Process {
                 process_state_changed: false,
             },
             SignalHandling::Catch => {
-                self.caught_signals.push(number);
+                self.caught_signals.push(signal);
                 SignalResult {
                     delivered: true,
                     caught: true,
@@ -598,7 +599,7 @@ mod tests {
     #[test]
     fn process_set_state_wakes_on_resumed() {
         let mut process = Process::with_parent_and_group(Pid(1), Pid(2));
-        process.state = ProcessState::stopped(Signal::SIGTSTP);
+        process.state = ProcessState::stopped(signal::SIGTSTP);
         let process = Rc::new(RefCell::new(process));
         let process2 = Rc::clone(&process);
         let waker = Rc::new(Cell::new(None));
@@ -634,7 +635,7 @@ mod tests {
         let (mut process, _reader, _writer) = process_with_pipe();
         assert!(
             process.set_state(ProcessState::Halted(ProcessResult::Signaled {
-                signal: Signal::SIGINT,
+                signal: signal::SIGINT,
                 core_dump: false
             }))
         );
@@ -774,7 +775,7 @@ mod tests {
         assert_eq!(
             process.state(),
             ProcessState::Halted(ProcessResult::Signaled {
-                signal: Signal::SIGTERM,
+                signal: signal::SIGTERM,
                 core_dump: false
             })
         );
@@ -796,7 +797,7 @@ mod tests {
         assert_eq!(
             process.state(),
             ProcessState::Halted(ProcessResult::Signaled {
-                signal: Signal::SIGABRT,
+                signal: signal::SIGABRT,
                 core_dump: true
             })
         );
@@ -816,14 +817,14 @@ mod tests {
                 process_state_changed: true,
             }
         );
-        assert_eq!(process.state(), ProcessState::stopped(Signal::SIGTSTP));
+        assert_eq!(process.state(), ProcessState::stopped(signal::SIGTSTP));
         assert_eq!(process.caught_signals, []);
     }
 
     #[test]
     fn process_raise_signal_default_continuing() {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
-        let _ = process.set_state(ProcessState::stopped(Signal::SIGTTOU));
+        let _ = process.set_state(ProcessState::stopped(signal::SIGTTOU));
         let result = process.raise_signal(signal::SIGCONT);
         assert_eq!(
             result,
@@ -857,7 +858,7 @@ mod tests {
     #[test]
     fn process_raise_signal_ignored_and_blocked_sigcont() {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
-        let _ = process.set_state(ProcessState::stopped(Signal::SIGTTOU));
+        let _ = process.set_state(ProcessState::stopped(signal::SIGTTOU));
         let _ = process.set_signal_handling(signal::SIGCONT, SignalHandling::Ignore);
         let _ = process.block_signals(SigmaskHow::SIG_BLOCK, &to_set([Signal::SIGCONT]));
         let result = process.raise_signal(signal::SIGCONT);

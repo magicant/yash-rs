@@ -122,7 +122,7 @@ mod tests {
     use super::*;
     use yash_env::job::{Job, Pid};
     use yash_env::option::State::{Off, On};
-    use yash_env::trap::Signal;
+    use yash_env::system::r#virtual::{SIGABRT, SIGHUP, SIGSTOP, SIGTSTP};
 
     #[test]
     fn status_of_unknown_job() {
@@ -171,27 +171,27 @@ mod tests {
         let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
         job.state = ProcessState::Halted(ProcessResult::Signaled {
-            signal: Signal::SIGHUP,
+            signal: SIGHUP,
             core_dump: false,
         });
         let index = jobs.add(job);
 
         assert_eq!(
             job_status(index, Off)(&mut jobs),
-            ControlFlow::Break(ExitStatus::from(Signal::SIGHUP)),
+            ControlFlow::Break(ExitStatus::from(SIGHUP)),
         );
         assert_eq!(jobs.get(index), None);
 
         let mut job = Job::new(Pid(456));
         job.state = ProcessState::Halted(ProcessResult::Signaled {
-            signal: Signal::SIGABRT,
+            signal: SIGABRT,
             core_dump: true,
         });
         let index = jobs.add(job);
 
         assert_eq!(
             job_status(index, On)(&mut jobs),
-            ControlFlow::Break(ExitStatus::from(Signal::SIGABRT)),
+            ControlFlow::Break(ExitStatus::from(SIGABRT)),
         );
         assert_eq!(jobs.get(index), None);
     }
@@ -200,14 +200,14 @@ mod tests {
     fn status_of_stopped_job_without_job_control() {
         let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
-        job.state = ProcessState::stopped(Signal::SIGTSTP);
+        job.state = ProcessState::stopped(SIGTSTP);
         let index = jobs.add(job);
 
         assert_eq!(job_status(index, Off)(&mut jobs), ControlFlow::Continue(()),);
         assert_eq!(jobs[index].pid, Pid(123));
 
         let mut job = Job::new(Pid(456));
-        job.state = ProcessState::stopped(Signal::SIGSTOP);
+        job.state = ProcessState::stopped(SIGSTOP);
         let index = jobs.add(job);
 
         assert_eq!(job_status(index, Off)(&mut jobs), ControlFlow::Continue(()),);
@@ -218,22 +218,22 @@ mod tests {
     fn status_of_stopped_job_with_job_control() {
         let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
-        job.state = ProcessState::stopped(Signal::SIGTSTP);
+        job.state = ProcessState::stopped(SIGTSTP);
         let index = jobs.add(job);
 
         assert_eq!(
             job_status(index, On)(&mut jobs),
-            ControlFlow::Break(ExitStatus::from(Signal::SIGTSTP)),
+            ControlFlow::Break(ExitStatus::from(SIGTSTP)),
         );
         assert_eq!(jobs[index].pid, Pid(123));
 
         let mut job = Job::new(Pid(456));
-        job.state = ProcessState::stopped(Signal::SIGSTOP);
+        job.state = ProcessState::stopped(SIGSTOP);
         let index = jobs.add(job);
 
         assert_eq!(
             job_status(index, On)(&mut jobs),
-            ControlFlow::Break(ExitStatus::from(Signal::SIGSTOP)),
+            ControlFlow::Break(ExitStatus::from(SIGSTOP)),
         );
         assert_eq!(jobs[index].pid, Pid(456));
     }

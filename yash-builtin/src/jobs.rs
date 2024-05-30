@@ -240,7 +240,7 @@ mod tests {
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::system::r#virtual::VirtualSystem;
-    use yash_env::trap::Signal;
+    use yash_env::system::r#virtual::{SIGINT, SIGQUIT, SIGSTOP, SIGTSTP};
 
     #[test]
     fn no_operands_no_jobs() {
@@ -261,7 +261,7 @@ mod tests {
         job.name = "echo first".to_string();
         env.jobs.add(job);
         let mut job = Job::new(Pid(72));
-        job.state = ProcessState::stopped(Signal::SIGSTOP);
+        job.state = ProcessState::stopped(SIGSTOP);
         job.name = "echo second".to_string();
         env.jobs.add(job);
 
@@ -284,7 +284,7 @@ mod tests {
         let i11 = env.jobs.add(job);
 
         let mut job = Job::new(Pid(12));
-        job.state = ProcessState::stopped(Signal::SIGTSTP);
+        job.state = ProcessState::stopped(SIGTSTP);
         job.name = "echo stopped".to_string();
         let i12 = env.jobs.add(job);
 
@@ -300,7 +300,7 @@ mod tests {
 
         let mut job = Job::new(Pid(15));
         job.state = ProcessState::Halted(ProcessResult::Signaled {
-            signal: Signal::SIGINT,
+            signal: SIGINT,
             core_dump: false,
         });
         job.name = "echo signaled".to_string();
@@ -308,7 +308,7 @@ mod tests {
 
         let mut job = Job::new(Pid(16));
         job.state = ProcessState::Halted(ProcessResult::Signaled {
-            signal: Signal::SIGQUIT,
+            signal: SIGQUIT,
             core_dump: true,
         });
         job.name = "echo core dumped".to_string();
@@ -334,7 +334,7 @@ mod tests {
         job.name = "echo first".to_string();
         env.jobs.add(job);
         let mut job = Job::new(Pid(72));
-        job.state = ProcessState::stopped(Signal::SIGSTOP);
+        job.state = ProcessState::stopped(SIGSTOP);
         job.name = "echo second".to_string();
         env.jobs.add(job);
         env.jobs.add(Job::new(Pid(100)));
@@ -389,7 +389,7 @@ mod tests {
         job.name = "echo first".to_string();
         env.jobs.add(job);
         let mut job = Job::new(Pid(72));
-        job.state = ProcessState::stopped(Signal::SIGSTOP);
+        job.state = ProcessState::stopped(SIGSTOP);
         job.name = "echo second".to_string();
         env.jobs.add(job);
         env.jobs.add(Job::new(Pid(100)));
@@ -434,7 +434,7 @@ mod tests {
         job.name = "echo first".to_string();
         env.jobs.add(job);
         let mut job = Job::new(Pid(72));
-        job.state = ProcessState::stopped(Signal::SIGSTOP);
+        job.state = ProcessState::stopped(SIGSTOP);
         job.name = "echo second".to_string();
         env.jobs.add(job);
         env.jobs.add(Job::new(Pid(100)));
@@ -481,7 +481,7 @@ mod tests {
         job.name = "echo first".to_string();
         let i42 = env.jobs.add(job);
         let mut job = Job::new(Pid(72));
-        job.state = ProcessState::stopped(Signal::SIGSTOP);
+        job.state = ProcessState::stopped(SIGSTOP);
         job.name = "echo second".to_string();
         let i72 = env.jobs.add(job);
 
@@ -518,7 +518,7 @@ mod tests {
         job.name = "echo first".to_string();
         env.jobs.add(job);
         let mut job = Job::new(Pid(72));
-        job.state = ProcessState::stopped(Signal::SIGSTOP);
+        job.state = ProcessState::stopped(SIGSTOP);
         job.name = "echo second".to_string();
         env.jobs.add(job);
 
@@ -545,7 +545,7 @@ mod tests {
         job.name = "echo first".to_string();
         env.jobs.add(job);
         let mut job = Job::new(Pid(72));
-        job.state = ProcessState::stopped(Signal::SIGSTOP);
+        job.state = ProcessState::stopped(SIGSTOP);
         job.name = "echo second".to_string();
         env.jobs.add(job);
 
@@ -566,7 +566,7 @@ mod tests {
         job.name = "echo first".to_string();
         env.jobs.add(job);
         let mut job = Job::new(Pid(72));
-        job.state = ProcessState::stopped(Signal::SIGSTOP);
+        job.state = ProcessState::stopped(SIGSTOP);
         job.name = "echo second".to_string();
         env.jobs.add(job);
 
@@ -585,7 +585,7 @@ mod tests {
         job.name = "echo first".to_string();
         env.jobs.add(job);
         let mut job = Job::new(Pid(72));
-        job.state = ProcessState::stopped(Signal::SIGSTOP);
+        job.state = ProcessState::stopped(SIGSTOP);
         job.name = "echo second".to_string();
         env.jobs.add(job);
 
@@ -605,7 +605,7 @@ mod tests {
         job.name = "echo first".to_string();
         env.jobs.add(job);
         let mut job = Job::new(Pid(72));
-        job.state = ProcessState::stopped(Signal::SIGSTOP);
+        job.state = ProcessState::stopped(SIGSTOP);
         job.name = "echo second".to_string();
         env.jobs.add(job);
 
