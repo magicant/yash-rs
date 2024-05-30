@@ -19,7 +19,7 @@
 use super::run_trap;
 use std::rc::Rc;
 use yash_env::trap::Action;
-use yash_env::trap::Condition;
+use yash_env::trap::OldCondition;
 use yash_env::Env;
 
 /// Executes the EXIT trap.
@@ -32,7 +32,7 @@ use yash_env::Env;
 /// with a `Break(divert)` where `divert.exit_status()` is `Some` exit status,
 /// that exit status is set to `env.exit_status`.
 pub async fn run_exit_trap(env: &mut Env) {
-    let Some(state) = env.traps.get_state(Condition::Exit).0 else {
+    let Some(state) = env.traps.get_state(OldCondition::Exit).0 else {
         return;
     };
     let Action::Command(command) = &state.action else {
@@ -41,7 +41,7 @@ pub async fn run_exit_trap(env: &mut Env) {
 
     let command = Rc::clone(command);
     let origin = state.origin.clone();
-    let result = run_trap(env, Condition::Exit, command, origin).await;
+    let result = run_trap(env, OldCondition::Exit, command, origin).await;
     env.apply_result(result);
 }
 
@@ -78,7 +78,7 @@ mod tests {
         env.traps
             .set_action(
                 &mut env.system,
-                Condition::Exit,
+                OldCondition::Exit,
                 Action::Command("echo exit trap executed".into()),
                 Location::dummy(""),
                 false,
@@ -96,7 +96,7 @@ mod tests {
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
-                assert_matches!(&env.stack[0], Frame::Trap(Condition::Exit));
+                assert_matches!(&env.stack[0], Frame::Trap(OldCondition::Exit));
                 Default::default()
             })
         }
@@ -106,7 +106,7 @@ mod tests {
         env.traps
             .set_action(
                 &mut env.system,
-                Condition::Exit,
+                OldCondition::Exit,
                 Action::Command("check".into()),
                 Location::dummy(""),
                 false,
@@ -122,7 +122,7 @@ mod tests {
         env.traps
             .set_action(
                 &mut env.system,
-                Condition::Exit,
+                OldCondition::Exit,
                 Action::Command("return -n 123".into()),
                 Location::dummy(""),
                 false,
@@ -143,7 +143,7 @@ mod tests {
         env.traps
             .set_action(
                 &mut env.system,
-                Condition::Exit,
+                OldCondition::Exit,
                 Action::Command("echo $?; echo $?".into()),
                 Location::dummy(""),
                 false,
@@ -162,7 +162,7 @@ mod tests {
         env.traps
             .set_action(
                 &mut env.system,
-                Condition::Exit,
+                OldCondition::Exit,
                 Action::Command("return -n 53; return".into()),
                 Location::dummy(""),
                 false,
@@ -181,7 +181,7 @@ mod tests {
         env.traps
             .set_action(
                 &mut env.system,
-                Condition::Exit,
+                OldCondition::Exit,
                 Action::Command("exit 31".into()),
                 Location::dummy(""),
                 false,
@@ -200,7 +200,7 @@ mod tests {
         env.traps
             .set_action(
                 &mut env.system,
-                Condition::Exit,
+                OldCondition::Exit,
                 Action::Command("echo; exit".into()),
                 Location::dummy(""),
                 false,

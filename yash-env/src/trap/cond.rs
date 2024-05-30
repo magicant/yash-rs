@@ -25,7 +25,7 @@ pub use nix::sys::signal::Signal;
 
 /// Condition under which an [`Action`] is executed
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum Condition {
+pub enum OldCondition {
     /// When the shell exits
     Exit,
     /// When the specified signal is delivered to the shell process
@@ -33,7 +33,7 @@ pub enum Condition {
 }
 
 /// Conversion from `Signal` to `Condition`
-impl From<Signal> for Condition {
+impl From<Signal> for OldCondition {
     fn from(signal: Signal) -> Self {
         Self::Signal(signal)
     }
@@ -43,11 +43,11 @@ impl From<Signal> for Condition {
 ///
 /// The result is an uppercase string representing the condition such as
 /// `"EXIT"` and `"TERM"`.
-impl std::fmt::Display for Condition {
+impl std::fmt::Display for OldCondition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Condition::Exit => "EXIT".fmt(f),
-            Condition::Signal(signal) => {
+            OldCondition::Exit => "EXIT".fmt(f),
+            OldCondition::Signal(signal) => {
                 let full_name = signal.as_str();
                 let name = full_name.strip_prefix("SIG").unwrap_or(full_name);
                 name.fmt(f)
@@ -65,7 +65,7 @@ pub struct ParseConditionError;
 /// This implementation supports parsing uppercase strings like `"EXIT"` and
 /// `"TERM"` as well as signal numbers like `"9"` and `"15"`. The number `"0"`
 /// denotes [`Condition::Exit`].
-impl std::str::FromStr for Condition {
+impl std::str::FromStr for OldCondition {
     type Err = ParseConditionError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -95,15 +95,18 @@ impl std::str::FromStr for Condition {
 
 #[test]
 fn condition_from_str() {
-    assert_eq!("EXIT".parse(), Ok(Condition::Exit));
-    assert_eq!("TERM".parse(), Ok(Condition::Signal(Signal::SIGTERM)));
-    assert_eq!("INT".parse(), Ok(Condition::Signal(Signal::SIGINT)));
+    assert_eq!("EXIT".parse(), Ok(OldCondition::Exit));
+    assert_eq!("TERM".parse(), Ok(OldCondition::Signal(Signal::SIGTERM)));
+    assert_eq!("INT".parse(), Ok(OldCondition::Signal(Signal::SIGINT)));
 
-    assert_eq!("0".parse(), Ok(Condition::Exit));
-    assert_eq!("1".parse(), Ok(Condition::Signal(Signal::SIGHUP)));
-    assert_eq!("9".parse(), Ok(Condition::Signal(Signal::SIGKILL)));
+    assert_eq!("0".parse(), Ok(OldCondition::Exit));
+    assert_eq!("1".parse(), Ok(OldCondition::Signal(Signal::SIGHUP)));
+    assert_eq!("9".parse(), Ok(OldCondition::Signal(Signal::SIGKILL)));
 
-    assert_eq!("XXXXX".parse::<Condition>(), Err(ParseConditionError));
-    assert_eq!("999999999".parse::<Condition>(), Err(ParseConditionError));
-    assert_eq!("-123".parse::<Condition>(), Err(ParseConditionError));
+    assert_eq!("XXXXX".parse::<OldCondition>(), Err(ParseConditionError));
+    assert_eq!(
+        "999999999".parse::<OldCondition>(),
+        Err(ParseConditionError)
+    );
+    assert_eq!("-123".parse::<OldCondition>(), Err(ParseConditionError));
 }

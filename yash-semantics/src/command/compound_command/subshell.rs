@@ -221,7 +221,7 @@ mod tests {
                 env.traps
                     .set_action(
                         &mut env.system,
-                        yash_env::trap::Condition::Exit,
+                        yash_env::trap::OldCondition::Exit,
                         yash_env::trap::Action::Command("echo exiting".into()),
                         Location::dummy(""),
                         false,

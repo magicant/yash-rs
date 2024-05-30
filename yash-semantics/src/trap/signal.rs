@@ -22,7 +22,7 @@ use std::rc::Rc;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 use yash_env::trap::Action;
-use yash_env::trap::Condition;
+use yash_env::trap::OldCondition;
 use yash_env::trap::Signal;
 #[cfg(doc)]
 use yash_env::trap::TrapSet;
@@ -53,7 +53,7 @@ fn in_trap(env: &Env) -> bool {
         .iter()
         .rev()
         .take_while(|frame| **frame != Frame::Subshell)
-        .any(|frame| matches!(*frame, Frame::Trap(Condition::Signal(_))))
+        .any(|frame| matches!(*frame, Frame::Trap(OldCondition::Signal(_))))
 }
 
 /// Runs trap commands for signals that have been caught.
@@ -166,7 +166,7 @@ mod tests {
     fn no_reentrance() {
         let (mut env, system) = signal_env();
         raise_signal(&system, SIGINT);
-        let mut env = env.push_frame(Frame::Trap(Condition::Signal(Signal::SIGTERM)));
+        let mut env = env.push_frame(Frame::Trap(OldCondition::Signal(Signal::SIGTERM)));
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()
             .unwrap();
@@ -178,7 +178,7 @@ mod tests {
     fn allow_reentrance_in_exit_trap() {
         let (mut env, system) = signal_env();
         raise_signal(&system, SIGINT);
-        let mut env = env.push_frame(Frame::Trap(Condition::Exit));
+        let mut env = env.push_frame(Frame::Trap(OldCondition::Exit));
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()
             .unwrap();
@@ -190,7 +190,7 @@ mod tests {
     fn allow_reentrance_in_subshell() {
         let (mut env, system) = signal_env();
         raise_signal(&system, SIGINT);
-        let mut env = env.push_frame(Frame::Trap(Condition::Signal(Signal::SIGTERM)));
+        let mut env = env.push_frame(Frame::Trap(OldCondition::Signal(Signal::SIGTERM)));
         let mut env = env.push_frame(Frame::Subshell);
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()
@@ -208,7 +208,7 @@ mod tests {
             Box::pin(async move {
                 assert_matches!(
                     &env.stack[0],
-                    Frame::Trap(Condition::Signal(Signal::SIGINT))
+                    Frame::Trap(OldCondition::Signal(Signal::SIGINT))
                 );
                 Default::default()
             })

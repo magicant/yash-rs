@@ -36,7 +36,7 @@
 mod cond;
 mod state;
 
-pub use self::cond::{Condition, ParseConditionError, Signal};
+pub use self::cond::{OldCondition, ParseConditionError, Signal};
 pub use self::state::{Action, SetActionError, TrapState};
 use self::state::{EnterSubshellOption, GrandState};
 use crate::system::{Errno, SignalHandling};
@@ -64,13 +64,23 @@ pub trait SignalSystem {
 /// [`TrapSet::iter`] returns this type of iterator.
 #[must_use]
 pub struct Iter<'a> {
-    inner: std::collections::btree_map::Iter<'a, Condition, GrandState>,
+    inner: std::collections::btree_map::Iter<'a, OldCondition, GrandState>,
 }
 
 impl<'a> Iterator for Iter<'a> {
-    type Item = (&'a Condition, Option<&'a TrapState>, Option<&'a TrapState>);
+    type Item = (
+        &'a OldCondition,
+        Option<&'a TrapState>,
+        Option<&'a TrapState>,
+    );
 
-    fn next(&mut self) -> Option<(&'a Condition, Option<&'a TrapState>, Option<&'a TrapState>)> {
+    fn next(
+        &mut self,
+    ) -> Option<(
+        &'a OldCondition,
+        Option<&'a TrapState>,
+        Option<&'a TrapState>,
+    )> {
         loop {
             let (cond, state) = self.inner.next()?;
             let (current, parent) = state.get_state();
@@ -86,7 +96,7 @@ impl<'a> Iterator for Iter<'a> {
 /// See the [module documentation](self) for details.
 #[derive(Clone, Debug, Default)]
 pub struct TrapSet {
-    traps: BTreeMap<Condition, GrandState>,
+    traps: BTreeMap<OldCondition, GrandState>,
 }
 
 impl TrapSet {
@@ -98,14 +108,14 @@ impl TrapSet {
     ///
     /// This function does not reflect the initial signal actions the shell
     /// inherited on startup.
-    pub fn get_state<C: Into<Condition>>(
+    pub fn get_state<C: Into<OldCondition>>(
         &self,
         cond: C,
     ) -> (Option<&TrapState>, Option<&TrapState>) {
         self.get_state_impl(cond.into())
     }
 
-    fn get_state_impl(&self, cond: Condition) -> (Option<&TrapState>, Option<&TrapState>) {
+    fn get_state_impl(&self, cond: OldCondition) -> (Option<&TrapState>, Option<&TrapState>) {
         match self.traps.get(&cond) {
             None => (None, None),
             Some(state) => state.get_state(),
@@ -130,7 +140,7 @@ impl TrapSet {
     /// This function clears all parent states remembered when [entering a
     /// subshell](Self::enter_subshell), not only for the specified condition
     /// but also for all other conditions.
-    pub fn set_action<S: SignalSystem, C: Into<Condition>>(
+    pub fn set_action<S: SignalSystem, C: Into<OldCondition>>(
         &mut self,
         system: &mut S,
         cond: C,
@@ -144,14 +154,14 @@ impl TrapSet {
     fn set_action_impl<S: SignalSystem>(
         &mut self,
         system: &mut S,
-        cond: Condition,
+        cond: OldCondition,
         action: Action,
         origin: Location,
         override_ignore: bool,
     ) -> Result<(), SetActionError> {
         match cond {
-            Condition::Signal(Signal::SIGKILL) => return Err(SetActionError::SIGKILL),
-            Condition::Signal(Signal::SIGSTOP) => return Err(SetActionError::SIGSTOP),
+            OldCondition::Signal(Signal::SIGKILL) => return Err(SetActionError::SIGKILL),
+            OldCondition::Signal(Signal::SIGSTOP) => return Err(SetActionError::SIGSTOP),
             _ => (),
         }
 
@@ -222,17 +232,19 @@ impl TrapSet {
 
         for (&cond, state) in &mut self.traps {
             let option = match cond {
-                Condition::Signal(Signal::SIGCHLD) => EnterSubshellOption::KeepInternalHandler,
-                Condition::Signal(Signal::SIGINT | Signal::SIGQUIT) if ignore_sigint_sigquit => {
+                OldCondition::Signal(Signal::SIGCHLD) => EnterSubshellOption::KeepInternalHandler,
+                OldCondition::Signal(Signal::SIGINT | Signal::SIGQUIT) if ignore_sigint_sigquit => {
                     EnterSubshellOption::Ignore
                 }
-                Condition::Signal(Signal::SIGTSTP | Signal::SIGTTIN | Signal::SIGTTOU)
+                OldCondition::Signal(Signal::SIGTSTP | Signal::SIGTTIN | Signal::SIGTTOU)
                     if keep_stopper_handlers
                         && state.internal_handler() != SignalHandling::Default =>
                 {
                     EnterSubshellOption::Ignore
                 }
-                Condition::Signal(_) | Condition::Exit => EnterSubshellOption::ClearInternalHandler,
+                OldCondition::Signal(_) | OldCondition::Exit => {
+                    EnterSubshellOption::ClearInternalHandler
+                }
             };
             _ = state.enter_subshell(system, cond, option);
         }
@@ -253,7 +265,7 @@ impl TrapSet {
     /// This function does nothing if no trap action has been
     /// [set](Self::set_action) for the signal.
     pub fn catch_signal(&mut self, signal: Signal) {
-        if let Some(state) = self.traps.get_mut(&Condition::Signal(signal)) {
+        if let Some(state) = self.traps.get_mut(&OldCondition::Signal(signal)) {
             state.mark_as_caught();
         }
     }
@@ -276,7 +288,7 @@ impl TrapSet {
     /// them is returned. If there is no caught signal, `None` is returned.
     pub fn take_caught_signal(&mut self) -> Option<(Signal, &TrapState)> {
         self.traps.iter_mut().find_map(|(&cond, state)| match cond {
-            Condition::Signal(signal) => state.handle_if_caught().map(|trap| (signal, trap)),
+            OldCondition::Signal(signal) => state.handle_if_caught().map(|trap| (signal, trap)),
             _ => None,
         })
     }
@@ -291,7 +303,7 @@ impl TrapSet {
     /// This function remembers that the handler has been installed, so a second
     /// call to the function will be a no-op.
     pub fn enable_sigchld_handler<S: SignalSystem>(&mut self, system: &mut S) -> Result<(), Errno> {
-        let entry = self.traps.entry(Condition::Signal(Signal::SIGCHLD));
+        let entry = self.traps.entry(OldCondition::Signal(Signal::SIGCHLD));
         GrandState::set_internal_handler(system, entry, SignalHandling::Catch)
     }
 
@@ -307,13 +319,13 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        let entry = self.traps.entry(Condition::Signal(Signal::SIGINT));
+        let entry = self.traps.entry(OldCondition::Signal(Signal::SIGINT));
         GrandState::set_internal_handler(system, entry, SignalHandling::Catch)?;
 
-        let entry = self.traps.entry(Condition::Signal(Signal::SIGTERM));
+        let entry = self.traps.entry(OldCondition::Signal(Signal::SIGTERM));
         GrandState::set_internal_handler(system, entry, SignalHandling::Ignore)?;
 
-        let entry = self.traps.entry(Condition::Signal(Signal::SIGQUIT));
+        let entry = self.traps.entry(OldCondition::Signal(Signal::SIGQUIT));
         GrandState::set_internal_handler(system, entry, SignalHandling::Ignore)
     }
 
@@ -328,13 +340,13 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        let entry = self.traps.entry(Condition::Signal(Signal::SIGTSTP));
+        let entry = self.traps.entry(OldCondition::Signal(Signal::SIGTSTP));
         GrandState::set_internal_handler(system, entry, SignalHandling::Ignore)?;
 
-        let entry = self.traps.entry(Condition::Signal(Signal::SIGTTIN));
+        let entry = self.traps.entry(OldCondition::Signal(Signal::SIGTTIN));
         GrandState::set_internal_handler(system, entry, SignalHandling::Ignore)?;
 
-        let entry = self.traps.entry(Condition::Signal(Signal::SIGTTOU));
+        let entry = self.traps.entry(OldCondition::Signal(Signal::SIGTTOU));
         GrandState::set_internal_handler(system, entry, SignalHandling::Ignore)
     }
 
@@ -343,7 +355,7 @@ impl TrapSet {
         signal: Signal,
         system: &mut S,
     ) -> Result<(), Errno> {
-        let entry = self.traps.entry(Condition::Signal(signal));
+        let entry = self.traps.entry(OldCondition::Signal(signal));
         GrandState::set_internal_handler(system, entry, SignalHandling::Default)
     }
 
@@ -383,7 +395,11 @@ impl TrapSet {
 }
 
 impl<'a> IntoIterator for &'a TrapSet {
-    type Item = (&'a Condition, Option<&'a TrapState>, Option<&'a TrapState>);
+    type Item = (
+        &'a OldCondition,
+        Option<&'a TrapState>,
+        Option<&'a TrapState>,
+    );
     type IntoIter = Iter<'a>;
 
     #[inline(always)]
@@ -419,15 +435,15 @@ mod tests {
 
     #[test]
     fn condition_display() {
-        assert_eq!(Condition::Exit.to_string(), "EXIT");
-        assert_eq!(Condition::Signal(Signal::SIGINT).to_string(), "INT");
+        assert_eq!(OldCondition::Exit.to_string(), "EXIT");
+        assert_eq!(OldCondition::Signal(Signal::SIGINT).to_string(), "INT");
     }
 
     #[test]
     fn condition_from_str() {
-        assert_eq!("EXIT".parse(), Ok(Condition::Exit));
-        assert_eq!("TERM".parse(), Ok(Condition::Signal(Signal::SIGTERM)));
-        assert_eq!("FOO".parse::<Condition>(), Err(ParseConditionError));
+        assert_eq!("EXIT".parse(), Ok(OldCondition::Exit));
+        assert_eq!("TERM".parse(), Ok(OldCondition::Signal(Signal::SIGTERM)));
+        assert_eq!("FOO".parse::<OldCondition>(), Err(ParseConditionError));
     }
 
     #[test]
@@ -545,12 +561,12 @@ mod tests {
 
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
-        assert_eq!(first.0, &Condition::Signal(Signal::SIGUSR1));
+        assert_eq!(first.0, &OldCondition::Signal(Signal::SIGUSR1));
         assert_eq!(first.1.unwrap().action, Action::Ignore);
         assert_eq!(first.1.unwrap().origin, origin_1);
         assert_eq!(first.2, None);
         let second = i.next().unwrap();
-        assert_eq!(second.0, &Condition::Signal(Signal::SIGUSR2));
+        assert_eq!(second.0, &OldCondition::Signal(Signal::SIGUSR2));
         assert_eq!(second.1.unwrap().action, command);
         assert_eq!(second.1.unwrap().origin, origin_2);
         assert_eq!(first.2, None);
@@ -586,12 +602,12 @@ mod tests {
 
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
-        assert_eq!(first.0, &Condition::Signal(Signal::SIGUSR1));
+        assert_eq!(first.0, &OldCondition::Signal(Signal::SIGUSR1));
         assert_eq!(first.1.unwrap().action, Action::Ignore);
         assert_eq!(first.1.unwrap().origin, origin_1);
         assert_eq!(first.2, None);
         let second = i.next().unwrap();
-        assert_eq!(second.0, &Condition::Signal(Signal::SIGUSR2));
+        assert_eq!(second.0, &OldCondition::Signal(Signal::SIGUSR2));
         assert_eq!(second.1, None);
         assert_eq!(second.2.unwrap().action, command);
         assert_eq!(second.2.unwrap().origin, origin_2);
@@ -622,7 +638,7 @@ mod tests {
 
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
-        assert_eq!(first.0, &Condition::Signal(Signal::SIGUSR2));
+        assert_eq!(first.0, &OldCondition::Signal(Signal::SIGUSR2));
         assert_eq!(first.1.unwrap().action, command);
         assert_eq!(first.1.unwrap().origin, origin_2);
         assert_eq!(first.2, None);

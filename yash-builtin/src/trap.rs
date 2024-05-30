@@ -129,7 +129,7 @@ use std::fmt::Write;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::trap::Action;
-use yash_env::trap::Condition;
+use yash_env::trap::OldCondition;
 use yash_env::trap::SetActionError;
 use yash_env::trap::TrapSet;
 use yash_env::Env;
@@ -149,7 +149,7 @@ pub enum Command {
     /// Set an action for one or more conditions
     SetAction {
         action: Action,
-        conditions: Vec<(Condition, Field)>,
+        conditions: Vec<(OldCondition, Field)>,
     },
 }
 
@@ -182,7 +182,10 @@ impl Command {
     ///
     /// If successful, returns a string that should be printed to the standard
     /// output. On failure, returns a non-empty list of errors.
-    pub fn execute(self, env: &mut Env) -> Result<String, Vec<(SetActionError, Condition, Field)>> {
+    pub fn execute(
+        self,
+        env: &mut Env,
+    ) -> Result<String, Vec<(SetActionError, OldCondition, Field)>> {
         match self {
             Self::PrintAll => Ok(display_traps(&env.traps)),
 
@@ -213,7 +216,7 @@ impl Command {
 
 /// Wrapper for creating an error message for a trap setting error
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct Error((SetActionError, Condition, Field));
+struct Error((SetActionError, OldCondition, Field));
 
 impl MessageBase for Error {
     fn message_title(&self) -> Cow<str> {

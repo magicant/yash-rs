@@ -129,7 +129,7 @@ fn is_non_negative_integer(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use yash_env::trap::{Condition, Signal};
+    use yash_env::trap::{OldCondition, Signal};
 
     #[test]
     fn print_all_for_no_operands() {
@@ -144,7 +144,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
-                conditions: vec![(Condition::Signal(Signal::SIGINT), Field::dummy("INT"))]
+                conditions: vec![(OldCondition::Signal(Signal::SIGINT), Field::dummy("INT"))]
             })
         );
     }
@@ -156,7 +156,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Ignore,
-                conditions: vec![(Condition::Signal(Signal::SIGINT), Field::dummy("INT"))]
+                conditions: vec![(OldCondition::Signal(Signal::SIGINT), Field::dummy("INT"))]
             })
         );
     }
@@ -168,7 +168,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Command("echo".into()),
-                conditions: vec![(Condition::Signal(Signal::SIGINT), Field::dummy("INT"))]
+                conditions: vec![(OldCondition::Signal(Signal::SIGINT), Field::dummy("INT"))]
             })
         );
     }
@@ -181,9 +181,9 @@ mod tests {
             Ok(Command::SetAction {
                 action: Action::Default,
                 conditions: vec![
-                    (Condition::Signal(Signal::SIGHUP), Field::dummy("HUP")),
-                    (Condition::Signal(Signal::SIGINT), Field::dummy("2")),
-                    (Condition::Signal(Signal::SIGTERM), Field::dummy("TERM")),
+                    (OldCondition::Signal(Signal::SIGHUP), Field::dummy("HUP")),
+                    (OldCondition::Signal(Signal::SIGINT), Field::dummy("2")),
+                    (OldCondition::Signal(Signal::SIGTERM), Field::dummy("TERM")),
                 ]
             })
         );
@@ -196,7 +196,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Ignore,
-                conditions: vec![(Condition::Signal(Signal::SIGHUP), Field::dummy("HUP"))]
+                conditions: vec![(OldCondition::Signal(Signal::SIGHUP), Field::dummy("HUP"))]
             })
         );
 
@@ -205,7 +205,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Ignore,
-                conditions: vec![(Condition::Signal(Signal::SIGQUIT), Field::dummy("QUIT"))]
+                conditions: vec![(OldCondition::Signal(Signal::SIGQUIT), Field::dummy("QUIT"))]
             })
         );
     }
@@ -217,7 +217,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
-                conditions: vec![(Condition::Signal(Signal::SIGHUP), Field::dummy("1"))]
+                conditions: vec![(OldCondition::Signal(Signal::SIGHUP), Field::dummy("1"))]
             })
         );
     }
@@ -229,7 +229,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
-                conditions: vec![(Condition::Exit, Field::dummy("EXIT"))]
+                conditions: vec![(OldCondition::Exit, Field::dummy("EXIT"))]
             })
         );
     }
@@ -241,7 +241,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
-                conditions: vec![(Condition::Exit, Field::dummy("0"))]
+                conditions: vec![(OldCondition::Exit, Field::dummy("0"))]
             })
         );
     }
@@ -265,7 +265,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
-                conditions: vec![(Condition::Signal(Signal::SIGHUP), Field::dummy("1"))]
+                conditions: vec![(OldCondition::Signal(Signal::SIGHUP), Field::dummy("1"))]
             })
         );
     }
@@ -277,7 +277,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
-                conditions: vec![(Condition::Exit, Field::dummy("0"))]
+                conditions: vec![(OldCondition::Exit, Field::dummy("0"))]
             })
         );
     }
@@ -289,7 +289,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Command("-1".into()),
-                conditions: vec![(Condition::Exit, Field::dummy("0"))]
+                conditions: vec![(OldCondition::Exit, Field::dummy("0"))]
             })
         );
     }

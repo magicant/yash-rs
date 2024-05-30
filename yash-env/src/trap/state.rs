@@ -16,7 +16,7 @@
 
 //! Items that manage the state of a single signal.
 
-use super::cond::Condition;
+use super::cond::OldCondition;
 use super::SignalSystem;
 #[cfg(doc)]
 use super::TrapSet;
@@ -187,7 +187,7 @@ impl GrandState {
     /// Updates the entry with the new action.
     pub fn set_action<S: SignalSystem>(
         system: &mut S,
-        entry: Entry<Condition, GrandState>,
+        entry: Entry<OldCondition, GrandState>,
         action: Action,
         origin: Location,
         override_ignore: bool,
@@ -202,7 +202,7 @@ impl GrandState {
 
         match entry {
             Entry::Vacant(vacant) => {
-                if let Condition::Signal(signal) = cond {
+                if let OldCondition::Signal(signal) = cond {
                     if !override_ignore {
                         let initial_handling =
                             system.set_signal_handling(signal, SignalHandling::Ignore)?;
@@ -234,7 +234,7 @@ impl GrandState {
                     return Err(SetActionError::InitiallyIgnored);
                 }
 
-                if let Condition::Signal(signal) = cond {
+                if let OldCondition::Signal(signal) = cond {
                     let old_handler = state.internal_handler.max((&state.current_setting).into());
                     let new_handler = state.internal_handler.max(handling);
                     if old_handler != new_handler {
@@ -260,12 +260,12 @@ impl GrandState {
     /// The condition of the given entry must be a signal.
     pub fn set_internal_handler<S: SignalSystem>(
         system: &mut S,
-        entry: Entry<Condition, GrandState>,
+        entry: Entry<OldCondition, GrandState>,
         handling: SignalHandling,
     ) -> Result<(), Errno> {
         let signal = match *entry.key() {
-            Condition::Signal(signal) => signal,
-            Condition::Exit => panic!("exit condition cannot have an internal handler"),
+            OldCondition::Signal(signal) => signal,
+            OldCondition::Exit => panic!("exit condition cannot have an internal handler"),
         };
 
         match entry {
@@ -305,7 +305,7 @@ impl GrandState {
     pub fn enter_subshell<S: SignalSystem>(
         &mut self,
         system: &mut S,
-        cond: Condition,
+        cond: OldCondition,
         option: EnterSubshellOption,
     ) -> Result<(), Errno> {
         let old_setting = (&self.current_setting).into();
@@ -325,7 +325,7 @@ impl GrandState {
             EnterSubshellOption::Ignore => SignalHandling::Ignore,
         };
         if old_handler != new_handler {
-            if let Condition::Signal(signal) = cond {
+            if let OldCondition::Signal(signal) = cond {
                 system.set_signal_handling(signal, new_handler)?;
             }
         }
@@ -349,11 +349,11 @@ impl GrandState {
     /// This function panics if the condition is not a signal.
     pub fn ignore<S: SignalSystem>(
         system: &mut S,
-        vacant: VacantEntry<Condition, GrandState>,
+        vacant: VacantEntry<OldCondition, GrandState>,
     ) -> Result<(), Errno> {
         let signal = match *vacant.key() {
-            Condition::Signal(signal) => signal,
-            Condition::Exit => panic!("exit condition cannot be ignored"),
+            OldCondition::Signal(signal) => signal,
+            OldCondition::Exit => panic!("exit condition cannot be ignored"),
         };
         let initial_handling = system.set_signal_handling(signal, SignalHandling::Ignore)?;
         vacant.insert(GrandState {
