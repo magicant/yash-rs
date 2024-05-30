@@ -96,6 +96,7 @@ use yash_env::job::id::parse_tail;
 use yash_env::job::id::FindError;
 use yash_env::job::Job;
 use yash_env::semantics::Field;
+use yash_env::system::SharedSystem;
 use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -111,7 +112,7 @@ const OPTIONS: &[OptionSpec] = &[
 struct Accumulator {
     current_job_index: Option<usize>,
     previous_job_index: Option<usize>,
-    alternate_format: bool,
+    show_pid: bool,
     pgid_only: bool,
     print: String,
     indices_reported: Vec<usize>,
@@ -123,10 +124,10 @@ impl Accumulator {
     /// 1. Formats a job report in `self.print` so it can be printed later.
     /// 1. Remembers the job index in `self.indices_reported` so the job can be
     ///    removed later.
-    fn report(&mut self, index: usize, job: &Job) {
-        use yash_env::job::fmt::{Marker, OldReport};
-        let report = OldReport {
-            index,
+    fn report(&mut self, index: usize, job: &Job, system: &SharedSystem) {
+        use yash_env::job::fmt::{Marker, Report, State};
+        let report = Report {
+            number: index + 1,
             marker: if self.current_job_index == Some(index) {
                 Marker::CurrentJob
             } else if self.previous_job_index == Some(index) {
@@ -134,13 +135,13 @@ impl Accumulator {
             } else {
                 Marker::None
             },
-            job,
+            pid: self.show_pid.then_some(job.pid),
+            state: State::from_process_state(job.state, system),
+            name: &job.name,
         };
 
         if self.pgid_only {
             writeln!(self.print, "{}", job.pid)
-        } else if self.alternate_format {
-            writeln!(self.print, "{report:#}")
         } else {
             writeln!(self.print, "{report}")
         }
@@ -173,7 +174,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     let mut accumulator = Accumulator {
         current_job_index: env.jobs.current_job(),
         previous_job_index: env.jobs.previous_job(),
-        alternate_format: false,
+        show_pid: false,
         pgid_only: false,
         print: String::new(),
         indices_reported: Vec::new(),
@@ -182,7 +183,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     // Apply options
     for option in options {
         match option.spec.get_short() {
-            Some('l') => accumulator.alternate_format = true,
+            Some('l') => accumulator.show_pid = true,
             Some('p') => accumulator.pgid_only = true,
             _ => unreachable!("unhandled option: {:?}", option),
         }
@@ -191,14 +192,14 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     if operands.is_empty() {
         // Report all jobs
         for (index, job) in &env.jobs {
-            accumulator.report(index, job)
+            accumulator.report(index, job, &env.system)
         }
     } else {
         // Report jobs specified by the operands
         for operand in operands {
             let job_id = parse(&operand.value).unwrap_or_else(|_| parse_tail(&operand.value));
             match job_id.find(&env.jobs) {
-                Ok(index) => accumulator.report(index, &env.jobs[index]),
+                Ok(index) => accumulator.report(index, &env.jobs[index], &env.system),
                 Err(error) => {
                     return report_failure(env, find_error_message(error, &operand)).await
                 }
