@@ -18,10 +18,10 @@
 
 #[cfg(doc)]
 use super::state::Action;
-use std::ffi::c_int;
-// TODO Support real-time signals
+use crate::signal;
 #[doc(no_inline)]
 pub use nix::sys::signal::Signal;
+use std::ffi::c_int;
 
 /// Condition under which an [`Action`] is executed
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -56,6 +56,7 @@ impl std::fmt::Display for OldCondition {
     }
 }
 
+// TODO Remove this
 /// Error in conversion from string to [`Condition`]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ParseConditionError;
@@ -109,4 +110,43 @@ fn condition_from_str() {
         Err(ParseConditionError)
     );
     assert_eq!("-123".parse::<OldCondition>(), Err(ParseConditionError));
+}
+
+/// Condition under which an [`Action`] is executed
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[non_exhaustive]
+pub enum Condition {
+    /// When the shell exits
+    Exit,
+    /// When the specified signal is delivered to the shell process
+    Signal(signal::Number),
+}
+
+impl From<signal::Number> for Condition {
+    fn from(number: signal::Number) -> Self {
+        Self::Signal(number)
+    }
+}
+
+/// Conversion from raw signal number to `Condition`
+///
+/// If the number is zero, the result is [`Condition::Exit`]. Otherwise, the
+/// result is [`Condition::Signal`] with the signal number.
+impl From<signal::RawNumber> for Condition {
+    fn from(number: signal::RawNumber) -> Self {
+        if let Ok(non_zero) = number.try_into() {
+            Self::Signal(signal::Number::from_raw_unchecked(non_zero))
+        } else {
+            Self::Exit
+        }
+    }
+}
+
+impl From<Condition> for signal::RawNumber {
+    fn from(cond: Condition) -> Self {
+        match cond {
+            Condition::Exit => 0,
+            Condition::Signal(number) => number.as_raw(),
+        }
+    }
 }
