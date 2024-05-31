@@ -213,6 +213,7 @@ impl Command {
                         // TODO an interactive shell can override originally ignored traps
                         false,
                     ) {
+                        let cause = cause.into();
                         errors.push(Error { cause, cond, field });
                     }
                 }
@@ -231,7 +232,7 @@ impl Command {
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub struct Error {
     /// The cause of the error
-    pub cause: SetActionError,
+    pub cause: ErrorCause,
     /// The condition for which the trap action could not be set
     pub cond: OldCondition,
     /// The field that specifies the condition
@@ -250,16 +251,11 @@ impl MessageBase for Error {
     }
 
     fn main_annotation(&self) -> Annotation<'_> {
-        let (error, cond, field) = (&self.cause, &self.cond, &self.field);
-        let label = match error {
-            SetActionError::InitiallyIgnored => todo!(),
-            SetActionError::SIGKILL => "SIGKILL cannot be caught or ignored".into(),
-            SetActionError::SIGSTOP => "SIGSTOP cannot be caught or ignored".into(),
-            SetActionError::SystemError(errno) => {
-                format!("system error updating trap for `{cond}`: {errno}").into()
-            }
-        };
-        Annotation::new(AnnotationType::Error, label, &field.origin)
+        Annotation::new(
+            AnnotationType::Error,
+            self.cause.to_string().into(),
+            &self.field.origin,
+        )
     }
 }
 
@@ -290,7 +286,8 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
         Err(mut errors) => {
             // For now, we ignore the InitiallyIgnored error since it is not
             // required by POSIX.
-            errors.retain(|error| error.cause != SetActionError::InitiallyIgnored);
+            errors.retain(|error| error.cause != SetActionError::InitiallyIgnored.into());
+
             match to_single_message(&{ errors }) {
                 None => crate::Result::default(),
                 Some(message) => report_failure(env, message).await,
