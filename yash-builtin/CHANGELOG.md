@@ -11,7 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `impl Default for common::syntax::OptionSpec`
 - `trap::CondSpec`
+- `trap::Error`
 - `trap::ErrorCause`
+
+### Changed
+
+- `trap::Command::execute` now returns `Result<String, Vec<Error>>`
+  (previously `Result<String, Vec<(SetActionError, Condition, Field)>>`).
 
 ## [0.1.0] - 2024-04-13
 

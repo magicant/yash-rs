@@ -198,17 +198,14 @@ impl Command {
     ///
     /// If successful, returns a string that should be printed to the standard
     /// output. On failure, returns a non-empty list of errors.
-    pub fn execute(
-        self,
-        env: &mut Env,
-    ) -> Result<String, Vec<(SetActionError, OldCondition, Field)>> {
+    pub fn execute(self, env: &mut Env) -> Result<String, Vec<Error>> {
         match self {
             Self::PrintAll => Ok(display_traps(&env.traps)),
 
             Self::SetAction { action, conditions } => {
                 let mut errors = Vec::new();
                 for (cond, field) in conditions {
-                    if let Err(error) = env.traps.set_action(
+                    if let Err(cause) = env.traps.set_action(
                         &mut env.system,
                         cond,
                         action.clone(),
@@ -216,7 +213,7 @@ impl Command {
                         // TODO an interactive shell can override originally ignored traps
                         false,
                     ) {
-                        errors.push((error, cond, field));
+                        errors.push(Error { cause, cond, field });
                     }
                 }
 
@@ -230,9 +227,22 @@ impl Command {
     }
 }
 
-/// Wrapper for creating an error message for a trap setting error
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct Error((SetActionError, OldCondition, Field));
+/// Information of an error that occurred while executing the `trap` built-in
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+pub struct Error {
+    /// The cause of the error
+    pub cause: SetActionError,
+    /// The condition for which the trap action could not be set
+    pub cond: OldCondition,
+    /// The field that specifies the condition
+    pub field: Field,
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.cause.fmt(f)
+    }
+}
 
 impl MessageBase for Error {
     fn message_title(&self) -> Cow<str> {
@@ -240,7 +250,7 @@ impl MessageBase for Error {
     }
 
     fn main_annotation(&self) -> Annotation<'_> {
-        let (error, cond, field) = &self.0;
+        let (error, cond, field) = (&self.cause, &self.cond, &self.field);
         let label = match error {
             SetActionError::InitiallyIgnored => todo!(),
             SetActionError::SIGKILL => "SIGKILL cannot be caught or ignored".into(),
@@ -280,8 +290,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
         Err(mut errors) => {
             // For now, we ignore the InitiallyIgnored error since it is not
             // required by POSIX.
-            errors.retain(|(error, _, _)| *error != SetActionError::InitiallyIgnored);
-            let errors = errors.into_iter().map(Error).collect::<Vec<_>>();
+            errors.retain(|error| error.cause != SetActionError::InitiallyIgnored);
             match to_single_message(&{ errors }) {
                 None => crate::Result::default(),
                 Some(message) => report_failure(env, message).await,
