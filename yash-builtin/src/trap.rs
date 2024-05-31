@@ -119,6 +119,9 @@
 //! are cleared when the built-in modifies any trap in the subshell. See
 //! [`TrapSet::enter_subshell`] and [`TrapSet::set_action`] for details.
 
+mod cond;
+
+pub use self::cond::CondSpec;
 use crate::common::report_error;
 use crate::common::report_failure;
 use crate::common::syntax::parse_arguments;
@@ -126,6 +129,7 @@ use crate::common::syntax::Mode;
 use crate::common::to_single_message;
 use std::borrow::Cow;
 use std::fmt::Write;
+use thiserror::Error;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::trap::Action;
@@ -175,6 +179,18 @@ pub fn display_traps(traps: &TrapSet) -> String {
         writeln!(output, "trap -- {} {}", quoted(command), cond).ok();
     }
     output
+}
+
+/// Cause of an error that may occur while executing the `trap` built-in
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[non_exhaustive]
+pub enum ErrorCause {
+    /// The specified condition is not supported.
+    #[error("signal not supported on this system")]
+    UnsupportedSignal,
+    /// An error occurred while [setting a trap](TrapSet::set_action).
+    #[error(transparent)]
+    SetAction(#[from] SetActionError),
 }
 
 impl Command {
