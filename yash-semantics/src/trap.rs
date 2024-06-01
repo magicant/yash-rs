@@ -52,7 +52,7 @@ use std::rc::Rc;
 use yash_env::semantics::Divert;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
-use yash_env::trap::OldCondition;
+use yash_env::trap::Condition;
 #[cfg(doc)]
 use yash_env::trap::TrapSet;
 use yash_env::Env;
@@ -76,8 +76,8 @@ use yash_syntax::source::Source;
 /// specification mentions the intended behavior for the `Divert::Return` case,
 /// implying that the diversion should be passed on to the caller.)
 #[must_use]
-async fn run_trap(env: &mut Env, cond: OldCondition, code: Rc<str>, origin: Location) -> Result {
-    let condition = cond.to_string();
+async fn run_trap(env: &mut Env, cond: Condition, code: Rc<str>, origin: Location) -> Result {
+    let condition = cond.to_string(&env.system).into_owned();
     let mut lexer = Lexer::from_memory(&code, Source::Trap { condition, origin });
     let mut env = env.push_frame(Frame::Trap(cond));
 

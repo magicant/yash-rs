@@ -23,9 +23,8 @@ use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 use yash_env::system::real::RealSystem;
 use yash_env::system::System as _;
-use yash_env::system::SystemEx as _;
 use yash_env::trap::Action;
-use yash_env::trap::OldCondition;
+use yash_env::trap::Condition;
 use yash_env::trap::Signal;
 #[cfg(doc)]
 use yash_env::trap::TrapSet;
@@ -53,7 +52,7 @@ pub async fn run_trap_if_caught(env: &mut Env, signal: Signal) -> Option<Result>
     };
     let code = Rc::clone(command);
     let origin = trap_state.origin.clone();
-    Some(run_trap(env, signal.into(), code, origin).await)
+    Some(run_trap(env, number.into(), code, origin).await)
 }
 
 fn in_trap(env: &Env) -> bool {
@@ -61,7 +60,7 @@ fn in_trap(env: &Env) -> bool {
         .iter()
         .rev()
         .take_while(|frame| **frame != Frame::Subshell)
-        .any(|frame| matches!(*frame, Frame::Trap(OldCondition::Signal(_))))
+        .any(|frame| matches!(*frame, Frame::Trap(Condition::Signal(_))))
 }
 
 /// Runs trap commands for signals that have been caught.
@@ -93,11 +92,6 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
         let Action::Command(command) = &state.action else {
             continue;
         };
-        let name = env.system.signal_name_from_number(signal);
-        let number = unsafe { RealSystem::new() }
-            .signal_number_from_name(name)
-            .unwrap();
-        let signal: Signal = number.as_raw().try_into().unwrap();
         let code = Rc::clone(command);
         let origin = state.origin.clone();
         run_trap(env, signal.into(), code, origin).await?;
@@ -123,9 +117,8 @@ mod tests {
     use yash_env::semantics::Field;
     use yash_env::signal;
     use yash_env::system::r#virtual::VirtualSystem;
-    use yash_env::system::r#virtual::{SIGINT, SIGUSR1, SIGUSR2};
+    use yash_env::system::r#virtual::{SIGINT, SIGTERM, SIGUSR1, SIGUSR2};
     use yash_env::trap::Action;
-    use yash_env::trap::Signal;
     use yash_syntax::source::Location;
 
     fn signal_env() -> (Env, VirtualSystem) {
@@ -179,7 +172,7 @@ mod tests {
     fn no_reentrance() {
         let (mut env, system) = signal_env();
         raise_signal(&system, SIGINT);
-        let mut env = env.push_frame(Frame::Trap(OldCondition::Signal(Signal::SIGTERM)));
+        let mut env = env.push_frame(Frame::Trap(Condition::Signal(SIGTERM)));
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()
             .unwrap();
@@ -191,7 +184,7 @@ mod tests {
     fn allow_reentrance_in_exit_trap() {
         let (mut env, system) = signal_env();
         raise_signal(&system, SIGINT);
-        let mut env = env.push_frame(Frame::Trap(OldCondition::Exit));
+        let mut env = env.push_frame(Frame::Trap(Condition::Exit));
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()
             .unwrap();
@@ -203,7 +196,7 @@ mod tests {
     fn allow_reentrance_in_subshell() {
         let (mut env, system) = signal_env();
         raise_signal(&system, SIGINT);
-        let mut env = env.push_frame(Frame::Trap(OldCondition::Signal(Signal::SIGTERM)));
+        let mut env = env.push_frame(Frame::Trap(Condition::Signal(SIGTERM)));
         let mut env = env.push_frame(Frame::Subshell);
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()
@@ -219,10 +212,7 @@ mod tests {
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
-                assert_matches!(
-                    &env.stack[0],
-                    Frame::Trap(OldCondition::Signal(Signal::SIGINT))
-                );
+                assert_matches!(&env.stack[0], Frame::Trap(Condition::Signal(SIGINT)));
                 Default::default()
             })
         }

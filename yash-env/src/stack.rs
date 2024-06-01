@@ -75,7 +75,7 @@ pub enum Frame {
     DotScript,
 
     /// Trap
-    Trap(crate::trap::OldCondition),
+    Trap(crate::trap::Condition),
     // TODO function
 }
 
@@ -85,8 +85,8 @@ impl From<Builtin> for Frame {
     }
 }
 
-impl From<crate::trap::OldCondition> for Frame {
-    fn from(condition: crate::trap::OldCondition) -> Self {
+impl From<crate::trap::Condition> for Frame {
+    fn from(condition: crate::trap::Condition) -> Self {
         Frame::Trap(condition)
     }
 }

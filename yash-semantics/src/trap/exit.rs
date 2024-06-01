@@ -20,7 +20,6 @@ use super::run_trap;
 use std::rc::Rc;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
-use yash_env::trap::OldCondition;
 use yash_env::Env;
 
 /// Executes the EXIT trap.
@@ -42,7 +41,7 @@ pub async fn run_exit_trap(env: &mut Env) {
 
     let command = Rc::clone(command);
     let origin = state.origin.clone();
-    let result = run_trap(env, OldCondition::Exit, command, origin).await;
+    let result = run_trap(env, Condition::Exit, command, origin).await;
     env.apply_result(result);
 }
 
@@ -97,7 +96,7 @@ mod tests {
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
-                assert_matches!(&env.stack[0], Frame::Trap(OldCondition::Exit));
+                assert_matches!(&env.stack[0], Frame::Trap(Condition::Exit));
                 Default::default()
             })
         }
