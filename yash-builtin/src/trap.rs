@@ -132,6 +132,8 @@ use std::fmt::Write;
 use thiserror::Error;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
+use yash_env::system::real::RealSystem;
+use yash_env::system::System as _;
 use yash_env::trap::Action;
 use yash_env::trap::OldCondition;
 use yash_env::trap::SetActionError;
@@ -153,7 +155,7 @@ pub enum Command {
     /// Set an action for one or more conditions
     SetAction {
         action: Action,
-        conditions: Vec<(OldCondition, Field)>,
+        conditions: Vec<(CondSpec, Field)>,
     },
 }
 
@@ -205,9 +207,39 @@ impl Command {
             Self::SetAction { action, conditions } => {
                 let mut errors = Vec::new();
                 for (cond, field) in conditions {
+                    let old_cond = match cond {
+                        CondSpec::Exit => OldCondition::Exit,
+                        CondSpec::SignalName(name) => {
+                            let signal = unsafe { RealSystem::new() }
+                                .signal_number_from_name(name)
+                                .and_then(|number| number.as_raw().try_into().ok());
+                            match signal {
+                                Some(signal) => OldCondition::Signal(signal),
+                                None => {
+                                    let cause = ErrorCause::UnsupportedSignal;
+                                    errors.push(Error { cause, cond, field });
+                                    continue;
+                                }
+                            }
+                        }
+                        CondSpec::Number(number) => {
+                            if number == 0 {
+                                OldCondition::Exit
+                            } else {
+                                match number.try_into() {
+                                    Ok(signal) => OldCondition::Signal(signal),
+                                    Err(_) => {
+                                        let cause = ErrorCause::UnsupportedSignal;
+                                        errors.push(Error { cause, cond, field });
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                    };
                     if let Err(cause) = env.traps.set_action(
                         &mut env.system,
-                        cond,
+                        old_cond,
                         action.clone(),
                         field.origin.clone(),
                         // TODO an interactive shell can override originally ignored traps
@@ -234,7 +266,7 @@ pub struct Error {
     /// The cause of the error
     pub cause: ErrorCause,
     /// The condition for which the trap action could not be set
-    pub cond: OldCondition,
+    pub cond: CondSpec,
     /// The field that specifies the condition
     pub field: Field,
 }

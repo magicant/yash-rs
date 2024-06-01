@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `trap::Command::SetAction::conditions` is now a `Vec<(CondSpec, Field)>`
+  (previously `Vec<(Condition, Field)>`).
 - `trap::Command::execute` now returns `Result<String, Vec<Error>>`
   (previously `Result<String, Vec<(SetActionError, Condition, Field)>>`).
 
