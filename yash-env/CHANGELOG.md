@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `job::fmt::State`
 - `impl From<trap::Condition> for stack::Frame`
 - `signal::{Number, RawNumber, Name, NameIter, UnknownNameError}`
+- `trap::SignalSystem::signal_name_from_number`
+- `trap::SignalSystem::signal_number_from_name`
 
 ### Changed
 

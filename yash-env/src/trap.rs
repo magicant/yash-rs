@@ -39,6 +39,7 @@ mod state;
 pub use self::cond::{Condition, OldCondition, ParseConditionError, Signal};
 pub use self::state::{Action, SetActionError, TrapState};
 use self::state::{EnterSubshellOption, GrandState};
+use crate::signal;
 use crate::system::{Errno, SignalHandling};
 #[cfg(doc)]
 use crate::system::{SharedSystem, System};
@@ -48,6 +49,17 @@ use yash_syntax::source::Location;
 
 /// System interface for signal handling configuration.
 pub trait SignalSystem {
+    /// Returns the name of a signal from its number.
+    #[must_use]
+    fn signal_name_from_number(&self, number: signal::Number) -> signal::Name;
+
+    /// Returns the signal number from its name.
+    ///
+    /// This function is used only for portable signals such as `SIGINT` and
+    /// `SIGTERM`, so this function is not expected to return an error.
+    #[must_use]
+    fn signal_number_from_name(&self, name: signal::Name) -> signal::Number;
+
     /// Sets how a signal is handled.
     ///
     /// This function updates the signal blocking mask and the signal action for
@@ -412,15 +424,25 @@ impl<'a> IntoIterator for &'a TrapSet {
 mod tests {
     use super::*;
     use crate::job::ProcessState;
+    use crate::system::r#virtual::VirtualSystem;
     use crate::system::r#virtual::{SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU};
+    use crate::system::System as _;
+    use crate::system::SystemEx as _;
     use crate::tests::in_virtual_system;
-    use crate::System;
     use std::collections::HashMap;
 
     #[derive(Default)]
     pub struct DummySystem(pub HashMap<Signal, SignalHandling>);
 
     impl SignalSystem for DummySystem {
+        fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
+            VirtualSystem::new().signal_name_from_number(number)
+        }
+
+        fn signal_number_from_name(&self, name: signal::Name) -> signal::Number {
+            VirtualSystem::new().signal_number_from_name(name).unwrap()
+        }
+
         fn set_signal_handling(
             &mut self,
             signal: Signal,

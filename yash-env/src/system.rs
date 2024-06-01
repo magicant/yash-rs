@@ -1093,6 +1093,17 @@ impl System for SharedSystem {
 }
 
 impl SignalSystem for SharedSystem {
+    #[inline]
+    fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
+        SystemEx::signal_name_from_number(self, number)
+    }
+
+    #[inline]
+    fn signal_number_from_name(&self, name: signal::Name) -> signal::Number {
+        System::signal_number_from_name(self, name)
+            .unwrap_or_else(|| panic!("unsupported signal name: {name:?}"))
+    }
+
     fn set_signal_handling(
         &mut self,
         signal: nix::sys::signal::Signal,
