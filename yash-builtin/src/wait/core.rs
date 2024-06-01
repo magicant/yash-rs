@@ -178,7 +178,7 @@ mod tests {
             env.traps
                 .set_action(
                     &mut env.system,
-                    Signal::SIGTERM,
+                    SIGTERM,
                     Action::Command("foo=bar".into()),
                     Location::dummy("somewhere"),
                     false,

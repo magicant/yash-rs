@@ -132,11 +132,11 @@ use std::fmt::Write;
 use thiserror::Error;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::system::real::RealSystem;
-use yash_env::system::System as _;
+use yash_env::system::System;
 use yash_env::trap::Action;
-use yash_env::trap::OldCondition;
+use yash_env::trap::Condition;
 use yash_env::trap::SetActionError;
+use yash_env::trap::SignalSystem;
 use yash_env::trap::TrapSet;
 use yash_env::Env;
 use yash_quote::quoted;
@@ -165,7 +165,8 @@ pub mod syntax;
 ///
 /// The returned string is the whole output of the `trap` built-in
 /// without operands, including the trailing newline.
-pub fn display_traps(traps: &TrapSet) -> String {
+#[must_use]
+pub fn display_traps<S: SignalSystem>(traps: &TrapSet, system: &S) -> String {
     let mut output = String::new();
     for (cond, current, parent) in traps {
         let trap = match (current, parent) {
@@ -178,6 +179,7 @@ pub fn display_traps(traps: &TrapSet) -> String {
             Action::Ignore => "",
             Action::Command(command) => command,
         };
+        let cond = cond.to_string(system);
         writeln!(output, "trap -- {} {}", quoted(command), cond).ok();
     }
     output
@@ -202,19 +204,16 @@ impl Command {
     /// output. On failure, returns a non-empty list of errors.
     pub fn execute(self, env: &mut Env) -> Result<String, Vec<Error>> {
         match self {
-            Self::PrintAll => Ok(display_traps(&env.traps)),
+            Self::PrintAll => Ok(display_traps(&env.traps, &env.system)),
 
             Self::SetAction { action, conditions } => {
                 let mut errors = Vec::new();
                 for (cond, field) in conditions {
-                    let old_cond = match cond {
-                        CondSpec::Exit => OldCondition::Exit,
+                    let cond2 = match cond {
+                        CondSpec::Exit => Condition::Exit,
                         CondSpec::SignalName(name) => {
-                            let signal = unsafe { RealSystem::new() }
-                                .signal_number_from_name(name)
-                                .and_then(|number| number.as_raw().try_into().ok());
-                            match signal {
-                                Some(signal) => OldCondition::Signal(signal),
+                            match System::signal_number_from_name(&env.system, name) {
+                                Some(number) => Condition::Signal(number),
                                 None => {
                                     let cause = ErrorCause::UnsupportedSignal;
                                     errors.push(Error { cause, cond, field });
@@ -224,11 +223,11 @@ impl Command {
                         }
                         CondSpec::Number(number) => {
                             if number == 0 {
-                                OldCondition::Exit
+                                Condition::Exit
                             } else {
-                                match number.try_into() {
-                                    Ok(signal) => OldCondition::Signal(signal),
-                                    Err(_) => {
+                                match env.system.validate_signal(number) {
+                                    Some((_name, number)) => Condition::Signal(number),
+                                    None => {
                                         let cause = ErrorCause::UnsupportedSignal;
                                         errors.push(Error { cause, cond, field });
                                         continue;
@@ -239,7 +238,7 @@ impl Command {
                     };
                     if let Err(cause) = env.traps.set_action(
                         &mut env.system,
-                        old_cond,
+                        cond2,
                         action.clone(),
                         field.origin.clone(),
                         // TODO an interactive shell can override originally ignored traps
@@ -414,7 +413,7 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let args = Field::dummies(["echo", "INT"]);
+        let args = Field::dummies(["echo", "EXIT"]);
         let _ = main(&mut env, args).now_or_never().unwrap();
         let args = Field::dummies(["echo t", "TERM"]);
         let _ = main(&mut env, args).now_or_never().unwrap();
@@ -422,7 +421,7 @@ mod tests {
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
-            assert_eq!(stdout, "trap -- echo INT\ntrap -- 'echo t' TERM\n")
+            assert_eq!(stdout, "trap -- echo EXIT\ntrap -- 'echo t' TERM\n")
         });
     }
 

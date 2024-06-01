@@ -1106,9 +1106,14 @@ impl SignalSystem for SharedSystem {
 
     fn set_signal_handling(
         &mut self,
-        signal: nix::sys::signal::Signal,
+        signal: signal::Number,
         handling: SignalHandling,
     ) -> Result<SignalHandling> {
+        let name = SystemEx::signal_name_from_number(self, signal);
+        let number = unsafe { real::RealSystem::new() }
+            .signal_number_from_name(name)
+            .unwrap();
+        let signal = number.as_raw().try_into().unwrap();
         self.0.borrow_mut().set_signal_handling(signal, handling)
     }
 }
@@ -1507,7 +1512,7 @@ impl AsyncSignal {
 mod tests {
     use super::r#virtual::VirtualSystem;
     use super::r#virtual::PIPE_SIZE;
-    use super::r#virtual::{SIGCHLD, SIGINT, SIGTERM};
+    use super::r#virtual::{SIGCHLD, SIGINT, SIGTERM, SIGUSR1};
     use super::*;
     use assert_matches::assert_matches;
     use futures_util::task::noop_waker;
@@ -1684,13 +1689,13 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut system = SharedSystem::new(Box::new(system));
         system
-            .set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch)
+            .set_signal_handling(SIGCHLD, SignalHandling::Catch)
             .unwrap();
         system
-            .set_signal_handling(Signal::SIGINT, SignalHandling::Catch)
+            .set_signal_handling(SIGINT, SignalHandling::Catch)
             .unwrap();
         system
-            .set_signal_handling(Signal::SIGUSR1, SignalHandling::Catch)
+            .set_signal_handling(SIGUSR1, SignalHandling::Catch)
             .unwrap();
 
         let mut context = Context::from_waker(noop_waker_ref());
@@ -1726,7 +1731,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut system = SharedSystem::new(Box::new(system));
         system
-            .set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch)
+            .set_signal_handling(SIGCHLD, SignalHandling::Catch)
             .unwrap();
 
         let mut context = Context::from_waker(noop_waker_ref());
@@ -1755,10 +1760,10 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut system = SharedSystem::new(Box::new(system));
         system
-            .set_signal_handling(Signal::SIGINT, SignalHandling::Catch)
+            .set_signal_handling(SIGINT, SignalHandling::Catch)
             .unwrap();
         system
-            .set_signal_handling(Signal::SIGTERM, SignalHandling::Catch)
+            .set_signal_handling(SIGTERM, SignalHandling::Catch)
             .unwrap();
 
         let mut context = Context::from_waker(noop_waker_ref());
@@ -1785,10 +1790,10 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut system = SharedSystem::new(Box::new(system));
         system
-            .set_signal_handling(Signal::SIGINT, SignalHandling::Catch)
+            .set_signal_handling(SIGINT, SignalHandling::Catch)
             .unwrap();
         system
-            .set_signal_handling(Signal::SIGTERM, SignalHandling::Catch)
+            .set_signal_handling(SIGTERM, SignalHandling::Catch)
             .unwrap();
 
         {
@@ -1817,7 +1822,7 @@ mod tests {
         let mut system_3 = system_1.clone();
         let (reader, writer) = system_1.pipe().unwrap();
         system_2
-            .set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch)
+            .set_signal_handling(SIGCHLD, SignalHandling::Catch)
             .unwrap();
 
         let mut buffer = [0];

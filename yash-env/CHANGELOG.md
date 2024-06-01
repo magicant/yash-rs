@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `F: for<'a> FnOnce(&'a mut Env, Option<JobControl>) -> Pin<Box<dyn Future<Output = ()> + 'a>> + 'static`.
   The `Output` type of the returned future has been changed from
   `semantics::Result` to `()`.
+- The following methods of `trap::TrapSet` now operate on `signal::Number`
+  instead of `trap::Signal`:
+    - `catch_signal`
+    - `take_caught_signal`
+    - `take_signal_if_caught`
 
 ### Removed
 

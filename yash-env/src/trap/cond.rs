@@ -18,9 +18,11 @@
 
 #[cfg(doc)]
 use super::state::Action;
+use super::SignalSystem;
 use crate::signal;
 #[doc(no_inline)]
 pub use nix::sys::signal::Signal;
+use std::borrow::Cow;
 use std::ffi::c_int;
 
 /// Condition under which an [`Action`] is executed
@@ -147,6 +149,22 @@ impl From<Condition> for signal::RawNumber {
         match cond {
             Condition::Exit => 0,
             Condition::Signal(number) => number.as_raw(),
+        }
+    }
+}
+
+impl Condition {
+    /// Converts this `Condition` to a `String`.
+    ///
+    /// The result is an uppercase string representing the condition such as
+    /// `"EXIT"` and `"TERM"`. Signal names are obtained from
+    /// [`signal::Name::as_string`]. This function depends on the signal system
+    /// to convert signal numbers to names.
+    #[must_use]
+    pub fn to_string<S: SignalSystem>(&self, system: &S) -> Cow<'static, str> {
+        match self {
+            Self::Exit => Cow::Borrowed("EXIT"),
+            Self::Signal(number) => system.signal_name_from_number(*number).as_string(),
         }
     }
 }

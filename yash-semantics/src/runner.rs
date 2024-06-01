@@ -179,7 +179,6 @@ mod tests {
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::system::r#virtual::SIGUSR1;
     use yash_env::trap::Action;
-    use yash_env::trap::Signal;
     use yash_syntax::source::Location;
     use yash_syntax::source::Source;
 
@@ -306,7 +305,7 @@ mod tests {
         env.traps
             .set_action(
                 &mut env.system,
-                Signal::SIGUSR1,
+                SIGUSR1,
                 Action::Command("echo USR1".into()),
                 Location::dummy(""),
                 false,

@@ -231,7 +231,12 @@ impl Env {
     pub async fn wait_for_signals(&mut self) -> Rc<[Signal]> {
         let result = self.system.wait_for_signals().await;
         for signal in result.iter().copied() {
-            self.traps.catch_signal(signal);
+            let name = unsafe { RealSystem::new() }
+                .validate_signal(signal as _)
+                .unwrap()
+                .0;
+            let number = self.system.signal_number_from_name(name).unwrap();
+            self.traps.catch_signal(number);
         }
         result
     }
@@ -506,7 +511,7 @@ mod tests {
             env.traps
                 .set_action(
                     &mut env.system,
-                    Signal::SIGCHLD,
+                    SIGCHLD,
                     Action::Command("".into()),
                     Location::dummy(""),
                     false,
@@ -520,7 +525,7 @@ mod tests {
             }
             env.wait_for_signal(Signal::SIGCHLD).await;
 
-            let trap_state = env.traps.get_state(Signal::SIGCHLD).0.unwrap();
+            let trap_state = env.traps.get_state(SIGCHLD).0.unwrap();
             assert!(trap_state.pending);
         })
     }
@@ -532,7 +537,7 @@ mod tests {
         env.traps
             .set_action(
                 &mut env.system,
-                Signal::SIGCHLD,
+                SIGCHLD,
                 Action::Command("".into()),
                 Location::dummy(""),
                 false,

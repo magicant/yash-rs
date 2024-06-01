@@ -312,12 +312,11 @@ mod tests {
     use crate::semantics::ExitStatus;
     use crate::system::r#virtual::INode;
     use crate::system::r#virtual::SystemState;
-    use crate::system::r#virtual::{SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU};
+    use crate::system::r#virtual::{SIGCHLD, SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU};
     use crate::system::Errno;
     use crate::system::SignalHandling;
     use crate::tests::in_virtual_system;
     use crate::trap::Action;
-    use crate::trap::Signal::SIGCHLD;
     use assert_matches::assert_matches;
     use futures_executor::LocalPool;
     use std::cell::Cell;

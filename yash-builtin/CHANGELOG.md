@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (previously `Vec<(Condition, Field)>`).
 - `trap::Command::execute` now returns `Result<String, Vec<Error>>`
   (previously `Result<String, Vec<(SetActionError, Condition, Field)>>`).
+- `trap::display_traps` is now marked `#[must_use]`.
+- `trap::display_traps` is now additionally takes a
+  `yash_env::trap::SignalSystem` argument.
 
 ## [0.1.0] - 2024-04-13
 

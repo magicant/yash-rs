@@ -21,6 +21,9 @@ use std::ops::ControlFlow::Continue;
 use std::rc::Rc;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
+use yash_env::system::real::RealSystem;
+use yash_env::system::System as _;
+use yash_env::system::SystemEx as _;
 use yash_env::trap::Action;
 use yash_env::trap::OldCondition;
 use yash_env::trap::Signal;
@@ -39,7 +42,12 @@ use yash_env::Env;
 /// result of running the trap action.
 #[must_use]
 pub async fn run_trap_if_caught(env: &mut Env, signal: Signal) -> Option<Result> {
-    let trap_state = env.traps.take_signal_if_caught(signal)?;
+    let name = unsafe { RealSystem::new() }
+        .validate_signal(signal as _)
+        .unwrap()
+        .0;
+    let number = env.system.signal_number_from_name(name).unwrap();
+    let trap_state = env.traps.take_signal_if_caught(number)?;
     let Action::Command(command) = &trap_state.action else {
         return None;
     };
@@ -85,6 +93,11 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
         let Action::Command(command) = &state.action else {
             continue;
         };
+        let name = env.system.signal_name_from_number(signal);
+        let number = unsafe { RealSystem::new() }
+            .signal_number_from_name(name)
+            .unwrap();
+        let signal: Signal = number.as_raw().try_into().unwrap();
         let code = Rc::clone(command);
         let origin = state.origin.clone();
         run_trap(env, signal.into(), code, origin).await?;
@@ -122,7 +135,7 @@ mod tests {
         env.traps
             .set_action(
                 &mut env.system,
-                Signal::SIGINT,
+                SIGINT,
                 Action::Command("echo trapped".into()),
                 Location::dummy(""),
                 false,
@@ -220,7 +233,7 @@ mod tests {
         env.traps
             .set_action(
                 &mut env.system,
-                Signal::SIGINT,
+                SIGINT,
                 Action::Command("check".into()),
                 Location::dummy(""),
                 false,
@@ -246,7 +259,7 @@ mod tests {
     #[test]
     fn exit_status_inside_trap() {
         let (mut env, system) = signal_env();
-        for signal in [Signal::SIGUSR1, Signal::SIGUSR2] {
+        for signal in [SIGUSR1, SIGUSR2] {
             env.traps
                 .set_action(
                     &mut env.system,
@@ -275,7 +288,7 @@ mod tests {
         env.traps
             .set_action(
                 &mut env.system,
-                Signal::SIGUSR1,
+                SIGUSR1,
                 Action::Command("echo; exit 56".into()),
                 Location::dummy(""),
                 false,
@@ -297,7 +310,7 @@ mod tests {
         env.traps
             .set_action(
                 &mut env.system,
-                Signal::SIGUSR1,
+                SIGUSR1,
                 Action::Command("echo; exit".into()),
                 Location::dummy(""),
                 false,
