@@ -263,7 +263,11 @@ pub trait System: Debug {
     /// When you set the handler to `SignalHandling::Catch`, signals sent to
     /// this process are accumulated in the `System` instance and made available
     /// from [`caught_signals`](Self::caught_signals).
-    fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> Result<SignalHandling>;
+    fn sigaction(
+        &mut self,
+        signal: signal::Number,
+        action: SignalHandling,
+    ) -> Result<SignalHandling>;
 
     /// Returns signals this process has caught, if any.
     ///
@@ -633,27 +637,31 @@ pub trait SystemEx: System {
     /// Use [`tcsetpgrp_with_block`](Self::tcsetpgrp_with_block) to change the
     /// job even if the current shell is not in the foreground.
     fn tcsetpgrp_without_block(&mut self, fd: Fd, pgid: Pid) -> Result<()> {
-        match self.sigaction(Signal::SIGTTOU, SignalHandling::Default) {
+        let sigttou = self
+            .signal_number_from_name(signal::Name::Ttou)
+            .ok_or(Errno::EINVAL)?;
+        match self.sigaction(sigttou, SignalHandling::Default) {
             Err(e) => Err(e),
             Ok(old_handling) => {
-                let mut sigttou = SigSet::empty();
+                let mut sigttou_set = SigSet::empty();
                 let mut old_set = SigSet::empty();
-                sigttou.add(Signal::SIGTTOU);
-                let result =
-                    match self.sigmask(SigmaskHow::SIG_UNBLOCK, Some(&sigttou), Some(&mut old_set))
-                    {
-                        Err(e) => Err(e),
-                        Ok(()) => {
-                            let result = self.tcsetpgrp(fd, pgid);
+                sigttou_set.add(Signal::SIGTTOU);
+                let result = match self.sigmask(
+                    SigmaskHow::SIG_UNBLOCK,
+                    Some(&sigttou_set),
+                    Some(&mut old_set),
+                ) {
+                    Err(e) => Err(e),
+                    Ok(()) => {
+                        let result = self.tcsetpgrp(fd, pgid);
 
-                            let result_2 =
-                                self.sigmask(SigmaskHow::SIG_SETMASK, Some(&old_set), None);
+                        let result_2 = self.sigmask(SigmaskHow::SIG_SETMASK, Some(&old_set), None);
 
-                            result.or(result_2)
-                        }
-                    };
+                        result.or(result_2)
+                    }
+                };
 
-                let result_2 = self.sigaction(Signal::SIGTTOU, old_handling).map(drop);
+                let result_2 = self.sigaction(sigttou, old_handling).map(drop);
 
                 result.or(result_2)
             }
@@ -1021,7 +1029,11 @@ impl System for SharedSystem {
     ) -> Result<()> {
         (**self.0.borrow_mut()).sigmask(how, set, old_set)
     }
-    fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> Result<SignalHandling> {
+    fn sigaction(
+        &mut self,
+        signal: signal::Number,
+        action: SignalHandling,
+    ) -> Result<SignalHandling> {
         self.0.borrow_mut().sigaction(signal, action)
     }
     fn caught_signals(&mut self) -> Vec<Signal> {
@@ -1189,19 +1201,24 @@ impl SelectSystem {
         signal: Signal,
         handling: SignalHandling,
     ) -> Result<SignalHandling> {
+        let name = unsafe { real::RealSystem::new() }
+            .validate_signal(signal as _)
+            .unwrap()
+            .0;
+        let signum = self.signal_number_from_name(name).unwrap();
         // The order of sigmask and sigaction is important to prevent the signal
         // from being caught. The signal must be caught only when the select
         // function temporarily unblocks the signal. This is to avoid race
         // condition.
         match handling {
             SignalHandling::Default | SignalHandling::Ignore => {
-                let old_handling = self.system.sigaction(signal, handling)?;
+                let old_handling = self.system.sigaction(signum, handling)?;
                 self.sigmask(SigmaskHow::SIG_UNBLOCK, signal)?;
                 Ok(old_handling)
             }
             SignalHandling::Catch => {
                 self.sigmask(SigmaskHow::SIG_BLOCK, signal)?;
-                self.system.sigaction(signal, handling)
+                self.system.sigaction(signum, handling)
             }
         }
     }

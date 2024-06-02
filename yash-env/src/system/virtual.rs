@@ -671,10 +671,13 @@ impl System for VirtualSystem {
         Ok(())
     }
 
-    fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> Result<SignalHandling> {
+    fn sigaction(
+        &mut self,
+        signal: signal::Number,
+        action: SignalHandling,
+    ) -> Result<SignalHandling> {
         let mut process = self.current_process_mut();
-        let number = signal::Number::from_signal_virtual(signal);
-        Ok(process.set_signal_handling(number, action))
+        Ok(process.set_signal_handling(signal, action))
     }
 
     fn caught_signals(&mut self) -> Vec<Signal> {
@@ -2126,9 +2129,7 @@ mod tests {
         system
             .sigmask(SigmaskHow::SIG_BLOCK, Some(&set), None)
             .unwrap();
-        system
-            .sigaction(Signal::SIGCHLD, SignalHandling::Catch)
-            .unwrap();
+        system.sigaction(SIGCHLD, SignalHandling::Catch).unwrap();
         system
     }
 
@@ -2557,9 +2558,7 @@ mod tests {
     #[test]
     fn exiting_child_sends_sigchld_to_parent() {
         let (mut system, mut executor) = virtual_system_with_executor();
-        system
-            .sigaction(Signal::SIGCHLD, SignalHandling::Catch)
-            .unwrap();
+        system.sigaction(SIGCHLD, SignalHandling::Catch).unwrap();
 
         let child_process = system.new_child_process().unwrap();
 

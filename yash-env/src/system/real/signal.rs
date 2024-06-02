@@ -16,9 +16,13 @@
 
 //! Signal implementation for the real system
 
+use super::SignalHandling;
 pub use crate::signal::*;
+use std::ffi::c_int;
+use std::mem::MaybeUninit;
 use std::num::NonZeroI32;
 use std::ops::RangeInclusive;
+use std::ptr::{addr_of, addr_of_mut};
 
 /// Returns the range of real-time signals supported by the real system.
 ///
@@ -391,6 +395,54 @@ impl Name {
                     Some(Self::Rtmax(decr))
                 }
             }
+        }
+    }
+}
+
+impl SignalHandling {
+    /// Converts the signal handling to `sigaction` for the real system.
+    ///
+    /// This function returns the `sigaction` in an `MaybeUninit` because the
+    /// `sigaction` structure may contain platform-dependent extra fields that
+    /// are not initialized by this function.
+    pub(super) fn to_sigaction(self) -> MaybeUninit<nix::libc::sigaction> {
+        let handler = match self {
+            SignalHandling::Default => nix::libc::SIG_DFL,
+            SignalHandling::Ignore => nix::libc::SIG_IGN,
+            SignalHandling::Catch => super::catch_signal as *const extern "C" fn(c_int) as _,
+        };
+
+        let mut sa = MaybeUninit::<nix::libc::sigaction>::uninit();
+        let sa_ptr = sa.as_mut_ptr();
+        unsafe {
+            addr_of_mut!((*sa_ptr).sa_flags).write(0);
+            nix::libc::sigemptyset(addr_of_mut!((*sa_ptr).sa_mask));
+
+            #[cfg(not(target_os = "aix"))]
+            #[allow(clippy::useless_transmute)] // See from_sigaction below
+            addr_of_mut!((*sa_ptr).sa_sigaction).write(std::mem::transmute(handler));
+
+            #[cfg(target_os = "aix")]
+            #[allow(clippy::useless_transmute)] // See from_sigaction below
+            addr_of_mut!((*sa_ptr).sa_union.__su_sigaction).write(std::mem::transmute(handler));
+        }
+        sa
+    }
+
+    /// Converts the `sigaction` to the signal handling for the real system.
+    pub(super) unsafe fn from_sigaction(sa: &MaybeUninit<nix::libc::sigaction>) -> Self {
+        #[cfg(not(target_os = "aix"))]
+        let handler = addr_of!((*sa.as_ptr()).sa_sigaction).read();
+
+        #[cfg(target_os = "aix")]
+        let handler = addr_of!((*sa.as_ptr()).sa_union.__su_sigaction).read();
+
+        // It is platform-specific whether we really need to transmute the handler.
+        #[allow(clippy::useless_transmute)]
+        match std::mem::transmute(handler) {
+            nix::libc::SIG_DFL => Self::Default,
+            nix::libc::SIG_IGN => Self::Ignore,
+            _ => Self::Catch,
         }
     }
 }

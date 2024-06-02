@@ -47,9 +47,6 @@ use crate::SignalHandling;
 use nix::errno::Errno as NixErrno;
 use nix::libc::DIR;
 use nix::libc::{S_IFDIR, S_IFMT, S_IFREG};
-use nix::sys::signal::SaFlags;
-use nix::sys::signal::SigAction;
-use nix::sys::signal::SigHandler;
 use nix::sys::stat::stat;
 use nix::unistd::AccessFlags;
 use std::convert::Infallible;
@@ -370,21 +367,29 @@ impl System for RealSystem {
         Ok(())
     }
 
-    fn sigaction(&mut self, signal: Signal, handling: SignalHandling) -> Result<SignalHandling> {
-        let handler = match handling {
-            SignalHandling::Default => SigHandler::SigDfl,
-            SignalHandling::Ignore => SigHandler::SigIgn,
-            SignalHandling::Catch => SigHandler::Handler(catch_signal),
-        };
-        let new_action = SigAction::new(handler, SaFlags::empty(), SigSet::empty());
-        // SAFETY: The `catch_signal` function only accesses atomic variables.
-        let old_action = unsafe { nix::sys::signal::sigaction(signal, &new_action) }?;
-        let old_handling = match old_action.handler() {
-            SigHandler::SigDfl => SignalHandling::Default,
-            SigHandler::SigIgn => SignalHandling::Ignore,
-            SigHandler::Handler(_) | SigHandler::SigAction(_) => SignalHandling::Catch,
-        };
-        Ok(old_handling)
+    fn sigaction(
+        &mut self,
+        signal: signal::Number,
+        handling: SignalHandling,
+    ) -> Result<SignalHandling> {
+        unsafe {
+            let new_action = handling.to_sigaction();
+
+            let mut old_action = MaybeUninit::<nix::libc::sigaction>::uninit();
+            let old_mask_ptr = std::ptr::addr_of_mut!((*old_action.as_mut_ptr()).sa_mask);
+            // POSIX requires *all* sigset_t objects to be initialized before use.
+            nix::libc::sigemptyset(old_mask_ptr).errno_if_m1()?;
+
+            nix::libc::sigaction(
+                signal.as_raw(),
+                new_action.as_ptr(),
+                old_action.as_mut_ptr(),
+            )
+            .errno_if_m1()?;
+
+            let old_handling = SignalHandling::from_sigaction(&old_action);
+            Ok(old_handling)
+        }
     }
 
     fn caught_signals(&mut self) -> Vec<Signal> {
