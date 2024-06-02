@@ -292,7 +292,7 @@ pub trait System: Debug {
     /// Note that signals become pending if sent while blocked by
     /// [`sigmask`](Self::sigmask). They must be unblocked so that they are
     /// caught and made available from this function.
-    fn caught_signals(&mut self) -> Vec<Signal>;
+    fn caught_signals(&mut self) -> Vec<signal::Number>;
 
     /// Sends a signal.
     ///
@@ -894,7 +894,7 @@ impl SharedSystem {
     /// If this `SharedSystem` is part of an [`Env`], you should call
     /// [`Env::wait_for_signals`] rather than calling this function directly
     /// so that the trap set can remember the caught signal.
-    pub async fn wait_for_signals(&self) -> Rc<[Signal]> {
+    pub async fn wait_for_signals(&self) -> Rc<[signal::Number]> {
         let status = self.0.borrow_mut().signal.wait_for_signals();
         poll_fn(|context| {
             let mut status = status.borrow_mut();
@@ -920,7 +920,7 @@ impl SharedSystem {
     /// If this `SharedSystem` is part of an [`Env`], you should call
     /// [`Env::wait_for_signal`] rather than calling this function directly
     /// so that the trap set can remember the caught signal.
-    pub async fn wait_for_signal(&self, signal: Signal) {
+    pub async fn wait_for_signal(&self, signal: signal::Number) {
         while !self.wait_for_signals().await.contains(&signal) {}
     }
 
@@ -1036,7 +1036,7 @@ impl System for SharedSystem {
     ) -> Result<SignalHandling> {
         self.0.borrow_mut().sigaction(signal, action)
     }
-    fn caught_signals(&mut self) -> Vec<Signal> {
+    fn caught_signals(&mut self) -> Vec<signal::Number> {
         self.0.borrow_mut().caught_signals()
     }
     fn kill(
@@ -1476,7 +1476,7 @@ struct AsyncSignal {
 #[derive(Clone, Debug)]
 enum SignalStatus {
     Expected(Option<Waker>),
-    Caught(Rc<[Signal]>),
+    Caught(Rc<[signal::Number]>),
 }
 
 impl AsyncSignal {
@@ -1511,16 +1511,17 @@ impl AsyncSignal {
     ///
     /// This function borrows `SignalStatus`es returned from `wait_for_signals`
     /// so you must not have conflicting borrows.
-    pub fn wake(&mut self, signals: &Rc<[Signal]>) {
-        for status in std::mem::take(&mut self.awaiters) {
-            if let Some(status) = status.upgrade() {
-                let mut status_ref = status.borrow_mut();
-                let new_status = SignalStatus::Caught(Rc::clone(signals));
-                let old_status = std::mem::replace(&mut *status_ref, new_status);
-                drop(status_ref);
-                if let SignalStatus::Expected(Some(waker)) = old_status {
-                    waker.wake();
-                }
+    pub fn wake(&mut self, signals: &Rc<[signal::Number]>) {
+        for status in self.awaiters.drain(..) {
+            let Some(status) = status.upgrade() else {
+                continue;
+            };
+            let mut status_ref = status.borrow_mut();
+            let new_status = SignalStatus::Caught(Rc::clone(signals));
+            let old_status = std::mem::replace(&mut *status_ref, new_status);
+            drop(status_ref);
+            if let SignalStatus::Expected(Some(waker)) = old_status {
+                waker.wake();
             }
         }
     }
@@ -1737,8 +1738,8 @@ mod tests {
         let result = future.as_mut().poll(&mut context);
         assert_matches!(result, Poll::Ready(signals) => {
             assert_eq!(signals.len(), 2);
-            assert!(signals.contains(&Signal::SIGCHLD));
-            assert!(signals.contains(&Signal::SIGINT));
+            assert!(signals.contains(&SIGCHLD));
+            assert!(signals.contains(&SIGINT));
         });
     }
 
@@ -1753,7 +1754,7 @@ mod tests {
             .unwrap();
 
         let mut context = Context::from_waker(noop_waker_ref());
-        let mut future = Box::pin(system.wait_for_signal(Signal::SIGCHLD));
+        let mut future = Box::pin(system.wait_for_signal(SIGCHLD));
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
 
@@ -1785,7 +1786,7 @@ mod tests {
             .unwrap();
 
         let mut context = Context::from_waker(noop_waker_ref());
-        let mut future = Box::pin(system.wait_for_signal(Signal::SIGINT));
+        let mut future = Box::pin(system.wait_for_signal(SIGINT));
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
 
@@ -2000,12 +2001,12 @@ mod tests {
         *status_1.borrow_mut() = SignalStatus::Expected(Some(noop_waker()));
         *status_2.borrow_mut() = SignalStatus::Expected(Some(noop_waker()));
 
-        async_signal.wake(&(Rc::new([Signal::SIGCHLD, Signal::SIGUSR1]) as Rc<[Signal]>));
+        async_signal.wake(&(Rc::new([SIGCHLD, SIGUSR1]) as Rc<[signal::Number]>));
         assert_matches!(&*status_1.borrow(), SignalStatus::Caught(signals) => {
-            assert_eq!(**signals, [Signal::SIGCHLD, Signal::SIGUSR1]);
+            assert_eq!(**signals, [SIGCHLD, SIGUSR1]);
         });
         assert_matches!(&*status_2.borrow(), SignalStatus::Caught(signals) => {
-            assert_eq!(**signals, [Signal::SIGCHLD, Signal::SIGUSR1]);
+            assert_eq!(**signals, [SIGCHLD, SIGUSR1]);
         });
     }
 }

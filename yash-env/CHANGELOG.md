@@ -35,27 +35,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   permission is denied for any directory component of the path.
 - `job::ProcessResult::{Stopped, Signaled}` now have associated values of type
   `signal::Number` instead of `trap::Signal`.
-- `job::ProcessState::stopped` now takes a `signal::Number` parameter instead of
-  a `trap::Signal`.
-- The following methods of `system::System` now operate on `signal::Number`
-  instead of `trap::Signal`:
-    - `kill`
-    - `sigaction`
-- The following methods of `system::virtual::Process` now operate on
-  `signal::Number` instead of `trap::Signal`:
-    - `signal_handling`
-    - `set_signal_handling`
+- The following methods now operate on `signal::Number` instead of `trap::Signal`:
+    - `Env::wait_for_signal`
+    - `Env::wait_for_signals`
+    - `job::ProcessState::stopped`
+    - `system::System::caught_signals`
+    - `system::System::kill`
+    - `system::System::sigaction`
+    - `system::virtual::Process::signal_handling`
+    - `system::virtual::Process::set_signal_handling`
+    - `trap::TrapSet::catch_signal`
+    - `trap::TrapSet::take_caught_signal`
+    - `trap::TrapSet::take_signal_if_caught`
 - `system::virtual::SignalEffect::of` now takes a `signal::Number` parameter
   instead of a `trap::Signal`. This function is now `const`.
 - The type parameter constraint for `subshell::Subshell` is now
   `F: for<'a> FnOnce(&'a mut Env, Option<JobControl>) -> Pin<Box<dyn Future<Output = ()> + 'a>> + 'static`.
   The `Output` type of the returned future has been changed from
   `semantics::Result` to `()`.
-- The following methods of `trap::TrapSet` now operate on `signal::Number`
-  instead of `trap::Signal`:
-    - `catch_signal`
-    - `take_caught_signal`
-    - `take_signal_if_caught`
 
 ### Removed
 

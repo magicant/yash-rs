@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prints its error message in prettier format.
 - `command::simple_command::replace_current_process` now uses `System::shell_path`
   to find the shell executable when it needs to fall back to the shell.
+- `trap::run_trap_if_caught` now takes a `yash_env::signal::Number` argument
+  instead of a `yash_env::trap::Signal`.
 
 ### Fixed
 

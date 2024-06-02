@@ -35,7 +35,6 @@ use super::OFlag;
 use super::Result;
 use super::SigSet;
 use super::SigmaskHow;
-use super::Signal;
 use super::System;
 use super::TimeSpec;
 use super::Times;
@@ -392,7 +391,7 @@ impl System for RealSystem {
         }
     }
 
-    fn caught_signals(&mut self) -> Vec<Signal> {
+    fn caught_signals(&mut self) -> Vec<signal::Number> {
         let mut signals = Vec::new();
         for slot in &CAUGHT_SIGNALS {
             // Need a fence to ensure we examine the slots in order.
@@ -405,9 +404,8 @@ impl System for RealSystem {
                 break;
             }
 
-            let signal = signal as c_int;
-            if let Ok(signal) = signal.try_into() {
-                signals.push(signal)
+            if let Some((_name, number)) = self.validate_signal(signal as signal::RawNumber) {
+                signals.push(number)
             } else {
                 // ignore unknown signal
             }
@@ -684,13 +682,20 @@ mod tests {
             let result = system.caught_signals();
             assert_eq!(result, []);
 
-            catch_signal(Signal::SIGINT as c_int);
-            catch_signal(Signal::SIGTERM as c_int);
-            catch_signal(Signal::SIGTERM as c_int);
-            catch_signal(Signal::SIGCHLD as c_int);
+            catch_signal(nix::libc::SIGINT);
+            catch_signal(nix::libc::SIGTERM);
+            catch_signal(nix::libc::SIGTERM);
+            catch_signal(nix::libc::SIGCHLD);
+
+            let sigint =
+                signal::Number::from_raw_unchecked(NonZeroI32::new(nix::libc::SIGINT).unwrap());
+            let sigterm =
+                signal::Number::from_raw_unchecked(NonZeroI32::new(nix::libc::SIGTERM).unwrap());
+            let sigchld =
+                signal::Number::from_raw_unchecked(NonZeroI32::new(nix::libc::SIGCHLD).unwrap());
 
             let result = system.caught_signals();
-            assert_eq!(result, [Signal::SIGINT, Signal::SIGTERM, Signal::SIGCHLD]);
+            assert_eq!(result, [sigint, sigterm, sigchld]);
             let result = system.caught_signals();
             assert_eq!(result, []);
         }

@@ -52,7 +52,6 @@ pub use self::system::SharedSystem;
 use self::system::SignalHandling;
 pub use self::system::System;
 use self::system::SystemEx;
-use self::trap::Signal;
 use self::trap::TrapSet;
 use self::variable::Scope;
 use self::variable::VariableRefMut;
@@ -228,15 +227,10 @@ impl Env {
     /// Before the function returns, it passes the results to
     /// [`TrapSet::catch_signal`] so the trap set can remember the signals
     /// caught to be handled later.
-    pub async fn wait_for_signals(&mut self) -> Rc<[Signal]> {
+    pub async fn wait_for_signals(&mut self) -> Rc<[signal::Number]> {
         let result = self.system.wait_for_signals().await;
         for signal in result.iter().copied() {
-            let name = unsafe { RealSystem::new() }
-                .validate_signal(signal as _)
-                .unwrap()
-                .0;
-            let number = self.system.signal_number_from_name(name).unwrap();
-            self.traps.catch_signal(number);
+            self.traps.catch_signal(signal);
         }
         result
     }
@@ -245,7 +239,7 @@ impl Env {
     ///
     /// This function calls [`wait_for_signals`](Self::wait_for_signals)
     /// repeatedly until it returns results containing the specified `signal`.
-    pub async fn wait_for_signal(&mut self, signal: Signal) {
+    pub async fn wait_for_signal(&mut self, signal: signal::Number) {
         while !self.wait_for_signals().await.contains(&signal) {}
     }
 
@@ -255,7 +249,7 @@ impl Env {
     /// [`wait_for_signals`](Self::wait_for_signals) but does not wait for
     /// signals to be caught. Instead, it only checks if any signals have been
     /// caught but not yet consumed in the [`SharedSystem`].
-    pub fn poll_signals(&mut self) -> Option<Rc<[Signal]>> {
+    pub fn poll_signals(&mut self) -> Option<Rc<[signal::Number]>> {
         let system = self.system.clone();
 
         let mut future = std::pin::pin!(self.wait_for_signals());
@@ -343,12 +337,16 @@ impl Env {
         // miss any `SIGCHLD` that may arrive between `wait` and `wait_for_signal`.
         self.traps.enable_sigchld_handler(&mut self.system)?;
 
+        let sigchld = self
+            .system
+            .signal_number_from_name(signal::Name::Chld)
+            .unwrap();
         loop {
             if let Some((pid, state)) = self.system.wait(target)? {
                 self.jobs.update_status(pid, state);
                 return Ok((pid, state));
             }
-            self.wait_for_signal(Signal::SIGCHLD).await;
+            self.wait_for_signal(sigchld).await;
         }
     }
 
@@ -473,6 +471,7 @@ mod tests {
     use crate::system::r#virtual::SystemState;
     use crate::system::r#virtual::SIGCHLD;
     use crate::trap::Action;
+    use crate::trap::Signal;
     use futures_executor::LocalPool;
     use futures_util::task::LocalSpawnExt as _;
     use futures_util::FutureExt as _;
@@ -523,7 +522,7 @@ mod tests {
                 assert!(process.blocked_signals().contains(Signal::SIGCHLD));
                 let _ = process.raise_signal(SIGCHLD);
             }
-            env.wait_for_signal(Signal::SIGCHLD).await;
+            env.wait_for_signal(SIGCHLD).await;
 
             let trap_state = env.traps.get_state(SIGCHLD).0.unwrap();
             assert!(trap_state.pending);
@@ -564,7 +563,7 @@ mod tests {
         }
 
         let result = env.poll_signals().unwrap();
-        assert_eq!(*result, [Signal::SIGCHLD]);
+        assert_eq!(*result, [SIGCHLD]);
     }
 
     #[test]

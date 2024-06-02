@@ -67,7 +67,6 @@ use super::OFlag;
 use super::Result;
 use super::SigSet;
 use super::SigmaskHow;
-use super::Signal;
 use super::TimeSpec;
 use super::Times;
 use super::AT_FDCWD;
@@ -680,11 +679,8 @@ impl System for VirtualSystem {
         Ok(process.set_signal_handling(signal, action))
     }
 
-    fn caught_signals(&mut self) -> Vec<Signal> {
+    fn caught_signals(&mut self) -> Vec<signal::Number> {
         std::mem::take(&mut self.current_process_mut().caught_signals)
-            .into_iter()
-            .filter_map(signal::Number::to_signal_virtual)
-            .collect()
     }
 
     /// Sends a signal to the target process.
@@ -1276,6 +1272,7 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_executor::LocalPool;
     use futures_util::FutureExt;
+    use nix::sys::signal::Signal;
     use std::ffi::CString;
     use std::ffi::OsString;
     use std::future::pending;
@@ -2157,7 +2154,7 @@ mod tests {
             Some(&SigSet::empty()),
         );
         assert_eq!(result, Err(Errno::EINTR));
-        assert_eq!(system.caught_signals(), [Signal::SIGCHLD]);
+        assert_eq!(system.caught_signals(), [SIGCHLD]);
     }
 
     #[test]
@@ -2567,7 +2564,7 @@ mod tests {
         executor.run_until(future);
         executor.run_until_stalled();
 
-        assert_eq!(env.system.caught_signals(), [Signal::SIGCHLD]);
+        assert_eq!(env.system.caught_signals(), [SIGCHLD]);
     }
 
     #[test]

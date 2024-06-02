@@ -20,12 +20,10 @@ use super::run_trap;
 use std::ops::ControlFlow::Continue;
 use std::rc::Rc;
 use yash_env::semantics::Result;
+use yash_env::signal;
 use yash_env::stack::Frame;
-use yash_env::system::real::RealSystem;
-use yash_env::system::System as _;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
-use yash_env::trap::Signal;
 #[cfg(doc)]
 use yash_env::trap::TrapSet;
 use yash_env::Env;
@@ -40,19 +38,14 @@ use yash_env::Env;
 /// Returns `None` if the signal has not been caught. Otherwise, returns the
 /// result of running the trap action.
 #[must_use]
-pub async fn run_trap_if_caught(env: &mut Env, signal: Signal) -> Option<Result> {
-    let name = unsafe { RealSystem::new() }
-        .validate_signal(signal as _)
-        .unwrap()
-        .0;
-    let number = env.system.signal_number_from_name(name).unwrap();
-    let trap_state = env.traps.take_signal_if_caught(number)?;
+pub async fn run_trap_if_caught(env: &mut Env, signal: signal::Number) -> Option<Result> {
+    let trap_state = env.traps.take_signal_if_caught(signal)?;
     let Action::Command(command) = &trap_state.action else {
         return None;
     };
     let code = Rc::clone(command);
     let origin = trap_state.origin.clone();
-    Some(run_trap(env, number.into(), code, origin).await)
+    Some(run_trap(env, signal.into(), code, origin).await)
 }
 
 fn in_trap(env: &Env) -> bool {
