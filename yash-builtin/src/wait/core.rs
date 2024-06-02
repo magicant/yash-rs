@@ -152,13 +152,13 @@ mod tests {
             let pid = subshell.start(&mut env).await.unwrap().0;
             let index = env.jobs.add(Job::new(pid));
             // Suspend the child process.
-            env.system.kill(pid, Some(Signal::SIGSTOP)).await.unwrap();
+            env.system.kill(pid, Some(SIGSTOP)).await.unwrap();
 
             // The job is suspended, so the function returns immediately.
             let result = wait_for_any_job_or_trap(&mut env).await;
             assert_eq!(result, Ok(()));
             // The job state is updated.
-            assert_eq!(env.jobs[index].state, ProcessState::stopped(SIGSTOP),);
+            assert_eq!(env.jobs[index].state, ProcessState::stopped(SIGSTOP));
         });
     }
 

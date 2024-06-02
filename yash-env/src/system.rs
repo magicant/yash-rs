@@ -292,7 +292,8 @@ pub trait System: Debug {
 
     /// Sends a signal.
     ///
-    /// This is a thin wrapper around the `kill` system call.
+    /// This is a thin wrapper around the `kill` system call. If `signal` is
+    /// `None`, permission to send a signal is checked, but no signal is sent.
     ///
     /// The virtual system version of this function blocks the calling thread if
     /// the signal stops or terminates the current process, hence returning a
@@ -300,7 +301,7 @@ pub trait System: Debug {
     fn kill(
         &mut self,
         target: Pid,
-        signal: Option<Signal>,
+        signal: Option<signal::Number>,
     ) -> Pin<Box<dyn Future<Output = Result<()>>>>;
 
     /// Waits for a next event.
@@ -1029,7 +1030,7 @@ impl System for SharedSystem {
     fn kill(
         &mut self,
         target: Pid,
-        signal: Option<Signal>,
+        signal: Option<signal::Number>,
     ) -> Pin<Box<(dyn Future<Output = Result<()>>)>> {
         self.0.borrow_mut().kill(target, signal)
     }

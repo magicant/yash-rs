@@ -94,8 +94,8 @@ use yash_env::job::id::ParseError;
 use yash_env::job::JobList;
 use yash_env::job::ProcessState;
 use yash_env::semantics::Field;
+use yash_env::signal;
 use yash_env::system::Errno;
-use yash_env::trap::Signal;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::source::pretty::Annotation;
@@ -168,7 +168,9 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<(), ResumeEr
 
     if job.state.is_alive() {
         let pgid = -job.pid;
-        env.system.kill(pgid, Signal::SIGCONT.into()).await?;
+        let sigcont = env.system.signal_number_from_name(signal::Name::Cont);
+        let sigcont = sigcont.ok_or(Errno::EINVAL)?;
+        env.system.kill(pgid, Some(sigcont)).await?;
 
         // We've just reported that the job is resumed, so there is no need to
         // report the same thing in the usual pre-prompt message.

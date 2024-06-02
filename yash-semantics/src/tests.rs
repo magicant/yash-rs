@@ -38,8 +38,8 @@ use yash_env::semantics::Field;
 use yash_env::system::r#virtual::FileBody;
 use yash_env::system::r#virtual::INode;
 use yash_env::system::r#virtual::SystemState;
+use yash_env::system::r#virtual::SIGSTOP;
 use yash_env::system::Errno;
-use yash_env::trap::Signal;
 use yash_env::variable::Scalar;
 use yash_env::variable::Scope;
 use yash_env::Env;
@@ -211,10 +211,7 @@ fn suspend_builtin_main(
     _args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
     Box::pin(async move {
-        env.system
-            .kill(Pid(0), Some(Signal::SIGSTOP))
-            .await
-            .unwrap();
+        env.system.kill(Pid(0), Some(SIGSTOP)).await.unwrap();
         yash_env::builtin::Result::default()
     })
 }

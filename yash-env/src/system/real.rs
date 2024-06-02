@@ -413,10 +413,11 @@ impl System for RealSystem {
     fn kill(
         &mut self,
         target: Pid,
-        signal: Option<Signal>,
+        signal: Option<signal::Number>,
     ) -> Pin<Box<(dyn Future<Output = Result<()>>)>> {
         Box::pin(async move {
-            nix::sys::signal::kill(target.into(), signal)?;
+            let raw = signal.map_or(0, signal::Number::as_raw);
+            unsafe { nix::libc::kill(target.0, raw) }.errno_if_m1()?;
             Ok(())
         })
     }

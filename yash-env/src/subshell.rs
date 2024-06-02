@@ -639,12 +639,12 @@ mod tests {
 
             parent_env
                 .system
-                .kill(child_pid, Some(Signal::SIGINT))
+                .kill(child_pid, Some(SIGINT))
                 .await
                 .unwrap();
             parent_env
                 .system
-                .kill(child_pid, Some(Signal::SIGQUIT))
+                .kill(child_pid, Some(SIGQUIT))
                 .await
                 .unwrap();
 

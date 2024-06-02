@@ -37,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `signal::Number` instead of `trap::Signal`.
 - `job::ProcessState::stopped` now takes a `signal::Number` parameter instead of
   a `trap::Signal`.
+- The following methods of `system::System` now operate on `signal::Number`
+  instead of `trap::Signal`:
+    - `kill`
 - The following methods of `system::virtual::Process` now operate on
   `signal::Number` instead of `trap::Signal`:
     - `signal_handling`

@@ -27,10 +27,12 @@ use yash_env::job::id::parse_tail;
 use yash_env::job::Pid;
 use yash_env::job::{id::FindError, JobList};
 use yash_env::semantics::Field;
+use yash_env::signal;
+use yash_env::system::real::RealSystem;
 use yash_env::system::Errno;
+use yash_env::system::System as _;
 use yash_env::trap::Signal;
 use yash_env::Env;
-use yash_env::System as _;
 use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 
 /// Error that may occur while [sending](send) a signal.
@@ -80,7 +82,11 @@ pub fn resolve_target(jobs: &JobList, target: &str) -> Result<Pid, Error> {
 }
 
 /// Sends the specified signal to the specified target.
-pub async fn send(env: &mut Env, signal: Option<Signal>, target: &Field) -> Result<(), Error> {
+pub async fn send(
+    env: &mut Env,
+    signal: Option<signal::Number>,
+    target: &Field,
+) -> Result<(), Error> {
     let pid = resolve_target(&env.jobs, &target.value)?;
     env.system.kill(pid, signal).await?;
     Ok(())
@@ -111,6 +117,13 @@ impl MessageBase for TargetError<'_> {
 pub async fn execute(env: &mut Env, signal: Option<Signal>, targets: &[Field]) -> crate::Result {
     let mut errors = Vec::new();
     for target in targets {
+        let signal = signal.map(|signal| {
+            let name = unsafe { RealSystem::new() }
+                .validate_signal(signal as _)
+                .unwrap()
+                .0;
+            env.system.signal_number_from_name(name).unwrap()
+        });
         if let Err(error) = send(env, signal, target).await {
             errors.push(TargetError { target, error });
         }

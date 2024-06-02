@@ -695,7 +695,7 @@ impl System for VirtualSystem {
     fn kill(
         &mut self,
         target: Pid,
-        signal: Option<Signal>,
+        signal: Option<signal::Number>,
     ) -> Pin<Box<(dyn Future<Output = Result<()>>)>> {
         let result = match target {
             Pid::MY_PROCESS_GROUP => {
@@ -710,8 +710,7 @@ impl System for VirtualSystem {
                 match state.processes.get_mut(&target) {
                     Some(process) => {
                         if let Some(signal) = signal {
-                            let result =
-                                process.raise_signal(signal::Number::from_signal_virtual(signal));
+                            let result = process.raise_signal(signal);
                             if result.process_state_changed {
                                 let parent_pid = process.ppid;
                                 raise_sigchld(&mut state, parent_pid);
@@ -1077,15 +1076,14 @@ impl System for VirtualSystem {
 fn send_signal_to_processes(
     state: &mut SystemState,
     target_pgid: Option<Pid>,
-    signal: Option<Signal>,
+    signal: Option<signal::Number>,
 ) -> Result<()> {
     let mut results = Vec::new();
 
     if let Some(signal) = signal {
-        let number = signal::Number::from_signal_virtual(signal);
         for (&_pid, process) in &mut state.processes {
             if target_pgid.map_or(true, |target_pgid| process.pgid == target_pgid) {
-                let result = process.raise_signal(number);
+                let result = process.raise_signal(signal);
                 results.push((result, process.ppid));
             }
         }
@@ -1839,9 +1837,7 @@ mod tests {
             .unwrap();
         assert_eq!(system.current_process().state(), ProcessState::Running);
 
-        let result = system
-            .kill(system.process_id, Some(Signal::SIGINT))
-            .now_or_never();
+        let result = system.kill(system.process_id, Some(SIGINT)).now_or_never();
         // The future should be pending because the current process has been killed
         assert_eq!(result, None);
         assert_eq!(
@@ -1857,7 +1853,7 @@ mod tests {
         let max_pid = *state.processes.keys().max().unwrap();
         drop(state);
         let e = system
-            .kill(Pid(max_pid.0 + 1), Some(Signal::SIGINT))
+            .kill(Pid(max_pid.0 + 1), Some(SIGINT))
             .now_or_never()
             .unwrap()
             .unwrap_err();
@@ -1882,7 +1878,7 @@ mod tests {
             .insert(Pid(21), Process::with_parent_and_group(Pid(10), Pid(21)));
         drop(state);
 
-        let result = system.kill(Pid::ALL, Some(Signal::SIGTERM)).now_or_never();
+        let result = system.kill(Pid::ALL, Some(SIGTERM)).now_or_never();
         // The future should be pending because the current process has been killed
         assert_eq!(result, None);
         let state = system.state.borrow();
@@ -1916,7 +1912,7 @@ mod tests {
         drop(state);
 
         let result = system
-            .kill(Pid::MY_PROCESS_GROUP, Some(Signal::SIGQUIT))
+            .kill(Pid::MY_PROCESS_GROUP, Some(SIGQUIT))
             .now_or_never();
         // The future should be pending because the current process has been killed
         assert_eq!(result, None);
@@ -1964,7 +1960,7 @@ mod tests {
         drop(state);
 
         system
-            .kill(Pid(-21), Some(Signal::SIGHUP))
+            .kill(Pid(-21), Some(SIGHUP))
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -2002,7 +1998,7 @@ mod tests {
         drop(state);
 
         system
-            .kill(-pgid, Some(Signal::SIGCONT))
+            .kill(-pgid, Some(SIGCONT))
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -2458,7 +2454,7 @@ mod tests {
             Box::new(|env| {
                 Box::pin(async move {
                     let pid = env.system.getpid();
-                    let result = env.system.kill(pid, Some(Signal::SIGKILL)).await;
+                    let result = env.system.kill(pid, Some(SIGKILL)).await;
                     unreachable!("kill returned {result:?}");
                 })
             }),
@@ -2492,7 +2488,7 @@ mod tests {
             Box::new(|env| {
                 Box::pin(async move {
                     let pid = env.system.getpid();
-                    let result = env.system.kill(pid, Some(Signal::SIGSTOP)).await;
+                    let result = env.system.kill(pid, Some(SIGSTOP)).await;
                     unreachable!("kill returned {result:?}");
                 })
             }),
@@ -2517,7 +2513,7 @@ mod tests {
             Box::new(|env| {
                 Box::pin(async move {
                     let pid = env.system.getpid();
-                    let result = env.system.kill(pid, Some(Signal::SIGSTOP)).await;
+                    let result = env.system.kill(pid, Some(SIGSTOP)).await;
                     assert_eq!(result, Ok(()));
                     env.exit_status = ExitStatus(123);
                 })
@@ -2527,7 +2523,7 @@ mod tests {
         executor.run_until_stalled();
 
         env.system
-            .kill(pid, Some(Signal::SIGCONT))
+            .kill(pid, Some(SIGCONT))
             .now_or_never()
             .unwrap()
             .unwrap();

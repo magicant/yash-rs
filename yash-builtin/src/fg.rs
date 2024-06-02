@@ -94,10 +94,10 @@ use yash_env::job::Pid;
 use yash_env::job::ProcessState;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
+use yash_env::signal;
 use yash_env::system::Errno;
 use yash_env::system::System as _;
 use yash_env::system::SystemEx as _;
-use yash_env::trap::Signal;
 use yash_env::Env;
 
 /// Waits for the specified job to finish (or suspend again).
@@ -141,7 +141,9 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<ProcessState
         env.system.tcsetpgrp_without_block(tty, job.pid)?;
 
         let pgid = -job.pid;
-        env.system.kill(pgid, Signal::SIGCONT.into()).await?;
+        let sigcont = env.system.signal_number_from_name(signal::Name::Cont);
+        let sigcont = sigcont.ok_or(Errno::EINVAL)?;
+        env.system.kill(pgid, Some(sigcont)).await?;
 
         // Wait for the job to finish (or suspend again).
         state = wait_until_halt(env, job.pid).await?;
@@ -213,10 +215,8 @@ mod tests {
     use yash_env::VirtualSystem;
 
     async fn suspend(env: &mut Env) {
-        env.system
-            .kill(env.system.getpid(), Some(Signal::SIGSTOP))
-            .await
-            .unwrap();
+        let target = env.system.getpid();
+        env.system.kill(target, Some(SIGSTOP)).await.unwrap();
     }
 
     #[test]
