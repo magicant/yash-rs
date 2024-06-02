@@ -36,7 +36,7 @@
 mod cond;
 mod state;
 
-pub use self::cond::{Condition, OldCondition, ParseConditionError, Signal};
+pub use self::cond::{Condition, Signal};
 pub use self::state::{Action, SetActionError, TrapState};
 use self::state::{EnterSubshellOption, GrandState};
 use crate::signal;
@@ -442,19 +442,6 @@ mod tests {
                 .insert(signal, handling)
                 .unwrap_or(SignalHandling::Default))
         }
-    }
-
-    #[test]
-    fn condition_display() {
-        assert_eq!(OldCondition::Exit.to_string(), "EXIT");
-        assert_eq!(OldCondition::Signal(Signal::SIGINT).to_string(), "INT");
-    }
-
-    #[test]
-    fn condition_from_str() {
-        assert_eq!("EXIT".parse(), Ok(OldCondition::Exit));
-        assert_eq!("TERM".parse(), Ok(OldCondition::Signal(Signal::SIGTERM)));
-        assert_eq!("FOO".parse::<OldCondition>(), Err(ParseConditionError));
     }
 
     #[test]
