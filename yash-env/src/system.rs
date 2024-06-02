@@ -1122,11 +1122,6 @@ impl SignalSystem for SharedSystem {
         signal: signal::Number,
         handling: SignalHandling,
     ) -> Result<SignalHandling> {
-        let name = SystemEx::signal_name_from_number(self, signal);
-        let number = unsafe { real::RealSystem::new() }
-            .signal_number_from_name(name)
-            .unwrap();
-        let signal = number.as_raw().try_into().unwrap();
         self.0.borrow_mut().set_signal_handling(signal, handling)
     }
 }
@@ -1181,7 +1176,15 @@ impl SelectSystem {
     }
 
     /// Calls `sigmask` and updates `self.wait_mask`.
-    fn sigmask(&mut self, how: SigmaskHow, signal: Signal) -> Result<()> {
+    fn sigmask(&mut self, how: SigmaskHow, signal: signal::Number) -> Result<()> {
+        let name = self.signal_name_from_number(signal);
+        let signal = unsafe { real::RealSystem::new() }
+            .signal_number_from_name(name)
+            .unwrap()
+            .as_raw()
+            .try_into()
+            .unwrap();
+
         let mut set = SigSet::empty();
         let mut old_set = SigSet::empty();
         set.add(signal);
@@ -1198,27 +1201,22 @@ impl SelectSystem {
     /// See [`SharedSystem::set_signal_handling`].
     pub fn set_signal_handling(
         &mut self,
-        signal: Signal,
+        signal: signal::Number,
         handling: SignalHandling,
     ) -> Result<SignalHandling> {
-        let name = unsafe { real::RealSystem::new() }
-            .validate_signal(signal as _)
-            .unwrap()
-            .0;
-        let signum = self.signal_number_from_name(name).unwrap();
         // The order of sigmask and sigaction is important to prevent the signal
         // from being caught. The signal must be caught only when the select
         // function temporarily unblocks the signal. This is to avoid race
         // condition.
         match handling {
             SignalHandling::Default | SignalHandling::Ignore => {
-                let old_handling = self.system.sigaction(signum, handling)?;
+                let old_handling = self.system.sigaction(signal, handling)?;
                 self.sigmask(SigmaskHow::SIG_UNBLOCK, signal)?;
                 Ok(old_handling)
             }
             SignalHandling::Catch => {
                 self.sigmask(SigmaskHow::SIG_BLOCK, signal)?;
-                self.system.sigaction(signum, handling)
+                self.system.sigaction(signal, handling)
             }
         }
     }
