@@ -45,6 +45,19 @@ impl From<signal::RawNumber> for CondSpec {
 }
 
 impl CondSpec {
+    /// Resolves the condition specification to a name and a signal number that can
+    /// be passed to [`TrapSet::set_action`](yash_env::trap::TrapSet::set_action).
+    #[must_use]
+    pub(super) fn resolve<S: System>(&self, system: &S) -> Option<Condition> {
+        match *self {
+            CondSpec::Exit | CondSpec::Number(0) => Some(Condition::Exit),
+            CondSpec::SignalName(name) => {
+                Some(Condition::Signal(system.signal_number_from_name(name)?))
+            }
+            CondSpec::Number(number) => Some(Condition::Signal(system.validate_signal(number)?.1)),
+        }
+    }
+
     /// Converts this `CondSpec` to a `Condition`.
     ///
     /// If this `CondSpec` contains a signal name or number that is not

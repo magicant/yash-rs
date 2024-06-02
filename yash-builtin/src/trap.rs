@@ -132,9 +132,8 @@ use std::fmt::Write;
 use thiserror::Error;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::system::System;
+use yash_env::system::SharedSystem;
 use yash_env::trap::Action;
-use yash_env::trap::Condition;
 use yash_env::trap::SetActionError;
 use yash_env::trap::SignalSystem;
 use yash_env::trap::TrapSet;
@@ -197,68 +196,6 @@ pub enum ErrorCause {
     SetAction(#[from] SetActionError),
 }
 
-impl Command {
-    /// Executes the trap built-in.
-    ///
-    /// If successful, returns a string that should be printed to the standard
-    /// output. On failure, returns a non-empty list of errors.
-    pub fn execute(self, env: &mut Env) -> Result<String, Vec<Error>> {
-        match self {
-            Self::PrintAll => Ok(display_traps(&env.traps, &env.system)),
-
-            Self::SetAction { action, conditions } => {
-                let mut errors = Vec::new();
-                for (cond, field) in conditions {
-                    let cond2 = match cond {
-                        CondSpec::Exit => Condition::Exit,
-                        CondSpec::SignalName(name) => {
-                            match System::signal_number_from_name(&env.system, name) {
-                                Some(number) => Condition::Signal(number),
-                                None => {
-                                    let cause = ErrorCause::UnsupportedSignal;
-                                    errors.push(Error { cause, cond, field });
-                                    continue;
-                                }
-                            }
-                        }
-                        CondSpec::Number(number) => {
-                            if number == 0 {
-                                Condition::Exit
-                            } else {
-                                match env.system.validate_signal(number) {
-                                    Some((_name, number)) => Condition::Signal(number),
-                                    None => {
-                                        let cause = ErrorCause::UnsupportedSignal;
-                                        errors.push(Error { cause, cond, field });
-                                        continue;
-                                    }
-                                }
-                            }
-                        }
-                    };
-                    if let Err(cause) = env.traps.set_action(
-                        &mut env.system,
-                        cond2,
-                        action.clone(),
-                        field.origin.clone(),
-                        // TODO an interactive shell can override originally ignored traps
-                        false,
-                    ) {
-                        let cause = cause.into();
-                        errors.push(Error { cause, cond, field });
-                    }
-                }
-
-                if errors.is_empty() {
-                    Ok(String::new())
-                } else {
-                    Err(errors)
-                }
-            }
-        }
-    }
-}
-
 /// Information of an error that occurred while executing the `trap` built-in
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub struct Error {
@@ -287,6 +224,63 @@ impl MessageBase for Error {
             self.cause.to_string().into(),
             &self.field.origin,
         )
+    }
+}
+
+/// Updates an action for a condition in the trap set.
+///
+/// This is a utility function for implementing [`Command::execute`].
+fn set_action(
+    traps: &mut TrapSet,
+    system: &mut SharedSystem,
+    cond: CondSpec,
+    field: Field,
+    action: Action,
+) -> Result<(), Error> {
+    let Some(cond2) = cond.resolve(system) else {
+        let cause = ErrorCause::UnsupportedSignal;
+        return Err(Error { cause, cond, field });
+    };
+    traps
+        .set_action(
+            system,
+            cond2,
+            action.clone(),
+            field.origin.clone(),
+            // TODO an interactive shell can override originally ignored traps
+            false,
+        )
+        .map_err(|cause| {
+            let cause = cause.into();
+            Error { cause, cond, field }
+        })
+}
+
+impl Command {
+    /// Executes the trap built-in.
+    ///
+    /// If successful, returns a string that should be printed to the standard
+    /// output. On failure, returns a non-empty list of errors.
+    pub fn execute(self, env: &mut Env) -> Result<String, Vec<Error>> {
+        match self {
+            Self::PrintAll => Ok(display_traps(&env.traps, &env.system)),
+
+            Self::SetAction { action, conditions } => {
+                let errors = conditions
+                    .into_iter()
+                    .filter_map(|(cond, field)| {
+                        set_action(&mut env.traps, &mut env.system, cond, field, action.clone())
+                            .err()
+                    })
+                    .collect::<Vec<Error>>();
+
+                if errors.is_empty() {
+                    Ok(String::new())
+                } else {
+                    Err(errors)
+                }
+            }
+        }
     }
 }
 
