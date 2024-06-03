@@ -227,6 +227,9 @@ pub trait System: Debug {
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)>;
 
     /// Gets the signal number from the signal name.
+    ///
+    /// This function returns the signal number corresponding to the signal name
+    /// in the system. If the signal name is not supported, it returns `None`.
     #[must_use]
     fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number>;
 

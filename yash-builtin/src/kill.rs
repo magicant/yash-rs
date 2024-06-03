@@ -143,11 +143,19 @@
 //!
 //! Some implementations print `0` or `EXIT` for `kill -l 0` or `kill -l EXIT`
 //! while this implementation regards them as invalid operands.
+//!
+//! On some systems, a signal may have more than one name. There seems to be no
+//! consensus whether `kill -l` should print all names or just one name for each
+//! signal. This implementation currently prints all names, but this behavior
+//! may change in the future.
 
 use crate::common::report_error;
 use yash_env::semantics::Field;
-use yash_env::trap::Signal;
 use yash_env::Env;
+
+mod signal;
+
+pub use signal::Signal;
 
 /// Parsed command line arguments
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -156,16 +164,18 @@ pub enum Command {
     /// Sends a signal to processes
     Send {
         /// Signal to send
-        signal: Option<Signal>,
+        signal: Signal,
+        /// Parameter that specified the signal, if any
+        signal_origin: Option<Field>,
         /// Target processes
         targets: Vec<Field>,
     },
     /// Lists signal names or descriptions
     Print {
-        /// Signal names or descriptions to list
+        /// Signals to list
         ///
         /// If empty, all signals are listed.
-        signals: Vec<Signal>,
+        signals: Vec<(Signal, Field)>,
         /// Whether to print descriptions
         verbose: bool,
     },
@@ -179,7 +189,12 @@ impl Command {
     /// Executes the built-in.
     pub async fn execute(&self, env: &mut Env) -> crate::Result {
         match self {
-            Self::Send { signal, targets } => send::execute(env, *signal, targets).await,
+            Self::Send {
+                signal,
+                signal_origin,
+                targets,
+            } => send::execute(env, *signal, signal_origin.as_ref(), targets).await,
+
             Self::Print { signals, verbose } => print::execute(env, signals, *verbose).await,
         }
     }

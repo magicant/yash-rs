@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `signal::{Number, RawNumber, Name, NameIter, UnknownNameError}`
 - `trap::SignalSystem::signal_name_from_number`
 - `trap::SignalSystem::signal_number_from_name`
+- `ExitStatus::to_signal_number`
 
 ### Changed
 

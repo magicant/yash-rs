@@ -22,11 +22,10 @@
 //! signal-specifying option.
 
 use super::Command;
-use std::ffi::c_int;
+use super::Signal;
 use thiserror::Error;
-use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::trap::Signal;
+use yash_env::signal;
 use yash_env::Env;
 use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
 use yash_syntax::source::Location;
@@ -151,49 +150,33 @@ impl Error {
 
 /// Converts a string to a signal.
 ///
-/// The string should be a signal name.
-///
-/// If the string is a valid signal name, this function returns `Some(signal)`.
-/// Otherwise, this function returns `None`.
-///
-/// The signal name is parsed case-insensitively.
-///
-/// If `allow_sig_prefix` is `true`, the `SIG` prefix is optional for signal
-/// names. Otherwise, the `SIG` prefix must **not** be present.
-#[must_use]
-pub fn parse_signal_name(s: &str, allow_sig_prefix: bool) -> Option<Signal> {
-    let mut name = String::with_capacity(s.len() + 3);
-    name.push_str(s);
-    name.make_ascii_uppercase();
-    if !allow_sig_prefix || !name.starts_with("SIG") {
-        name.insert_str(0, "SIG");
-    }
-    name.parse().ok()
-}
-
-/// Converts a string to a signal.
-///
-/// The string may be a signal name or a signal number.
+/// The string may be a signal name or a number.
 ///
 /// If the string is a valid signal name or number, this function returns
-/// `Some(Some(signal))`. If the string represents the dummy signal number `0`,
-/// this function returns `Some(None)`. Otherwise, this function returns `None`.
+/// `Some(signal)`. If the string represents the dummy signal number `0`, the
+/// return value will be `Some(Signal::Number(0))`. Otherwise, this function
+/// returns `None`.
 ///
 /// The signal name is parsed case-insensitively.
 ///
 /// If `allow_sig_prefix` is `true`, the `SIG` prefix is optional for signal
 /// names. Otherwise, the `SIG` prefix must **not** be present.
 #[must_use]
-pub fn parse_signal_name_or_number(s: &str, allow_sig_prefix: bool) -> Option<Option<Signal>> {
-    if let Ok(number) = s.parse::<c_int>() {
-        if number == 0 {
-            Some(None)
-        } else {
-            number.try_into().ok().map(Some)
-        }
-    } else {
-        parse_signal_name(s, allow_sig_prefix).map(Some)
+pub fn parse_signal(mut s: &str, allow_sig_prefix: bool) -> Option<Signal> {
+    fn starts_with_sig(s: &str) -> bool {
+        let mut cs = s.chars();
+        matches!(
+            (cs.next(), cs.next(), cs.next()),
+            (Some('S' | 's'), Some('I' | 'i'), Some('G' | 'g'))
+        )
     }
+
+    if allow_sig_prefix && starts_with_sig(s) {
+        // Skip the `SIG` prefix
+        s = &s[3..];
+    }
+
+    s.parse().ok()
 }
 
 /// Updates a signal and its origin.
@@ -207,9 +190,9 @@ pub fn parse_signal_name_or_number(s: &str, allow_sig_prefix: bool) -> Option<Op
 /// However, if `signal_origin` already contains a field, this function returns
 /// `Error::MultipleSignals(signal_origin.take().unwrap(), new_signal_origin)`.
 fn set_signal(
-    signal: &mut Option<Signal>,
+    signal: &mut Signal,
     signal_origin: &mut Option<Field>,
-    new_signal: Option<Option<Signal>>,
+    new_signal: Option<Signal>,
     new_signal_origin: Field,
 ) -> Result<(), Error> {
     let Some(new_signal) = new_signal else {
@@ -236,20 +219,16 @@ fn invalid_signal_to_unknown_option(error: Error) -> Error {
 fn parse_signals<I: Iterator<Item = Field>>(
     operands: I,
     allow_sig_prefix: bool,
-) -> Result<Vec<Signal>, Error> {
-    let parse_one = move |operand: Field| {
-        if let Some(exit_status) = operand.value.parse().ok().map(ExitStatus) {
-            exit_status.try_into().ok()
-        } else {
-            parse_signal_name(&operand.value, allow_sig_prefix)
-        }
-        .ok_or(Error::InvalidSignal(operand))
+) -> Result<Vec<(Signal, Field)>, Error> {
+    let parse_one = |operand: Field| match parse_signal(&operand.value, allow_sig_prefix) {
+        Some(signal) => Ok((signal, operand)),
+        None => Err(Error::InvalidSignal(operand)),
     };
 
     operands.map(parse_one).collect()
 }
 
-/// Parse the case where the `-l` or `-v` option is specified.
+/// Parses operands after the `-l` or `-v` option, returning the final command.
 fn parse_list_case<I: Iterator<Item = Field>>(
     operands: I,
     allow_sig_prefix: bool,
@@ -274,7 +253,7 @@ fn parse_list_case<I: Iterator<Item = Field>>(
 pub fn parse(_env: &Env, args: Vec<Field>) -> Result<Command, Error> {
     let allow_sig_prefix = false; // TODO true depending on the shell option
     let mut args = args.into_iter().peekable();
-    let mut signal = Some(Signal::SIGTERM);
+    let mut signal = Signal::Name(signal::Name::Term);
     let mut signal_origin = None;
     let mut list = None;
     let mut verbose = None;
@@ -304,18 +283,15 @@ pub fn parse(_env: &Env, args: Vec<Field>) -> Result<Command, Error> {
                         set_signal(
                             &mut signal,
                             &mut signal_origin,
-                            parse_signal_name_or_number(
-                                &current_signal_arg.value,
-                                allow_sig_prefix,
-                            ),
+                            parse_signal(&current_signal_arg.value, allow_sig_prefix),
                             current_signal_arg,
                         )?;
                     } else {
                         set_signal(
                             &mut signal,
                             &mut signal_origin,
-                            parse_signal_name_or_number(remainder, allow_sig_prefix)
-                                .or_else(|| parse_signal_name_or_number(options, allow_sig_prefix)),
+                            parse_signal(remainder, allow_sig_prefix)
+                                .or_else(|| parse_signal(options, allow_sig_prefix)),
                             arg,
                         )?;
                     }
@@ -331,7 +307,7 @@ pub fn parse(_env: &Env, args: Vec<Field>) -> Result<Command, Error> {
                     set_signal(
                         &mut signal,
                         &mut signal_origin,
-                        parse_signal_name_or_number(options, allow_sig_prefix),
+                        parse_signal(options, allow_sig_prefix),
                         arg,
                     )
                     .map_err(invalid_signal_to_unknown_option)?;
@@ -366,7 +342,11 @@ pub fn parse(_env: &Env, args: Vec<Field>) -> Result<Command, Error> {
             Err(Error::MissingTarget)
         } else {
             let targets = args.collect();
-            Ok(Command::Send { signal, targets })
+            Ok(Command::Send {
+                signal,
+                signal_origin,
+                targets,
+            })
         }
     }
 }
@@ -376,59 +356,49 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_signal_names() {
-        assert_eq!(parse_signal_name("TERM", false), Some(Signal::SIGTERM));
-        assert_eq!(parse_signal_name("TeRm", false), Some(Signal::SIGTERM));
-        assert_eq!(parse_signal_name("INT", false), Some(Signal::SIGINT));
-        assert_eq!(parse_signal_name("uSr2", false), Some(Signal::SIGUSR2));
+    fn parse_signal_names_without_sig_prefix() {
+        assert_eq!(
+            parse_signal("INT", false),
+            Some(Signal::Name(signal::Name::Int))
+        );
+        assert_eq!(
+            parse_signal("RtMin+5", false),
+            Some(Signal::Name(signal::Name::Rtmin(5)))
+        );
+        assert_eq!(parse_signal("SigRtMin+5", false), None);
+    }
 
-        // When `allow_sig_prefix` is `true`, the `SIG` prefix is optional.
-        assert_eq!(parse_signal_name("tErM", true), Some(Signal::SIGTERM));
-        assert_eq!(parse_signal_name("sIgtErM", true), Some(Signal::SIGTERM));
-
-        // When `allow_sig_prefix` is `false`, the `SIG` prefix must not be present.
-        assert_eq!(parse_signal_name("sIgtErM", false), None);
+    #[test]
+    fn parse_signal_names_with_sig_prefix() {
+        assert_eq!(
+            parse_signal("INT", true),
+            Some(Signal::Name(signal::Name::Int))
+        );
+        assert_eq!(
+            parse_signal("RtMin+5", true),
+            Some(Signal::Name(signal::Name::Rtmin(5)))
+        );
+        assert_eq!(
+            parse_signal("SigRtMin+5", true),
+            Some(Signal::Name(signal::Name::Rtmin(5)))
+        );
     }
 
     #[test]
     fn parse_signal_numbers() {
-        assert_eq!(parse_signal_name_or_number("0", false), Some(None));
-        assert_eq!(
-            parse_signal_name_or_number("1", false),
-            Some(Some(Signal::SIGHUP))
-        );
-        assert_eq!(
-            parse_signal_name_or_number("2", false),
-            Some(Some(Signal::SIGINT))
-        );
-        assert_eq!(
-            parse_signal_name_or_number("3", false),
-            Some(Some(Signal::SIGQUIT))
-        );
-        assert_eq!(
-            parse_signal_name_or_number("6", false),
-            Some(Some(Signal::SIGABRT))
-        );
-        assert_eq!(
-            parse_signal_name_or_number("9", false),
-            Some(Some(Signal::SIGKILL))
-        );
-        assert_eq!(
-            parse_signal_name_or_number("14", false),
-            Some(Some(Signal::SIGALRM))
-        );
-        assert_eq!(
-            parse_signal_name_or_number("15", false),
-            Some(Some(Signal::SIGTERM))
-        );
+        assert_eq!(parse_signal("0", false), Some(Signal::Number(0)));
+        assert_eq!(parse_signal("1", false), Some(Signal::Number(1)));
+        assert_eq!(parse_signal("3", true), Some(Signal::Number(3)));
+        assert_eq!(parse_signal("6", false), Some(Signal::Number(6)));
+        assert_eq!(parse_signal("9", true), Some(Signal::Number(9)));
+        assert_eq!(parse_signal("14", true), Some(Signal::Number(14)));
     }
 
     #[test]
-    fn parse_signal_name_or_number_errors() {
-        assert_eq!(parse_signal_name_or_number("", false), None);
-        assert_eq!(parse_signal_name_or_number("TERM1", false), None);
-        assert_eq!(parse_signal_name_or_number("1TERM", false), None);
-        assert_eq!(parse_signal_name_or_number("-1", false), None);
+    fn parse_signal_errors() {
+        assert_eq!(parse_signal("", false), None);
+        assert_eq!(parse_signal("TERM1", false), None);
+        assert_eq!(parse_signal("1TERM", false), None);
     }
 
     #[test]
@@ -438,7 +408,8 @@ mod tests {
         assert_eq!(
             result,
             Ok(Command::Send {
-                signal: Some(Signal::SIGTERM),
+                signal: Signal::Name(signal::Name::Term),
+                signal_origin: None,
                 targets: Field::dummies([""]),
             })
         )
@@ -451,7 +422,8 @@ mod tests {
         assert_eq!(
             result,
             Ok(Command::Send {
-                signal: Some(Signal::SIGTERM),
+                signal: Signal::Name(signal::Name::Term),
+                signal_origin: None,
                 targets: Field::dummies(["-"]),
             })
         );
@@ -465,7 +437,8 @@ mod tests {
         assert_eq!(
             result,
             Ok(Command::Send {
-                signal: Some(Signal::SIGINT),
+                signal: Signal::Name(signal::Name::Int),
+                signal_origin: Some(Field::dummy("INT")),
                 targets: Field::dummies(["0"]),
             })
         );
@@ -474,7 +447,7 @@ mod tests {
         assert_eq!(
             result,
             Ok(Command::Print {
-                signals: vec![Signal::SIGKILL],
+                signals: vec![(Signal::Number(9), Field::dummy("9"))],
                 verbose: false,
             })
         );
@@ -487,7 +460,8 @@ mod tests {
         assert_eq!(
             result,
             Ok(Command::Send {
-                signal: Some(Signal::SIGQUIT),
+                signal: Signal::Name(signal::Name::Quit),
+                signal_origin: Some(Field::dummy("QuIt")),
                 targets: Field::dummies(["1"]),
             })
         );
@@ -500,7 +474,8 @@ mod tests {
         assert_eq!(
             result,
             Ok(Command::Send {
-                signal: Some(Signal::SIGQUIT),
+                signal: Signal::Name(signal::Name::Quit),
+                signal_origin: Some(Field::dummy("-sQuIt")),
                 targets: Field::dummies(["1"]),
             })
         );
@@ -513,7 +488,8 @@ mod tests {
         assert_eq!(
             result,
             Ok(Command::Send {
-                signal: Some(Signal::SIGKILL),
+                signal: Signal::Number(9),
+                signal_origin: Some(Field::dummy("9")),
                 targets: Field::dummies(["1"]),
             })
         );
@@ -526,7 +502,8 @@ mod tests {
         assert_eq!(
             result,
             Ok(Command::Send {
-                signal: Some(Signal::SIGQUIT),
+                signal: Signal::Name(signal::Name::Quit),
+                signal_origin: Some(Field::dummy("QuIt")),
                 targets: Field::dummies(["1"]),
             })
         );
@@ -539,7 +516,8 @@ mod tests {
         assert_eq!(
             result,
             Ok(Command::Send {
-                signal: Some(Signal::SIGKILL),
+                signal: Signal::Name(signal::Name::Kill),
+                signal_origin: Some(Field::dummy("-KILL")),
                 targets: Field::dummies(["1"]),
             })
         );
@@ -552,7 +530,8 @@ mod tests {
         assert_eq!(
             result,
             Ok(Command::Send {
-                signal: Some(Signal::SIGSTOP),
+                signal: Signal::Name(signal::Name::Stop),
+                signal_origin: Some(Field::dummy("-stop")),
                 targets: Field::dummies(["1"]),
             })
         );
@@ -565,7 +544,8 @@ mod tests {
         assert_eq!(
             result,
             Ok(Command::Send {
-                signal: Some(Signal::SIGKILL),
+                signal: Signal::Number(9),
+                signal_origin: Some(Field::dummy("-9")),
                 targets: Field::dummies(["1"]),
             })
         );
@@ -614,12 +594,14 @@ mod tests {
     #[test]
     fn option_l_with_operands() {
         let env = Env::new_virtual();
-        let exit_status = &ExitStatus::from(Signal::SIGQUIT).to_string();
-        let result = parse(&env, Field::dummies(["-l", "TERM", "1", exit_status]));
+        let result = parse(&env, Field::dummies(["-l", "Term", "1"]));
         assert_eq!(
             result,
             Ok(Command::Print {
-                signals: vec![Signal::SIGTERM, Signal::SIGHUP, Signal::SIGQUIT],
+                signals: vec![
+                    (Signal::Name(signal::Name::Term), Field::dummy("Term")),
+                    (Signal::Number(1), Field::dummy("1")),
+                ],
                 verbose: false,
             })
         );
@@ -807,8 +789,8 @@ mod tests {
     #[test]
     fn invalid_separate_signal_argument_to_option_n() {
         let env = Env::new_virtual();
-        let result = parse(&env, Field::dummies(["-n", "-1", "123"]));
-        assert_eq!(result, Err(Error::InvalidSignal(Field::dummy("-1"))));
+        let result = parse(&env, Field::dummies(["-n", "TERM1", "123"]));
+        assert_eq!(result, Err(Error::InvalidSignal(Field::dummy("TERM1"))));
     }
 
     #[test]
@@ -825,8 +807,8 @@ mod tests {
         let result = parse(&env, Field::dummies(["-l", "TERM1"]));
         assert_eq!(result, Err(Error::InvalidSignal(Field::dummy("TERM1"))));
 
-        let result = parse(&env, Field::dummies(["-l", "TERM", "0", "1"]));
-        assert_eq!(result, Err(Error::InvalidSignal(Field::dummy("0"))));
+        let result = parse(&env, Field::dummies(["-l", "TERM", "0A", "1"]));
+        assert_eq!(result, Err(Error::InvalidSignal(Field::dummy("0A"))));
     }
 
     #[test]
@@ -836,8 +818,8 @@ mod tests {
         let result = parse(&env, Field::dummies(["-v", "TERM1"]));
         assert_eq!(result, Err(Error::InvalidSignal(Field::dummy("TERM1"))));
 
-        let result = parse(&env, Field::dummies(["-v", "TERM", "0", "1"]));
-        assert_eq!(result, Err(Error::InvalidSignal(Field::dummy("0"))));
+        let result = parse(&env, Field::dummies(["-v", "TERM", "0A", "1"]));
+        assert_eq!(result, Err(Error::InvalidSignal(Field::dummy("0A"))));
     }
 
     #[test]

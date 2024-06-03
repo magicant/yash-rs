@@ -19,6 +19,8 @@
 //! [`execute`] calls [`send`] for each target and reports all errors.
 //! [`send`] uses [`resolve_target`] to determine the argument to the
 //! [`kill`](yash_env::System::kill) system call.
+
+use super::Signal;
 use crate::common::{report_failure, to_single_message};
 use std::borrow::Cow;
 use std::num::ParseIntError;
@@ -28,10 +30,8 @@ use yash_env::job::Pid;
 use yash_env::job::{id::FindError, JobList};
 use yash_env::semantics::Field;
 use yash_env::signal;
-use yash_env::system::real::RealSystem;
 use yash_env::system::Errno;
 use yash_env::system::System as _;
-use yash_env::trap::Signal;
 use yash_env::Env;
 use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 
@@ -93,6 +93,28 @@ pub async fn send(
 }
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
+#[error("signal {signal} not supported on this system")]
+struct UnsupportedSignal<'a> {
+    signal: Signal,
+    // TODO Consider: origin: &'a Location,
+    origin: &'a Field,
+}
+
+impl MessageBase for UnsupportedSignal<'_> {
+    fn message_title(&self) -> Cow<str> {
+        "unsupported signal".into()
+    }
+
+    fn main_annotation(&self) -> Annotation<'_> {
+        Annotation::new(
+            AnnotationType::Error,
+            self.to_string().into(),
+            &self.origin.origin,
+        )
+    }
+}
+
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
 #[error("{target}: {error}")]
 struct TargetError<'a> {
     target: &'a Field,
@@ -114,16 +136,28 @@ impl MessageBase for TargetError<'_> {
 }
 
 /// Executes the `Send` command.
-pub async fn execute(env: &mut Env, signal: Option<Signal>, targets: &[Field]) -> crate::Result {
+///
+/// This function sends the specified signal to the specified targets.
+/// If an error occurs, it reports the error to the standard error and returns a
+/// non-zero exit status.
+///
+/// `signal_origin` is the field that specified the signal. It is used to report
+/// the error location if the signal is not supported on the current system. If
+/// it is `None` and the `signal` is not supported, the function panics.
+pub async fn execute(
+    env: &mut Env,
+    signal: Signal,
+    signal_origin: Option<&Field>,
+    targets: &[Field],
+) -> crate::Result {
+    let Ok(signal) = signal.to_number(&env.system) else {
+        let origin = signal_origin.unwrap();
+        let message = UnsupportedSignal { signal, origin };
+        return report_failure(env, &message).await;
+    };
+
     let mut errors = Vec::new();
     for target in targets {
-        let signal = signal.map(|signal| {
-            let name = unsafe { RealSystem::new() }
-                .validate_signal(signal as _)
-                .unwrap()
-                .0;
-            env.system.signal_number_from_name(name).unwrap()
-        });
         if let Err(error) = send(env, signal, target).await {
             errors.push(TargetError { target, error });
         }
@@ -139,9 +173,14 @@ pub async fn execute(env: &mut Env, signal: Option<Signal>, targets: &[Field]) -
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::assert_stderr;
     use assert_matches::assert_matches;
+    use futures_util::FutureExt;
+    use std::rc::Rc;
     use yash_env::job::Job;
     use yash_env::job::ProcessState;
+    use yash_env::semantics::ExitStatus;
+    use yash_env::system::r#virtual::VirtualSystem;
 
     #[test]
     fn resolve_target_process_ids() {
@@ -222,5 +261,17 @@ mod tests {
         let jobs = JobList::new();
         let result = resolve_target(&jobs, "abc");
         assert_matches!(result, Err(Error::ProcessId(_)));
+    }
+
+    #[test]
+    fn execute_unsupported_signal() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        let result = execute(&mut env, Signal::Number(-1), Some(&Field::dummy("-1")), &[])
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, crate::Result::from(ExitStatus::FAILURE));
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
 }

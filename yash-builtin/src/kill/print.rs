@@ -21,78 +21,201 @@
 //!
 //! [`print`]: print()
 
-use std::ffi::c_int;
+use super::Signal;
+use crate::common::{report_failure, to_single_message};
+use std::borrow::Cow;
 use std::fmt::Write;
-use yash_env::trap::Signal;
+use std::num::NonZeroI32;
+use thiserror::Error;
+use yash_env::semantics::Field;
+use yash_env::signal::{Name, Number};
+use yash_env::system::System;
+use yash_env::system::SystemEx;
 use yash_env::Env;
+use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
+
+/// Returns an iterator over all supported signals.
+///
+/// The iterator yields non-real-time signals first, followed by real-time signals.
+fn all_signals<S: System>(system: &S) -> impl Iterator<Item = (Name, Number)> + '_ {
+    let non_real_time = Name::iter()
+        .filter(|name| !matches!(name, Name::Rtmin(_) | Name::Rtmax(_)))
+        .filter_map(|name| Some((name, system.signal_number_from_name(name)?)));
+
+    let rtmin = system.signal_number_from_name(Name::Rtmin(0));
+    let rtmax = system.signal_number_from_name(Name::Rtmax(0));
+    let range = if let (Some(rtmin), Some(rtmax)) = (rtmin, rtmax) {
+        rtmin.as_raw()..=rtmax.as_raw()
+    } else {
+        #[allow(clippy::reversed_empty_ranges)]
+        {
+            0..=-1
+        }
+    };
+    let real_time = range.into_iter().map(|n| {
+        let number = Number::from_raw_unchecked(NonZeroI32::new(n).unwrap());
+        let name = system.signal_name_from_number(number);
+        (name, number)
+    });
+
+    non_real_time.chain(real_time)
+}
+
+/// Writes the specified signal into the output string.
+fn write_one_signal(name: Name, number: Number, verbose: bool, output: &mut String) {
+    if verbose {
+        // TODO Include the description of the signal
+        writeln!(output, "{number}\t{name}").unwrap();
+    } else {
+        writeln!(output, "{name}").unwrap();
+    }
+}
+
+/// Error indicating that a signal is not recognized.
+///
+/// This error may be returned from [`print`](print()).
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+#[error("{:?} does not represent a valid signal", .origin.value)]
+pub struct InvalidSignal<'a> {
+    /// The signal that is not recognized
+    pub signal: Signal,
+    /// The operand that specified the signal
+    pub origin: &'a Field,
+}
+
+impl MessageBase for InvalidSignal<'_> {
+    fn message_title(&self) -> Cow<str> {
+        "unrecognized operand".into()
+    }
+
+    fn main_annotation(&self) -> Annotation<'_> {
+        Annotation::new(
+            AnnotationType::Error,
+            self.to_string().into(),
+            &self.origin.origin,
+        )
+    }
+}
 
 /// Lists the specified signals into a string.
 ///
 /// If `signals` is empty, all signals are listed.
-#[must_use]
-pub fn print(signals: &[Signal], verbose: bool) -> String {
-    let mut specified = signals.iter().copied();
-    let mut all = Signal::iterator();
-    let iter: &mut dyn Iterator<Item = Signal> = if signals.is_empty() {
-        &mut all
-    } else {
-        &mut specified
-    };
+/// If `signals` contains invalid signals, the function returns an error.
+pub fn print<'a, S: SystemEx>(
+    system: &S,
+    signals: &'a [(Signal, Field)],
+    verbose: bool,
+) -> Result<String, Vec<InvalidSignal<'a>>> {
+    let mut output = String::new();
+    let mut errors = Vec::new();
 
-    let mut result = String::new();
-    for signal in iter {
-        let name = signal.as_str();
-        let name = name.strip_prefix("SIG").unwrap_or(name);
-        if verbose {
-            let number = signal as c_int;
-            // TODO Include the description of the signal
-            writeln!(result, "{number}\t{name}").unwrap();
-        } else {
-            writeln!(result, "{name}").unwrap();
+    if signals.is_empty() {
+        // Print all signals
+        for (name, number) in all_signals(system) {
+            write_one_signal(name, number, verbose, &mut output);
+        }
+    } else {
+        // Print the specified signals
+        for &(signal, ref origin) in signals {
+            let Some((name, number)) = signal.to_name_and_number(system) else {
+                errors.push(InvalidSignal { signal, origin });
+                continue;
+            };
+            write_one_signal(name, number, verbose, &mut output);
         }
     }
-    result
+
+    if errors.is_empty() {
+        Ok(output)
+    } else {
+        Err(errors)
+    }
 }
 
 /// Executes the `Print` command.
-pub async fn execute(env: &mut Env, signals: &[Signal], verbose: bool) -> crate::Result {
-    let result = print(signals, verbose);
-    crate::common::output(env, &result).await
+pub async fn execute(env: &mut Env, signals: &[(Signal, Field)], verbose: bool) -> crate::Result {
+    match print(&env.system, signals, verbose) {
+        Ok(output) => crate::common::output(env, &output).await,
+        Err(errors) => report_failure(env, to_single_message(&errors).unwrap()).await,
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use yash_env::semantics::ExitStatus;
+    use yash_env::system::r#virtual::VirtualSystem;
+    use yash_env::system::r#virtual::SIGKILL;
 
     #[test]
-    fn print_non_empty_non_verbose() {
-        let result = print(&[Signal::SIGTERM, Signal::SIGINT], false);
-        assert_eq!(result, "TERM\nINT\n");
+    fn print_one_non_verbose() {
+        let system = &VirtualSystem::new();
+        let signals = &[(Signal::Name(Name::Int), Field::dummy("INT"))];
 
-        let result = print(&[Signal::SIGKILL, Signal::SIGTSTP, Signal::SIGQUIT], false);
-        assert_eq!(result, "KILL\nTSTP\nQUIT\n");
+        let result = print(system, signals, false).unwrap();
+        assert_eq!(result, "INT\n");
     }
 
     #[test]
-    fn print_non_empty_verbose() {
-        let result = print(&[Signal::SIGTERM, Signal::SIGINT], true);
-        assert_eq!(result, "15\tTERM\n2\tINT\n");
+    fn print_some_non_verbose() {
+        let system = &VirtualSystem::new();
+        let signals = &[
+            (Signal::Name(Name::Term), Field::dummy("SIGTERM")),
+            (
+                Signal::Number(ExitStatus::from(SIGKILL).0),
+                Field::dummy("9"),
+            ),
+        ];
 
-        let result = print(&[Signal::SIGKILL, Signal::SIGALRM, Signal::SIGQUIT], true);
-        assert_eq!(result, "9\tKILL\n14\tALRM\n3\tQUIT\n");
+        let result = print(system, signals, false).unwrap();
+        assert_eq!(result, "TERM\nKILL\n");
+    }
+
+    #[test]
+    fn print_one_verbose() {
+        let system = &VirtualSystem::new();
+        let signals = &[(Signal::Name(Name::Int), Field::dummy("INT"))];
+
+        let result = print(system, signals, true).unwrap();
+        assert_eq!(result, "2\tINT\n");
+    }
+
+    #[test]
+    fn print_some_unknown() {
+        let system = &VirtualSystem::new();
+        let signals = &[
+            (Signal::Number(0), Field::dummy("0")),
+            (Signal::Name(Name::Int), Field::dummy("INT")),
+            (Signal::Name(Name::Rtmin(-1)), Field::dummy("RTMIN-1")),
+        ];
+
+        let errors = print(system, signals, false).unwrap_err();
+        assert_eq!(
+            errors,
+            [
+                InvalidSignal {
+                    signal: Signal::Number(0),
+                    origin: &Field::dummy("0")
+                },
+                InvalidSignal {
+                    signal: Signal::Name(Name::Rtmin(-1)),
+                    origin: &Field::dummy("RTMIN-1")
+                },
+            ]
+        );
     }
 
     #[test]
     fn print_all_non_verbose() {
-        let result = print(&[], false);
-        assert!(result.contains("HUP\n"), "result: {result:?}");
-        assert!(result.contains("INT\n"), "result: {result:?}");
-        assert!(result.contains("KILL\n"), "result: {result:?}");
-        assert!(result.contains("QUIT\n"), "result: {result:?}");
-        assert!(result.contains("STOP\n"), "result: {result:?}");
-        assert!(result.contains("TERM\n"), "result: {result:?}");
-        assert!(result.contains("TSTP\n"), "result: {result:?}");
-        assert!(result.contains("TTIN\n"), "result: {result:?}");
-        assert!(result.contains("TTOU\n"), "result: {result:?}");
+        let system = &VirtualSystem::new();
+        let result = print(system, &[], false).unwrap();
+        assert_eq!(
+            result,
+            "ABRT\nALRM\nBUS\nCHLD\nCLD\nCONT\nEMT\nFPE\nHUP\nILL\nINFO\nINT\n\
+            IO\nIOT\nKILL\nLOST\nPIPE\nPOLL\nPROF\nPWR\nQUIT\nSEGV\nSTKFLT\n\
+            STOP\nSYS\nTERM\nTHR\nTRAP\nTSTP\nTTIN\nTTOU\nURG\nUSR1\nUSR2\n\
+            VTALRM\nWINCH\nXCPU\nXFSZ\nRTMIN\nRTMIN+1\nRTMIN+2\nRTMIN+3\n\
+            RTMIN+4\nRTMAX-3\nRTMAX-2\nRTMAX-1\nRTMAX\n"
+        );
     }
 }
