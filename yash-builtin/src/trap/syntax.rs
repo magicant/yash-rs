@@ -101,6 +101,8 @@ pub fn interpret(
         });
 
     // Parse the remaining operands as conditions
+    // TODO Case-insensitive parse
+    // TODO Allow SIG prefix
     let (conditions, errors): (Vec<_>, Vec<_>) = operands
         .map(|operand| match operand.value.parse() {
             Ok(condition) => Ok((condition, operand)),
