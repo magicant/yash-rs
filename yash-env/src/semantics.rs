@@ -131,16 +131,6 @@ impl ExitStatus {
     }
 }
 
-/// Converts a signal to the corresponding exit status.
-///
-/// POSIX requires the exit status to be greater than 128. The current
-/// implementation returns `signal_number + 384`.
-impl From<Signal> for ExitStatus {
-    fn from(signal: Signal) -> Self {
-        Self::from(signal as c_int + 0x180)
-    }
-}
-
 /// Converts the exit status to `ExitCode`.
 ///
 /// Note that `ExitCode` only supports exit statuses in the range of 0 to 255.
@@ -266,26 +256,6 @@ mod tests {
     use super::*;
     use crate::system::r#virtual::VirtualSystem;
     use crate::system::r#virtual::{SIGINT, SIGTERM};
-
-    #[test]
-    fn signal_try_from_exit_status() {
-        let result = Signal::try_from(ExitStatus(0));
-        assert!(result.is_err(), "result = {result:?}");
-
-        assert_eq!(
-            Signal::try_from(ExitStatus(Signal::SIGINT as c_int)),
-            Ok(Signal::SIGINT)
-        );
-
-        let mut exit_status = ExitStatus::from(Signal::SIGTERM);
-        exit_status.0 &= 0xFF;
-        assert_eq!(Signal::try_from(exit_status), Ok(Signal::SIGTERM));
-
-        assert_eq!(
-            Signal::try_from(ExitStatus::from(Signal::SIGHUP)),
-            Ok(Signal::SIGHUP)
-        );
-    }
 
     #[test]
     fn exit_status_to_signal_number() {
