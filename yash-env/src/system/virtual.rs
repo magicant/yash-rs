@@ -65,7 +65,6 @@ use super::FdSet;
 use super::FileStat;
 use super::OFlag;
 use super::Result;
-use super::SigSet;
 use super::SigmaskHow;
 use super::TimeSpec;
 use super::Times;
@@ -645,9 +644,8 @@ impl System for VirtualSystem {
 
     fn sigmask(
         &mut self,
-        how: SigmaskHow,
-        set: Option<&SigSet>,
-        oldset: Option<&mut SigSet>,
+        op: Option<(SigmaskHow, &[signal::Number])>,
+        old_mask: Option<&mut Vec<signal::Number>>,
     ) -> Result<()> {
         let mut state = self.state.borrow_mut();
         let process = state
@@ -655,12 +653,13 @@ impl System for VirtualSystem {
             .get_mut(&self.process_id)
             .expect("current process not found");
 
-        if let Some(oldset) = oldset {
-            *oldset = *process.blocked_signals();
+        if let Some(old_mask) = old_mask {
+            old_mask.clear();
+            old_mask.extend(process.blocked_signals());
         }
 
-        if let Some(set) = set {
-            let result = process.block_signals(how, set);
+        if let Some((how, mask)) = op {
+            let result = process.block_signals(how, mask);
             if result.process_state_changed {
                 let parent_pid = process.ppid;
                 raise_sigchld(&mut state, parent_pid);
@@ -747,12 +746,16 @@ impl System for VirtualSystem {
         readers: &mut FdSet,
         writers: &mut FdSet,
         timeout: Option<&TimeSpec>,
-        signal_mask: Option<&SigSet>,
+        signal_mask: Option<&[signal::Number]>,
     ) -> Result<c_int> {
         let mut process = self.current_process_mut();
 
         if let Some(signal_mask) = signal_mask {
-            let save_mask = *process.blocked_signals();
+            let save_mask = process
+                .blocked_signals()
+                .iter()
+                .copied()
+                .collect::<Vec<signal::Number>>();
             let result_1 = process.block_signals(SigmaskHow::SIG_SETMASK, signal_mask);
             let result_2 = process.block_signals(SigmaskHow::SIG_SETMASK, &save_mask);
             assert!(!result_2.delivered);
@@ -1272,7 +1275,6 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_executor::LocalPool;
     use futures_util::FutureExt;
-    use nix::sys::signal::Signal;
     use std::ffi::CString;
     use std::ffi::OsString;
     use std::future::pending;
@@ -2121,10 +2123,8 @@ mod tests {
 
     fn system_for_catching_sigchld() -> VirtualSystem {
         let mut system = VirtualSystem::new();
-        let mut set = SigSet::empty();
-        set.add(Signal::SIGCHLD);
         system
-            .sigmask(SigmaskHow::SIG_BLOCK, Some(&set), None)
+            .sigmask(Some((SigmaskHow::SIG_BLOCK, &[SIGCHLD])), None)
             .unwrap();
         system.sigaction(SIGCHLD, SignalHandling::Catch).unwrap();
         system
@@ -2133,12 +2133,7 @@ mod tests {
     #[test]
     fn select_on_non_pending_signal() {
         let mut system = system_for_catching_sigchld();
-        let result = system.select(
-            &mut FdSet::new(),
-            &mut FdSet::new(),
-            None,
-            Some(&SigSet::empty()),
-        );
+        let result = system.select(&mut FdSet::new(), &mut FdSet::new(), None, Some(&[]));
         assert_eq!(result, Ok(0));
         assert_eq!(system.caught_signals(), []);
     }
@@ -2146,13 +2141,8 @@ mod tests {
     #[test]
     fn select_on_pending_signal() {
         let mut system = system_for_catching_sigchld();
-        let _ = system.current_process_mut().raise_signal(signal::SIGCHLD);
-        let result = system.select(
-            &mut FdSet::new(),
-            &mut FdSet::new(),
-            None,
-            Some(&SigSet::empty()),
-        );
+        let _ = system.current_process_mut().raise_signal(SIGCHLD);
+        let result = system.select(&mut FdSet::new(), &mut FdSet::new(), None, Some(&[]));
         assert_eq!(result, Err(Errno::EINTR));
         assert_eq!(system.caught_signals(), [SIGCHLD]);
     }

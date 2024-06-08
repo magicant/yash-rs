@@ -399,6 +399,28 @@ impl Name {
     }
 }
 
+/// Returns an iterator over all signal numbers.
+fn all_signals() -> impl Iterator<Item = Number> {
+    let non_real_time = Name::iter()
+        .filter(|name| !matches!(name, Name::Rtmin(_) | Name::Rtmax(_)))
+        .filter_map(Name::to_raw_real);
+
+    let real_time = rt_range()
+        .filter_map(NonZeroI32::new)
+        .map(Number::from_raw_unchecked);
+
+    non_real_time.chain(real_time)
+}
+
+/// Converts the signal set to a vector of signal numbers.
+///
+/// This function adds the signal numbers in the set to the vector.
+pub(super) fn sigset_to_vec(set: *const nix::libc::sigset_t, vec: &mut Vec<Number>) {
+    vec.extend(
+        all_signals().filter(|number| unsafe { nix::libc::sigismember(set, number.as_raw()) == 1 }),
+    );
+}
+
 impl SignalHandling {
     /// Converts the signal handling to `sigaction` for the real system.
     ///

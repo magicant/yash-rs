@@ -43,11 +43,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `system::System::caught_signals`
     - `system::System::kill`
     - `system::System::sigaction`
+    - `system::System::sigmask`
+    - `system::System::select`
+    - `system::virtual::Process::blocked_signals`
+    - `system::virtual::Process::pending_signals`
+    - `system::virtual::Process::block_signals`
     - `system::virtual::Process::signal_handling`
     - `system::virtual::Process::set_signal_handling`
     - `trap::TrapSet::catch_signal`
     - `trap::TrapSet::take_caught_signal`
     - `trap::TrapSet::take_signal_if_caught`
+- `system::System::sigmask` now takes three parameters:
+    1. `&mut self,`
+    2. `op: Option<(SigmaskHow, &[signal::Number])>,`
+    3. `old_mask: Option<&mut Vec<signal::Number>>,`
 - `system::virtual::SignalEffect::of` now takes a `signal::Number` parameter
   instead of a `trap::Signal`. This function is now `const`.
 - The type parameter constraint for `subshell::Subshell` is now
