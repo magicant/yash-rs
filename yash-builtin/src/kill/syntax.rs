@@ -163,7 +163,7 @@ impl Error {
 /// names. Otherwise, the `SIG` prefix must **not** be present.
 #[must_use]
 pub fn parse_signal(mut s: &str, allow_sig_prefix: bool) -> Option<Signal> {
-    fn starts_with_sig(s: &str) -> bool {
+    fn starts_with_sig_case_insensitive(s: &str) -> bool {
         let mut cs = s.chars();
         matches!(
             (cs.next(), cs.next(), cs.next()),
@@ -171,7 +171,7 @@ pub fn parse_signal(mut s: &str, allow_sig_prefix: bool) -> Option<Signal> {
         )
     }
 
-    if allow_sig_prefix && starts_with_sig(s) {
+    if allow_sig_prefix && starts_with_sig_case_insensitive(s) {
         // Skip the `SIG` prefix
         s = &s[3..];
     }
