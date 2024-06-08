@@ -63,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `impl std::fmt::Display for job::ProcessState`
 - `impl From<Signal> for ExitStatus`
 - `semantics::apply_errexit`
+- `trap::Signal`
 - `trap::ParseConditionError`
 
 ### Fixed

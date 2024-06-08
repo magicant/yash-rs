@@ -20,9 +20,6 @@
 use super::state::Action;
 use super::SignalSystem;
 use crate::signal;
-// TODO Remove this
-#[doc(no_inline)]
-pub use nix::sys::signal::Signal;
 use std::borrow::Cow;
 
 /// Condition under which an [`Action`] is executed

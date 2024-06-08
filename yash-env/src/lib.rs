@@ -471,10 +471,10 @@ mod tests {
     use crate::system::r#virtual::SystemState;
     use crate::system::r#virtual::SIGCHLD;
     use crate::trap::Action;
-    use crate::trap::Signal;
     use futures_executor::LocalPool;
     use futures_util::task::LocalSpawnExt as _;
     use futures_util::FutureExt as _;
+    use nix::sys::signal::Signal;
     use std::cell::RefCell;
     use yash_syntax::source::Location;
 

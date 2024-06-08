@@ -40,7 +40,6 @@ use crate::semantics::ExitStatus;
 use crate::signal;
 #[cfg(doc)]
 use crate::subshell::Subshell;
-use crate::trap::Signal;
 use crate::trap::SignalSystem;
 use crate::Env;
 use futures_util::future::poll_fn;
@@ -55,6 +54,7 @@ pub use nix::fcntl::OFlag;
 pub use nix::sys::signal::SigSet;
 #[doc(no_inline)]
 pub use nix::sys::signal::SigmaskHow;
+use nix::sys::signal::Signal;
 #[doc(no_inline)]
 pub use nix::sys::stat::{FileStat, Mode, SFlag};
 #[doc(no_inline)]

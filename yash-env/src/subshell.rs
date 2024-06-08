@@ -36,8 +36,8 @@ use crate::system::SigSet;
 use crate::system::SigmaskHow::{SIG_BLOCK, SIG_SETMASK};
 use crate::system::System;
 use crate::system::SystemEx;
-use crate::trap::Signal;
 use crate::Env;
+use nix::sys::signal::Signal;
 use std::future::Future;
 use std::pin::Pin;
 

@@ -36,7 +36,7 @@
 mod cond;
 mod state;
 
-pub use self::cond::{Condition, Signal};
+pub use self::cond::Condition;
 pub use self::state::{Action, SetActionError, TrapState};
 use self::state::{EnterSubshellOption, GrandState};
 use crate::signal;
