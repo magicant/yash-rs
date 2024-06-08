@@ -259,8 +259,8 @@ mod tests {
     use yash_env::option::Option::*;
     use yash_env::option::OptionSet;
     use yash_env::option::State::*;
+    use yash_env::system::r#virtual::SIGTSTP;
     use yash_env::system::SignalHandling;
-    use yash_env::trap::Signal::SIGTSTP;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
     use yash_env::VirtualSystem;

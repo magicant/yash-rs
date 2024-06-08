@@ -119,6 +119,9 @@
 //! are cleared when the built-in modifies any trap in the subshell. See
 //! [`TrapSet::enter_subshell`] and [`TrapSet::set_action`] for details.
 
+mod cond;
+
+pub use self::cond::CondSpec;
 use crate::common::report_error;
 use crate::common::report_failure;
 use crate::common::syntax::parse_arguments;
@@ -126,11 +129,13 @@ use crate::common::syntax::Mode;
 use crate::common::to_single_message;
 use std::borrow::Cow;
 use std::fmt::Write;
+use thiserror::Error;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
+use yash_env::system::SharedSystem;
 use yash_env::trap::Action;
-use yash_env::trap::Condition;
 use yash_env::trap::SetActionError;
+use yash_env::trap::SignalSystem;
 use yash_env::trap::TrapSet;
 use yash_env::Env;
 use yash_quote::quoted;
@@ -149,7 +154,7 @@ pub enum Command {
     /// Set an action for one or more conditions
     SetAction {
         action: Action,
-        conditions: Vec<(Condition, Field)>,
+        conditions: Vec<(CondSpec, Field)>,
     },
 }
 
@@ -159,7 +164,8 @@ pub mod syntax;
 ///
 /// The returned string is the whole output of the `trap` built-in
 /// without operands, including the trailing newline.
-pub fn display_traps(traps: &TrapSet) -> String {
+#[must_use]
+pub fn display_traps<S: SignalSystem>(traps: &TrapSet, system: &S) -> String {
     let mut output = String::new();
     for (cond, current, parent) in traps {
         let trap = match (current, parent) {
@@ -172,9 +178,82 @@ pub fn display_traps(traps: &TrapSet) -> String {
             Action::Ignore => "",
             Action::Command(command) => command,
         };
+        let cond = cond.to_string(system);
         writeln!(output, "trap -- {} {}", quoted(command), cond).ok();
     }
     output
+}
+
+/// Cause of an error that may occur while executing the `trap` built-in
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[non_exhaustive]
+pub enum ErrorCause {
+    /// The specified condition is not supported.
+    #[error("signal not supported on this system")]
+    UnsupportedSignal,
+    /// An error occurred while [setting a trap](TrapSet::set_action).
+    #[error(transparent)]
+    SetAction(#[from] SetActionError),
+}
+
+/// Information of an error that occurred while executing the `trap` built-in
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+pub struct Error {
+    /// The cause of the error
+    pub cause: ErrorCause,
+    /// The condition for which the trap action could not be set
+    pub cond: CondSpec,
+    /// The field that specifies the condition
+    pub field: Field,
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.cause.fmt(f)
+    }
+}
+
+impl MessageBase for Error {
+    fn message_title(&self) -> Cow<str> {
+        "cannot update trap".into()
+    }
+
+    fn main_annotation(&self) -> Annotation<'_> {
+        Annotation::new(
+            AnnotationType::Error,
+            self.cause.to_string().into(),
+            &self.field.origin,
+        )
+    }
+}
+
+/// Updates an action for a condition in the trap set.
+///
+/// This is a utility function for implementing [`Command::execute`].
+fn set_action(
+    traps: &mut TrapSet,
+    system: &mut SharedSystem,
+    cond: CondSpec,
+    field: Field,
+    action: Action,
+) -> Result<(), Error> {
+    let Some(cond2) = cond.resolve(system) else {
+        let cause = ErrorCause::UnsupportedSignal;
+        return Err(Error { cause, cond, field });
+    };
+    traps
+        .set_action(
+            system,
+            cond2,
+            action.clone(),
+            field.origin.clone(),
+            // TODO an interactive shell can override originally ignored traps
+            false,
+        )
+        .map_err(|cause| {
+            let cause = cause.into();
+            Error { cause, cond, field }
+        })
 }
 
 impl Command {
@@ -182,24 +261,18 @@ impl Command {
     ///
     /// If successful, returns a string that should be printed to the standard
     /// output. On failure, returns a non-empty list of errors.
-    pub fn execute(self, env: &mut Env) -> Result<String, Vec<(SetActionError, Condition, Field)>> {
+    pub fn execute(self, env: &mut Env) -> Result<String, Vec<Error>> {
         match self {
-            Self::PrintAll => Ok(display_traps(&env.traps)),
+            Self::PrintAll => Ok(display_traps(&env.traps, &env.system)),
 
             Self::SetAction { action, conditions } => {
-                let mut errors = Vec::new();
-                for (cond, field) in conditions {
-                    if let Err(error) = env.traps.set_action(
-                        &mut env.system,
-                        cond,
-                        action.clone(),
-                        field.origin.clone(),
-                        // TODO an interactive shell can override originally ignored traps
-                        false,
-                    ) {
-                        errors.push((error, cond, field));
-                    }
-                }
+                let errors = conditions
+                    .into_iter()
+                    .filter_map(|(cond, field)| {
+                        set_action(&mut env.traps, &mut env.system, cond, field, action.clone())
+                            .err()
+                    })
+                    .collect::<Vec<Error>>();
 
                 if errors.is_empty() {
                     Ok(String::new())
@@ -208,29 +281,6 @@ impl Command {
                 }
             }
         }
-    }
-}
-
-/// Wrapper for creating an error message for a trap setting error
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct Error((SetActionError, Condition, Field));
-
-impl MessageBase for Error {
-    fn message_title(&self) -> Cow<str> {
-        "cannot update trap".into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        let (error, cond, field) = &self.0;
-        let label = match error {
-            SetActionError::InitiallyIgnored => todo!(),
-            SetActionError::SIGKILL => "SIGKILL cannot be caught or ignored".into(),
-            SetActionError::SIGSTOP => "SIGSTOP cannot be caught or ignored".into(),
-            SetActionError::SystemError(errno) => {
-                format!("system error updating trap for `{cond}`: {errno}").into()
-            }
-        };
-        Annotation::new(AnnotationType::Error, label, &field.origin)
     }
 }
 
@@ -261,8 +311,8 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
         Err(mut errors) => {
             // For now, we ignore the InitiallyIgnored error since it is not
             // required by POSIX.
-            errors.retain(|(error, _, _)| *error != SetActionError::InitiallyIgnored);
-            let errors = errors.into_iter().map(Error).collect::<Vec<_>>();
+            errors.retain(|error| error.cause != SetActionError::InitiallyIgnored.into());
+
             match to_single_message(&{ errors }) {
                 None => crate::Result::default(),
                 Some(message) => report_failure(env, message).await,
@@ -284,8 +334,8 @@ mod tests {
     use yash_env::semantics::Divert;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
+    use yash_env::system::r#virtual::{SIGINT, SIGPIPE, SIGUSR1, SIGUSR2};
     use yash_env::system::SignalHandling;
-    use yash_env::trap::Signal;
     use yash_env::Env;
     use yash_env::VirtualSystem;
 
@@ -299,10 +349,7 @@ mod tests {
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let process = &state.borrow().processes[&pid];
-        assert_eq!(
-            process.signal_handling(Signal::SIGUSR1),
-            SignalHandling::Ignore
-        );
+        assert_eq!(process.signal_handling(SIGUSR1), SignalHandling::Ignore);
     }
 
     #[test]
@@ -315,10 +362,7 @@ mod tests {
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let process = &state.borrow().processes[&pid];
-        assert_eq!(
-            process.signal_handling(Signal::SIGUSR2),
-            SignalHandling::Catch
-        );
+        assert_eq!(process.signal_handling(SIGUSR2), SignalHandling::Catch);
     }
 
     #[test]
@@ -331,10 +375,7 @@ mod tests {
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let process = &state.borrow().processes[&pid];
-        assert_eq!(
-            process.signal_handling(Signal::SIGPIPE),
-            SignalHandling::Default
-        );
+        assert_eq!(process.signal_handling(SIGPIPE), SignalHandling::Default);
     }
 
     #[test]
@@ -366,7 +407,7 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let args = Field::dummies(["echo", "INT"]);
+        let args = Field::dummies(["echo", "EXIT"]);
         let _ = main(&mut env, args).now_or_never().unwrap();
         let args = Field::dummies(["echo t", "TERM"]);
         let _ = main(&mut env, args).now_or_never().unwrap();
@@ -374,7 +415,7 @@ mod tests {
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
-            assert_eq!(stdout, "trap -- echo INT\ntrap -- 'echo t' TERM\n")
+            assert_eq!(stdout, "trap -- echo EXIT\ntrap -- 'echo t' TERM\n")
         });
     }
 
@@ -441,7 +482,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         system
             .current_process_mut()
-            .set_signal_handling(Signal::SIGINT, SignalHandling::Ignore);
+            .set_signal_handling(SIGINT, SignalHandling::Ignore);
         let mut env = Env::with_system(Box::new(system.clone()));
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("trap"),
@@ -453,7 +494,7 @@ mod tests {
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stderr(&system.state, |stderr| assert_eq!(stderr, ""));
         assert_eq!(
-            system.current_process().signal_handling(Signal::SIGINT),
+            system.current_process().signal_handling(SIGINT),
             SignalHandling::Ignore
         );
     }

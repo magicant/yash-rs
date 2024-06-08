@@ -36,9 +36,10 @@ use crate::io::Fd;
 use crate::io::MIN_INTERNAL_FD;
 use crate::job::Pid;
 use crate::job::ProcessState;
+use crate::semantics::ExitStatus;
+use crate::signal;
 #[cfg(doc)]
 use crate::subshell::Subshell;
-use crate::trap::Signal;
 use crate::trap::SignalSystem;
 use crate::Env;
 use futures_util::future::poll_fn;
@@ -53,6 +54,7 @@ pub use nix::fcntl::OFlag;
 pub use nix::sys::signal::SigSet;
 #[doc(no_inline)]
 pub use nix::sys::signal::SigmaskHow;
+use nix::sys::signal::Signal;
 #[doc(no_inline)]
 pub use nix::sys::stat::{FileStat, Mode, SFlag};
 #[doc(no_inline)]
@@ -214,6 +216,23 @@ pub trait System: Debug {
     /// Returns consumed CPU times.
     fn times(&self) -> Result<Times>;
 
+    /// Tests if a signal number is valid.
+    ///
+    /// This function returns `Some((name, number))` if the signal number refers
+    /// to a valid signal supported by the system. Otherwise, it returns `None`.
+    ///
+    /// Note that one signal number can have multiple names, in which case this
+    /// function returns the name that is considered the most common.
+    #[must_use]
+    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)>;
+
+    /// Gets the signal number from the signal name.
+    ///
+    /// This function returns the signal number corresponding to the signal name
+    /// in the system. If the signal name is not supported, it returns `None`.
+    #[must_use]
+    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number>;
+
     /// Gets and/or sets the signal blocking mask.
     ///
     /// This is a low-level function used internally by
@@ -247,7 +266,11 @@ pub trait System: Debug {
     /// When you set the handler to `SignalHandling::Catch`, signals sent to
     /// this process are accumulated in the `System` instance and made available
     /// from [`caught_signals`](Self::caught_signals).
-    fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> Result<SignalHandling>;
+    fn sigaction(
+        &mut self,
+        signal: signal::Number,
+        action: SignalHandling,
+    ) -> Result<SignalHandling>;
 
     /// Returns signals this process has caught, if any.
     ///
@@ -272,11 +295,12 @@ pub trait System: Debug {
     /// Note that signals become pending if sent while blocked by
     /// [`sigmask`](Self::sigmask). They must be unblocked so that they are
     /// caught and made available from this function.
-    fn caught_signals(&mut self) -> Vec<Signal>;
+    fn caught_signals(&mut self) -> Vec<signal::Number>;
 
     /// Sends a signal.
     ///
-    /// This is a thin wrapper around the `kill` system call.
+    /// This is a thin wrapper around the `kill` system call. If `signal` is
+    /// `None`, permission to send a signal is checked, but no signal is sent.
     ///
     /// The virtual system version of this function blocks the calling thread if
     /// the signal stops or terminates the current process, hence returning a
@@ -284,7 +308,7 @@ pub trait System: Debug {
     fn kill(
         &mut self,
         target: Pid,
-        signal: Option<Signal>,
+        signal: Option<signal::Number>,
     ) -> Pin<Box<dyn Future<Output = Result<()>>>>;
 
     /// Waits for a next event.
@@ -616,31 +640,61 @@ pub trait SystemEx: System {
     /// Use [`tcsetpgrp_with_block`](Self::tcsetpgrp_with_block) to change the
     /// job even if the current shell is not in the foreground.
     fn tcsetpgrp_without_block(&mut self, fd: Fd, pgid: Pid) -> Result<()> {
-        match self.sigaction(Signal::SIGTTOU, SignalHandling::Default) {
+        let sigttou = self
+            .signal_number_from_name(signal::Name::Ttou)
+            .ok_or(Errno::EINVAL)?;
+        match self.sigaction(sigttou, SignalHandling::Default) {
             Err(e) => Err(e),
             Ok(old_handling) => {
-                let mut sigttou = SigSet::empty();
+                let mut sigttou_set = SigSet::empty();
                 let mut old_set = SigSet::empty();
-                sigttou.add(Signal::SIGTTOU);
-                let result =
-                    match self.sigmask(SigmaskHow::SIG_UNBLOCK, Some(&sigttou), Some(&mut old_set))
-                    {
-                        Err(e) => Err(e),
-                        Ok(()) => {
-                            let result = self.tcsetpgrp(fd, pgid);
+                sigttou_set.add(Signal::SIGTTOU);
+                let result = match self.sigmask(
+                    SigmaskHow::SIG_UNBLOCK,
+                    Some(&sigttou_set),
+                    Some(&mut old_set),
+                ) {
+                    Err(e) => Err(e),
+                    Ok(()) => {
+                        let result = self.tcsetpgrp(fd, pgid);
 
-                            let result_2 =
-                                self.sigmask(SigmaskHow::SIG_SETMASK, Some(&old_set), None);
+                        let result_2 = self.sigmask(SigmaskHow::SIG_SETMASK, Some(&old_set), None);
 
-                            result.or(result_2)
-                        }
-                    };
+                        result.or(result_2)
+                    }
+                };
 
-                let result_2 = self.sigaction(Signal::SIGTTOU, old_handling).map(drop);
+                let result_2 = self.sigaction(sigttou, old_handling).map(drop);
 
                 result.or(result_2)
             }
         }
+    }
+
+    /// Returns the signal name for the signal number.
+    ///
+    /// This function returns the signal name for the given signal number.
+    ///
+    /// If the signal number is invalid, this function panics. It may occur if
+    /// the number is from a different system or was created without checking
+    /// the validity.
+    #[must_use]
+    fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
+        self.validate_signal(number.as_raw()).unwrap().0
+    }
+
+    /// Returns the signal number that corresponds to the exit status.
+    ///
+    /// This function is basically the inverse of `impl From<signal::Number> for
+    /// ExitStatus`. However, this function supports not only the offset of 384
+    /// but also the offset of 128 and zero to accept exit statuses returned
+    /// from other processes.
+    #[must_use]
+    fn signal_number_from_exit_status(&self, status: ExitStatus) -> Option<signal::Number> {
+        [0x180, 0x80, 0].into_iter().find_map(|offset| {
+            let raw_number = status.0.checked_sub(offset)?;
+            self.validate_signal(raw_number).map(|(_, number)| number)
+        })
     }
 }
 
@@ -843,7 +897,7 @@ impl SharedSystem {
     /// If this `SharedSystem` is part of an [`Env`], you should call
     /// [`Env::wait_for_signals`] rather than calling this function directly
     /// so that the trap set can remember the caught signal.
-    pub async fn wait_for_signals(&self) -> Rc<[Signal]> {
+    pub async fn wait_for_signals(&self) -> Rc<[signal::Number]> {
         let status = self.0.borrow_mut().signal.wait_for_signals();
         poll_fn(|context| {
             let mut status = status.borrow_mut();
@@ -869,7 +923,7 @@ impl SharedSystem {
     /// If this `SharedSystem` is part of an [`Env`], you should call
     /// [`Env::wait_for_signal`] rather than calling this function directly
     /// so that the trap set can remember the caught signal.
-    pub async fn wait_for_signal(&self, signal: Signal) {
+    pub async fn wait_for_signal(&self, signal: signal::Number) {
         while !self.wait_for_signals().await.contains(&signal) {}
     }
 
@@ -964,6 +1018,12 @@ impl System for SharedSystem {
     fn times(&self) -> Result<Times> {
         self.0.borrow().times()
     }
+    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
+        self.0.borrow().validate_signal(number)
+    }
+    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
+        self.0.borrow().signal_number_from_name(name)
+    }
     fn sigmask(
         &mut self,
         how: SigmaskHow,
@@ -972,16 +1032,20 @@ impl System for SharedSystem {
     ) -> Result<()> {
         (**self.0.borrow_mut()).sigmask(how, set, old_set)
     }
-    fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> Result<SignalHandling> {
+    fn sigaction(
+        &mut self,
+        signal: signal::Number,
+        action: SignalHandling,
+    ) -> Result<SignalHandling> {
         self.0.borrow_mut().sigaction(signal, action)
     }
-    fn caught_signals(&mut self) -> Vec<Signal> {
+    fn caught_signals(&mut self) -> Vec<signal::Number> {
         self.0.borrow_mut().caught_signals()
     }
     fn kill(
         &mut self,
         target: Pid,
-        signal: Option<Signal>,
+        signal: Option<signal::Number>,
     ) -> Pin<Box<(dyn Future<Output = Result<()>>)>> {
         self.0.borrow_mut().kill(target, signal)
     }
@@ -1045,9 +1109,19 @@ impl System for SharedSystem {
 }
 
 impl SignalSystem for SharedSystem {
+    #[inline]
+    fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
+        SystemEx::signal_name_from_number(self, number)
+    }
+
+    #[inline]
+    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
+        System::signal_number_from_name(self, name)
+    }
+
     fn set_signal_handling(
         &mut self,
-        signal: nix::sys::signal::Signal,
+        signal: signal::Number,
         handling: SignalHandling,
     ) -> Result<SignalHandling> {
         self.0.borrow_mut().set_signal_handling(signal, handling)
@@ -1104,7 +1178,15 @@ impl SelectSystem {
     }
 
     /// Calls `sigmask` and updates `self.wait_mask`.
-    fn sigmask(&mut self, how: SigmaskHow, signal: Signal) -> Result<()> {
+    fn sigmask(&mut self, how: SigmaskHow, signal: signal::Number) -> Result<()> {
+        let name = self.signal_name_from_number(signal);
+        let signal = unsafe { real::RealSystem::new() }
+            .signal_number_from_name(name)
+            .unwrap()
+            .as_raw()
+            .try_into()
+            .unwrap();
+
         let mut set = SigSet::empty();
         let mut old_set = SigSet::empty();
         set.add(signal);
@@ -1121,7 +1203,7 @@ impl SelectSystem {
     /// See [`SharedSystem::set_signal_handling`].
     pub fn set_signal_handling(
         &mut self,
-        signal: Signal,
+        signal: signal::Number,
         handling: SignalHandling,
     ) -> Result<SignalHandling> {
         // The order of sigmask and sigaction is important to prevent the signal
@@ -1394,7 +1476,7 @@ struct AsyncSignal {
 #[derive(Clone, Debug)]
 enum SignalStatus {
     Expected(Option<Waker>),
-    Caught(Rc<[Signal]>),
+    Caught(Rc<[signal::Number]>),
 }
 
 impl AsyncSignal {
@@ -1429,16 +1511,17 @@ impl AsyncSignal {
     ///
     /// This function borrows `SignalStatus`es returned from `wait_for_signals`
     /// so you must not have conflicting borrows.
-    pub fn wake(&mut self, signals: &Rc<[Signal]>) {
-        for status in std::mem::take(&mut self.awaiters) {
-            if let Some(status) = status.upgrade() {
-                let mut status_ref = status.borrow_mut();
-                let new_status = SignalStatus::Caught(Rc::clone(signals));
-                let old_status = std::mem::replace(&mut *status_ref, new_status);
-                drop(status_ref);
-                if let SignalStatus::Expected(Some(waker)) = old_status {
-                    waker.wake();
-                }
+    pub fn wake(&mut self, signals: &Rc<[signal::Number]>) {
+        for status in self.awaiters.drain(..) {
+            let Some(status) = status.upgrade() else {
+                continue;
+            };
+            let mut status_ref = status.borrow_mut();
+            let new_status = SignalStatus::Caught(Rc::clone(signals));
+            let old_status = std::mem::replace(&mut *status_ref, new_status);
+            drop(status_ref);
+            if let SignalStatus::Expected(Some(waker)) = old_status {
+                waker.wake();
             }
         }
     }
@@ -1446,9 +1529,10 @@ impl AsyncSignal {
 
 #[cfg(test)]
 mod tests {
+    use super::r#virtual::VirtualSystem;
+    use super::r#virtual::PIPE_SIZE;
+    use super::r#virtual::{SIGCHLD, SIGINT, SIGTERM, SIGUSR1};
     use super::*;
-    use crate::system::r#virtual::VirtualSystem;
-    use crate::system::r#virtual::PIPE_SIZE;
     use assert_matches::assert_matches;
     use futures_util::task::noop_waker;
     use futures_util::task::noop_waker_ref;
@@ -1624,13 +1708,13 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut system = SharedSystem::new(Box::new(system));
         system
-            .set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch)
+            .set_signal_handling(SIGCHLD, SignalHandling::Catch)
             .unwrap();
         system
-            .set_signal_handling(Signal::SIGINT, SignalHandling::Catch)
+            .set_signal_handling(SIGINT, SignalHandling::Catch)
             .unwrap();
         system
-            .set_signal_handling(Signal::SIGUSR1, SignalHandling::Catch)
+            .set_signal_handling(SIGUSR1, SignalHandling::Catch)
             .unwrap();
 
         let mut context = Context::from_waker(noop_waker_ref());
@@ -1644,8 +1728,8 @@ mod tests {
             assert!(process.blocked_signals().contains(Signal::SIGCHLD));
             assert!(process.blocked_signals().contains(Signal::SIGINT));
             assert!(process.blocked_signals().contains(Signal::SIGUSR1));
-            let _ = process.raise_signal(Signal::SIGCHLD);
-            let _ = process.raise_signal(Signal::SIGINT);
+            let _ = process.raise_signal(SIGCHLD);
+            let _ = process.raise_signal(SIGINT);
         }
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
@@ -1654,8 +1738,8 @@ mod tests {
         let result = future.as_mut().poll(&mut context);
         assert_matches!(result, Poll::Ready(signals) => {
             assert_eq!(signals.len(), 2);
-            assert!(signals.contains(&Signal::SIGCHLD));
-            assert!(signals.contains(&Signal::SIGINT));
+            assert!(signals.contains(&SIGCHLD));
+            assert!(signals.contains(&SIGINT));
         });
     }
 
@@ -1666,11 +1750,11 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut system = SharedSystem::new(Box::new(system));
         system
-            .set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch)
+            .set_signal_handling(SIGCHLD, SignalHandling::Catch)
             .unwrap();
 
         let mut context = Context::from_waker(noop_waker_ref());
-        let mut future = Box::pin(system.wait_for_signal(Signal::SIGCHLD));
+        let mut future = Box::pin(system.wait_for_signal(SIGCHLD));
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
 
@@ -1678,7 +1762,7 @@ mod tests {
             let mut state = state.borrow_mut();
             let process = state.processes.get_mut(&process_id).unwrap();
             assert!(process.blocked_signals().contains(Signal::SIGCHLD));
-            let _ = process.raise_signal(Signal::SIGCHLD);
+            let _ = process.raise_signal(SIGCHLD);
         }
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
@@ -1695,22 +1779,22 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut system = SharedSystem::new(Box::new(system));
         system
-            .set_signal_handling(Signal::SIGINT, SignalHandling::Catch)
+            .set_signal_handling(SIGINT, SignalHandling::Catch)
             .unwrap();
         system
-            .set_signal_handling(Signal::SIGTERM, SignalHandling::Catch)
+            .set_signal_handling(SIGTERM, SignalHandling::Catch)
             .unwrap();
 
         let mut context = Context::from_waker(noop_waker_ref());
-        let mut future = Box::pin(system.wait_for_signal(Signal::SIGINT));
+        let mut future = Box::pin(system.wait_for_signal(SIGINT));
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
 
         {
             let mut state = state.borrow_mut();
             let process = state.processes.get_mut(&process_id).unwrap();
-            let _ = process.raise_signal(Signal::SIGCHLD);
-            let _ = process.raise_signal(Signal::SIGTERM);
+            let _ = process.raise_signal(SIGCHLD);
+            let _ = process.raise_signal(SIGTERM);
         }
         system.select(false).unwrap();
 
@@ -1725,17 +1809,17 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut system = SharedSystem::new(Box::new(system));
         system
-            .set_signal_handling(Signal::SIGINT, SignalHandling::Catch)
+            .set_signal_handling(SIGINT, SignalHandling::Catch)
             .unwrap();
         system
-            .set_signal_handling(Signal::SIGTERM, SignalHandling::Catch)
+            .set_signal_handling(SIGTERM, SignalHandling::Catch)
             .unwrap();
 
         {
             let mut state = state.borrow_mut();
             let process = state.processes.get_mut(&process_id).unwrap();
-            let _ = process.raise_signal(Signal::SIGINT);
-            let _ = process.raise_signal(Signal::SIGTERM);
+            let _ = process.raise_signal(SIGINT);
+            let _ = process.raise_signal(SIGTERM);
         }
         system.select(false).unwrap();
 
@@ -1757,7 +1841,7 @@ mod tests {
         let mut system_3 = system_1.clone();
         let (reader, writer) = system_1.pipe().unwrap();
         system_2
-            .set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch)
+            .set_signal_handling(SIGCHLD, SignalHandling::Catch)
             .unwrap();
 
         let mut buffer = [0];
@@ -1917,12 +2001,12 @@ mod tests {
         *status_1.borrow_mut() = SignalStatus::Expected(Some(noop_waker()));
         *status_2.borrow_mut() = SignalStatus::Expected(Some(noop_waker()));
 
-        async_signal.wake(&(Rc::new([Signal::SIGCHLD, Signal::SIGUSR1]) as Rc<[Signal]>));
+        async_signal.wake(&(Rc::new([SIGCHLD, SIGUSR1]) as Rc<[signal::Number]>));
         assert_matches!(&*status_1.borrow(), SignalStatus::Caught(signals) => {
-            assert_eq!(**signals, [Signal::SIGCHLD, Signal::SIGUSR1]);
+            assert_eq!(**signals, [SIGCHLD, SIGUSR1]);
         });
         assert_matches!(&*status_2.borrow(), SignalStatus::Caught(signals) => {
-            assert_eq!(**signals, [Signal::SIGCHLD, Signal::SIGUSR1]);
+            assert_eq!(**signals, [SIGCHLD, SIGUSR1]);
         });
     }
 }

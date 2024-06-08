@@ -22,8 +22,8 @@
 
 use thiserror::Error;
 use yash_env::job::Pid;
+use yash_env::signal;
 use yash_env::system::Errno;
-use yash_env::trap::Signal;
 use yash_env::Env;
 use yash_env::System as _;
 use yash_semantics::trap::run_trap_if_caught;
@@ -36,8 +36,8 @@ pub enum Error {
     NothingToWait,
     /// The built-in was interrupted by a signal and the trap action was
     /// executed.
-    #[error("trapped({0})")]
-    Trapped(Signal, yash_env::semantics::Result),
+    #[error("trapped signal {0}")]
+    Trapped(signal::Number, yash_env::semantics::Result),
     /// An unexpected error occurred in the underlying system.
     #[error("system error: {0}")]
     SystemError(#[from] Errno),
@@ -106,6 +106,7 @@ mod tests {
     use yash_env::job::ProcessState;
     use yash_env::semantics::ExitStatus;
     use yash_env::subshell::Subshell;
+    use yash_env::system::r#virtual::{SIGSTOP, SIGTERM};
     use yash_env::trap::Action;
     use yash_env::variable::Value;
     use yash_env::VirtualSystem;
@@ -151,16 +152,13 @@ mod tests {
             let pid = subshell.start(&mut env).await.unwrap().0;
             let index = env.jobs.add(Job::new(pid));
             // Suspend the child process.
-            env.system.kill(pid, Some(Signal::SIGSTOP)).await.unwrap();
+            env.system.kill(pid, Some(SIGSTOP)).await.unwrap();
 
             // The job is suspended, so the function returns immediately.
             let result = wait_for_any_job_or_trap(&mut env).await;
             assert_eq!(result, Ok(()));
             // The job state is updated.
-            assert_eq!(
-                env.jobs[index].state,
-                ProcessState::stopped(Signal::SIGSTOP),
-            );
+            assert_eq!(env.jobs[index].state, ProcessState::stopped(SIGSTOP));
         });
     }
 
@@ -180,7 +178,7 @@ mod tests {
             env.traps
                 .set_action(
                     &mut env.system,
-                    Signal::SIGTERM,
+                    SIGTERM,
                     Action::Command("foo=bar".into()),
                     Location::dummy("somewhere"),
                     false,
@@ -193,11 +191,11 @@ mod tests {
                 assert_eq!(poll!(&mut future), Poll::Pending);
 
                 // Trigger the trap.
-                _ = system.current_process_mut().raise_signal(Signal::SIGTERM);
+                _ = system.current_process_mut().raise_signal(SIGTERM);
 
                 // Now the function should return.
                 let result = future.await;
-                assert_eq!(result, Err(Error::Trapped(Signal::SIGTERM, Continue(()))));
+                assert_eq!(result, Err(Error::Trapped(SIGTERM, Continue(()))));
             }
 
             // The trap action must have assigned the variable.

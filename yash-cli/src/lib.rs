@@ -35,8 +35,8 @@ use std::ops::ControlFlow::{Break, Continue};
 use yash_builtin::BUILTINS;
 use yash_env::option::Option::{Interactive, Monitor, Stdin};
 use yash_env::option::State::On;
+use yash_env::signal;
 use yash_env::system::SignalHandling;
-use yash_env::trap::Signal::SIGPIPE;
 use yash_env::Env;
 use yash_env::RealSystem;
 use yash_env::System;
@@ -134,7 +134,11 @@ pub fn bin_main() -> i32 {
     // Rust by default sets SIGPIPE to SIG_IGN, which is not desired.
     // As an imperfect workaround, we set SIGPIPE to SIG_DFL here.
     // TODO Use unix_sigpipe: https://github.com/rust-lang/rust/issues/97889
-    _ = env.system.sigaction(SIGPIPE, SignalHandling::Default);
+    let sigpipe = env
+        .system
+        .signal_number_from_name(signal::Name::Pipe)
+        .unwrap();
+    _ = env.system.sigaction(sigpipe, SignalHandling::Default);
 
     let system = env.system.clone();
     let mut pool = futures_executor::LocalPool::new();

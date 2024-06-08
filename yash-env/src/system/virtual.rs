@@ -67,7 +67,6 @@ use super::OFlag;
 use super::Result;
 use super::SigSet;
 use super::SigmaskHow;
-use super::Signal;
 use super::TimeSpec;
 use super::Times;
 use super::AT_FDCWD;
@@ -98,6 +97,7 @@ use std::future::poll_fn;
 use std::future::Future;
 use std::io::SeekFrom;
 use std::mem::MaybeUninit;
+use std::num::NonZeroI32;
 use std::ops::DerefMut as _;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
@@ -632,6 +632,17 @@ impl System for VirtualSystem {
         Ok(self.state.borrow().times)
     }
 
+    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
+        let non_zero = NonZeroI32::new(number)?;
+        let name = signal::Name::try_from_raw_virtual(number)?;
+        Some((name, signal::Number::from_raw_unchecked(non_zero)))
+    }
+
+    #[inline(always)]
+    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
+        name.to_raw_virtual()
+    }
+
     fn sigmask(
         &mut self,
         how: SigmaskHow,
@@ -659,12 +670,16 @@ impl System for VirtualSystem {
         Ok(())
     }
 
-    fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> Result<SignalHandling> {
+    fn sigaction(
+        &mut self,
+        signal: signal::Number,
+        action: SignalHandling,
+    ) -> Result<SignalHandling> {
         let mut process = self.current_process_mut();
         Ok(process.set_signal_handling(signal, action))
     }
 
-    fn caught_signals(&mut self) -> Vec<Signal> {
+    fn caught_signals(&mut self) -> Vec<signal::Number> {
         std::mem::take(&mut self.current_process_mut().caught_signals)
     }
 
@@ -679,7 +694,7 @@ impl System for VirtualSystem {
     fn kill(
         &mut self,
         target: Pid,
-        signal: Option<Signal>,
+        signal: Option<signal::Number>,
     ) -> Pin<Box<(dyn Future<Output = Result<()>>)>> {
         let result = match target {
             Pid::MY_PROCESS_GROUP => {
@@ -1060,7 +1075,7 @@ impl System for VirtualSystem {
 fn send_signal_to_processes(
     state: &mut SystemState,
     target_pgid: Option<Pid>,
-    signal: Option<Signal>,
+    signal: Option<signal::Number>,
 ) -> Result<()> {
     let mut results = Vec::new();
 
@@ -1087,7 +1102,7 @@ fn send_signal_to_processes(
 
 fn raise_sigchld(state: &mut SystemState, target_pid: Pid) {
     if let Some(target) = state.processes.get_mut(&target_pid) {
-        let result = target.raise_signal(Signal::SIGCHLD);
+        let result = target.raise_signal(signal::SIGCHLD);
         assert!(!result.process_state_changed);
     }
 }
@@ -1257,6 +1272,7 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_executor::LocalPool;
     use futures_util::FutureExt;
+    use nix::sys::signal::Signal;
     use std::ffi::CString;
     use std::ffi::OsString;
     use std::future::pending;
@@ -1821,15 +1837,13 @@ mod tests {
             .unwrap();
         assert_eq!(system.current_process().state(), ProcessState::Running);
 
-        let result = system
-            .kill(system.process_id, Some(Signal::SIGINT))
-            .now_or_never();
+        let result = system.kill(system.process_id, Some(SIGINT)).now_or_never();
         // The future should be pending because the current process has been killed
         assert_eq!(result, None);
         assert_eq!(
             system.current_process().state(),
             ProcessState::Halted(ProcessResult::Signaled {
-                signal: Signal::SIGINT,
+                signal: SIGINT,
                 core_dump: false
             })
         );
@@ -1839,7 +1853,7 @@ mod tests {
         let max_pid = *state.processes.keys().max().unwrap();
         drop(state);
         let e = system
-            .kill(Pid(max_pid.0 + 1), Some(Signal::SIGINT))
+            .kill(Pid(max_pid.0 + 1), Some(SIGINT))
             .now_or_never()
             .unwrap()
             .unwrap_err();
@@ -1864,7 +1878,7 @@ mod tests {
             .insert(Pid(21), Process::with_parent_and_group(Pid(10), Pid(21)));
         drop(state);
 
-        let result = system.kill(Pid::ALL, Some(Signal::SIGTERM)).now_or_never();
+        let result = system.kill(Pid::ALL, Some(SIGTERM)).now_or_never();
         // The future should be pending because the current process has been killed
         assert_eq!(result, None);
         let state = system.state.borrow();
@@ -1872,7 +1886,7 @@ mod tests {
             assert_eq!(
                 process.state,
                 ProcessState::Halted(ProcessResult::Signaled {
-                    signal: Signal::SIGTERM,
+                    signal: SIGTERM,
                     core_dump: false
                 })
             );
@@ -1898,7 +1912,7 @@ mod tests {
         drop(state);
 
         let result = system
-            .kill(Pid::MY_PROCESS_GROUP, Some(Signal::SIGQUIT))
+            .kill(Pid::MY_PROCESS_GROUP, Some(SIGQUIT))
             .now_or_never();
         // The future should be pending because the current process has been killed
         assert_eq!(result, None);
@@ -1906,21 +1920,21 @@ mod tests {
         assert_eq!(
             state.processes[&system.process_id].state,
             ProcessState::Halted(ProcessResult::Signaled {
-                signal: Signal::SIGQUIT,
+                signal: SIGQUIT,
                 core_dump: true
             })
         );
         assert_eq!(
             state.processes[&Pid(10)].state,
             ProcessState::Halted(ProcessResult::Signaled {
-                signal: Signal::SIGQUIT,
+                signal: SIGQUIT,
                 core_dump: true
             })
         );
         assert_eq!(
             state.processes[&Pid(11)].state,
             ProcessState::Halted(ProcessResult::Signaled {
-                signal: Signal::SIGQUIT,
+                signal: SIGQUIT,
                 core_dump: true
             })
         );
@@ -1946,7 +1960,7 @@ mod tests {
         drop(state);
 
         system
-            .kill(Pid(-21), Some(Signal::SIGHUP))
+            .kill(Pid(-21), Some(SIGHUP))
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -1959,14 +1973,14 @@ mod tests {
         assert_eq!(
             state.processes[&Pid(11)].state,
             ProcessState::Halted(ProcessResult::Signaled {
-                signal: Signal::SIGHUP,
+                signal: SIGHUP,
                 core_dump: false
             })
         );
         assert_eq!(
             state.processes[&Pid(21)].state,
             ProcessState::Halted(ProcessResult::Signaled {
-                signal: Signal::SIGHUP,
+                signal: SIGHUP,
                 core_dump: false
             })
         );
@@ -1984,7 +1998,7 @@ mod tests {
         drop(state);
 
         system
-            .kill(-pgid, Some(Signal::SIGCONT))
+            .kill(-pgid, Some(SIGCONT))
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -2112,9 +2126,7 @@ mod tests {
         system
             .sigmask(SigmaskHow::SIG_BLOCK, Some(&set), None)
             .unwrap();
-        system
-            .sigaction(Signal::SIGCHLD, SignalHandling::Catch)
-            .unwrap();
+        system.sigaction(SIGCHLD, SignalHandling::Catch).unwrap();
         system
     }
 
@@ -2134,7 +2146,7 @@ mod tests {
     #[test]
     fn select_on_pending_signal() {
         let mut system = system_for_catching_sigchld();
-        let _ = system.current_process_mut().raise_signal(Signal::SIGCHLD);
+        let _ = system.current_process_mut().raise_signal(signal::SIGCHLD);
         let result = system.select(
             &mut FdSet::new(),
             &mut FdSet::new(),
@@ -2142,7 +2154,7 @@ mod tests {
             Some(&SigSet::empty()),
         );
         assert_eq!(result, Err(Errno::EINTR));
-        assert_eq!(system.caught_signals(), [Signal::SIGCHLD]);
+        assert_eq!(system.caught_signals(), [SIGCHLD]);
     }
 
     #[test]
@@ -2440,7 +2452,7 @@ mod tests {
             Box::new(|env| {
                 Box::pin(async move {
                     let pid = env.system.getpid();
-                    let result = env.system.kill(pid, Some(Signal::SIGKILL)).await;
+                    let result = env.system.kill(pid, Some(SIGKILL)).await;
                     unreachable!("kill returned {result:?}");
                 })
             }),
@@ -2454,7 +2466,7 @@ mod tests {
             Ok(Some((
                 pid,
                 ProcessState::Halted(ProcessResult::Signaled {
-                    signal: Signal::SIGKILL,
+                    signal: SIGKILL,
                     core_dump: false
                 })
             )))
@@ -2474,7 +2486,7 @@ mod tests {
             Box::new(|env| {
                 Box::pin(async move {
                     let pid = env.system.getpid();
-                    let result = env.system.kill(pid, Some(Signal::SIGSTOP)).await;
+                    let result = env.system.kill(pid, Some(SIGSTOP)).await;
                     unreachable!("kill returned {result:?}");
                 })
             }),
@@ -2483,10 +2495,7 @@ mod tests {
         executor.run_until_stalled();
 
         let result = env.system.wait(pid);
-        assert_eq!(
-            result,
-            Ok(Some((pid, ProcessState::stopped(Signal::SIGSTOP))))
-        );
+        assert_eq!(result, Ok(Some((pid, ProcessState::stopped(SIGSTOP)))));
     }
 
     #[test]
@@ -2502,7 +2511,7 @@ mod tests {
             Box::new(|env| {
                 Box::pin(async move {
                     let pid = env.system.getpid();
-                    let result = env.system.kill(pid, Some(Signal::SIGSTOP)).await;
+                    let result = env.system.kill(pid, Some(SIGSTOP)).await;
                     assert_eq!(result, Ok(()));
                     env.exit_status = ExitStatus(123);
                 })
@@ -2512,7 +2521,7 @@ mod tests {
         executor.run_until_stalled();
 
         env.system
-            .kill(pid, Some(Signal::SIGCONT))
+            .kill(pid, Some(SIGCONT))
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -2546,9 +2555,7 @@ mod tests {
     #[test]
     fn exiting_child_sends_sigchld_to_parent() {
         let (mut system, mut executor) = virtual_system_with_executor();
-        system
-            .sigaction(Signal::SIGCHLD, SignalHandling::Catch)
-            .unwrap();
+        system.sigaction(SIGCHLD, SignalHandling::Catch).unwrap();
 
         let child_process = system.new_child_process().unwrap();
 
@@ -2557,7 +2564,7 @@ mod tests {
         executor.run_until(future);
         executor.run_until_stalled();
 
-        assert_eq!(env.system.caught_signals(), [Signal::SIGCHLD]);
+        assert_eq!(env.system.caught_signals(), [SIGCHLD]);
     }
 
     #[test]

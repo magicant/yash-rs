@@ -16,6 +16,8 @@
 
 //! Implementation of `System` that actually interacts with the system.
 
+mod signal;
+
 use super::resource::LimitPair;
 use super::resource::Resource;
 use super::AtFlags;
@@ -33,20 +35,17 @@ use super::OFlag;
 use super::Result;
 use super::SigSet;
 use super::SigmaskHow;
-use super::Signal;
 use super::System;
 use super::TimeSpec;
 use super::Times;
 use crate::io::Fd;
 use crate::job::Pid;
+use crate::job::ProcessResult;
 use crate::job::ProcessState;
 use crate::SignalHandling;
 use nix::errno::Errno as NixErrno;
 use nix::libc::DIR;
 use nix::libc::{S_IFDIR, S_IFMT, S_IFREG};
-use nix::sys::signal::SaFlags;
-use nix::sys::signal::SigAction;
-use nix::sys::signal::SigHandler;
 use nix::sys::stat::stat;
 use nix::unistd::AccessFlags;
 use std::convert::Infallible;
@@ -59,6 +58,7 @@ use std::ffi::OsString;
 use std::future::Future;
 use std::io::SeekFrom;
 use std::mem::MaybeUninit;
+use std::num::NonZeroI32;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::ffi::OsStringExt as _;
 use std::os::unix::io::IntoRawFd;
@@ -345,6 +345,17 @@ impl System for RealSystem {
         })
     }
 
+    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
+        let non_zero = NonZeroI32::new(number)?;
+        let name = signal::Name::try_from_raw_real(number)?;
+        Some((name, signal::Number::from_raw_unchecked(non_zero)))
+    }
+
+    #[inline(always)]
+    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
+        name.to_raw_real()
+    }
+
     fn sigmask(
         &mut self,
         how: SigmaskHow,
@@ -355,24 +366,32 @@ impl System for RealSystem {
         Ok(())
     }
 
-    fn sigaction(&mut self, signal: Signal, handling: SignalHandling) -> Result<SignalHandling> {
-        let handler = match handling {
-            SignalHandling::Default => SigHandler::SigDfl,
-            SignalHandling::Ignore => SigHandler::SigIgn,
-            SignalHandling::Catch => SigHandler::Handler(catch_signal),
-        };
-        let new_action = SigAction::new(handler, SaFlags::empty(), SigSet::empty());
-        // SAFETY: The `catch_signal` function only accesses atomic variables.
-        let old_action = unsafe { nix::sys::signal::sigaction(signal, &new_action) }?;
-        let old_handling = match old_action.handler() {
-            SigHandler::SigDfl => SignalHandling::Default,
-            SigHandler::SigIgn => SignalHandling::Ignore,
-            SigHandler::Handler(_) | SigHandler::SigAction(_) => SignalHandling::Catch,
-        };
-        Ok(old_handling)
+    fn sigaction(
+        &mut self,
+        signal: signal::Number,
+        handling: SignalHandling,
+    ) -> Result<SignalHandling> {
+        unsafe {
+            let new_action = handling.to_sigaction();
+
+            let mut old_action = MaybeUninit::<nix::libc::sigaction>::uninit();
+            let old_mask_ptr = std::ptr::addr_of_mut!((*old_action.as_mut_ptr()).sa_mask);
+            // POSIX requires *all* sigset_t objects to be initialized before use.
+            nix::libc::sigemptyset(old_mask_ptr).errno_if_m1()?;
+
+            nix::libc::sigaction(
+                signal.as_raw(),
+                new_action.as_ptr(),
+                old_action.as_mut_ptr(),
+            )
+            .errno_if_m1()?;
+
+            let old_handling = SignalHandling::from_sigaction(&old_action);
+            Ok(old_handling)
+        }
     }
 
-    fn caught_signals(&mut self) -> Vec<Signal> {
+    fn caught_signals(&mut self) -> Vec<signal::Number> {
         let mut signals = Vec::new();
         for slot in &CAUGHT_SIGNALS {
             // Need a fence to ensure we examine the slots in order.
@@ -385,9 +404,8 @@ impl System for RealSystem {
                 break;
             }
 
-            let signal = signal as c_int;
-            if let Ok(signal) = signal.try_into() {
-                signals.push(signal)
+            if let Some((_name, number)) = self.validate_signal(signal as signal::RawNumber) {
+                signals.push(number)
             } else {
                 // ignore unknown signal
             }
@@ -398,10 +416,11 @@ impl System for RealSystem {
     fn kill(
         &mut self,
         target: Pid,
-        signal: Option<Signal>,
+        signal: Option<signal::Number>,
     ) -> Pin<Box<(dyn Future<Output = Result<()>>)>> {
         Box::pin(async move {
-            nix::sys::signal::kill(target.into(), signal)?;
+            let raw = signal.map_or(0, signal::Number::as_raw);
+            unsafe { nix::libc::kill(target.0, raw) }.errno_if_m1()?;
             Ok(())
         })
     }
@@ -477,10 +496,29 @@ impl System for RealSystem {
     }
 
     fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
-        use nix::sys::wait::WaitPidFlag;
+        use nix::sys::wait::{WaitPidFlag, WaitStatus::*};
         let options = WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED | WaitPidFlag::WNOHANG;
         let status = nix::sys::wait::waitpid(Some(target.into()), options.into())?;
-        Ok(ProcessState::from_wait_status(status))
+        match status {
+            StillAlive => Ok(None),
+            Continued(pid) => Ok(Some((pid.into(), ProcessState::Running))),
+            Exited(pid, exit_status) => Ok(Some((pid.into(), ProcessState::exited(exit_status)))),
+            Signaled(pid, signal, core_dump) => {
+                // SAFETY: The signal number is always a valid signal number, which is non-zero.
+                let raw_number = unsafe { NonZeroI32::new_unchecked(signal as _) };
+                let signal = signal::Number::from_raw_unchecked(raw_number);
+                let process_result = ProcessResult::Signaled { signal, core_dump };
+                Ok(Some((pid.into(), process_result.into())))
+            }
+            Stopped(pid, signal) => {
+                // SAFETY: The signal number is always a valid signal number, which is non-zero.
+                let raw_number = unsafe { NonZeroI32::new_unchecked(signal as _) };
+                let signal = signal::Number::from_raw_unchecked(raw_number);
+                Ok(Some((pid.into(), ProcessState::stopped(signal))))
+            }
+            #[allow(unreachable_patterns)]
+            _ => unreachable!(),
+        }
     }
 
     fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {
@@ -644,13 +682,20 @@ mod tests {
             let result = system.caught_signals();
             assert_eq!(result, []);
 
-            catch_signal(Signal::SIGINT as c_int);
-            catch_signal(Signal::SIGTERM as c_int);
-            catch_signal(Signal::SIGTERM as c_int);
-            catch_signal(Signal::SIGCHLD as c_int);
+            catch_signal(nix::libc::SIGINT);
+            catch_signal(nix::libc::SIGTERM);
+            catch_signal(nix::libc::SIGTERM);
+            catch_signal(nix::libc::SIGCHLD);
+
+            let sigint =
+                signal::Number::from_raw_unchecked(NonZeroI32::new(nix::libc::SIGINT).unwrap());
+            let sigterm =
+                signal::Number::from_raw_unchecked(NonZeroI32::new(nix::libc::SIGTERM).unwrap());
+            let sigchld =
+                signal::Number::from_raw_unchecked(NonZeroI32::new(nix::libc::SIGCHLD).unwrap());
 
             let result = system.caught_signals();
-            assert_eq!(result, [Signal::SIGINT, Signal::SIGTERM, Signal::SIGCHLD]);
+            assert_eq!(result, [sigint, sigterm, sigchld]);
             let result = system.caught_signals();
             assert_eq!(result, []);
         }

@@ -345,7 +345,7 @@ mod tests {
     use yash_env::option::State::On;
     use yash_env::semantics::Field;
     use yash_env::system::r#virtual::FileBody;
-    use yash_env::trap::Signal;
+    use yash_env::system::r#virtual::SIGSTOP;
     use yash_env::VirtualSystem;
 
     #[test]
@@ -627,12 +627,12 @@ mod tests {
             let pipeline: syntax::Pipeline = "return -n 0 | suspend x".parse().unwrap();
             let result = pipeline.execute(&mut env).await;
             assert_eq!(result, Continue(()));
-            assert_eq!(env.exit_status, ExitStatus::from(Signal::SIGSTOP));
+            assert_eq!(env.exit_status, ExitStatus::from(SIGSTOP));
 
             assert_eq!(env.jobs.len(), 1);
             let job = env.jobs.iter().next().unwrap().1;
             assert!(job.job_controlled);
-            assert_eq!(job.state, ProcessState::stopped(Signal::SIGSTOP));
+            assert_eq!(job.state, ProcessState::stopped(SIGSTOP));
             assert!(job.state_changed);
             assert_eq!(job.name, "return -n 0 | suspend x");
         })

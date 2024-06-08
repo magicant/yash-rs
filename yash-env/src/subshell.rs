@@ -36,8 +36,8 @@ use crate::system::SigSet;
 use crate::system::SigmaskHow::{SIG_BLOCK, SIG_SETMASK};
 use crate::system::System;
 use crate::system::SystemEx;
-use crate::trap::Signal::{SIGINT, SIGQUIT};
 use crate::Env;
+use nix::sys::signal::Signal;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -277,8 +277,8 @@ impl<'a> MaskGuard<'a> {
 
         let mut sigint_sigquit = SigSet::empty();
         let mut old_mask = SigSet::empty();
-        sigint_sigquit.add(SIGINT);
-        sigint_sigquit.add(SIGQUIT);
+        sigint_sigquit.add(Signal::SIGINT);
+        sigint_sigquit.add(Signal::SIGQUIT);
 
         let success = self
             .env
@@ -312,14 +312,13 @@ mod tests {
     use crate::semantics::ExitStatus;
     use crate::system::r#virtual::INode;
     use crate::system::r#virtual::SystemState;
+    use crate::system::r#virtual::{SIGCHLD, SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU};
     use crate::system::Errno;
     use crate::system::SignalHandling;
     use crate::tests::in_virtual_system;
     use crate::trap::Action;
-    use crate::trap::Signal::SIGCHLD;
     use assert_matches::assert_matches;
     use futures_executor::LocalPool;
-    use nix::sys::signal::Signal::{SIGTSTP, SIGTTIN, SIGTTOU};
     use std::cell::Cell;
     use std::cell::RefCell;
     use std::rc::Rc;
@@ -654,8 +653,8 @@ mod tests {
 
             let state = state.borrow();
             let parent_process = &state.processes[&parent_env.main_pid];
-            assert!(!parent_process.blocked_signals().contains(SIGINT));
-            assert!(!parent_process.blocked_signals().contains(SIGQUIT));
+            assert!(!parent_process.blocked_signals().contains(Signal::SIGINT));
+            assert!(!parent_process.blocked_signals().contains(Signal::SIGQUIT));
             let child_process = &state.processes[&child_pid];
             assert_eq!(
                 child_process.signal_handling(SIGINT),

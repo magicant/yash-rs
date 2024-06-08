@@ -16,10 +16,9 @@
 
 //! Items that manage the state of a single signal.
 
-use super::cond::Condition;
-use super::SignalSystem;
 #[cfg(doc)]
 use super::TrapSet;
+use super::{Condition, SignalSystem};
 use crate::system::{Errno, SignalHandling};
 use std::collections::btree_map::{Entry, VacantEntry};
 use std::rc::Rc;
@@ -387,9 +386,9 @@ impl GrandState {
 
 #[cfg(test)]
 mod tests {
-    use super::super::cond::Signal;
     use super::super::tests::DummySystem;
     use super::*;
+    use crate::system::r#virtual::{SIGCHLD, SIGQUIT, SIGTSTP, SIGTTOU, SIGUSR1};
     use assert_matches::assert_matches;
     use std::collections::BTreeMap;
 
@@ -397,14 +396,14 @@ mod tests {
     fn setting_trap_to_ignore_without_override_ignore() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let entry = map.entry(Signal::SIGCHLD.into());
+        let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("origin");
 
         let result =
             GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), false);
         assert_eq!(result, Ok(()));
         assert_eq!(
-            map[&Signal::SIGCHLD.into()].get_state(),
+            map[&SIGCHLD.into()].get_state(),
             (
                 Some(&TrapState {
                     action: Action::Ignore,
@@ -414,21 +413,21 @@ mod tests {
                 None
             )
         );
-        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
+        assert_eq!(system.0[&SIGCHLD], SignalHandling::Ignore);
     }
 
     #[test]
     fn setting_trap_to_ignore_with_override_ignore() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let entry = map.entry(Signal::SIGCHLD.into());
+        let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("origin");
 
         let result =
             GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), true);
         assert_eq!(result, Ok(()));
         assert_eq!(
-            map[&Signal::SIGCHLD.into()].get_state(),
+            map[&SIGCHLD.into()].get_state(),
             (
                 Some(&TrapState {
                     action: Action::Ignore,
@@ -438,14 +437,14 @@ mod tests {
                 None
             )
         );
-        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
+        assert_eq!(system.0[&SIGCHLD], SignalHandling::Ignore);
     }
 
     #[test]
     fn setting_trap_to_command() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let entry = map.entry(Signal::SIGCHLD.into());
+        let entry = map.entry(SIGCHLD.into());
         let action = Action::Command("echo".into());
         let origin = Location::dummy("origin");
 
@@ -453,7 +452,7 @@ mod tests {
             GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false);
         assert_eq!(result, Ok(()));
         assert_eq!(
-            map[&Signal::SIGCHLD.into()].get_state(),
+            map[&SIGCHLD.into()].get_state(),
             (
                 Some(&TrapState {
                     action,
@@ -463,24 +462,24 @@ mod tests {
                 None
             )
         );
-        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
+        assert_eq!(system.0[&SIGCHLD], SignalHandling::Catch);
     }
 
     #[test]
     fn setting_trap_to_default() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let entry = map.entry(Signal::SIGCHLD.into());
+        let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("foo");
         GrandState::set_action(&mut system, entry, Action::Ignore, origin, false).unwrap();
 
-        let entry = map.entry(Signal::SIGCHLD.into());
+        let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("bar");
         let result =
             GrandState::set_action(&mut system, entry, Action::Default, origin.clone(), false);
         assert_eq!(result, Ok(()));
         assert_eq!(
-            map[&Signal::SIGCHLD.into()].get_state(),
+            map[&SIGCHLD.into()].get_state(),
             (
                 Some(&TrapState {
                     action: Action::Default,
@@ -490,41 +489,41 @@ mod tests {
                 None
             )
         );
-        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Default);
+        assert_eq!(system.0[&SIGCHLD], SignalHandling::Default);
     }
 
     #[test]
     fn resetting_trap_from_ignore_no_override() {
         let mut system = DummySystem::default();
-        system.0.insert(Signal::SIGCHLD, SignalHandling::Ignore);
+        system.0.insert(SIGCHLD, SignalHandling::Ignore);
         let mut map = BTreeMap::new();
-        let entry = map.entry(Signal::SIGCHLD.into());
+        let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("foo");
         let result = GrandState::set_action(&mut system, entry, Action::Ignore, origin, false);
         assert_eq!(result, Err(SetActionError::InitiallyIgnored));
 
         // Idempotence
-        let entry = map.entry(Signal::SIGCHLD.into());
+        let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("bar");
         let result = GrandState::set_action(&mut system, entry, Action::Ignore, origin, false);
         assert_eq!(result, Err(SetActionError::InitiallyIgnored));
 
-        assert_eq!(map[&Signal::SIGCHLD.into()].get_state(), (None, None));
-        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
+        assert_eq!(map[&SIGCHLD.into()].get_state(), (None, None));
+        assert_eq!(system.0[&SIGCHLD], SignalHandling::Ignore);
     }
 
     #[test]
     fn resetting_trap_from_ignore_override() {
         let mut system = DummySystem::default();
-        system.0.insert(Signal::SIGCHLD, SignalHandling::Ignore);
+        system.0.insert(SIGCHLD, SignalHandling::Ignore);
         let mut map = BTreeMap::new();
-        let entry = map.entry(Signal::SIGCHLD.into());
+        let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("origin");
         let result =
             GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), true);
         assert_eq!(result, Ok(()));
         assert_eq!(
-            map[&Signal::SIGCHLD.into()].get_state(),
+            map[&SIGCHLD.into()].get_state(),
             (
                 Some(&TrapState {
                     action: Action::Ignore,
@@ -534,93 +533,93 @@ mod tests {
                 None
             )
         );
-        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
+        assert_eq!(system.0[&SIGCHLD], SignalHandling::Ignore);
     }
 
     #[test]
     fn internal_handler_ignore() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let entry = map.entry(Signal::SIGCHLD.into());
+        let entry = map.entry(SIGCHLD.into());
 
         let result = GrandState::set_internal_handler(&mut system, entry, SignalHandling::Ignore);
         assert_eq!(result, Ok(()));
         assert_eq!(
-            map[&Signal::SIGCHLD.into()].internal_handler(),
+            map[&SIGCHLD.into()].internal_handler(),
             SignalHandling::Ignore
         );
-        assert_eq!(map[&Signal::SIGCHLD.into()].get_state(), (None, None));
-        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
+        assert_eq!(map[&SIGCHLD.into()].get_state(), (None, None));
+        assert_eq!(system.0[&SIGCHLD], SignalHandling::Ignore);
     }
 
     #[test]
     fn internal_handler_catch() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let entry = map.entry(Signal::SIGCHLD.into());
+        let entry = map.entry(SIGCHLD.into());
 
         let result = GrandState::set_internal_handler(&mut system, entry, SignalHandling::Catch);
         assert_eq!(result, Ok(()));
         assert_eq!(
-            map[&Signal::SIGCHLD.into()].internal_handler(),
+            map[&SIGCHLD.into()].internal_handler(),
             SignalHandling::Catch
         );
-        assert_eq!(map[&Signal::SIGCHLD.into()].get_state(), (None, None));
-        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
+        assert_eq!(map[&SIGCHLD.into()].get_state(), (None, None));
+        assert_eq!(system.0[&SIGCHLD], SignalHandling::Catch);
     }
 
     #[test]
     fn action_ignore_and_internal_handler_catch() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let entry = map.entry(Signal::SIGCHLD.into());
+        let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("origin");
         let _ = GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), false);
-        let entry = map.entry(Signal::SIGCHLD.into());
+        let entry = map.entry(SIGCHLD.into());
 
         let result = GrandState::set_internal_handler(&mut system, entry, SignalHandling::Catch);
         assert_eq!(result, Ok(()));
         assert_eq!(
-            map[&Signal::SIGCHLD.into()].internal_handler(),
+            map[&SIGCHLD.into()].internal_handler(),
             SignalHandling::Catch
         );
-        assert_matches!(map[&Signal::SIGCHLD.into()].get_state(), (Some(state), None) => {
+        assert_matches!(map[&SIGCHLD.into()].get_state(), (Some(state), None) => {
             assert_eq!(state.action, Action::Ignore);
             assert_eq!(state.origin, origin);
         });
-        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
+        assert_eq!(system.0[&SIGCHLD], SignalHandling::Catch);
     }
 
     #[test]
     fn action_catch_and_internal_handler_ignore() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let entry = map.entry(Signal::SIGCHLD.into());
+        let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("origin");
         let action = Action::Command("echo".into());
         let _ = GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false);
-        let entry = map.entry(Signal::SIGCHLD.into());
+        let entry = map.entry(SIGCHLD.into());
 
         let result = GrandState::set_internal_handler(&mut system, entry, SignalHandling::Ignore);
         assert_eq!(result, Ok(()));
         assert_eq!(
-            map[&Signal::SIGCHLD.into()].internal_handler(),
+            map[&SIGCHLD.into()].internal_handler(),
             SignalHandling::Ignore
         );
-        assert_matches!(map[&Signal::SIGCHLD.into()].get_state(), (Some(state), None) => {
+        assert_matches!(map[&SIGCHLD.into()].get_state(), (Some(state), None) => {
             assert_eq!(state.action, action);
             assert_eq!(state.origin, origin);
         });
-        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
+        assert_eq!(system.0[&SIGCHLD], SignalHandling::Catch);
     }
 
     #[test]
     fn set_internal_handler_for_initially_defaulted_signal_then_allow_override() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let entry = map.entry(Signal::SIGTTOU.into());
+        let entry = map.entry(SIGTTOU.into());
         let _ = GrandState::set_internal_handler(&mut system, entry, SignalHandling::Ignore);
-        let entry = map.entry(Signal::SIGTTOU.into());
+        let entry = map.entry(SIGTTOU.into());
         let origin = Location::dummy("origin");
         let action = Action::Command("echo".into());
 
@@ -628,11 +627,11 @@ mod tests {
             GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false);
         assert_eq!(result, Ok(()));
         assert_eq!(
-            map[&Signal::SIGTTOU.into()].internal_handler(),
+            map[&SIGTTOU.into()].internal_handler(),
             SignalHandling::Ignore
         );
         assert_eq!(
-            map[&Signal::SIGTTOU.into()].get_state(),
+            map[&SIGTTOU.into()].get_state(),
             (
                 Some(&TrapState {
                     action,
@@ -642,15 +641,15 @@ mod tests {
                 None
             )
         );
-        assert_eq!(system.0[&Signal::SIGTTOU], SignalHandling::Catch);
+        assert_eq!(system.0[&SIGTTOU], SignalHandling::Catch);
     }
 
     #[test]
     fn set_internal_handler_for_initially_ignored_signal_then_reject_override() {
         let mut system = DummySystem::default();
-        system.0.insert(Signal::SIGTTOU, SignalHandling::Ignore);
+        system.0.insert(SIGTTOU, SignalHandling::Ignore);
         let mut map = BTreeMap::new();
-        let cond = Signal::SIGTTOU.into();
+        let cond = SIGTTOU.into();
         let entry = map.entry(cond);
         let _ = GrandState::set_internal_handler(&mut system, entry, SignalHandling::Ignore);
         let entry = map.entry(cond);
@@ -661,14 +660,14 @@ mod tests {
         assert_eq!(result, Err(SetActionError::InitiallyIgnored));
         assert_eq!(map[&cond].internal_handler(), SignalHandling::Ignore);
         assert_eq!(map[&cond].get_state(), (None, None));
-        assert_eq!(system.0[&Signal::SIGTTOU], SignalHandling::Ignore);
+        assert_eq!(system.0[&SIGTTOU], SignalHandling::Ignore);
     }
 
     #[test]
     fn enter_subshell_with_internal_handler_keeping_internal_handler() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let cond = Signal::SIGCHLD.into();
+        let cond = SIGCHLD.into();
         GrandState::set_internal_handler(&mut system, map.entry(cond), SignalHandling::Catch)
             .unwrap();
 
@@ -680,14 +679,14 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(map[&cond].internal_handler(), SignalHandling::Catch);
         assert_eq!(map[&cond].get_state(), (None, None));
-        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
+        assert_eq!(system.0[&SIGCHLD], SignalHandling::Catch);
     }
 
     #[test]
     fn enter_subshell_with_internal_handler_clearing_internal_handler() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let cond = Signal::SIGCHLD.into();
+        let cond = SIGCHLD.into();
         let entry = map.entry(cond);
         GrandState::set_internal_handler(&mut system, entry, SignalHandling::Catch).unwrap();
 
@@ -698,18 +697,18 @@ mod tests {
         );
         assert_eq!(result, Ok(()));
         assert_eq!(
-            map[&Signal::SIGCHLD.into()].internal_handler(),
+            map[&SIGCHLD.into()].internal_handler(),
             SignalHandling::Default
         );
         assert_eq!(map[&cond].get_state(), (None, None));
-        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Default);
+        assert_eq!(system.0[&SIGCHLD], SignalHandling::Default);
     }
 
     #[test]
     fn enter_subshell_with_ignore_and_no_internal_handler() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let cond = Signal::SIGCHLD.into();
+        let cond = SIGCHLD.into();
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
         GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), false).unwrap();
@@ -732,14 +731,14 @@ mod tests {
                 None
             )
         );
-        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
+        assert_eq!(system.0[&SIGCHLD], SignalHandling::Ignore);
     }
 
     #[test]
     fn enter_subshell_with_ignore_clearing_internal_handler() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let cond = Signal::SIGCHLD.into();
+        let cond = SIGCHLD.into();
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
         GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), false).unwrap();
@@ -764,14 +763,14 @@ mod tests {
                 None
             )
         );
-        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
+        assert_eq!(system.0[&SIGCHLD], SignalHandling::Ignore);
     }
 
     #[test]
     fn enter_subshell_with_command_and_no_internal_handler() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let cond = Signal::SIGCHLD.into();
+        let cond = SIGCHLD.into();
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
         let action = Action::Command("echo".into());
@@ -795,14 +794,14 @@ mod tests {
                 }),
             )
         );
-        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Default);
+        assert_eq!(system.0[&SIGCHLD], SignalHandling::Default);
     }
 
     #[test]
     fn enter_subshell_with_command_keeping_internal_handler() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let cond = Signal::SIGTSTP.into();
+        let cond = SIGTSTP.into();
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
         let action = Action::Command("echo".into());
@@ -828,14 +827,14 @@ mod tests {
                 }),
             )
         );
-        assert_eq!(system.0[&Signal::SIGTSTP], SignalHandling::Ignore);
+        assert_eq!(system.0[&SIGTSTP], SignalHandling::Ignore);
     }
 
     #[test]
     fn enter_subshell_with_command_clearing_internal_handler() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let cond = Signal::SIGTSTP.into();
+        let cond = SIGTSTP.into();
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
         let action = Action::Command("echo".into());
@@ -861,14 +860,14 @@ mod tests {
                 }),
             )
         );
-        assert_eq!(system.0[&Signal::SIGTSTP], SignalHandling::Default);
+        assert_eq!(system.0[&SIGTSTP], SignalHandling::Default);
     }
 
     #[test]
     fn enter_subshell_with_command_ignoring() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let cond = Signal::SIGQUIT.into();
+        let cond = SIGQUIT.into();
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
         let action = Action::Command("echo".into());
@@ -892,21 +891,21 @@ mod tests {
                 }),
             )
         );
-        assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Ignore);
+        assert_eq!(system.0[&SIGQUIT], SignalHandling::Ignore);
     }
 
     #[test]
     fn ignoring_initially_defaulted_signal() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let cond = Signal::SIGQUIT.into();
+        let cond = SIGQUIT.into();
         let entry = map.entry(cond);
         let vacant = assert_matches!(entry, Entry::Vacant(vacant) => vacant);
 
         let result = GrandState::ignore(&mut system, vacant);
         assert_eq!(result, Ok(()));
         assert_eq!(map[&cond].get_state(), (None, None));
-        assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Ignore);
+        assert_eq!(system.0[&SIGQUIT], SignalHandling::Ignore);
 
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
@@ -918,16 +917,16 @@ mod tests {
     #[test]
     fn ignoring_initially_ignored_signal() {
         let mut system = DummySystem::default();
-        system.0.insert(Signal::SIGQUIT, SignalHandling::Ignore);
+        system.0.insert(SIGQUIT, SignalHandling::Ignore);
         let mut map = BTreeMap::new();
-        let cond = Signal::SIGQUIT.into();
+        let cond = SIGQUIT.into();
         let entry = map.entry(cond);
         let vacant = assert_matches!(entry, Entry::Vacant(vacant) => vacant);
 
         let result = GrandState::ignore(&mut system, vacant);
         assert_eq!(result, Ok(()));
         assert_eq!(map[&cond].get_state(), (None, None));
-        assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Ignore);
+        assert_eq!(system.0[&SIGQUIT], SignalHandling::Ignore);
 
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
@@ -940,7 +939,7 @@ mod tests {
     fn clearing_parent_setting() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let cond = Signal::SIGCHLD.into();
+        let cond = SIGCHLD.into();
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
         let action = Action::Command("echo".into());
@@ -958,7 +957,7 @@ mod tests {
     fn marking_as_caught_and_handling() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
-        let cond = Signal::SIGUSR1.into();
+        let cond = SIGUSR1.into();
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
         let action = Action::Command("echo".into());

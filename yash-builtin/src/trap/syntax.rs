@@ -101,6 +101,8 @@ pub fn interpret(
         });
 
     // Parse the remaining operands as conditions
+    // TODO Case-insensitive parse
+    // TODO Allow SIG prefix
     let (conditions, errors): (Vec<_>, Vec<_>) = operands
         .map(|operand| match operand.value.parse() {
             Ok(condition) => Ok((condition, operand)),
@@ -128,8 +130,9 @@ fn is_non_negative_integer(s: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use super::super::CondSpec;
     use super::*;
-    use yash_env::trap::{Condition, Signal};
+    use yash_env::signal::Name;
 
     #[test]
     fn print_all_for_no_operands() {
@@ -144,7 +147,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
-                conditions: vec![(Condition::Signal(Signal::SIGINT), Field::dummy("INT"))]
+                conditions: vec![(CondSpec::SignalName(Name::Int), Field::dummy("INT"))]
             })
         );
     }
@@ -156,7 +159,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Ignore,
-                conditions: vec![(Condition::Signal(Signal::SIGINT), Field::dummy("INT"))]
+                conditions: vec![(CondSpec::SignalName(Name::Int), Field::dummy("INT"))]
             })
         );
     }
@@ -168,7 +171,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Command("echo".into()),
-                conditions: vec![(Condition::Signal(Signal::SIGINT), Field::dummy("INT"))]
+                conditions: vec![(CondSpec::SignalName(Name::Int), Field::dummy("INT"))]
             })
         );
     }
@@ -181,9 +184,9 @@ mod tests {
             Ok(Command::SetAction {
                 action: Action::Default,
                 conditions: vec![
-                    (Condition::Signal(Signal::SIGHUP), Field::dummy("HUP")),
-                    (Condition::Signal(Signal::SIGINT), Field::dummy("2")),
-                    (Condition::Signal(Signal::SIGTERM), Field::dummy("TERM")),
+                    (CondSpec::SignalName(Name::Hup), Field::dummy("HUP")),
+                    (CondSpec::Number(2), Field::dummy("2")),
+                    (CondSpec::SignalName(Name::Term), Field::dummy("TERM")),
                 ]
             })
         );
@@ -196,7 +199,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Ignore,
-                conditions: vec![(Condition::Signal(Signal::SIGHUP), Field::dummy("HUP"))]
+                conditions: vec![(CondSpec::SignalName(Name::Hup), Field::dummy("HUP"))]
             })
         );
 
@@ -205,7 +208,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Ignore,
-                conditions: vec![(Condition::Signal(Signal::SIGQUIT), Field::dummy("QUIT"))]
+                conditions: vec![(CondSpec::SignalName(Name::Quit), Field::dummy("QUIT"))]
             })
         );
     }
@@ -217,7 +220,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
-                conditions: vec![(Condition::Signal(Signal::SIGHUP), Field::dummy("1"))]
+                conditions: vec![(CondSpec::Number(1), Field::dummy("1"))]
             })
         );
     }
@@ -229,7 +232,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
-                conditions: vec![(Condition::Exit, Field::dummy("EXIT"))]
+                conditions: vec![(CondSpec::Exit, Field::dummy("EXIT"))]
             })
         );
     }
@@ -241,19 +244,19 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
-                conditions: vec![(Condition::Exit, Field::dummy("0"))]
+                conditions: vec![(CondSpec::Number(0), Field::dummy("0"))]
             })
         );
     }
 
     #[test]
     fn action_with_unknown_conditions() {
-        let result = interpret(vec![], Field::dummies(["-", "FOOBAR", "INT", "999999999"]));
+        let result = interpret(vec![], Field::dummies(["-", "FOOBAR", "INT", "9999999999"]));
         assert_eq!(
             result,
             Err(vec![
                 Error::UnknownCondition(Field::dummy("FOOBAR")),
-                Error::UnknownCondition(Field::dummy("999999999")),
+                Error::UnknownCondition(Field::dummy("9999999999")),
             ])
         );
     }
@@ -265,7 +268,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
-                conditions: vec![(Condition::Signal(Signal::SIGHUP), Field::dummy("1"))]
+                conditions: vec![(CondSpec::Number(1), Field::dummy("1"))]
             })
         );
     }
@@ -277,7 +280,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
-                conditions: vec![(Condition::Exit, Field::dummy("0"))]
+                conditions: vec![(CondSpec::Number(0), Field::dummy("0"))]
             })
         );
     }
@@ -289,7 +292,7 @@ mod tests {
             result,
             Ok(Command::SetAction {
                 action: Action::Command("-1".into()),
-                conditions: vec![(Condition::Exit, Field::dummy("0"))]
+                conditions: vec![(CondSpec::Number(0), Field::dummy("0"))]
             })
         );
     }

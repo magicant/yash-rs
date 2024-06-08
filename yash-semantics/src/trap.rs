@@ -77,7 +77,7 @@ use yash_syntax::source::Source;
 /// implying that the diversion should be passed on to the caller.)
 #[must_use]
 async fn run_trap(env: &mut Env, cond: Condition, code: Rc<str>, origin: Location) -> Result {
-    let condition = cond.to_string();
+    let condition = cond.to_string(&env.system).into_owned();
     let mut lexer = Lexer::from_memory(&code, Source::Trap { condition, origin });
     let mut env = env.push_frame(Frame::Trap(cond));
 

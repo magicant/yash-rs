@@ -42,8 +42,7 @@
 //! special parameter.
 
 use crate::semantics::ExitStatus;
-use crate::trap::Signal;
-use nix::sys::wait::WaitStatus;
+use crate::signal;
 use slab::Slab;
 use std::collections::HashMap;
 use std::iter::FusedIterator;
@@ -130,11 +129,14 @@ impl Pid {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProcessResult {
     /// The process has been stopped by a signal.
-    Stopped(Signal),
+    Stopped(signal::Number),
     /// The process has exited.
     Exited(ExitStatus),
     /// The process has been terminated by a signal.
-    Signaled { signal: Signal, core_dump: bool },
+    Signaled {
+        signal: signal::Number,
+        core_dump: bool,
+    },
 }
 
 impl ProcessResult {
@@ -185,7 +187,7 @@ impl ProcessState {
     /// Creates a new `ProcessState` instance representing a stopped process.
     #[inline]
     #[must_use]
-    pub fn stopped(signal: Signal) -> Self {
+    pub fn stopped(signal: signal::Number) -> Self {
         Self::Halted(ProcessResult::Stopped(signal))
     }
 
@@ -209,34 +211,6 @@ impl ProcessState {
     #[must_use]
     pub fn is_stopped(&self) -> bool {
         matches!(self, Self::Halted(result) if result.is_stopped())
-    }
-
-    /// Converts `WaitStatus` to `ProcessState`.
-    ///
-    /// If the given `WaitStatus` represents a change in the process state, this
-    /// function returns the new state with the process ID. Otherwise, it
-    /// returns `None`.
-    ///
-    /// The `WaitStatus` type is defined in the `nix` crate, which is not
-    /// covered by the semantic versioning policy of this crate.
-    #[must_use]
-    pub fn from_wait_status(status: WaitStatus) -> Option<(Pid, Self)> {
-        match status {
-            WaitStatus::Continued(pid) => Some((pid.into(), ProcessState::Running)),
-
-            WaitStatus::Exited(pid, exit_status) => {
-                Some((pid.into(), ProcessState::exited(exit_status)))
-            }
-
-            WaitStatus::Stopped(pid, signal) => Some((pid.into(), ProcessState::stopped(signal))),
-
-            WaitStatus::Signaled(pid, signal, core_dump) => Some((
-                pid.into(),
-                ProcessState::Halted(ProcessResult::Signaled { signal, core_dump }),
-            )),
-
-            _ => None,
-        }
     }
 }
 
@@ -954,7 +928,7 @@ pub mod id;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trap::Signal;
+    use crate::system::r#virtual::{SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU};
 
     #[test]
     fn job_list_find_by_pid() {
@@ -1149,7 +1123,7 @@ mod tests {
         // suspended one.
         let mut list = JobList::default();
         let mut suspended = Job::new(Pid(10));
-        suspended.state = ProcessState::stopped(Signal::SIGSTOP);
+        suspended.state = ProcessState::stopped(SIGSTOP);
         let running = Job::new(Pid(20));
         let i10 = list.add(suspended.clone());
         let i20 = list.add(running.clone());
@@ -1176,7 +1150,7 @@ mod tests {
         assert_ne!(ex_current_job_index, ex_previous_job_index);
 
         let mut suspended = Job::new(Pid(20));
-        suspended.state = ProcessState::stopped(Signal::SIGSTOP);
+        suspended.state = ProcessState::stopped(SIGSTOP);
         let i20 = list.add(suspended);
         let now_current_job_index = list.current_job().unwrap();
         let now_previous_job_index = list.previous_job().unwrap();
@@ -1192,7 +1166,7 @@ mod tests {
         let i18 = list.add(running);
 
         let mut suspended_1 = Job::new(Pid(19));
-        suspended_1.state = ProcessState::stopped(Signal::SIGSTOP);
+        suspended_1.state = ProcessState::stopped(SIGSTOP);
         let i19 = list.add(suspended_1);
 
         let ex_current_job_index = list.current_job().unwrap();
@@ -1201,7 +1175,7 @@ mod tests {
         assert_eq!(ex_previous_job_index, i18);
 
         let mut suspended_2 = Job::new(Pid(20));
-        suspended_2.state = ProcessState::stopped(Signal::SIGSTOP);
+        suspended_2.state = ProcessState::stopped(SIGSTOP);
         let i20 = list.add(suspended_2);
 
         let now_current_job_index = list.current_job().unwrap();
@@ -1220,9 +1194,9 @@ mod tests {
         let mut suspended_1 = Job::new(Pid(11));
         let mut suspended_2 = Job::new(Pid(12));
         let mut suspended_3 = Job::new(Pid(13));
-        suspended_1.state = ProcessState::stopped(Signal::SIGSTOP);
-        suspended_2.state = ProcessState::stopped(Signal::SIGSTOP);
-        suspended_3.state = ProcessState::stopped(Signal::SIGSTOP);
+        suspended_1.state = ProcessState::stopped(SIGSTOP);
+        suspended_2.state = ProcessState::stopped(SIGSTOP);
+        suspended_3.state = ProcessState::stopped(SIGSTOP);
         list.add(suspended_1);
         list.add(suspended_2);
         list.add(suspended_3);
@@ -1268,9 +1242,9 @@ mod tests {
         let mut suspended_1 = Job::new(Pid(11));
         let mut suspended_2 = Job::new(Pid(12));
         let mut suspended_3 = Job::new(Pid(13));
-        suspended_1.state = ProcessState::stopped(Signal::SIGSTOP);
-        suspended_2.state = ProcessState::stopped(Signal::SIGSTOP);
-        suspended_3.state = ProcessState::stopped(Signal::SIGSTOP);
+        suspended_1.state = ProcessState::stopped(SIGSTOP);
+        suspended_2.state = ProcessState::stopped(SIGSTOP);
+        suspended_3.state = ProcessState::stopped(SIGSTOP);
         list.add(suspended_1);
         list.add(suspended_2);
         list.add(suspended_3);
@@ -1302,8 +1276,8 @@ mod tests {
 
         let mut suspended_1 = Job::new(Pid(11));
         let mut suspended_2 = Job::new(Pid(12));
-        suspended_1.state = ProcessState::stopped(Signal::SIGSTOP);
-        suspended_2.state = ProcessState::stopped(Signal::SIGSTOP);
+        suspended_1.state = ProcessState::stopped(SIGSTOP);
+        suspended_2.state = ProcessState::stopped(SIGSTOP);
         list.add(suspended_1);
         list.add(suspended_2);
 
@@ -1341,8 +1315,8 @@ mod tests {
 
         let mut suspended_1 = Job::new(Pid(21));
         let mut suspended_2 = Job::new(Pid(22));
-        suspended_1.state = ProcessState::stopped(Signal::SIGSTOP);
-        suspended_2.state = ProcessState::stopped(Signal::SIGSTOP);
+        suspended_1.state = ProcessState::stopped(SIGSTOP);
+        suspended_2.state = ProcessState::stopped(SIGSTOP);
         let i21 = list.add(suspended_1);
         let i22 = list.add(suspended_2);
 
@@ -1365,7 +1339,7 @@ mod tests {
     fn set_current_job_not_suspended() {
         let mut list = JobList::default();
         let mut suspended = Job::new(Pid(10));
-        suspended.state = ProcessState::stopped(Signal::SIGTSTP);
+        suspended.state = ProcessState::stopped(SIGTSTP);
         let running = Job::new(Pid(20));
         let i10 = list.add(suspended);
         let i20 = list.add(running);
@@ -1394,7 +1368,7 @@ mod tests {
     fn resuming_current_job_without_other_suspended_jobs() {
         let mut list = JobList::default();
         let mut suspended = Job::new(Pid(10));
-        suspended.state = ProcessState::stopped(Signal::SIGTSTP);
+        suspended.state = ProcessState::stopped(SIGTSTP);
         let running = Job::new(Pid(20));
         let i10 = list.add(suspended);
         let i20 = list.add(running);
@@ -1408,8 +1382,8 @@ mod tests {
         let mut list = JobList::default();
         let mut suspended_1 = Job::new(Pid(10));
         let mut suspended_2 = Job::new(Pid(20));
-        suspended_1.state = ProcessState::stopped(Signal::SIGTSTP);
-        suspended_2.state = ProcessState::stopped(Signal::SIGTSTP);
+        suspended_1.state = ProcessState::stopped(SIGTSTP);
+        suspended_2.state = ProcessState::stopped(SIGTSTP);
         let i10 = list.add(suspended_1);
         let i20 = list.add(suspended_2);
         list.set_current_job(i10).unwrap();
@@ -1425,9 +1399,9 @@ mod tests {
         let mut suspended_1 = Job::new(Pid(10));
         let mut suspended_2 = Job::new(Pid(20));
         let mut suspended_3 = Job::new(Pid(30));
-        suspended_1.state = ProcessState::stopped(Signal::SIGTSTP);
-        suspended_2.state = ProcessState::stopped(Signal::SIGTSTP);
-        suspended_3.state = ProcessState::stopped(Signal::SIGTSTP);
+        suspended_1.state = ProcessState::stopped(SIGTSTP);
+        suspended_2.state = ProcessState::stopped(SIGTSTP);
+        suspended_3.state = ProcessState::stopped(SIGTSTP);
         list.add(suspended_1);
         list.add(suspended_2);
         list.add(suspended_3);
@@ -1453,9 +1427,9 @@ mod tests {
         let mut suspended_1 = Job::new(Pid(10));
         let mut suspended_2 = Job::new(Pid(20));
         let mut suspended_3 = Job::new(Pid(30));
-        suspended_1.state = ProcessState::stopped(Signal::SIGTSTP);
-        suspended_2.state = ProcessState::stopped(Signal::SIGTSTP);
-        suspended_3.state = ProcessState::stopped(Signal::SIGTSTP);
+        suspended_1.state = ProcessState::stopped(SIGTSTP);
+        suspended_2.state = ProcessState::stopped(SIGTSTP);
+        suspended_3.state = ProcessState::stopped(SIGTSTP);
         list.add(suspended_1);
         list.add(suspended_2);
         list.add(suspended_3);
@@ -1481,9 +1455,9 @@ mod tests {
         let mut suspended_1 = Job::new(Pid(10));
         let mut suspended_2 = Job::new(Pid(20));
         let mut suspended_3 = Job::new(Pid(30));
-        suspended_1.state = ProcessState::stopped(Signal::SIGTSTP);
-        suspended_2.state = ProcessState::stopped(Signal::SIGTSTP);
-        suspended_3.state = ProcessState::stopped(Signal::SIGTSTP);
+        suspended_1.state = ProcessState::stopped(SIGTSTP);
+        suspended_2.state = ProcessState::stopped(SIGTSTP);
+        suspended_3.state = ProcessState::stopped(SIGTSTP);
         let i10 = list.add(suspended_1);
         let i20 = list.add(suspended_2);
         let _i30 = list.add(suspended_3);
@@ -1500,7 +1474,7 @@ mod tests {
         let i11 = list.add(Job::new(Pid(11)));
         let i12 = list.add(Job::new(Pid(12)));
         list.set_current_job(i11).unwrap();
-        list.update_status(Pid(11), ProcessState::stopped(Signal::SIGTTOU));
+        list.update_status(Pid(11), ProcessState::stopped(SIGTTOU));
         assert_eq!(list.current_job(), Some(i11));
         assert_eq!(list.previous_job(), Some(i12));
     }
@@ -1511,7 +1485,7 @@ mod tests {
         let i11 = list.add(Job::new(Pid(11)));
         let i12 = list.add(Job::new(Pid(12)));
         list.set_current_job(i11).unwrap();
-        list.update_status(Pid(12), ProcessState::stopped(Signal::SIGTTOU));
+        list.update_status(Pid(12), ProcessState::stopped(SIGTTOU));
         assert_eq!(list.current_job(), Some(i12));
         assert_eq!(list.previous_job(), Some(i11));
     }
@@ -1523,7 +1497,7 @@ mod tests {
         let _i11 = list.add(Job::new(Pid(11)));
         let i12 = list.add(Job::new(Pid(12)));
         list.set_current_job(i10).unwrap();
-        list.update_status(Pid(12), ProcessState::stopped(Signal::SIGTTIN));
+        list.update_status(Pid(12), ProcessState::stopped(SIGTTIN));
         assert_eq!(list.current_job(), Some(i12));
         assert_eq!(list.previous_job(), Some(i10));
     }
@@ -1534,12 +1508,12 @@ mod tests {
         let i11 = list.add(Job::new(Pid(11)));
         let i12 = list.add(Job::new(Pid(12)));
         let mut suspended = Job::new(Pid(10));
-        suspended.state = ProcessState::stopped(Signal::SIGTTIN);
+        suspended.state = ProcessState::stopped(SIGTTIN);
         let i10 = list.add(suspended);
         assert_eq!(list.current_job(), Some(i10));
         assert_eq!(list.previous_job(), Some(i11));
 
-        list.update_status(Pid(12), ProcessState::stopped(Signal::SIGTTOU));
+        list.update_status(Pid(12), ProcessState::stopped(SIGTTOU));
         assert_eq!(list.current_job(), Some(i12));
         assert_eq!(list.previous_job(), Some(i10));
     }

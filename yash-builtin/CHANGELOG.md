@@ -5,11 +5,46 @@ All notable changes to `yash-builtin` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.1] - Unreleased
+## [0.2.0] - Unreleased
 
 ### Added
 
 - `impl Default for common::syntax::OptionSpec`
+- `kill::Signal`
+- `kill::syntax::parse_signal`
+- `kill::print::InvalidSignal`
+- Support for real-time signals in the kill built-in
+- `trap::CondSpec`
+- `trap::Error`
+- `trap::ErrorCause`
+
+### Changed
+
+- `kill::syntax::parse_signal` now returns an `Option<kill::Signal>` instead of
+  `Option<Option<yash_env::trap::Signal>>`
+- `kill::send::execute` now additionally takes the
+  `signal_origin: Option<&Field>` argument.
+- `kill::print::print` now additionally takes the `system: &SystemEx` argument
+  and returns `Result<String, Vec<InvalidSignal>>` (previously `String`).
+- `kill::Command::Send::signal` is now a `kill::Signal`
+  (previously `Option<yash_env::trap::Signal>`).
+- `kill::Command::Send` now has a `signal_origin: Option<Field>` field.
+- `kill::Command::Print::signals` is now a `Vec<kill::Signal>`
+  (previously `Vec<yash_env::trap::Signal>`).
+- `trap::Command::SetAction::conditions` is now a `Vec<(CondSpec, Field)>`
+  (previously `Vec<(Condition, Field)>`).
+- `trap::Command::execute` now returns `Result<String, Vec<Error>>`
+  (previously `Result<String, Vec<(SetActionError, Condition, Field)>>`).
+- `trap::display_traps` is now marked `#[must_use]`.
+- `trap::display_traps` is now additionally takes a
+  `yash_env::trap::SignalSystem` argument.
+- `wait::core::Error::Trapped` now contains a `yash_env::signal::Number`
+  instead of a `yash_env::trap::Signal`.
+
+### Removed
+
+- `kill::syntax::parse_signal_name`
+- `kill::syntax::parse_signal_name_or_number`
 
 ## [0.1.0] - 2024-04-13
 
