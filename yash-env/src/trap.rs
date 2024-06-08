@@ -55,10 +55,24 @@ pub trait SignalSystem {
 
     /// Returns the signal number from its name.
     ///
-    /// This function is used only for portable signals such as `SIGINT` and
-    /// `SIGTERM`, so this function is not expected to return an error.
+    /// This function returns the signal number corresponding to the signal name
+    /// in the system. If the signal name is not supported, it returns `None`.
+    ///
+    /// Note that the `TrapSet` implementation assumes that the system supports
+    /// all the following signals:
+    ///
+    /// - `SIGCHLD`
+    /// - `SIGINT`
+    /// - `SIGTERM`
+    /// - `SIGQUIT`
+    /// - `SIGTSTP`
+    /// - `SIGTTIN`
+    /// - `SIGTTOU`
+    ///
+    /// If this method returns `None` for any of these signals, `TrapSet` will
+    /// panic.
     #[must_use]
-    fn signal_number_from_name(&self, name: signal::Name) -> signal::Number;
+    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number>;
 
     /// Sets how a signal is handled.
     ///
@@ -257,7 +271,9 @@ impl TrapSet {
 
         if ignore_sigint_sigquit {
             for name in [signal::Name::Int, signal::Name::Quit] {
-                let number = system.signal_number_from_name(name);
+                let number = system
+                    .signal_number_from_name(name)
+                    .unwrap_or_else(|| panic!("missing support for signal {name}"));
                 match self.traps.entry(Condition::Signal(number)) {
                     Entry::Vacant(vacant) => _ = GrandState::ignore(system, vacant),
                     // If the entry is occupied, the signal is already ignored in the loop above.
@@ -306,7 +322,9 @@ impl TrapSet {
         handling: SignalHandling,
         system: &mut S,
     ) -> Result<(), Errno> {
-        let number = system.signal_number_from_name(signal);
+        let number = system
+            .signal_number_from_name(signal)
+            .unwrap_or_else(|| panic!("missing support for signal {signal}"));
         let entry = self.traps.entry(Condition::Signal(number));
         GrandState::set_internal_handler(system, entry, handling)
     }
@@ -428,8 +446,8 @@ mod tests {
             VirtualSystem::new().signal_name_from_number(number)
         }
 
-        fn signal_number_from_name(&self, name: signal::Name) -> signal::Number {
-            VirtualSystem::new().signal_number_from_name(name).unwrap()
+        fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
+            VirtualSystem::new().signal_number_from_name(name)
         }
 
         fn set_signal_handling(

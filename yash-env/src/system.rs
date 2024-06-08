@@ -1115,9 +1115,8 @@ impl SignalSystem for SharedSystem {
     }
 
     #[inline]
-    fn signal_number_from_name(&self, name: signal::Name) -> signal::Number {
+    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
         System::signal_number_from_name(self, name)
-            .unwrap_or_else(|| panic!("unsupported signal name: {name:?}"))
     }
 
     fn set_signal_handling(
