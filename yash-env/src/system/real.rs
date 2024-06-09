@@ -33,7 +33,6 @@ use super::FileStat;
 use super::Mode;
 use super::OFlag;
 use super::Result;
-use super::SigSet;
 use super::SigmaskHow;
 use super::System;
 use super::TimeSpec;
@@ -358,12 +357,50 @@ impl System for RealSystem {
 
     fn sigmask(
         &mut self,
-        how: SigmaskHow,
-        set: Option<&SigSet>,
-        oldset: Option<&mut SigSet>,
+        op: Option<(SigmaskHow, &[signal::Number])>,
+        old_mask: Option<&mut Vec<signal::Number>>,
     ) -> Result<()> {
-        nix::sys::signal::sigprocmask(how, set, oldset)?;
-        Ok(())
+        unsafe {
+            let (how, raw_mask) = match op {
+                None => (SigmaskHow::SIG_BLOCK, None),
+                Some((how, mask)) => {
+                    let mut raw_mask = MaybeUninit::<nix::libc::sigset_t>::uninit();
+                    nix::libc::sigemptyset(raw_mask.as_mut_ptr()).errno_if_m1()?;
+                    for &signal in mask {
+                        nix::libc::sigaddset(raw_mask.as_mut_ptr(), signal.as_raw())
+                            .errno_if_m1()?;
+                    }
+                    (how, Some(raw_mask))
+                }
+            };
+            let mut old_mask_pair = match old_mask {
+                None => None,
+                Some(old_mask) => {
+                    let mut raw_old_mask = MaybeUninit::<nix::libc::sigset_t>::uninit();
+                    // POSIX requires *all* sigset_t objects to be initialized before use.
+                    nix::libc::sigemptyset(raw_old_mask.as_mut_ptr()).errno_if_m1()?;
+                    Some((old_mask, raw_old_mask))
+                }
+            };
+
+            let raw_set_ptr = raw_mask
+                .as_ref()
+                .map_or(std::ptr::null(), |raw_set| raw_set.as_ptr());
+            let raw_old_set_ptr = old_mask_pair
+                .as_mut()
+                .map_or(std::ptr::null_mut(), |(_, raw_old_mask)| {
+                    raw_old_mask.as_mut_ptr()
+                });
+            let result = nix::libc::sigprocmask(how as _, raw_set_ptr, raw_old_set_ptr);
+            result.errno_if_m1().map(drop)?;
+
+            if let Some((old_mask, raw_old_mask)) = old_mask_pair {
+                old_mask.clear();
+                signal::sigset_to_vec(raw_old_mask.as_ptr(), old_mask);
+            }
+
+            Ok(())
+        }
     }
 
     fn sigaction(
@@ -430,7 +467,7 @@ impl System for RealSystem {
         readers: &mut FdSet,
         writers: &mut FdSet,
         timeout: Option<&TimeSpec>,
-        signal_mask: Option<&SigSet>,
+        signal_mask: Option<&[signal::Number]>,
     ) -> Result<c_int> {
         use std::ptr::{null, null_mut};
         let nfds = readers.upper_bound().max(writers.upper_bound()).0;
@@ -438,10 +475,25 @@ impl System for RealSystem {
         let writers = &mut writers.inner;
         let errors = null_mut();
         let timeout = timeout.map_or(null(), |timeout| timeout.as_ref());
-        let signal_mask = signal_mask.map_or(null(), |mask| mask.as_ref());
-        let raw_result =
-            unsafe { nix::libc::pselect(nfds, readers, writers, errors, timeout, signal_mask) };
-        raw_result.errno_if_m1()
+
+        let raw_mask = match signal_mask {
+            None => None,
+            Some(mask) => {
+                let mut raw_mask = MaybeUninit::<nix::libc::sigset_t>::uninit();
+                unsafe { nix::libc::sigemptyset(raw_mask.as_mut_ptr()) }.errno_if_m1()?;
+                for &signal in mask {
+                    unsafe { nix::libc::sigaddset(raw_mask.as_mut_ptr(), signal.as_raw()) }
+                        .errno_if_m1()?;
+                }
+                Some(raw_mask)
+            }
+        };
+
+        let raw_mask_ptr = raw_mask
+            .as_ref()
+            .map_or(null(), |raw_mask| raw_mask.as_ptr());
+        unsafe { nix::libc::pselect(nfds, readers, writers, errors, timeout, raw_mask_ptr) }
+            .errno_if_m1()
     }
 
     fn getpid(&self) -> Pid {

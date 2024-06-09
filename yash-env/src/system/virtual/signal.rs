@@ -16,7 +16,6 @@
 
 //! Functions about signals
 
-use super::super::Signal;
 pub(super) use crate::signal::*;
 use std::num::NonZeroI32;
 
@@ -336,28 +335,6 @@ impl Name {
             }
             _ => None,
         }
-    }
-}
-
-// TODO Remove this
-impl Number {
-    /// Converts a signal number in the real system to a signal number in the virtual system.
-    pub(super) fn from_signal_virtual(signal: Signal) -> Self {
-        use crate::system::System as _;
-        unsafe { crate::RealSystem::new() }
-            .validate_signal(signal as RawNumber)
-            .and_then(|(name, _real_number)| name.to_raw_virtual())
-            .unwrap()
-    }
-
-    /// Converts a signal number in the virtual system to a signal number in the real system.
-    pub(super) fn to_signal_virtual(self) -> Option<Signal> {
-        use crate::system::System as _;
-        unsafe { crate::RealSystem::new() }
-            .signal_number_from_name(Name::try_from_raw_virtual(self.as_raw())?)?
-            .as_raw()
-            .try_into()
-            .ok()
     }
 }
 

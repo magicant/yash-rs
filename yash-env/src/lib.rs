@@ -474,7 +474,6 @@ mod tests {
     use futures_executor::LocalPool;
     use futures_util::task::LocalSpawnExt as _;
     use futures_util::FutureExt as _;
-    use nix::sys::signal::Signal;
     use std::cell::RefCell;
     use yash_syntax::source::Location;
 
@@ -519,7 +518,7 @@ mod tests {
             {
                 let mut state = state.borrow_mut();
                 let process = state.processes.get_mut(&env.main_pid).unwrap();
-                assert!(process.blocked_signals().contains(Signal::SIGCHLD));
+                assert!(process.blocked_signals().contains(&SIGCHLD));
                 let _ = process.raise_signal(SIGCHLD);
             }
             env.wait_for_signal(SIGCHLD).await;
@@ -558,7 +557,7 @@ mod tests {
         {
             let mut state = system.state.borrow_mut();
             let process = state.processes.get_mut(&system.process_id).unwrap();
-            assert!(process.blocked_signals().contains(Signal::SIGCHLD));
+            assert!(process.blocked_signals().contains(&SIGCHLD));
             let _ = process.raise_signal(SIGCHLD);
         }
 

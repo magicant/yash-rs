@@ -29,15 +29,14 @@
 use crate::job::Pid;
 use crate::job::ProcessResult;
 use crate::job::ProcessState;
+use crate::signal;
 use crate::stack::Frame;
 use crate::system::ChildProcessTask;
 use crate::system::Errno;
-use crate::system::SigSet;
 use crate::system::SigmaskHow::{SIG_BLOCK, SIG_SETMASK};
 use crate::system::System;
 use crate::system::SystemEx;
 use crate::Env;
-use nix::sys::signal::Signal;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -263,7 +262,7 @@ where
 #[derive(Debug)]
 struct MaskGuard<'a> {
     env: &'a mut Env,
-    old_mask: Option<SigSet>,
+    old_mask: Option<Vec<signal::Number>>,
 }
 
 impl<'a> MaskGuard<'a> {
@@ -275,15 +274,19 @@ impl<'a> MaskGuard<'a> {
     fn block_sigint_sigquit(&mut self) -> bool {
         assert_eq!(self.old_mask, None);
 
-        let mut sigint_sigquit = SigSet::empty();
-        let mut old_mask = SigSet::empty();
-        sigint_sigquit.add(Signal::SIGINT);
-        sigint_sigquit.add(Signal::SIGQUIT);
+        let Some(sigint) = self.env.system.signal_number_from_name(signal::Name::Int) else {
+            return false;
+        };
+        let Some(sigquit) = self.env.system.signal_number_from_name(signal::Name::Quit) else {
+            return false;
+        };
+
+        let mut old_mask = Vec::new();
 
         let success = self
             .env
             .system
-            .sigmask(SIG_BLOCK, Some(&sigint_sigquit), Some(&mut old_mask))
+            .sigmask(Some((SIG_BLOCK, &[sigint, sigquit])), Some(&mut old_mask))
             .is_ok();
         if success {
             self.old_mask = Some(old_mask);
@@ -297,7 +300,7 @@ impl<'a> Drop for MaskGuard<'a> {
         if let Some(old_mask) = &self.old_mask {
             self.env
                 .system
-                .sigmask(SIG_SETMASK, Some(old_mask), None)
+                .sigmask(Some((SIG_SETMASK, old_mask)), None)
                 .ok();
         }
     }
@@ -653,8 +656,8 @@ mod tests {
 
             let state = state.borrow();
             let parent_process = &state.processes[&parent_env.main_pid];
-            assert!(!parent_process.blocked_signals().contains(Signal::SIGINT));
-            assert!(!parent_process.blocked_signals().contains(Signal::SIGQUIT));
+            assert!(!parent_process.blocked_signals().contains(&SIGINT));
+            assert!(!parent_process.blocked_signals().contains(&SIGQUIT));
             let child_process = &state.processes[&child_pid];
             assert_eq!(
                 child_process.signal_handling(SIGINT),
