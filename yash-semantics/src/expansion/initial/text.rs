@@ -23,7 +23,6 @@ use super::param::ParamRef;
 use super::Env;
 use super::Expand;
 use super::Phrase;
-use futures_util::FutureExt;
 use yash_syntax::syntax::Text;
 use yash_syntax::syntax::TextUnit::{self, *};
 use yash_syntax::syntax::Unquote;
@@ -103,18 +102,16 @@ impl Expand for TextUnit {
             }
 
             RawParam { name, location } => {
-                let modifier = &yash_syntax::syntax::Modifier::None;
                 let param = ParamRef {
                     name,
-                    modifier,
+                    modifier: &yash_syntax::syntax::Modifier::None,
                     location,
                 };
-                param.expand(env).boxed_local().await // Boxing needed for recursion
+                Box::pin(param.expand(env)).await // Boxing needed for recursion
             }
 
-            BracedParam(param) => {
-                ParamRef::from(param).expand(env).boxed_local().await // Boxing needed for recursion
-            }
+            // Boxing needed for recursion
+            BracedParam(param) => Box::pin(ParamRef::from(param).expand(env)).await,
 
             CommandSubst { content, location } => {
                 let command = content.clone();
@@ -129,9 +126,8 @@ impl Expand for TextUnit {
             }
 
             Arith { content, location } => {
-                super::arith::expand(content, location, env)
-                    .boxed_local() // Boxing needed for recursion
-                    .await
+                // Boxing needed for recursion
+                Box::pin(super::arith::expand(content, location, env)).await
             }
         }
     }

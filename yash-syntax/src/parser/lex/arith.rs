@@ -20,10 +20,7 @@ use super::core::Lexer;
 use crate::parser::core::Result;
 use crate::parser::error::Error;
 use crate::parser::error::SyntaxError;
-use crate::syntax::Text;
 use crate::syntax::TextUnit;
-use std::future::Future;
-use std::pin::Pin;
 
 impl Lexer<'_> {
     /// Parses an arithmetic expansion.
@@ -56,9 +53,7 @@ impl Lexer<'_> {
         let is_delimiter = |c| c == ')';
         let is_escapable = |c| matches!(c, '$' | '`' | '\\');
         // Boxing needed for recursion
-        let content: Pin<Box<dyn Future<Output = Result<Text>>>> =
-            Box::pin(self.text_with_parentheses(is_delimiter, is_escapable));
-        let content = content.await?;
+        let content = Box::pin(self.text_with_parentheses(is_delimiter, is_escapable)).await?;
 
         // Part 3: Parse `))`
         match self.peek_char().await? {

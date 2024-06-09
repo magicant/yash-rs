@@ -29,9 +29,6 @@ use crate::syntax::SwitchType;
 use crate::syntax::Trim;
 use crate::syntax::TrimLength;
 use crate::syntax::TrimSide;
-use crate::syntax::Word;
-use std::future::Future;
-use std::pin::Pin;
 
 impl Lexer<'_> {
     /// Returns an invalid modifier error.
@@ -78,9 +75,7 @@ impl Lexer<'_> {
             context: WordContext::Word,
         };
         // Boxing needed for recursion
-        let pattern =
-            Box::pin(lexer.word(|c| c == '}')) as Pin<Box<dyn Future<Output = Result<Word>>>>;
-        let mut pattern = pattern.await?;
+        let mut pattern = Box::pin(lexer.word(|c| c == '}')).await?;
         pattern.parse_tilde_front();
 
         Ok(Modifier::Trim(Trim {
@@ -113,8 +108,7 @@ impl WordLexer<'_, '_> {
         };
 
         // Boxing needed for recursion
-        let word = Box::pin(self.word(|c| c == '}')) as Pin<Box<dyn Future<Output = Result<Word>>>>;
-        let mut word = word.await?;
+        let mut word = Box::pin(self.word(|c| c == '}')).await?;
         match self.context {
             WordContext::Text => (),
             WordContext::Word => word.parse_tilde_front(),
