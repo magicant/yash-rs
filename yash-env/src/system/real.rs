@@ -635,8 +635,8 @@ impl System for RealSystem {
     /// [`confstr_path`](Self::confstr_path).
     fn shell_path(&self) -> CString {
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        if self.is_executable_file(CStr::from_bytes_with_nul(b"/proc/self/exe\0").unwrap()) {
-            return CString::new("/proc/self/exe").unwrap();
+        if self.is_executable_file(c"/proc/self/exe") {
+            return c"/proc/self/exe".to_owned();
         }
         // TODO Add optimization for other targets
 
@@ -655,7 +655,7 @@ impl System for RealSystem {
         }
 
         // The last resort
-        CString::new("/bin/sh").unwrap()
+        c"/bin/sh".to_owned()
     }
 
     fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair> {
@@ -717,8 +717,7 @@ mod tests {
     #[test]
     fn real_system_directory_entries() {
         let mut system = unsafe { RealSystem::new() };
-        let path = CString::new(".").unwrap();
-        let mut dir = system.opendir(&path).unwrap();
+        let mut dir = system.opendir(c".").unwrap();
         let mut count = 0;
         while dir.next().unwrap().is_some() {
             count += 1;

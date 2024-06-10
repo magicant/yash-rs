@@ -312,7 +312,6 @@ impl Identify {
 mod tests {
     use super::*;
     use crate::command::Search;
-    use std::ffi::CString;
     use yash_env::builtin::Builtin;
     use yash_env::function::Function;
     use yash_syntax::alias::HashEntry;
@@ -332,14 +331,14 @@ mod tests {
         }
 
         let mut external_target = Target::External {
-            path: CString::new("/bin/sh").unwrap(),
+            path: c"/bin/sh".to_owned(),
         };
         let result = normalize_target(&TestEnv, &mut external_target);
         assert_eq!(result, Ok(()));
         assert_eq!(
             external_target,
             Target::External {
-                path: CString::new("/bin/sh").unwrap(),
+                path: c"/bin/sh".to_owned(),
             }
         );
 
@@ -349,7 +348,7 @@ mod tests {
         };
         let mut builtin_target = Target::Builtin {
             builtin,
-            path: Some(CString::new("/usr/bin/echo").unwrap()),
+            path: Some(c"/usr/bin/echo".to_owned()),
         };
         let result = normalize_target(&TestEnv, &mut builtin_target);
         assert_eq!(result, Ok(()));
@@ -357,7 +356,7 @@ mod tests {
             builtin_target,
             Target::Builtin {
                 builtin,
-                path: Some(CString::new("/usr/bin/echo").unwrap()),
+                path: Some(c"/usr/bin/echo".to_owned()),
             }
         );
     }
@@ -375,14 +374,14 @@ mod tests {
         }
 
         let mut external_target = Target::External {
-            path: CString::new("foo/sh").unwrap(),
+            path: c"foo/sh".to_owned(),
         };
         let result = normalize_target(&TestEnv, &mut external_target);
         assert_eq!(result, Ok(()));
         assert_eq!(
             external_target,
             Target::External {
-                path: CString::new("/bin/foo/sh").unwrap(),
+                path: c"/bin/foo/sh".to_owned(),
             }
         );
     }
@@ -400,7 +399,7 @@ mod tests {
         }
 
         let mut external_target = Target::External {
-            path: CString::new("/bin/sh").unwrap(),
+            path: c"/bin/sh".to_owned(),
         };
         let result = normalize_target(&TestEnv, &mut external_target);
         assert_eq!(result, Err(()));
@@ -516,7 +515,7 @@ mod tests {
                 r#type: Type::Substitutive,
                 execute: |_, _| unreachable!(),
             },
-            path: Some(CString::new("/bin/echo").unwrap()),
+            path: Some(c"/bin/echo".to_owned()),
         };
 
         let mut output = String::new();
@@ -549,7 +548,7 @@ mod tests {
     fn describe_external() {
         let name = &Field::dummy("ls");
         let target = &Target::External {
-            path: CString::new("/bin/ls").unwrap(),
+            path: c"/bin/ls".to_owned(),
         };
 
         let mut output = String::new();

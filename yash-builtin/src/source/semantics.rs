@@ -236,17 +236,14 @@ mod tests {
     #[test]
     fn open_file_result_lower_bound() {
         let mut system = system_with_file("/foo/file", "");
-        let path = CString::new("/foo/file").unwrap();
-        let result = open_file(&mut system, &path);
+        let result = open_file(&mut system, c"/foo/file");
         assert_matches!(result, Ok(fd) if fd >= MIN_INTERNAL_FD);
     }
 
     #[test]
     fn open_file_result_cloexec() {
         let mut system = system_with_file("/foo/file", "");
-        let path = CString::new("/foo/file").unwrap();
-
-        let fd = open_file(&mut system, &path).unwrap();
+        let fd = open_file(&mut system, c"/foo/file").unwrap();
 
         let process = system.current_process();
         let fd_body = process.get_fd(fd).unwrap();

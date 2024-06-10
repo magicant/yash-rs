@@ -19,7 +19,6 @@
 use crate::trap::run_exit_trap;
 
 use super::Command;
-use std::ffi::CStr;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::io::print_error;
@@ -115,7 +114,7 @@ fn nullify_stdin(env: &mut Env) -> std::result::Result<(), yash_env::system::Err
     env.system.close(Fd::STDIN)?;
 
     use yash_env::system::{Mode, OFlag};
-    let path = CStr::from_bytes_with_nul(b"/dev/null\0").unwrap();
+    let path = c"/dev/null";
     let fd = env.system.open(path, OFlag::O_RDONLY, Mode::empty())?;
     assert_eq!(fd, Fd::STDIN);
     Ok(())

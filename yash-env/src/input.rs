@@ -128,7 +128,6 @@ mod tests {
     use crate::System;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
-    use std::ffi::CStr;
 
     #[test]
     fn empty_reader() {
@@ -215,7 +214,7 @@ mod tests {
             state.file_system.save("/foo", file).unwrap();
         }
         let mut system = SharedSystem::new(Box::new(system));
-        let path = CStr::from_bytes_with_nul(b"/foo\0").unwrap();
+        let path = c"/foo";
         let fd = system.open(path, OFlag::O_RDONLY, Mode::empty()).unwrap();
         let mut reader = FdReader::new(fd, system);
 

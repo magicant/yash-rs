@@ -1037,7 +1037,7 @@ impl System for VirtualSystem {
     ///
     /// The current implementation returns "/bin/sh".
     fn shell_path(&self) -> CString {
-        CString::new("/bin/sh").unwrap()
+        c"/bin/sh".to_owned()
     }
 
     fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair> {
@@ -1294,11 +1294,7 @@ mod tests {
     fn fstatat_non_existent_file() {
         let system = VirtualSystem::new();
         assert_matches!(
-            system.fstatat(
-                Fd(0),
-                &CString::new("/no/such/file").unwrap(),
-                AtFlags::empty()
-            ),
+            system.fstatat(Fd(0), c"/no/such/file", AtFlags::empty()),
             Err(Errno::ENOENT)
         );
     }
@@ -1313,11 +1309,7 @@ mod tests {
         drop(state);
 
         let stat = system
-            .fstatat(
-                Fd(0),
-                &CString::new("/some/file").unwrap(),
-                AtFlags::empty(),
-            )
+            .fstatat(Fd(0), c"/some/file", AtFlags::empty())
             .unwrap();
         assert_eq!(stat.st_mode, SFlag::S_IFREG.bits() | Mode::default().0);
         assert_eq!(stat.st_size, 5);
@@ -1333,9 +1325,7 @@ mod tests {
         state.file_system.save(path, content).unwrap();
         drop(state);
 
-        let stat = system
-            .fstatat(Fd(0), &CString::new("/some/").unwrap(), AtFlags::empty())
-            .unwrap();
+        let stat = system.fstatat(Fd(0), c"/some/", AtFlags::empty()).unwrap();
         assert_eq!(stat.st_mode, SFlag::S_IFDIR.bits() | 0o755);
         // TODO Other stat properties
     }
@@ -1357,11 +1347,7 @@ mod tests {
         drop(state);
 
         let stat = system
-            .fstatat(
-                Fd(0),
-                &CString::new("/some/fifo").unwrap(),
-                AtFlags::empty(),
-            )
+            .fstatat(Fd(0), c"/some/fifo", AtFlags::empty())
             .unwrap();
         assert_eq!(stat.st_mode, SFlag::S_IFIFO.bits() | Mode::default().0);
         assert_eq!(stat.st_size, 42);
@@ -1393,9 +1379,7 @@ mod tests {
     #[test]
     fn fstatat_symlink_to_regular_file() {
         let system = system_with_symlink();
-        let stat = system
-            .fstatat(Fd(0), &CString::new("/link").unwrap(), AtFlags::empty())
-            .unwrap();
+        let stat = system.fstatat(Fd(0), c"/link", AtFlags::empty()).unwrap();
         assert_eq!(stat.st_mode, SFlag::S_IFREG.bits() | Mode::default().0);
     }
 
@@ -1403,11 +1387,7 @@ mod tests {
     fn fstatat_symlink_no_follow() {
         let system = system_with_symlink();
         let stat = system
-            .fstatat(
-                Fd(0),
-                &CString::new("/link").unwrap(),
-                AtFlags::AT_SYMLINK_NOFOLLOW,
-            )
+            .fstatat(Fd(0), c"/link", AtFlags::AT_SYMLINK_NOFOLLOW)
             .unwrap();
         assert_eq!(stat.st_mode, SFlag::S_IFLNK.bits() | Mode::default().0);
     }
@@ -1415,7 +1395,7 @@ mod tests {
     #[test]
     fn is_executable_file_non_existing_file() {
         let system = VirtualSystem::new();
-        assert!(!system.is_executable_file(&CString::new("/no/such/file").unwrap()));
+        assert!(!system.is_executable_file(c"/no/such/file"));
     }
 
     #[test]
@@ -1426,7 +1406,7 @@ mod tests {
         let mut state = system.state.borrow_mut();
         state.file_system.save(path, content).unwrap();
         drop(state);
-        assert!(!system.is_executable_file(&CString::new("/some/file").unwrap()));
+        assert!(!system.is_executable_file(c"/some/file"));
     }
 
     #[test]
@@ -1439,7 +1419,7 @@ mod tests {
         let mut state = system.state.borrow_mut();
         state.file_system.save(path, content).unwrap();
         drop(state);
-        assert!(system.is_executable_file(&CString::new("/some/file").unwrap()));
+        assert!(system.is_executable_file(c"/some/file"));
     }
 
     #[test]
@@ -1515,7 +1495,7 @@ mod tests {
     fn open_non_existing_file_no_creation() {
         let mut system = VirtualSystem::new();
         let result = system.open(
-            &CString::new("/no/such/file").unwrap(),
+            c"/no/such/file",
             OFlag::O_RDONLY,
             nix::sys::stat::Mode::empty(),
         );
@@ -1526,7 +1506,7 @@ mod tests {
     fn open_creating_non_existing_file() {
         let mut system = VirtualSystem::new();
         let result = system.open(
-            &CString::new("new_file").unwrap(),
+            c"new_file",
             OFlag::O_WRONLY | OFlag::O_CREAT,
             nix::sys::stat::Mode::empty(),
         );
@@ -1545,18 +1525,14 @@ mod tests {
         let mut system = VirtualSystem::new();
         let fd = system
             .open(
-                &CString::new("file").unwrap(),
+                c"file",
                 OFlag::O_WRONLY | OFlag::O_CREAT,
                 nix::sys::stat::Mode::all(),
             )
             .unwrap();
         system.write(fd, &[75, 96, 133]).unwrap();
 
-        let result = system.open(
-            &CString::new("file").unwrap(),
-            OFlag::O_RDONLY,
-            nix::sys::stat::Mode::empty(),
-        );
+        let result = system.open(c"file", OFlag::O_RDONLY, nix::sys::stat::Mode::empty());
         assert_eq!(result, Ok(Fd(4)));
 
         let mut buffer = [0; 5];
@@ -1571,14 +1547,14 @@ mod tests {
     fn open_existing_file_excl() {
         let mut system = VirtualSystem::new();
         let first = system.open(
-            &CString::new("my_file").unwrap(),
+            c"my_file",
             OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_EXCL,
             nix::sys::stat::Mode::empty(),
         );
         assert_eq!(first, Ok(Fd(3)));
 
         let second = system.open(
-            &CString::new("my_file").unwrap(),
+            c"my_file",
             OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_EXCL,
             nix::sys::stat::Mode::empty(),
         );
@@ -1590,7 +1566,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         let fd = system
             .open(
-                &CString::new("file").unwrap(),
+                c"file",
                 OFlag::O_WRONLY | OFlag::O_CREAT,
                 nix::sys::stat::Mode::all(),
             )
@@ -1598,18 +1574,14 @@ mod tests {
         system.write(fd, &[1, 2, 3]).unwrap();
 
         let result = system.open(
-            &CString::new("file").unwrap(),
+            c"file",
             OFlag::O_WRONLY | OFlag::O_TRUNC,
             nix::sys::stat::Mode::empty(),
         );
         assert_eq!(result, Ok(Fd(4)));
 
         let reader = system
-            .open(
-                &CString::new("file").unwrap(),
-                OFlag::O_RDONLY,
-                nix::sys::stat::Mode::empty(),
-            )
+            .open(c"file", OFlag::O_RDONLY, nix::sys::stat::Mode::empty())
             .unwrap();
         let count = system.read(reader, &mut [0; 1]).unwrap();
         assert_eq!(count, 0);
@@ -1620,7 +1592,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         let fd = system
             .open(
-                &CString::new("file").unwrap(),
+                c"file",
                 OFlag::O_WRONLY | OFlag::O_CREAT,
                 nix::sys::stat::Mode::all(),
             )
@@ -1628,7 +1600,7 @@ mod tests {
         system.write(fd, &[1, 2, 3]).unwrap();
 
         let result = system.open(
-            &CString::new("file").unwrap(),
+            c"file",
             OFlag::O_WRONLY | OFlag::O_APPEND,
             nix::sys::stat::Mode::empty(),
         );
@@ -1636,11 +1608,7 @@ mod tests {
         system.write(Fd(4), &[4, 5, 6]).unwrap();
 
         let reader = system
-            .open(
-                &CString::new("file").unwrap(),
-                OFlag::O_RDONLY,
-                nix::sys::stat::Mode::empty(),
-            )
+            .open(c"file", OFlag::O_RDONLY, nix::sys::stat::Mode::empty())
             .unwrap();
         let mut buffer = [0; 7];
         let count = system.read(reader, &mut buffer).unwrap();
@@ -1654,13 +1622,13 @@ mod tests {
 
         // Create a regular file and its parent directory
         let _ = system.open(
-            &CString::new("/dir/file").unwrap(),
+            c"/dir/file",
             OFlag::O_WRONLY | OFlag::O_CREAT,
             nix::sys::stat::Mode::empty(),
         );
 
         let result = system.open(
-            &CString::new("/dir").unwrap(),
+            c"/dir",
             OFlag::O_RDONLY | OFlag::O_DIRECTORY,
             nix::sys::stat::Mode::empty(),
         );
@@ -1673,13 +1641,13 @@ mod tests {
 
         // Create a regular file
         let _ = system.open(
-            &CString::new("/file").unwrap(),
+            c"/file",
             OFlag::O_WRONLY | OFlag::O_CREAT,
             nix::sys::stat::Mode::empty(),
         );
 
         let result = system.open(
-            &CString::new("/file/file").unwrap(),
+            c"/file/file",
             OFlag::O_WRONLY | OFlag::O_CREAT,
             nix::sys::stat::Mode::empty(),
         );
@@ -1692,13 +1660,13 @@ mod tests {
 
         // Create a regular file
         let _ = system.open(
-            &CString::new("/file").unwrap(),
+            c"/file",
             OFlag::O_WRONLY | OFlag::O_CREAT,
             nix::sys::stat::Mode::empty(),
         );
 
         let result = system.open(
-            &CString::new("/file").unwrap(),
+            c"/file",
             OFlag::O_RDONLY | OFlag::O_DIRECTORY,
             nix::sys::stat::Mode::empty(),
         );
@@ -1711,14 +1679,14 @@ mod tests {
         let mut system = VirtualSystem::new();
 
         let writer = system.open(
-            &CString::new("/dir/file").unwrap(),
+            c"/dir/file",
             OFlag::O_WRONLY | OFlag::O_CREAT,
             nix::sys::stat::Mode::all(),
         );
         system.write(writer.unwrap(), &[1, 2, 3, 42]).unwrap();
 
         let reader = system.open(
-            &CString::new("./dir/file").unwrap(),
+            c"./dir/file",
             OFlag::O_RDONLY,
             nix::sys::stat::Mode::empty(),
         );
@@ -1756,18 +1724,10 @@ mod tests {
     fn fcntl_getfl() {
         let mut system = VirtualSystem::new();
         let mode = nix::sys::stat::Mode::all();
-        let reader = system
-            .open(&CString::new("/dev/stdin").unwrap(), OFlag::O_RDONLY, mode)
-            .unwrap();
-        let writer = system
-            .open(&CString::new("/dev/stdout").unwrap(), OFlag::O_WRONLY, mode)
-            .unwrap();
+        let reader = system.open(c"/dev/stdin", OFlag::O_RDONLY, mode).unwrap();
+        let writer = system.open(c"/dev/stdout", OFlag::O_WRONLY, mode).unwrap();
         let appender = system
-            .open(
-                &CString::new("/dev/stdout").unwrap(),
-                OFlag::O_RDWR | OFlag::O_APPEND,
-                mode,
-            )
+            .open(c"/dev/stdout", OFlag::O_RDWR | OFlag::O_APPEND, mode)
             .unwrap();
 
         assert_eq!(system.fcntl_getfl(reader), Ok(OFlag::O_RDONLY));
@@ -1806,12 +1766,12 @@ mod tests {
         let mut system = VirtualSystem::new();
 
         let _ = system.open(
-            &CString::new("/dir/file").unwrap(),
+            c"/dir/file",
             OFlag::O_WRONLY | OFlag::O_CREAT,
             nix::sys::stat::Mode::all(),
         );
 
-        let mut dir = system.opendir(&CString::new("./dir").unwrap()).unwrap();
+        let mut dir = system.opendir(c"./dir").unwrap();
         let mut files = Vec::new();
         while let Some(entry) = dir.next().unwrap() {
             files.push(entry.name.to_os_string());
@@ -2591,11 +2551,8 @@ mod tests {
         state.file_system.save(path, content).unwrap();
         drop(state);
         let path = CString::new(path).unwrap();
-        let args = [CString::new("file").unwrap(), CString::new("bar").unwrap()];
-        let envs = [
-            CString::new("foo=FOO").unwrap(),
-            CString::new("baz").unwrap(),
-        ];
+        let args = [c"file".to_owned(), c"bar".to_owned()];
+        let envs = [c"foo=FOO".to_owned(), c"baz".to_owned()];
         let _ = system.execve(&path, &args, &envs);
 
         let process = system.current_process();
@@ -2623,8 +2580,7 @@ mod tests {
     #[test]
     fn execve_returns_enoent_on_file_not_found() {
         let mut system = VirtualSystem::new();
-        let path = CString::new("/no/such/file").unwrap();
-        let result = system.execve(&path, &[], &[]);
+        let result = system.execve(c"/no/such/file", &[], &[]);
         assert_eq!(result, Err(Errno::ENOENT));
     }
 
@@ -2634,12 +2590,12 @@ mod tests {
 
         // Create a regular file and its parent directory
         let _ = system.open(
-            &CString::new("/dir/file").unwrap(),
+            c"/dir/file",
             OFlag::O_WRONLY | OFlag::O_CREAT,
             nix::sys::stat::Mode::empty(),
         );
 
-        let result = system.chdir(CStr::from_bytes_with_nul(b"/dir\0").unwrap());
+        let result = system.chdir(c"/dir");
         assert_eq!(result, Ok(()));
         assert_eq!(system.current_process().cwd, Path::new("/dir"));
     }
@@ -2648,7 +2604,7 @@ mod tests {
     fn chdir_fails_with_non_existing_directory() {
         let mut system = VirtualSystem::new();
 
-        let result = system.chdir(CStr::from_bytes_with_nul(b"/no/such/dir\0").unwrap());
+        let result = system.chdir(c"/no/such/dir");
         assert_eq!(result, Err(Errno::ENOENT));
     }
 
@@ -2658,12 +2614,12 @@ mod tests {
 
         // Create a regular file and its parent directory
         let _ = system.open(
-            &CString::new("/dir/file").unwrap(),
+            c"/dir/file",
             OFlag::O_WRONLY | OFlag::O_CREAT,
             nix::sys::stat::Mode::empty(),
         );
 
-        let result = system.chdir(CStr::from_bytes_with_nul(b"/dir/file\0").unwrap());
+        let result = system.chdir(c"/dir/file");
         assert_eq!(result, Err(Errno::ENOTDIR));
     }
 

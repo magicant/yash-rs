@@ -58,7 +58,6 @@ use self::variable::VariableRefMut;
 use self::variable::VariableSet;
 use futures_util::task::noop_waker_ref;
 use std::collections::HashMap;
-use std::ffi::CStr;
 use std::fmt::Debug;
 use std::future::Future;
 use std::ops::ControlFlow::{self, Break, Continue};
@@ -292,7 +291,7 @@ impl Env {
         }
 
         let first_fd = self.system.open(
-            CStr::from_bytes_with_nul(b"/dev/tty\0").unwrap(),
+            c"/dev/tty",
             crate::system::OFlag::O_RDWR | crate::system::OFlag::O_CLOEXEC,
             crate::system::Mode::empty(),
         )?;

@@ -183,9 +183,9 @@ mod tests {
 
         let process = &system.current_process();
         let arguments = process.last_exec().as_ref().unwrap();
-        assert_eq!(arguments.0, CString::new("/bin/echo").unwrap());
-        assert_eq!(arguments.1, [CString::new("echo").unwrap()]);
-        assert_eq!(arguments.2, [CString::new("PATH=/bin").unwrap()]);
+        assert_eq!(arguments.0, c"/bin/echo".to_owned());
+        assert_eq!(arguments.1, [c"echo".to_owned()]);
+        assert_eq!(arguments.2, [c"PATH=/bin".to_owned()]);
     }
 
     #[test]
@@ -218,12 +218,9 @@ mod tests {
 
         let process = &system.current_process();
         let arguments = process.last_exec().as_ref().unwrap();
-        assert_eq!(arguments.0, CString::new("/usr/bin/ls").unwrap());
-        assert_eq!(
-            arguments.1,
-            [CString::new("ls").unwrap(), CString::new("-l").unwrap()]
-        );
-        assert_eq!(arguments.2, [CString::new("PATH=/usr/bin").unwrap()]);
+        assert_eq!(arguments.0, c"/usr/bin/ls".to_owned());
+        assert_eq!(arguments.1, [c"ls".to_owned(), c"-l".to_owned()]);
+        assert_eq!(arguments.2, [c"PATH=/usr/bin".to_owned()]);
     }
 
     #[test]
@@ -251,8 +248,8 @@ mod tests {
 
         let process = &system.current_process();
         let arguments = process.last_exec().as_ref().unwrap();
-        assert_eq!(arguments.0, CString::new("/bin/echo").unwrap());
-        assert_eq!(arguments.1, [CString::new("/bin/echo").unwrap()]);
+        assert_eq!(arguments.0, c"/bin/echo".to_owned());
+        assert_eq!(arguments.1, [c"/bin/echo".to_owned()]);
         assert_eq!(arguments.2, []);
     }
 
