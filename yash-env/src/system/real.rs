@@ -64,6 +64,7 @@ use std::os::unix::io::IntoRawFd;
 use std::path::Path;
 use std::path::PathBuf;
 use std::pin::Pin;
+use std::ptr::addr_of;
 use std::ptr::NonNull;
 use std::sync::atomic::compiler_fence;
 use std::sync::atomic::AtomicIsize;
@@ -325,22 +326,26 @@ impl System for RealSystem {
 
     fn times(&self) -> Result<Times> {
         let mut tms = MaybeUninit::<nix::libc::tms>::uninit();
-        let raw_result = unsafe { nix::libc::times(tms.as_mut_ptr()) };
-        if raw_result == (-1) as _ {
-            return Err(Errno::last());
-        }
-        let tms = unsafe { tms.assume_init() };
+        unsafe { nix::libc::times(tms.as_mut_ptr()) }.errno_if_m1()?;
 
         let ticks_per_second = unsafe { nix::libc::sysconf(nix::libc::_SC_CLK_TCK) };
         if ticks_per_second <= 0 {
             return Err(Errno::last());
         }
 
+        // SAFETY: The four fields of `tms` have been initialized by `times`.
+        // (But that does not mean *all* fields are initialized,
+        // so we cannot use `assume_init` here.)
+        let utime = unsafe { addr_of!((*tms.as_ptr()).tms_utime).read() };
+        let stime = unsafe { addr_of!((*tms.as_ptr()).tms_stime).read() };
+        let cutime = unsafe { addr_of!((*tms.as_ptr()).tms_cutime).read() };
+        let cstime = unsafe { addr_of!((*tms.as_ptr()).tms_cstime).read() };
+
         Ok(Times {
-            self_user: tms.tms_utime as f64 / ticks_per_second as f64,
-            self_system: tms.tms_stime as f64 / ticks_per_second as f64,
-            children_user: tms.tms_cutime as f64 / ticks_per_second as f64,
-            children_system: tms.tms_cstime as f64 / ticks_per_second as f64,
+            self_user: utime as f64 / ticks_per_second as f64,
+            self_system: stime as f64 / ticks_per_second as f64,
+            children_user: cutime as f64 / ticks_per_second as f64,
+            children_system: cstime as f64 / ticks_per_second as f64,
         })
     }
 

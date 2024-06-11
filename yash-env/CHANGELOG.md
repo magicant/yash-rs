@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - External dependency versions:
     - Rust 1.70.0 → 1.77.0
 
+### Fixed
+
+- Possible undefined behavior in `RealSystem::times`
+
 ## [0.2.0] - 2024-06-09
 
 ### Added
