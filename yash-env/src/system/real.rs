@@ -326,7 +326,10 @@ impl System for RealSystem {
 
     fn times(&self) -> Result<Times> {
         let mut tms = MaybeUninit::<nix::libc::tms>::uninit();
-        unsafe { nix::libc::times(tms.as_mut_ptr()) }.errno_if_m1()?;
+        let raw_result = unsafe { nix::libc::times(tms.as_mut_ptr()) };
+        if raw_result == (-1) as _ {
+            return Err(Errno::last());
+        }
 
         let ticks_per_second = unsafe { nix::libc::sysconf(nix::libc::_SC_CLK_TCK) };
         if ticks_per_second <= 0 {
