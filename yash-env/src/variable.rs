@@ -1267,9 +1267,9 @@ mod tests {
         assert_eq!(
             &ss,
             &[
-                CString::new("bar=BAR").unwrap(),
-                CString::new("baz=1:two:3").unwrap(),
-                CString::new("foo=FOO").unwrap()
+                c"bar=BAR".to_owned(),
+                c"baz=1:two:3".to_owned(),
+                c"foo=FOO".to_owned()
             ]
         );
     }

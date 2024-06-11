@@ -24,7 +24,6 @@ mod pipeline;
 pub mod simple_command;
 
 use crate::trap::run_traps_for_caught_signals;
-use futures_util::FutureExt as _;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::semantics::Result;
 use yash_env::Env;
@@ -72,13 +71,13 @@ impl Command for syntax::Command {
 /// executed.
 impl Command for syntax::List {
     async fn execute(&self, env: &mut Env) -> Result {
-        async move {
+        // Boxing needed for recursion
+        Box::pin(async move {
             for item in &self.0 {
                 item.execute(env).await?
             }
             Continue(())
-        }
-        .boxed_local() // Boxing needed for recursion
+        })
         .await
     }
 }

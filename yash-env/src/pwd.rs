@@ -26,7 +26,6 @@ use crate::variable::Value::Scalar;
 use crate::variable::Variable;
 use crate::System;
 use nix::sys::stat::FileStat;
-use std::ffi::CStr;
 use std::ffi::CString;
 use std::path::Path;
 use thiserror::Error;
@@ -72,8 +71,7 @@ impl Env {
                 const AT_FLAGS: AtFlags = AtFlags::empty();
                 let cstr_pwd = CString::new(pwd.as_bytes()).ok()?;
                 let s1 = self.system.fstatat(AT_FDCWD, &cstr_pwd, AT_FLAGS).ok()?;
-                let dot = CStr::from_bytes_with_nul(b".\0").unwrap();
-                let s2 = self.system.fstatat(AT_FDCWD, dot, AT_FLAGS).ok()?;
+                let s2 = self.system.fstatat(AT_FDCWD, c".", AT_FLAGS).ok()?;
                 same_files(&s1, &s2).then_some(pwd)
             }
             _ => None,

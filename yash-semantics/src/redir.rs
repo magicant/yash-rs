@@ -664,7 +664,6 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use std::cell::RefCell;
-    use std::ffi::CStr;
     use std::rc::Rc;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::INode;
@@ -829,7 +828,7 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             e.cause,
-            ErrorCause::OpenFile(CString::new("no_such_file").unwrap(), Errno::ENOENT)
+            ErrorCause::OpenFile(c"no_such_file".to_owned(), Errno::ENOENT)
         );
         assert_eq!(e.location, redir.body.operand().location);
     }
@@ -895,11 +894,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let fd = env
             .system
-            .open(
-                CStr::from_bytes_with_nul(b"foo\0").unwrap(),
-                OFlag::O_WRONLY | OFlag::O_CREAT,
-                Mode::all(),
-            )
+            .open(c"foo", OFlag::O_WRONLY | OFlag::O_CREAT, Mode::all())
             .unwrap();
         env.system.fcntl_setfd(fd, FdFlag::FD_CLOEXEC).unwrap();
 
@@ -1091,7 +1086,7 @@ mod tests {
 
         assert_eq!(
             e.cause,
-            ErrorCause::OpenFile(CString::new("foo").unwrap(), Errno::EEXIST)
+            ErrorCause::OpenFile(c"foo".to_owned(), Errno::EEXIST)
         );
         assert_eq!(e.location, redir.body.operand().location);
         let file = file.borrow();

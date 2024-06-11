@@ -184,7 +184,7 @@ impl SearchEnv<'_> {
             }
             Some(Err(pattern)) => {
                 let dir_path = if self.prefix.is_empty() {
-                    CString::new(".").unwrap()
+                    c".".to_owned()
                 } else if let Ok(dir_path) = CString::new(self.prefix.as_str()) {
                     dir_path
                 } else {

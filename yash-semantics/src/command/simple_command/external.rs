@@ -215,7 +215,7 @@ fn fall_back_on_sh<S: System>(
 
     // Some shells change their behavior depending on args[0].
     // We set it to "sh" for the maximum portability.
-    args[0] = CString::new("sh").unwrap();
+    c"sh".clone_into(&mut args[0]);
 
     let sh_path = system.shell_path();
     let _ = system.execve(&sh_path, &args, &envs);
@@ -270,24 +270,18 @@ mod tests {
             let state = state.borrow();
             let process = state.processes.values().last().unwrap();
             let arguments = process.last_exec().as_ref().unwrap();
-            assert_eq!(arguments.0, CString::new("/some/file").unwrap());
+            assert_eq!(arguments.0, c"/some/file".to_owned());
             assert_eq!(
                 arguments.1,
                 [
-                    CString::new("/some/file").unwrap(),
-                    CString::new("foo").unwrap(),
-                    CString::new("bar").unwrap()
+                    c"/some/file".to_owned(),
+                    c"foo".to_owned(),
+                    c"bar".to_owned()
                 ]
             );
             let mut envs = arguments.2.clone();
             envs.sort();
-            assert_eq!(
-                envs,
-                [
-                    CString::new("env=scalar").unwrap(),
-                    CString::new("var=123").unwrap()
-                ]
-            );
+            assert_eq!(envs, [c"env=scalar".to_owned(), c"var=123".to_owned()]);
         });
     }
 
