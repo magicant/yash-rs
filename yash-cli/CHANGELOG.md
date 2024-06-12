@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0-beta.2] - Unreleased
 
+### Changed
+
 - External dependency versions:
     - Rust 1.75.0 → 1.77.0
+
+### Fixed
+
+- The break and continue built-ins no longer allow exiting a trap.
 
 ## [0.1.0-beta.1] - 2024-06-09
 

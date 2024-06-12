@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `stack::Stack::loop_count` no longer counts loops below a `Frame::Trap(_)` frame.
 - Possible undefined behavior in `RealSystem::times`
 
 ## [0.2.0] - 2024-06-09

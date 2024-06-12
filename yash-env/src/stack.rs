@@ -150,17 +150,24 @@ impl Stack {
     /// This function returns the number of lexically enclosing `for`, `while`,
     /// and `until` loops in the current execution environment. That is, the
     /// result is the count of `Frame::Loop`s pushed after the last
-    /// `Frame::Subshell` or `Frame::DotScript`.
+    /// `Frame::Subshell`, `Frame::DotScript`, or `Frame::Trap(_)`.
     ///
     /// The function stops counting when `max_count` is reached. The parameter
     /// is useful if you don't have to count more than a specific number.
     /// Pass `usize::MAX` to count all loops.
     #[must_use]
     pub fn loop_count(&self, max_count: usize) -> usize {
+        fn retains_context(frame: &Frame) -> bool {
+            match frame {
+                Frame::Loop | Frame::Condition | Frame::Builtin(_) => true,
+                Frame::Subshell | Frame::DotScript | Frame::Trap(_) => false,
+            }
+        }
+
         self.inner
             .iter()
             .rev()
-            .take_while(|&frame| !matches!(frame, Frame::Subshell | Frame::DotScript))
+            .take_while(|&frame| retains_context(frame))
             .filter(|&frame| frame == &Frame::Loop)
             .take(max_count)
             .count()
@@ -306,6 +313,29 @@ mod tests {
     }
 
     #[test]
+    fn loop_count_with_conditions() {
+        let mut stack = Stack::default();
+        let mut stack = stack.push(Frame::Loop);
+        let mut stack = stack.push(Frame::Condition);
+        assert_eq!(stack.loop_count(usize::MAX), 1);
+        let stack = stack.push(Frame::Loop);
+        assert_eq!(stack.loop_count(usize::MAX), 2);
+    }
+
+    #[test]
+    fn loop_count_with_builtins() {
+        let mut stack = Stack::default();
+        let mut stack = stack.push(Frame::Loop);
+        let mut stack = stack.push(Frame::Builtin(Builtin {
+            name: Field::dummy(""),
+            is_special: false,
+        }));
+        assert_eq!(stack.loop_count(usize::MAX), 1);
+        let stack = stack.push(Frame::Loop);
+        assert_eq!(stack.loop_count(usize::MAX), 2);
+    }
+
+    #[test]
     fn loop_count_with_dot_scripts() {
         let mut stack = Stack::default();
         let mut stack = stack.push(Frame::Loop);
@@ -316,6 +346,24 @@ mod tests {
         let mut stack = stack.push(Frame::Loop);
         assert_eq!(stack.loop_count(usize::MAX), 2);
         let mut stack = stack.push(Frame::DotScript);
+        assert_eq!(stack.loop_count(usize::MAX), 0);
+        let stack = stack.push(Frame::Loop);
+        assert_eq!(stack.loop_count(usize::MAX), 1);
+    }
+
+    #[test]
+    fn loop_count_with_traps() {
+        let mut stack = Stack::default();
+        let mut stack = stack.push(Frame::Loop);
+        let mut stack = stack.push(Frame::Trap(crate::trap::Condition::Exit));
+        assert_eq!(stack.loop_count(usize::MAX), 0);
+        let mut stack = stack.push(Frame::Loop);
+        assert_eq!(stack.loop_count(usize::MAX), 1);
+        let mut stack = stack.push(Frame::Loop);
+        assert_eq!(stack.loop_count(usize::MAX), 2);
+        let mut stack = stack.push(Frame::Trap(crate::trap::Condition::Signal(
+            crate::signal::Number::from_raw_unchecked(1.try_into().unwrap()),
+        )));
         assert_eq!(stack.loop_count(usize::MAX), 0);
         let stack = stack.push(Frame::Loop);
         assert_eq!(stack.loop_count(usize::MAX), 1);
