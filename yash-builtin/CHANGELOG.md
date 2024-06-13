@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - External dependency versions:
     - Rust 1.75.0 → 1.77.0
 
+### Fixed
+
+- The break and continue built-ins now return `ExitStatus::ERROR` for syntax
+  errors and `ExitStatus::FAILURE` for semantic errors. Previously, they always
+  returned `ExitStatus::ERROR` for both types of errors, while the documentation
+  stated that they returned `ExitStatus::FAILURE` for semantic errors.
+
 ## [0.2.0] - 2024-06-09
 
 ### Added

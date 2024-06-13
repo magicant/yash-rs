@@ -55,7 +55,7 @@
 //!
 //! # Exit status
 //!
-//! `ExitStatus::SUCCESS` or `ExitStatus::FAILURE` depending on the results
+//! Zero if the built-in successfully continues the loop; non-zero otherwise.
 //!
 //! # Portability
 //!
@@ -78,7 +78,7 @@
 //! This module re-exports [`super::break::syntax`].
 
 use crate::common::report_error;
-use crate::common::report_simple_error;
+use crate::common::report_simple_failure;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
 use yash_env::Env;
@@ -87,10 +87,6 @@ use yash_env::Env;
 pub mod semantics;
 pub use super::r#break::syntax;
 
-async fn report_semantics_error(env: &mut Env, error: &semantics::Error) -> Result {
-    report_simple_error(env, &format!("cannot continue: {}", error)).await
-}
-
 /// Entry point for executing the `continue` built-in
 ///
 /// This function uses the [`syntax`] and [`semantics`] modules to execute the built-in.
@@ -98,7 +94,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     match syntax::parse(env, args) {
         Ok(count) => match semantics::run(&env.stack, count) {
             Ok(result) => result,
-            Err(e) => report_semantics_error(env, &e).await,
+            Err(e) => report_simple_failure(env, &format!("cannot continue: {e}")).await,
         },
         Err(e) => report_error(env, &e).await,
     }
@@ -141,7 +137,7 @@ mod tests {
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(
             result,
-            result_with_divert(ExitStatus::ERROR, Divert::Interrupt(None))
+            result_with_divert(ExitStatus::FAILURE, Divert::Interrupt(None))
         );
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| {

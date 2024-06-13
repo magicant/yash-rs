@@ -53,7 +53,7 @@
 //!
 //! # Exit status
 //!
-//! `ExitStatus::SUCCESS` or `ExitStatus::FAILURE` depending on the results
+//! Zero if the built-in successfully breaks the loop; non-zero otherwise.
 //!
 //! # Portability
 //!
@@ -75,7 +75,7 @@
 //! continue built-in implementation.
 
 use crate::common::report_error;
-use crate::common::report_simple_error;
+use crate::common::report_simple_failure;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
 use yash_env::Env;
@@ -84,10 +84,6 @@ use yash_env::Env;
 pub mod semantics;
 pub mod syntax;
 
-async fn report_semantics_error(env: &mut Env, error: &semantics::Error) -> Result {
-    report_simple_error(env, &format!("cannot break: {}", error)).await
-}
-
 /// Entry point for executing the `break` built-in
 ///
 /// This function uses the [`syntax`] and [`semantics`] modules to execute the built-in.
@@ -95,7 +91,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     match syntax::parse(env, args) {
         Ok(count) => match semantics::run(&env.stack, count) {
             Ok(result) => result,
-            Err(e) => report_semantics_error(env, &e).await,
+            Err(e) => report_simple_failure(env, &format!("cannot break: {e}")).await,
         },
         Err(e) => report_error(env, &e).await,
     }
