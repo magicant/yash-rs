@@ -45,8 +45,8 @@
 //! // The lines below require the `annotate-snippets` feature.
 //! # #[cfg(feature = "annotate-snippets")]
 //! # {
-//! let snippet = annotate_snippets::Snippet::from(&message);
-//! eprint!("{}", annotate_snippets::Renderer::plain().render(snippet));
+//! let message = annotate_snippets::Message::from(&message);
+//! eprint!("{}", annotate_snippets::Renderer::plain().render(message));
 //! # }
 //! ```
 //!
@@ -259,362 +259,75 @@ impl<'a, T: MessageBase> From<&'a T> for Message<'a> {
 #[cfg(feature = "annotate-snippets")]
 mod annotate_snippets_support {
     use super::*;
-    use annotate_snippets::Snippet;
 
     /// Converts `yash_syntax::source::pretty::AnnotationType` into
-    /// `annotate_snippets::snippet::AnnotationType`.
+    /// `annotate_snippets::Level`.
     ///
     /// This implementation is only available when the `yash_syntax` crate is
     /// built with the `annotate-snippets` feature enabled.
-    impl From<AnnotationType> for annotate_snippets::AnnotationType {
+    impl From<AnnotationType> for annotate_snippets::Level {
         fn from(r#type: AnnotationType) -> Self {
             use AnnotationType::*;
             match r#type {
-                Error => annotate_snippets::AnnotationType::Error,
-                Warning => annotate_snippets::AnnotationType::Warning,
-                Info => annotate_snippets::AnnotationType::Info,
-                Note => annotate_snippets::AnnotationType::Note,
-                Help => annotate_snippets::AnnotationType::Help,
+                Error => Self::Error,
+                Warning => Self::Warning,
+                Info => Self::Info,
+                Note => Self::Note,
+                Help => Self::Help,
             }
         }
     }
 
-    impl<'a> From<&'a Message<'a>> for Snippet<'a> {
+    /// Converts `yash_syntax::source::pretty::Message` into
+    /// `annotate_snippets::Message`.
+    ///
+    /// This implementation is only available when the `yash_syntax` crate is
+    /// built with the `annotate-snippets` feature enabled.
+    impl<'a> From<&'a Message<'a>> for annotate_snippets::Message<'a> {
         fn from(message: &'a Message<'a>) -> Self {
-            let mut snippet = Snippet {
-                title: Some(annotate_snippets::Annotation {
-                    id: None,
-                    label: Some(&message.title),
-                    annotation_type: message.r#type.into(),
-                }),
-                footer: vec![],
-                slices: vec![],
-            };
-
-            let mut lines = vec![];
+            let mut snippets: Vec<(
+                &super::super::Code,
+                annotate_snippets::Snippet,
+                Vec<annotate_snippets::Annotation>,
+            )> = Vec::new();
+            // We basically convert each annotation into a snippet, but want to merge annotations
+            // with the same code into a single snippet. For this, we first collect all annotations
+            // into a temporary vector, and then merge annotations with the same code into a single
+            // snippet.
             for annotation in &message.annotations {
-                let code = &annotation.location.code;
-                let line_start = code
-                    .start_line_number
-                    .get()
-                    .try_into()
-                    .unwrap_or(usize::MAX);
-                let value = &annotation.code;
-                let range = &annotation.location.range;
-                let annotation = annotate_snippets::SourceAnnotation {
-                    range: (range.start, range.end),
-                    label: &annotation.label,
-                    annotation_type: annotation.r#type.into(),
-                };
-                if let Some(i) = lines.iter().position(|l| l == code) {
-                    snippet.slices[i].annotations.push(annotation);
+                let range = annotation.location.range.clone();
+                let level = annotate_snippets::Level::from(annotation.r#type);
+                let as_annotation = level.span(range).label(&annotation.label);
+                let code = &*annotation.location.code;
+                if let Some((_, _, annotations)) =
+                    snippets.iter_mut().find(|&&mut (c, _, _)| c == code)
+                {
+                    annotations.push(as_annotation);
                 } else {
-                    snippet.slices.push(annotate_snippets::Slice {
-                        source: value,
-                        line_start,
-                        origin: Some(code.source.label()),
-                        fold: true,
-                        annotations: vec![annotation],
-                    });
-                    lines.push(code.clone());
+                    let line_start = code
+                        .start_line_number
+                        .get()
+                        .try_into()
+                        .unwrap_or(usize::MAX);
+                    let snippet = annotate_snippets::Snippet::source(&annotation.code)
+                        .line_start(line_start)
+                        .origin(code.source.label())
+                        .fold(true);
+                    snippets.push((code, snippet, vec![as_annotation]));
                 }
             }
 
-            for footer in &message.footers {
-                snippet.footer.push(annotate_snippets::Annotation {
-                    id: None,
-                    label: Some(&footer.label),
-                    annotation_type: footer.r#type.into(),
-                });
-            }
-
-            snippet
+            annotate_snippets::Level::from(message.r#type)
+                .title(&message.title)
+                .snippets(
+                    snippets
+                        .into_iter()
+                        .map(|(_, snippet, annotations)| snippet.annotations(annotations)),
+                )
+                .footers(message.footers.iter().map(|footer| {
+                    let level = annotate_snippets::Level::from(footer.r#type);
+                    level.title(&footer.label)
+                }))
         }
-    }
-
-    #[test]
-    fn from_message_type_and_title() {
-        let message = Message {
-            r#type: AnnotationType::Error,
-            title: "my title".into(),
-            annotations: vec![],
-            footers: vec![],
-        };
-        let snippet = Snippet::from(&message);
-        let title = snippet.title.unwrap();
-        assert_eq!(title.id, None);
-        assert_eq!(title.label, Some("my title"));
-        assert_eq!(
-            title.annotation_type,
-            annotate_snippets::AnnotationType::Error,
-        );
-        assert_eq!(snippet.slices.len(), 0, "{:?}", snippet.footer);
-        assert_eq!(snippet.footer.len(), 0, "{:?}", snippet.footer);
-    }
-
-    #[test]
-    fn from_message_one_annotation() {
-        let location = Location::dummy("my location");
-        let message = Message {
-            r#type: AnnotationType::Warning,
-            title: "my title".into(),
-            annotations: vec![Annotation::new(
-                AnnotationType::Info,
-                "my label".into(),
-                &location,
-            )],
-            footers: vec![],
-        };
-        let snippet = Snippet::from(&message);
-        let title = snippet.title.unwrap();
-        assert_eq!(title.id, None);
-        assert_eq!(title.label, Some("my title"));
-        assert_eq!(
-            title.annotation_type,
-            annotate_snippets::AnnotationType::Warning,
-        );
-        assert_eq!(snippet.slices.len(), 1, "{:?}", snippet.slices);
-        assert_eq!(snippet.slices[0].source, "my location");
-        assert_eq!(snippet.slices[0].line_start, 1);
-        assert_eq!(snippet.slices[0].origin, Some("<?>"));
-        assert_eq!(snippet.slices[0].annotations.len(), 1);
-        assert_eq!(snippet.slices[0].annotations[0].range, (0, 11));
-        assert_eq!(snippet.slices[0].annotations[0].label, "my label");
-        assert_eq!(
-            snippet.slices[0].annotations[0].annotation_type,
-            annotate_snippets::AnnotationType::Info,
-        );
-        assert_eq!(snippet.footer.len(), 0, "{:?}", snippet.footer);
-    }
-
-    #[test]
-    fn from_message_non_default_line_start() {
-        use super::super::*;
-        use std::num::NonZeroU64;
-        use std::rc::Rc;
-
-        let location = Location {
-            code: Rc::new(Code {
-                value: "".to_string().into(),
-                start_line_number: NonZeroU64::new(128).unwrap(),
-                source: Source::Unknown,
-            }),
-            range: 42..123,
-        };
-        let message = Message {
-            r#type: AnnotationType::Warning,
-            title: "".into(),
-            annotations: vec![Annotation::new(AnnotationType::Info, "".into(), &location)],
-            footers: vec![],
-        };
-        let snippet = Snippet::from(&message);
-        assert_eq!(snippet.slices[0].line_start, 128);
-    }
-
-    #[test]
-    fn from_message_non_default_range() {
-        let mut location = Location::dummy("my location");
-        location.range = 6..9;
-        let message = Message {
-            r#type: AnnotationType::Warning,
-            title: "".into(),
-            annotations: vec![Annotation::new(AnnotationType::Info, "".into(), &location)],
-            footers: vec![],
-        };
-        let snippet = Snippet::from(&message);
-        assert_eq!(snippet.slices[0].annotations[0].range, (6, 9));
-    }
-
-    #[test]
-    fn from_message_non_default_origin() {
-        use super::super::*;
-        use std::num::NonZeroU64;
-
-        let original = Location::dummy("my original");
-        let alias = Rc::new(Alias {
-            name: "foo".to_string(),
-            replacement: "bar".to_string(),
-            global: false,
-            origin: Location::dummy("my origin"),
-        });
-        let code = Rc::new(Code {
-            value: "substitution".to_string().into(),
-            start_line_number: NonZeroU64::new(10).unwrap(),
-            source: Source::Alias { original, alias },
-        });
-        let location = Location { code, range: 4..9 };
-        let message = Message {
-            r#type: AnnotationType::Warning,
-            title: "my title".into(),
-            annotations: vec![Annotation::new(
-                AnnotationType::Info,
-                "my label".into(),
-                &location,
-            )],
-            footers: vec![],
-        };
-        let snippet = Snippet::from(&message);
-        assert_eq!(snippet.slices[0].source, "substitution");
-        assert_eq!(snippet.slices[0].line_start, 10);
-        assert_eq!(snippet.slices[0].origin, Some("<alias>"));
-    }
-
-    #[test]
-    fn from_message_two_annotations_different_slice() {
-        let location_1 = Location::dummy("my location 1");
-        let location_2 = Location::dummy("my location 2");
-        let message = Message {
-            r#type: AnnotationType::Error,
-            title: "some title".into(),
-            annotations: vec![
-                Annotation::new(AnnotationType::Note, "my label 1".into(), &location_1),
-                Annotation::new(AnnotationType::Info, "my label 2".into(), &location_2),
-            ],
-            footers: vec![],
-        };
-        let snippet = Snippet::from(&message);
-        let title = snippet.title.unwrap();
-        assert_eq!(title.id, None);
-        assert_eq!(title.label, Some("some title"));
-        assert_eq!(
-            title.annotation_type,
-            annotate_snippets::AnnotationType::Error,
-        );
-        assert_eq!(snippet.slices.len(), 2, "{:?}", snippet.slices);
-        assert_eq!(snippet.slices[0].source, "my location 1");
-        assert_eq!(snippet.slices[0].annotations.len(), 1);
-        assert_eq!(snippet.slices[0].annotations[0].range, (0, 13));
-        assert_eq!(snippet.slices[0].annotations[0].label, "my label 1");
-        assert_eq!(
-            snippet.slices[0].annotations[0].annotation_type,
-            annotate_snippets::AnnotationType::Note,
-        );
-        assert_eq!(snippet.slices[1].source, "my location 2");
-        assert_eq!(snippet.slices[1].annotations.len(), 1);
-        assert_eq!(snippet.slices[1].annotations[0].range, (0, 13));
-        assert_eq!(snippet.slices[1].annotations[0].label, "my label 2");
-        assert_eq!(
-            snippet.slices[1].annotations[0].annotation_type,
-            annotate_snippets::AnnotationType::Info,
-        );
-        assert_eq!(snippet.footer.len(), 0, "{:?}", snippet.footer);
-    }
-
-    #[test]
-    fn from_message_two_annotations_same_slice() {
-        let location_1 = Location::dummy("my location");
-        let location_3 = Location {
-            range: 2..4,
-            ..location_1.clone()
-        };
-        let message = Message {
-            r#type: AnnotationType::Error,
-            title: "some title".into(),
-            annotations: vec![
-                Annotation::new(AnnotationType::Info, "my label 1".into(), &location_3),
-                Annotation::new(AnnotationType::Help, "my label 2".into(), &location_1),
-            ],
-            footers: vec![],
-        };
-        let snippet = Snippet::from(&message);
-        let title = snippet.title.unwrap();
-        assert_eq!(title.id, None);
-        assert_eq!(title.label, Some("some title"));
-        assert_eq!(
-            title.annotation_type,
-            annotate_snippets::AnnotationType::Error,
-        );
-        assert_eq!(snippet.slices.len(), 1, "{:?}", snippet.slices);
-        assert_eq!(snippet.slices[0].source, "my location");
-        assert_eq!(snippet.slices[0].annotations.len(), 2);
-        assert_eq!(snippet.slices[0].annotations[0].range, (2, 4));
-        assert_eq!(snippet.slices[0].annotations[0].label, "my label 1");
-        assert_eq!(
-            snippet.slices[0].annotations[0].annotation_type,
-            annotate_snippets::AnnotationType::Info,
-        );
-        assert_eq!(snippet.slices[0].annotations[1].range, (0, 11));
-        assert_eq!(snippet.slices[0].annotations[1].label, "my label 2");
-        assert_eq!(
-            snippet.slices[0].annotations[1].annotation_type,
-            annotate_snippets::AnnotationType::Help,
-        );
-        assert_eq!(snippet.footer.len(), 0, "{:?}", snippet.footer);
-    }
-
-    #[test]
-    fn from_message_one_footer() {
-        let message = Message {
-            r#type: AnnotationType::Error,
-            title: "some title".into(),
-            annotations: vec![],
-            footers: vec![Footer {
-                r#type: AnnotationType::Note,
-                label: "footer text".into(),
-            }],
-        };
-        let snippet = Snippet::from(&message);
-        let title = snippet.title.unwrap();
-        assert_eq!(title.id, None);
-        assert_eq!(title.label, Some("some title"));
-        assert_eq!(
-            title.annotation_type,
-            annotate_snippets::AnnotationType::Error,
-        );
-        assert_eq!(snippet.slices.len(), 0, "{:?}", snippet.slices);
-        assert_eq!(snippet.footer.len(), 1, "{:?}", snippet.footer);
-        assert_eq!(
-            snippet.footer[0].annotation_type,
-            annotate_snippets::AnnotationType::Note,
-        );
-        assert_eq!(snippet.footer[0].label, Some("footer text"));
-    }
-
-    #[test]
-    fn from_message_many_footers() {
-        let message = Message {
-            r#type: AnnotationType::Error,
-            title: "some title".into(),
-            annotations: vec![],
-            footers: vec![
-                Footer {
-                    r#type: AnnotationType::Info,
-                    label: "footer 1".into(),
-                },
-                Footer {
-                    r#type: AnnotationType::Warning,
-                    label: "footer 2".into(),
-                },
-                Footer {
-                    r#type: AnnotationType::Error,
-                    label: "footer 3".into(),
-                },
-            ],
-        };
-        let snippet = Snippet::from(&message);
-        let title = snippet.title.unwrap();
-        assert_eq!(title.id, None);
-        assert_eq!(title.label, Some("some title"));
-        assert_eq!(
-            title.annotation_type,
-            annotate_snippets::AnnotationType::Error,
-        );
-        assert_eq!(snippet.slices.len(), 0, "{:?}", snippet.slices);
-        assert_eq!(snippet.footer.len(), 3, "{:?}", snippet.footer);
-        assert_eq!(
-            snippet.footer[0].annotation_type,
-            annotate_snippets::AnnotationType::Info,
-        );
-        assert_eq!(snippet.footer[0].label, Some("footer 1"));
-        assert_eq!(
-            snippet.footer[1].annotation_type,
-            annotate_snippets::AnnotationType::Warning,
-        );
-        assert_eq!(snippet.footer[1].label, Some("footer 2"));
-        assert_eq!(
-            snippet.footer[2].annotation_type,
-            annotate_snippets::AnnotationType::Error,
-        );
-        assert_eq!(snippet.footer[2].label, Some("footer 3"));
     }
 }

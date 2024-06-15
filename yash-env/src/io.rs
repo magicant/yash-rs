@@ -20,7 +20,6 @@
 use crate::system::SharedSystem;
 use crate::Env;
 use annotate_snippets::Renderer;
-use annotate_snippets::Snippet;
 use std::borrow::Cow;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -51,13 +50,13 @@ pub const MIN_INTERNAL_FD: Fd = Fd(10);
 /// [`SharedSystem::print_error`].
 #[must_use]
 pub fn message_to_string(env: &Env, message: &Message<'_>) -> String {
-    let s = Snippet::from(message);
+    let m = annotate_snippets::Message::from(message);
     let r = if env.should_print_error_in_color() {
         Renderer::styled()
     } else {
         Renderer::plain()
     };
-    format!("{}\n", r.render(s))
+    format!("{}\n", r.render(m))
 }
 
 /// Convenience function for printing an error message.
