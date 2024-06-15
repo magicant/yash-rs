@@ -50,8 +50,7 @@ pub trait Input {
     /// Errors returned from this function are considered unrecoverable. Once an error is returned,
     /// this function should not be called any more.
     ///
-    /// Because the current Rust compiler does not support `async` functions in a trait, this
-    /// function is explicitly declared to return a `Future` in a pinned box.
+    /// For object safety, this async method is declared to return the future in a pinned box.
     async fn next_line(&mut self, context: &Context) -> Result;
 }
 
