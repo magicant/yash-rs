@@ -17,7 +17,7 @@ categories = ["command-line-utilities", "parser-implementations"]
 annotate-snippets = { version = "0.11.4", optional = true }
 async-trait = "0.1.73"
 futures-util = "0.3.28"
-itertools = "0.11.0"
+itertools = "0.13.0"
 thiserror = "1.0.47"
 
 [dev-dependencies]
