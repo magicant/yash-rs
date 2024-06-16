@@ -16,6 +16,8 @@
 
 //! Expansion of command substitution
 
+use std::cell::RefCell;
+
 use super::super::attr::AttrChar;
 use super::super::attr::Origin;
 use super::super::phrase::Phrase;
@@ -90,8 +92,9 @@ where
     }
 
     // Run the command
+    let env = RefCell::new(env);
     let mut lexer = Lexer::from_memory(command.as_ref(), Source::CommandSubst { original });
-    ReadEvalLoop::new(env, &mut lexer).run().await
+    ReadEvalLoop::new(&env, &mut lexer).run().await
 }
 
 /// The second half of [`expand`] that does not depend on type parameter `C`.

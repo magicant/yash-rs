@@ -30,6 +30,7 @@ use futures_util::task::LocalSpawnExt as _;
 use futures_util::FutureExt as _;
 use startup::args::Parse;
 use startup::prepare_input;
+use std::cell::RefCell;
 use std::num::NonZeroU64;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_builtin::BUILTINS;
@@ -107,7 +108,8 @@ async fn parse_and_print(mut env: Env) -> i32 {
     let mut lexer = Lexer::new(input.input, line, input.source);
 
     // Run the read-eval loop
-    let mut rel = ReadEvalLoop::new(&mut env, &mut lexer);
+    let shared_env = RefCell::new(&mut env);
+    let mut rel = ReadEvalLoop::new(&shared_env, &mut lexer);
     rel.set_verbose(input.verbose);
     let result = rel.run().await;
     env.apply_result(result);

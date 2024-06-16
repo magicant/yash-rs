@@ -18,6 +18,7 @@
 
 use super::Command;
 use crate::common::report_failure;
+use std::cell::RefCell;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::num::NonZeroU64;
@@ -49,7 +50,7 @@ impl Command {
     /// If the file is not found or cannot be read, this method reports an error
     /// to the standard error and returns `ExitStatus::FAILURE.into()`.
     pub async fn execute(self, env: &mut Env) -> crate::Result {
-        let env = &mut env.push_frame(Frame::DotScript);
+        let env = &mut *env.push_frame(Frame::DotScript);
 
         let fd = match find_and_open_file(env, &self.file.value) {
             Ok(fd) => fd,
@@ -66,7 +67,8 @@ impl Command {
             origin: self.file.origin,
         };
         let mut lexer = Lexer::new(input, start_line_number, source);
-        let divert = ReadEvalLoop::new(env, &mut lexer).run().await;
+        let shared_env = RefCell::new(&mut *env);
+        let divert = ReadEvalLoop::new(&shared_env, &mut lexer).run().await;
 
         _ = env.system.close(fd);
 

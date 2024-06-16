@@ -45,6 +45,7 @@
 //! which should be called before exiting, runs the trap.
 
 use crate::ReadEvalLoop;
+use std::cell::RefCell;
 use std::ops::ControlFlow::Break;
 use std::rc::Rc;
 use yash_env::semantics::Divert;
@@ -82,7 +83,7 @@ async fn run_trap(env: &mut Env, cond: Condition, code: Rc<str>, origin: Locatio
     let previous_exit_status = env.exit_status;
 
     // Boxing needed for recursion
-    let mut result = Box::pin(ReadEvalLoop::new(&mut env, &mut lexer).run()).await;
+    let mut result = Box::pin(ReadEvalLoop::new(&RefCell::new(&mut env), &mut lexer).run()).await;
 
     if let Break(Divert::Interrupt(ref mut exit_status)) = result {
         if let Some(exit_status) = exit_status {
