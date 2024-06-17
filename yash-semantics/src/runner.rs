@@ -67,6 +67,7 @@ use yash_syntax::parser::Parser;
 /// # })
 /// ```
 #[derive(Debug)]
+#[must_use = "the loop must be run to execute commands"]
 pub struct ReadEvalLoop<'a, 'b> {
     env: &'a mut Env,
     lexer: &'a mut Lexer<'b>,
@@ -78,7 +79,6 @@ impl<'a, 'b> ReadEvalLoop<'a, 'b> {
     ///
     /// This constructor requires two parameters: an environment in which the
     /// loop runs and a lexer that reads input.
-    #[must_use]
     pub fn new(env: &'a mut Env, lexer: &'a mut Lexer<'b>) -> Self {
         Self {
             env,
