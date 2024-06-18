@@ -21,6 +21,7 @@
 
 use crate::source::Location;
 use std::borrow::Borrow;
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -94,3 +95,89 @@ impl Borrow<str> for HashEntry {
 
 /// Collection of aliases.
 pub type AliasSet = HashSet<HashEntry>;
+
+/// Interface used by the parser to look up aliases.
+///
+/// This trait is an abstract interface that represents an immutable collection
+/// of aliases. The parser uses this trait to look up aliases when it encounters
+/// a command word in a simple command.
+pub trait Glossary {
+    /// Looks up an alias by name.
+    ///
+    /// If an alias with the given name is found, it is returned. Otherwise, the
+    /// return value is `None`.
+    #[must_use]
+    // This method returns an `Rc<Alias>` rather than `&Alias` so that the
+    // implementation for `RefCell` below can return a value after releasing
+    // the borrow of the inner glossary.
+    fn look_up(&self, name: &str) -> Option<Rc<Alias>>;
+
+    /// Returns whether the glossary is empty.
+    ///
+    /// If the glossary is empty, the parser can skip alias expansion. This
+    /// method is used as a hint to optimize alias expansion.
+    ///
+    /// If the glossary has any aliases, it must return `false`.
+    ///
+    /// The default implementation returns `false`.
+    #[must_use]
+    fn is_empty(&self) -> bool {
+        false
+    }
+}
+
+impl Glossary for AliasSet {
+    fn look_up(&self, name: &str) -> Option<Rc<Alias>> {
+        self.get(name).map(|entry| entry.0.clone())
+    }
+    #[inline(always)]
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+}
+
+/// Empty glossary that does not contain any aliases.
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+pub struct EmptyGlossary;
+
+impl Glossary for EmptyGlossary {
+    #[inline(always)]
+    fn look_up(&self, _name: &str) -> Option<Rc<Alias>> {
+        None
+    }
+    #[inline(always)]
+    fn is_empty(&self) -> bool {
+        true
+    }
+}
+
+impl<T: Glossary> Glossary for &T {
+    fn look_up(&self, name: &str) -> Option<Rc<Alias>> {
+        (**self).look_up(name)
+    }
+    fn is_empty(&self) -> bool {
+        (**self).is_empty()
+    }
+}
+
+impl<T: Glossary> Glossary for &mut T {
+    fn look_up(&self, name: &str) -> Option<Rc<Alias>> {
+        (**self).look_up(name)
+    }
+    fn is_empty(&self) -> bool {
+        (**self).is_empty()
+    }
+}
+
+/// Allows a glossary to be wrapped in a `RefCell`.
+///
+/// This implementation's methods immutably borrow the inner glossary.
+/// If the inner glossary is mutably borrowed at the same time, it panics.
+impl<T: Glossary> Glossary for RefCell<T> {
+    fn look_up(&self, name: &str) -> Option<Rc<Alias>> {
+        self.borrow().look_up(name)
+    }
+    fn is_empty(&self) -> bool {
+        self.borrow().is_empty()
+    }
+}
