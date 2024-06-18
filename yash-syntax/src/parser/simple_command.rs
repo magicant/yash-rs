@@ -167,6 +167,7 @@ mod tests {
     use super::super::lex::Lexer;
     use super::super::lex::TokenId::EndOfInput;
     use super::*;
+    use crate::alias::EmptyGlossary;
     use crate::source::Source;
     use crate::syntax::RedirBody;
     use crate::syntax::RedirOp;
@@ -176,8 +177,7 @@ mod tests {
     #[test]
     fn parser_array_values_no_open_parenthesis() {
         let mut lexer = Lexer::from_memory(")", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
         let result = parser.array_values().now_or_never().unwrap().unwrap();
         assert_eq!(result, None);
     }
@@ -185,8 +185,7 @@ mod tests {
     #[test]
     fn parser_array_values_empty() {
         let mut lexer = Lexer::from_memory("()", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
         let result = parser.array_values().now_or_never().unwrap();
         let words = result.unwrap().unwrap();
         assert_eq!(words, []);
@@ -198,8 +197,7 @@ mod tests {
     #[test]
     fn parser_array_values_many() {
         let mut lexer = Lexer::from_memory("(a b c)", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
         let result = parser.array_values().now_or_never().unwrap();
         let words = result.unwrap().unwrap();
         assert_eq!(words.len(), 3);
@@ -217,8 +215,7 @@ mod tests {
         )",
             Source::Unknown,
         );
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
         let result = parser.array_values().now_or_never().unwrap();
         let words = result.unwrap().unwrap();
         assert_eq!(words.len(), 3);
@@ -230,8 +227,7 @@ mod tests {
     #[test]
     fn parser_array_values_unclosed() {
         let mut lexer = Lexer::from_memory("(a b", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
         let e = parser.array_values().now_or_never().unwrap().unwrap_err();
         assert_matches!(e.cause,
              ErrorCause::Syntax(SyntaxError::UnclosedArrayValue { opening_location }) => {
@@ -249,8 +245,7 @@ mod tests {
     #[test]
     fn parser_array_values_invalid_word() {
         let mut lexer = Lexer::from_memory("(a;b)", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
         let e = parser.array_values().now_or_never().unwrap().unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedArrayValue { opening_location }) => {
@@ -268,8 +263,7 @@ mod tests {
     #[test]
     fn parser_simple_command_eof() {
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.simple_command().now_or_never().unwrap();
         assert_eq!(result, Ok(Rec::Parsed(None)));
@@ -278,8 +272,7 @@ mod tests {
     #[test]
     fn parser_simple_command_keyword() {
         let mut lexer = Lexer::from_memory("then", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.simple_command().now_or_never().unwrap();
         assert_eq!(result, Ok(Rec::Parsed(None)));
@@ -288,8 +281,7 @@ mod tests {
     #[test]
     fn parser_simple_command_one_assignment() {
         let mut lexer = Lexer::from_memory("my=assignment", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -307,8 +299,7 @@ mod tests {
     #[test]
     fn parser_simple_command_many_assignments() {
         let mut lexer = Lexer::from_memory("a= b=! c=X", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -338,8 +329,7 @@ mod tests {
     #[test]
     fn parser_simple_command_one_word() {
         let mut lexer = Lexer::from_memory("word", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -352,8 +342,7 @@ mod tests {
     #[test]
     fn parser_simple_command_many_words() {
         let mut lexer = Lexer::from_memory(": if then", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -368,8 +357,7 @@ mod tests {
     #[test]
     fn parser_simple_command_one_redirection() {
         let mut lexer = Lexer::from_memory("<foo", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -389,8 +377,7 @@ mod tests {
     #[test]
     fn parser_simple_command_many_redirections() {
         let mut lexer = Lexer::from_memory("<one >two >>three", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -420,8 +407,7 @@ mod tests {
     #[test]
     fn parser_simple_command_assignment_word() {
         let mut lexer = Lexer::from_memory("if=then else", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -436,8 +422,7 @@ mod tests {
     #[test]
     fn parser_simple_command_word_redirection() {
         let mut lexer = Lexer::from_memory("word <redirection", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -455,8 +440,7 @@ mod tests {
     #[test]
     fn parser_simple_command_redirection_assignment() {
         let mut lexer = Lexer::from_memory("<foo a=b", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -475,8 +459,7 @@ mod tests {
     #[test]
     fn parser_simple_command_assignment_redirection_word() {
         let mut lexer = Lexer::from_memory("if=then <foo else", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -496,8 +479,7 @@ mod tests {
     #[test]
     fn parser_simple_command_array_assignment() {
         let mut lexer = Lexer::from_memory("a=()", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -516,8 +498,7 @@ mod tests {
     #[test]
     fn parser_simple_command_empty_assignment_followed_by_blank_and_parenthesis() {
         let mut lexer = Lexer::from_memory("a= ()", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -538,8 +519,7 @@ mod tests {
     #[test]
     fn parser_simple_command_non_empty_assignment_followed_by_parenthesis() {
         let mut lexer = Lexer::from_memory("a=b()", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();

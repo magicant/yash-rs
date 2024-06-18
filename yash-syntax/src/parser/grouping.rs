@@ -98,7 +98,7 @@ mod tests {
     use super::super::error::ErrorCause;
     use super::super::lex::Lexer;
     use super::*;
-    use crate::alias::{AliasSet, HashEntry};
+    use crate::alias::{AliasSet, EmptyGlossary, HashEntry};
     use crate::source::Location;
     use crate::source::Source;
     use assert_matches::assert_matches;
@@ -107,8 +107,7 @@ mod tests {
     #[test]
     fn parser_grouping_short() {
         let mut lexer = Lexer::from_memory("{ :; }", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -120,8 +119,7 @@ mod tests {
     #[test]
     fn parser_grouping_long() {
         let mut lexer = Lexer::from_memory("{ foo; bar& }", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -133,8 +131,7 @@ mod tests {
     #[test]
     fn parser_grouping_unclosed() {
         let mut lexer = Lexer::from_memory(" { oh no ", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -154,8 +151,7 @@ mod tests {
     #[test]
     fn parser_grouping_empty_posix() {
         let mut lexer = Lexer::from_memory("{ }", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -201,8 +197,7 @@ mod tests {
     #[test]
     fn parser_subshell_short() {
         let mut lexer = Lexer::from_memory("(:)", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -218,8 +213,7 @@ mod tests {
     #[test]
     fn parser_subshell_long() {
         let mut lexer = Lexer::from_memory("( foo& bar; )", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -235,8 +229,7 @@ mod tests {
     #[test]
     fn parser_subshell_unclosed() {
         let mut lexer = Lexer::from_memory(" ( oh no", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -256,8 +249,7 @@ mod tests {
     #[test]
     fn parser_subshell_empty_posix() {
         let mut lexer = Lexer::from_memory("( )", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();

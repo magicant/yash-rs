@@ -23,6 +23,7 @@ use crate::source::Location;
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::HashSet;
+use std::fmt::Debug;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::rc::Rc;
@@ -101,7 +102,7 @@ pub type AliasSet = HashSet<HashEntry>;
 /// This trait is an abstract interface that represents an immutable collection
 /// of aliases. The parser uses this trait to look up aliases when it encounters
 /// a command word in a simple command.
-pub trait Glossary {
+pub trait Glossary: Debug {
     /// Looks up an alias by name.
     ///
     /// If an alias with the given name is found, it is returned. Otherwise, the

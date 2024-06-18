@@ -10,12 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `alias::Glossary`
+    - This new trait is now used as an interface to provide the parser with
+      alias definitions.
 
 ### Changed
 
 - External dependency versions:
     - Rust 1.70.0 → 1.77.0
     - annotate-snippets 0.10.0 → 0.11.4
+- The second argument of `parser::Parser::new` is now `&dyn alias::Glossary`
+  instead of `&alias::AliasSet`.
 
 ### Fixed
 

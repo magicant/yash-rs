@@ -75,14 +75,14 @@ mod tests {
     use super::super::error::ErrorCause;
     use super::super::lex::Lexer;
     use super::*;
+    use crate::alias::EmptyGlossary;
     use crate::source::Source;
     use futures_util::FutureExt;
 
     #[test]
     fn parser_and_or_list_eof() {
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.and_or_list().now_or_never().unwrap();
         assert_eq!(result, Ok(Rec::Parsed(None)));
@@ -91,8 +91,7 @@ mod tests {
     #[test]
     fn parser_and_or_list_one() {
         let mut lexer = Lexer::from_memory("foo", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.and_or_list().now_or_never().unwrap();
         let aol = result.unwrap().unwrap().unwrap();
@@ -103,8 +102,7 @@ mod tests {
     #[test]
     fn parser_and_or_list_many() {
         let mut lexer = Lexer::from_memory("first && second || \n\n third;", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.and_or_list().now_or_never().unwrap();
         let aol = result.unwrap().unwrap().unwrap();
@@ -119,8 +117,7 @@ mod tests {
     #[test]
     fn parser_and_or_list_missing_command_after_and_and() {
         let mut lexer = Lexer::from_memory("foo &&", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let e = parser.and_or_list().now_or_never().unwrap().unwrap_err();
         assert_eq!(

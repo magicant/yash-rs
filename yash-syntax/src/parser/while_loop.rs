@@ -98,7 +98,7 @@ mod tests {
     use super::super::lex::Lexer;
     use super::super::lex::TokenId::EndOfInput;
     use super::*;
-    use crate::alias::{AliasSet, HashEntry};
+    use crate::alias::{AliasSet, EmptyGlossary, HashEntry};
     use crate::source::Location;
     use crate::source::Source;
     use assert_matches::assert_matches;
@@ -107,8 +107,7 @@ mod tests {
     #[test]
     fn parser_while_loop_short() {
         let mut lexer = Lexer::from_memory("while true; do :; done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -124,8 +123,7 @@ mod tests {
     #[test]
     fn parser_while_loop_long() {
         let mut lexer = Lexer::from_memory("while false; true& do foo; bar& done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -141,8 +139,7 @@ mod tests {
     #[test]
     fn parser_while_loop_unclosed() {
         let mut lexer = Lexer::from_memory("while :", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -162,8 +159,7 @@ mod tests {
     #[test]
     fn parser_while_loop_empty_posix() {
         let mut lexer = Lexer::from_memory(" while do :; done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -207,8 +203,7 @@ mod tests {
     #[test]
     fn parser_until_loop_short() {
         let mut lexer = Lexer::from_memory("until true; do :; done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -224,8 +219,7 @@ mod tests {
     #[test]
     fn parser_until_loop_long() {
         let mut lexer = Lexer::from_memory("until false; true& do foo; bar& done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -241,8 +235,7 @@ mod tests {
     #[test]
     fn parser_until_loop_unclosed() {
         let mut lexer = Lexer::from_memory("until :", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -262,8 +255,7 @@ mod tests {
     #[test]
     fn parser_until_loop_empty_posix() {
         let mut lexer = Lexer::from_memory("  until do :; done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
