@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `alias::Glossary`
     - This new trait is now used as an interface to provide the parser with
       alias definitions.
+- `impl<T> input::Input for T where T: DerefMut<Target: input::Input>`
+    - This new trait implementation allows more types to be used as input
+      sources, especially when it is used with a decorator that requires
+      another input source.
 
 ### Changed
 
