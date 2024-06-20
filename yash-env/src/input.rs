@@ -25,3 +25,6 @@ pub use yash_syntax::input::*;
 
 mod fd_reader;
 pub use fd_reader::FdReader;
+
+mod echo;
+pub use echo::Echo;
