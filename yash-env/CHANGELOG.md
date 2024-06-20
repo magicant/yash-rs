@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `impl yash_system::alias::Glossary for Env`
+- `input::FdReader` is now marked `#[must_use]`.
 
 ### Changed
 

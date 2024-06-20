@@ -37,6 +37,7 @@ use yash_syntax::input::Result;
 /// the original and clone share the same `SharedSystem`, reading a line from
 /// one instance will affect the next read from the other.
 #[derive(Clone, Debug)]
+#[must_use = "FdReader does nothing unless used by a parser"]
 pub struct FdReader {
     /// File descriptor to read from
     fd: Fd,
