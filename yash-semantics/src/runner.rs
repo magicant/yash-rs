@@ -120,7 +120,13 @@ impl<'a, 'b> ReadEvalLoop<'a, 'b> {
     /// # })
     /// ```
     ///
+    /// # Deprecation
+    ///
+    /// This function is deprecated in favor of the [`Echo`] input decorator.
+    ///
+    /// [`Echo`]: yash_env::input::Echo
     /// [`FdReader`]: yash_env::input::FdReader
+    #[deprecated = "use yash_env::input::Echo instead"]
     pub fn set_verbose(&mut self, verbose: Option<Rc<Cell<State>>>) {
         self.verbose = verbose;
     }
@@ -263,6 +269,7 @@ mod tests {
         let line = NonZeroU64::new(1).unwrap();
         let mut lexer = Lexer::new(input, line, Source::Stdin);
         let mut rel = ReadEvalLoop::new(&mut env, &mut lexer);
+        #[allow(deprecated)]
         rel.set_verbose(Some(Rc::clone(&verbose)));
 
         let result = rel.run().now_or_never().unwrap();

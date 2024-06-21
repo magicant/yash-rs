@@ -9,12 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `runner::ReadEvalLoop` now has the `must_use` attribute.
+- `ReadEvalLoop` now has the `must_use` attribute.
 
 ### Changed
 
 - External dependency versions:
     - Rust 1.75.0 → 1.77.0
+
+### Deprecated
+
+- `ReadEvalLoop::set_verbose` in favor of `yash_env::input::Echo`
 
 ### Removed
 
