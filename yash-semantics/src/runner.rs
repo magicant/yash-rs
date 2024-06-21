@@ -258,6 +258,7 @@ mod tests {
         env.options.set(Verbose, On);
         let mut input = Box::new(FdReader::new(Fd::STDIN, Clone::clone(&env.system)));
         let verbose = Rc::new(Cell::new(Off));
+        #[allow(deprecated)]
         input.set_echo(Some(Rc::clone(&verbose)));
         let line = NonZeroU64::new(1).unwrap();
         let mut lexer = Lexer::new(input, line, Source::Stdin);

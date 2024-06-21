@@ -70,6 +70,13 @@ impl FdReader {
     /// can change the state of the shared cell through the lifetime of the
     /// input function to reflect the option dynamically changed, which will
     /// affect the next `next_line` call.
+    ///
+    /// # Deprecation
+    ///
+    /// This function is deprecated in favor of the [`Echo`] struct.
+    ///
+    /// [`Echo`]: super::Echo
+    #[deprecated = "use Echo instead"]
     pub fn set_echo(&mut self, echo: Option<Rc<Cell<State>>>) {
         self.echo = echo;
     }
@@ -255,6 +262,7 @@ mod tests {
         }
         let system = SharedSystem::new(Box::new(system));
         let mut reader = FdReader::new(Fd::STDIN, system);
+        #[allow(deprecated)]
         reader.set_echo(Some(Rc::new(Cell::new(State::Off))));
 
         let _ = reader
@@ -279,6 +287,7 @@ mod tests {
         }
         let system = SharedSystem::new(Box::new(system));
         let mut reader = FdReader::new(Fd::STDIN, system);
+        #[allow(deprecated)]
         reader.set_echo(Some(Rc::new(Cell::new(State::On))));
 
         let _ = reader

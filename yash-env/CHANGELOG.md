@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Internal dependency versions:
     - annotate-snippets 0.10.0 → 0.11.4
 
+### Deprecated
+
+- `input::FdReader::set_echo` in favor of `input::Echo`
+
 ### Fixed
 
 - `stack::Stack::loop_count` no longer counts loops below a `Frame::Trap(_)` frame.
