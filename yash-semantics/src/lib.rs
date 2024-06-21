@@ -23,8 +23,8 @@
 //! A word can be expanded by using functions and traits defined in
 //! [`expansion`].
 //!
-//! A [`ReadEvalLoop`] reads, parses, and executes commands from an
-//! input. It is a utility for running a shell script.
+//! The [`read_eval_loop`] reads, parses, and executes commands from an input.
+//! It is a utility for running a shell script.
 
 pub mod assign;
 pub mod command;
@@ -41,7 +41,10 @@ mod handle;
 pub use handle::Handle;
 
 mod runner;
-pub use runner::ReadEvalLoop;
+pub use runner::read_eval_loop;
+
+mod runner_legacy;
+pub use runner_legacy::ReadEvalLoop;
 
 #[cfg(test)]
 pub(crate) mod tests;

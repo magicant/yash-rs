@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `read_eval_loop`
+    - This function replaces the `ReadEvalLoop` struct and its methods.
+      It supports the `yash_env::input::Echo` decorator by taking a
+      `&RefCell<&mut Env>`.
 - `ReadEvalLoop` now has the `must_use` attribute.
 
 ### Changed
