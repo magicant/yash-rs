@@ -141,6 +141,7 @@ mod tests {
     use super::super::lex::Lexer;
     use super::super::lex::Operator::Newline;
     use super::*;
+    use crate::alias::EmptyGlossary;
     use crate::source::Source;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
@@ -148,8 +149,7 @@ mod tests {
     #[test]
     fn parser_redirection_less() {
         let mut lexer = Lexer::from_memory("</dev/null\n", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.redirection().now_or_never().unwrap();
         let redir = result.unwrap().unwrap();
@@ -166,8 +166,7 @@ mod tests {
     #[test]
     fn parser_redirection_less_greater() {
         let mut lexer = Lexer::from_memory("<> /dev/null\n", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.redirection().now_or_never().unwrap();
         let redir = result.unwrap().unwrap();
@@ -181,8 +180,7 @@ mod tests {
     #[test]
     fn parser_redirection_greater() {
         let mut lexer = Lexer::from_memory(">/dev/null\n", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.redirection().now_or_never().unwrap();
         let redir = result.unwrap().unwrap();
@@ -196,8 +194,7 @@ mod tests {
     #[test]
     fn parser_redirection_greater_greater() {
         let mut lexer = Lexer::from_memory(" >> /dev/null\n", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.redirection().now_or_never().unwrap();
         let redir = result.unwrap().unwrap();
@@ -211,8 +208,7 @@ mod tests {
     #[test]
     fn parser_redirection_greater_bar() {
         let mut lexer = Lexer::from_memory(">| /dev/null\n", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.redirection().now_or_never().unwrap();
         let redir = result.unwrap().unwrap();
@@ -226,8 +222,7 @@ mod tests {
     #[test]
     fn parser_redirection_less_and() {
         let mut lexer = Lexer::from_memory("<& -\n", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.redirection().now_or_never().unwrap();
         let redir = result.unwrap().unwrap();
@@ -241,8 +236,7 @@ mod tests {
     #[test]
     fn parser_redirection_greater_and() {
         let mut lexer = Lexer::from_memory(">& 3\n", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.redirection().now_or_never().unwrap();
         let redir = result.unwrap().unwrap();
@@ -256,8 +250,7 @@ mod tests {
     #[test]
     fn parser_redirection_greater_greater_bar() {
         let mut lexer = Lexer::from_memory(">>| 3\n", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.redirection().now_or_never().unwrap();
         let redir = result.unwrap().unwrap();
@@ -271,8 +264,7 @@ mod tests {
     #[test]
     fn parser_redirection_less_less_less() {
         let mut lexer = Lexer::from_memory("<<< foo\n", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.redirection().now_or_never().unwrap();
         let redir = result.unwrap().unwrap();
@@ -286,8 +278,7 @@ mod tests {
     #[test]
     fn parser_redirection_less_less() {
         let mut lexer = Lexer::from_memory("<<end \nend\n", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.redirection().now_or_never().unwrap();
         let redir = result.unwrap().unwrap();
@@ -307,8 +298,7 @@ mod tests {
     #[test]
     fn parser_redirection_less_less_dash() {
         let mut lexer = Lexer::from_memory("<<-end \nend\n", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.redirection().now_or_never().unwrap();
         let redir = result.unwrap().unwrap();
@@ -328,8 +318,7 @@ mod tests {
     #[test]
     fn parser_redirection_with_io_number() {
         let mut lexer = Lexer::from_memory("12< /dev/null\n", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.redirection().now_or_never().unwrap();
         let redir = result.unwrap().unwrap();
@@ -349,8 +338,7 @@ mod tests {
             "9999999999999999999999999999999999999999< x",
             Source::Unknown,
         );
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let e = parser.redirection().now_or_never().unwrap().unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::FdOutOfRange));
@@ -366,8 +354,7 @@ mod tests {
     #[test]
     fn parser_redirection_not_operator() {
         let mut lexer = Lexer::from_memory("x", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.redirection().now_or_never().unwrap();
         assert_eq!(result, Ok(None));
@@ -376,8 +363,7 @@ mod tests {
     #[test]
     fn parser_redirection_non_word_operand() {
         let mut lexer = Lexer::from_memory(" < >", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let e = parser.redirection().now_or_never().unwrap().unwrap_err();
         assert_eq!(
@@ -393,8 +379,7 @@ mod tests {
     #[test]
     fn parser_redirection_eof_operand() {
         let mut lexer = Lexer::from_memory("  < ", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let e = parser.redirection().now_or_never().unwrap().unwrap_err();
         assert_eq!(
@@ -410,8 +395,7 @@ mod tests {
     #[test]
     fn parser_redirection_not_heredoc_delimiter() {
         let mut lexer = Lexer::from_memory("<< <<", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let e = parser.redirection().now_or_never().unwrap().unwrap_err();
         assert_eq!(
@@ -427,8 +411,7 @@ mod tests {
     #[test]
     fn parser_redirection_eof_heredoc_delimiter() {
         let mut lexer = Lexer::from_memory("<<", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let e = parser.redirection().now_or_never().unwrap().unwrap_err();
         assert_eq!(

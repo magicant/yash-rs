@@ -18,6 +18,7 @@
 
 use super::Command;
 use crate::common::report_failure;
+use std::cell::RefCell;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::num::NonZeroU64;
@@ -36,7 +37,7 @@ use yash_env::system::OFlag;
 use yash_env::system::System;
 use yash_env::system::SystemEx as _;
 use yash_env::Env;
-use yash_semantics::ReadEvalLoop;
+use yash_semantics::read_eval_loop;
 use yash_syntax::parser::lex::Lexer;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -49,7 +50,7 @@ impl Command {
     /// If the file is not found or cannot be read, this method reports an error
     /// to the standard error and returns `ExitStatus::FAILURE.into()`.
     pub async fn execute(self, env: &mut Env) -> crate::Result {
-        let env = &mut env.push_frame(Frame::DotScript);
+        let env = &mut *env.push_frame(Frame::DotScript);
 
         let fd = match find_and_open_file(env, &self.file.value) {
             Ok(fd) => fd,
@@ -66,7 +67,7 @@ impl Command {
             origin: self.file.origin,
         };
         let mut lexer = Lexer::new(input, start_line_number, source);
-        let divert = ReadEvalLoop::new(env, &mut lexer).run().await;
+        let divert = read_eval_loop(&RefCell::new(env), &mut lexer).await;
 
         _ = env.system.close(fd);
 

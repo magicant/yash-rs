@@ -7,11 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.10.0] - Unreleased
 
+### Added
+
+- `alias::Glossary`
+    - This new trait is now used as an interface to provide the parser with
+      alias definitions.
+- `impl<T> input::Input for T where T: DerefMut<Target: input::Input>`
+    - This new trait implementation allows more types to be used as input
+      sources, especially when it is used with a decorator that requires
+      another input source.
+
 ### Changed
 
 - External dependency versions:
     - Rust 1.70.0 → 1.77.0
     - annotate-snippets 0.10.0 → 0.11.4
+- The second argument of `parser::Parser::new` is now `&dyn alias::Glossary`
+  instead of `&alias::AliasSet`.
 
 ### Fixed
 

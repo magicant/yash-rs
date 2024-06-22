@@ -25,7 +25,7 @@ use super::lex::Keyword;
 use super::lex::Lexer;
 use super::lex::Token;
 use super::lex::TokenId::*;
-use crate::alias::AliasSet;
+use crate::alias::Glossary;
 use crate::parser::lex::is_blank;
 use crate::syntax::HereDoc;
 use crate::syntax::MaybeLiteral;
@@ -115,8 +115,8 @@ pub struct Parser<'a, 'b> {
     /// Lexer that provides tokens.
     lexer: &'a mut Lexer<'b>,
 
-    /// Aliases that are used while parsing.
-    aliases: &'a AliasSet,
+    /// Collection of aliases the parser applies to substitute command words.
+    glossary: &'a dyn Glossary,
 
     /// Token to parse next.
     ///
@@ -133,11 +133,13 @@ pub struct Parser<'a, 'b> {
 }
 
 impl<'a, 'b> Parser<'a, 'b> {
-    /// Creates a new parser based on the given lexer and alias set.
-    pub fn new(lexer: &'a mut Lexer<'b>, aliases: &'a AliasSet) -> Parser<'a, 'b> {
+    /// Creates a new parser based on the given lexer and glossary.
+    ///
+    /// The parser uses the lexer to read tokens and the glossary to look up aliases.
+    pub fn new(lexer: &'a mut Lexer<'b>, glossary: &'a dyn Glossary) -> Parser<'a, 'b> {
         Parser {
             lexer,
-            aliases,
+            glossary,
             token: None,
             unread_here_docs: vec![],
         }
@@ -180,16 +182,16 @@ impl<'a, 'b> Parser<'a, 'b> {
     /// [taken](Self::take_token_raw).
     fn substitute_alias(&mut self, token: Token, is_command_name: bool) -> Rec<Token> {
         // TODO Only POSIXly-valid alias name should be recognized in POSIXly-correct mode.
-        if !self.aliases.is_empty() {
+        if !self.glossary.is_empty() {
             if let Token(_) = token.id {
                 if let Some(name) = token.word.to_string_if_literal() {
                     if !token.word.location.code.source.is_alias_for(&name) {
-                        if let Some(alias) = self.aliases.get(&name as &str) {
+                        if let Some(alias) = self.glossary.look_up(&name) {
                             if is_command_name
-                                || alias.0.global
+                                || alias.global
                                 || self.lexer.is_after_blank_ending_alias(token.index)
                             {
-                                self.lexer.substitute_alias(token.index, &alias.0);
+                                self.lexer.substitute_alias(token.index, &alias);
                                 return Rec::AliasSubstituted;
                             }
                         }

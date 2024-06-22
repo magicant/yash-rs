@@ -38,16 +38,15 @@
 //! let input = Box::new(Memory::new("echo $?"));
 //!
 //! // Next, create a lexer.
-//! # use std::num::NonZeroU64;
-//! # use yash_syntax::parser::lex::Lexer;
+//! use std::num::NonZeroU64;
+//! use yash_syntax::parser::lex::Lexer;
 //! let line = NonZeroU64::new(1).unwrap();
 //! let mut lexer = Lexer::new(input, line, Source::Unknown);
 //!
 //! // Then, create a new parser borrowing the lexer.
-//! # use yash_syntax::parser::Parser;
-//! # use yash_syntax::alias::AliasSet;
-//! let aliases = AliasSet::new();
-//! let mut parser = Parser::new(&mut lexer, &aliases);
+//! use yash_syntax::parser::Parser;
+//! use yash_syntax::alias::EmptyGlossary;
+//! let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 //!
 //! // Lastly, call the parser's function to get an AST.
 //! use futures_executor::block_on;

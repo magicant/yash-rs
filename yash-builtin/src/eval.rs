@@ -60,12 +60,13 @@
 //! separator for the built-in.
 
 use crate::Result;
+use std::cell::RefCell;
 use std::num::NonZeroU64;
 #[cfg(doc)]
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::Env;
-use yash_semantics::ReadEvalLoop;
+use yash_semantics::read_eval_loop;
 use yash_syntax::input::Memory;
 use yash_syntax::parser::lex::Lexer;
 use yash_syntax::source::Source;
@@ -84,7 +85,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
         original: command.origin,
     };
     let mut lexer = Lexer::new(input, start_line_number, source);
-    let divert = ReadEvalLoop::new(env, &mut lexer).run().await;
+    let divert = read_eval_loop(&RefCell::new(env), &mut lexer).await;
     Result::with_exit_status_and_divert(env.exit_status, divert)
 }
 

@@ -30,6 +30,7 @@ use futures_util::task::LocalSpawnExt as _;
 use futures_util::FutureExt as _;
 use startup::args::Parse;
 use startup::prepare_input;
+use std::cell::RefCell;
 use std::num::NonZeroU64;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_builtin::BUILTINS;
@@ -41,9 +42,8 @@ use yash_env::Env;
 use yash_env::RealSystem;
 use yash_env::System;
 use yash_semantics::trap::run_exit_trap;
-use yash_semantics::Divert;
 use yash_semantics::ExitStatus;
-use yash_semantics::ReadEvalLoop;
+use yash_semantics::{read_eval_loop, Divert};
 use yash_syntax::parser::lex::Lexer;
 
 async fn print_version(env: &mut Env) -> i32 {
@@ -52,7 +52,10 @@ async fn print_version(env: &mut Env) -> i32 {
     result.exit_status().0
 }
 
+// The RefCell is local to this function, so it is safe to keep borrows across await points.
+#[allow(clippy::await_holding_refcell_ref)]
 async fn parse_and_print(mut env: Env) -> i32 {
+    // Parse the command-line arguments
     let run = match startup::args::parse(std::env::args()) {
         Ok(Parse::Help) => todo!("print help"),
         Ok(Parse::Version) => return print_version(&mut env).await,
@@ -63,6 +66,8 @@ async fn parse_and_print(mut env: Env) -> i32 {
             return ExitStatus::ERROR.0;
         }
     };
+
+    // Apply the parsed options to the environment
     if startup::auto_interactive(&env.system, &run) {
         env.options.set(Interactive, On);
     }
@@ -76,9 +81,11 @@ async fn parse_and_print(mut env: Env) -> i32 {
         env.options.set(Monitor, On);
     }
 
+    // Apply the parsed operands to the environment
     env.arg0 = run.arg0;
     env.variables.positional_params_mut().values = run.positional_params;
 
+    // Initialize signal handlers
     if env.options.get(Interactive) == On {
         env.traps.enable_terminator_handlers(&mut env.system).ok();
         if env.options.get(Monitor) == On {
@@ -86,8 +93,10 @@ async fn parse_and_print(mut env: Env) -> i32 {
         }
     }
 
+    // Prepare built-ins
     env.builtins.extend(BUILTINS.iter().cloned());
 
+    // Prepare variables
     env.variables.extend_env(std::env::vars());
     env.init_variables();
 
@@ -95,11 +104,17 @@ async fn parse_and_print(mut env: Env) -> i32 {
     // TODO run rcfile if interactive
 
     // Prepare the input for the main read-eval loop
-    let input = match prepare_input(&mut env.system, &run.source) {
+    let ref_env = &RefCell::new(&mut env);
+    let input = match prepare_input(ref_env, &run.source) {
         Ok(input) => input,
         Err(e) => {
             let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());
-            env.system.print_error(&format!("{}: {}\n", arg0, e)).await;
+            let message = format!("{}: {}\n", arg0, e);
+            // The borrow checker of Rust 1.79.0 is not smart enough to reason
+            // about the lifetime of `input` here, so we re-borrow from `ref_env`
+            // instead of reusing `env`.
+            // env.system.print_error(&message).await;
+            ref_env.borrow_mut().system.print_error(&message).await;
             return ExitStatus::FAILURE.0;
         }
     };
@@ -107,9 +122,12 @@ async fn parse_and_print(mut env: Env) -> i32 {
     let mut lexer = Lexer::new(input.input, line, input.source);
 
     // Run the read-eval loop
-    let mut rel = ReadEvalLoop::new(&mut env, &mut lexer);
-    rel.set_verbose(input.verbose);
-    let result = rel.run().await;
+    let result = read_eval_loop(ref_env, &mut lexer).await;
+
+    // The borrow checker of Rust 1.79.0 is not smart enough to reason about the
+    // lifetime of `input` here, so we re-borrow from `ref_env` instead of reusing `env`.
+    // env.system.print_error(&message).await;
+    let env = &mut **ref_env.borrow_mut();
     env.apply_result(result);
 
     match result {
@@ -118,7 +136,7 @@ async fn parse_and_print(mut env: Env) -> i32 {
         | Break(Divert::Break { .. })
         | Break(Divert::Return(_))
         | Break(Divert::Interrupt(_))
-        | Break(Divert::Exit(_)) => run_exit_trap(&mut env).await,
+        | Break(Divert::Exit(_)) => run_exit_trap(env).await,
         Break(Divert::Abort(_)) => (),
     }
 

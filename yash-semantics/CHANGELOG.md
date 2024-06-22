@@ -9,12 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `runner::ReadEvalLoop` now has the `must_use` attribute.
+- `read_eval_loop`
+    - This function replaces the `ReadEvalLoop` struct and its methods.
+      It supports the `yash_env::input::Echo` decorator by taking a
+      `&RefCell<&mut Env>`.
+- `ReadEvalLoop` now has the `must_use` attribute.
 
 ### Changed
 
 - External dependency versions:
     - Rust 1.75.0 → 1.77.0
+
+### Deprecated
+
+- `ReadEvalLoop::set_verbose` in favor of `yash_env::input::Echo`
 
 ### Removed
 

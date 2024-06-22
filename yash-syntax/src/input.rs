@@ -17,6 +17,7 @@
 //! Methods about passing [source](crate::source) code to the [parser](crate::parser).
 
 use async_trait::async_trait;
+use std::ops::DerefMut;
 
 /// Current state in which source code is read.
 ///
@@ -52,6 +53,17 @@ pub trait Input {
     ///
     /// For object safety, this async method is declared to return the future in a pinned box.
     async fn next_line(&mut self, context: &Context) -> Result;
+}
+
+#[async_trait(?Send)]
+impl<T> Input for T
+where
+    T: DerefMut,
+    T::Target: Input,
+{
+    async fn next_line(&mut self, context: &Context) -> Result {
+        self.deref_mut().next_line(context).await
+    }
 }
 
 /// Input function that reads from a string in memory.

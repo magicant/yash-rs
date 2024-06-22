@@ -445,6 +445,7 @@ impl Env {
     }
 }
 
+mod alias;
 pub mod builtin;
 pub mod function;
 pub mod input;
@@ -466,14 +467,17 @@ mod tests {
     use crate::io::MIN_INTERNAL_FD;
     use crate::job::Job;
     use crate::subshell::Subshell;
+    use crate::system::r#virtual::FileBody;
     use crate::system::r#virtual::INode;
     use crate::system::r#virtual::SystemState;
     use crate::system::r#virtual::SIGCHLD;
     use crate::trap::Action;
+    use assert_matches::assert_matches;
     use futures_executor::LocalPool;
     use futures_util::task::LocalSpawnExt as _;
     use futures_util::FutureExt as _;
     use std::cell::RefCell;
+    use std::str::from_utf8;
     use yash_syntax::source::Location;
 
     /// Helper function to perform a test in a virtual system with an executor.
@@ -500,6 +504,18 @@ mod tests {
             shared_system.select(false).unwrap();
             SystemState::select_all(&state);
         }
+    }
+
+    /// Helper function for asserting on the content of /dev/stderr.
+    pub fn assert_stderr<F, T>(state: &RefCell<SystemState>, f: F) -> T
+    where
+        F: FnOnce(&str) -> T,
+    {
+        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
+        let stderr = stderr.borrow();
+        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
+            f(from_utf8(content).unwrap())
+        })
     }
 
     #[test]

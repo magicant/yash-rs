@@ -178,7 +178,7 @@ mod tests {
     use super::super::error::ErrorCause;
     use super::super::lex::Lexer;
     use super::*;
-    use crate::alias::{AliasSet, HashEntry};
+    use crate::alias::{AliasSet, EmptyGlossary, HashEntry};
     use crate::source::Location;
     use crate::source::Source;
     use assert_matches::assert_matches;
@@ -213,8 +213,7 @@ mod tests {
     #[test]
     fn parser_case_item_minimum() {
         let mut lexer = Lexer::from_memory("foo)", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let item = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(item.patterns.len(), 1);
@@ -228,8 +227,7 @@ mod tests {
     #[test]
     fn parser_case_item_with_open_paren() {
         let mut lexer = Lexer::from_memory("(foo)", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let item = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(item.patterns.len(), 1);
@@ -243,8 +241,7 @@ mod tests {
     #[test]
     fn parser_case_item_many_patterns() {
         let mut lexer = Lexer::from_memory("1 | esac | $three)", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let item = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(item.patterns.len(), 3);
@@ -260,8 +257,7 @@ mod tests {
     #[test]
     fn parser_case_item_non_empty_body() {
         let mut lexer = Lexer::from_memory("foo)\necho ok\n:&\n", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let item = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(item.patterns.len(), 1);
@@ -277,8 +273,7 @@ mod tests {
     #[test]
     fn parser_case_item_with_double_semicolon() {
         let mut lexer = Lexer::from_memory("foo);;", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let item = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(item.patterns.len(), 1);
@@ -292,8 +287,7 @@ mod tests {
     #[test]
     fn parser_case_item_with_non_empty_body_and_double_semicolon() {
         let mut lexer = Lexer::from_memory("foo):;\n;;", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let item = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(item.patterns.len(), 1);
@@ -308,8 +302,7 @@ mod tests {
     #[test]
     fn parser_case_item_missing_pattern_without_open_paren() {
         let mut lexer = Lexer::from_memory(")", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let e = parser.case_item().now_or_never().unwrap().unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingPattern));
@@ -322,8 +315,7 @@ mod tests {
     #[test]
     fn parser_case_item_esac_after_paren() {
         let mut lexer = Lexer::from_memory("(esac)", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let e = parser.case_item().now_or_never().unwrap().unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EsacAsPattern));
@@ -336,8 +328,7 @@ mod tests {
     #[test]
     fn parser_case_item_first_pattern_not_word_after_open_paren() {
         let mut lexer = Lexer::from_memory("(&", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let e = parser.case_item().now_or_never().unwrap().unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidPattern));
@@ -350,8 +341,7 @@ mod tests {
     #[test]
     fn parser_case_item_missing_pattern_after_bar() {
         let mut lexer = Lexer::from_memory("(foo| |", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let e = parser.case_item().now_or_never().unwrap().unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingPattern));
@@ -364,8 +354,7 @@ mod tests {
     #[test]
     fn parser_case_item_missing_close_paren() {
         let mut lexer = Lexer::from_memory("(foo bar", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let e = parser.case_item().now_or_never().unwrap().unwrap_err();
         assert_eq!(
@@ -381,8 +370,7 @@ mod tests {
     #[test]
     fn parser_case_command_minimum() {
         let mut lexer = Lexer::from_memory("case foo in esac", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -501,8 +489,7 @@ mod tests {
     #[test]
     fn parser_case_command_one_item() {
         let mut lexer = Lexer::from_memory("case foo in bar) esac", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -522,8 +509,7 @@ mod tests {
             "case x in\n\na) ;; (b|c):&:; ;;\n d)echo\nesac",
             Source::Unknown,
         );
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -542,8 +528,7 @@ mod tests {
     #[test]
     fn parser_case_command_many_items_with_final_double_semicolon() {
         let mut lexer = Lexer::from_memory("case x in(1);; 2)echo\n\n;;\n\nesac", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -561,8 +546,7 @@ mod tests {
     #[test]
     fn parser_case_command_missing_subject() {
         let mut lexer = Lexer::from_memory(" case  ", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -576,8 +560,7 @@ mod tests {
     #[test]
     fn parser_case_command_invalid_subject() {
         let mut lexer = Lexer::from_memory(" case ; ", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -591,8 +574,7 @@ mod tests {
     #[test]
     fn parser_case_command_missing_in() {
         let mut lexer = Lexer::from_memory(" case x esac", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -612,8 +594,7 @@ mod tests {
     #[test]
     fn parser_case_command_missing_esac() {
         let mut lexer = Lexer::from_memory("case x in a) }", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();

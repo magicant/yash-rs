@@ -1,5 +1,5 @@
 // This file is part of yash, an extended POSIX shell.
-// Copyright (C) 2021 WATANABE Yuki
+// Copyright (C) 2024 WATANABE Yuki
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,17 +14,22 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Methods about passing [source](yash_syntax::source) code to the
-//! [parser](yash_syntax::parser).
-//!
-//! This module extends [`yash_syntax::input`] with input functions that are
-//! implemented depending on the environment.
+//! Implementation of the environment about aliases
 
-#[doc(no_inline)]
-pub use yash_syntax::input::*;
+use crate::Env;
+use std::rc::Rc;
+use yash_syntax::alias::{Alias, Glossary};
 
-mod fd_reader;
-pub use fd_reader::FdReader;
-
-mod echo;
-pub use echo::Echo;
+/// Allows to look up aliases in the environment.
+///
+/// This implementation delegates to `self.aliases`.
+impl Glossary for Env {
+    #[inline(always)]
+    fn look_up(&self, name: &str) -> Option<Rc<Alias>> {
+        self.aliases.look_up(name)
+    }
+    #[inline(always)]
+    fn is_empty(&self) -> bool {
+        self.aliases.is_empty()
+    }
+}

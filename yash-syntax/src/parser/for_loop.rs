@@ -159,7 +159,7 @@ mod tests {
     use super::super::error::ErrorCause;
     use super::super::lex::Lexer;
     use super::*;
-    use crate::alias::{AliasSet, HashEntry};
+    use crate::alias::{AliasSet, EmptyGlossary, HashEntry};
     use crate::source::Source;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
@@ -167,8 +167,7 @@ mod tests {
     #[test]
     fn parser_for_loop_short() {
         let mut lexer = Lexer::from_memory("for A do :; done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -185,8 +184,7 @@ mod tests {
     #[test]
     fn parser_for_loop_with_semicolon_before_do() {
         let mut lexer = Lexer::from_memory("for B ; do :; done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -203,8 +201,7 @@ mod tests {
     #[test]
     fn parser_for_loop_with_semicolon_and_newlines_before_do() {
         let mut lexer = Lexer::from_memory("for B ; \n\t\n do :; done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -221,8 +218,7 @@ mod tests {
     #[test]
     fn parser_for_loop_with_newlines_before_do() {
         let mut lexer = Lexer::from_memory("for B \n \\\n \n do :; done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -239,8 +235,7 @@ mod tests {
     #[test]
     fn parser_for_loop_with_zero_values_delimited_by_semicolon() {
         let mut lexer = Lexer::from_memory("for foo in; do :; done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -257,8 +252,7 @@ mod tests {
     #[test]
     fn parser_for_loop_with_one_value_delimited_by_semicolon_and_newlines() {
         let mut lexer = Lexer::from_memory("for foo in bar; \n \n do :; done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -280,8 +274,7 @@ mod tests {
     #[test]
     fn parser_for_loop_with_many_values_delimited_by_one_newline() {
         let mut lexer = Lexer::from_memory("for in in in a b c\ndo :; done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -303,8 +296,7 @@ mod tests {
     #[test]
     fn parser_for_loop_with_zero_values_delimited_by_many_newlines() {
         let mut lexer = Lexer::from_memory("for foo in \n \n \n do :; done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -321,8 +313,7 @@ mod tests {
     #[test]
     fn parser_for_loop_newlines_before_in() {
         let mut lexer = Lexer::from_memory("for foo\n \n\nin\ndo :; done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -399,8 +390,7 @@ mod tests {
     #[test]
     fn parser_for_loop_missing_name_eof() {
         let mut lexer = Lexer::from_memory(" for ", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -414,8 +404,7 @@ mod tests {
     #[test]
     fn parser_for_loop_missing_name_newline() {
         let mut lexer = Lexer::from_memory(" for\ndo :; done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -429,8 +418,7 @@ mod tests {
     #[test]
     fn parser_for_loop_missing_name_semicolon() {
         let mut lexer = Lexer::from_memory("for; do :; done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -482,8 +470,7 @@ mod tests {
     #[test]
     fn parser_for_loop_semicolon_after_newline() {
         let mut lexer = Lexer::from_memory("for X\n; do :; done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -541,8 +528,7 @@ mod tests {
     #[test]
     fn parser_for_loop_invalid_token_after_semicolon() {
         let mut lexer = Lexer::from_memory(" for X; ! do :; done", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();

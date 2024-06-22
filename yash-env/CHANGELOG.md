@@ -7,12 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.1] - Unreleased
 
+### Added
+
+- `impl yash_system::alias::Glossary for Env`
+- `input::Echo`
+    - This is a decorator of `Input` that implements the behavior of the verbose shell option.
+- `input::FdReader` is now marked `#[must_use]`.
+
 ### Changed
 
 - External dependency versions:
     - Rust 1.70.0 → 1.77.0
 - Internal dependency versions:
     - annotate-snippets 0.10.0 → 0.11.4
+
+### Deprecated
+
+- `input::FdReader::set_echo` in favor of `input::Echo`
 
 ### Fixed
 

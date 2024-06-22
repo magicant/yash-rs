@@ -19,6 +19,7 @@
 use super::keyword::Keyword;
 use super::op::Operator;
 use crate::alias::Alias;
+use crate::alias::EmptyGlossary;
 use crate::input::Context;
 use crate::input::Input;
 use crate::input::Memory;
@@ -745,8 +746,7 @@ impl<'a> Lexer<'a> {
     pub async fn inner_program(&mut self) -> Result<String> {
         let begin = self.index();
 
-        let aliases = Default::default();
-        let mut parser = super::super::Parser::new(self, &aliases);
+        let mut parser = super::super::Parser::new(self, &EmptyGlossary);
         parser.maybe_compound_list().await?;
 
         let end = parser.peek_token().await?.index;

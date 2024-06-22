@@ -18,19 +18,18 @@
 
 use self::args::Run;
 use self::args::Source;
-use std::cell::Cell;
+use std::cell::RefCell;
 use std::ffi::CString;
-use std::rc::Rc;
 use thiserror::Error;
+use yash_env::input::Echo;
 use yash_env::input::FdReader;
 use yash_env::io::Fd;
 use yash_env::option::Option::Interactive;
-use yash_env::option::State;
 use yash_env::system::Errno;
 use yash_env::system::Mode;
 use yash_env::system::OFlag;
-use yash_env::system::SystemEx;
-use yash_env::SharedSystem;
+use yash_env::system::SystemEx as _;
+use yash_env::Env;
 use yash_env::System;
 #[cfg(doc)]
 use yash_semantics::ReadEvalLoop;
@@ -60,12 +59,10 @@ pub fn auto_interactive<S: System>(system: &S, run: &Run) -> bool {
 
 /// Result of [`prepare_input`].
 pub struct SourceInput<'a> {
-    /// Input to be passed to the parser.
+    /// Input to be passed to the lexer
     pub input: Box<dyn Input + 'a>,
-    /// Source of the input.
+    /// Description of the source
     pub source: SyntaxSource,
-    /// Flag that should be passed to [`ReadEvalLoop::set_verbose`].
-    pub verbose: Option<Rc<Cell<State>>>,
 }
 
 /// Error returned by [`prepare_input`].
@@ -79,12 +76,22 @@ pub struct PrepareInputError<'a> {
 }
 
 /// Prepares the input for the shell.
+///
+/// This function constructs an input object from the given source. If the source
+/// is read with a file descriptor, the [`Echo`] decorator is applied to the input
+/// to implement the [verbose](yash_env::option::Verbose) shell option.
+///
+/// The `RefCell` passed as the first argument should be shared with (and only
+/// with) the [`read_eval_loop`](yash_semantics::read_eval_loop) function that
+/// consumes the input and executes the parsed commands.
 pub fn prepare_input<'a>(
-    system: &mut SharedSystem,
+    env: &'a RefCell<&mut Env>,
     source: &'a Source,
 ) -> Result<SourceInput<'a>, PrepareInputError<'a>> {
     match source {
         Source::Stdin => {
+            let mut system = env.borrow().system.clone();
+
             if system.isatty(Fd::STDIN).unwrap_or(false) || system.fd_is_pipe(Fd::STDIN) {
                 // It makes virtually no sense to make it blocking here
                 // since we will be doing non-blocking reads anyway,
@@ -93,17 +100,14 @@ pub fn prepare_input<'a>(
                 system.set_blocking(Fd::STDIN).ok();
             }
 
-            let mut input = Box::new(FdReader::new(Fd::STDIN, system.clone()));
-            let echo = Rc::new(Cell::new(State::Off));
-            input.set_echo(Some(Rc::clone(&echo)));
-            Ok(SourceInput {
-                input,
-                source: SyntaxSource::Stdin,
-                verbose: Some(echo),
-            })
+            let input = Box::new(Echo::new(FdReader::new(Fd::STDIN, system), env));
+            let source = SyntaxSource::Stdin;
+            Ok(SourceInput { input, source })
         }
 
         Source::File { path } => {
+            let mut system = env.borrow().system.clone();
+
             let c_path = CString::new(path.as_str()).map_err(|_| PrepareInputError {
                 errno: Errno::EILSEQ,
                 path,
@@ -112,25 +116,17 @@ pub fn prepare_input<'a>(
                 .open(&c_path, OFlag::O_RDONLY | OFlag::O_CLOEXEC, Mode::empty())
                 .and_then(|fd| system.move_fd_internal(fd))
                 .map_err(|errno| PrepareInputError { errno, path })?;
-            let mut input = Box::new(FdReader::new(fd, system.clone()));
-            let echo = Rc::new(Cell::new(State::Off));
-            input.set_echo(Some(Rc::clone(&echo)));
-            Ok(SourceInput {
-                input,
-                source: SyntaxSource::CommandFile {
-                    path: path.to_owned(),
-                },
-                verbose: Some(echo),
-            })
+
+            let input = Box::new(Echo::new(FdReader::new(fd, system), env));
+            let path = path.to_owned();
+            let source = SyntaxSource::CommandFile { path };
+            Ok(SourceInput { input, source })
         }
 
         Source::String(command) => {
             let input = Box::new(Memory::new(command));
-            Ok(SourceInput {
-                input,
-                source: SyntaxSource::CommandString,
-                verbose: None,
-            })
+            let source = SyntaxSource::CommandString;
+            Ok(SourceInput { input, source })
         }
     }
 }

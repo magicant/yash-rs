@@ -140,6 +140,7 @@ mod tests {
     use super::super::lex::Lexer;
     use super::super::lex::TokenId::EndOfInput;
     use super::*;
+    use crate::alias::EmptyGlossary;
     use crate::source::Source;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
@@ -147,8 +148,7 @@ mod tests {
     #[test]
     fn parser_if_command_minimum() {
         let mut lexer = Lexer::from_memory("if a; then b; fi", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -169,8 +169,7 @@ mod tests {
             "if\ntrue\nthen\nfalse\n\nelif x; then y& fi",
             Source::Unknown,
         );
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -192,8 +191,7 @@ mod tests {
             "if a; then b; elif c; then d; elif e 1; e 2& then f 1; f 2& elif g; then h; fi",
             Source::Unknown,
         );
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -214,8 +212,7 @@ mod tests {
     #[test]
     fn parser_if_command_else() {
         let mut lexer = Lexer::from_memory("if a; then b; else c; d; fi", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -234,8 +231,7 @@ mod tests {
     fn parser_if_command_elif_and_else() {
         let mut lexer =
             Lexer::from_memory("if 1; then 2; elif 3; then 4; else 5; fi", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let compound_command = result.unwrap().unwrap();
@@ -254,8 +250,7 @@ mod tests {
     #[test]
     fn parser_if_command_without_then_after_if() {
         let mut lexer = Lexer::from_memory(" if :; fi", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -274,8 +269,7 @@ mod tests {
     #[test]
     fn parser_if_command_without_then_after_elif() {
         let mut lexer = Lexer::from_memory("if a; then b; elif c; fi", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -295,8 +289,7 @@ mod tests {
     #[test]
     fn parser_if_command_without_fi() {
         let mut lexer = Lexer::from_memory("  if :; then :; }", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -316,8 +309,7 @@ mod tests {
     #[test]
     fn parser_if_command_empty_condition() {
         let mut lexer = Lexer::from_memory("   if then :; fi", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -331,8 +323,7 @@ mod tests {
     #[test]
     fn parser_if_command_empty_body() {
         let mut lexer = Lexer::from_memory("if :; then fi", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -346,8 +337,7 @@ mod tests {
     #[test]
     fn parser_if_command_empty_elif_condition() {
         let mut lexer = Lexer::from_memory("if :; then :; elif then :; fi", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -364,8 +354,7 @@ mod tests {
     #[test]
     fn parser_if_command_empty_elif_body() {
         let mut lexer = Lexer::from_memory("if :; then :; elif :; then fi", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -382,8 +371,7 @@ mod tests {
     #[test]
     fn parser_if_command_empty_else() {
         let mut lexer = Lexer::from_memory("if :; then :; else fi", Source::Unknown);
-        let aliases = Default::default();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
         let result = parser.compound_command().now_or_never().unwrap();
         let e = result.unwrap_err();
