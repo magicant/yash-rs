@@ -580,6 +580,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "yash-prompt"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures-util",
+ "yash-env",
+ "yash-semantics",
+]
+
+[[package]]
 name = "yash-quote"
 version = "1.1.1"
 

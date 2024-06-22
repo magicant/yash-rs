@@ -1,0 +1,78 @@
+// This file is part of yash, an extended POSIX shell.
+// Copyright (C) 2024 WATANABE Yuki
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+//! Defines the `Prompter` decorator.
+
+use async_trait::async_trait;
+use std::cell::RefCell;
+use yash_env::input::{Context, Input, Result};
+use yash_env::Env;
+
+/// [`Input`] decorator that shows a command prompt.
+///
+/// This decorator expands and shows the command prompt before the input is read
+/// by the inner `Input`.
+#[derive(Clone, Debug)]
+#[must_use = "Prompter does nothing unless used by a parser"]
+pub struct Prompter<'a, 'b, T: 'a> {
+    inner: T,
+    env: &'a RefCell<&'b mut Env>,
+}
+
+impl<'a, 'b, T> Prompter<'a, 'b, T> {
+    /// Creates a new `Prompter` decorator.
+    ///
+    /// The first argument is the inner `Input` that performs the actual input
+    /// operation. The second argument is the shell environment that contains
+    /// the prompt variable and the system interface to print to the standard
+    /// error. It is wrapped in a `RefCell` so that it can be shared with other
+    /// decorators and the parser.
+    pub fn new(inner: T, env: &'a RefCell<&'b mut Env>) -> Self {
+        Self { inner, env }
+    }
+}
+
+#[async_trait(?Send)]
+impl<'a, 'b, T> Input for Prompter<'a, 'b, T>
+where
+    T: Input + 'a,
+{
+    async fn next_line(&mut self, context: &Context) -> Result {
+        // TODO: Show the prompt.
+        _ = self.env.borrow_mut();
+
+        self.inner.next_line(context).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures_util::FutureExt as _;
+    use yash_env::input::Memory;
+
+    #[test]
+    fn prompter_reads_from_inner_input() {
+        let mut env = Env::new_virtual();
+        let ref_env = RefCell::new(&mut env);
+        let mut prompter = Prompter::new(Memory::new("echo hello"), &ref_env);
+        let result = prompter
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result.unwrap(), "echo hello");
+    }
+}

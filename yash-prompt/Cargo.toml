@@ -1,0 +1,22 @@
+[package]
+name = "yash-prompt"
+version = "0.1.0"
+authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
+edition = "2021"
+rust-version = "1.77.0"
+description = "Command line prompt for yash shell"
+# documentation = "https://yash.osdn.jp/doc/"
+readme = "README.md"
+# homepage = "https://yash.osdn.jp/"
+repository = "https://github.com/magicant/yash-rs"
+license = "GPL-3.0-or-later"
+keywords = ["posix", "shell"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+async-trait = "0.1.73"
+yash-env = { path = "../yash-env", version = "0.2.0" }
+yash-semantics = { path = "../yash-semantics", version = "0.2.0" }
+
+[dev-dependencies]
+futures-util = "0.3.28"
