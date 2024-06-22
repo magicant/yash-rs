@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - External dependency versions:
     - Rust 1.75.0 → 1.77.0
+- The first argument to `startup::prepare_input` is now `env: &'a RefCell<&mut Env>`
+  instead of `system: &mut SharedSystem`. This change is to allow the function to
+  construct `yash_env::input::Echo` for the returned source input.
+
+### Removed
+
+- `startup::SourceInput::verbose`
+    - The caller of `startup::prepare_input` is no longer responsible for setting
+      the `verbose` flag of the read-eval loop. The behavior of the verbose option
+      is now implemented in `yash_env::input::Echo`, which is included in
+      the `startup::SourceInput::input` field.
 
 ### Fixed
 

@@ -22,9 +22,10 @@ use super::super::phrase::Phrase;
 use super::Env;
 use super::Error;
 use crate::expansion::ErrorCause;
+use crate::read_eval_loop;
 use crate::trap::run_exit_trap;
 use crate::Handle;
-use crate::ReadEvalLoop;
+use std::cell::RefCell;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
 use yash_env::subshell::JobControl;
@@ -91,7 +92,7 @@ where
 
     // Run the command
     let mut lexer = Lexer::from_memory(command.as_ref(), Source::CommandSubst { original });
-    ReadEvalLoop::new(env, &mut lexer).run().await
+    read_eval_loop(&RefCell::new(env), &mut lexer).await
 }
 
 /// The second half of [`expand`] that does not depend on type parameter `C`.
