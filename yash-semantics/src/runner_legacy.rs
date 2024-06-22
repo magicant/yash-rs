@@ -66,6 +66,7 @@ use yash_syntax::parser::Parser;
 /// assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 /// # })
 /// ```
+#[deprecated = "use the `read_eval_loop` function instead"]
 #[derive(Debug)]
 #[must_use = "the loop must be run to execute commands"]
 pub struct ReadEvalLoop<'a, 'b> {
@@ -74,6 +75,7 @@ pub struct ReadEvalLoop<'a, 'b> {
     verbose: Option<Rc<Cell<State>>>,
 }
 
+#[allow(deprecated)]
 impl<'a, 'b> ReadEvalLoop<'a, 'b> {
     /// Creates a new read-eval-loop instance.
     ///
@@ -193,6 +195,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.exit_status = ExitStatus(5);
         let mut lexer = Lexer::from_memory("", Source::Unknown);
+        #[allow(deprecated)]
         let rel = ReadEvalLoop::new(&mut env, &mut lexer);
         let result = rel.run().now_or_never().unwrap();
         assert_eq!(result, Continue(()));
@@ -208,6 +211,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         let mut lexer = Lexer::from_memory("echo $?; return -n 7", Source::Unknown);
+        #[allow(deprecated)]
         let rel = ReadEvalLoop::new(&mut env, &mut lexer);
         let result = rel.run().now_or_never().unwrap();
         assert_eq!(result, Continue(()));
@@ -222,6 +226,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         let mut lexer = Lexer::from_memory("echo 1\necho 2\necho 3;", Source::Unknown);
+        #[allow(deprecated)]
         let rel = ReadEvalLoop::new(&mut env, &mut lexer);
         let result = rel.run().now_or_never().unwrap();
         assert_eq!(result, Continue(()));
@@ -242,6 +247,7 @@ mod tests {
         })));
         env.builtins.insert("echo", echo_builtin());
         let mut lexer = Lexer::from_memory("echo", Source::Unknown);
+        #[allow(deprecated)]
         let rel = ReadEvalLoop::new(&mut env, &mut lexer);
         let result = rel.run().now_or_never().unwrap();
         assert_eq!(result, Continue(()));
@@ -268,6 +274,7 @@ mod tests {
         input.set_echo(Some(Rc::clone(&verbose)));
         let line = NonZeroU64::new(1).unwrap();
         let mut lexer = Lexer::new(input, line, Source::Stdin);
+        #[allow(deprecated)]
         let mut rel = ReadEvalLoop::new(&mut env, &mut lexer);
         #[allow(deprecated)]
         rel.set_verbose(Some(Rc::clone(&verbose)));
@@ -285,6 +292,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let mut lexer = Lexer::from_memory(";;", Source::Unknown);
+        #[allow(deprecated)]
         let rel = ReadEvalLoop::new(&mut env, &mut lexer);
         let result = rel.run().now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
@@ -298,6 +306,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         let mut lexer = Lexer::from_memory(";;\necho !", Source::Unknown);
+        #[allow(deprecated)]
         let rel = ReadEvalLoop::new(&mut env, &mut lexer);
         let result = rel.run().now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
@@ -326,6 +335,7 @@ mod tests {
             .unwrap()
             .raise_signal(SIGUSR1);
         let mut lexer = Lexer::from_memory("echo $?", Source::Unknown);
+        #[allow(deprecated)]
         let rel = ReadEvalLoop::new(&mut env, &mut lexer);
         let result = rel.run().now_or_never().unwrap();
         assert_eq!(result, Continue(()));

@@ -44,6 +44,7 @@ mod runner;
 pub use runner::read_eval_loop;
 
 mod runner_legacy;
+#[allow(deprecated)]
 pub use runner_legacy::ReadEvalLoop;
 
 #[cfg(test)]
