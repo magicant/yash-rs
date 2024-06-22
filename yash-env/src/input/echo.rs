@@ -30,6 +30,7 @@ use yash_syntax::input::{Context, Input, Result};
 /// the standard error before it is returned to the caller. Otherwise, the input
 /// is returned as is.
 #[derive(Clone, Debug)]
+#[doc(alias = "Verbose")]
 #[must_use = "Echo does nothing unless used by a parser"]
 pub struct Echo<'a, 'b, T: 'a> {
     inner: T,
