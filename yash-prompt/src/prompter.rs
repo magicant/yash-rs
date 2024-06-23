@@ -51,8 +51,11 @@ where
     T: Input + 'a,
 {
     async fn next_line(&mut self, context: &Context) -> Result {
-        // TODO: Show the prompt.
-        _ = self.env.borrow_mut();
+        {
+            let mut system = self.env.borrow().system.clone();
+            // TODO Honor $PS1 and $PS2
+            system.print_error("$ ").await;
+        }
 
         self.inner.next_line(context).await
     }
@@ -62,7 +65,21 @@ where
 mod tests {
     use super::*;
     use futures_util::FutureExt as _;
+    use std::rc::Rc;
     use yash_env::input::Memory;
+    use yash_env::system::r#virtual::SystemState;
+    use yash_env::system::r#virtual::VirtualSystem;
+    use yash_env::variable::Value;
+    use yash_env::variable::PS1;
+    use yash_env::variable::PS1_INITIAL_VALUE_NON_ROOT;
+    use yash_env_test_helper::assert_stderr;
+
+    fn define_variable<N: Into<String>, V: Into<Value>>(env: &mut Env, name: N, value: V) {
+        env.variables
+            .get_or_new(name, yash_env::variable::Scope::Global)
+            .assign(value, None)
+            .unwrap();
+    }
 
     #[test]
     fn prompter_reads_from_inner_input() {
@@ -75,4 +92,39 @@ mod tests {
             .unwrap();
         assert_eq!(result.unwrap(), "echo hello");
     }
+
+    #[test]
+    fn prompter_shows_prompt_before_reading() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        define_variable(&mut env, PS1, PS1_INITIAL_VALUE_NON_ROOT);
+
+        struct InputMock(Rc<RefCell<SystemState>>);
+        #[async_trait::async_trait(?Send)]
+        impl Input for InputMock {
+            async fn next_line(&mut self, _: &Context) -> Result {
+                // The Prompter is expected to have shown the prompt before
+                // calling the inner input. Let's check that here.
+                assert_stderr(&self.0, |stderr| {
+                    assert_eq!(stderr, PS1_INITIAL_VALUE_NON_ROOT)
+                });
+
+                Ok("foo".to_string())
+            }
+        }
+
+        let ref_env = RefCell::new(&mut env);
+        let mut prompter = Prompter::new(InputMock(state), &ref_env);
+        let result = prompter
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result.unwrap(), "foo"); // Make sure the mock input is called.
+    }
+
+    // TODO ps1_variable_defines_default_prompt
+    // TODO ps2_variable_defines_continuation_prompt
+    // TODO variable_is_expanded_in_prompt
+    // TODO Should we implement and test all of the above here?
 }
