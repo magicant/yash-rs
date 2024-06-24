@@ -14,37 +14,85 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// TODO Elaborate overall module doc text, demonstrate how pushing and popping
-// contexts work with examples.
-//! Type definitions for shell variables.
+//! Items for shell variables
 //!
-//! A [`VariableSet`] is a stack of contexts, and a _context_ is a map of
-//! name-variable pairs. The `VariableSet` has a _base context_ with the same
-//! lifetime as the `VariableSet` itself. Additional contexts can be added
-//! (pushed) and removed (popped) on a last-in-first-out basis.
+//! A [`Variable`] is a named parameter that can be assigned and exported. It is
+//! defined in a context of a variable set. A [`VariableSet`] is a stack of
+//! contexts that can be pushed and popped. Each context has a map of
+//! name-variable pairs that effectively manages the variables.
 //!
-//! You can define any number of [`Variable`]s in a context.
-//! A new context is empty when pushed to the variable set.
-//! You can pop a context regardless of whether it is empty or not;
-//! all the variables in the popped context are removed as well.
+//! # Variable sets and contexts
 //!
-//! Variables in a context hide those with the same name in lower contexts. You
-//! cannot access such hidden variables until removing the hiding variable from
-//! the upper context.
+//! The variable set is a component of the shell environment ([`Env`]). It
+//! contains a non-empty stack of contexts. The first context in the stack is
+//! called the _base context_, and it is always present. Other contexts can be
+//! pushed and popped on a last-in-first-out basis.
 //!
-//! Each regular context has a special array variable called positional
-//! parameters. Because it does not have a name as a variable, you need to use
-//! dedicated methods for accessing it.
-//! See [`VariableSet::positional_params`] and its [mut
-//! variant](VariableSet::positional_params_mut).
+//! Each context is a map of name-variable pairs. Variables in a context hide
+//! those with the same name in lower contexts. You cannot access such hidden
+//! variables until the hiding variables are removed or the context containing
+//! them is popped.
+//!
+//! There are two types of [`Context`]s: regular and volatile. A regular context
+//! is the default context type and may have positional parameters. A volatile
+//! context is used for holding temporary variables when executing a built-in or
+//! function. The context types and [`Scope`] affect the behavior of variable
+//! assignment. The base context is always a regular context.
+//!
+//! Note that the notion of name-variable pairs is directly implemented in the
+//! [`VariableSet`] struct, and is not visible in the [`Context`] enum.
+//!
+//! ## Context guards
 //!
 //! This module provides guards to ensure contexts are pushed and popped
 //! correctly. The push function returns a guard that will pop the context when
 //! dropped. Implementing `Deref` and `DerefMut`, the guard allows access to the
-//! borrowed `VariableSet` or `Env`. [`VariableSet::push_context`] returns a
-//! [`ContextGuard`] that allows re-borrowing the `VariableSet`.
-//! [`Env::push_context`] returns a [`EnvContextGuard`] that implements
-//! `DerefMut<Target = Env>`.
+//! borrowed variable set or environment. To push a new context and acquire a
+//! guard, use [`VariableSet::push_context`] or [`Env::push_context`].
+//!
+//! # Variables
+//!
+//! An instance of [`Variable`] represents the value and attributes of a shell
+//! variable. Although all the fields of a variable are public, you cannot
+//! obtain a mutable reference to a variable from a variable set directly. You
+//! need to use [`VariableRefMut`] to modify a variable.
+//!
+//! ## Variable names and initial values
+//!
+//! This module defines constants for the names and initial values of some
+//! variables. The constants are used in the shell initialization process to
+//! create and assign the variables. The documentation for each name constant
+//! describes the variable's purpose and initial value.
+//!
+//! # Examples
+//!
+//! ```
+//! use yash_env::variable::{Context, Scope, VariableSet};
+//! let mut set = VariableSet::new();
+//!
+//! // Define a variable in the base context
+//! let mut var = set.get_or_new("foo", Scope::Global);
+//! var.assign("hello", None).unwrap();
+//!
+//! // Push a new context
+//! let mut guard = set.push_context(Context::default());
+//!
+//! // The variable is still visible
+//! assert_eq!(guard.get("foo").unwrap().value, Some("hello".into()));
+//!
+//! // Defining a new variable in the new context hides the previous variable
+//! let mut var = guard.get_or_new("foo", Scope::Local);
+//! var.assign("world", None).unwrap();
+//!
+//! // The new variable is visible
+//! assert_eq!(guard.get("foo").unwrap().value, Some("world".into()));
+//!
+//! // Pop the context
+//! drop(guard);
+//!
+//! // The previous variable is visible again
+//! assert_eq!(set.get("foo").unwrap().value, Some("hello".into()));
+//! ```
 
 use crate::semantics::Field;
 #[cfg(doc)]
