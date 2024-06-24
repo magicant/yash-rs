@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `input::Echo`
     - This is a decorator of `Input` that implements the behavior of the verbose shell option.
 - `input::FdReader` is now marked `#[must_use]`.
+- Variable name constants in the `variable` module:
+  `CDPATH`, `ENV`, `HOME`, `IFS`, `LINENO`, `OLDPWD`, `OPTARG`, `OPTIND`,
+  `PATH`, `PPID`, `PS1`, `PS2`, `PS4`, `PWD`
+- Variable initial value constants in the `variable` module:
+  `IFS_INITIAL_VALUE`, `OPTIND_INITIAL_VALUE`, `PS1_INITIAL_VALUE_NON_ROOT`,
+  `PS1_INITIAL_VALUE_ROOT`, `PS2_INITIAL_VALUE`, `PS4_INITIAL_VALUE`
 
 ### Changed
 

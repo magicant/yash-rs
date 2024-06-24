@@ -36,6 +36,7 @@ use yash_env::system::Mode;
 use yash_env::system::OFlag;
 use yash_env::system::System;
 use yash_env::system::SystemEx as _;
+use yash_env::variable::PATH;
 use yash_env::Env;
 use yash_semantics::read_eval_loop;
 use yash_syntax::parser::lex::Lexer;
@@ -86,7 +87,7 @@ fn find_and_open_file(env: &mut Env, filename: &str) -> Result<Fd, Errno> {
         Box::new(std::iter::once("."))
     } else {
         env.variables
-            .get("PATH")
+            .get(PATH)
             .and_then(|v| v.value.as_ref())
             .map_or(Box::new(std::iter::empty()), |v| Box::new(v.split()))
         // TODO If not in POSIX mode, search in the current working directory too
@@ -186,7 +187,7 @@ mod tests {
         }
         let mut env = Env::with_system(Box::new(system.clone()));
         env.variables
-            .get_or_new("PATH", Scope::Global)
+            .get_or_new(PATH, Scope::Global)
             .assign("/foo:/bar:/baz", None)
             .unwrap();
 
@@ -218,7 +219,7 @@ mod tests {
         }
         let mut env = Env::with_system(Box::new(system.clone()));
         env.variables
-            .get_or_new("PATH", Scope::Global)
+            .get_or_new(PATH, Scope::Global)
             .assign("/foo:/bar:/baz", None)
             .unwrap();
 

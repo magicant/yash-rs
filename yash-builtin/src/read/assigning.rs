@@ -20,6 +20,7 @@ use yash_env::semantics::Field;
 use yash_env::variable::Scope;
 use yash_env::variable::Value;
 use yash_env::variable::Variable;
+use yash_env::variable::IFS;
 use yash_env::Env;
 use yash_semantics::expansion::attr::AttrChar;
 use yash_semantics::expansion::attr_strip::Strip as _;
@@ -46,7 +47,7 @@ pub fn assign(
     last_variable: Field,
 ) -> Vec<Error> {
     #[rustfmt::skip]
-    let ifs = match env.variables.get("IFS") {
+    let ifs = match env.variables.get(IFS) {
         Some(&Variable { value: Some(Value::Scalar(ref value)), ..  }) => value,
         // TODO If the variable is an array, should we ignore it?
         _ => Ifs::DEFAULT,
@@ -224,7 +225,7 @@ mod tests {
     #[test]
     fn non_default_ifs() {
         let mut env = Env::new_virtual();
-        env.get_or_create_variable("IFS", Scope::Global)
+        env.get_or_create_variable(IFS, Scope::Global)
             .assign(" *", None)
             .unwrap();
         let text = attr_chars("1\t22 * * 333");
@@ -245,7 +246,7 @@ mod tests {
     #[test]
     fn non_default_ifs_with_empty_field() {
         let mut env = Env::new_virtual();
-        env.get_or_create_variable("IFS", Scope::Global)
+        env.get_or_create_variable(IFS, Scope::Global)
             .assign(" *", None)
             .unwrap();
         let text = attr_chars("1 22 * * 333 ");
@@ -266,7 +267,7 @@ mod tests {
     #[test]
     fn non_default_ifs_delimiting_last_field() {
         let mut env = Env::new_virtual();
-        env.get_or_create_variable("IFS", Scope::Global)
+        env.get_or_create_variable(IFS, Scope::Global)
             .assign(" *", None)
             .unwrap();
         let text = attr_chars("1 22 * 333 * ");
@@ -289,7 +290,7 @@ mod tests {
     #[test]
     fn non_default_ifs_delimiting_last_field_extra() {
         let mut env = Env::new_virtual();
-        env.get_or_create_variable("IFS", Scope::Global)
+        env.get_or_create_variable(IFS, Scope::Global)
             .assign(" *", None)
             .unwrap();
         let text = attr_chars("1 22 * 333 44  * ");
@@ -312,7 +313,7 @@ mod tests {
     #[test]
     fn quote_removal() {
         let mut env = Env::new_virtual();
-        env.get_or_create_variable("IFS", Scope::Global)
+        env.get_or_create_variable(IFS, Scope::Global)
             .assign(r" \", None)
             .unwrap();
         let text = vec![

@@ -20,6 +20,7 @@ use crate::expansion::attr::AttrChar;
 use crate::expansion::attr::Origin;
 use yash_env::variable::Value;
 use yash_env::variable::Variable;
+use yash_env::variable::HOME;
 use yash_env::Env;
 use yash_env::System;
 
@@ -40,7 +41,7 @@ where
 /// Performs tilde expansion.
 pub fn expand(name: &str, env: &Env) -> Vec<AttrChar> {
     if name.is_empty() {
-        let result = match env.variables.get("HOME") {
+        let result = match env.variables.get(HOME) {
             Some(Variable {
                 value: Some(Value::Scalar(value)),
                 ..
@@ -69,7 +70,7 @@ mod tests {
     fn empty_name_with_scalar_home() {
         let mut env = Env::new_virtual();
         env.variables
-            .get_or_new("HOME", Scope::Global)
+            .get_or_new(HOME, Scope::Global)
             .assign("/home/foobar", None)
             .unwrap();
 
@@ -101,7 +102,7 @@ mod tests {
     fn empty_name_with_array_home() {
         let mut env = Env::new_virtual();
         env.variables
-            .get_or_new("HOME", Scope::Global)
+            .get_or_new(HOME, Scope::Global)
             .assign(Value::Array(vec![]), None)
             .unwrap();
 

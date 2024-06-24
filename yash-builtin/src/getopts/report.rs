@@ -24,6 +24,8 @@ use yash_env::variable::AssignError;
 use yash_env::variable::Scope;
 use yash_env::variable::UnsetError;
 use yash_env::variable::Value;
+use yash_env::variable::OPTARG;
+use yash_env::variable::OPTIND;
 use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -191,17 +193,17 @@ impl model::Result {
             .map_err(|e| Error::with_name_and_assign_error(var_name.value.clone(), e))?;
 
         if let Some(value) = optarg {
-            env.get_or_create_variable("OPTARG", Scope::Global)
+            env.get_or_create_variable(OPTARG, Scope::Global)
                 .assign(value, location.clone())
-                .map_err(|e| Error::with_name_and_assign_error("OPTARG".to_string(), e))?;
+                .map_err(|e| Error::with_name_and_assign_error(OPTARG.to_string(), e))?;
         } else {
-            env.variables.unset("OPTARG", Scope::Global)?;
+            env.variables.unset(OPTARG, Scope::Global)?;
         }
 
         let optind = indexes_to_optind(self.next_arg_index, self.next_char_index);
-        env.get_or_create_variable("OPTIND", Scope::Global)
+        env.get_or_create_variable(OPTIND, Scope::Global)
             .assign(optind.clone(), location)
-            .map_err(|e| Error::with_name_and_assign_error("OPTIND".to_string(), e))?;
+            .map_err(|e| Error::with_name_and_assign_error(OPTIND.to_string(), e))?;
 
         if let Some(state) = &mut env.getopts_state {
             state.optind = optind;
@@ -231,7 +233,7 @@ mod tests {
     fn env_with_dummy_arg0_and_optarg() -> Env {
         let mut env = Env::new_virtual();
         env.arg0 = "some/arg0".to_string();
-        env.get_or_create_variable("OPTARG", Scope::Global)
+        env.get_or_create_variable(OPTARG, Scope::Global)
             .assign("DUMMY", None)
             .unwrap();
         env
@@ -266,8 +268,8 @@ mod tests {
 
         assert_eq!(report, Ok(Some(String::new())));
         assert_variable_scalar(&env, "opt_var", "a");
-        assert_variable_scalar(&env, "OPTIND", "2");
-        assert_variable_none(&env, "OPTARG");
+        assert_variable_scalar(&env, OPTIND, "2");
+        assert_variable_none(&env, OPTARG);
     }
 
     #[test]
@@ -317,7 +319,7 @@ mod tests {
 
         _ = result.report(&mut env, false, Field::dummy("opt_var"));
 
-        let optind = env.variables.get("OPTIND").unwrap();
+        let optind = env.variables.get(OPTIND).unwrap();
         assert_matches!(&optind.value, Some(Value::Scalar(s)) if s == "2");
         assert_eq!(optind.last_assigned_location, Some(location));
     }
@@ -345,7 +347,7 @@ mod tests {
 
         _ = result.report(&mut env, false, Field::dummy("opt_var"));
 
-        let optind = env.variables.get("OPTARG").unwrap();
+        let optind = env.variables.get(OPTARG).unwrap();
         assert_matches!(&optind.value, Some(Value::Scalar(s)) if s == "some argument");
         assert_eq!(optind.last_assigned_location, Some(location));
     }
@@ -390,8 +392,8 @@ mod tests {
 
         assert_eq!(report, Ok(Some(String::new())));
         assert_variable_scalar(&env, "opt_var", "a");
-        assert_variable_scalar(&env, "OPTIND", "2");
-        assert_variable_scalar(&env, "OPTARG", "foo");
+        assert_variable_scalar(&env, OPTIND, "2");
+        assert_variable_scalar(&env, OPTARG, "foo");
     }
 
     #[test]
@@ -411,8 +413,8 @@ mod tests {
 
         assert_eq!(report, Ok(Some(String::new())));
         assert_variable_scalar(&env, "opt_var", "a");
-        assert_variable_scalar(&env, "OPTIND", "4:3");
-        assert_variable_none(&env, "OPTARG");
+        assert_variable_scalar(&env, OPTIND, "4:3");
+        assert_variable_none(&env, OPTARG);
     }
 
     #[test]
@@ -432,8 +434,8 @@ mod tests {
 
         assert_eq!(report, Ok(Some(String::new())));
         assert_variable_scalar(&env, "opt_var", "?");
-        assert_variable_scalar(&env, "OPTIND", "2");
-        assert_variable_scalar(&env, "OPTARG", "a");
+        assert_variable_scalar(&env, OPTIND, "2");
+        assert_variable_scalar(&env, OPTARG, "a");
     }
 
     #[test]
@@ -456,8 +458,8 @@ mod tests {
         assert!(message.contains("-a"), "message = {message:?}");
         assert!(message.contains("invalid"), "message = {message:?}");
         assert_variable_scalar(&env, "opt_var", "?");
-        assert_variable_scalar(&env, "OPTIND", "2");
-        assert_variable_none(&env, "OPTARG");
+        assert_variable_scalar(&env, OPTIND, "2");
+        assert_variable_none(&env, OPTARG);
     }
 
     #[test]
@@ -477,8 +479,8 @@ mod tests {
 
         assert_eq!(report, Ok(Some(String::new())));
         assert_variable_scalar(&env, "opt_var", ":");
-        assert_variable_scalar(&env, "OPTIND", "2");
-        assert_variable_scalar(&env, "OPTARG", "a");
+        assert_variable_scalar(&env, OPTIND, "2");
+        assert_variable_scalar(&env, OPTARG, "a");
     }
 
     #[test]
@@ -501,8 +503,8 @@ mod tests {
         assert!(message.contains("-a"), "message = {message:?}");
         assert!(message.contains("argument"), "message = {message:?}");
         assert_variable_scalar(&env, "opt_var", "?");
-        assert_variable_scalar(&env, "OPTIND", "2");
-        assert_variable_none(&env, "OPTARG");
+        assert_variable_scalar(&env, OPTIND, "2");
+        assert_variable_none(&env, OPTARG);
     }
 
     #[test]
@@ -516,7 +518,7 @@ mod tests {
             },
             is_special: false,
         }));
-        let mut optind = env.get_or_create_variable("OPTIND", Scope::Global);
+        let mut optind = env.get_or_create_variable(OPTIND, Scope::Global);
         let read_only_location = Location::dummy("read-only location");
         optind.make_read_only(read_only_location.clone());
         let result = model::Result {
@@ -534,7 +536,7 @@ mod tests {
         assert_eq!(
             report,
             Err(Error::AssignReadOnlyError {
-                name: "OPTIND".to_string(),
+                name: OPTIND.to_string(),
                 new_value: Value::scalar("2"),
                 assigned_location: Some(invocation_location),
                 read_only_location,
@@ -553,7 +555,7 @@ mod tests {
             },
             is_special: false,
         }));
-        let mut optarg = env.get_or_create_variable("OPTARG", Scope::Global);
+        let mut optarg = env.get_or_create_variable(OPTARG, Scope::Global);
         let read_only_location = Location::dummy("read-only location");
         optarg.make_read_only(read_only_location.clone());
         let result = model::Result {
@@ -571,7 +573,7 @@ mod tests {
         assert_eq!(
             report,
             Err(Error::AssignReadOnlyError {
-                name: "OPTARG".to_string(),
+                name: OPTARG.to_string(),
                 new_value: Value::scalar("some argument"),
                 assigned_location: Some(invocation_location),
                 read_only_location,
@@ -582,7 +584,7 @@ mod tests {
     #[test]
     fn report_with_readonly_optarg_to_be_unset() {
         let mut env = env_with_dummy_arg0_and_optarg();
-        let mut optarg = env.get_or_create_variable("OPTARG", Scope::Global);
+        let mut optarg = env.get_or_create_variable(OPTARG, Scope::Global);
         let read_only_location = Location::dummy("read-only location");
         optarg.make_read_only(read_only_location.clone());
         let result = model::Result {
@@ -600,7 +602,7 @@ mod tests {
         assert_eq!(
             report,
             Err(Error::UnsetReadOnlyError {
-                name: "OPTARG".to_string(),
+                name: OPTARG.to_string(),
                 read_only_location,
             })
         );

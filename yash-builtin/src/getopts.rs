@@ -194,6 +194,7 @@ use yash_env::builtin::getopts::Origin;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::variable::Value;
+use yash_env::variable::OPTIND;
 use yash_env::Env;
 
 pub mod model;
@@ -249,7 +250,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     // Get the `$OPTIND` value
     let optind = env
         .variables
-        .get("OPTIND")
+        .get(OPTIND)
         .and_then(|v| match &v.value {
             Some(Value::Scalar(value)) => Some(value.as_str()),
             _ => None,

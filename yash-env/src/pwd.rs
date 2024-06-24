@@ -24,6 +24,7 @@ use crate::variable::AssignError;
 use crate::variable::Scope::Global;
 use crate::variable::Value::Scalar;
 use crate::variable::Variable;
+use crate::variable::PWD;
 use crate::System;
 use nix::sys::stat::FileStat;
 use std::ffi::CString;
@@ -63,7 +64,7 @@ impl Env {
     /// - there is no dot (`.`) or dot-dot (`..`) component in the pathname.
     #[must_use]
     pub fn get_pwd_if_correct(&self) -> Option<&str> {
-        match self.variables.get("PWD") {
+        match self.variables.get(PWD) {
             Some(Variable {
                 value: Some(Scalar(pwd)),
                 ..
@@ -101,7 +102,7 @@ impl Env {
                 .into_os_string()
                 .into_string()
                 .map_err(|_| Errno::EILSEQ)?;
-            let mut var = self.variables.get_or_new("PWD", Global);
+            let mut var = self.variables.get_or_new(PWD, Global);
             var.assign(dir, None)?;
             var.export(true);
         }
@@ -182,7 +183,7 @@ mod tests {
 
         let result = env.prepare_pwd();
         assert_eq!(result, Ok(()));
-        let pwd = env.variables.get("PWD").unwrap();
+        let pwd = env.variables.get(PWD).unwrap();
         assert_eq!(pwd.value, Some(Value::scalar("/foo/bar/dir")));
         assert!(pwd.is_exported);
     }
@@ -191,13 +192,13 @@ mod tests {
     fn prepare_pwd_with_correct_path() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .get_or_new("PWD", Global)
+            .get_or_new(PWD, Global)
             .assign("/foo/link", None)
             .unwrap();
 
         let result = env.prepare_pwd();
         assert_eq!(result, Ok(()));
-        let pwd = env.variables.get("PWD").unwrap();
+        let pwd = env.variables.get(PWD).unwrap();
         assert_eq!(pwd.value, Some(Value::scalar("/foo/link")));
     }
 
@@ -205,13 +206,13 @@ mod tests {
     fn prepare_pwd_with_dot() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .get_or_new("PWD", Global)
+            .get_or_new(PWD, Global)
             .assign("/foo/./link", None)
             .unwrap();
 
         let result = env.prepare_pwd();
         assert_eq!(result, Ok(()));
-        let pwd = env.variables.get("PWD").unwrap();
+        let pwd = env.variables.get(PWD).unwrap();
         assert_eq!(pwd.value, Some(Value::scalar("/foo/bar/dir")));
         assert!(pwd.is_exported);
     }
@@ -220,13 +221,13 @@ mod tests {
     fn prepare_pwd_with_dot_dot() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .get_or_new("PWD", Global)
+            .get_or_new(PWD, Global)
             .assign("/foo/./link", None)
             .unwrap();
 
         let result = env.prepare_pwd();
         assert_eq!(result, Ok(()));
-        let pwd = env.variables.get("PWD").unwrap();
+        let pwd = env.variables.get(PWD).unwrap();
         assert_eq!(pwd.value, Some(Value::scalar("/foo/bar/dir")));
         assert!(pwd.is_exported);
     }
@@ -235,13 +236,13 @@ mod tests {
     fn prepare_pwd_with_wrong_path() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .get_or_new("PWD", Global)
+            .get_or_new(PWD, Global)
             .assign("/foo/bar", None)
             .unwrap();
 
         let result = env.prepare_pwd();
         assert_eq!(result, Ok(()));
-        let pwd = env.variables.get("PWD").unwrap();
+        let pwd = env.variables.get(PWD).unwrap();
         assert_eq!(pwd.value, Some(Value::scalar("/foo/bar/dir")));
         assert!(pwd.is_exported);
     }
@@ -265,13 +266,13 @@ mod tests {
 
         let mut env = Env::with_system(system);
         env.variables
-            .get_or_new("PWD", Global)
+            .get_or_new(PWD, Global)
             .assign("link", None)
             .unwrap();
 
         let result = env.prepare_pwd();
         assert_eq!(result, Ok(()));
-        let pwd = env.variables.get("PWD").unwrap();
+        let pwd = env.variables.get(PWD).unwrap();
         assert_eq!(pwd.value, Some(Value::scalar("/")));
         assert!(pwd.is_exported);
     }

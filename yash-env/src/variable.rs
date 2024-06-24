@@ -76,6 +76,11 @@ pub use self::main::AssignError;
 pub use self::main::Variable;
 pub use self::main::VariableRefMut;
 
+mod constants;
+
+// Export variable name and initial value constants
+pub use self::constants::*;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct VariableInContext {
     variable: Variable,
@@ -561,11 +566,11 @@ impl VariableSet {
     /// This function ignores any assignment errors.
     pub fn init(&mut self) {
         const VARIABLES: &[(&str, &str)] = &[
-            ("IFS", " \t\n"),
-            ("OPTIND", "1"),
-            ("PS1", "$ "),
-            ("PS2", "> "),
-            ("PS4", "+ "),
+            (IFS, IFS_INITIAL_VALUE),
+            (OPTIND, OPTIND_INITIAL_VALUE),
+            (PS1, PS1_INITIAL_VALUE_NON_ROOT),
+            (PS2, PS2_INITIAL_VALUE),
+            (PS4, PS4_INITIAL_VALUE),
         ];
         for &(name, value) in VARIABLES {
             self.get_or_new(name, Scope::Global)
@@ -573,7 +578,7 @@ impl VariableSet {
                 .ok();
         }
 
-        self.get_or_new("LINENO", Scope::Global)
+        self.get_or_new(LINENO, Scope::Global)
             .set_quirk(Some(Quirk::LineNumber))
     }
 
@@ -1292,7 +1297,7 @@ mod tests {
     fn init_lineno() {
         let mut variables = VariableSet::new();
         variables.init();
-        let v = variables.get("LINENO").unwrap();
+        let v = variables.get(LINENO).unwrap();
         assert_eq!(v.value, None);
         assert_eq!(v.quirk, Some(Quirk::LineNumber));
         assert_eq!(v.last_assigned_location, None);
