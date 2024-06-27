@@ -123,14 +123,9 @@ fn nullify_stdin(env: &mut Env) -> std::result::Result<(), yash_env::system::Err
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stderr;
-    use crate::tests::assert_stdout;
     use crate::tests::cat_builtin;
     use crate::tests::echo_builtin;
-    use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
-    use crate::tests::stub_tty;
-    use crate::tests::LocalExecutor;
     use futures_util::task::LocalSpawnExt;
     use futures_util::FutureExt;
     use std::cell::RefCell;
@@ -142,6 +137,11 @@ mod tests {
     use yash_env::system::r#virtual::INode;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stderr;
+    use yash_env_test_helper::assert_stdout;
+    use yash_env_test_helper::in_virtual_system;
+    use yash_env_test_helper::stub_tty;
+    use yash_env_test_helper::LocalExecutor;
 
     #[test]
     fn item_execute_sync() {

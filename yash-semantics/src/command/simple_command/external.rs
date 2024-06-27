@@ -225,9 +225,6 @@ fn fall_back_on_sh<S: System>(
 mod tests {
     use super::*;
     use crate::command::Command;
-    use crate::tests::assert_stderr;
-    use crate::tests::in_virtual_system;
-    use crate::tests::stub_tty;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use std::cell::RefCell;
@@ -239,6 +236,9 @@ mod tests {
     use yash_env::system::r#virtual::INode;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
+    use yash_env_test_helper::assert_stderr;
+    use yash_env_test_helper::in_virtual_system;
+    use yash_env_test_helper::stub_tty;
     use yash_syntax::syntax;
 
     #[test]

@@ -182,10 +182,10 @@ async fn read_char(env: &mut Env) -> Result<Option<char>, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::in_virtual_system;
     use std::cell::RefCell;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::SystemState;
+    use yash_env_test_helper::in_virtual_system;
 
     fn set_stdin<B: Into<Vec<u8>>>(system: &RefCell<SystemState>, bytes: B) {
         let state = system.borrow_mut();

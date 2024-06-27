@@ -94,10 +94,7 @@ pub async fn execute(env: &mut Env, subject: &Word, items: &[CaseItem]) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stderr;
-    use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
-    use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
     use futures_util::FutureExt;
     use std::cell::RefCell;
@@ -109,6 +106,9 @@ mod tests {
     use yash_env::system::r#virtual::SystemState;
     use yash_env::variable::Scope;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stderr;
+    use yash_env_test_helper::assert_stdout;
+    use yash_env_test_helper::in_virtual_system;
     use yash_syntax::syntax::CompoundCommand;
 
     fn fixture() -> (Env, Rc<RefCell<SystemState>>) {

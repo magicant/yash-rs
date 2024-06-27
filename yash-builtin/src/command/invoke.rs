@@ -80,8 +80,6 @@ async fn invoke_target(env: &mut Env, target: Target, mut fields: Vec<Field>) ->
 mod tests {
     use super::super::Search;
     use super::*;
-    use crate::tests::assert_stderr;
-    use crate::tests::assert_stdout;
     use assert_matches::assert_matches;
     use enumset::EnumSet;
     use futures_util::FutureExt as _;
@@ -92,6 +90,8 @@ mod tests {
     use yash_env::function::Function;
     use yash_env::semantics::Field;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stderr;
+    use yash_env_test_helper::assert_stdout;
     use yash_semantics::Divert::Return;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::FullCompoundCommand;

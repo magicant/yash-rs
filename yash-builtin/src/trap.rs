@@ -324,8 +324,6 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stderr;
-    use crate::tests::assert_stdout;
     use crate::Result;
     use futures_util::future::FutureExt;
     use std::ops::ControlFlow::{Break, Continue};
@@ -338,6 +336,8 @@ mod tests {
     use yash_env::system::SignalHandling;
     use yash_env::Env;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stderr;
+    use yash_env_test_helper::assert_stdout;
 
     #[test]
     fn setting_trap_to_ignore() {

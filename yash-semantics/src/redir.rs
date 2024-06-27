@@ -659,7 +659,6 @@ impl<'e> RedirGuard<'e> {
 mod tests {
     use super::*;
     use crate::tests::echo_builtin;
-    use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
@@ -671,6 +670,7 @@ mod tests {
     use yash_env::system::resource::Resource;
     use yash_env::Env;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::in_virtual_system;
     use yash_syntax::syntax::Text;
 
     /// Returns a virtual system with a file descriptor limit.

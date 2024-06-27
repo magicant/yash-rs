@@ -147,8 +147,6 @@ impl Command for syntax::CompoundCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stderr;
-    use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
@@ -167,6 +165,8 @@ mod tests {
     use yash_env::semantics::Field;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stderr;
+    use yash_env_test_helper::assert_stdout;
 
     #[test]
     fn stack_in_condition() {

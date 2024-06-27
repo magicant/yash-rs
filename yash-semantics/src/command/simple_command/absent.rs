@@ -109,8 +109,6 @@ pub async fn execute_absent_target(
 mod tests {
     use super::*;
     use crate::command::Command;
-    use crate::tests::assert_stderr;
-    use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
@@ -121,6 +119,8 @@ mod tests {
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stderr;
+    use yash_env_test_helper::in_virtual_system;
     use yash_syntax::source::Location;
     use yash_syntax::syntax;
 

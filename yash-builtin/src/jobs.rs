@@ -226,8 +226,6 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stderr;
-    use crate::tests::assert_stdout;
     use assert_matches::assert_matches;
     use futures_util::future::FutureExt;
     use std::rc::Rc;
@@ -241,6 +239,8 @@ mod tests {
     use yash_env::stack::Frame;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::system::r#virtual::{SIGINT, SIGQUIT, SIGSTOP, SIGTSTP};
+    use yash_env_test_helper::assert_stderr;
+    use yash_env_test_helper::assert_stdout;
 
     #[test]
     fn no_operands_no_jobs() {

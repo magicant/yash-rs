@@ -197,10 +197,6 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stderr;
-    use crate::tests::assert_stdout;
-    use crate::tests::in_virtual_system;
-    use crate::tests::stub_tty;
     use futures_util::FutureExt as _;
     use std::cell::Cell;
     use std::rc::Rc;
@@ -213,6 +209,10 @@ mod tests {
     use yash_env::system::r#virtual::Process;
     use yash_env::system::r#virtual::SIGSTOP;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stderr;
+    use yash_env_test_helper::assert_stdout;
+    use yash_env_test_helper::in_virtual_system;
+    use yash_env_test_helper::stub_tty;
 
     async fn suspend(env: &mut Env) {
         let target = env.system.getpid();

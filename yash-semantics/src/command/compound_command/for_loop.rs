@@ -116,8 +116,6 @@ async fn trace_values(env: &mut Env, name: &Field, values: &[Field]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stderr;
-    use crate::tests::assert_stdout;
     use crate::tests::break_builtin;
     use crate::tests::continue_builtin;
     use crate::tests::echo_builtin;
@@ -130,6 +128,8 @@ mod tests {
     use yash_env::option::Option::ErrExit;
     use yash_env::option::State::On;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stderr;
+    use yash_env_test_helper::assert_stdout;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::CompoundCommand;
 

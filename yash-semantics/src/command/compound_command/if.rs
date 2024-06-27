@@ -52,7 +52,6 @@ pub async fn execute(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use futures_util::FutureExt;
@@ -62,6 +61,7 @@ mod tests {
     use yash_env::semantics::Divert;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stdout;
     use yash_syntax::syntax::CompoundCommand;
 
     fn fixture() -> (Env, Rc<RefCell<SystemState>>) {

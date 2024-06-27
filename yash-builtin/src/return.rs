@@ -143,13 +143,13 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stderr;
     use futures_util::FutureExt;
     use std::rc::Rc;
     use yash_env::semantics::ExitStatus;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stderr;
 
     #[test]
     fn return_without_arguments_with_exit_status_0() {

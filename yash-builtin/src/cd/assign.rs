@@ -99,13 +99,13 @@ pub fn new_pwd(env: &Env, mode: Mode, path: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::{assert_stderr, assert_stdout};
     use futures_util::FutureExt;
     use std::rc::Rc;
     use yash_env::semantics::Field;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::{assert_stderr, assert_stdout};
     use yash_syntax::source::Location;
 
     #[test]

@@ -103,12 +103,12 @@ pub async fn perform_assignments(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use yash_env::variable::Value;
     use yash_env::variable::Variable;
+    use yash_env_test_helper::in_virtual_system;
     use yash_syntax::source::Location;
 
     #[test]

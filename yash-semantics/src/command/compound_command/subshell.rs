@@ -73,12 +73,8 @@ async fn subshell_main(env: &mut Env, body: Rc<List>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stderr;
-    use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
-    use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
-    use crate::tests::stub_tty;
     use crate::tests::suspend_builtin;
     use futures_util::FutureExt;
     use std::future::Future;
@@ -90,6 +86,10 @@ mod tests {
     use yash_env::option::State::On;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::system::r#virtual::SIGSTOP;
+    use yash_env_test_helper::assert_stderr;
+    use yash_env_test_helper::assert_stdout;
+    use yash_env_test_helper::in_virtual_system;
+    use yash_env_test_helper::stub_tty;
     use yash_syntax::syntax::CompoundCommand;
 
     #[test]

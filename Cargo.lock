@@ -515,6 +515,7 @@ dependencies = [
  "itertools",
  "thiserror",
  "yash-env",
+ "yash-env-test-helper",
  "yash-quote",
  "yash-semantics",
  "yash-syntax",
@@ -559,6 +560,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "yash-env-test-helper"
+version = "0.1.0"
+dependencies = [
+ "assert_matches",
+ "futures-executor",
+ "futures-util",
+ "yash-env",
+]
+
+[[package]]
 name = "yash-fnmatch"
 version = "1.1.1"
 dependencies = [
@@ -583,6 +594,7 @@ dependencies = [
  "thiserror",
  "yash-arith",
  "yash-env",
+ "yash-env-test-helper",
  "yash-fnmatch",
  "yash-quote",
  "yash-syntax",
