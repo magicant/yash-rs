@@ -588,6 +588,7 @@ dependencies = [
  "yash-env",
  "yash-env-test-helper",
  "yash-semantics",
+ "yash-syntax",
 ]
 
 [[package]]

@@ -19,7 +19,9 @@
 use async_trait::async_trait;
 use std::cell::RefCell;
 use yash_env::input::{Context, Input, Result};
+use yash_env::variable::{Expansion, PS1};
 use yash_env::Env;
+use yash_syntax::source::Location;
 
 /// [`Input`] decorator that shows a command prompt.
 ///
@@ -51,14 +53,22 @@ where
     T: Input + 'a,
 {
     async fn next_line(&mut self, context: &Context) -> Result {
-        {
-            let mut system = self.env.borrow().system.clone();
-            // TODO Honor $PS1 and $PS2
-            system.print_error("$ ").await;
-        }
-
+        print_prompt(&self.env.borrow(), context).await;
         self.inner.next_line(context).await
     }
+}
+
+async fn print_prompt(env: &Env, _context: &Context) {
+    let location = Location::dummy(""); // TODO context.location;
+
+    // TODO Use PS2, YASH_PS1, etc.
+    let ps1 = match env.variables.get(PS1).map(|v| v.expand(&location)) {
+        Some(Expansion::Scalar(s)) => s,
+        _ => Default::default(),
+    };
+    // TODO Perform parameter expansion in the prompt string
+    // TODO This clone should be avoided
+    env.system.clone().print_error(&ps1).await;
 }
 
 #[cfg(test)]
@@ -123,7 +133,23 @@ mod tests {
         assert_eq!(result.unwrap(), "foo"); // Make sure the mock input is called.
     }
 
-    // TODO ps1_variable_defines_default_prompt
+    #[test]
+    fn ps1_variable_defines_main_prompt() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        define_variable(&mut env, PS1, "my_custom_prompt>");
+        let ref_env = RefCell::new(&mut env);
+        let mut prompter = Prompter::new(Memory::new(""), &ref_env);
+
+        prompter
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap()
+            .ok();
+        assert_stderr(&state, |stderr| assert_eq!(stderr, "my_custom_prompt>"));
+    }
+
     // TODO ps2_variable_defines_continuation_prompt
     // TODO variable_is_expanded_in_prompt
     // TODO Should we implement and test all of the above here?
