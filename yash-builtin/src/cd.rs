@@ -150,6 +150,7 @@ use crate::Result;
 use std::path::Path;
 use yash_env::semantics::Field;
 use yash_env::variable::Value::Scalar;
+use yash_env::variable::PWD;
 use yash_env::Env;
 
 /// Treatments of symbolic links in the pathname
@@ -185,7 +186,7 @@ pub mod syntax;
 pub mod target;
 
 fn get_pwd(env: &Env) -> String {
-    match env.variables.get("PWD") {
+    match env.variables.get(PWD) {
         Some(variable) => match &variable.value {
             Some(Scalar(value)) => value.clone(),
             _ => String::new(),

@@ -23,6 +23,8 @@ use std::path::PathBuf;
 use yash_env::variable::AssignError;
 use yash_env::variable::Scope::Global;
 use yash_env::variable::Value::Scalar;
+use yash_env::variable::OLDPWD;
+use yash_env::variable::PWD;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::source::pretty::Annotation;
@@ -37,7 +39,7 @@ use yash_syntax::source::pretty::Message;
 /// This function examines the stack to find the command location that invoked
 /// the cd built-in.
 pub async fn set_oldpwd(env: &mut Env, value: String) {
-    set_variable(env, "OLDPWD", value).await
+    set_variable(env, OLDPWD, value).await
 }
 
 /// Assigns the working directory path to `$PWD`.
@@ -50,7 +52,7 @@ pub async fn set_oldpwd(env: &mut Env, value: String) {
 /// the cd built-in.
 pub async fn set_pwd(env: &mut Env, path: PathBuf) {
     let value = path.into_os_string().into_string().unwrap_or_default();
-    set_variable(env, "PWD", value).await
+    set_variable(env, PWD, value).await
 }
 
 async fn set_variable(env: &mut Env, name: &str, value: String) {
@@ -97,13 +99,13 @@ pub fn new_pwd(env: &Env, mode: Mode, path: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::{assert_stderr, assert_stdout};
     use futures_util::FutureExt;
     use std::rc::Rc;
     use yash_env::semantics::Field;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::{assert_stderr, assert_stdout};
     use yash_syntax::source::Location;
 
     #[test]
@@ -121,7 +123,7 @@ mod tests {
         set_oldpwd(&mut env, "/some/path".to_string())
             .now_or_never()
             .unwrap();
-        let variable = env.variables.get("OLDPWD").unwrap();
+        let variable = env.variables.get(OLDPWD).unwrap();
         assert_eq!(variable.value, Some(Scalar("/some/path".to_string())));
         assert_eq!(variable.quirk, None);
         assert_eq!(variable.last_assigned_location, Some(location));
@@ -142,14 +144,14 @@ mod tests {
             name: cd,
             is_special: false,
         }));
-        env.get_or_create_variable("OLDPWD", Global)
+        env.get_or_create_variable(OLDPWD, Global)
             .assign("/old/pwd", None)
             .unwrap();
 
         set_oldpwd(&mut env, "/some/dir".to_string())
             .now_or_never()
             .unwrap();
-        let variable = env.variables.get("OLDPWD").unwrap();
+        let variable = env.variables.get(OLDPWD).unwrap();
         assert_eq!(variable.value, Some(Scalar("/some/dir".to_string())));
         assert_eq!(variable.quirk, None);
         assert_eq!(variable.last_assigned_location, Some(location));
@@ -169,14 +171,14 @@ mod tests {
             is_special: false,
         }));
         let read_only_location = Location::dummy("read-only");
-        let mut oldpwd = env.get_or_create_variable("OLDPWD", Global);
+        let mut oldpwd = env.get_or_create_variable(OLDPWD, Global);
         oldpwd.assign("/old/pwd", None).unwrap();
         oldpwd.make_read_only(read_only_location.clone());
 
         set_oldpwd(&mut env, "/foo".to_string())
             .now_or_never()
             .unwrap();
-        let variable = env.variables.get("OLDPWD").unwrap();
+        let variable = env.variables.get(OLDPWD).unwrap();
         assert_eq!(variable.value, Some(Scalar("/old/pwd".to_string())));
         assert_eq!(variable.last_assigned_location, None);
         assert_eq!(variable.read_only_location, Some(read_only_location));
@@ -199,7 +201,7 @@ mod tests {
         set_pwd(&mut env, PathBuf::from("/some/path"))
             .now_or_never()
             .unwrap();
-        let variable = env.variables.get("PWD").unwrap();
+        let variable = env.variables.get(PWD).unwrap();
         assert_eq!(variable.value, Some(Scalar("/some/path".to_string())));
         assert_eq!(variable.quirk, None);
         assert_eq!(variable.last_assigned_location, Some(location));
@@ -220,14 +222,14 @@ mod tests {
             name: cd,
             is_special: false,
         }));
-        env.get_or_create_variable("PWD", Global)
+        env.get_or_create_variable(PWD, Global)
             .assign("/old/path", None)
             .unwrap();
 
         set_pwd(&mut env, PathBuf::from("/some/path"))
             .now_or_never()
             .unwrap();
-        let variable = env.variables.get("PWD").unwrap();
+        let variable = env.variables.get(PWD).unwrap();
         assert_eq!(variable.value, Some(Scalar("/some/path".to_string())));
         assert_eq!(variable.quirk, None);
         assert_eq!(variable.last_assigned_location, Some(location));
@@ -248,14 +250,14 @@ mod tests {
             is_special: false,
         }));
         let read_only_location = Location::dummy("read-only");
-        let mut pwd = env.get_or_create_variable("PWD", Global);
+        let mut pwd = env.get_or_create_variable(PWD, Global);
         pwd.assign("/old/path", None).unwrap();
         pwd.make_read_only(read_only_location.clone());
 
         set_pwd(&mut env, PathBuf::from("/some/path"))
             .now_or_never()
             .unwrap();
-        let variable = env.variables.get("PWD").unwrap();
+        let variable = env.variables.get(PWD).unwrap();
         assert_eq!(variable.value, Some(Scalar("/old/path".to_string())));
         assert_eq!(variable.last_assigned_location, None);
         assert_eq!(variable.read_only_location, Some(read_only_location));

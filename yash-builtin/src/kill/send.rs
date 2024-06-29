@@ -173,7 +173,6 @@ pub async fn execute(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stderr;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use std::rc::Rc;
@@ -181,6 +180,7 @@ mod tests {
     use yash_env::job::ProcessState;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::r#virtual::VirtualSystem;
+    use yash_env_test_helper::assert_stderr;
 
     #[test]
     fn resolve_target_process_ids() {

@@ -69,6 +69,7 @@ mod tests {
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::INode;
     use yash_env::variable::Scope::Global;
+    use yash_env::variable::PWD;
     use yash_env::VirtualSystem;
 
     fn env_with_symlink_to_dir() -> Env {
@@ -109,7 +110,7 @@ mod tests {
     fn logical_with_correct_pwd() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .get_or_new("PWD", Global)
+            .get_or_new(PWD, Global)
             .assign("/foo/link", None)
             .unwrap();
         let result = compute(&env, Mode::Logical).unwrap();
@@ -120,7 +121,7 @@ mod tests {
     fn logical_with_wrong_pwd() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .get_or_new("PWD", Global)
+            .get_or_new(PWD, Global)
             .assign("/foo/./link", None)
             .unwrap();
         let result = compute(&env, Mode::Logical).unwrap();
@@ -131,7 +132,7 @@ mod tests {
     fn physical() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .get_or_new("PWD", Global)
+            .get_or_new(PWD, Global)
             .assign("/foo/link", None)
             .unwrap();
         let result = compute(&env, Mode::Physical).unwrap();

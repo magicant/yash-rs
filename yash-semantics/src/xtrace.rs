@@ -41,12 +41,13 @@ use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_env::variable::Value::Scalar;
 use yash_env::variable::Variable;
+use yash_env::variable::PS4;
 use yash_env::Env;
 use yash_quote::quoted;
 use yash_syntax::syntax::Text;
 
 async fn expand_ps4(env: &mut Env) -> String {
-    let value = match env.variables.get("PS4") {
+    let value = match env.variables.get(PS4) {
         Some(Variable {
             value: Some(Scalar(value)),
             ..
@@ -258,7 +259,7 @@ mod tests {
     fn fixture() -> Env {
         let mut env = Env::new_virtual();
         env.variables
-            .get_or_new("PS4", Global)
+            .get_or_new(PS4, Global)
             .assign("+${X=x}+ ", None)
             .unwrap();
         env

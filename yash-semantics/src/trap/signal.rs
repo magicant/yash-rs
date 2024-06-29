@@ -96,7 +96,6 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
     use crate::tests::exit_builtin;
     use assert_matches::assert_matches;
@@ -112,6 +111,7 @@ mod tests {
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::system::r#virtual::{SIGINT, SIGTERM, SIGUSR1, SIGUSR2};
     use yash_env::trap::Action;
+    use yash_env_test_helper::assert_stdout;
     use yash_syntax::source::Location;
 
     fn signal_env() -> (Env, VirtualSystem) {

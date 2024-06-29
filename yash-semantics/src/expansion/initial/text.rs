@@ -146,9 +146,9 @@ impl Expand for Text {
 mod tests {
     use super::*;
     use crate::tests::echo_builtin;
-    use crate::tests::in_virtual_system;
     use futures_util::FutureExt;
     use yash_env::variable::Scope;
+    use yash_env_test_helper::in_virtual_system;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::Modifier;
     use yash_syntax::syntax::Param;

@@ -1,0 +1,21 @@
+[package]
+name = "yash-env-test-helper"
+version = "0.1.0"
+authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
+edition = "2021"
+rust-version = "1.77.0"
+description = "Test helper for yash-env crate"
+# documentation = "https://yash.osdn.jp/doc/"
+# readme = "README.md"
+# homepage = "https://yash.osdn.jp/"
+repository = "https://github.com/magicant/yash-rs"
+license = "GPL-3.0-or-later"
+keywords = ["posix", "shell"]
+categories = ["command-line-utilities"]
+publish = false
+
+[dependencies]
+assert_matches = "1.5.0"
+futures-executor = "0.3.28"
+futures-util = { version = "0.3.28", features = ["channel"] }
+yash-env = { path = "../yash-env", version = "0.2.0" }

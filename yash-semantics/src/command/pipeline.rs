@@ -325,11 +325,8 @@ impl PipeSet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stdout;
     use crate::tests::cat_builtin;
-    use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
-    use crate::tests::stub_tty;
     use crate::tests::suspend_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
@@ -347,6 +344,9 @@ mod tests {
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::SIGSTOP;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stdout;
+    use yash_env_test_helper::in_virtual_system;
+    use yash_env_test_helper::stub_tty;
 
     #[test]
     fn empty_pipeline() {

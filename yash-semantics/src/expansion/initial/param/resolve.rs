@@ -65,6 +65,7 @@ mod tests {
     use yash_env::job::Pid;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
+    use yash_env::variable::PATH;
     use yash_syntax::source::Location;
 
     #[test]
@@ -81,7 +82,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let mut x = env.variables.get_or_new("x", Scope::Global);
         x.assign("foo", None).unwrap();
-        let mut path = env.variables.get_or_new("PATH", Scope::Global);
+        let mut path = env.variables.get_or_new(PATH, Scope::Global);
         path.assign("/bin:/usr/bin", Location::dummy("assigned"))
             .unwrap();
         path.export(true);
@@ -90,7 +91,7 @@ mod tests {
 
         let result = resolve(Name::Variable("x"), &env, &loc);
         assert_eq!(result, Expansion::Scalar("foo".into()));
-        let result = resolve(Name::Variable("PATH"), &env, &loc);
+        let result = resolve(Name::Variable(PATH), &env, &loc);
         assert_eq!(result, Expansion::Scalar("/bin:/usr/bin".into()));
     }
 
@@ -99,7 +100,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let mut x = env.variables.get_or_new("x", Scope::Global);
         x.assign(Value::Array(vec![]), None).unwrap();
-        let mut path = env.variables.get_or_new("PATH", Scope::Global);
+        let mut path = env.variables.get_or_new(PATH, Scope::Global);
         let values = ["/bin".to_string(), "/usr/bin".to_string()];
         path.assign(
             Value::array(values.clone()),
@@ -112,7 +113,7 @@ mod tests {
 
         let result = resolve(Name::Variable("x"), &env, &loc);
         assert_eq!(result, Expansion::Array([].as_slice().into()));
-        let result = resolve(Name::Variable("PATH"), &env, &loc);
+        let result = resolve(Name::Variable(PATH), &env, &loc);
         assert_eq!(result, Expansion::Array(values.as_slice().into()));
     }
 

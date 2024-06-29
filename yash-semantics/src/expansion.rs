@@ -92,6 +92,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::system::Errno;
 use yash_env::variable::Value;
 use yash_env::variable::Variable;
+use yash_env::variable::IFS;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
@@ -317,7 +318,7 @@ pub async fn expand_words<'a, I: IntoIterator<Item = &'a Word>>(
     // field splitting //
     use yash_env::variable::Value::Scalar;
     #[rustfmt::skip]
-    let ifs = match env.inner.variables.get("IFS") {
+    let ifs = match env.inner.variables.get(IFS) {
         Some(&Variable { value: Some(Scalar(ref value)), ..  }) => Ifs::new(value),
         // TODO If the variable is an array, should we ignore it?
         _ => Ifs::default(),
@@ -364,11 +365,11 @@ pub async fn expand_value(
 mod tests {
     use super::*;
     use crate::tests::echo_builtin;
-    use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use yash_env::variable::Scope;
+    use yash_env_test_helper::in_virtual_system;
     use yash_syntax::source::pretty::Message;
 
     #[test]
@@ -441,7 +442,7 @@ mod tests {
             .assign("foo  bar ", None)
             .unwrap();
         env.variables
-            .get_or_new("IFS", Scope::Global)
+            .get_or_new(IFS, Scope::Global)
             .assign(" o", None)
             .unwrap();
         let words = &["$v".parse().unwrap()];

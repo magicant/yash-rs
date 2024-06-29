@@ -48,7 +48,6 @@ pub async fn run_exit_trap(env: &mut Env) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
     use crate::tests::exit_builtin;
     use crate::tests::return_builtin;
@@ -61,6 +60,7 @@ mod tests {
     use yash_env::semantics::Field;
     use yash_env::stack::Frame;
     use yash_env::system::r#virtual::VirtualSystem;
+    use yash_env_test_helper::assert_stdout;
     use yash_syntax::source::Location;
 
     #[test]

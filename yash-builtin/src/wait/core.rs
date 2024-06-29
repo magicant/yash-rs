@@ -95,7 +95,6 @@ pub async fn wait_for_any_job_or_trap(env: &mut Env) -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::in_virtual_system;
     use futures_util::poll;
     use futures_util::FutureExt as _;
     use std::future::{pending, ready};
@@ -110,6 +109,7 @@ mod tests {
     use yash_env::trap::Action;
     use yash_env::variable::Value;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::in_virtual_system;
     use yash_syntax::source::Location;
 
     #[test]

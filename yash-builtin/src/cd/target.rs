@@ -23,6 +23,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use thiserror::Error;
 use yash_env::variable::Value;
+use yash_env::variable::HOME;
+use yash_env::variable::OLDPWD;
 use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -152,7 +154,7 @@ pub fn target(env: &Env, command: &Command, pwd: &str) -> Result<(PathBuf, Origi
     // Step 1 & 2: substitute $HOME and $OLDPWD
     let (mut curpath, mut origin) = match &command.operand {
         None => {
-            let home = get_scalar(env, "HOME").ok_or_else(|| {
+            let home = get_scalar(env, HOME).ok_or_else(|| {
                 let builtin = env.stack.current_builtin();
                 let location =
                     builtin.map_or_else(|| Location::dummy(""), |b| b.name.origin.clone());
@@ -162,7 +164,7 @@ pub fn target(env: &Env, command: &Command, pwd: &str) -> Result<(PathBuf, Origi
         }
 
         Some(operand) if operand.value == "-" => {
-            let oldpwd = get_scalar(env, "OLDPWD").ok_or_else(|| TargetError::UnsetOldpwd {
+            let oldpwd = get_scalar(env, OLDPWD).ok_or_else(|| TargetError::UnsetOldpwd {
                 location: operand.origin.clone(),
             })?;
             (PathBuf::from(&oldpwd), Origin::Oldpwd)
@@ -257,7 +259,7 @@ mod tests {
             mode: Mode::default(),
             operand: None,
         };
-        env.get_or_create_variable("HOME", Scope::Global)
+        env.get_or_create_variable(HOME, Scope::Global)
             .assign("/home/user", None)
             .unwrap();
 
@@ -296,7 +298,7 @@ mod tests {
             name: arg0,
             is_special: false,
         }));
-        env.get_or_create_variable("HOME", Scope::Global)
+        env.get_or_create_variable(HOME, Scope::Global)
             .assign("", None)
             .unwrap();
 
@@ -311,7 +313,7 @@ mod tests {
             mode: Mode::default(),
             operand: Some(Field::dummy("-")),
         };
-        env.get_or_create_variable("OLDPWD", Scope::Global)
+        env.get_or_create_variable(OLDPWD, Scope::Global)
             .assign("/old/dir", None)
             .unwrap();
 
@@ -342,7 +344,7 @@ mod tests {
             mode: Mode::default(),
             operand: Some(operand),
         };
-        env.get_or_create_variable("OLDPWD", Scope::Global)
+        env.get_or_create_variable(OLDPWD, Scope::Global)
             .assign("", None)
             .unwrap();
 

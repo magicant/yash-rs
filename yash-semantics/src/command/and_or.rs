@@ -84,7 +84,6 @@ async fn execute_conditional_pipeline(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
@@ -99,6 +98,7 @@ mod tests {
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stdout;
 
     #[test]
     fn single_pipeline_list() {

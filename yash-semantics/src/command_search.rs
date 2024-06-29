@@ -44,6 +44,7 @@ use yash_env::builtin::Builtin;
 use yash_env::builtin::Type::{Elective, Extension, Mandatory, Special, Substitutive};
 use yash_env::function::Function;
 use yash_env::variable::Expansion;
+use yash_env::variable::PATH;
 use yash_env::Env;
 use yash_env::System;
 
@@ -138,7 +139,7 @@ impl PathEnv for Env {
     /// variable has a quirk, the function panics.
     fn path(&self) -> Expansion<'_> {
         self.variables
-            .get("PATH")
+            .get(PATH)
             .and_then(|var| {
                 assert_eq!(var.quirk, None, "PATH does not support quirks");
                 var.value.as_ref()

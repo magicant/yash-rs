@@ -56,6 +56,7 @@ use self::trap::TrapSet;
 use self::variable::Scope;
 use self::variable::VariableRefMut;
 use self::variable::VariableSet;
+use self::variable::PPID;
 use futures_util::task::noop_waker_ref;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -207,11 +208,13 @@ impl Env {
     /// - `PWD=(current working directory)` (See [`Env::prepare_pwd`])
     ///
     /// This function ignores any errors that may occur.
+    ///
+    /// TODO: PS1 should be set to `"# "` for root users.
     pub fn init_variables(&mut self) {
         self.variables.init();
 
         self.variables
-            .get_or_new("PPID", Scope::Global)
+            .get_or_new(PPID, Scope::Global)
             .assign(self.system.getppid().to_string(), None)
             .ok();
 

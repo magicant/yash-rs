@@ -39,6 +39,7 @@ use std::ops::Add;
 use std::ops::AddAssign;
 use yash_env::variable::Value;
 use yash_env::variable::VariableSet;
+use yash_env::variable::IFS;
 
 /// Array of fields with optimized data structure
 ///
@@ -263,7 +264,7 @@ impl Phrase {
                 0 => vec![],
                 1 => fields.swap_remove(0),
                 _ => {
-                    let separator = match vars.get("IFS").and_then(|v| v.value.as_ref()) {
+                    let separator = match vars.get(IFS).and_then(|v| v.value.as_ref()) {
                         Some(Value::Scalar(value)) => value.chars().next(),
                         Some(Value::Array(values)) => {
                             values.first().and_then(|value| value.chars().next())
@@ -1058,7 +1059,7 @@ mod tests {
     #[test]
     fn ifs_join_full_unassigned_ifs() {
         let mut vars = VariableSet::new();
-        vars.get_or_new("IFS", Scope::Global);
+        vars.get_or_new(IFS, Scope::Global);
         let phrase = Full(vec![
             dummy_field("foo"),
             dummy_field("bar"),
@@ -1071,7 +1072,7 @@ mod tests {
     #[test]
     fn ifs_join_full_scalar_ifs() {
         let mut vars = VariableSet::new();
-        vars.get_or_new("IFS", Scope::Global)
+        vars.get_or_new(IFS, Scope::Global)
             .assign("!?", None)
             .unwrap();
         let phrase = Full(vec![
@@ -1086,7 +1087,7 @@ mod tests {
     #[test]
     fn ifs_join_full_array_ifs() {
         let mut vars = VariableSet::new();
-        vars.get_or_new("IFS", Scope::Global)
+        vars.get_or_new(IFS, Scope::Global)
             .assign(Value::array(["-+", "abc"]), None)
             .unwrap();
         let phrase = Full(vec![
@@ -1101,7 +1102,7 @@ mod tests {
     #[test]
     fn ifs_join_full_empty_scalar_ifs() {
         let mut vars = VariableSet::new();
-        vars.get_or_new("IFS", Scope::Global)
+        vars.get_or_new(IFS, Scope::Global)
             .assign("", None)
             .unwrap();
         let phrase = Full(vec![
@@ -1116,7 +1117,7 @@ mod tests {
     #[test]
     fn ifs_join_full_empty_array_ifs() {
         let mut vars = VariableSet::new();
-        vars.get_or_new("IFS", Scope::Global)
+        vars.get_or_new(IFS, Scope::Global)
             .assign(Value::Array(vec![]), None)
             .unwrap();
         let phrase = Full(vec![
@@ -1127,7 +1128,7 @@ mod tests {
         let field = phrase.ifs_join(&vars);
         assert_eq!(field, dummy_field("foobarbaz"));
 
-        vars.get_or_new("IFS", Scope::Global)
+        vars.get_or_new(IFS, Scope::Global)
             .assign(Value::array(["", "abc"]), None)
             .unwrap();
         let phrase = Full(vec![

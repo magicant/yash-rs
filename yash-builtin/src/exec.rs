@@ -142,7 +142,7 @@ mod tests {
     use std::cell::RefCell;
     use std::rc::Rc;
     use yash_env::system::r#virtual::{FileBody, INode};
-    use yash_env::variable::Scope;
+    use yash_env::variable::{Scope, PATH};
     use yash_env::VirtualSystem;
 
     #[test]
@@ -174,7 +174,7 @@ mod tests {
             .unwrap();
 
         // Prepare the PATH variable
-        let path = &mut env.variables.get_or_new("PATH", Scope::Global);
+        let path = &mut env.variables.get_or_new(PATH, Scope::Global);
         path.assign("/bin", None).unwrap();
         path.export(true);
 
@@ -209,7 +209,7 @@ mod tests {
             .unwrap();
 
         // Prepare the PATH variable
-        let path = &mut env.variables.get_or_new("PATH", Scope::Global);
+        let path = &mut env.variables.get_or_new(PATH, Scope::Global);
         path.assign("/usr/bin", None).unwrap();
         path.export(true);
 

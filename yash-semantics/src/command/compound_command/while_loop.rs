@@ -94,7 +94,6 @@ pub async fn execute_until(env: &mut Env, condition: &List, body: &List) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stdout;
     use crate::tests::break_builtin;
     use crate::tests::continue_builtin;
     use crate::tests::echo_builtin;
@@ -111,6 +110,7 @@ mod tests {
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stdout;
     use yash_syntax::syntax::CompoundCommand;
 
     fn fixture() -> (Env, Rc<RefCell<SystemState>>) {

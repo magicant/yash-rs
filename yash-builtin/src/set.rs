@@ -249,8 +249,6 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stderr;
-    use crate::tests::assert_stdout;
     use futures_util::FutureExt;
     use std::ops::ControlFlow::Continue;
     use std::rc::Rc;
@@ -264,6 +262,8 @@ mod tests {
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stderr;
+    use yash_env_test_helper::assert_stdout;
     use yash_semantics::command::Command as _;
     use yash_syntax::syntax::List;
 

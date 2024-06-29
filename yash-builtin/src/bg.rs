@@ -228,8 +228,6 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stderr;
-    use crate::tests::assert_stdout;
     use futures_util::FutureExt as _;
     use yash_env::job::Job;
     use yash_env::job::Pid;
@@ -238,6 +236,8 @@ mod tests {
     use yash_env::system::r#virtual::Process;
     use yash_env::system::r#virtual::{SIGSTOP, SIGTSTP, SIGTTIN};
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stderr;
+    use yash_env_test_helper::assert_stdout;
 
     #[test]
     fn resume_job_by_index_sends_sigcont() {

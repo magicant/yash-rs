@@ -94,8 +94,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stderr;
-    use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
     use crate::tests::local_builtin;
     use crate::tests::return_builtin;
@@ -108,6 +106,8 @@ mod tests {
     use yash_env::system::r#virtual::FileBody;
     use yash_env::variable::Scope;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stderr;
+    use yash_env_test_helper::assert_stdout;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::FullCompoundCommand;
     use yash_syntax::syntax::SimpleCommand;

@@ -276,6 +276,7 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use yash_env::variable::Value::*;
+    use yash_env::variable::IFS;
     use yash_syntax::syntax::SwitchCondition::*;
     use yash_syntax::syntax::SwitchType::*;
 
@@ -451,7 +452,7 @@ mod tests {
         env.variables.positional_params_mut().values =
             vec!["1".to_string(), "2  2".to_string(), "3".to_string()];
         env.variables
-            .get_or_new("IFS", Scope::Global)
+            .get_or_new(IFS, Scope::Global)
             .assign("~", None)
             .unwrap();
         let mut env = Env::new(&mut env);

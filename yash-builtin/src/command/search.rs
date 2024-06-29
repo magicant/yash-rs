@@ -94,6 +94,7 @@ mod tests {
     use yash_env::builtin::Type::Special;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::variable::Scope;
+    use yash_env::variable::PATH;
     use yash_semantics::command_search::PathEnv as _;
     use yash_semantics::command_search::SearchEnv as _;
     use yash_syntax::source::Location;
@@ -105,7 +106,7 @@ mod tests {
         system.state.borrow_mut().path = "/bin:/usr/bin:/std".into();
         let env = &mut Env::with_system(system);
         env.variables
-            .get_or_new("PATH", Scope::Global)
+            .get_or_new(PATH, Scope::Global)
             .assign("/usr/local/bin:/bin", None)
             .unwrap();
         let params = &Search {
@@ -154,7 +155,7 @@ mod tests {
         system.state.borrow_mut().path = "/bin:/usr/bin:/std".into();
         let env = &mut Env::with_system(system);
         env.variables
-            .get_or_new("PATH", Scope::Global)
+            .get_or_new(PATH, Scope::Global)
             .assign("/usr/local/bin:/bin", None)
             .unwrap();
         let params = &Search {
@@ -175,7 +176,7 @@ mod tests {
         system.state.borrow_mut().path = "/bin:/usr/bin:/std".into();
         let env = &mut Env::with_system(system);
         env.variables
-            .get_or_new("PATH", Scope::Global)
+            .get_or_new(PATH, Scope::Global)
             .assign(array.clone(), None)
             .unwrap();
         let params = &Search {

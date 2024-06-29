@@ -353,97 +353,12 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
 ];
 
 #[cfg(test)]
-pub(crate) mod tests {
-    use assert_matches::assert_matches;
-    use futures_executor::LocalSpawner;
-    use futures_util::task::LocalSpawnExt as _;
-    use futures_util::FutureExt as _;
-    use std::cell::RefCell;
-    use std::future::Future;
-    use std::pin::Pin;
-    use std::rc::Rc;
-    use std::str::from_utf8;
-    use yash_env::system::r#virtual::FileBody;
-    use yash_env::system::r#virtual::INode;
-    use yash_env::system::r#virtual::SystemState;
-    use yash_env::Env;
-    use yash_env::VirtualSystem;
-
-    #[derive(Clone, Debug)]
-    pub struct LocalExecutor(pub LocalSpawner);
-
-    impl yash_env::system::r#virtual::Executor for LocalExecutor {
-        fn spawn(
-            &self,
-            task: Pin<Box<dyn Future<Output = ()>>>,
-        ) -> Result<(), Box<dyn std::error::Error>> {
-            self.0
-                .spawn_local(task)
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
-        }
-    }
-
-    /// Helper function to perform a test in a virtual system with an executor.
-    pub fn in_virtual_system<F, Fut, T>(f: F) -> T
-    where
-        F: FnOnce(Env, Rc<RefCell<SystemState>>) -> Fut,
-        Fut: Future<Output = T> + 'static,
-        T: 'static,
-    {
-        let system = VirtualSystem::new();
-        let state = Rc::clone(&system.state);
-        let mut executor = futures_executor::LocalPool::new();
-        state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
-
-        let env = Env::with_system(Box::new(system));
-        let shared_system = env.system.clone();
-        let task = f(env, Rc::clone(&state));
-        let mut task = executor.spawner().spawn_local_with_handle(task).unwrap();
-        loop {
-            if let Some(result) = (&mut task).now_or_never() {
-                return result;
-            }
-            executor.run_until_stalled();
-            shared_system.select(false).unwrap();
-            SystemState::select_all(&state);
-        }
-    }
-
-    pub fn stub_tty(state: &RefCell<SystemState>) {
-        state
-            .borrow_mut()
-            .file_system
-            .save("/dev/tty", Rc::new(RefCell::new(INode::new([]))))
-            .unwrap();
-    }
-
-    /// Helper function for asserting on the content of /dev/stdout.
-    pub fn assert_stdout<F, T>(state: &RefCell<SystemState>, f: F) -> T
-    where
-        F: FnOnce(&str) -> T,
-    {
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            f(from_utf8(content).unwrap())
-        })
-    }
-
-    /// Helper function for asserting on the content of /dev/stderr.
-    pub fn assert_stderr<F, T>(state: &RefCell<SystemState>, f: F) -> T
-    where
-        F: FnOnce(&str) -> T,
-    {
-        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
-        let stderr = stderr.borrow();
-        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
-            f(from_utf8(content).unwrap())
-        })
-    }
+mod tests {
+    use super::*;
 
     #[test]
     fn builtins_are_sorted() {
-        super::BUILTINS
+        BUILTINS
             .windows(2)
             .for_each(|pair| assert!(pair[0].0 < pair[1].0, "disordered pair: {pair:?}"))
     }

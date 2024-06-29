@@ -84,8 +84,6 @@ pub async fn execute_builtin(
 mod tests {
     use super::*;
     use crate::command::Command;
-    use crate::tests::assert_stderr;
-    use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
     use crate::tests::local_builtin;
     use crate::tests::return_builtin;
@@ -102,6 +100,8 @@ mod tests {
     use yash_env::system::Errno;
     use yash_env::variable::Value;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stderr;
+    use yash_env_test_helper::assert_stdout;
     use yash_syntax::syntax;
 
     #[test]

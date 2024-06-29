@@ -106,13 +106,13 @@ async fn report_define_error(env: &mut Env, error: &DefineError) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_stderr;
     use futures_util::FutureExt;
     use std::ops::ControlFlow::Break;
     use yash_env::option::On;
     use yash_env::option::Option::ErrExit;
     use yash_env::semantics::Divert;
     use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stderr;
     use yash_syntax::source::Location;
 
     #[test]

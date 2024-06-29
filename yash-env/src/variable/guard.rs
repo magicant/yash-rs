@@ -33,6 +33,12 @@ impl VariableSet {
     /// Pushes a new context to this variable set.
     ///
     /// This function returns a scope guard that will pop the context when dropped.
+    /// The guard provides a mutable reference to the variable set, allowing
+    /// variables to be added or modified within the context.
+    ///
+    /// Note that the guard does not provide access to the whole environment
+    /// that contains the variable set. If you need access to the environment,
+    /// use [`Env::push_context`] instead.
     #[inline]
     pub fn push_context(&mut self, context: Context) -> ContextGuard<'_> {
         self.push_context_impl(context);

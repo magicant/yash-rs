@@ -167,11 +167,11 @@ async fn expand_common(
 mod tests {
     use super::*;
     use crate::tests::echo_builtin;
-    use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
     use futures_util::FutureExt;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::Errno;
+    use yash_env_test_helper::in_virtual_system;
 
     #[test]
     fn empty_substitution() {
