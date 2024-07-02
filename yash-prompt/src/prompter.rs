@@ -52,23 +52,29 @@ impl<'a, 'b, T> Input for Prompter<'a, 'b, T>
 where
     T: Input + 'a,
 {
+    #[allow(clippy::await_holding_refcell_ref)]
     async fn next_line(&mut self, context: &Context) -> Result {
-        print_prompt(&self.env.borrow(), context).await;
+        print_prompt(&mut self.env.borrow_mut(), context).await;
         self.inner.next_line(context).await
     }
 }
 
-async fn print_prompt(env: &Env, _context: &Context) {
+async fn print_prompt(env: &mut Env, _context: &Context) {
     let location = Location::dummy(""); // TODO context.location;
 
     // TODO Use PS2, YASH_PS1, etc.
+    // https://github.com/rust-lang/rust-clippy/issues/13031
+    #[allow(clippy::manual_unwrap_or_default)]
     let ps1 = match env.variables.get(PS1).map(|v| v.expand(&location)) {
-        Some(Expansion::Scalar(s)) => s,
+        Some(Expansion::Scalar(s)) => s.into_owned(),
         _ => Default::default(),
     };
-    // TODO Perform parameter expansion in the prompt string
-    // TODO This clone should be avoided
-    env.system.clone().print_error(&ps1).await;
+
+    // Perform parameter expansion in the prompt string
+    let expanded_prompt = super::expand_posix(env, &ps1, true).await;
+
+    // Print the prompt to the standard error
+    env.system.print_error(&expanded_prompt).await;
 }
 
 #[cfg(test)]
@@ -151,6 +157,22 @@ mod tests {
     }
 
     // TODO ps2_variable_defines_continuation_prompt
-    // TODO variable_is_expanded_in_prompt
-    // TODO Should we implement and test all of the above here?
+
+    #[test]
+    fn parameter_expansion_in_prompt_string() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        define_variable(&mut env, PS1, "$X $ ");
+        define_variable(&mut env, "X", "foo");
+        let ref_env = RefCell::new(&mut env);
+        let mut prompter = Prompter::new(Memory::new(""), &ref_env);
+
+        prompter
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap()
+            .ok();
+        assert_stderr(&state, |stderr| assert_eq!(stderr, "foo $ "));
+    }
 }

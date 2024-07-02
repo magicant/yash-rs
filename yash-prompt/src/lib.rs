@@ -18,5 +18,10 @@
 //!
 //! TBD
 
+mod expand_posix;
+pub use expand_posix::expand_posix;
+
+// TODO Yash-specific prompt expansion
+
 mod prompter;
 pub use prompter::Prompter;
