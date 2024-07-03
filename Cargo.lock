@@ -534,6 +534,7 @@ dependencies = [
  "thiserror",
  "yash-builtin",
  "yash-env",
+ "yash-prompt",
  "yash-semantics",
  "yash-syntax",
 ]
