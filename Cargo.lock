@@ -534,6 +534,7 @@ dependencies = [
  "thiserror",
  "yash-builtin",
  "yash-env",
+ "yash-prompt",
  "yash-semantics",
  "yash-syntax",
 ]
@@ -577,6 +578,18 @@ dependencies = [
  "regex",
  "regex-syntax",
  "thiserror",
+]
+
+[[package]]
+name = "yash-prompt"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures-util",
+ "yash-env",
+ "yash-env-test-helper",
+ "yash-semantics",
+ "yash-syntax",
 ]
 
 [[package]]

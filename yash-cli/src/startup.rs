@@ -25,14 +25,14 @@ use yash_env::input::Echo;
 use yash_env::input::FdReader;
 use yash_env::io::Fd;
 use yash_env::option::Option::Interactive;
+use yash_env::option::State::On;
 use yash_env::system::Errno;
 use yash_env::system::Mode;
 use yash_env::system::OFlag;
 use yash_env::system::SystemEx as _;
 use yash_env::Env;
 use yash_env::System;
-#[cfg(doc)]
-use yash_semantics::ReadEvalLoop;
+use yash_prompt::Prompter;
 use yash_syntax::input::Input;
 use yash_syntax::input::Memory;
 use yash_syntax::source::Source as SyntaxSource;
@@ -77,9 +77,12 @@ pub struct PrepareInputError<'a> {
 
 /// Prepares the input for the shell.
 ///
-/// This function constructs an input object from the given source. If the source
-/// is read with a file descriptor, the [`Echo`] decorator is applied to the input
-/// to implement the [verbose](yash_env::option::Verbose) shell option.
+/// This function constructs an input object from the given source.
+/// If the shell is interactive and the source is the standard input,
+/// the [`Prompter`] decorator is applied to the input to show the prompt.
+/// If the source is read with a file descriptor, the [`Echo`] decorator is
+/// applied to the input to implement the [verbose](yash_env::option::Verbose)
+/// shell option.
 ///
 /// The `RefCell` passed as the first argument should be shared with (and only
 /// with) the [`read_eval_loop`](yash_semantics::read_eval_loop) function that
@@ -90,7 +93,10 @@ pub fn prepare_input<'a>(
 ) -> Result<SourceInput<'a>, PrepareInputError<'a>> {
     match source {
         Source::Stdin => {
-            let mut system = env.borrow().system.clone();
+            let (mut system, is_interactive) = {
+                let env = env.borrow();
+                (env.system.clone(), env.options.get(Interactive) == On)
+            };
 
             if system.isatty(Fd::STDIN).unwrap_or(false) || system.fd_is_pipe(Fd::STDIN) {
                 // It makes virtually no sense to make it blocking here
@@ -100,7 +106,12 @@ pub fn prepare_input<'a>(
                 system.set_blocking(Fd::STDIN).ok();
             }
 
-            let input = Box::new(Echo::new(FdReader::new(Fd::STDIN, system), env));
+            let reader = FdReader::new(Fd::STDIN, system);
+            let input: Box<dyn Input> = if is_interactive {
+                Box::new(Echo::new(Prompter::new(reader, env), env))
+            } else {
+                Box::new(Echo::new(reader, env))
+            };
             let source = SyntaxSource::Stdin;
             Ok(SourceInput { input, source })
         }
