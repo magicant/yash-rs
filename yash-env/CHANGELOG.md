@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Variable initial value constants in the `variable` module:
   `IFS_INITIAL_VALUE`, `OPTIND_INITIAL_VALUE`, `PS1_INITIAL_VALUE_NON_ROOT`,
   `PS1_INITIAL_VALUE_ROOT`, `PS2_INITIAL_VALUE`, `PS4_INITIAL_VALUE`
+- `impl System for &SharedSystem` and `impl trap::SignalSystem for &SharedSystem`
+    - This allows `SharedSystem` to be used as a system behind a non-mutable reference.
 
 ### Changed
 

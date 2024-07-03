@@ -307,7 +307,11 @@ impl SharedSystem {
     }
 }
 
-impl System for SharedSystem {
+/// Delegates `System` methods to the contained system instance.
+///
+/// This implementation only requires a non-mutable reference to the shared
+/// system because it uses `RefCell` to access the contained system instance.
+impl System for &SharedSystem {
     fn fstat(&self, fd: Fd) -> Result<FileStat> {
         self.0.borrow().fstat(fd)
     }
@@ -466,6 +470,234 @@ impl System for SharedSystem {
     }
 }
 
+/// Delegates `System` methods to the contained system instance.
+impl System for SharedSystem {
+    // All methods are delegated to `impl System for &SharedSystem`,
+    // which in turn delegates to the contained system instance.
+    #[inline]
+    fn fstat(&self, fd: Fd) -> Result<FileStat> {
+        (&self).fstat(fd)
+    }
+    #[inline]
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> Result<FileStat> {
+        (&self).fstatat(dir_fd, path, flags)
+    }
+    #[inline]
+    fn is_executable_file(&self, path: &CStr) -> bool {
+        (&self).is_executable_file(path)
+    }
+    #[inline]
+    fn is_directory(&self, path: &CStr) -> bool {
+        (&self).is_directory(path)
+    }
+    #[inline]
+    fn pipe(&mut self) -> Result<(Fd, Fd)> {
+        (&mut &*self).pipe()
+    }
+    #[inline]
+    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> Result<Fd> {
+        (&mut &*self).dup(from, to_min, flags)
+    }
+    #[inline]
+    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
+        (&mut &*self).dup2(from, to)
+    }
+    #[inline]
+    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd> {
+        (&mut &*self).open(path, option, mode)
+    }
+    #[inline]
+    fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
+        (&mut &*self).open_tmpfile(parent_dir)
+    }
+    #[inline]
+    fn close(&mut self, fd: Fd) -> Result<()> {
+        (&mut &*self).close(fd)
+    }
+    #[inline]
+    fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag> {
+        (&self).fcntl_getfl(fd)
+    }
+    #[inline]
+    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> Result<()> {
+        (&mut &*self).fcntl_setfl(fd, flags)
+    }
+    #[inline]
+    fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag> {
+        (&self).fcntl_getfd(fd)
+    }
+    #[inline]
+    fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> Result<()> {
+        (&mut &*self).fcntl_setfd(fd, flags)
+    }
+    #[inline]
+    fn isatty(&self, fd: Fd) -> Result<bool> {
+        (&self).isatty(fd)
+    }
+    #[inline]
+    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
+        (&mut &*self).read(fd, buffer)
+    }
+    #[inline]
+    fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {
+        (&mut &*self).write(fd, buffer)
+    }
+    #[inline]
+    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
+        (&mut &*self).lseek(fd, position)
+    }
+    #[inline]
+    fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
+        (&mut &*self).fdopendir(fd)
+    }
+    #[inline]
+    fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
+        (&mut &*self).opendir(path)
+    }
+    #[inline]
+    fn umask(&mut self, mask: Mode) -> Mode {
+        (&mut &*self).umask(mask)
+    }
+    #[inline]
+    fn now(&self) -> Instant {
+        (&self).now()
+    }
+    #[inline]
+    fn times(&self) -> Result<Times> {
+        (&self).times()
+    }
+    #[inline]
+    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
+        (&self).validate_signal(number)
+    }
+    #[inline]
+    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
+        System::signal_number_from_name(&self, name)
+    }
+    #[inline]
+    fn sigmask(
+        &mut self,
+        op: Option<(SigmaskHow, &[signal::Number])>,
+        old_mask: Option<&mut Vec<signal::Number>>,
+    ) -> Result<()> {
+        (&mut &*self).sigmask(op, old_mask)
+    }
+    #[inline]
+    fn sigaction(
+        &mut self,
+        signal: signal::Number,
+        action: SignalHandling,
+    ) -> Result<SignalHandling> {
+        (&mut &*self).sigaction(signal, action)
+    }
+    #[inline]
+    fn caught_signals(&mut self) -> Vec<signal::Number> {
+        (&mut &*self).caught_signals()
+    }
+    #[inline]
+    fn kill(
+        &mut self,
+        target: Pid,
+        signal: Option<signal::Number>,
+    ) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+        (&mut &*self).kill(target, signal)
+    }
+    #[inline]
+    fn select(
+        &mut self,
+        readers: &mut FdSet,
+        writers: &mut FdSet,
+        timeout: Option<&TimeSpec>,
+        signal_mask: Option<&[signal::Number]>,
+    ) -> Result<c_int> {
+        (&mut &*self).select(readers, writers, timeout, signal_mask)
+    }
+    #[inline]
+    fn getpid(&self) -> Pid {
+        (&self).getpid()
+    }
+    #[inline]
+    fn getppid(&self) -> Pid {
+        (&self).getppid()
+    }
+    #[inline]
+    fn getpgrp(&self) -> Pid {
+        (&self).getpgrp()
+    }
+    #[inline]
+    fn setpgid(&mut self, pid: Pid, pgid: Pid) -> Result<()> {
+        (&mut &*self).setpgid(pid, pgid)
+    }
+    #[inline]
+    fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
+        (&self).tcgetpgrp(fd)
+    }
+    #[inline]
+    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> Result<()> {
+        (&mut &*self).tcsetpgrp(fd, pgid)
+    }
+    #[inline]
+    fn new_child_process(&mut self) -> Result<ChildProcessStarter> {
+        (&mut &*self).new_child_process()
+    }
+    #[inline]
+    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
+        (&mut &*self).wait(target)
+    }
+    #[inline]
+    fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {
+        (&mut &*self).execve(path, args, envs)
+    }
+    #[inline]
+    fn getcwd(&self) -> Result<PathBuf> {
+        (&self).getcwd()
+    }
+    #[inline]
+    fn chdir(&mut self, path: &CStr) -> Result<()> {
+        (&mut &*self).chdir(path)
+    }
+    #[inline]
+    fn getpwnam_dir(&self, name: &str) -> Result<Option<PathBuf>> {
+        (&self).getpwnam_dir(name)
+    }
+    #[inline]
+    fn confstr_path(&self) -> Result<OsString> {
+        (&self).confstr_path()
+    }
+    #[inline]
+    fn shell_path(&self) -> CString {
+        (&self).shell_path()
+    }
+    #[inline]
+    fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair> {
+        (&self).getrlimit(resource)
+    }
+    #[inline]
+    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> std::io::Result<()> {
+        (&mut &*self).setrlimit(resource, limits)
+    }
+}
+
+impl SignalSystem for &SharedSystem {
+    #[inline]
+    fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
+        SystemEx::signal_name_from_number(*self, number)
+    }
+
+    #[inline]
+    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
+        System::signal_number_from_name(*self, name)
+    }
+
+    fn set_signal_handling(
+        &mut self,
+        signal: signal::Number,
+        handling: SignalHandling,
+    ) -> Result<SignalHandling> {
+        self.0.borrow_mut().set_signal_handling(signal, handling)
+    }
+}
+
 impl SignalSystem for SharedSystem {
     #[inline]
     fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
@@ -477,6 +709,7 @@ impl SignalSystem for SharedSystem {
         System::signal_number_from_name(self, name)
     }
 
+    #[inline]
     fn set_signal_handling(
         &mut self,
         signal: signal::Number,
