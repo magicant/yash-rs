@@ -23,7 +23,7 @@ use yash_env::variable::{Expansion, PS1};
 use yash_env::Env;
 use yash_syntax::source::Location;
 
-/// [`Input`] decorator that shows a command prompt.
+/// [`Input`] decorator that shows a command prompt
 ///
 /// This decorator expands and shows the command prompt before the input is read
 /// by the inner `Input`.
