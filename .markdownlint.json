@@ -1,0 +1,9 @@
+{
+    "line-length": false,
+    "no-duplicate-heading": {
+        "siblings_only": true
+    },
+    "ul-indent": {
+        "indent": 4
+    }
+}
