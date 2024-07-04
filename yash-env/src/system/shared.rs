@@ -126,7 +126,7 @@ impl SharedSystem {
         SharedSystem(Rc::new(RefCell::new(SelectSystem::new(system))))
     }
 
-    fn set_nonblocking(&mut self, fd: Fd) -> Result<OFlag> {
+    fn set_nonblocking(&self, fd: Fd) -> Result<OFlag> {
         let mut inner = self.0.borrow_mut();
         let flags = inner.fcntl_getfl(fd)?;
         if !flags.contains(OFlag::O_NONBLOCK) {
@@ -135,7 +135,7 @@ impl SharedSystem {
         Ok(flags)
     }
 
-    fn reset_nonblocking(&mut self, fd: Fd, old_flags: OFlag) {
+    fn reset_nonblocking(&self, fd: Fd, old_flags: OFlag) {
         if !old_flags.contains(OFlag::O_NONBLOCK) {
             let _: Result<()> = self.0.borrow_mut().fcntl_setfl(fd, old_flags);
         }
@@ -145,7 +145,7 @@ impl SharedSystem {
     ///
     /// This function waits for one or more bytes to be available for reading.
     /// If successful, returns the number of bytes read.
-    pub async fn read_async(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
+    pub async fn read_async(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
         let flags = self.set_nonblocking(fd)?;
 
         // We need to retain a strong reference to the waker outside the poll_fn
@@ -180,7 +180,7 @@ impl SharedSystem {
     /// returned.
     ///
     /// This function silently ignores signals that may interrupt writes.
-    pub async fn write_all(&mut self, fd: Fd, mut buffer: &[u8]) -> Result<usize> {
+    pub async fn write_all(&self, fd: Fd, mut buffer: &[u8]) -> Result<usize> {
         if buffer.is_empty() {
             return Ok(0);
         }
@@ -220,7 +220,7 @@ impl SharedSystem {
     }
 
     /// Convenience function for printing a message to the standard error
-    pub async fn print_error(&mut self, message: &str) {
+    pub async fn print_error(&self, message: &str) {
         _ = self.write_all(Fd::STDERR, message.as_bytes()).await;
     }
 

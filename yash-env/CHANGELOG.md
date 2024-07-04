@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Rust 1.70.0 → 1.77.0
 - Internal dependency versions:
     - annotate-snippets 0.10.0 → 0.11.4
+- All inherent methods of `SharedSystem` now take `&self` instead of `&mut self`:
+    - `SharedSystem::read_async`
+    - `SharedSystem::write_all`
+    - `SharedSystem::print_error`
 
 ### Deprecated
 
