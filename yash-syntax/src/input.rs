@@ -19,16 +19,31 @@
 use async_trait::async_trait;
 use std::ops::DerefMut;
 
-/// Current state in which source code is read.
+/// Parameter passed to the input function
 ///
-/// The context is passed to the input function so that it can read the input in a
-/// context-dependent way.
-///
-/// Currently, this structure is empty. It may be extended to provide with some useful data in
-/// future versions.
-#[derive(Debug, Default)]
+/// The context is passed to the [input function](Input::next_line) so that it
+/// can read the input in a context-dependent way.
+#[derive(Debug)]
 #[non_exhaustive]
-pub struct Context;
+pub struct Context {
+    pub(crate) is_first_line: bool,
+}
+
+impl Default for Context {
+    fn default() -> Self {
+        Self {
+            is_first_line: true,
+        }
+    }
+}
+
+impl Context {
+    /// Whether the current line is the first line of the input
+    #[must_use]
+    pub fn is_first_line(&self) -> bool {
+        self.is_first_line
+    }
+}
 
 /// Error returned by the [Input] function.
 pub type Error = std::io::Error;
@@ -94,36 +109,39 @@ mod tests {
     #[test]
     fn memory_empty_source() {
         let mut input = Memory::new("");
+        let context = Context::default();
 
-        let line = input.next_line(&Context).now_or_never().unwrap().unwrap();
+        let line = input.next_line(&context).now_or_never().unwrap().unwrap();
         assert_eq!(line, "");
     }
 
     #[test]
     fn memory_one_line() {
         let mut input = Memory::new("one\n");
+        let context = Context::default();
 
-        let line = input.next_line(&Context).now_or_never().unwrap().unwrap();
+        let line = input.next_line(&context).now_or_never().unwrap().unwrap();
         assert_eq!(line, "one\n");
 
-        let line = input.next_line(&Context).now_or_never().unwrap().unwrap();
+        let line = input.next_line(&context).now_or_never().unwrap().unwrap();
         assert_eq!(line, "");
     }
 
     #[test]
     fn memory_three_lines() {
         let mut input = Memory::new("one\ntwo\nthree");
+        let context = Context::default();
 
-        let line = input.next_line(&Context).now_or_never().unwrap().unwrap();
+        let line = input.next_line(&context).now_or_never().unwrap().unwrap();
         assert_eq!(line, "one\n");
 
-        let line = input.next_line(&Context).now_or_never().unwrap().unwrap();
+        let line = input.next_line(&context).now_or_never().unwrap().unwrap();
         assert_eq!(line, "two\n");
 
-        let line = input.next_line(&Context).now_or_never().unwrap().unwrap();
+        let line = input.next_line(&context).now_or_never().unwrap().unwrap();
         assert_eq!(line, "three");
 
-        let line = input.next_line(&Context).now_or_never().unwrap().unwrap();
+        let line = input.next_line(&context).now_or_never().unwrap().unwrap();
         assert_eq!(line, "");
     }
 }

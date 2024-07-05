@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - This new trait implementation allows more types to be used as input
       sources, especially when it is used with a decorator that requires
       another input source.
+- `input::Context::is_first_line`
+    - This new method allows changing the behavior of the input function
+      depending on whether the current line is the first line of the input.
 
 ### Changed
 
@@ -155,8 +158,8 @@ This version contains variety of fixes.
 - `parser::lex::TokenId::is_clause_delimiter`
 - `impl std::error::Error for parser::Error`
 - `source::pretty::MessageBase`
-   - `impl MessageBase for parser::Error`
-   - `impl<'a, T: MessageBase> From<&'a T> for source::pretty::Message<'a>`
+    - `impl MessageBase for parser::Error`
+    - `impl<'a, T: MessageBase> From<&'a T> for source::pretty::Message<'a>`
 
 ### Changed
 
