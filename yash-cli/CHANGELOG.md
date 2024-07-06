@@ -7,10 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0-beta.2] - Unreleased
 
+### Added
+
+- Internal dependencies:
+    - yash-prompt 0.1.0
+
 ### Changed
 
 - External dependency versions:
     - Rust 1.75.0 → 1.77.0
+- The shell now shows the prompt before reading the input in the interactive mode.
+  To achieve this, the `startup::prepare_input` function now applies the
+  `yash_prompt::Prompter` decorator to the returned source input.
 - The first argument to `startup::prepare_input` is now `env: &'a RefCell<&mut Env>`
   instead of `system: &mut SharedSystem`. This change is to allow the function to
   construct `yash_env::input::Echo` for the returned source input.

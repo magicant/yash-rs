@@ -19,7 +19,7 @@
 use async_trait::async_trait;
 use std::cell::RefCell;
 use yash_env::input::{Context, Input, Result};
-use yash_env::variable::{Expansion, PS1};
+use yash_env::variable::{Expansion, PS1, PS2};
 use yash_env::Env;
 use yash_syntax::source::Location;
 
@@ -59,19 +59,20 @@ where
     }
 }
 
-async fn print_prompt(env: &mut Env, _context: &Context) {
+async fn print_prompt(env: &mut Env, context: &Context) {
     let location = Location::dummy(""); // TODO context.location;
 
-    // TODO Use PS2, YASH_PS1, etc.
+    // TODO Yash-specific prompt variables
+    let var = if context.is_first_line() { PS1 } else { PS2 };
     // https://github.com/rust-lang/rust-clippy/issues/13031
     #[allow(clippy::manual_unwrap_or_default)]
-    let ps1 = match env.variables.get(PS1).map(|v| v.expand(&location)) {
+    let prompt = match env.variables.get(var).map(|v| v.expand(&location)) {
         Some(Expansion::Scalar(s)) => s.into_owned(),
         _ => Default::default(),
     };
 
     // Perform parameter expansion in the prompt string
-    let expanded_prompt = super::expand_posix(env, &ps1, true).await;
+    let expanded_prompt = super::expand_posix(env, &prompt, true).await;
 
     // Print the prompt to the standard error
     env.system.print_error(&expanded_prompt).await;
@@ -156,7 +157,20 @@ mod tests {
         assert_stderr(&state, |stderr| assert_eq!(stderr, "my_custom_prompt>"));
     }
 
-    // TODO ps2_variable_defines_continuation_prompt
+    #[test]
+    fn ps2_variable_defines_continuation_prompt() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        define_variable(&mut env, PS2, "continuation_prompt>");
+        let ref_env = RefCell::new(&mut env);
+        let mut prompter = Prompter::new(Memory::new(""), &ref_env);
+        let mut context = Context::default();
+        context.set_is_first_line(false);
+
+        prompter.next_line(&context).now_or_never().unwrap().ok();
+        assert_stderr(&state, |stderr| assert_eq!(stderr, "continuation_prompt>"));
+    }
 
     #[test]
     fn parameter_expansion_in_prompt_string() {
