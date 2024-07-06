@@ -19,7 +19,7 @@
 use async_trait::async_trait;
 use std::cell::RefCell;
 use yash_env::input::{Context, Input, Result};
-use yash_env::variable::{Expansion, PS1, PS2};
+use yash_env::variable::{Expansion, VariableSet, PS1, PS2};
 use yash_env::Env;
 use yash_syntax::source::Location;
 
@@ -60,22 +60,37 @@ where
 }
 
 async fn print_prompt(env: &mut Env, context: &Context) {
-    let location = Location::dummy(""); // TODO context.location;
-
-    // TODO Yash-specific prompt variables
-    let var = if context.is_first_line() { PS1 } else { PS2 };
-    // https://github.com/rust-lang/rust-clippy/issues/13031
-    #[allow(clippy::manual_unwrap_or_default)]
-    let prompt = match env.variables.get(var).map(|v| v.expand(&location)) {
-        Some(Expansion::Scalar(s)) => s.into_owned(),
-        _ => Default::default(),
-    };
+    // Obtain the prompt string
+    let prompt = fetch_posix(&env.variables, context);
 
     // Perform parameter expansion in the prompt string
     let expanded_prompt = super::expand_posix(env, &prompt, true).await;
 
     // Print the prompt to the standard error
     env.system.print_error(&expanded_prompt).await;
+}
+
+/// Fetches the command prompt string from the variable set.
+///
+/// The return value is the raw value taken from the `PS1` or `PS2` variable
+/// in the set. [`Context::is_first_line`] determines which variable is used.
+/// An empty string is returned if the variable is not found.
+///
+/// The returned prompt string should be expanded before being shown to the
+/// user.
+///
+/// This function does not consider yash-specific prompt variables.
+pub fn fetch_posix(variables: &VariableSet, context: &Context) -> String {
+    // TODO context.location;
+    let location = Location::dummy("");
+
+    // TODO Yash-specific prompt variables
+    let var = if context.is_first_line() { PS1 } else { PS2 };
+    // https://github.com/rust-lang/rust-clippy/issues/13031
+    match variables.get(var).map(|v| v.expand(&location)) {
+        Some(Expansion::Scalar(s)) => s.into_owned(),
+        _ => Default::default(),
+    }
 }
 
 #[cfg(test)]
