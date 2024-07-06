@@ -64,7 +64,7 @@ async fn print_prompt(env: &mut Env, context: &Context) {
     let prompt = fetch_posix(&env.variables, context);
 
     // Perform parameter expansion in the prompt string
-    let expanded_prompt = super::expand_posix(env, &prompt, true).await;
+    let expanded_prompt = super::expand_posix(env, &prompt, context.is_first_line()).await;
 
     // Print the prompt to the standard error
     env.system.print_error(&expanded_prompt).await;
@@ -160,7 +160,7 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        define_variable(&mut env, PS1, "my_custom_prompt>");
+        define_variable(&mut env, PS1, "my_custom_prompt !! >");
         let ref_env = RefCell::new(&mut env);
         let mut prompter = Prompter::new(Memory::new(""), &ref_env);
 
@@ -169,7 +169,8 @@ mod tests {
             .now_or_never()
             .unwrap()
             .ok();
-        assert_stderr(&state, |stderr| assert_eq!(stderr, "my_custom_prompt>"));
+        assert_stderr(&state, |stderr| assert_eq!(stderr, "my_custom_prompt ! >"));
+        // Note that "!!" is expanded to "!" in the prompt string.
     }
 
     #[test]
@@ -177,14 +178,15 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        define_variable(&mut env, PS2, "continuation_prompt>");
+        define_variable(&mut env, PS2, "continuation ! >");
         let ref_env = RefCell::new(&mut env);
         let mut prompter = Prompter::new(Memory::new(""), &ref_env);
         let mut context = Context::default();
         context.set_is_first_line(false);
 
         prompter.next_line(&context).now_or_never().unwrap().ok();
-        assert_stderr(&state, |stderr| assert_eq!(stderr, "continuation_prompt>"));
+        assert_stderr(&state, |stderr| assert_eq!(stderr, "continuation ! >"));
+        // Note that "!" is not expanded in the prompt string.
     }
 
     #[test]
