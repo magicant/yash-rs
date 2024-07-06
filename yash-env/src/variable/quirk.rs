@@ -241,6 +241,11 @@ impl Expansion<'_> {
 }
 
 /// Implementation of [`Variable::expand`].
+///
+/// For the purpose of line number counting, this function allows
+/// `location.range.start` to be greater than the character count of the code,
+/// in which case the line number is calculated as if the range were the end of
+/// the code.
 pub fn expand<'a>(var: &'a Variable, mut location: &Location) -> Expansion<'a> {
     match &var.quirk {
         None => var.value.as_ref().into(),
@@ -314,6 +319,19 @@ mod tests {
         let loc = Location { code, range };
         let result = var.expand(&loc);
         assert_eq!(result, Expansion::Scalar("44".into()));
+    }
+
+    #[test]
+    fn expand_line_number_out_of_range() {
+        let var = Variable {
+            quirk: Some(Quirk::LineNumber),
+            ..Default::default()
+        };
+        let code = stub_code();
+        let range = 13..13;
+        let loc = Location { code, range };
+        let result = var.expand(&loc);
+        assert_eq!(result, Expansion::Scalar("45".into()));
     }
 
     #[test]
