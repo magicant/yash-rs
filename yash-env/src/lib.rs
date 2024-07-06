@@ -40,7 +40,7 @@ use self::job::Pid;
 use self::job::ProcessState;
 use self::option::On;
 use self::option::OptionSet;
-use self::option::{AllExport, ErrExit, Monitor};
+use self::option::{AllExport, ErrExit, Interactive, Monitor};
 use self::semantics::Divert;
 use self::semantics::ExitStatus;
 use self::stack::Frame;
@@ -301,6 +301,17 @@ impl Env {
         let final_fd = self.system.move_fd_internal(first_fd);
         self.tty = final_fd.ok();
         final_fd
+    }
+
+    /// Tests whether the current environment is an interactive shell.
+    ///
+    /// This function returns true if and only if:
+    ///
+    /// - the [`Interactive`] option is `On` in `self.options`, and
+    /// - the current context is not in a subshell (no `Frame::Subshell` in `self.stack`).
+    #[must_use]
+    pub fn is_interactive(&self) -> bool {
+        self.options.get(Interactive) == On && !self.stack.contains(&Frame::Subshell)
     }
 
     /// Tests whether the shell is performing job control.
