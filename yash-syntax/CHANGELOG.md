@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `input::Context::is_first_line`
     - This new method allows changing the behavior of the input function
       depending on whether the current line is the first line of the input.
+    - The corresponding setter method `set_is_first_line` is also added.
 
 ### Changed
 

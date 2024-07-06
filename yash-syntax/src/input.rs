@@ -26,7 +26,7 @@ use std::ops::DerefMut;
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct Context {
-    pub(crate) is_first_line: bool,
+    is_first_line: bool,
 }
 
 impl Default for Context {
@@ -39,9 +39,19 @@ impl Default for Context {
 
 impl Context {
     /// Whether the current line is the first line of the input
+    #[inline]
     #[must_use]
     pub fn is_first_line(&self) -> bool {
         self.is_first_line
+    }
+
+    /// Sets whether the current line is the first line of the input
+    ///
+    /// This method is used by the lexer to set the flag. It can also be used in
+    /// tests to simulate a non-first line. The default value is `true`.
+    #[inline]
+    pub fn set_is_first_line(&mut self, is_first_line: bool) {
+        self.is_first_line = is_first_line;
     }
 }
 

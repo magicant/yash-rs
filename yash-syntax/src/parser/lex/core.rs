@@ -212,10 +212,7 @@ impl<'a> LexerCore<'a> {
 
             // Read more input
             let index = self.next_index();
-            let context = Context {
-                is_first_line: self.raw_code.value.borrow().is_empty(),
-            };
-            match self.input.next_line(&context).await {
+            match self.input.next_line(&self.input_context()).await {
                 Ok(line) => {
                     if line.is_empty() {
                         // End of input
@@ -241,6 +238,13 @@ impl<'a> LexerCore<'a> {
                 }
             }
         }
+    }
+
+    /// Returns the input context for the next character.
+    fn input_context(&self) -> Context {
+        let mut context = Context::default();
+        context.set_is_first_line(self.raw_code.value.borrow().is_empty());
+        context
     }
 
     /// Consumes the next character.
