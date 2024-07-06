@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Env::is_interactive`
 - `impl yash_system::alias::Glossary for Env`
 - `input::Echo`
     - This is a decorator of `Input` that implements the behavior of the verbose shell option.

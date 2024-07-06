@@ -51,6 +51,8 @@
 //! value of the `PS2` variable as a prompt if the shell is interactive and the
 //! input is from a terminal.
 //!
+//! Prompting requires the optional `yash-prompt` feature.
+//!
 //! # Options
 //!
 //! The **`-r`** option disables the interpretation of backslashes.

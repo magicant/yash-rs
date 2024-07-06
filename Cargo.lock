@@ -516,6 +516,7 @@ dependencies = [
  "thiserror",
  "yash-env",
  "yash-env-test-helper",
+ "yash-prompt",
  "yash-quote",
  "yash-semantics",
  "yash-syntax",

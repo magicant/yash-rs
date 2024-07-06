@@ -18,11 +18,15 @@ cargo tomlfmt --dryrun --path yash-syntax/Cargo.toml
 
 # Make sure we don't have any unnecessary dependencies in Cargo.toml.
 RUSTFLAGS='-D unused_crate_dependencies' cargo check --lib --all-features
+RUSTFLAGS='-D unused_crate_dependencies' cargo check --package 'yash-builtin' --no-default-features
+RUSTFLAGS='-D unused_crate_dependencies' cargo check --package 'yash-builtin' --no-default-features --features yash-semantics
+RUSTFLAGS='-D unused_crate_dependencies' cargo check --package 'yash-syntax' --no-default-features
 
 # Make sure the crates can be built with all combinations of features.
 cargo build --package 'yash-arith' --all-targets
 cargo build --package 'yash-builtin' --all-targets
 cargo build --package 'yash-builtin' --all-targets --no-default-features
+cargo build --package 'yash-builtin' --all-targets --no-default-features --features yash-semantics
 cargo build --package 'yash-cli' --all-targets
 cargo build --package 'yash-env' --all-targets
 cargo build --package 'yash-env-test-helper' --all-targets

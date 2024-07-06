@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - The break and continue built-ins no longer allow exiting a trap.
+- The read built-in now shows a prompt when reading a continued line.
 
 ## [0.1.0-beta.1] - 2024-06-09
 

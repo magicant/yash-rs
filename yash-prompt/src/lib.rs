@@ -27,6 +27,8 @@
 //! used to create an interactive shell prompt. The prompter internally uses
 //! the following functions to expand prompt strings:
 //!
+//! - [`fetch_posix`]: Fetches the value of a variable defined by POSIX for
+//!   a prompt string.
 //! - [`expand_posix`]: Expands a prompt string in a POSIX-compliant manner.
 //! - `expand_ex`: Expands a prompt string with yash-specific expansions.
 //!   (This function is not yet implemented.)
@@ -70,4 +72,5 @@ pub use expand_posix::expand_posix;
 // TODO Yash-specific prompt expansion
 
 mod prompter;
+pub use prompter::fetch_posix;
 pub use prompter::Prompter;

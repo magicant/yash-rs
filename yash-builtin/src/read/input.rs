@@ -95,7 +95,8 @@ fn plain(value: char) -> AttrChar {
 /// continuation, this function removes the backslash-newline pair and continues
 /// reading the next line. When reading the second and subsequent lines, this
 /// function displays the value of the `PS2` variable as a prompt if the shell
-/// is interactive and the input is from a terminal.
+/// is interactive and the input is from a terminal. This requires the optional
+/// `yash-prompt` feature.
 ///
 /// If successful, this function returns a vector of [`AttrChar`]s representing
 /// the line read and a boolean value indicating whether the line was terminated
@@ -114,7 +115,7 @@ pub async fn read(env: &mut Env, is_raw: bool) -> Result<(Vec<AttrChar>, bool), 
                 let c = read_char(env).await?;
                 if c == Some('\n') {
                     // Line continuation
-                    // TODO Display $PS2
+                    print_prompt(env).await;
                     continue;
                 }
                 result.push(quoting('\\'));
@@ -176,6 +177,36 @@ async fn read_char(env: &mut Env) -> Result<Option<char>, Error> {
                 Some(_) => return Err(Errno::EILSEQ.into()),
             },
         }
+    }
+}
+
+/// Prints the prompt string for the continuation line.
+///
+/// This function prints the value of the `PS2` variable as a prompt for the
+/// continuation line. If the shell is not interactive or the standard input
+/// is not a terminal, this function does nothing.
+async fn print_prompt(env: &mut Env) {
+    #[cfg(feature = "yash-prompt")]
+    {
+        use yash_env::System as _;
+        if !env.is_interactive() {
+            return;
+        }
+        if env.system.isatty(Fd::STDIN) != Ok(true) {
+            return;
+        }
+
+        // Obtain the prompt string
+        let mut context = yash_env::input::Context::default();
+        context.set_is_first_line(false);
+        let prompt = yash_prompt::fetch_posix(&env.variables, &context);
+        let prompt = yash_prompt::expand_posix(env, &prompt, false).await;
+        env.system.print_error(&prompt).await;
+    }
+
+    #[cfg(not(feature = "yash-prompt"))]
+    {
+        _ = env;
     }
 }
 
@@ -320,4 +351,6 @@ mod tests {
             assert_eq!(result, Err(Errno::EILSEQ.into()));
         });
     }
+
+    // TODO Test PS2 prompt
 }
