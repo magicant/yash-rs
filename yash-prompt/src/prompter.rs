@@ -84,7 +84,6 @@ pub fn fetch_posix(variables: &VariableSet, context: &Context) -> String {
     // TODO context.location;
     let location = Location::dummy("");
 
-    // TODO Yash-specific prompt variables
     let var = if context.is_first_line() { PS1 } else { PS2 };
     // https://github.com/rust-lang/rust-clippy/issues/13031
     match variables.get(var).map(|v| v.expand(&location)) {
@@ -92,6 +91,8 @@ pub fn fetch_posix(variables: &VariableSet, context: &Context) -> String {
         _ => Default::default(),
     }
 }
+
+// TODO pub fn fetch_ex: yash-specific prompt variables
 
 #[cfg(test)]
 mod tests {
