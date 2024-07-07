@@ -16,12 +16,13 @@
 
 //! Prompt string expansion (POSIX-compatible)
 
+use futures_util::FutureExt as _;
 use yash_env::Env;
 use yash_semantics::expansion::expand_text;
-use yash_syntax::syntax::{
-    Text,
-    TextUnit::{self, Literal},
-};
+use yash_syntax::parser::lex::Lexer;
+use yash_syntax::source::Source;
+use yash_syntax::syntax::Text;
+use yash_syntax::syntax::TextUnit::{self, Literal};
 
 /// Expands the prompt string according to the POSIX standard.
 ///
@@ -33,8 +34,18 @@ use yash_syntax::syntax::{
 /// expands to `0`.)
 ///
 /// The [expansion](expand_text) of the text is returned.
-pub async fn expand_posix<'a>(env: &mut Env, prompt: &'a str, excl: bool) -> String {
-    let mut text = prompt.parse().unwrap_or_else(|_| {
+///
+/// # Portability
+///
+/// The current implementation does not recognize any backslash escapes in the
+/// text since the POSIX standard does not specify any. However, other shell
+/// implementations support backslash escapes in the prompt string. This
+/// discrepancy may be reconsidered in the future.
+pub async fn expand_posix(env: &mut Env, prompt: &str, excl: bool) -> String {
+    let mut lexer = Lexer::from_memory(prompt, Source::Unknown);
+    let text_result = lexer.text(|_| false, |_| false).now_or_never().unwrap();
+
+    let mut text = text_result.unwrap_or_else(|_| {
         // If expansions in the prompt string cannot be parsed, treat all
         // characters as literals.
         Text::from_literal_chars(prompt.chars())
@@ -69,7 +80,6 @@ fn replace_exclamation_marks(text: &mut Vec<TextUnit>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::FutureExt as _;
     use yash_env::option::{Off, Unset};
     use yash_env::variable::Scope::Global;
 
