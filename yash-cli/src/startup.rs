@@ -128,6 +128,7 @@ pub fn prepare_input<'a>(
                 .and_then(|fd| system.move_fd_internal(fd))
                 .map_err(|errno| PrepareInputError { errno, path })?;
 
+            // TODO Make FdReader buffered
             let input = Box::new(Echo::new(FdReader::new(fd, system), env));
             let path = path.to_owned();
             let source = SyntaxSource::CommandFile { path };

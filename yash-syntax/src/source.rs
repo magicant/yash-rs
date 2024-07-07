@@ -171,7 +171,8 @@ pub struct Code {
     /// Content of the code, usually terminated by a newline.
     ///
     /// The value is contained in a `RefCell` so that more lines can be appended
-    /// to the value as the parser reads input lines.
+    /// to the value as the parser reads input lines. It is not intended to be
+    /// mutably borrowed for other purposes.
     pub value: RefCell<String>,
 
     /// Line number of the first line of the code. Counted from 1.

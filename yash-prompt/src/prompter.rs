@@ -81,10 +81,9 @@ async fn print_prompt(env: &mut Env, context: &Context) {
 ///
 /// This function does not consider yash-specific prompt variables.
 pub fn fetch_posix(variables: &VariableSet, context: &Context) -> String {
-    // TODO context.location;
-    let location = Location::dummy("");
-
     let var = if context.is_first_line() { PS1 } else { PS2 };
+    // The location is irrelevant (as long as the variable does not have a quirk)
+    let location = Location::dummy(String::new());
     // https://github.com/rust-lang/rust-clippy/issues/13031
     match variables.get(var).map(|v| v.expand(&location)) {
         Some(Expansion::Scalar(s)) => s.into_owned(),
