@@ -249,17 +249,7 @@ pub fn expand<'a>(var: &'a Variable, mut location: &Location) -> Expansion<'a> {
             while let Source::Alias { original, .. } = &location.code.source {
                 location = original;
             }
-            let count = location
-                .code
-                .value
-                .borrow()
-                .chars()
-                .take(location.range.start)
-                .filter(|c| *c == '\n')
-                .count()
-                .try_into()
-                .unwrap_or(u64::MAX);
-            let line_number = u64::from(location.code.start_line_number).saturating_add(count);
+            let line_number = location.code.line_number(location.range.start);
             line_number.to_string().into()
         }
     }

@@ -299,16 +299,7 @@ impl<'a> LexerCore<'a> {
 
     /// Clears the internal buffer.
     fn flush(&mut self) {
-        let lines = self
-            .raw_code
-            .value
-            .borrow()
-            .chars()
-            .filter(|&c| c == '\n')
-            .count()
-            .try_into()
-            .unwrap_or(u64::MAX);
-        let start_line_number = self.raw_code.start_line_number.saturating_add(lines);
+        let start_line_number = self.raw_code.line_number(usize::MAX);
         self.raw_code = Rc::new(Code {
             value: RefCell::new(String::new()),
             start_line_number,

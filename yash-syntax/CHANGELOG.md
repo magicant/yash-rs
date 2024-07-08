@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `source::Code::line_number`
+    - This new method returns the line number of a particular character in the
+      code.
 - `alias::Glossary`
     - This new trait is now used as an interface to provide the parser with
       alias definitions.

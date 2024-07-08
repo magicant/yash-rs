@@ -182,6 +182,30 @@ pub struct Code {
     pub source: Source,
 }
 
+impl Code {
+    /// Computes the line number of the character at the given index.
+    ///
+    /// The index should be between 0 and `self.value.borrow().chars().count()`.
+    /// The return value is `self.start_line_number` plus the number of newlines
+    /// in `self.value` up to the character at `char_index`. If `char_index` is
+    /// out of bounds, the return value is for the last character.
+    ///
+    /// This function will panic if `self.value` has been mutually borrowed.
+    #[must_use]
+    pub fn line_number(&self, char_index: usize) -> NonZeroU64 {
+        let newlines = self
+            .value
+            .borrow()
+            .chars()
+            .take(char_index)
+            .filter(|c| *c == '\n')
+            .count()
+            .try_into()
+            .unwrap_or(u64::MAX);
+        self.start_line_number.saturating_add(newlines)
+    }
+}
+
 /// Creates an iterator of [source char](SourceChar)s from a string.
 ///
 /// `index_offset` will be the index of the first source char's location.
@@ -264,4 +288,41 @@ pub struct SourceChar {
     pub value: char,
     /// Location of this character in source code.
     pub location: Location,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn line_number() {
+        let code = Code {
+            value: RefCell::new("a\nbc\nd".to_string()),
+            start_line_number: NonZeroU64::new(1).unwrap(),
+            source: Source::Unknown,
+        };
+        assert_eq!(code.line_number(0).get(), 1);
+        assert_eq!(code.line_number(1).get(), 1);
+        assert_eq!(code.line_number(2).get(), 2);
+        assert_eq!(code.line_number(3).get(), 2);
+        assert_eq!(code.line_number(4).get(), 2);
+        assert_eq!(code.line_number(5).get(), 3);
+        assert_eq!(code.line_number(6).get(), 3);
+        assert_eq!(code.line_number(7).get(), 3);
+        assert_eq!(code.line_number(usize::MAX).get(), 3);
+
+        let code = Code {
+            start_line_number: NonZeroU64::new(3).unwrap(),
+            ..code
+        };
+        assert_eq!(code.line_number(0).get(), 3);
+        assert_eq!(code.line_number(1).get(), 3);
+        assert_eq!(code.line_number(2).get(), 4);
+        assert_eq!(code.line_number(3).get(), 4);
+        assert_eq!(code.line_number(4).get(), 4);
+        assert_eq!(code.line_number(5).get(), 5);
+        assert_eq!(code.line_number(6).get(), 5);
+        assert_eq!(code.line_number(7).get(), 5);
+        assert_eq!(code.line_number(usize::MAX).get(), 5);
+    }
 }
