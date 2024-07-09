@@ -30,7 +30,6 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::r#virtual::SIGSTOP;
 use yash_env::system::Errno;
-use yash_env::variable::Scalar;
 use yash_env::variable::Scope;
 use yash_env::Env;
 use yash_env::System;
@@ -158,8 +157,8 @@ fn local_builtin_main(
             } else {
                 let name = value;
                 if let Some(var) = env.variables.get(&name) {
-                    if let Some(Scalar(value)) = &var.value {
-                        let line = format!("{name}={value}\n");
+                    if let Some(value) = &var.value {
+                        let line = format!("{name}={}\n", value.quote());
                         if let Err(errno) = env.system.write_all(Fd::STDOUT, line.as_bytes()).await
                         {
                             unimplemented!("write error: {:?}", errno);
