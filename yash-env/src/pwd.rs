@@ -22,8 +22,6 @@ use crate::system::Errno;
 use crate::system::AT_FDCWD;
 use crate::variable::AssignError;
 use crate::variable::Scope::Global;
-use crate::variable::Value::Scalar;
-use crate::variable::Variable;
 use crate::variable::PWD;
 use crate::System;
 use nix::sys::stat::FileStat;
@@ -64,19 +62,25 @@ impl Env {
     /// - there is no dot (`.`) or dot-dot (`..`) component in the pathname.
     #[must_use]
     pub fn get_pwd_if_correct(&self) -> Option<&str> {
-        match self.variables.get(PWD) {
-            Some(Variable {
-                value: Some(Scalar(pwd)),
-                ..
-            }) if Path::new(pwd).is_absolute() && !has_dot_or_dot_dot(pwd) => {
-                const AT_FLAGS: AtFlags = AtFlags::empty();
-                let cstr_pwd = CString::new(pwd.as_bytes()).ok()?;
-                let s1 = self.system.fstatat(AT_FDCWD, &cstr_pwd, AT_FLAGS).ok()?;
-                let s2 = self.system.fstatat(AT_FDCWD, c".", AT_FLAGS).ok()?;
-                same_files(&s1, &s2).then_some(pwd)
+        self.variables.get_scalar(PWD).filter(|pwd| {
+            if !Path::new(pwd).is_absolute() {
+                return false;
             }
-            _ => None,
-        }
+            if has_dot_or_dot_dot(pwd) {
+                return false;
+            }
+            let Ok(cstr_pwd) = CString::new(pwd.as_bytes()) else {
+                return false;
+            };
+            const AT_FLAGS: AtFlags = AtFlags::empty();
+            let Ok(s1) = self.system.fstatat(AT_FDCWD, &cstr_pwd, AT_FLAGS) else {
+                return false;
+            };
+            let Ok(s2) = self.system.fstatat(AT_FDCWD, c".", AT_FLAGS) else {
+                return false;
+            };
+            same_files(&s1, &s2)
+        })
     }
 
     /// Tests if the `$PWD` variable is correct.

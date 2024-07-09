@@ -193,7 +193,6 @@ use std::num::NonZeroUsize;
 use yash_env::builtin::getopts::Origin;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::variable::Value;
 use yash_env::variable::OPTIND;
 use yash_env::Env;
 
@@ -248,14 +247,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     };
 
     // Get the `$OPTIND` value
-    let optind = env
-        .variables
-        .get(OPTIND)
-        .and_then(|v| match &v.value {
-            Some(Value::Scalar(value)) => Some(value.as_str()),
-            _ => None,
-        })
-        .unwrap_or("");
+    let optind = env.variables.get_scalar(OPTIND).unwrap_or_default();
     let (arg_index, char_index) = indexes_from_optind(optind);
 
     // Verify the state

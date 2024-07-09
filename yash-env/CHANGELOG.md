@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `input::Echo`
     - This is a decorator of `Input` that implements the behavior of the verbose shell option.
 - `input::FdReader` is now marked `#[must_use]`.
+- `variable::VariableSet::get_scalar`
+    - This is a convenience method that returns a scalar variable as a `Cow<str>`.
 - Variable name constants in the `variable` module:
   `CDPATH`, `ENV`, `HOME`, `IFS`, `LINENO`, `OLDPWD`, `OPTARG`, `OPTIND`,
   `PATH`, `PPID`, `PS1`, `PS2`, `PS4`, `PWD`

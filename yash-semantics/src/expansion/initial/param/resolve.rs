@@ -26,8 +26,7 @@ pub fn resolve<'a>(name: Name<'_>, env: &'a Env, location: &Location) -> Expansi
     fn variable<'a>(env: &'a Env, name: &str, location: &Location) -> Expansion<'a> {
         env.variables
             .get(name)
-            .map(|v| v.expand(location))
-            .unwrap_or(Expansion::Unset)
+            .map_or(Expansion::Unset, |v| v.expand(location))
     }
     fn options(env: &Env) -> Expansion {
         let mut value = String::new();

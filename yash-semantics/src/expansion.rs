@@ -91,7 +91,6 @@ use thiserror::Error;
 use yash_env::semantics::ExitStatus;
 use yash_env::system::Errno;
 use yash_env::variable::Value;
-use yash_env::variable::Variable;
 use yash_env::variable::IFS;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -316,13 +315,12 @@ pub async fn expand_words<'a, I: IntoIterator<Item = &'a Word>>(
     // TODO brace expansion
 
     // field splitting //
-    use yash_env::variable::Value::Scalar;
-    #[rustfmt::skip]
-    let ifs = match env.inner.variables.get(IFS) {
-        Some(&Variable { value: Some(Scalar(ref value)), ..  }) => Ifs::new(value),
-        // TODO If the variable is an array, should we ignore it?
-        _ => Ifs::default(),
-    };
+    let ifs = env
+        .inner
+        .variables
+        .get_scalar(IFS)
+        .map(Ifs::new)
+        .unwrap_or_default();
     let mut split_fields = Vec::with_capacity(fields.len());
     for field in fields {
         split::split_into(field, &ifs, &mut split_fields);

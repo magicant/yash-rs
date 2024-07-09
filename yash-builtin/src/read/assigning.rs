@@ -18,8 +18,6 @@
 
 use yash_env::semantics::Field;
 use yash_env::variable::Scope;
-use yash_env::variable::Value;
-use yash_env::variable::Variable;
 use yash_env::variable::IFS;
 use yash_env::Env;
 use yash_semantics::expansion::attr::AttrChar;
@@ -46,13 +44,11 @@ pub fn assign(
     variables: Vec<Field>,
     last_variable: Field,
 ) -> Vec<Error> {
-    #[rustfmt::skip]
-    let ifs = match env.variables.get(IFS) {
-        Some(&Variable { value: Some(Value::Scalar(ref value)), ..  }) => value,
-        // TODO If the variable is an array, should we ignore it?
-        _ => Ifs::DEFAULT,
-    };
-    let ifs = ifs.to_owned();
+    let ifs = env
+        .variables
+        .get_scalar(IFS)
+        .unwrap_or(Ifs::DEFAULT)
+        .to_owned();
     let ifs = Ifs::new(&ifs);
 
     let mut ranges = ifs.ranges(text.iter().copied());
@@ -107,6 +103,8 @@ fn assign_one(env: &mut Env, name: Field, value: &[AttrChar]) -> Result<(), Erro
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use yash_env::variable::Value;
+    use yash_env::variable::Variable;
     use yash_env::variable::VariableSet;
     use yash_semantics::expansion::attr::Origin;
     use yash_syntax::source::Location;

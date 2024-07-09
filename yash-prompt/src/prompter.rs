@@ -19,9 +19,8 @@
 use async_trait::async_trait;
 use std::cell::RefCell;
 use yash_env::input::{Context, Input, Result};
-use yash_env::variable::{Expansion, VariableSet, PS1, PS2};
+use yash_env::variable::{VariableSet, PS1, PS2};
 use yash_env::Env;
-use yash_syntax::source::Location;
 
 /// [`Input`] decorator that shows a command prompt
 ///
@@ -82,13 +81,7 @@ async fn print_prompt(env: &mut Env, context: &Context) {
 /// This function does not consider yash-specific prompt variables.
 pub fn fetch_posix(variables: &VariableSet, context: &Context) -> String {
     let var = if context.is_first_line() { PS1 } else { PS2 };
-    // The location is irrelevant (as long as the variable does not have a quirk)
-    let location = Location::dummy(String::new());
-    // https://github.com/rust-lang/rust-clippy/issues/13031
-    match variables.get(var).map(|v| v.expand(&location)) {
-        Some(Expansion::Scalar(s)) => s.into_owned(),
-        _ => Default::default(),
-    }
+    variables.get_scalar(var).unwrap_or_default().to_owned()
 }
 
 // TODO pub fn fetch_ex: yash-specific prompt variables

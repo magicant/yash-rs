@@ -22,7 +22,6 @@ use std::borrow::Cow;
 use std::path::Path;
 use std::path::PathBuf;
 use thiserror::Error;
-use yash_env::variable::Value;
 use yash_env::variable::HOME;
 use yash_env::variable::OLDPWD;
 use yash_env::Env;
@@ -135,11 +134,9 @@ impl MessageBase for TargetError {
 
 /// Returns the variable value if it is a non-empty scalar.
 fn get_scalar<'a>(env: &'a Env, name: &str) -> Option<&'a str> {
-    let var = env.variables.get(name)?;
-    match &var.value {
-        Some(Value::Scalar(value)) if !value.is_empty() => Some(value),
-        _ => None,
-    }
+    env.variables
+        .get_scalar(name)
+        .filter(|value| !value.is_empty())
 }
 
 /// Computes the target directory of the cd built-in.

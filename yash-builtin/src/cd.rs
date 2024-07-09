@@ -149,7 +149,6 @@ use crate::common::report_failure;
 use crate::Result;
 use std::path::Path;
 use yash_env::semantics::Field;
-use yash_env::variable::Value::Scalar;
 use yash_env::variable::PWD;
 use yash_env::Env;
 
@@ -186,13 +185,7 @@ pub mod syntax;
 pub mod target;
 
 fn get_pwd(env: &Env) -> String {
-    match env.variables.get(PWD) {
-        Some(variable) => match &variable.value {
-            Some(Scalar(value)) => value.clone(),
-            _ => String::new(),
-        },
-        None => String::new(),
-    }
+    env.variables.get_scalar(PWD).unwrap_or_default().to_owned()
 }
 
 /// Entry point for executing the `cd` built-in

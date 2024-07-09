@@ -39,22 +39,13 @@ use std::fmt::Write;
 use yash_env::option::OptionSet;
 use yash_env::option::State;
 use yash_env::semantics::Field;
-use yash_env::variable::Value::Scalar;
-use yash_env::variable::Variable;
 use yash_env::variable::PS4;
 use yash_env::Env;
 use yash_quote::quoted;
 use yash_syntax::syntax::Text;
 
 async fn expand_ps4(env: &mut Env) -> String {
-    let value = match env.variables.get(PS4) {
-        Some(Variable {
-            value: Some(Scalar(value)),
-            ..
-        }) => value.to_owned(),
-
-        _ => String::new(),
-    };
+    let value = env.variables.get_scalar(PS4).unwrap_or_default().to_owned();
 
     let text = match value.parse::<Text>() {
         Ok(text) => text,

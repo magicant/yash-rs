@@ -467,6 +467,29 @@ impl VariableSet {
         }
     }
 
+    /// Gets the value of the specified scalar variable.
+    ///
+    /// This is a convenience function that retrieves the value of the specified
+    /// scalar variable. If the variable is unset or an array, this method
+    /// returns `None`.
+    ///
+    /// Note that this function does not apply any [`Quirk`] the variable may
+    /// have. Use [`Variable::expand`] to apply quirks.
+    #[must_use]
+    pub fn get_scalar<N>(&self, name: &N) -> Option<&str>
+    where
+        String: Borrow<N>,
+        N: Hash + Eq + ?Sized,
+    {
+        fn inner(var: &Variable) -> Option<&str> {
+            match var.value.as_ref()? {
+                Scalar(value) => Some(value),
+                Array(_) => None,
+            }
+        }
+        inner(self.get(name)?)
+    }
+
     /// Unsets a variable.
     ///
     /// If successful, the return value is the previous value. If the specified

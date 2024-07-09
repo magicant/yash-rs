@@ -18,8 +18,6 @@
 
 use crate::expansion::attr::AttrChar;
 use crate::expansion::attr::Origin;
-use yash_env::variable::Value;
-use yash_env::variable::Variable;
 use yash_env::variable::HOME;
 use yash_env::Env;
 use yash_env::System;
@@ -41,13 +39,7 @@ where
 /// Performs tilde expansion.
 pub fn expand(name: &str, env: &Env) -> Vec<AttrChar> {
     if name.is_empty() {
-        let result = match env.variables.get(HOME) {
-            Some(Variable {
-                value: Some(Value::Scalar(value)),
-                ..
-            }) => value,
-            _ => "~",
-        };
+        let result = env.variables.get_scalar(HOME).unwrap_or("~");
         into_attr_chars(result.chars())
     } else {
         if let Ok(Some(path)) = env.system.getpwnam_dir(name) {
@@ -64,6 +56,7 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
     use yash_env::variable::Scope;
+    use yash_env::variable::Value;
     use yash_env::VirtualSystem;
 
     #[test]

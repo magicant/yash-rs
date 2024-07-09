@@ -30,8 +30,6 @@ use yash_arith::eval;
 use yash_env::option::Option::Unset;
 use yash_env::option::State::{Off, On};
 use yash_env::variable::Scope::Global;
-use yash_env::variable::Value::Scalar;
-use yash_env::variable::Variable;
 use yash_syntax::source::Code;
 use yash_syntax::source::Location;
 use yash_syntax::source::Source;
@@ -208,17 +206,15 @@ impl<'a> yash_arith::Env for VarEnv<'a> {
     type GetVariableError = UnsetVariable;
     type AssignVariableError = AssignReadOnlyError;
 
-    #[rustfmt::skip]
     fn get_variable(&self, name: &str) -> Result<Option<&str>, UnsetVariable> {
-        if let Some(Variable { value: Some(Scalar(value)), .. }) = self.env.variables.get(name) {
-            Ok(Some(value))
-        } else {
-            match self.env.options.get(Unset) {
+        match self.env.variables.get_scalar(name) {
+            Some(value) => Ok(Some(value)),
+            None => match self.env.options.get(Unset) {
                 // TODO If the variable exists but is not scalar, UnsetVariable
                 // does not seem to be the right error.
                 Off => Err(UnsetVariable),
                 On => Ok(None),
-            }
+            },
         }
     }
 
@@ -305,6 +301,7 @@ mod tests {
     use yash_env::semantics::ExitStatus;
     use yash_env::system::Errno;
     use yash_env::variable::Scope::Global;
+    use yash_env::variable::Value::Scalar;
     use yash_env_test_helper::in_virtual_system;
 
     #[test]
