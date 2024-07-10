@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - External dependency versions:
     - Rust 1.70.0 → 1.77.0
     - annotate-snippets 0.10.0 → 0.11.4
+- `source::Code::source` is now `Rc<Source>` instead of `Source`.
+    - This change is made to avoid cloning the `Source` object when the `Lexer`
+      flushes its buffer and creates a new `Code` object sharing the same
+      `Source`.
+    - The lexer constructor `Lexer::new` now takes  `Rc<Source>` instead of
+      `Source`.
+    - The lexer constructor `Lexer::from_memory` now takes a generic parameter
+      that can be converted to `Rc<Source>`.
 - The second argument of `parser::Parser::new` is now `&dyn alias::Glossary`
   instead of `&alias::AliasSet`.
 

@@ -256,7 +256,7 @@ mod tests {
         let location = list.0[0].async_flag.as_ref().unwrap();
         assert_eq!(*location.code.value.borrow(), "foo & bar ; baz&");
         assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.code.source, Source::Unknown);
+        assert_eq!(*location.code.source, Source::Unknown);
         assert_eq!(location.range, 4..5);
         assert_eq!(list.0[0].and_or.to_string(), "foo");
 
@@ -266,7 +266,7 @@ mod tests {
         let location = list.0[2].async_flag.as_ref().unwrap();
         assert_eq!(*location.code.value.borrow(), "foo & bar ; baz&");
         assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.code.source, Source::Unknown);
+        assert_eq!(*location.code.source, Source::Unknown);
         assert_eq!(location.range, 15..16);
         assert_eq!(list.0[2].and_or.to_string(), "baz");
     }
@@ -338,7 +338,7 @@ mod tests {
         );
         assert_eq!(*e.location.code.value.borrow(), "<<END");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 2..5);
     }
 
@@ -351,7 +351,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::UnopenedSubshell));
         assert_eq!(*e.location.code.value.borrow(), "foo)");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 3..4);
     }
 
@@ -364,7 +364,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingSeparator));
         assert_eq!(*e.location.code.value.borrow(), "foo bar (");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 8..9);
     }
 
@@ -380,7 +380,7 @@ mod tests {
         );
         assert_eq!(*e.location.code.value.borrow(), "foo bar; ;");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 9..10);
     }
 
@@ -441,7 +441,7 @@ mod tests {
         );
         assert_eq!(*e.location.code.value.borrow(), ";");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 0..1);
     }
 
@@ -458,7 +458,7 @@ mod tests {
         );
         assert_eq!(*e.location.code.value.borrow(), "echo; ls\n &");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 10..11);
     }
 }

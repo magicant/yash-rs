@@ -93,7 +93,7 @@ mod tests {
             assert_eq!(name, "@");
             assert_eq!(*location.code.value.borrow(), "$@;");
             assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(*location.code.source, Source::Unknown);
             assert_eq!(location.range, 0..2);
         });
 
@@ -111,7 +111,7 @@ mod tests {
             assert_eq!(name, "1");
             assert_eq!(*location.code.value.borrow(), "$12");
             assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(*location.code.source, Source::Unknown);
             assert_eq!(location.range, 0..2);
         });
 
@@ -129,7 +129,7 @@ mod tests {
             assert_eq!(name, "az_AZ_019");
             assert_eq!(*location.code.value.borrow(), "$az_AZ_019<");
             assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(*location.code.source, Source::Unknown);
             assert_eq!(location.range, 0..10);
         });
 
@@ -147,7 +147,7 @@ mod tests {
             assert_eq!(name, "abc");
             assert_eq!(*location.code.value.borrow(), "$a\\\n\\\nb\\\n\\\nc\\\n>");
             assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(*location.code.source, Source::Unknown);
             assert_eq!(location.range, 0..14);
         });
 

@@ -397,7 +397,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingForName));
         assert_eq!(*e.location.code.value.borrow(), " for ");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 5..5);
     }
 
@@ -411,7 +411,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingForName));
         assert_eq!(*e.location.code.value.borrow(), " for\n");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 4..5);
     }
 
@@ -425,7 +425,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingForName));
         assert_eq!(*e.location.code.value.borrow(), "for; do :; done");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 3..4);
     }
 
@@ -458,10 +458,10 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "&");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.range, 0..1);
-        assert_matches!(&e.location.code.source, Source::Alias { original, alias } => {
+        assert_matches!(&*e.location.code.source, Source::Alias { original, alias } => {
             assert_eq!(*original.code.value.borrow(), "FOR if do :; done");
             assert_eq!(original.code.start_line_number.get(), 1);
-            assert_eq!(original.code.source, Source::Unknown);
+            assert_eq!(*original.code.source, Source::Unknown);
             assert_eq!(original.range, 4..6);
             assert_eq!(alias.name, "if");
         });
@@ -478,12 +478,12 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::MissingForBody { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "for X\n; do :; done");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 0..3);
         });
         assert_eq!(*e.location.code.value.borrow(), "for X\n; do :; done");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 6..7);
     }
 
@@ -516,10 +516,10 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "&");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.range, 0..1);
-        assert_matches!(&e.location.code.source, Source::Alias { original, alias } => {
+        assert_matches!(&*e.location.code.source, Source::Alias { original, alias } => {
             assert_eq!(*original.code.value.borrow(), "for_A_in_a_b if c; do :; done");
             assert_eq!(original.code.start_line_number.get(), 1);
-            assert_eq!(original.code.source, Source::Unknown);
+            assert_eq!(*original.code.source, Source::Unknown);
             assert_eq!(original.range, 13..15);
             assert_eq!(alias.name, "if");
         });
@@ -536,12 +536,12 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::MissingForBody { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), " for X; ! do :; done");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 1..4);
         });
         assert_eq!(*e.location.code.value.borrow(), " for X; ! do :; done");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 8..9);
     }
 }

@@ -233,12 +233,12 @@ mod tests {
              ErrorCause::Syntax(SyntaxError::UnclosedArrayValue { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "(a b");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 0..1);
         });
         assert_eq!(*e.location.code.value.borrow(), "(a b");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 4..4);
     }
 
@@ -251,12 +251,12 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::UnclosedArrayValue { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "(a;b)");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 0..1);
         });
         assert_eq!(*e.location.code.value.borrow(), "(a;b)");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 2..3);
     }
 
@@ -292,7 +292,7 @@ mod tests {
         assert_eq!(sc.assigns[0].value.to_string(), "assignment");
         assert_eq!(*sc.assigns[0].location.code.value.borrow(), "my=assignment");
         assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
-        assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
+        assert_eq!(*sc.assigns[0].location.code.source, Source::Unknown);
         assert_eq!(sc.assigns[0].location.range, 0..13);
     }
 
@@ -310,19 +310,19 @@ mod tests {
         assert_eq!(sc.assigns[0].value.to_string(), "");
         assert_eq!(*sc.assigns[0].location.code.value.borrow(), "a= b=! c=X");
         assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
-        assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
+        assert_eq!(*sc.assigns[0].location.code.source, Source::Unknown);
         assert_eq!(sc.assigns[0].location.range, 0..2);
         assert_eq!(sc.assigns[1].name, "b");
         assert_eq!(sc.assigns[1].value.to_string(), "!");
         assert_eq!(*sc.assigns[1].location.code.value.borrow(), "a= b=! c=X");
         assert_eq!(sc.assigns[1].location.code.start_line_number.get(), 1);
-        assert_eq!(sc.assigns[1].location.code.source, Source::Unknown);
+        assert_eq!(*sc.assigns[1].location.code.source, Source::Unknown);
         assert_eq!(sc.assigns[1].location.range, 3..6);
         assert_eq!(sc.assigns[2].name, "c");
         assert_eq!(sc.assigns[2].value.to_string(), "X");
         assert_eq!(*sc.assigns[2].location.code.value.borrow(), "a= b=! c=X");
         assert_eq!(sc.assigns[2].location.code.start_line_number.get(), 1);
-        assert_eq!(sc.assigns[2].location.code.source, Source::Unknown);
+        assert_eq!(*sc.assigns[2].location.code.source, Source::Unknown);
         assert_eq!(sc.assigns[2].location.range, 7..10);
     }
 
@@ -509,7 +509,7 @@ mod tests {
         assert_eq!(sc.assigns[0].value.to_string(), "");
         assert_eq!(*sc.assigns[0].location.code.value.borrow(), "a= ()");
         assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
-        assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
+        assert_eq!(*sc.assigns[0].location.code.source, Source::Unknown);
         assert_eq!(sc.assigns[0].location.range, 0..2);
 
         let next = parser.peek_token().now_or_never().unwrap().unwrap();
@@ -530,7 +530,7 @@ mod tests {
         assert_eq!(sc.assigns[0].value.to_string(), "b");
         assert_eq!(*sc.assigns[0].location.code.value.borrow(), "a=b()");
         assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
-        assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
+        assert_eq!(*sc.assigns[0].location.code.source, Source::Unknown);
         assert_eq!(sc.assigns[0].location.range, 0..3);
 
         let next = parser.peek_token().now_or_never().unwrap().unwrap();

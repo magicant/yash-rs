@@ -115,7 +115,7 @@ impl<'a, 'b> ReadEvalLoop<'a, 'b> {
     /// let verbose = Rc::new(Cell::new(State::Off));
     /// input.set_echo(Some(Rc::clone(&verbose)));
     /// let line = NonZeroU64::new(1).unwrap();
-    /// let mut lexer = Lexer::new(input, line, Source::Stdin);
+    /// let mut lexer = Lexer::new(input, line, Rc::new(Source::Stdin));
     /// let mut rel = ReadEvalLoop::new(&mut env, &mut lexer);
     /// rel.set_verbose(Some(Rc::clone(&verbose)));
     /// let _ = rel.run().await;
@@ -273,7 +273,7 @@ mod tests {
         #[allow(deprecated)]
         input.set_echo(Some(Rc::clone(&verbose)));
         let line = NonZeroU64::new(1).unwrap();
-        let mut lexer = Lexer::new(input, line, Source::Stdin);
+        let mut lexer = Lexer::new(input, line, Rc::new(Source::Stdin));
         #[allow(deprecated)]
         let mut rel = ReadEvalLoop::new(&mut env, &mut lexer);
         #[allow(deprecated)]

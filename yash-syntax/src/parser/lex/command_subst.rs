@@ -74,7 +74,7 @@ mod tests {
         assert_matches!(text_unit, TextUnit::CommandSubst { location, content } => {
             assert_eq!(*location.code.value.borrow(), "$( foo bar )baz");
             assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(*location.code.source, Source::Unknown);
             assert_eq!(location.range, 0..12);
             assert_eq!(&*content, " foo bar ");
         });
@@ -82,7 +82,7 @@ mod tests {
         let next = lexer.location().now_or_never().unwrap().unwrap();
         assert_eq!(*next.code.value.borrow(), "$( foo bar )baz");
         assert_eq!(next.code.start_line_number.get(), 1);
-        assert_eq!(next.code.source, Source::Unknown);
+        assert_eq!(*next.code.source, Source::Unknown);
         assert_eq!(next.range, 12..13);
     }
 
@@ -99,7 +99,7 @@ mod tests {
         let next = lexer.location().now_or_never().unwrap().unwrap();
         assert_eq!(*next.code.value.borrow(), "$ foo bar )baz");
         assert_eq!(next.code.start_line_number.get(), 1);
-        assert_eq!(next.code.source, Source::Unknown);
+        assert_eq!(*next.code.source, Source::Unknown);
         assert_eq!(next.range, 1..2);
     }
 
@@ -115,12 +115,12 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::UnclosedCommandSubstitution { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "$( foo bar baz");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 1..2);
         });
         assert_eq!(*e.location.code.value.borrow(), "$( foo bar baz");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 14..14);
     }
 }

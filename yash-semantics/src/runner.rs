@@ -79,6 +79,7 @@ use yash_syntax::parser::Parser;
 /// # use std::cell::RefCell;
 /// # use std::num::NonZeroU64;
 /// # use std::ops::ControlFlow::Continue;
+/// # use std::rc::Rc;
 /// # use yash_env::Env;
 /// # use yash_env::input::Echo;
 /// # use yash_semantics::ExitStatus;
@@ -89,7 +90,7 @@ use yash_syntax::parser::Parser;
 /// let mut env = Env::new_virtual();
 /// let mut ref_env = RefCell::new(&mut env);
 /// let input = Box::new(Echo::new(Memory::new("case foo in (bar) ;; esac"), &ref_env));
-/// let mut lexer = Lexer::new(input, NonZeroU64::new(1).unwrap(), Source::CommandString);
+/// let mut lexer = Lexer::new(input, NonZeroU64::MIN, Rc::new(Source::CommandString));
 /// let result = read_eval_loop(&ref_env, &mut lexer).await;
 /// drop(lexer);
 /// assert_eq!(result, Continue(()));
@@ -232,7 +233,7 @@ mod tests {
         let ref_env = RefCell::new(&mut env);
         let input = Box::new(Echo::new(Memory::new("case _ in esac"), &ref_env));
         let line = NonZeroU64::new(1).unwrap();
-        let mut lexer = Lexer::new(input, line, Source::CommandString);
+        let mut lexer = Lexer::new(input, line, Rc::new(Source::CommandString));
 
         let result = read_eval_loop(&ref_env, &mut lexer).now_or_never().unwrap();
         drop(lexer);

@@ -246,7 +246,7 @@ pub fn expand<'a>(var: &'a Variable, mut location: &Location) -> Expansion<'a> {
         None => var.value.as_ref().into(),
 
         Some(Quirk::LineNumber) => {
-            while let Source::Alias { original, .. } = &location.code.source {
+            while let Source::Alias { original, .. } = &*location.code.source {
                 location = original;
             }
             let line_number = location.code.line_number(location.range.start);
@@ -275,7 +275,7 @@ mod tests {
         Code {
             value: "foo\nbar\nbaz\n".to_string().into(),
             start_line_number: NonZeroU64::new(42).unwrap(),
-            source: Source::Unknown,
+            source: Source::Unknown.into(),
         }
         .into()
     }
@@ -319,7 +319,7 @@ mod tests {
             let code = Code {
                 value: " \n \n ".to_string().into(),
                 start_line_number: NonZeroU64::new(15).unwrap(),
-                source: Source::Alias { original, alias },
+                source: Source::Alias { original, alias }.into(),
             }
             .into();
             let range = 0..1;

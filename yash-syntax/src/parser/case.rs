@@ -308,7 +308,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingPattern));
         assert_eq!(*e.location.code.value.borrow(), ")");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 0..1);
     }
 
@@ -321,7 +321,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EsacAsPattern));
         assert_eq!(*e.location.code.value.borrow(), "(esac)");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 1..5);
     }
 
@@ -334,7 +334,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidPattern));
         assert_eq!(*e.location.code.value.borrow(), "(&");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 1..2);
     }
 
@@ -347,7 +347,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingPattern));
         assert_eq!(*e.location.code.value.borrow(), "(foo| |");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 6..7);
     }
 
@@ -363,7 +363,7 @@ mod tests {
         );
         assert_eq!(*e.location.code.value.borrow(), "(foo bar");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 5..8);
     }
 
@@ -553,7 +553,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingCaseSubject));
         assert_eq!(*e.location.code.value.borrow(), " case  ");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 7..7);
     }
 
@@ -567,7 +567,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidCaseSubject));
         assert_eq!(*e.location.code.value.borrow(), " case ; ");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 6..7);
     }
 
@@ -582,12 +582,12 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::MissingIn { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), " case x esac");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 1..5);
         });
         assert_eq!(*e.location.code.value.borrow(), " case x esac");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 8..12);
     }
 
@@ -602,12 +602,12 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::UnclosedCase { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "case x in a) }");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 0..4);
         });
         assert_eq!(*e.location.code.value.borrow(), "case x in a) }");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 13..14);
     }
 }

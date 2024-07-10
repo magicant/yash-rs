@@ -166,7 +166,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::DoubleNegation));
         assert_eq!(*e.location.code.value.borrow(), " !  !");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 4..5);
     }
 
@@ -182,7 +182,7 @@ mod tests {
         );
         assert_eq!(*e.location.code.value.borrow(), "!\n");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 1..2);
     }
 
@@ -198,7 +198,7 @@ mod tests {
         );
         assert_eq!(*e.location.code.value.borrow(), "foo | ;");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 6..7);
     }
 
@@ -211,7 +211,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::BangAfterBar));
         assert_eq!(*e.location.code.value.borrow(), "foo | !");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 6..7);
     }
 

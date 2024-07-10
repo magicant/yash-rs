@@ -229,7 +229,8 @@ impl<'a> yash_arith::Env for VarEnv<'a> {
             start_line_number: 1.try_into().unwrap(),
             source: Source::Arith {
                 original: self.expansion_location.clone(),
-            },
+            }
+            .into(),
         });
         self.env
             .get_or_create_variable(name, Global)
@@ -278,7 +279,8 @@ pub async fn expand(text: &Text, location: &Location, env: &mut Env<'_>) -> Resu
                 start_line_number: 1.try_into().unwrap(),
                 source: Source::Arith {
                     original: location.clone(),
-                },
+                }
+                .into(),
             });
             let cause = convert_error_cause(error.cause, &code);
             Err(Error {
@@ -428,7 +430,7 @@ mod tests {
         let location2 = v.last_assigned_location.as_ref().unwrap();
         assert_eq!(*location2.code.value.borrow(), "3 + (x = 4 * 6)");
         assert_eq!(location2.code.start_line_number.get(), 1);
-        assert_eq!(location2.code.source, Source::Arith { original: location });
+        assert_eq!(*location2.code.source, Source::Arith { original: location });
         assert_eq!(location2.range, 5..6);
         assert!(!v.is_exported);
         assert_eq!(v.read_only_location, None);
@@ -447,7 +449,10 @@ mod tests {
             ErrorCause::ArithError(ArithError::InvalidNumericConstant)
         );
         assert_eq!(*e.location.code.value.borrow(), "09");
-        assert_eq!(e.location.code.source, Source::Arith { original: location });
+        assert_eq!(
+            *e.location.code.source,
+            Source::Arith { original: location }
+        );
         assert_eq!(e.location.range, 0..2);
     }
 }

@@ -642,12 +642,12 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::UnclosedParen { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "x(()");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 1..2);
         });
         assert_eq!(*e.location.code.value.borrow(), "x(()");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 4..4);
     }
 }

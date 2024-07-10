@@ -351,12 +351,12 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::UnclosedSingleQuote { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "'abc\ndef\\");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 0..1);
         });
         assert_eq!(*e.location.code.value.borrow(), "'abc\ndef\\");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 9..9);
     }
 
@@ -475,12 +475,12 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::UnclosedDoubleQuote { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "\"abc\ndef");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 0..1);
         });
         assert_eq!(*e.location.code.value.borrow(), "\"abc\ndef");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 8..8);
     }
 
@@ -499,7 +499,7 @@ mod tests {
             assert_eq!(&**content, ":");
             assert_eq!(*location.code.value.borrow(), r"0$(:)X\#");
             assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(*location.code.source, Source::Unknown);
             assert_eq!(location.range, 1..5);
         });
         assert_eq!(word.units[2], WordUnit::Unquoted(TextUnit::Literal('X')));
@@ -509,7 +509,7 @@ mod tests {
         );
         assert_eq!(*word.location.code.value.borrow(), r"0$(:)X\#");
         assert_eq!(word.location.code.start_line_number.get(), 1);
-        assert_eq!(word.location.code.source, Source::Unknown);
+        assert_eq!(*word.location.code.source, Source::Unknown);
         assert_eq!(word.location.range, 0..8);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
@@ -530,7 +530,7 @@ mod tests {
         assert_eq!(word.units, []);
         assert_eq!(*word.location.code.value.borrow(), "");
         assert_eq!(word.location.code.start_line_number.get(), 1);
-        assert_eq!(word.location.code.source, Source::Unknown);
+        assert_eq!(*word.location.code.source, Source::Unknown);
         assert_eq!(word.location.range, 0..0);
     }
 

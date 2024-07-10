@@ -188,7 +188,7 @@ mod tests {
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${@};");
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 0..4);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some(';')));
@@ -213,7 +213,7 @@ mod tests {
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "X${foo_123}<");
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 1..11);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
@@ -236,7 +236,7 @@ mod tests {
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${123}<");
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 0..6);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
@@ -259,7 +259,7 @@ mod tests {
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${#}<");
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 0..4);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
@@ -279,7 +279,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyParam));
         assert_eq!(*e.location.code.value.borrow(), "${};");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 2..3);
     }
 
@@ -297,7 +297,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyParam));
         assert_eq!(*e.location.code.value.borrow(), "${;");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 2..3);
     }
 
@@ -316,12 +316,12 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::UnclosedParam { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "${_;");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 0..2);
         });
         assert_eq!(*e.location.code.value.borrow(), "${_;");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 3..4);
     }
 
@@ -342,7 +342,7 @@ mod tests {
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${#foo_123}<");
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 0..11);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
@@ -365,7 +365,7 @@ mod tests {
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${##}<");
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 0..5);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
@@ -388,7 +388,7 @@ mod tests {
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${#?}<");
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 0..5);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
@@ -411,7 +411,7 @@ mod tests {
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${#-}<");
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 0..5);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
@@ -438,7 +438,7 @@ mod tests {
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${x+})");
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 0..5);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some(')')));
@@ -465,7 +465,7 @@ mod tests {
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${foo:?'!'})");
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 0..11);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some(')')));
@@ -492,7 +492,7 @@ mod tests {
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${#+?}<");
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 0..6);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
@@ -519,7 +519,7 @@ mod tests {
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${#--}<");
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 0..6);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
@@ -546,7 +546,7 @@ mod tests {
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${#=?}<");
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 0..6);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
@@ -573,7 +573,7 @@ mod tests {
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${#??}<");
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 0..6);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
@@ -600,7 +600,7 @@ mod tests {
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${#:-}<");
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 0..6);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
@@ -627,7 +627,7 @@ mod tests {
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${###};");
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 0..6);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some(';')));
@@ -654,7 +654,7 @@ mod tests {
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${#%};");
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 0..5);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some(';')));
@@ -696,7 +696,7 @@ mod tests {
             "${\\\n#\\\n\\\na_\\\n1\\\n\\\n}z"
         );
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 0..19);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('z')));
@@ -719,7 +719,7 @@ mod tests {
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${#\\\n\\\n}z");
         assert_eq!(param.location.code.start_line_number.get(), 1);
-        assert_eq!(param.location.code.source, Source::Unknown);
+        assert_eq!(*param.location.code.source, Source::Unknown);
         assert_eq!(param.location.range, 0..8);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('z')));

@@ -468,7 +468,7 @@ mod tests {
         let code = Rc::new(Code {
             value: "".to_string().into(),
             start_line_number: NonZeroU64::new(1).unwrap(),
-            source: Source::Unknown,
+            source: Source::Unknown.into(),
         });
         let location = Location { code, range: 0..42 };
         let error = Error {
@@ -486,7 +486,7 @@ mod tests {
         let code = Rc::new(Code {
             value: "".to_string().into(),
             start_line_number: NonZeroU64::new(1).unwrap(),
-            source: Source::Unknown,
+            source: Source::Unknown.into(),
         });
         let location = Location { code, range: 0..42 };
         let error = Error {

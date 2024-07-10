@@ -126,7 +126,7 @@ mod tests {
             assert_eq!(name, "0");
             assert_eq!(*location.code.value.borrow(), "$0");
             assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(*location.code.source, Source::Unknown);
             assert_eq!(location.range, 0..2);
         });
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
@@ -144,7 +144,7 @@ mod tests {
         assert_matches!(text_unit, TextUnit::CommandSubst { location, content } => {
             assert_eq!(*location.code.value.borrow(), "$()");
             assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(*location.code.source, Source::Unknown);
             assert_eq!(location.range, 0..3);
             assert_eq!(&*content, "");
         });
@@ -160,7 +160,7 @@ mod tests {
         assert_matches!(text_unit, TextUnit::CommandSubst { location, content } => {
             assert_eq!(*location.code.value.borrow(), "$( foo bar )");
             assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(*location.code.source, Source::Unknown);
             assert_eq!(location.range, 0..12);
             assert_eq!(&*content, " foo bar ");
         });
@@ -180,7 +180,7 @@ mod tests {
             assert_eq!(content, Text(vec![Literal('1')]));
             assert_eq!(*location.code.value.borrow(), "$((1))");
             assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(*location.code.source, Source::Unknown);
             assert_eq!(location.range, 0..6);
         });
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));

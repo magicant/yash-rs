@@ -257,12 +257,12 @@ mod tests {
         assert_matches!(e.cause, ErrorCause::Syntax(SyntaxError::IfMissingThen { if_location }) => {
             assert_eq!(*if_location.code.value.borrow(), " if :; fi");
             assert_eq!(if_location.code.start_line_number.get(), 1);
-            assert_eq!(if_location.code.source, Source::Unknown);
+            assert_eq!(*if_location.code.source, Source::Unknown);
             assert_eq!(if_location.range, 1..3);
         });
         assert_eq!(*e.location.code.value.borrow(), " if :; fi");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 7..9);
     }
 
@@ -277,12 +277,12 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::ElifMissingThen { elif_location }) => {
             assert_eq!(*elif_location.code.value.borrow(), "if a; then b; elif c; fi");
             assert_eq!(elif_location.code.start_line_number.get(), 1);
-            assert_eq!(elif_location.code.source, Source::Unknown);
+            assert_eq!(*elif_location.code.source, Source::Unknown);
             assert_eq!(elif_location.range, 14..18);
         });
         assert_eq!(*e.location.code.value.borrow(), "if a; then b; elif c; fi");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 22..24);
     }
 
@@ -297,12 +297,12 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::UnclosedIf { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "  if :; then :; }");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 2..4);
         });
         assert_eq!(*e.location.code.value.borrow(), "  if :; then :; }");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 16..17);
     }
 
@@ -316,7 +316,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyIfCondition));
         assert_eq!(*e.location.code.value.borrow(), "   if then :; fi");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 6..10);
     }
 
@@ -330,7 +330,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyIfBody));
         assert_eq!(*e.location.code.value.borrow(), "if :; then fi");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 11..13);
     }
 
@@ -347,7 +347,7 @@ mod tests {
             "if :; then :; elif then :; fi"
         );
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 19..23);
     }
 
@@ -364,7 +364,7 @@ mod tests {
             "if :; then :; elif :; then fi"
         );
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 27..29);
     }
 
@@ -378,7 +378,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyElse));
         assert_eq!(*e.location.code.value.borrow(), "if :; then :; else fi");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 19..21);
     }
 }

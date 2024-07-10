@@ -119,7 +119,7 @@ async fn parse_and_print(mut env: Env) -> i32 {
         }
     };
     let line = NonZeroU64::new(1).unwrap();
-    let mut lexer = Lexer::new(input.input, line, input.source);
+    let mut lexer = Lexer::new(input.input, line, input.source.into());
 
     // Run the read-eval loop
     let result = read_eval_loop(ref_env, &mut lexer).await;

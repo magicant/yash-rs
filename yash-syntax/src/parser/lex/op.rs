@@ -410,6 +410,7 @@ mod tests {
     use crate::syntax::WordUnit;
     use futures_util::FutureExt;
     use std::num::NonZeroU64;
+    use std::rc::Rc;
 
     fn ensure_sorted(trie: &Trie) {
         assert!(
@@ -438,7 +439,7 @@ mod tests {
         assert_eq!(t.word.units[2], WordUnit::Unquoted(TextUnit::Literal('-')));
         assert_eq!(*t.word.location.code.value.borrow(), "<<-");
         assert_eq!(t.word.location.code.start_line_number.get(), 1);
-        assert_eq!(t.word.location.code.source, Source::Unknown);
+        assert_eq!(*t.word.location.code.source, Source::Unknown);
         assert_eq!(t.word.location.range, 0..3);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLessDash));
 
@@ -455,7 +456,7 @@ mod tests {
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(*t.word.location.code.value.borrow(), "<<>");
         assert_eq!(t.word.location.code.start_line_number.get(), 1);
-        assert_eq!(t.word.location.code.source, Source::Unknown);
+        assert_eq!(*t.word.location.code.source, Source::Unknown);
         assert_eq!(t.word.location.range, 0..2);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
 
@@ -475,7 +476,7 @@ mod tests {
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(*t.word.location.code.value.borrow(), "<<");
         assert_eq!(t.word.location.code.start_line_number.get(), 1);
-        assert_eq!(t.word.location.code.source, Source::Unknown);
+        assert_eq!(*t.word.location.code.source, Source::Unknown);
         assert_eq!(t.word.location.range, 0..2);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
 
@@ -492,7 +493,7 @@ mod tests {
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(*t.word.location.code.value.borrow(), "\\\n\\\n<\\\n<\\\n>");
         assert_eq!(t.word.location.code.start_line_number.get(), 1);
-        assert_eq!(t.word.location.code.source, Source::Unknown);
+        assert_eq!(*t.word.location.code.source, Source::Unknown);
         assert_eq!(t.word.location.range, 0..10);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
 
@@ -525,14 +526,14 @@ mod tests {
         let mut lexer = Lexer::new(
             Box::new(OneLineInput(Some("\n".to_owned()))),
             line_number,
-            Source::Unknown,
+            Rc::new(Source::Unknown),
         );
 
         let t = lexer.operator().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(t.word.units, [WordUnit::Unquoted(TextUnit::Literal('\n'))]);
         assert_eq!(*t.word.location.code.value.borrow(), "\n");
         assert_eq!(t.word.location.code.start_line_number.get(), 1);
-        assert_eq!(t.word.location.code.source, Source::Unknown);
+        assert_eq!(*t.word.location.code.source, Source::Unknown);
         assert_eq!(t.word.location.range, 0..1);
         assert_eq!(t.id, TokenId::Operator(Operator::Newline));
     }

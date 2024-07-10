@@ -153,7 +153,7 @@ mod tests {
         );
         assert_eq!(*e.location.code.value.borrow(), "( ");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 2..2);
     }
 
@@ -175,7 +175,7 @@ mod tests {
         );
         assert_eq!(*e.location.code.value.borrow(), "( ) ");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 4..4);
     }
 
@@ -197,7 +197,7 @@ mod tests {
         );
         assert_eq!(*e.location.code.value.borrow(), "() foo ; ");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 3..6);
     }
 
@@ -313,7 +313,7 @@ mod tests {
         );
         assert_eq!(*e.location.code.value.borrow(), "()b");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 2..3);
     }
 }

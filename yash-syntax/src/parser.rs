@@ -41,7 +41,7 @@
 //! use std::num::NonZeroU64;
 //! use yash_syntax::parser::lex::Lexer;
 //! let line = NonZeroU64::new(1).unwrap();
-//! let mut lexer = Lexer::new(input, line, Source::Unknown);
+//! let mut lexer = Lexer::new(input, line, Source::Unknown.into());
 //!
 //! // Then, create a new parser borrowing the lexer.
 //! use yash_syntax::parser::Parser;

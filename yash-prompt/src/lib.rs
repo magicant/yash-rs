@@ -58,7 +58,7 @@
 //! let reader = FdReader::new(Fd::STDIN, env.system.clone());
 //! let mut ref_env = RefCell::new(&mut env);
 //! let input = Box::new(Prompter::new(reader, &ref_env));
-//! let mut lexer = Lexer::new(input, NonZeroU64::new(1).unwrap(), Source::Stdin);
+//! let mut lexer = Lexer::new(input, NonZeroU64::MIN, Source::Stdin.into());
 //! let result = read_eval_loop(&ref_env, &mut lexer).await;
 //! drop(lexer);
 //! assert_eq!(result, Continue(()));

@@ -147,12 +147,12 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::UnclosedDoClause { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), " do not close ");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 1..3);
         });
         assert_eq!(*e.location.code.value.borrow(), " do not close ");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 14..14);
     }
 
@@ -165,7 +165,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyDoClause));
         assert_eq!(*e.location.code.value.borrow(), "do done");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 3..7);
     }
 

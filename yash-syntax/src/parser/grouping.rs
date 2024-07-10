@@ -139,12 +139,12 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::UnclosedGrouping { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), " { oh no ");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 1..2);
         });
         assert_eq!(*e.location.code.value.borrow(), " { oh no ");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 9..9);
     }
 
@@ -158,7 +158,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyGrouping));
         assert_eq!(*e.location.code.value.borrow(), "{ }");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 2..3);
     }
 
@@ -205,7 +205,7 @@ mod tests {
             assert_eq!(body.to_string(), ":");
             assert_eq!(*location.code.value.borrow(), "(:)");
             assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(*location.code.source, Source::Unknown);
             assert_eq!(location.range, 0..1);
         });
     }
@@ -221,7 +221,7 @@ mod tests {
             assert_eq!(body.to_string(), "foo& bar");
             assert_eq!(*location.code.value.borrow(), "( foo& bar; )");
             assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(*location.code.source, Source::Unknown);
             assert_eq!(location.range, 0..1);
         });
     }
@@ -237,12 +237,12 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::UnclosedSubshell { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), " ( oh no");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 1..2);
         });
         assert_eq!(*e.location.code.value.borrow(), " ( oh no");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 8..8);
     }
 
@@ -256,7 +256,7 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptySubshell));
         assert_eq!(*e.location.code.value.borrow(), "( )");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 2..3);
     }
 }

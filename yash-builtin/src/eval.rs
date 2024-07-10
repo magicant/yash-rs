@@ -62,6 +62,7 @@
 use crate::Result;
 use std::cell::RefCell;
 use std::num::NonZeroU64;
+use std::rc::Rc;
 #[cfg(doc)]
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -81,9 +82,9 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     // Parse and execute the command string
     let input = Box::new(Memory::new(&command.value));
     let start_line_number = NonZeroU64::new(1).unwrap();
-    let source = Source::Eval {
+    let source = Rc::new(Source::Eval {
         original: command.origin,
-    };
+    });
     let mut lexer = Lexer::new(input, start_line_number, source);
     let divert = read_eval_loop(&RefCell::new(env), &mut lexer).await;
     Result::with_exit_status_and_divert(env.exit_status, divert)

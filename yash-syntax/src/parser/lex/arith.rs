@@ -105,7 +105,7 @@ mod tests {
             assert_eq!(content.0, []);
             assert_eq!(*location.code.value.borrow(), "$(());");
             assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(*location.code.source, Source::Unknown);
             assert_eq!(location.range, 0..5);
         });
 
@@ -136,7 +136,7 @@ mod tests {
             assert_eq!(content.0, []);
             assert_eq!(*location.code.value.borrow(), "$(\\\n\\\n(\\\n)\\\n\\\n);");
             assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(*location.code.source, Source::Unknown);
             assert_eq!(location.range, 0..15);
         });
 
@@ -166,7 +166,7 @@ mod tests {
             );
             assert_eq!(*location.code.value.borrow(), r#".$((\\\"\`\$));"#);
             assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(*location.code.source, Source::Unknown);
             assert_eq!(location.range, 1..14);
         });
 
@@ -185,12 +185,12 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::UnclosedArith { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "$((1");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 0..3);
         });
         assert_eq!(*e.location.code.value.borrow(), "$((1");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 4..4);
     }
 
@@ -206,12 +206,12 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::UnclosedArith { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "$((1)");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 0..3);
         });
         assert_eq!(*e.location.code.value.borrow(), "$((1)");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 5..5);
     }
 

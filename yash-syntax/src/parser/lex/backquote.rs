@@ -231,12 +231,12 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::UnclosedBackquote { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "`");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 0..1);
         });
         assert_eq!(*e.location.code.value.borrow(), "`");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 1..1);
     }
 
@@ -251,12 +251,12 @@ mod tests {
         assert_matches!(e.cause, ErrorCause::Syntax(SyntaxError::UnclosedBackquote { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "`foo");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
-            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(*opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.range, 0..1);
         });
         assert_eq!(*e.location.code.value.borrow(), "`foo");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 4..4);
     }
 }

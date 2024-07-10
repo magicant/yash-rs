@@ -323,12 +323,12 @@ END
             ErrorCause::Syntax(SyntaxError::UnclosedHereDocContent { redir_op_location }) => {
             assert_eq!(*redir_op_location.code.value.borrow(), "END");
             assert_eq!(redir_op_location.code.start_line_number.get(), 1);
-            assert_eq!(redir_op_location.code.source, Source::Unknown);
+            assert_eq!(*redir_op_location.code.source, Source::Unknown);
             assert_eq!(redir_op_location.range, 0..3);
         });
         assert_eq!(*e.location.code.value.borrow(), "");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 0..0);
     }
 }

@@ -101,13 +101,13 @@ impl Source {
     /// // `is_alias_for` returns true if the names match
     /// # use yash_syntax::source::*;
     /// let original = Location::dummy("");
-    /// let alias = std::rc::Rc::new(yash_syntax::alias::Alias{
+    /// let alias = std::rc::Rc::new(yash_syntax::alias::Alias {
     ///     name: "foo".to_string(),
     ///     replacement: "".to_string(),
     ///     global: false,
     ///     origin: original.clone()
     /// });
-    /// let source = Source::Alias{original, alias};
+    /// let source = Source::Alias { original, alias };
     /// assert_eq!(source.is_alias_for("foo"), true);
     /// assert_eq!(source.is_alias_for("bar"), false);
     /// ```
@@ -116,22 +116,23 @@ impl Source {
     /// // `is_alias_for` checks aliases recursively.
     /// # use std::rc::Rc;
     /// # use yash_syntax::source::*;
-    /// let mut original = Location::dummy("");
-    /// let alias = Rc::new(yash_syntax::alias::Alias{
+    /// let original = Location::dummy("");
+    /// let alias = Rc::new(yash_syntax::alias::Alias {
     ///     name: "foo".to_string(),
     ///     replacement: "".to_string(),
     ///     global: false,
-    ///     origin: original.clone()
+    ///     origin: original.clone(),
     /// });
-    /// let source = Source::Alias{original: original.clone(), alias};
-    /// let alias = Rc::new(yash_syntax::alias::Alias{
+    /// let source = Source::Alias { original, alias };
+    /// let alias = Rc::new(yash_syntax::alias::Alias {
     ///     name: "bar".to_string(),
     ///     replacement: "".to_string(),
     ///     global: false,
-    ///     origin: original.clone()
+    ///     origin: Location::dummy(""),
     /// });
-    /// Rc::make_mut(&mut original.code).source = source;
-    /// let source = Source::Alias{original, alias};
+    /// let mut original = Location::dummy("");
+    /// Rc::make_mut(&mut original.code).source = Rc::new(source);
+    /// let source = Source::Alias { original, alias };
     /// assert_eq!(source.is_alias_for("foo"), true);
     /// assert_eq!(source.is_alias_for("bar"), true);
     /// assert_eq!(source.is_alias_for("baz"), false);
@@ -168,7 +169,7 @@ impl Source {
 /// produce an AST.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Code {
-    /// Content of the code, usually terminated by a newline.
+    /// Content of the code, usually terminated by a newline
     ///
     /// The value is contained in a `RefCell` so that more lines can be appended
     /// to the value as the parser reads input lines. It is not intended to be
@@ -178,8 +179,8 @@ pub struct Code {
     /// Line number of the first line of the code. Counted from 1.
     pub start_line_number: NonZeroU64,
 
-    /// Source of this code.
-    pub source: Source,
+    /// Origin of this code
+    pub source: Rc<Source>,
 }
 
 impl Code {
@@ -220,7 +221,7 @@ impl Code {
 /// let code = Rc::new(Code {
 ///     value: RefCell::new(s.to_string()),
 ///     start_line_number: NonZeroU64::new(1).unwrap(),
-///     source: Source::Unknown,
+///     source: Rc::new(Source::Unknown),
 /// });
 /// let chars: Vec<_> = source_chars(s, &code, 10).collect();
 /// assert_eq!(chars[0].value, 'a');
@@ -273,7 +274,7 @@ impl Location {
             let code = Rc::new(Code {
                 value: RefCell::new(value),
                 start_line_number: NonZeroU64::new(1).unwrap(),
-                source: Source::Unknown,
+                source: Rc::new(Source::Unknown),
             });
             Location { code, range }
         }
@@ -299,7 +300,7 @@ mod tests {
         let code = Code {
             value: RefCell::new("a\nbc\nd".to_string()),
             start_line_number: NonZeroU64::new(1).unwrap(),
-            source: Source::Unknown,
+            source: Rc::new(Source::Unknown),
         };
         assert_eq!(code.line_number(0).get(), 1);
         assert_eq!(code.line_number(1).get(), 1);
