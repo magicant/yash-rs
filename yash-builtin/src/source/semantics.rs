@@ -26,6 +26,7 @@ use std::ops::ControlFlow;
 use std::os::unix::ffi::OsStringExt as _;
 use std::path::PathBuf;
 use std::rc::Rc;
+use yash_env::input::Echo;
 use yash_env::input::FdReader;
 use yash_env::io::Fd;
 use yash_env::semantics::Divert;
@@ -62,14 +63,16 @@ impl Command {
         // TODO set positional parameters
 
         // Parse and execute the command script
-        let input = Box::new(FdReader::new(fd, env.system.clone()));
+        let system = env.system.clone();
+        let ref_env = RefCell::new(&mut *env);
+        let input = Box::new(Echo::new(FdReader::new(fd, system), &ref_env));
         let start_line_number = NonZeroU64::new(1).unwrap();
         let source = Rc::new(Source::DotScript {
             name: self.file.value,
             origin: self.file.origin,
         });
         let mut lexer = Lexer::new(input, start_line_number, source);
-        let divert = read_eval_loop(&RefCell::new(env), &mut lexer).await;
+        let divert = read_eval_loop(&ref_env, &mut { lexer }).await;
 
         _ = env.system.close(fd);
 

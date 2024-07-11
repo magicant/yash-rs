@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - The read built-in now shows a prompt when reading a continued line.
+- The source built-in now echoes the input when the verbose shell option is set.
 - The break and continue built-ins now return `ExitStatus::ERROR` for syntax
   errors and `ExitStatus::FAILURE` for semantic errors. Previously, they always
   returned `ExitStatus::ERROR` for both types of errors, while the documentation

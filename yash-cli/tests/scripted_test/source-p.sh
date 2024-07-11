@@ -1,4 +1,4 @@
-# dot-p.sh: test of the dot built-in for any POSIX-compliant shell
+# source-p.sh: test of the dot built-in for any POSIX-compliant shell
 
 posix="true"
 
@@ -36,6 +36,13 @@ in
 0
 out
 __OUT__
+
+test_e 'with verbose option' -v
+. ./file3
+__IN__
+. ./file3
+exit 11
+__ERR__
 
 (
 # Ensure $PWD is safe to assign to $PATH
