@@ -136,6 +136,7 @@ use yash_env::option::State;
 use yash_env::option::{Interactive, Monitor};
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
+use yash_env::stack::Frame::Subshell;
 use yash_env::variable::Scope::Global;
 use yash_env::Env;
 
@@ -165,9 +166,12 @@ pub mod syntax;
 // TODO pub mod semantics;
 
 /// Enables or disables stopper handlers depending on the `Interactive` and
-/// `Monitor` option states.
+/// `Monitor` option states. The handlers are disabled in subshells.
 fn update_stopper_handlers(env: &mut Env) {
-    if env.options.get(Interactive) == State::On && env.options.get(Monitor) == State::On {
+    if env.options.get(Interactive) == State::On
+        && env.options.get(Monitor) == State::On
+        && !env.stack.contains(&Subshell)
+    {
         _ = env.traps.enable_stopper_handlers(&mut env.system)
     } else {
         _ = env.traps.disable_stopper_handlers(&mut env.system)
@@ -443,6 +447,25 @@ xtrace           off
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let mut expected_options = OptionSet::default();
         expected_options.set(Monitor, On);
+        assert_eq!(env.options, expected_options);
+        let state = state.borrow();
+        let handling = state.processes[&env.main_pid].signal_handling(SIGTSTP);
+        assert_eq!(handling, SignalHandling::Default);
+    }
+
+    #[test]
+    fn stopper_handlers_not_enabled_in_subshell() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        let mut env = env.push_frame(Subshell);
+        env.options.set(Interactive, On);
+        let args = Field::dummies(["-m"]);
+
+        let result = main(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
+        let mut expected_options = OptionSet::default();
+        expected_options.extend([Interactive, Monitor]);
         assert_eq!(env.options, expected_options);
         let state = state.borrow();
         let handling = state.processes[&env.main_pid].signal_handling(SIGTSTP);

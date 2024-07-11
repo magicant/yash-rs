@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The break and continue built-ins no longer allow exiting a trap.
 - The read built-in now shows a prompt when reading a continued line.
 - The source built-in now echoes the input when the verbose shell option is set.
+- The set built-in no longer sets the `SIGTTIN`, `SIGTTOU`, and `SIGTSTP` signals
+  to be ignored when invoked with the `-m` option in a subshell of an
+  interactive shell.
 
 ## [0.1.0-beta.1] - 2024-06-09
 

@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   errors and `ExitStatus::FAILURE` for semantic errors. Previously, they always
   returned `ExitStatus::ERROR` for both types of errors, while the documentation
   stated that they returned `ExitStatus::FAILURE` for semantic errors.
+- The set built-in no longer enables stopper handlers (see
+  `yash_env::trap::TrapSet`) when invoked with the `-m` option in a subshell of
+  an interactive shell. Previously, it enabled stopper handlers in such cases,
+  which was inconsistent with the job control behavior implemented in the
+  `yash-semantics` crate.
 
 ## [0.2.0] - 2024-06-09
 
