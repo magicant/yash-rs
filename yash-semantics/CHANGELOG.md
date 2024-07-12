@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - External dependency versions:
     - Rust 1.75.0 → 1.77.0
+    - yash-syntax 0.9.0 → 0.10.0
 
 ### Deprecated
 

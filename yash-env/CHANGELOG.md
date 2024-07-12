@@ -5,7 +5,7 @@ All notable changes to `yash-env` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.1] - Unreleased
+## [0.2.1] - 2024-07-12
 
 ### Added
 
@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - External dependency versions:
     - Rust 1.70.0 → 1.77.0
+    - yash-syntax 0.9.0 → 0.10.0
 - Internal dependency versions:
     - annotate-snippets 0.10.0 → 0.11.4
 - All inherent methods of `SharedSystem` now take `&self` instead of `&mut self`:
