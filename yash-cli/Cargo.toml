@@ -1,6 +1,6 @@
 [package]
 name = "yash-cli"
-version = "0.1.0-beta.1"
+version = "0.1.0-beta.2"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2021"
 rust-version = "1.77.0"
@@ -21,10 +21,10 @@ path = "src/main.rs"
 futures-executor = "0.3.28"
 futures-util = { version = "0.3.28", features = ["channel"] }
 thiserror = "1.0.47"
-yash-builtin = { path = "../yash-builtin", version = "0.2.0" }
+yash-builtin = { path = "../yash-builtin", version = "0.3.0" }
 yash-env = { path = "../yash-env", version = "0.2.0" }
 yash-prompt = { path = "../yash-prompt", version = "0.1.0" }
-yash-semantics = { path = "../yash-semantics", version = "0.2.0" }
+yash-semantics = { path = "../yash-semantics", version = "0.3.0" }
 yash-syntax = { path = "../yash-syntax", version = "0.10.0" }
 
 [dev-dependencies]

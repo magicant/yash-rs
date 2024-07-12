@@ -1,6 +1,6 @@
 [package]
 name = "yash-builtin"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2021"
 rust-version = "1.77.0"
@@ -27,7 +27,7 @@ thiserror = "1.0.47"
 yash-env = { path = "../yash-env", version = "0.2.0" }
 yash-prompt = { path = "../yash-prompt", version = "0.1.0", optional = true }
 yash-quote = { path = "../yash-quote", version = "1.1.1" }
-yash-semantics = { path = "../yash-semantics", version = "0.2.0", optional = true }
+yash-semantics = { path = "../yash-semantics", version = "0.3.0", optional = true }
 yash-syntax = { path = "../yash-syntax", version = "0.10.0" }
 
 [dev-dependencies]
@@ -35,4 +35,4 @@ assert_matches = "1.5.0"
 futures-executor = "0.3.28"
 futures-util = { version = "0.3.28", features = ["channel"] }
 yash-env-test-helper = { path = "../yash-env-test-helper", version = "0.1.0" }
-yash-semantics = { path = "../yash-semantics", version = "0.2.0" }
+yash-semantics = { path = "../yash-semantics", version = "0.3.0" }

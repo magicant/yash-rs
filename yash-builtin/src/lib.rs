@@ -34,7 +34,7 @@
 //! [stack](Env::stack) should contain a [built-in frame](Frame::Builtin) so
 //! that `Stack::current_builtin` provides the correct command word.
 //!
-//! # Optional dependency
+//! # Optional dependencies
 //!
 //! The `yash-builtin` crate has an optional dependency on the `yash-semantics`
 //! crate, which is enabled by default. If you disable the `yash-semantics`
@@ -47,6 +47,11 @@
 //! - `source`
 //! - `type`
 //! - `wait`
+//!
+//! The `yash-builtin` crate also has an optional dependency on the
+//! `yash-prompt` crate, which is enabled by default. If you disable the
+//! `yash-prompt` feature, the `read` built-in will not print the prompt.
+//! Note that the `yash-prompt` feature requires the `yash-semantics` feature.
 
 pub mod alias;
 pub mod bg;
