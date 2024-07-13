@@ -133,8 +133,10 @@ impl ArithError {
 }
 
 /// Error expanding an unset variable
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct UnsetVariable;
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct UnsetVariable {
+    name: String,
+}
 
 /// Converts `yash_arith::ErrorCause` into `initial::ErrorCause`.
 ///
@@ -190,7 +192,9 @@ fn convert_error_cause(
             }
             yash_arith::EvalError::ReverseShifting => ErrorCause::ArithError(ReverseShifting),
             yash_arith::EvalError::AssignmentToValue => ErrorCause::ArithError(AssignmentToValue),
-            yash_arith::EvalError::GetVariableError(UnsetVariable) => ErrorCause::UnsetParameter,
+            yash_arith::EvalError::GetVariableError(UnsetVariable { name }) => {
+                ErrorCause::UnsetParameter { name }
+            }
             yash_arith::EvalError::AssignVariableError(e) => ErrorCause::AssignReadOnly(e),
         },
     }
@@ -212,7 +216,9 @@ impl<'a> yash_arith::Env for VarEnv<'a> {
             None => match self.env.options.get(Unset) {
                 // TODO If the variable exists but is not scalar, UnsetVariable
                 // does not seem to be the right error.
-                Off => Err(UnsetVariable),
+                Off => Err(UnsetVariable {
+                    name: name.to_owned(),
+                }),
                 On => Ok(None),
             },
         }
@@ -348,12 +354,17 @@ mod tests {
         let location = Location::dummy("my location");
         let env = VarEnv {
             env: &mut env,
-            expression: "v",
+            expression: "0+v",
             expansion_location: &location,
         };
 
         let result = env.get_variable("v");
-        assert_eq!(result, Err(UnsetVariable));
+        assert_eq!(
+            result,
+            Err(UnsetVariable {
+                name: "v".to_string()
+            })
+        );
     }
 
     #[test]

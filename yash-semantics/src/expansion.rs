@@ -94,6 +94,7 @@ use yash_env::variable::Value;
 use yash_env::variable::IFS;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
+use yash_syntax::source::pretty::Footer;
 use yash_syntax::source::pretty::MessageBase;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::Text;
@@ -130,8 +131,8 @@ pub enum ErrorCause {
     AssignReadOnly(#[from] AssignReadOnlyError),
 
     /// Expansion of an unset parameter with the `nounset` option
-    #[error("unset parameter")]
-    UnsetParameter,
+    #[error("unset parameter {name:?}")]
+    UnsetParameter { name: String },
 
     /// Expansion of an empty value with an error switch
     #[error(transparent)]
@@ -152,7 +153,7 @@ impl ErrorCause {
             CommandSubstError(_) => "error performing the command substitution",
             ArithError(_) => "error evaluating the arithmetic expansion",
             AssignReadOnly(_) => "error assigning to variable",
-            UnsetParameter => "unset parameter",
+            UnsetParameter { .. } => "cannot expand unset parameter",
             VacantExpansion(error) => error.message_or_default(),
             NonassignableParameter(_) => "cannot assign to parameter",
         }
@@ -167,7 +168,7 @@ impl ErrorCause {
             CommandSubstError(e) => e.to_string().into(),
             ArithError(e) => e.to_string().into(),
             AssignReadOnly(e) => e.to_string().into(),
-            UnsetParameter => "unset parameter disallowed by the nounset option".into(),
+            UnsetParameter { name } => format!("parameter {name:?} is not set").into(),
             VacantExpansion(e) => e.vacancy.description().into(),
             NonassignableParameter(e) => e.to_string().into(),
         }
@@ -186,9 +187,24 @@ impl ErrorCause {
                 &e.read_only_location,
                 "the variable was made read-only here",
             )),
-            UnsetParameter => None,
+            UnsetParameter { .. } => None,
             VacantExpansion(_) => None,
             NonassignableParameter(_) => None,
+        }
+    }
+
+    /// Returns a footer message for the error.
+    #[must_use]
+    pub fn footer(&self) -> Option<&'static str> {
+        use ErrorCause::*;
+        match self {
+            CommandSubstError(_)
+            | ArithError(_)
+            | AssignReadOnly(_)
+            | VacantExpansion(_)
+            | NonassignableParameter(_) => None,
+
+            UnsetParameter { .. } => Some("unset parameters are disallowed by the nounset option"),
         }
     }
 }
@@ -219,6 +235,17 @@ impl MessageBase for Error {
                 location,
             )))
         }
+    }
+
+    fn footers(&self) -> Vec<Footer> {
+        self.cause
+            .footer()
+            .into_iter()
+            .map(|label| Footer {
+                r#type: AnnotationType::Info,
+                label: label.into(),
+            })
+            .collect()
     }
 }
 

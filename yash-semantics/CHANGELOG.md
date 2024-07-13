@@ -5,6 +5,24 @@ All notable changes to `yash-semantics` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - Unreleased
+
+### Added
+
+- Error types in the `expansion` module (which are reexported in the `assign`
+  module) have been extended for more informative error messages:
+    - The `ErrorCause::footer` method has been added.
+    - The `Error` struct now has non-default implementation of the
+      `MessageBase::footers` method.
+
+### Changed
+
+- The `expansion::ErrorCause` enum has been extended for more informative error
+  messages:
+    - The variant `UnsetParameter` now has a `name` field of type `String`.
+    - The `message` and `label` methods return more informative messages for
+      these variants.
+
 ## [0.3.0] - 2024-07-13
 
 ### Added
@@ -86,6 +104,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial implementation of the `yash-semantics` crate
 
+[0.4.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.4.0
 [0.3.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.3.0
 [0.2.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.2.0
 [0.1.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.1.0
