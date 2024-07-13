@@ -14,8 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - The `ErrorCause::footer` method has been added.
     - The `Error` struct now has non-default implementation of the
       `MessageBase::footers` method.
-- Likewise, the following error types are also extended:
+- Likewise, the following error items are also extended:
     - `expansion::initial::VacantError` now has a `name: String` field.
+    - `expansion::initial::NonassignableError::NotVariable` now has a `name:
+      String` field.
 
 ### Changed
 

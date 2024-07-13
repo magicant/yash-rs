@@ -123,8 +123,8 @@ impl VacantError {
 #[non_exhaustive]
 pub enum NonassignableError {
     /// The parameter is not a variable.
-    #[error("not an assignable variable")]
-    NotVariable,
+    #[error("parameter {name:?} is not an assignable variable")]
+    NotVariable { name: String },
     // /// The parameter expansion refers to an array but does not index a single
     // /// element.
     // #[error("cannot assign to a non-scalar array range")]
@@ -178,6 +178,7 @@ fn attribute(mut phrase: Phrase) -> Phrase {
 /// Assigns the expansion of `value` to variable `name`.
 async fn assign(
     env: &mut Env<'_>,
+    orig_name: &str,
     name: Option<Name<'_>>,
     value: &Word,
     location: Location,
@@ -186,7 +187,9 @@ async fn assign(
     let name = match name {
         Some(Name::Variable(name)) => name,
         _ => {
-            let cause = ErrorCause::NonassignableParameter(NonassignableError::NotVariable);
+            let name = orig_name.to_owned();
+            let cause =
+                ErrorCause::NonassignableParameter(NonassignableError::NotVariable { name });
             return Err(Error { cause, location });
         }
     };
@@ -265,7 +268,9 @@ pub async fn apply(
         (Alter, Occupied) | (Default, Vacant(_)) => {
             Some(switch.word.expand(env).await.map(attribute))
         }
-        (Assign, Vacant(_)) => Some(assign(env, name, &switch.word, location.clone()).await),
+        (Assign, Vacant(_)) => {
+            Some(assign(env, orig_name, name, &switch.word, location.clone()).await)
+        }
         (Error, Vacant(vacancy)) => Some(Err(vacant_expansion_error(
             env,
             orig_name.to_owned(),
@@ -586,9 +591,11 @@ mod tests {
             .now_or_never()
             .unwrap();
         let error = result.unwrap().unwrap_err();
-        assert_eq!(
+        assert_matches!(
             error.cause,
-            ErrorCause::NonassignableParameter(NonassignableError::NotVariable)
+            ErrorCause::NonassignableParameter(NonassignableError::NotVariable { name }) => {
+                assert_eq!(name, "-");
+            }
         );
         assert_eq!(error.location, location);
     }
