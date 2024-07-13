@@ -169,7 +169,7 @@ impl ErrorCause {
             ArithError(e) => e.to_string().into(),
             AssignReadOnly(e) => e.to_string().into(),
             UnsetParameter { name } => format!("parameter {name:?} is not set").into(),
-            VacantExpansion(e) => e.vacancy.description().into(),
+            VacantExpansion(e) => format!("{}: {}", e.name, e.vacancy).into(),
             NonassignableParameter(e) => e.to_string().into(),
         }
     }

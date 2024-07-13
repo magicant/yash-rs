@@ -14,12 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - The `ErrorCause::footer` method has been added.
     - The `Error` struct now has non-default implementation of the
       `MessageBase::footers` method.
+- Likewise, the following error types are also extended:
+    - `expansion::initial::VacantError` now has a `name: String` field.
 
 ### Changed
 
 - The `expansion::ErrorCause` enum has been extended for more informative error
   messages:
-    - The variant `UnsetParameter` now has a `name` field of type `String`.
+    - The variant `UnsetParameter` now has a `name: String` field.
     - The `message` and `label` methods return more informative messages for
       these variants.
 
