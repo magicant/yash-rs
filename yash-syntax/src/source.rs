@@ -155,7 +155,7 @@ impl Source {
             CommandFile { path } => path,
             Alias { .. } => "<alias>",
             CommandSubst { .. } => "<command_substitution>",
-            Arith { .. } => "<arith>",
+            Arith { .. } => "<arithmetic_expansion>",
             Eval { .. } => "<eval>",
             DotScript { name, .. } => name,
             Trap { condition, .. } => condition,
