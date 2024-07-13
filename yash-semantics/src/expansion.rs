@@ -176,6 +176,7 @@ impl ErrorCause {
 
     /// Returns a location related with the error cause and a message describing
     /// the location.
+    #[deprecated = "use the additional_message method instead"]
     #[must_use]
     pub fn related_location(&self) -> Option<(&Location, &'static str)> {
         // TODO Localize
@@ -190,6 +191,42 @@ impl ErrorCause {
             UnsetParameter { .. } => None,
             VacantExpansion(_) => None,
             NonassignableParameter(_) => None,
+        }
+    }
+
+    /// Returns an additional message for the error.
+    ///
+    /// Some variants of the error cause may have an additional message that
+    /// provides more information about the error. This method returns the
+    /// additional message and its location if available. The message is
+    /// intended to be displayed after the [main message](Self::message).
+    ///
+    /// If this method returns a message without a location, the message
+    /// should be used to annotate the same location as the main message.
+    #[must_use]
+    pub fn additional_message(&self) -> Option<(Cow<str>, Option<&Location>)> {
+        use initial::Vacancy::*;
+        use ErrorCause::*;
+        match self {
+            CommandSubstError(_) => None,
+            ArithError(e) => e
+                .related_location()
+                .map(|(loc, msg)| (msg.into(), Some(loc))),
+            AssignReadOnly(e) => Some((
+                "the variable was made read-only here".into(),
+                Some(&e.read_only_location),
+            )),
+            UnsetParameter { .. } => None,
+            VacantExpansion(_) => None,
+            NonassignableParameter(e) => {
+                let message = match e.vacancy {
+                    Unset => "assignment was attempted because the parameter was not set",
+                    EmptyScalar => "assignment was attempted because the parameter was an empty string",
+                    ValuelessArray => "assignment was attempted because the parameter was an empty array",
+                    EmptyValueArray => "assignment was attempted because the parameter was an array of an empty string",
+                };
+                Some((message.into(), None))
+            }
         }
     }
 
@@ -227,13 +264,13 @@ impl MessageBase for Error {
     }
 
     fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
-        if let Some((location, label)) = self.cause.related_location() {
+        if let Some((label, location)) = self.cause.additional_message() {
             // TODO Use Extend::extend_one
             results.extend(std::iter::once(Annotation::new(
                 AnnotationType::Info,
-                label.into(),
-                location,
-            )))
+                label,
+                location.unwrap_or(&self.location),
+            )));
         }
     }
 

@@ -120,8 +120,18 @@ impl VacantError {
 
 /// Error caused by an assign switch
 #[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
+#[error("{cause}")]
+pub struct NonassignableError {
+    /// Cause of the error
+    pub cause: NonassignableErrorCause,
+    /// State of the parameter value that caused an attempt to assign an
+    /// alternate value that resulted in this error
+    pub vacancy: Vacancy,
+}
+
+#[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum NonassignableError {
+pub enum NonassignableErrorCause {
     /// The parameter is not a variable.
     #[error("parameter {name:?} is not an assignable variable")]
     NotVariable { name: String },
@@ -180,6 +190,7 @@ async fn assign(
     env: &mut Env<'_>,
     orig_name: &str,
     name: Option<Name<'_>>,
+    vacancy: Vacancy,
     value: &Word,
     location: Location,
 ) -> Result<Phrase, Error> {
@@ -188,8 +199,10 @@ async fn assign(
         Some(Name::Variable(name)) => name,
         _ => {
             let name = orig_name.to_owned();
-            let cause =
-                ErrorCause::NonassignableParameter(NonassignableError::NotVariable { name });
+            let cause = ErrorCause::NonassignableParameter(NonassignableError {
+                cause: NonassignableErrorCause::NotVariable { name },
+                vacancy,
+            });
             return Err(Error { cause, location });
         }
     };
@@ -265,12 +278,23 @@ pub async fn apply(
     let cond = ValueCondition::with(switch.condition, Vacancy::of(&*value));
     match (switch.r#type, cond) {
         (Alter, Vacant(_)) | (Default, Occupied) | (Assign, Occupied) | (Error, Occupied) => None,
+
         (Alter, Occupied) | (Default, Vacant(_)) => {
             Some(switch.word.expand(env).await.map(attribute))
         }
-        (Assign, Vacant(_)) => {
-            Some(assign(env, orig_name, name, &switch.word, location.clone()).await)
-        }
+
+        (Assign, Vacant(vacancy)) => Some(
+            assign(
+                env,
+                orig_name,
+                name,
+                vacancy,
+                &switch.word,
+                location.clone(),
+            )
+            .await,
+        ),
+
         (Error, Vacant(vacancy)) => Some(Err(vacant_expansion_error(
             env,
             orig_name.to_owned(),
@@ -584,7 +608,7 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let name = Some(Name::Special('-'));
-        let mut value = None;
+        let mut value = Some(Scalar("".to_string()));
         let location = Location::dummy("somewhere");
 
         let result = apply(&mut env, &switch, "-", name, &mut value, &location)
@@ -593,8 +617,9 @@ mod tests {
         let error = result.unwrap().unwrap_err();
         assert_matches!(
             error.cause,
-            ErrorCause::NonassignableParameter(NonassignableError::NotVariable { name }) => {
-                assert_eq!(name, "-");
+            ErrorCause::NonassignableParameter(error) => {
+                assert_eq!(error.cause, NonassignableErrorCause::NotVariable { name: "-".to_string() });
+                assert_eq!(error.vacancy, Vacancy::EmptyScalar);
             }
         );
         assert_eq!(error.location, location);

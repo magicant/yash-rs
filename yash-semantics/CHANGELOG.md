@@ -11,13 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Error types in the `expansion` module (which are reexported in the `assign`
   module) have been extended for more informative error messages:
-    - The `ErrorCause::footer` method has been added.
+    - The `ErrorCause::additional_message` and `ErrorCause::footer` methods have
+      been added.
     - The `Error` struct now has non-default implementation of the
       `MessageBase::footers` method.
 - Likewise, the following error items are also extended:
     - `expansion::initial::VacantError` now has a `name: String` field.
-    - `expansion::initial::NonassignableError::NotVariable` now has a `name:
-      String` field.
+    - The `expansion::initial::NonassignableErrorCause` enum is a successor to
+      the previous `NonassignableError` enum. The new `NotVariable` variant has
+      a `name: String` field.
 
 ### Changed
 
@@ -26,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - The variant `UnsetParameter` now has a `name: String` field.
     - The `message` and `label` methods return more informative messages for
       these variants.
+- The `expansion::initial::NonassignableError` enum has been replaced with a
+  struct of the same name so that it can have a `Vacancy` field.
+
+### Deprecated
+
+- The `expansion::ErrorCause::related_location` method has been deprecated in
+  favor of the `additional_message` method.
 
 ## [0.3.0] - 2024-07-13
 
