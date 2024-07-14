@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Shell command language syntax.
+//! Shell command language syntax
 //!
 //! This module contains types that represent abstract syntax trees (ASTs) of
 //! the shell language.
@@ -88,7 +88,7 @@ use std::rc::Rc;
 #[cfg(not(unix))]
 type RawFd = i32;
 
-/// Result of [`Unquote::write_unquoted`].
+/// Result of [`Unquote::write_unquoted`]
 ///
 /// If there is some quotes to be removed, the result will be `Ok(true)`. If no
 /// quotes, `Ok(false)`. On error, `Err(Error)`.
@@ -117,7 +117,7 @@ pub trait Unquote {
     }
 }
 
-/// Possibly literal syntax element.
+/// Possibly literal syntax element
 ///
 /// A syntax element is _literal_ if it is not quoted and does not contain any
 /// expansions. Such an element can be expanded to a string independently of the
@@ -168,7 +168,7 @@ impl<T: MaybeLiteral> MaybeLiteral for [T] {
     }
 }
 
-/// Flag that specifies how the value is substituted in a [switch](Switch).
+/// Flag that specifies how the value is substituted in a [switch](Switch)
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SwitchType {
     /// Alter an existing value, if any. (`+`)
@@ -194,7 +194,7 @@ impl fmt::Display for SwitchType {
     }
 }
 
-/// Condition that triggers a [switch](Switch).
+/// Condition that triggers a [switch](Switch)
 ///
 /// In the lexical grammar of the shell language, a switch condition is an
 /// optional colon that precedes a switch type.
@@ -218,7 +218,7 @@ impl fmt::Display for SwitchCondition {
 }
 
 /// Parameter expansion [modifier](Modifier) that conditionally substitutes the
-/// value being expanded.
+/// value being expanded
 ///
 /// Examples of switches include `+foo`, `:-bar` and `:=baz`.
 ///
@@ -226,11 +226,11 @@ impl fmt::Display for SwitchCondition {
 /// [type](SwitchType) (one of `+`, `-`, `=` and `?`) and a [word](Word).
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Switch {
-    /// How the value is substituted.
+    /// How the value is substituted
     pub r#type: SwitchType,
-    /// Condition that determines whether the value is substituted or not.
+    /// Condition that determines whether the value is substituted or not
     pub condition: SwitchCondition,
-    /// Word that substitutes the parameter value.
+    /// Word that substitutes the parameter value
     pub word: Word,
 }
 
@@ -248,12 +248,12 @@ impl Unquote for Switch {
 }
 
 /// Flag that specifies which side of the expanded value is removed in a
-/// [trim](Trim).
+/// [trim](Trim)
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TrimSide {
-    /// Beginning of the value.
+    /// Beginning of the value
     Prefix,
-    /// End of the value.
+    /// End of the value
     Suffix,
 }
 
@@ -268,7 +268,7 @@ impl fmt::Display for TrimSide {
     }
 }
 
-/// Flag that specifies pattern matching strategy in a [trim](Trim).
+/// Flag that specifies pattern matching strategy in a [trim](Trim)
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TrimLength {
     /// Match as small number of characters as possible.
@@ -278,7 +278,7 @@ pub enum TrimLength {
 }
 
 /// Parameter expansion [modifier](Modifier) that removes the beginning or end
-/// of the value being expanded.
+/// of the value being expanded
 ///
 /// Examples of trims include `#foo`, `##bar` and `%%baz*`.
 ///
@@ -315,21 +315,21 @@ impl Unquote for Trim {
     }
 }
 
-/// Attribute that modifies a parameter expansion.
+/// Attribute that modifies a parameter expansion
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Modifier {
-    /// No modifier.
+    /// No modifier
     None,
-    /// `#` prefix. (`${#foo}`)
+    /// `#` prefix (`${#foo}`)
     Length,
-    /// `+`, `-`, `=` or `?` suffix, optionally with `:`. (`${foo:-bar}`)
+    /// `+`, `-`, `=` or `?` suffix, optionally with `:` (`${foo:-bar}`)
     Switch(Switch),
-    /// `#`, `##`, `%` or `%%` suffix.
+    /// `#`, `##`, `%` or `%%` suffix
     Trim(Trim),
     // TODO Subst
 }
 
-/// Parameter expansion enclosed in braces.
+/// Parameter expansion enclosed in braces
 ///
 /// This struct is used only for parameter expansions that are enclosed braces.
 /// Expansions that are not enclosed in braces are directly encoded with
@@ -337,12 +337,12 @@ pub enum Modifier {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Param {
     // TODO recursive expansion
-    /// Parameter name.
+    /// Parameter name
     pub name: String,
     // TODO index
-    /// Modifier.
+    /// Modifier
     pub modifier: Modifier,
-    /// Position of this parameter expansion in the source code.
+    /// Position of this parameter expansion in the source code
     pub location: Location,
 }
 
@@ -386,12 +386,12 @@ impl Unquote for Param {
     }
 }
 
-/// Element of [`TextUnit::Backquote`].
+/// Element of [`TextUnit::Backquote`]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BackquoteUnit {
-    /// Literal single character.
+    /// Literal single character
     Literal(char),
-    /// Backslash-escaped single character.
+    /// Backslash-escaped single character
     Backslashed(char),
 }
 
@@ -419,47 +419,47 @@ impl Unquote for BackquoteUnit {
     }
 }
 
-/// Element of a [Text], i.e., something that can be expanded.
+/// Element of a [Text], i.e., something that can be expanded
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TextUnit {
-    /// Literal single character.
+    /// Literal single character
     Literal(char),
-    /// Backslash-escaped single character.
+    /// Backslash-escaped single character
     Backslashed(char),
-    /// Parameter expansion that is not enclosed in braces.
+    /// Parameter expansion that is not enclosed in braces
     RawParam {
-        /// Parameter name.
+        /// Parameter name
         name: String,
-        /// Position of this parameter expansion in the source code.
+        /// Position of this parameter expansion in the source code
         location: Location,
     },
-    /// Parameter expansion that is enclosed in braces.
+    /// Parameter expansion that is enclosed in braces
     BracedParam(Param),
-    /// Command substitution of the form `$(...)`.
+    /// Command substitution of the form `$(...)`
     CommandSubst {
         /// Command string that will be parsed and executed when the command
-        /// substitution is expanded.
+        /// substitution is expanded
         ///
         /// This value is reference-counted so that the shell does not have to
         /// clone the entire string when it is passed to a subshell to execute
         /// the command substitution.
         content: Rc<str>,
-        /// Position of this command substitution in the source code.
+        /// Position of this command substitution in the source code
         location: Location,
     },
-    /// Command substitution of the form `` `...` ``.
+    /// Command substitution of the form `` `...` ``
     Backquote {
         /// Command string that will be parsed and executed when the command
-        /// substitution is expanded.
+        /// substitution is expanded
         content: Vec<BackquoteUnit>,
-        /// Position of this command substitution in the source code.
+        /// Position of this command substitution in the source code
         location: Location,
     },
-    /// Arithmetic expansion.
+    /// Arithmetic expansion
     Arith {
-        /// Expression that is to be evaluated.
+        /// Expression that is to be evaluated
         content: Text,
-        /// Position of this arithmetic expansion in the source code.
+        /// Position of this arithmetic expansion in the source code
         location: Location,
     },
 }
@@ -536,7 +536,7 @@ impl MaybeLiteral for TextUnit {
     }
 }
 
-/// String that may contain some expansions.
+/// String that may contain some expansions
 ///
 /// A text is a sequence of [text unit](TextUnit)s, which may contain some kinds
 /// of expansions.
@@ -568,16 +568,16 @@ impl MaybeLiteral for Text {
     }
 }
 
-/// Element of a [Word], i.e., text with quotes and tilde expansion.
+/// Element of a [Word], i.e., text with quotes and tilde expansion
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum WordUnit {
-    /// Unquoted [`TextUnit`] as a word unit.
+    /// Unquoted [`TextUnit`] as a word unit
     Unquoted(TextUnit),
-    /// String surrounded with a pair of single quotations.
+    /// String surrounded with a pair of single quotations
     SingleQuote(String),
-    /// Text surrounded with a pair of double quotations.
+    /// Text surrounded with a pair of double quotations
     DoubleQuote(Text),
-    /// Tilde expansion.
+    /// Tilde expansion
     ///
     /// The `String` value does not contain the initial tilde.
     Tilde(String),
@@ -625,7 +625,7 @@ impl MaybeLiteral for WordUnit {
     }
 }
 
-/// Token that may involve expansions and quotes.
+/// Token that may involve expansions and quotes
 ///
 /// A word is a sequence of [word unit](WordUnit)s. It depends on context whether
 /// an empty word is valid or not. It is your responsibility to ensure a word is
@@ -635,9 +635,9 @@ impl MaybeLiteral for WordUnit {
 /// single- and double-quotes and tilde expansions. Compare [`WordUnit`] and [`TextUnit`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Word {
-    /// Word units that constitute the word.
+    /// Word units that constitute the word
     pub units: Vec<WordUnit>,
-    /// Position of the word in the source code.
+    /// Position of the word in the source code
     pub location: Location,
 }
 
@@ -659,17 +659,17 @@ impl MaybeLiteral for Word {
     }
 }
 
-/// Value of an [assignment](Assign).
+/// Value of an [assignment](Assign)
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Value {
-    /// Scalar value, a possibly empty word.
+    /// Scalar value, a possibly empty word
     ///
     /// Note: Because a scalar assignment value is created from a normal command
     /// word, the location of the word in the scalar value refers to the entire
     /// assignment word rather than the assigned value.
     Scalar(Word),
 
-    /// Array, possibly empty list of non-empty words.
+    /// Array, possibly empty list of non-empty words
     ///
     /// Array assignment is a POSIXly non-portable extension.
     Array(Vec<Word>),
@@ -686,16 +686,16 @@ impl fmt::Display for Value {
     }
 }
 
-/// Assignment word.
+/// Assignment word
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Assign {
-    /// Name of the variable to assign to.
+    /// Name of the variable to assign to
     ///
     /// In the valid assignment syntax, the name must not be empty.
     pub name: String,
-    /// Value assigned to the variable.
+    /// Value assigned to the variable
     pub value: Value,
-    /// Location of the assignment word.
+    /// Location of the assignment word
     pub location: Location,
 }
 
@@ -705,7 +705,7 @@ impl fmt::Display for Assign {
     }
 }
 
-/// Fallible conversion from a word into an assignment.
+/// Fallible conversion from a word into an assignment
 impl TryFrom<Word> for Assign {
     type Error = Word;
     /// Converts a word into an assignment.
@@ -736,7 +736,7 @@ impl TryFrom<Word> for Assign {
     }
 }
 
-/// File descriptor.
+/// File descriptor
 ///
 /// This is the `newtype` pattern applied to [`RawFd`], which is merely a type
 /// alias.
@@ -744,11 +744,11 @@ impl TryFrom<Word> for Assign {
 pub struct Fd(pub RawFd);
 
 impl Fd {
-    /// File descriptor for the standard input.
+    /// File descriptor for the standard input
     pub const STDIN: Fd = Fd(0);
-    /// File descriptor for the standard output.
+    /// File descriptor for the standard output
     pub const STDOUT: Fd = Fd(1);
-    /// File descriptor for the standard error.
+    /// File descriptor for the standard error
     pub const STDERR: Fd = Fd(2);
 }
 
@@ -764,7 +764,7 @@ impl fmt::Display for Fd {
     }
 }
 
-/// Redirection operators.
+/// Redirection operators
 ///
 /// This enum defines the redirection operator types except here-document and
 /// process redirection.
@@ -834,18 +834,19 @@ impl fmt::Display for RedirOp {
     }
 }
 
-/// Here-document.
+/// Here-document
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HereDoc {
-    /// Token that marks the end of the content of the here-document.
+    /// Token that marks the end of the content of the here-document
     pub delimiter: Word,
 
     /// Whether leading tab characters should be removed from each line of the
-    /// here-document content. This value is `true` for the `<<-` operator and
-    /// `false` for `<<`.
+    /// here-document content
+    ///
+    /// This value is `true` for the `<<-` operator and `false` for `<<`.
     pub remove_tabs: bool,
 
-    /// Content of the here-document.
+    /// Content of the here-document
     ///
     /// The content ends with a newline unless it is empty. If the delimiter is
     /// quoted, the content must be all literal. If `remove_tabs` is `true`,
@@ -873,12 +874,12 @@ impl fmt::Display for HereDoc {
     }
 }
 
-/// Part of a redirection that defines the nature of the resulting file descriptor.
+/// Part of a redirection that defines the nature of the resulting file descriptor
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RedirBody {
-    /// Normal redirection.
+    /// Normal redirection
     Normal { operator: RedirOp, operand: Word },
-    /// Here-document.
+    /// Here-document
     HereDoc(Rc<HereDoc>),
     // TODO process redirection
 }
@@ -908,12 +909,12 @@ impl<T: Into<Rc<HereDoc>>> From<T> for RedirBody {
     }
 }
 
-/// Redirection.
+/// Redirection
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Redir {
-    /// File descriptor that is modified by this redirection.
+    /// File descriptor that is modified by this redirection
     pub fd: Option<Fd>,
-    /// Nature of the resulting file descriptor.
+    /// Nature of the resulting file descriptor
     pub body: RedirBody,
 }
 
@@ -943,7 +944,7 @@ impl fmt::Display for Redir {
     }
 }
 
-/// Command that involves assignments, redirections, and word expansions.
+/// Command that involves assignments, redirections, and word expansions
 ///
 /// In the shell language syntax, a valid simple command must contain at least one of assignments,
 /// redirections, and words. The parser must not produce a completely empty simple command.
@@ -997,7 +998,7 @@ impl fmt::Display for SimpleCommand {
     }
 }
 
-/// `elif-then` clause.
+/// `elif-then` clause
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ElifThen {
     pub condition: List,
@@ -1015,15 +1016,15 @@ impl fmt::Display for ElifThen {
     }
 }
 
-/// Branch item of a `case` compound command.
+/// Branch item of a `case` compound command
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CaseItem {
     /// Array of patterns that are matched against the main word of the case
-    /// compound command to decide if the body of this item should be executed.
+    /// compound command to decide if the body of this item should be executed
     ///
     /// A syntactically valid case item must have at least one pattern.
     pub patterns: Vec<Word>,
-    /// Commands that are executed if any of the patterns matched.
+    /// Commands that are executed if any of the patterns matched
     pub body: List,
 }
 
@@ -1038,31 +1039,31 @@ impl fmt::Display for CaseItem {
     }
 }
 
-/// Command that contains other commands.
+/// Command that contains other commands
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CompoundCommand {
-    /// List as a command.
+    /// List as a command
     Grouping(List),
-    /// Command for executing commands in a subshell.
+    /// Command for executing commands in a subshell
     Subshell { body: Rc<List>, location: Location },
-    /// For loop.
+    /// For loop
     For {
         name: Word,
         values: Option<Vec<Word>>,
         body: List,
     },
-    /// While loop.
+    /// While loop
     While { condition: List, body: List },
-    /// Until loop.
+    /// Until loop
     Until { condition: List, body: List },
-    /// If conditional construct.
+    /// If conditional construct
     If {
         condition: List,
         body: List,
         elifs: Vec<ElifThen>,
         r#else: Option<List>,
     },
-    /// Case conditional construct.
+    /// Case conditional construct
     Case { subject: Word, items: Vec<CaseItem> },
     // TODO [[ ]]
 }
@@ -1112,12 +1113,12 @@ impl fmt::Display for CompoundCommand {
     }
 }
 
-/// Compound command with redirections.
+/// Compound command with redirections
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FullCompoundCommand {
-    /// The main part.
+    /// The main part
     pub command: CompoundCommand,
-    /// Redirections.
+    /// Redirections
     pub redirs: Vec<Redir>,
 }
 
@@ -1129,14 +1130,14 @@ impl fmt::Display for FullCompoundCommand {
     }
 }
 
-/// Function definition command.
+/// Function definition command
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FunctionDefinition {
-    /// Whether the function definition command starts with the `function` reserved word.
+    /// Whether the function definition command starts with the `function` reserved word
     pub has_keyword: bool,
-    /// Function name.
+    /// Function name
     pub name: Word,
-    /// Function body.
+    /// Function body
     pub body: Rc<FullCompoundCommand>,
 }
 
@@ -1149,14 +1150,14 @@ impl fmt::Display for FunctionDefinition {
     }
 }
 
-/// Element of a pipe sequence.
+/// Element of a pipe sequence
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Command {
-    /// Simple command.
+    /// Simple command
     Simple(SimpleCommand),
-    /// Compound command.
+    /// Compound command
     Compound(FullCompoundCommand),
-    /// Function definition command.
+    /// Function definition command
     Function(FunctionDefinition),
 }
 
@@ -1173,14 +1174,14 @@ impl fmt::Display for Command {
 /// Commands separated by `|`
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Pipeline {
-    /// Elements of the pipeline.
+    /// Elements of the pipeline
     ///
     /// A valid pipeline must have at least one command.
     ///
     /// The commands are contained in `Rc` to allow executing them
     /// asynchronously without cloning them.
     pub commands: Vec<Rc<Command>>,
-    /// True if the pipeline begins with a `!`.
+    /// Whether the pipeline begins with a `!`
     pub negation: bool,
 }
 
@@ -1193,7 +1194,7 @@ impl fmt::Display for Pipeline {
     }
 }
 
-/// Condition that decides if a [Pipeline] in an [and-or list](AndOrList) should be executed.
+/// Condition that decides if a [Pipeline] in an [and-or list](AndOrList) should be executed
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AndOr {
     /// `&&`
@@ -1231,7 +1232,7 @@ impl fmt::Display for AndOr {
     }
 }
 
-/// Pipelines separated by `&&` and `||`.
+/// Pipelines separated by `&&` and `||`
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AndOrList {
     pub first: Pipeline,
@@ -1247,15 +1248,15 @@ impl fmt::Display for AndOrList {
     }
 }
 
-/// Element of a [List].
+/// Element of a [List]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Item {
-    /// Main part of this item.
+    /// Main part of this item
     ///
     /// The and-or list is contained in `Rc` to allow executing it
     /// asynchronously without cloning it.
     pub and_or: Rc<AndOrList>,
-    /// Location of the `&` operator for this item, if any.
+    /// Location of the `&` operator for this item, if any
     pub async_flag: Option<Location>,
 }
 
@@ -1277,7 +1278,7 @@ impl fmt::Display for Item {
     }
 }
 
-/// Sequence of [and-or lists](AndOrList) separated by `;` or `&`.
+/// Sequence of [and-or lists](AndOrList) separated by `;` or `&`
 ///
 /// It depends on context whether an empty list is a valid syntax.
 #[derive(Clone, Debug, Eq, PartialEq)]
