@@ -94,6 +94,7 @@ pub async fn execute(
                     name: name.value,
                     new_value: error.new_value,
                     read_only_location: error.read_only_location,
+                    vacancy: None,
                 });
                 let location = name.origin;
                 let error = Error { cause, location };

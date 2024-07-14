@@ -76,7 +76,8 @@ impl Expand for ParamRef<'_> {
 
         // Switch //
         if let Modifier::Switch(switch) = self.modifier {
-            if let Some(result) = switch::apply(env, switch, name, &mut value, self.location).await
+            if let Some(result) =
+                switch::apply(env, switch, self.name, name, &mut value, self.location).await
             {
                 return result;
             }
@@ -84,7 +85,9 @@ impl Expand for ParamRef<'_> {
             // Check for nounset option error //
             if value.is_none() && env.inner.options.get(Unset) == Off {
                 return Err(Error {
-                    cause: ErrorCause::UnsetParameter,
+                    cause: ErrorCause::UnsetParameter {
+                        name: self.name.to_owned(),
+                    },
                     location: self.location.clone(),
                 });
             }
@@ -319,11 +322,12 @@ pub mod tests {
         let mut env = yash_env::Env::new_virtual();
         env.options.set(Unset, Off);
         let mut env = Env::new(&mut env);
-        let param = param("foo");
+        let name = "foo".to_owned();
+        let param = param(&name);
         let param = ParamRef::from(&param);
 
         let e = param.expand(&mut env).now_or_never().unwrap().unwrap_err();
-        assert_eq!(e.cause, ErrorCause::UnsetParameter);
+        assert_eq!(e.cause, ErrorCause::UnsetParameter { name });
         assert_eq!(e.location, Location::dummy(""));
     }
 

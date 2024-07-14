@@ -67,6 +67,7 @@ pub async fn perform_assignment(
                 name: assign.name.clone(),
                 new_value: e.new_value,
                 read_only_location: e.read_only_location,
+                vacancy: None,
             }),
             location: e.assigned_location.unwrap(),
         })?;
@@ -179,6 +180,7 @@ mod tests {
             assert_eq!(error.name, "v");
             assert_eq!(error.new_value, Value::scalar("new"));
             assert_eq!(error.read_only_location, location);
+            assert_eq!(error.vacancy, None);
         });
         assert_eq!(e.location, Location::dummy("v=new"));
     }

@@ -8,7 +8,8 @@ programs.
 [![yash-cli at docs.rs](https://docs.rs/yash-cli/badge.svg)](https://docs.rs/yash-cli)
 [![Build status](https://github.com/magicant/yash-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/magicant/yash-rs/actions/workflows/rust.yml)
 
-- [Changelog](CHANGELOG.md)
+- [Changelog for the entire shell binary](CHANGELOG-bin.md)
+- [Changelog for the library crate](CHANGELOG-lib.md)
 
 ## License
 

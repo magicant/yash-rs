@@ -1,6 +1,10 @@
 # Changelog
 
-All notable changes to `yash-cli` will be documented in this file.
+All notable changes to the `yash-cli` library crate are documented in this file.
+
+This file lists changes to the library crate, which is unlikely to be of interest
+to users of the shell.
+For changes to the shell binary as a whole, see [CHANGELOG-bin.md](CHANGELOG-bin.md).
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -34,15 +38,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       the `verbose` flag of the read-eval loop. The behavior of the verbose option
       is now implemented in `yash_env::input::Echo`, which is included in
       the `startup::SourceInput::input` field.
-
-### Fixed
-
-- The break and continue built-ins no longer allow exiting a trap.
-- The read built-in now shows a prompt when reading a continued line.
-- The source built-in now echoes the input when the verbose shell option is set.
-- The set built-in no longer sets the `SIGTTIN`, `SIGTTOU`, and `SIGTSTP` signals
-  to be ignored when invoked with the `-m` option in a subshell of an
-  interactive shell.
 
 ## [0.1.0-beta.1] - 2024-06-09
 
