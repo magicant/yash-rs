@@ -77,7 +77,7 @@ impl Expand for ParamRef<'_> {
         // Switch //
         if let Modifier::Switch(switch) = self.modifier {
             if let Some(result) =
-                switch::apply(env, switch, self.name, name, &mut value, self.location).await
+                switch::apply(env, switch, self.name, name, value.as_ref(), self.location).await
             {
                 return result;
             }

@@ -271,12 +271,12 @@ pub async fn apply(
     switch: &Switch,
     orig_name: &str,
     name: Option<Name<'_>>,
-    value: &mut Option<Value>,
+    value: Option<&Value>,
     location: &Location,
 ) -> Option<Result<Phrase, Error>> {
     use SwitchType::*;
     use ValueCondition::*;
-    let cond = ValueCondition::with(switch.condition, Vacancy::of(&*value));
+    let cond = ValueCondition::with(switch.condition, Vacancy::of(value));
     match (switch.r#type, cond) {
         (Alter, Vacant(_)) | (Default, Occupied) | (Assign, Occupied) | (Error, Occupied) => None,
 
@@ -314,7 +314,6 @@ mod tests {
     use crate::expansion::attr::AttrChar;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
-    use yash_env::variable::Value::*;
     use yash_env::variable::IFS;
     use yash_syntax::syntax::SwitchCondition::*;
     use yash_syntax::syntax::SwitchType::*;
@@ -396,13 +395,11 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let name = Some(Name::Variable("var"));
-        let mut value = None;
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, "var", name, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", name, None, &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, None);
-        assert_eq!(value, None);
     }
 
     #[test]
@@ -415,9 +412,9 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let name = Some(Name::Variable("var"));
-        let mut value = Some(Scalar("bar".to_string()));
+        let value = Value::scalar("bar");
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, "var", name, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", name, Some(&value), &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Some(Ok(Phrase::Field(to_field("foo")))));
@@ -433,9 +430,8 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let name = Some(Name::Variable("var"));
-        let mut value = None;
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, "var", name, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", name, None, &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Some(Ok(Phrase::Field(to_field("foo")))));
@@ -451,13 +447,12 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let name = Some(Name::Variable("var"));
-        let mut value = Some(Scalar("bar".to_string()));
+        let value = Value::scalar("bar");
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, "var", name, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", name, Some(&value), &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, None);
-        assert_eq!(value, Some(Scalar("bar".to_string())));
     }
 
     #[test]
@@ -470,10 +465,9 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let name = Some(Name::Variable("var"));
-        let mut value = None;
         let location = Location::dummy("somewhere");
 
-        let result = apply(&mut env, &switch, "var", name, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", name, None, &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Some(Ok(Phrase::Field(to_field("foo")))));
@@ -501,10 +495,9 @@ mod tests {
             word: "\"$@\"".parse().unwrap(),
         };
         let name = Some(Name::Variable("var"));
-        let mut value = None;
         let location = Location::dummy("somewhere");
 
-        let result = apply(&mut env, &switch, "var", name, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", name, None, &location)
             .now_or_never()
             .unwrap();
 
@@ -559,13 +552,12 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let name = Some(Name::Variable("var"));
-        let mut value = Some(Scalar("bar".to_string()));
+        let value = Value::scalar("bar");
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, "var", name, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", name, Some(&value), &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, None);
-        assert_eq!(value, Some(Scalar("bar".to_string())));
     }
 
     #[test]
@@ -582,10 +574,10 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let name = Some(Name::Variable("var"));
-        let mut value = save_var.value.clone();
+        let value = save_var.value.as_ref();
         let location = Location::dummy("somewhere");
 
-        let result = apply(&mut env, &switch, "var", name, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", name, value, &location)
             .now_or_never()
             .unwrap();
         assert_matches!(result, Some(Err(error)) => {
@@ -610,10 +602,10 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let name = Some(Name::Special('-'));
-        let mut value = Some(Scalar("".to_string()));
+        let value = Value::scalar("");
         let location = Location::dummy("somewhere");
 
-        let result = apply(&mut env, &switch, "-", name, &mut value, &location)
+        let result = apply(&mut env, &switch, "-", name, Some(&value), &location)
             .now_or_never()
             .unwrap();
         let error = result.unwrap().unwrap_err();
@@ -637,9 +629,8 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let name = Some(Name::Variable("var"));
-        let mut value = None;
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, "var", name, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", name, None, &location)
             .now_or_never()
             .unwrap();
         let error = result.unwrap().unwrap_err();
@@ -660,9 +651,9 @@ mod tests {
             word: "bar".parse().unwrap(),
         };
         let name = Some(Name::Variable("var"));
-        let mut value = Some(Value::scalar(""));
+        let value = Value::scalar("");
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, "var", name, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", name, Some(&value), &location)
             .now_or_never()
             .unwrap();
         let error = result.unwrap().unwrap_err();
@@ -683,9 +674,9 @@ mod tests {
             word: "".parse().unwrap(),
         };
         let name = Some(Name::Variable("var"));
-        let mut value = Some(Value::Array(vec![]));
+        let value = Value::Array(vec![]);
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, "var", name, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", name, Some(&value), &location)
             .now_or_never()
             .unwrap();
         let error = result.unwrap().unwrap_err();
@@ -707,12 +698,11 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let name = Some(Name::Variable("var"));
-        let mut value = Some(Value::scalar(""));
+        let value = Value::scalar("");
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, "var", name, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", name, Some(&value), &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, None);
-        assert_eq!(value, Some(Scalar("".to_string())));
     }
 }
