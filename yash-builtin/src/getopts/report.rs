@@ -93,7 +93,7 @@ impl Error {
                     annotations.push(Annotation::new(
                         AnnotationType::Info,
                         format!(
-                            "the built-in needs to update the variable to `{}`",
+                            "the built-in needs to update the variable to {}",
                             new_value.quote()
                         )
                         .into(),
