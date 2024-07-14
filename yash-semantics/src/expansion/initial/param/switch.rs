@@ -218,6 +218,7 @@ async fn assign(
                 name: name.to_owned(),
                 new_value: e.new_value,
                 read_only_location: e.read_only_location,
+                vacancy: Some(vacancy),
             });
             Error { cause, location }
         })?;
@@ -581,7 +582,7 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let name = Some(Name::Variable("var"));
-        let mut value = None;
+        let mut value = save_var.value.clone();
         let location = Location::dummy("somewhere");
 
         let result = apply(&mut env, &switch, "var", name, &mut value, &location)
@@ -593,6 +594,7 @@ mod tests {
                 assert_eq!(e.name, "var");
                 assert_eq!(e.new_value, Value::scalar("foo"));
                 assert_eq!(e.read_only_location, Location::dummy("read-only"));
+                assert_eq!(e.vacancy, Some(Vacancy::EmptyScalar));
             });
         });
         assert_eq!(env.inner.variables.get("var"), Some(&save_var));

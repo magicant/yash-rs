@@ -83,6 +83,7 @@ use self::initial::ArithError;
 use self::initial::Expand;
 use self::initial::Expand as _;
 use self::initial::NonassignableError;
+use self::initial::Vacancy;
 use self::initial::VacantError;
 use self::quote_removal::skip_quotes;
 use self::split::Ifs;
@@ -109,10 +110,17 @@ pub use yash_env::semantics::Field;
 pub struct AssignReadOnlyError {
     /// Name of the read-only variable
     pub name: String,
-    /// Value that was being assigned.
+    /// Value that was being assigned
     pub new_value: Value,
-    /// Location where the variable was made read-only.
+    /// Location where the variable was made read-only
     pub read_only_location: Location,
+    /// State of the variable before the assignment
+    ///
+    /// If this assignment error occurred in a parameter expansion as in
+    /// `${foo=bar}` or `${foo:=bar}`, this field is `Some`, and the value is
+    /// the state of the variable before the assignment. In other cases, this
+    /// field is `None`.
+    pub vacancy: Option<Vacancy>,
 }
 
 /// Types of errors that may occur in the word expansion.
@@ -441,6 +449,7 @@ mod tests {
                 name: "foo".into(),
                 new_value: "value".into(),
                 read_only_location: Location::dummy("ROL"),
+                vacancy: None,
             }),
             location: Location {
                 range: 2..4,

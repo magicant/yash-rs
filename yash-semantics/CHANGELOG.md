@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - The `Error` struct now has non-default implementation of the
       `MessageBase::footers` method.
 - Likewise, the following error items are also extended:
+    - The `AssignReadOnlyError` struct now has a `vacancy: Option<Vacancy>`
+      field.
     - `expansion::initial::VacantError` now has a `name: String` field.
     - The `expansion::initial::NonassignableErrorCause` enum is a successor to
       the previous `NonassignableError` enum. The new `NotVariable` variant has

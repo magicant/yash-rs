@@ -246,6 +246,7 @@ impl<'a> yash_arith::Env for VarEnv<'a> {
                 name: name.to_owned(),
                 new_value: e.new_value,
                 read_only_location: e.read_only_location,
+                vacancy: None,
             })
     }
 }

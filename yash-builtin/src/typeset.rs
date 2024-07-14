@@ -533,6 +533,7 @@ impl From<AssignReadOnlyError> for yash_semantics::expansion::AssignReadOnlyErro
             name: e.name,
             new_value: e.new_value,
             read_only_location: e.read_only_location,
+            vacancy: None,
         }
     }
 }
