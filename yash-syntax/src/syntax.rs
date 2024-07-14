@@ -335,7 +335,7 @@ pub enum Modifier {
 /// Expansions that are not enclosed in braces are directly encoded with
 /// [`TextUnit::RawParam`].
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Param {
+pub struct BracedParam {
     // TODO recursive expansion
     /// Parameter name
     pub name: String,
@@ -346,7 +346,7 @@ pub struct Param {
     pub location: Location,
 }
 
-impl fmt::Display for Param {
+impl fmt::Display for BracedParam {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use Modifier::*;
         match self.modifier {
@@ -358,7 +358,7 @@ impl fmt::Display for Param {
     }
 }
 
-impl Unquote for Param {
+impl Unquote for BracedParam {
     fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
         use Modifier::*;
         match self.modifier {
@@ -434,7 +434,7 @@ pub enum TextUnit {
         location: Location,
     },
     /// Parameter expansion that is enclosed in braces
-    BracedParam(Param),
+    BracedParam(BracedParam),
     /// Command substitution of the form `$(...)`
     CommandSubst {
         /// Command string that will be parsed and executed when the command
@@ -1437,14 +1437,14 @@ mod tests {
 
     #[test]
     fn braced_param_display() {
-        let param = Param {
+        let param = BracedParam {
             name: "foo".to_string(),
             modifier: Modifier::None,
             location: Location::dummy(""),
         };
         assert_eq!(param.to_string(), "${foo}");
 
-        let param = Param {
+        let param = BracedParam {
             modifier: Modifier::Length,
             ..param
         };
@@ -1455,7 +1455,7 @@ mod tests {
             condition: SwitchCondition::UnsetOrEmpty,
             word: "bar baz".parse().unwrap(),
         };
-        let param = Param {
+        let param = BracedParam {
             modifier: Modifier::Switch(switch),
             ..param
         };
@@ -1466,7 +1466,7 @@ mod tests {
             length: TrimLength::Shortest,
             pattern: "baz' 'bar".parse().unwrap(),
         };
-        let param = Param {
+        let param = BracedParam {
             modifier: Modifier::Trim(trim),
             ..param
         };
@@ -1475,7 +1475,7 @@ mod tests {
 
     #[test]
     fn braced_param_unquote() {
-        let param = Param {
+        let param = BracedParam {
             name: "foo".to_string(),
             modifier: Modifier::None,
             location: Location::dummy(""),
@@ -1484,7 +1484,7 @@ mod tests {
         assert_eq!(unquoted, "${foo}");
         assert_eq!(is_quoted, false);
 
-        let param = Param {
+        let param = BracedParam {
             modifier: Modifier::Length,
             ..param
         };
@@ -1497,7 +1497,7 @@ mod tests {
             condition: SwitchCondition::UnsetOrEmpty,
             word: "'bar'".parse().unwrap(),
         };
-        let param = Param {
+        let param = BracedParam {
             modifier: Modifier::Switch(switch),
             ..param
         };
@@ -1510,7 +1510,7 @@ mod tests {
             length: TrimLength::Shortest,
             pattern: "baz' 'bar".parse().unwrap(),
         };
-        let param = Param {
+        let param = BracedParam {
             modifier: Modifier::Trim(trim),
             ..param
         };

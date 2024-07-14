@@ -68,9 +68,9 @@ impl<T, E> Shift for Result<Option<T>, E> {
     }
 }
 
-impl FromStr for Param {
+impl FromStr for BracedParam {
     type Err = Option<Error>;
-    fn from_str(s: &str) -> Result<Param, Option<Error>> {
+    fn from_str(s: &str) -> Result<BracedParam, Option<Error>> {
         match TextUnit::from_str(s) {
             Err(e) => Err(Some(e)),
             Ok(TextUnit::BracedParam(param)) => Ok(param),
@@ -432,7 +432,7 @@ mod tests {
     #[test]
     fn param_from_str() {
         block_on(async {
-            let parse: Param = "${foo}".parse().unwrap();
+            let parse: BracedParam = "${foo}".parse().unwrap();
             assert_eq!(parse.to_string(), "${foo}");
         })
     }

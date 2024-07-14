@@ -150,8 +150,8 @@ mod tests {
     use yash_env::variable::Scope;
     use yash_env_test_helper::in_virtual_system;
     use yash_syntax::source::Location;
+    use yash_syntax::syntax::BracedParam;
     use yash_syntax::syntax::Modifier;
-    use yash_syntax::syntax::Param;
 
     #[test]
     fn literal() {
@@ -219,7 +219,7 @@ mod tests {
             .assign("x", None)
             .unwrap();
         let mut env = Env::new(&mut env);
-        let param = BracedParam(Param {
+        let param = BracedParam(BracedParam {
             name: "foo".to_string(),
             modifier: Modifier::None,
             location: Location::dummy(""),

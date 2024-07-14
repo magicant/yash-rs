@@ -28,8 +28,8 @@ use yash_env::option::State::Off;
 use yash_env::variable::Expansion;
 use yash_env::variable::Value;
 use yash_syntax::source::Location;
+use yash_syntax::syntax::BracedParam;
 use yash_syntax::syntax::Modifier;
-use yash_syntax::syntax::Param;
 
 /// Reference to a parameter expansion
 pub struct ParamRef<'a> {
@@ -38,8 +38,8 @@ pub struct ParamRef<'a> {
     pub location: &'a Location,
 }
 
-impl<'a> From<&'a Param> for ParamRef<'a> {
-    fn from(param: &'a Param) -> Self {
+impl<'a> From<&'a BracedParam> for ParamRef<'a> {
+    fn from(param: &'a BracedParam) -> Self {
         ParamRef {
             name: &param.name,
             modifier: &param.modifier,
@@ -169,8 +169,8 @@ pub mod tests {
         env
     }
 
-    pub fn param<N: ToString>(name: N) -> Param {
-        Param {
+    pub fn param<N: ToString>(name: N) -> BracedParam {
+        BracedParam {
             name: name.to_string(),
             modifier: Modifier::None,
             location: Location::dummy(""),

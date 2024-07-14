@@ -22,8 +22,8 @@ use super::raw_param::is_special_parameter_char;
 use crate::parser::core::Result;
 use crate::parser::error::Error;
 use crate::parser::error::SyntaxError;
+use crate::syntax::BracedParam;
 use crate::syntax::Modifier;
-use crate::syntax::Param;
 
 /// Tests if a character can be part of a variable name.
 ///
@@ -91,7 +91,7 @@ impl WordLexer<'_, '_> {
     /// The `start_index` parameter should be the index for the initial `$`. It is
     /// used to construct the result, but this function does not check if it
     /// actually points to the `$`.
-    pub async fn braced_param(&mut self, start_index: usize) -> Result<Option<Param>> {
+    pub async fn braced_param(&mut self, start_index: usize) -> Result<Option<BracedParam>> {
         if !self.skip_if(|c| c == '{').await? {
             return Ok(None);
         }
@@ -136,7 +136,7 @@ impl WordLexer<'_, '_> {
             (false, suffix) => suffix,
         };
 
-        Ok(Some(Param {
+        Ok(Some(BracedParam {
             name,
             modifier,
             location: self.location_range(start_index..self.index()),
