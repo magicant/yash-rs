@@ -143,7 +143,13 @@ impl super::Source {
     pub fn complement_annotations<'a, 's: 'a, T: Extend<Annotation<'a>>>(&'s self, result: &mut T) {
         use super::Source::*;
         match self {
-            Unknown | Stdin | CommandString | CommandFile { .. } => (),
+            Unknown
+            | Stdin
+            | CommandString
+            | CommandFile { .. }
+            | VariableValue { .. }
+            | Other { .. } => (),
+
             CommandSubst { original } => {
                 // TODO Use Extend::extend_one
                 result.extend(std::iter::once(Annotation::new(

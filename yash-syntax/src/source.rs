@@ -82,6 +82,18 @@ pub enum Source {
         /// Location of the simple command that has set this trap command
         origin: Location,
     },
+
+    /// Value of a variable
+    VariableValue {
+        /// Variable name
+        name: String,
+    },
+
+    /// Other source
+    Other {
+        /// Label that describes the source
+        label: String,
+    },
     // TODO More Source types
 }
 
@@ -159,6 +171,8 @@ impl Source {
             Eval { .. } => "<eval>",
             DotScript { name, .. } => name,
             Trap { condition, .. } => condition,
+            VariableValue { name } => name,
+            Other { label } => label,
         }
     }
 }

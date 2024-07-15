@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   struct is renamed to `syntax::BracedParam`.
 - The `parser::SyntaxError::InvalidParam` variant is added, which is returned
   when a parameter expansion has an invalid name.
+- The `source::Source` enum is extended with new variants `VariableValue` and
+  `Other`.
 
 ### Changed
 
