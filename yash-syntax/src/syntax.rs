@@ -42,11 +42,11 @@
 //!
 //! ## Parsing
 //!
-//! Most AST types defined in this module implement the
-//! [`FromStr`](std::str::FromStr) trait, which means you can easily get an AST
-//! out of source code by calling `parse` on a `&str`. However, all
-//! [location](crate::source::Location)s in ASTs constructed this way will only
-//! have [unknown source](crate::source::Source::Unknown).
+//! Most AST types defined in this module implement the [`FromStr`] trait, which
+//! means you can easily get an AST out of source code by calling `parse` on a
+//! `&str`. However, all [location](crate::source::Location)s in ASTs
+//! constructed this way will only have
+//! [unknown source](crate::source::Source::Unknown).
 //!
 //! ```
 //! use std::str::FromStr;
@@ -80,10 +80,12 @@ use crate::source::Location;
 use itertools::Itertools;
 use std::cell::OnceCell;
 use std::fmt;
-use std::fmt::Write;
+use std::fmt::Write as _;
 #[cfg(unix)]
 use std::os::unix::io::RawFd;
 use std::rc::Rc;
+use std::str::FromStr;
+use thiserror::Error;
 
 #[cfg(not(unix))]
 type RawFd = i32;
@@ -167,6 +169,208 @@ impl<T: MaybeLiteral> MaybeLiteral for [T] {
             .try_fold(result, |result, unit| unit.extend_if_literal(result))
     }
 }
+
+/// Special parameter
+///
+/// This enum value identifies a special parameter in the shell language.
+/// Each special parameter is a single character that has a special meaning in
+/// the shell language. For example, `@` represents all positional parameters.
+///
+/// See [`ParamType`] for other types of parameters.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum SpecialParam {
+    /// `@` (all positional parameters)
+    At,
+    /// `*` (all positional parameters)
+    Asterisk,
+    /// `#` (number of positional parameters)
+    Number,
+    /// `?` (exit status of the last command)
+    Question,
+    /// `-` (active shell options)
+    Hyphen,
+    /// `$` (process ID of the shell)
+    Dollar,
+    /// `!` (process ID of the last asynchronous command)
+    Exclamation,
+    /// `0` (name of the shell or shell script)
+    Zero,
+}
+
+impl SpecialParam {
+    /// Returns the character representing the special parameter.
+    #[must_use]
+    pub const fn as_char(self) -> char {
+        use SpecialParam::*;
+        match self {
+            At => '@',
+            Asterisk => '*',
+            Number => '#',
+            Question => '?',
+            Hyphen => '-',
+            Dollar => '$',
+            Exclamation => '!',
+            Zero => '0',
+        }
+    }
+
+    /// Returns the special parameter that corresponds to the given character.
+    ///
+    /// If the character does not represent any special parameter, `None` is
+    /// returned.
+    #[must_use]
+    pub const fn from_char(c: char) -> Option<SpecialParam> {
+        use SpecialParam::*;
+        match c {
+            '@' => Some(At),
+            '*' => Some(Asterisk),
+            '#' => Some(Number),
+            '?' => Some(Question),
+            '-' => Some(Hyphen),
+            '$' => Some(Dollar),
+            '!' => Some(Exclamation),
+            '0' => Some(Zero),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for SpecialParam {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_char().fmt(f)
+    }
+}
+
+/// Error that occurs when a character cannot be parsed as a special parameter
+///
+/// This error value is returned by the `TryFrom<char>` and `FromStr`
+/// implementations for [`SpecialParam`].
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[error("not a special parameter")]
+pub struct NotSpecialParam;
+
+impl TryFrom<char> for SpecialParam {
+    type Error = NotSpecialParam;
+    fn try_from(c: char) -> Result<SpecialParam, NotSpecialParam> {
+        SpecialParam::from_char(c).ok_or(NotSpecialParam)
+    }
+}
+
+impl FromStr for SpecialParam {
+    type Err = NotSpecialParam;
+    fn from_str(s: &str) -> Result<SpecialParam, NotSpecialParam> {
+        // If `s` contains a single character and nothing else, parse it as a
+        // special parameter.
+        let mut chars = s.chars();
+        chars
+            .next()
+            .filter(|_| chars.as_str().is_empty())
+            .and_then(SpecialParam::from_char)
+            .ok_or(NotSpecialParam)
+    }
+}
+
+/// Type of a parameter
+///
+/// This enum distinguishes three types of [parameters](Param): named, special and
+/// positional parameters. However, this value does not include the actual
+/// parameter name as a string. The actual name is stored in a separate field in
+/// the AST node that contains this value.
+///
+/// Note the careful use of the term "name" here. In POSIX terminology, a
+/// "name" identifies a named parameter (that is, a variable) and does not
+/// include special or positional parameters. An identifier that refers to any
+/// kind of parameter is called a "parameter".
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum ParamType {
+    /// Named parameter
+    Variable,
+    /// Special parameter
+    Special(SpecialParam),
+    /// Positional parameter
+    ///
+    /// Positional parameters are indexed starting from 1, so the index of `0`
+    /// always refers to a non-existent parameter. If the string form of a
+    /// positional parameter represents an index that is too large to fit in a
+    /// `usize`, the index should be `usize::MAX`, which is also guaranteed to
+    /// spot a non-existent parameter since a `Vec` cannot have more than
+    /// `isize::MAX` elements.
+    Positional(usize),
+}
+
+impl From<SpecialParam> for ParamType {
+    fn from(special: SpecialParam) -> ParamType {
+        ParamType::Special(special)
+    }
+}
+
+/// Parameter
+///
+/// A parameter is an identifier that appears in a parameter expansion
+/// ([`TextUnit::RawParam`] and [`BracedParam`]). There are three
+/// [types](ParamType) of parameters depending on the character category of the
+/// identifier.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Param {
+    /// Literal representation of the parameter name
+    ///
+    /// This is the raw string form of the parameter as it appears in the source
+    /// code. Examples include `foo`, `@`, `#`, `0`, and `12`.
+    pub id: String,
+
+    /// Type of the parameter
+    ///
+    /// This precomputed value is used to optimize the evaluation of parameter
+    /// expansions by avoiding the need to parse the `id` field every time.
+    ///
+    /// It is your responsibility to ensure that the `type` field is consistent
+    /// with the `id` field. For example, if the `id` field is `"@"`, the `type`
+    /// field must be `Special(At)`. The [parser](crate::parser) ensures this
+    /// invariant when it constructs a `Param` value.
+    pub r#type: ParamType,
+}
+
+impl Param {
+    /// Constructs a `Param` value representing a named parameter.
+    ///
+    /// This function assumes that the argument is a valid name for a variable.
+    /// The returned `Param` value will have the `Variable` type regardless of
+    /// the argument.
+    #[must_use]
+    pub fn variable<I: Into<String>>(id: I) -> Param {
+        let id = id.into();
+        let r#type = ParamType::Variable;
+        Param { id, r#type }
+    }
+}
+
+/// Constructs a `Param` value representing a special parameter.
+impl From<SpecialParam> for Param {
+    fn from(special: SpecialParam) -> Param {
+        Param {
+            id: special.to_string(),
+            r#type: special.into(),
+        }
+    }
+}
+
+/// Constructs a `Param` value from a positional parameter index.
+impl From<usize> for Param {
+    fn from(index: usize) -> Param {
+        Param {
+            id: index.to_string(),
+            r#type: ParamType::Positional(index),
+        }
+    }
+}
+
+impl fmt::Display for Param {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.id.fmt(f)
+    }
+}
+
+// TODO Consider implementing FromStr for Param
 
 /// Flag that specifies how the value is substituted in a [switch](Switch)
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1311,7 +1515,23 @@ impl fmt::Display for List {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use std::str::FromStr;
+
+    #[test]
+    fn special_param_from_str() {
+        assert_eq!("@".parse(), Ok(SpecialParam::At));
+        assert_eq!("*".parse(), Ok(SpecialParam::Asterisk));
+        assert_eq!("#".parse(), Ok(SpecialParam::Number));
+        assert_eq!("?".parse(), Ok(SpecialParam::Question));
+        assert_eq!("-".parse(), Ok(SpecialParam::Hyphen));
+        assert_eq!("$".parse(), Ok(SpecialParam::Dollar));
+        assert_eq!("!".parse(), Ok(SpecialParam::Exclamation));
+        assert_eq!("0".parse(), Ok(SpecialParam::Zero));
+
+        assert_eq!(SpecialParam::from_str(""), Err(NotSpecialParam));
+        assert_eq!(SpecialParam::from_str("##"), Err(NotSpecialParam));
+        assert_eq!(SpecialParam::from_str("1"), Err(NotSpecialParam));
+        assert_eq!(SpecialParam::from_str("00"), Err(NotSpecialParam));
+    }
 
     #[test]
     fn switch_display() {

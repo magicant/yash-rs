@@ -18,6 +18,7 @@
 
 use super::core::Lexer;
 use crate::parser::core::Result;
+use crate::syntax::SpecialParam;
 use crate::syntax::TextUnit;
 
 /// Tests if a character can be part of a POSIXly-portable name.
@@ -25,15 +26,15 @@ use crate::syntax::TextUnit;
 /// Returns true if the character is an ASCII alphanumeric or underscore.
 ///
 /// Note that a valid name cannot start with a digit.
-pub fn is_portable_name_char(c: char) -> bool {
+pub const fn is_portable_name_char(c: char) -> bool {
     matches!(c, '0'..='9' | 'A'..='Z' | '_' | 'a'..='z')
 }
 
 /// Tests if a character names a special parameter.
 ///
 /// A special parameter is one of: `@*#?-$!0`.
-pub fn is_special_parameter_char(c: char) -> bool {
-    matches!(c, '@' | '*' | '#' | '?' | '-' | '$' | '!' | '0')
+pub const fn is_special_parameter_char(c: char) -> bool {
+    SpecialParam::from_char(c).is_some()
 }
 
 /// Tests if a character is a valid single-character raw parameter name.
@@ -43,7 +44,7 @@ pub fn is_special_parameter_char(c: char) -> bool {
 /// the name.
 ///
 /// This function returns true for ASCII digits and special parameter names.
-pub fn is_single_char_name(c: char) -> bool {
+pub const fn is_single_char_name(c: char) -> bool {
     c.is_ascii_digit() || is_special_parameter_char(c)
 }
 
