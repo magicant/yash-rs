@@ -98,6 +98,7 @@ use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Footer;
 use yash_syntax::source::pretty::MessageBase;
 use yash_syntax::source::Location;
+use yash_syntax::syntax::Param;
 use yash_syntax::syntax::Text;
 use yash_syntax::syntax::Word;
 
@@ -139,8 +140,8 @@ pub enum ErrorCause {
     AssignReadOnly(#[from] AssignReadOnlyError),
 
     /// Expansion of an unset parameter with the `nounset` option
-    #[error("unset parameter {name:?}")]
-    UnsetParameter { name: String },
+    #[error("unset parameter `{param}`")]
+    UnsetParameter { param: Param },
 
     /// Expansion of an empty value with an error switch
     #[error(transparent)]
@@ -176,7 +177,7 @@ impl ErrorCause {
             CommandSubstError(e) => e.to_string().into(),
             ArithError(e) => e.to_string().into(),
             AssignReadOnly(e) => e.to_string().into(),
-            UnsetParameter { name } => format!("parameter {name:?} is not set").into(),
+            UnsetParameter { param } => format!("parameter `{param}` is not set").into(),
             VacantExpansion(e) => format!("{}: {}", e.name, e.vacancy).into(),
             NonassignableParameter(e) => e.to_string().into(),
         }

@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Error types in the `expansion` module (some of which are reexported in the
   `assign` module) have been extended for more informative error messages:
-    - The `ErrorCause::UnsetParameter` variant now has a `name: String` field.
+    - The `ErrorCause::UnsetParameter` variant now has a `param: Param` field.
     - The `message` and `label` methods of `ErrorCause` return more informative
       messages for the `UnsetParameter` and `VacantExpansion` variants.
     - The `expansion::initial::NonassignableError` enum has been replaced with a

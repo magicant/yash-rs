@@ -83,7 +83,7 @@ impl Expand for ParamRef<'_> {
             if value.is_none() && env.inner.options.get(Unset) == Off {
                 return Err(Error {
                     cause: ErrorCause::UnsetParameter {
-                        name: self.param.id.to_owned(),
+                        param: self.param.clone(),
                     },
                     location: self.location.clone(),
                 });
@@ -323,12 +323,11 @@ pub mod tests {
         let mut env = yash_env::Env::new_virtual();
         env.options.set(Unset, Off);
         let mut env = Env::new(&mut env);
-        let name = "foo".to_owned();
-        let param = braced_variable(&name);
-        let param = ParamRef::from(&param);
+        let param = braced_variable("foo");
+        let pr = ParamRef::from(&param);
 
-        let e = param.expand(&mut env).now_or_never().unwrap().unwrap_err();
-        assert_eq!(e.cause, ErrorCause::UnsetParameter { name });
+        let e = pr.expand(&mut env).now_or_never().unwrap().unwrap_err();
+        assert_eq!(e.cause, ErrorCause::UnsetParameter { param: param.param });
         assert_eq!(e.location, Location::dummy(""));
     }
 
