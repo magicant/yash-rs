@@ -44,6 +44,8 @@ pub enum SyntaxError {
     UnclosedParam { opening_location: Location },
     /// A parameter expansion lacks a name.
     EmptyParam,
+    /// A parameter expansion has an invalid name.
+    InvalidParam,
     /// A command substitution started with `$(` but lacks a closing `)`.
     UnclosedCommandSubstitution { opening_location: Location },
     /// A command substitution started with `` ` `` but lacks a closing `` ` ``.
@@ -173,6 +175,7 @@ impl SyntaxError {
             UnclosedDoubleQuote { .. } => "The double quote is not closed",
             UnclosedParam { .. } => "The parameter expansion is not closed",
             EmptyParam => "The parameter name is missing",
+            InvalidParam => "The parameter name is invalid",
             UnclosedCommandSubstitution { .. } => "The command substitution is not closed",
             UnclosedBackquote { .. } => "The backquote is not closed",
             UnclosedArith { .. } => "The arithmetic expansion is not closed",
@@ -263,6 +266,7 @@ impl SyntaxError {
             UnclosedDoubleQuote { .. } => "expected `\"`",
             UnclosedParam { .. } | UnclosedGrouping { .. } => "expected `}`",
             EmptyParam => "expected a parameter name",
+            InvalidParam => "not a valid named or positional parameter",
             UnclosedBackquote { .. } => "expected '`'",
             UnclosedArith { .. } => "expected `))`",
             InvalidCommandToken => "does not begin a valid command",

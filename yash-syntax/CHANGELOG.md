@@ -18,14 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   New enum types `syntax::SpecialParam` and `syntax::ParamType` are added to
   represent the details of the parameter. Note that the former `syntax::Param`
   struct is renamed to `syntax::BracedParam`.
+- The `parser::SyntaxError::InvalidParam` variant is added, which is returned
+  when a parameter expansion has an invalid name.
 
 ### Changed
 
 - `syntax::Param` has been renamed to `syntax::BracedParam`.
-- The `syntax::TextUnit::RawParam` variant now has a `param: Param` field
-  instead of a `name: String` field.
+- The `syntax::TextUnit::RawParam` variant now has a `param: syntax::Param`
+  field instead of a `name: String` field.
+- The `syntax::BracedParam` struct (formerly `syntax::Param`) now has a
+  `param: syntax::Param` field instead of a `name: String` field.
 - `source::Source::label` now returns `"<arithmetic_expansion>"` for
   `Source::Arith`. Previously, it returned `"<arith>"`.
+- The `parser::lex::WordLexer::braced_param` method now returns
+  `parser::SyntaxError::InvalidParam` if the parameter starts with a digit but
+  contains a non-digit character.
 
 ## [0.10.0] - 2024-07-12
 

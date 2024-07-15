@@ -18,12 +18,15 @@
 
 use super::core::WordLexer;
 use super::raw_param::is_portable_name_char;
-use super::raw_param::is_special_parameter_char;
 use crate::parser::core::Result;
 use crate::parser::error::Error;
 use crate::parser::error::SyntaxError;
 use crate::syntax::BracedParam;
 use crate::syntax::Modifier;
+use crate::syntax::Param;
+use crate::syntax::ParamType;
+use crate::syntax::SpecialParam;
+use std::num::IntErrorKind;
 
 /// Tests if a character can be part of a variable name.
 ///
@@ -32,6 +35,35 @@ use crate::syntax::Modifier;
 pub fn is_name_char(c: char) -> bool {
     // TODO support other Unicode name characters
     is_portable_name_char(c)
+}
+
+/// Determines the type of the parameter.
+///
+/// This function assumes the argument contains [name characters](is_name_char)
+/// only.
+///
+/// - If the argument does not start with a digit, it is a named parameter.
+/// - Otherwise, it is a positional parameter.
+///   However, if it contains non-digit characters, it is an error.
+///
+/// This function does not care for special parameters other than `0`.
+/// The special parameter `0` is recognized only if the argument is exactly
+/// a single-digit `0`, as required by POSIX.
+#[must_use]
+fn type_of_id(id: &str) -> Option<ParamType> {
+    if id == "0" {
+        return Some(ParamType::Special(SpecialParam::Zero));
+    }
+    if id.starts_with(|c: char| c.is_ascii_digit()) {
+        return match id.parse() {
+            Ok(index) => Some(ParamType::Positional(index)),
+            Err(e) => match e.kind() {
+                IntErrorKind::PosOverflow => Some(ParamType::Positional(usize::MAX)),
+                _ => None,
+            },
+        };
+    }
+    Some(ParamType::Variable)
 }
 
 impl WordLexer<'_, '_> {
@@ -100,17 +132,30 @@ impl WordLexer<'_, '_> {
 
         let has_length_prefix = self.length_prefix().await?;
 
+        let param_start_index = self.index();
+
         let c = self.peek_char().await?.unwrap();
-        let name = if is_special_parameter_char(c) {
+        let param = if is_name_char(c) {
             self.consume_char();
-            c.to_string()
-        } else if is_name_char(c) {
-            self.consume_char();
-            let mut name = c.to_string();
+
+            // Parse the remaining characters of the parameter name
+            let mut id = c.to_string();
             while let Some(c) = self.consume_char_if(is_name_char).await? {
-                name.push(c.value);
+                id.push(c.value);
             }
-            name
+
+            let Some(r#type) = type_of_id(&id) else {
+                let cause = SyntaxError::InvalidParam.into();
+                let location = self.location_range(param_start_index..self.index());
+                return Err(Error { cause, location });
+            };
+            Param { id, r#type }
+        } else if let Some(special) = SpecialParam::from_char(c) {
+            self.consume_char();
+            Param {
+                id: c.to_string(),
+                r#type: special.into(),
+            }
         } else {
             let cause = SyntaxError::EmptyParam.into();
             let location = self.location().await?.clone();
@@ -137,7 +182,7 @@ impl WordLexer<'_, '_> {
         };
 
         Ok(Some(BracedParam {
-            name,
+            param,
             modifier,
             location: self.location_range(start_index..self.index()),
         }))
@@ -183,7 +228,7 @@ mod tests {
 
         let result = lexer.braced_param(0).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "@");
+        assert_eq!(param.param, Param::from(SpecialParam::At));
         assert_eq!(param.modifier, Modifier::None);
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${@};");
@@ -208,7 +253,7 @@ mod tests {
 
         let result = lexer.braced_param(1).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "foo_123");
+        assert_eq!(param.param, Param::variable("foo_123"));
         assert_eq!(param.modifier, Modifier::None);
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "X${foo_123}<");
@@ -220,7 +265,7 @@ mod tests {
     }
 
     #[test]
-    fn lexer_braced_param_numeric_name() {
+    fn lexer_braced_param_positional() {
         let mut lexer = Lexer::from_memory("${123}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
@@ -231,7 +276,7 @@ mod tests {
 
         let result = lexer.braced_param(0).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "123");
+        assert_eq!(param.param, Param::from(123));
         assert_eq!(param.modifier, Modifier::None);
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${123}<");
@@ -242,8 +287,98 @@ mod tests {
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
     }
 
+    /// Tests that the parameter expansion `${00}` is parsed as a positional
+    /// parameter with the index 0. Compare [`lexer_braced_param_special_zero`].
     #[test]
-    fn lexer_braced_param_hash() {
+    fn lexer_braced_param_positional_zero() {
+        let mut lexer = Lexer::from_memory("${00}<", Source::Unknown);
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
+        lexer.peek_char().now_or_never().unwrap().unwrap();
+        lexer.consume_char();
+
+        let result = lexer.braced_param(0).now_or_never().unwrap();
+        let param = result.unwrap().unwrap();
+        assert_eq!(param.param.id, "00");
+        assert_eq!(param.param.r#type, ParamType::Positional(0));
+        assert_eq!(param.modifier, Modifier::None);
+        // TODO assert about other param members
+        assert_eq!(*param.location.code.value.borrow(), "${00}<");
+        assert_eq!(param.location.code.start_line_number.get(), 1);
+        assert_eq!(*param.location.code.source, Source::Unknown);
+        assert_eq!(param.location.range, 0..5);
+
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
+    }
+
+    #[test]
+    fn lexer_braced_param_positional_overflow() {
+        // This overflow is reported at the execution time of the script, not at
+        // the parsing time.
+        let mut lexer = Lexer::from_memory(
+            "${9999999999999999999999999999999999999999}",
+            Source::Unknown,
+        );
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
+        lexer.peek_char().now_or_never().unwrap().unwrap();
+        lexer.consume_char();
+
+        let result = lexer.braced_param(0).now_or_never().unwrap();
+        let param = result.unwrap().unwrap();
+        assert_eq!(param.param.r#type, ParamType::Positional(usize::MAX));
+    }
+
+    #[test]
+    fn lexer_braced_param_invalid_param() {
+        let mut lexer = Lexer::from_memory("${0_0}", Source::Unknown);
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
+        lexer.peek_char().now_or_never().unwrap().unwrap();
+        lexer.consume_char();
+
+        let e = lexer.braced_param(0).now_or_never().unwrap().unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidParam));
+        assert_eq!(*e.location.code.value.borrow(), "${0_0}");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(*e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.range, 2..5);
+    }
+
+    /// Tests that the parameter expansion `${0}` is parsed as a special
+    /// parameter `0`. Compare [`lexer_braced_param_positional_zero`].
+    #[test]
+    fn lexer_braced_param_special_zero() {
+        let mut lexer = Lexer::from_memory("${0}<", Source::Unknown);
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
+        lexer.peek_char().now_or_never().unwrap().unwrap();
+        lexer.consume_char();
+
+        let result = lexer.braced_param(0).now_or_never().unwrap();
+        let param = result.unwrap().unwrap();
+        assert_eq!(param.param.id, "0");
+        assert_eq!(param.param.r#type, ParamType::Special(SpecialParam::Zero));
+        assert_eq!(param.modifier, Modifier::None);
+        // TODO assert about other param members
+        assert_eq!(*param.location.code.value.borrow(), "${0}<");
+        assert_eq!(param.location.code.start_line_number.get(), 1);
+        assert_eq!(*param.location.code.source, Source::Unknown);
+        assert_eq!(param.location.range, 0..4);
+
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
+    }
+
+    #[test]
+    fn lexer_braced_param_special_hash() {
         let mut lexer = Lexer::from_memory("${#}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
@@ -254,7 +389,7 @@ mod tests {
 
         let result = lexer.braced_param(0).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "#");
+        assert_eq!(param.param, Param::from(SpecialParam::Number));
         assert_eq!(param.modifier, Modifier::None);
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${#}<");
@@ -337,7 +472,7 @@ mod tests {
 
         let result = lexer.braced_param(0).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "foo_123");
+        assert_eq!(param.param, Param::variable("foo_123"));
         assert_eq!(param.modifier, Modifier::Length);
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${#foo_123}<");
@@ -360,7 +495,7 @@ mod tests {
 
         let result = lexer.braced_param(0).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "#");
+        assert_eq!(param.param, Param::from(SpecialParam::Number));
         assert_eq!(param.modifier, Modifier::Length);
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${##}<");
@@ -383,7 +518,7 @@ mod tests {
 
         let result = lexer.braced_param(0).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "?");
+        assert_eq!(param.param, Param::from(SpecialParam::Question));
         assert_eq!(param.modifier, Modifier::Length);
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${#?}<");
@@ -406,7 +541,7 @@ mod tests {
 
         let result = lexer.braced_param(0).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "-");
+        assert_eq!(param.param, Param::from(SpecialParam::Hyphen));
         assert_eq!(param.modifier, Modifier::Length);
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${#-}<");
@@ -429,7 +564,7 @@ mod tests {
 
         let result = lexer.braced_param(0).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "x");
+        assert_eq!(param.param, Param::variable("x"));
         assert_matches!(param.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Alter);
             assert_eq!(switch.condition, SwitchCondition::Unset);
@@ -456,7 +591,7 @@ mod tests {
 
         let result = lexer.braced_param(0).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "foo");
+        assert_eq!(param.param, Param::variable("foo"));
         assert_matches!(param.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Error);
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
@@ -483,7 +618,7 @@ mod tests {
 
         let result = lexer.braced_param(0).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "#");
+        assert_eq!(param.param, Param::from(SpecialParam::Number));
         assert_matches!(param.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Alter);
             assert_eq!(switch.condition, SwitchCondition::Unset);
@@ -510,7 +645,7 @@ mod tests {
 
         let result = lexer.braced_param(0).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "#");
+        assert_eq!(param.param, Param::from(SpecialParam::Number));
         assert_matches!(param.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Default);
             assert_eq!(switch.condition, SwitchCondition::Unset);
@@ -537,7 +672,7 @@ mod tests {
 
         let result = lexer.braced_param(0).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "#");
+        assert_eq!(param.param, Param::from(SpecialParam::Number));
         assert_matches!(param.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Assign);
             assert_eq!(switch.condition, SwitchCondition::Unset);
@@ -564,7 +699,7 @@ mod tests {
 
         let result = lexer.braced_param(0).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "#");
+        assert_eq!(param.param, Param::from(SpecialParam::Number));
         assert_matches!(param.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Error);
             assert_eq!(switch.condition, SwitchCondition::Unset);
@@ -591,7 +726,7 @@ mod tests {
 
         let result = lexer.braced_param(0).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "#");
+        assert_eq!(param.param, Param::from(SpecialParam::Number));
         assert_matches!(param.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Default);
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
@@ -618,7 +753,7 @@ mod tests {
 
         let result = lexer.braced_param(0).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "#");
+        assert_eq!(param.param, Param::from(SpecialParam::Number));
         assert_matches!(param.modifier, Modifier::Trim(trim) => {
             assert_eq!(trim.side, TrimSide::Prefix);
             assert_eq!(trim.length, TrimLength::Longest);
@@ -645,7 +780,7 @@ mod tests {
 
         let result = lexer.braced_param(0).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "#");
+        assert_eq!(param.param, Param::from(SpecialParam::Number));
         assert_matches!(param.modifier, Modifier::Trim(trim) => {
             assert_eq!(trim.side, TrimSide::Suffix);
             assert_eq!(trim.length, TrimLength::Shortest);
@@ -688,7 +823,7 @@ mod tests {
 
         let result = lexer.braced_param(0).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "a_1");
+        assert_eq!(param.param, Param::variable("a_1"));
         assert_eq!(param.modifier, Modifier::Length);
         // TODO assert about other param members
         assert_eq!(
@@ -714,7 +849,7 @@ mod tests {
 
         let result = lexer.braced_param(0).now_or_never().unwrap();
         let param = result.unwrap().unwrap();
-        assert_eq!(param.name, "#");
+        assert_eq!(param.param, Param::from(SpecialParam::Number));
         assert_eq!(param.modifier, Modifier::None);
         // TODO assert about other param members
         assert_eq!(*param.location.code.value.borrow(), "${#\\\n\\\n}z");

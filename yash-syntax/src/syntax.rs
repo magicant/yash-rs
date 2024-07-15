@@ -541,8 +541,8 @@ pub enum Modifier {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BracedParam {
     // TODO recursive expansion
-    /// Parameter name
-    pub name: String,
+    /// Parameter to be expanded
+    pub param: Param,
     // TODO index
     /// Modifier
     pub modifier: Modifier,
@@ -554,10 +554,10 @@ impl fmt::Display for BracedParam {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use Modifier::*;
         match self.modifier {
-            None => write!(f, "${{{}}}", self.name),
-            Length => write!(f, "${{#{}}}", self.name),
-            Switch(ref switch) => write!(f, "${{{}{}}}", self.name, switch),
-            Trim(ref trim) => write!(f, "${{{}{}}}", self.name, trim),
+            None => write!(f, "${{{}}}", self.param),
+            Length => write!(f, "${{#{}}}", self.param),
+            Switch(ref switch) => write!(f, "${{{}{}}}", self.param, switch),
+            Trim(ref trim) => write!(f, "${{{}{}}}", self.param, trim),
         }
     }
 }
@@ -567,21 +567,21 @@ impl Unquote for BracedParam {
         use Modifier::*;
         match self.modifier {
             None => {
-                write!(w, "${{{}}}", self.name)?;
+                write!(w, "${{{}}}", self.param)?;
                 Ok(false)
             }
             Length => {
-                write!(w, "${{#{}}}", self.name)?;
+                write!(w, "${{#{}}}", self.param)?;
                 Ok(false)
             }
             Switch(ref switch) => {
-                write!(w, "${{{}", self.name)?;
+                write!(w, "${{{}", self.param)?;
                 let quoted = switch.write_unquoted(w)?;
                 w.write_char('}')?;
                 Ok(quoted)
             }
             Trim(ref trim) => {
-                write!(w, "${{{}", self.name)?;
+                write!(w, "${{{}", self.param)?;
                 let quoted = trim.write_unquoted(w)?;
                 w.write_char('}')?;
                 Ok(quoted)
@@ -1658,7 +1658,7 @@ mod tests {
     #[test]
     fn braced_param_display() {
         let param = BracedParam {
-            name: "foo".to_string(),
+            param: Param::variable("foo"),
             modifier: Modifier::None,
             location: Location::dummy(""),
         };
@@ -1696,7 +1696,7 @@ mod tests {
     #[test]
     fn braced_param_unquote() {
         let param = BracedParam {
-            name: "foo".to_string(),
+            param: Param::variable("foo"),
             modifier: Modifier::None,
             location: Location::dummy(""),
         };

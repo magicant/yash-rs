@@ -144,6 +144,7 @@ impl Expand for Text {
 
 #[cfg(test)]
 mod tests {
+    use super::super::param::tests::braced_variable;
     use super::*;
     use crate::tests::echo_builtin;
     use futures_util::FutureExt;
@@ -151,7 +152,6 @@ mod tests {
     use yash_env_test_helper::in_virtual_system;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::BracedParam;
-    use yash_syntax::syntax::Modifier;
     use yash_syntax::syntax::Param;
 
     #[test]
@@ -221,11 +221,7 @@ mod tests {
             .assign("x", None)
             .unwrap();
         let mut env = Env::new(&mut env);
-        let param = BracedParam(BracedParam {
-            name: "foo".to_string(),
-            modifier: Modifier::None,
-            location: Location::dummy(""),
-        });
+        let param = BracedParam(braced_variable("foo"));
         let result = param.expand(&mut env).now_or_never().unwrap();
 
         let c = AttrChar {

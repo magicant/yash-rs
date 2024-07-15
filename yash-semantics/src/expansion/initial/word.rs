@@ -128,10 +128,11 @@ impl Expand for Word {
 
 #[cfg(test)]
 mod tests {
+    use super::super::param::tests::braced_param;
     use super::super::param::tests::env_with_positional_params_and_ifs;
-    use super::super::param::tests::param;
     use super::*;
     use futures_util::FutureExt;
+    use yash_syntax::syntax::SpecialParam;
     use yash_syntax::syntax::Text;
     use yash_syntax::syntax::TextUnit;
 
@@ -294,7 +295,8 @@ mod tests {
     fn inside_double_quote_is_non_splitting_context() {
         let mut env = env_with_positional_params_and_ifs();
         let mut env = Env::new(&mut env);
-        let unit = DoubleQuote(Text(vec![TextUnit::BracedParam(param("*"))]));
+        let unit = TextUnit::BracedParam(braced_param(SpecialParam::Asterisk));
+        let unit = DoubleQuote(Text(vec![unit]));
         let result = unit.expand(&mut env).now_or_never().unwrap();
 
         assert!(env.will_split);

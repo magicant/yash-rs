@@ -41,7 +41,7 @@ pub struct ParamRef<'a> {
 impl<'a> From<&'a BracedParam> for ParamRef<'a> {
     fn from(param: &'a BracedParam) -> Self {
         ParamRef {
-            name: &param.name,
+            name: &param.param.id,
             modifier: &param.modifier,
             location: &param.location,
         }
@@ -157,7 +157,7 @@ pub mod tests {
     use super::*;
     use futures_util::FutureExt;
     use yash_env::variable::{Scope, IFS};
-    use yash_syntax::syntax::{Switch, SwitchCondition, SwitchType};
+    use yash_syntax::syntax::{Param, SpecialParam, Switch, SwitchCondition, SwitchType};
 
     pub fn env_with_positional_params_and_ifs() -> yash_env::Env {
         let mut env = yash_env::Env::new_virtual();
@@ -169,12 +169,16 @@ pub mod tests {
         env
     }
 
-    pub fn param<N: ToString>(name: N) -> BracedParam {
+    pub fn braced_param<P: Into<Param>>(param: P) -> BracedParam {
         BracedParam {
-            name: name.to_string(),
+            param: param.into(),
             modifier: Modifier::None,
             location: Location::dummy(""),
         }
+    }
+
+    pub fn braced_variable<I: Into<String>>(id: I) -> BracedParam {
+        braced_param(Param::variable(id))
     }
 
     #[test]
@@ -185,7 +189,7 @@ pub mod tests {
             .assign("a1\u{30A4}", None)
             .unwrap();
         let mut env = Env::new(&mut env);
-        let param = param("foo");
+        let param = braced_variable("foo");
         let param = ParamRef::from(&param);
 
         let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
@@ -196,7 +200,7 @@ pub mod tests {
     fn length_of_unset() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
-        let mut param = param("foo");
+        let mut param = braced_variable("foo");
         param.modifier = Modifier::Length;
         let param = ParamRef::from(&param);
 
@@ -212,7 +216,7 @@ pub mod tests {
             .assign("a1\u{30A4}", None)
             .unwrap();
         let mut env = Env::new(&mut env);
-        let mut param = param("foo");
+        let mut param = braced_variable("foo");
         param.modifier = Modifier::Length;
         let param = ParamRef::from(&param);
 
@@ -228,7 +232,7 @@ pub mod tests {
             .assign(Value::array(["", "foo", "1", "bar"]), None)
             .unwrap();
         let mut env = Env::new(&mut env);
-        let mut param = param("foo");
+        let mut param = braced_variable("foo");
         param.modifier = Modifier::Length;
         let param = ParamRef::from(&param);
 
@@ -253,7 +257,7 @@ pub mod tests {
             .get_or_new("foo", Scope::Global)
             .assign("", None)
             .unwrap();
-        let mut param = param("foo");
+        let mut param = braced_variable("foo");
         param.modifier = Modifier::Switch(Switch {
             r#type: SwitchType::Alter,
             condition: SwitchCondition::Unset,
@@ -276,7 +280,7 @@ pub mod tests {
             .assign("abc", None)
             .unwrap();
         let mut env = Env::new(&mut env);
-        let mut param = param("foo");
+        let mut param = braced_variable("foo");
         param.modifier = Modifier::Trim(Trim {
             side: TrimSide::Prefix,
             length: TrimLength::Shortest,
@@ -294,7 +298,7 @@ pub mod tests {
 
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
-        let mut param = param("foo");
+        let mut param = braced_variable("foo");
         param.modifier = Modifier::Trim(Trim {
             side: TrimSide::Prefix,
             length: TrimLength::Shortest,
@@ -310,7 +314,7 @@ pub mod tests {
     fn unset_option() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
-        let param = param("foo");
+        let param = braced_variable("foo");
         let param = ParamRef::from(&param);
 
         let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
@@ -323,7 +327,7 @@ pub mod tests {
         env.options.set(Unset, Off);
         let mut env = Env::new(&mut env);
         let name = "foo".to_owned();
-        let param = param(&name);
+        let param = braced_variable(&name);
         let param = ParamRef::from(&param);
 
         let e = param.expand(&mut env).now_or_never().unwrap().unwrap_err();
@@ -336,7 +340,7 @@ pub mod tests {
         let mut env = yash_env::Env::new_virtual();
         env.options.set(Unset, Off);
         let mut env = Env::new(&mut env);
-        let mut param = param("foo");
+        let mut param = braced_variable("foo");
         param.modifier = Modifier::Switch(Switch {
             r#type: SwitchType::Alter,
             condition: SwitchCondition::Unset,
@@ -351,7 +355,7 @@ pub mod tests {
     #[test]
     fn expand_at_no_join_in_non_splitting_context() {
         let mut env = env_with_positional_params_and_ifs();
-        let param = param("@");
+        let param = braced_param(SpecialParam::At);
         let param = ParamRef::from(&param);
         let mut env = Env::new(&mut env);
         env.will_split = false;
@@ -363,7 +367,7 @@ pub mod tests {
     #[test]
     fn expand_asterisk_no_join_in_splitting_context() {
         let mut env = env_with_positional_params_and_ifs();
-        let param = param("*");
+        let param = braced_param(SpecialParam::Asterisk);
         let param = ParamRef::from(&param);
         let mut env = Env::new(&mut env);
 
@@ -374,7 +378,7 @@ pub mod tests {
     #[test]
     fn expand_asterisk_ifs_join_in_non_splitting_context() {
         let mut env = env_with_positional_params_and_ifs();
-        let param = param("*");
+        let param = braced_param(SpecialParam::Asterisk);
         let param = ParamRef::from(&param);
         let mut env = Env::new(&mut env);
         env.will_split = false;

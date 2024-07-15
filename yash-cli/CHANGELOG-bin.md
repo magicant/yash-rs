@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The shell now rejects an invalid parameter as a syntax error. Specifically,
+  if a parameter starts with a digit but is not a valid number, the shell now
+  reports a syntax error instead of treating it as a variable. For example,
+  `${1abc}` and `${0_1}` are now syntax errors.
 - Improved error messages for some parameter expansion errors.
 
 ## [0.1.0-beta.2] - 2024-07-13
