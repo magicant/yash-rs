@@ -70,17 +70,16 @@ impl WordLexer<'_, '_> {
     /// Tests if there is a length prefix (`#`).
     ///
     /// This function may consume many characters, possibly beyond the length
-    /// prefix, regardless of the result. The caller should rewind to the index
-    /// this function returns.
+    /// prefix, regardless of the result. The caller should remember the index
+    /// before calling this function and rewind afterwards.
     async fn has_length_prefix(&mut self) -> Result<bool> {
         if !self.skip_if(|c| c == '#').await? {
             return Ok(false);
         }
 
-        // Remember that a parameter expansion cannot have both a prefix and
-        // suffix modifier. For example, `${#-?}` is not considered to have a
-        // prefix. We need to look ahead to see if it is okay to treat the `#`
-        // as a prefix.
+        // A parameter expansion cannot have both a prefix and suffix modifier.
+        // For example, `${#-?}` is not considered to have a prefix. We need to
+        // look ahead to see if it is okay to treat the `#` as a prefix.
         if let Some(c) = self.peek_char().await? {
             // Check characters that cannot be a special parameter.
             if matches!(c, '}' | '+' | '=' | ':' | '%') {
