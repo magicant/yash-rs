@@ -25,31 +25,32 @@ use super::Env;
 use super::Expand;
 use yash_env::option::Option::Unset;
 use yash_env::option::State::Off;
-use yash_env::variable::Expansion;
 use yash_env::variable::Value;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::BracedParam;
 use yash_syntax::syntax::Modifier;
+use yash_syntax::syntax::Param;
+use yash_syntax::syntax::ParamType;
+use yash_syntax::syntax::SpecialParam;
 
 /// Reference to a parameter expansion
 pub struct ParamRef<'a> {
-    pub name: &'a str,
+    pub param: &'a Param,
     pub modifier: &'a Modifier,
     pub location: &'a Location,
 }
 
 impl<'a> From<&'a BracedParam> for ParamRef<'a> {
-    fn from(param: &'a BracedParam) -> Self {
+    fn from(bp: &'a BracedParam) -> Self {
         ParamRef {
-            name: &param.param.id,
-            modifier: &param.modifier,
-            location: &param.location,
+            param: &bp.param,
+            modifier: &bp.modifier,
+            location: &bp.location,
         }
     }
 }
 
 // TODO Consider exporting these modules
-mod name;
 mod resolve;
 mod switch;
 mod trim;
@@ -64,11 +65,7 @@ impl Expand for ParamRef<'_> {
         // TODO Expand and parse Index
 
         // Lookup //
-        let name = self.name.try_into().ok();
-        let resolve = match name {
-            Some(name) => resolve::resolve(name, env.inner, self.location),
-            None => Expansion::Unset,
-        };
+        let resolve = resolve::resolve(env.inner, self.param, self.location);
 
         // TODO Apply Index
 
@@ -77,7 +74,7 @@ impl Expand for ParamRef<'_> {
         // Switch //
         if let Modifier::Switch(switch) = self.modifier {
             if let Some(result) =
-                switch::apply(env, switch, self.name, name, value.as_ref(), self.location).await
+                switch::apply(env, switch, self.param, value.as_ref(), self.location).await
             {
                 return result;
             }
@@ -86,7 +83,7 @@ impl Expand for ParamRef<'_> {
             if value.is_none() && env.inner.options.get(Unset) == Off {
                 return Err(Error {
                     cause: ErrorCause::UnsetParameter {
-                        name: self.name.to_owned(),
+                        name: self.param.id.to_owned(),
                     },
                     location: self.location.clone(),
                 });
@@ -116,7 +113,7 @@ impl Expand for ParamRef<'_> {
         }
 
         let mut phrase = into_phrase(value);
-        if !env.will_split && self.name == "*" {
+        if !env.will_split && self.param.r#type == ParamType::Special(SpecialParam::Asterisk) {
             phrase = Phrase::Field(phrase.ifs_join(&env.inner.variables));
         }
         Ok(phrase)
@@ -157,7 +154,7 @@ pub mod tests {
     use super::*;
     use futures_util::FutureExt;
     use yash_env::variable::{Scope, IFS};
-    use yash_syntax::syntax::{Param, SpecialParam, Switch, SwitchCondition, SwitchType};
+    use yash_syntax::syntax::{Switch, SwitchCondition, SwitchType};
 
     pub fn env_with_positional_params_and_ifs() -> yash_env::Env {
         let mut env = yash_env::Env::new_virtual();

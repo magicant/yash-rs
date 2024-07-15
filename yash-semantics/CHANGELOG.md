@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - The `MessageBase::additional_annotations` method implementation for the
       `Error` struct has been extended to produce more annotations for errors
       with `Vacancy` information.
+- External dependency versions:
+    - yash-syntax 0.10.0 → 0.11.0
 
 ## [0.3.0] - 2024-07-13
 

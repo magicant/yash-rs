@@ -102,12 +102,12 @@ impl Expand for TextUnit {
             }
 
             RawParam { param, location } => {
-                let param = ParamRef {
-                    name: &param.id,
+                let param_ref = ParamRef {
+                    param,
                     modifier: &yash_syntax::syntax::Modifier::None,
                     location,
                 };
-                Box::pin(param.expand(env)).await // Boxing needed for recursion
+                Box::pin(param_ref.expand(env)).await // Boxing needed for recursion
             }
 
             // Boxing needed for recursion
