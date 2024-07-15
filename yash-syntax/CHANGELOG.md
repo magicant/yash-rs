@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The following functions are now `const`:
     - `parser::lex::is_portable_name_char`
     - `parser::lex::is_special_parameter_char`
-    - `parser::lex::is_single_char_name`
+- The `parser::lex::is_single_char_name` const function is added.
 - A new `syntax::Param` struct is introduced to represent a parameter in
   parameter expansions (`syntax::TextUnit::RawParam` and `syntax::BracedParam`).
   New enum types `syntax::SpecialParam` and `syntax::ParamType` are added to
