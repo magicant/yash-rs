@@ -95,12 +95,12 @@ impl std::fmt::Display for Vacancy {
 /// `VacantError` is an error that is returned when you apply an error switch to
 /// a [vacant](Vacancy) value.
 #[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
-#[error("{} ({}: {})", self.message_or_default(), .name, .vacancy)]
+#[error("{} ({}: {})", self.message_or_default(), .param, .vacancy)]
 #[non_exhaustive]
 pub struct VacantError {
-    /// Name of the variable that caused this error
-    pub name: String,
-    /// State of the variable value that caused this error
+    /// Parameter that caused this error
+    pub param: Param,
+    /// State of the parameter value that caused this error
     pub vacancy: Vacancy,
     /// Error message specified in the switch
     pub message: Option<String>,
@@ -239,7 +239,7 @@ async fn vacant_expansion_error_message(
 /// Constructs a vacant expansion error.
 async fn vacant_expansion_error(
     env: &mut Env<'_>,
-    name: String,
+    param: &Param,
     vacancy: Vacancy,
     message_word: &Word,
     location: Location,
@@ -249,7 +249,7 @@ async fn vacant_expansion_error(
         Err(error) => return error,
     };
     let cause = ErrorCause::VacantExpansion(VacantError {
-        name,
+        param: param.clone(),
         vacancy,
         message,
     });
@@ -284,7 +284,7 @@ pub async fn apply(
 
         (Error, Vacant(vacancy)) => Some(Err(vacant_expansion_error(
             env,
-            param.id.to_owned(),
+            param,
             vacancy,
             &switch.word,
             location.clone(),
@@ -622,7 +622,7 @@ mod tests {
             .unwrap();
         let error = result.unwrap().unwrap_err();
         assert_matches!(error.cause, ErrorCause::VacantExpansion(e) => {
-            assert_eq!(e.name, "var");
+            assert_eq!(e.param, param);
             assert_eq!(e.message, Some("foo".to_string()));
             assert_eq!(e.vacancy, Vacancy::Unset);
         });
@@ -645,7 +645,7 @@ mod tests {
             .unwrap();
         let error = result.unwrap().unwrap_err();
         assert_matches!(error.cause, ErrorCause::VacantExpansion(e) => {
-            assert_eq!(e.name, "var");
+            assert_eq!(e.param, param);
             assert_eq!(e.message, Some("bar".to_string()));
             assert_eq!(e.vacancy, Vacancy::EmptyScalar);
         });
@@ -668,7 +668,7 @@ mod tests {
             .unwrap();
         let error = result.unwrap().unwrap_err();
         assert_matches!(error.cause, ErrorCause::VacantExpansion(e) => {
-            assert_eq!(e.name, "var");
+            assert_eq!(e.param, param);
             assert_eq!(e.message, None);
             assert_eq!(e.vacancy, Vacancy::ValuelessArray);
         });

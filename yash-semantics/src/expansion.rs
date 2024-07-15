@@ -174,13 +174,21 @@ impl ErrorCause {
         // TODO Localize
         use ErrorCause::*;
         match self {
-            CommandSubstError(e) => e.to_string().into(),
-            ArithError(e) => e.to_string().into(),
-            AssignReadOnly(e) => e.to_string().into(),
-            UnsetParameter { param } => format!("parameter `{param}` is not set").into(),
-            VacantExpansion(e) => format!("{}: {}", e.name, e.vacancy).into(),
-            NonassignableParameter(e) => e.to_string().into(),
+            CommandSubstError(e) => e.to_string(),
+            ArithError(e) => e.to_string(),
+            AssignReadOnly(e) => e.to_string(),
+            UnsetParameter { param } => format!("parameter `{param}` is not set"),
+            VacantExpansion(e) => match e.vacancy {
+                Vacancy::Unset => format!("parameter `{}` is not set", e.param),
+                Vacancy::EmptyScalar => format!("parameter `{}` is an empty string", e.param),
+                Vacancy::ValuelessArray => format!("parameter `{}` is an empty array", e.param),
+                Vacancy::EmptyValueArray => {
+                    format!("parameter `{}` is an array of an empty string", e.param)
+                }
+            },
+            NonassignableParameter(e) => e.to_string(),
         }
+        .into()
     }
 
     /// Returns a location related with the error cause and a message describing

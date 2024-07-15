@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       `MessageBase::footers` method.
     - The `AssignReadOnlyError` struct now has a `vacancy: Option<Vacancy>`
       field.
-    - The `initial::VacantError` struct now has a `name: String` field.
+    - The `initial::VacantError` struct now has a `param: Param` field.
     - The `initial::NonassignableErrorCause` enum is a successor to the previous
       `NonassignableError` enum. The new `NotVariable` variant has a `param:
       Param` field.
