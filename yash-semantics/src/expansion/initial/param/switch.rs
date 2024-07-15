@@ -134,8 +134,8 @@ pub struct NonassignableError {
 #[non_exhaustive]
 pub enum NonassignableErrorCause {
     /// The parameter is not a variable.
-    #[error("parameter {name:?} is not an assignable variable")]
-    NotVariable { name: String },
+    #[error("parameter `{param}` is not an assignable variable")]
+    NotVariable { param: Param },
     // /// The parameter expansion refers to an array but does not index a single
     // /// element.
     // #[error("cannot assign to a non-scalar array range")]
@@ -196,11 +196,9 @@ async fn assign(
 ) -> Result<Phrase, Error> {
     // TODO Support assignment to an array element
     if param.r#type != ParamType::Variable {
-        let name = param.id.to_owned();
-        let cause = ErrorCause::NonassignableParameter(NonassignableError {
-            cause: NonassignableErrorCause::NotVariable { name },
-            vacancy,
-        });
+        let param = param.clone();
+        let cause = NonassignableErrorCause::NotVariable { param };
+        let cause = ErrorCause::NonassignableParameter(NonassignableError { cause, vacancy });
         return Err(Error { cause, location });
     }
     let value_phrase = attribute(value.expand(env).await?);
@@ -601,7 +599,7 @@ mod tests {
         assert_matches!(
             error.cause,
             ErrorCause::NonassignableParameter(error) => {
-                assert_eq!(error.cause, NonassignableErrorCause::NotVariable { name: "-".to_string() });
+                assert_eq!(error.cause, NonassignableErrorCause::NotVariable { param });
                 assert_eq!(error.vacancy, Vacancy::EmptyScalar);
             }
         );

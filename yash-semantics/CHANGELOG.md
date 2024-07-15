@@ -18,8 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       field.
     - The `initial::VacantError` struct now has a `name: String` field.
     - The `initial::NonassignableErrorCause` enum is a successor to the previous
-      `NonassignableError` enum. The new `NotVariable` variant has a `name:
-      String` field.
+      `NonassignableError` enum. The new `NotVariable` variant has a `param:
+      Param` field.
 
 ### Changed
 
