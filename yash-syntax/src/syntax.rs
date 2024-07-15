@@ -632,8 +632,8 @@ pub enum TextUnit {
     Backslashed(char),
     /// Parameter expansion that is not enclosed in braces
     RawParam {
-        /// Parameter name
-        name: String,
+        /// Parameter to be expanded
+        param: Param,
         /// Position of this parameter expansion in the source code
         location: Location,
     },
@@ -675,7 +675,7 @@ impl fmt::Display for TextUnit {
         match self {
             Literal(c) => write!(f, "{c}"),
             Backslashed(c) => write!(f, "\\{c}"),
-            RawParam { name, .. } => write!(f, "${name}"),
+            RawParam { param, .. } => write!(f, "${param}"),
             BracedParam(param) => param.fmt(f),
             CommandSubst { content, .. } => write!(f, "$({content})"),
             Backquote { content, .. } => {
@@ -699,8 +699,8 @@ impl Unquote for TextUnit {
                 w.write_char(*c)?;
                 Ok(true)
             }
-            RawParam { name, .. } => {
-                write!(w, "${name}")?;
+            RawParam { param, .. } => {
+                write!(w, "${param}")?;
                 Ok(false)
             }
             BracedParam(param) => param.write_unquoted(w),
@@ -1768,7 +1768,7 @@ mod tests {
         assert_eq!(backslashed.to_string(), r"\X");
 
         let raw_param = RawParam {
-            name: "PARAM".to_string(),
+            param: Param::variable("PARAM"),
             location: Location::dummy(""),
         };
         assert_eq!(raw_param.to_string(), "$PARAM");
@@ -1813,7 +1813,7 @@ mod tests {
         let nonempty = Text(vec![
             Literal('W'),
             RawParam {
-                name: "X".to_string(),
+                param: Param::variable("X"),
                 location: Location::dummy(""),
             },
             CommandSubst {

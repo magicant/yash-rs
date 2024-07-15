@@ -101,9 +101,9 @@ impl Expand for TextUnit {
                 Ok(Phrase::Field(vec![bs, c]))
             }
 
-            RawParam { name, location } => {
+            RawParam { param, location } => {
                 let param = ParamRef {
-                    name,
+                    name: &param.id,
                     modifier: &yash_syntax::syntax::Modifier::None,
                     location,
                 };
@@ -152,6 +152,7 @@ mod tests {
     use yash_syntax::source::Location;
     use yash_syntax::syntax::BracedParam;
     use yash_syntax::syntax::Modifier;
+    use yash_syntax::syntax::Param;
 
     #[test]
     fn literal() {
@@ -197,10 +198,11 @@ mod tests {
             .assign("x", None)
             .unwrap();
         let mut env = Env::new(&mut env);
-        let name = "foo".to_string();
-        let location = Location::dummy("");
-        let param = RawParam { name, location };
-        let result = param.expand(&mut env).now_or_never().unwrap();
+        let raw_param = RawParam {
+            param: Param::variable("foo"),
+            location: Location::dummy(""),
+        };
+        let result = raw_param.expand(&mut env).now_or_never().unwrap();
 
         let c = AttrChar {
             value: 'x',

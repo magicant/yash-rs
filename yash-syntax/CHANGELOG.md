@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `syntax::Param` has been renamed to `syntax::BracedParam`.
+- The `syntax::TextUnit::RawParam` variant now has a `param: Param` field
+  instead of a `name: String` field.
 - `source::Source::label` now returns `"<arithmetic_expansion>"` for
   `Source::Arith`. Previously, it returned `"<arith>"`.
 

@@ -61,6 +61,8 @@ mod tests {
     use crate::parser::lex::WordContext;
     use crate::source::Source;
     use crate::syntax::Literal;
+    use crate::syntax::Param;
+    use crate::syntax::SpecialParam;
     use crate::syntax::Text;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
@@ -122,8 +124,8 @@ mod tests {
         };
         let result = lexer.dollar_unit().now_or_never().unwrap();
         let text_unit = result.unwrap().unwrap();
-        assert_matches!(text_unit, TextUnit::RawParam { name, location } => {
-            assert_eq!(name, "0");
+        assert_matches!(text_unit, TextUnit::RawParam { param, location } => {
+            assert_eq!(param, Param::from(SpecialParam::Zero));
             assert_eq!(*location.code.value.borrow(), "$0");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(*location.code.source, Source::Unknown);
@@ -195,8 +197,8 @@ mod tests {
         };
         let result = lexer.dollar_unit().now_or_never().unwrap();
         let text_unit = result.unwrap().unwrap();
-        assert_matches!(text_unit, TextUnit::RawParam { name, .. } => {
-            assert_eq!(name, "0");
+        assert_matches!(text_unit, TextUnit::RawParam { param, .. } => {
+            assert_eq!(param, Param::from(SpecialParam::Zero));
         });
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
