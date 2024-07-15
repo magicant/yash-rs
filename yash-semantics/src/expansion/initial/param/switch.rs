@@ -16,7 +16,6 @@
 
 //! Parameter expansion switch semantics
 
-use super::name::Name;
 use super::Env;
 use super::Error;
 use super::Phrase;
@@ -30,6 +29,8 @@ use crate::expansion::ErrorCause;
 use yash_env::variable::Scope;
 use yash_env::variable::Value;
 use yash_syntax::source::Location;
+use yash_syntax::syntax::Param;
+use yash_syntax::syntax::ParamType;
 use yash_syntax::syntax::Switch;
 use yash_syntax::syntax::SwitchCondition;
 use yash_syntax::syntax::SwitchType;
@@ -94,12 +95,12 @@ impl std::fmt::Display for Vacancy {
 /// `VacantError` is an error that is returned when you apply an error switch to
 /// a [vacant](Vacancy) value.
 #[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
-#[error("{} ({}: {})", self.message_or_default(), .name, .vacancy)]
+#[error("{} ({}: {})", self.message_or_default(), .param, .vacancy)]
 #[non_exhaustive]
 pub struct VacantError {
-    /// Name of the variable that caused this error
-    pub name: String,
-    /// State of the variable value that caused this error
+    /// Parameter that caused this error
+    pub param: Param,
+    /// State of the parameter value that caused this error
     pub vacancy: Vacancy,
     /// Error message specified in the switch
     pub message: Option<String>,
@@ -133,8 +134,8 @@ pub struct NonassignableError {
 #[non_exhaustive]
 pub enum NonassignableErrorCause {
     /// The parameter is not a variable.
-    #[error("parameter {name:?} is not an assignable variable")]
-    NotVariable { name: String },
+    #[error("parameter `{param}` is not an assignable variable")]
+    NotVariable { param: Param },
     // /// The parameter expansion refers to an array but does not index a single
     // /// element.
     // #[error("cannot assign to a non-scalar array range")]
@@ -188,34 +189,28 @@ fn attribute(mut phrase: Phrase) -> Phrase {
 /// Assigns the expansion of `value` to variable `name`.
 async fn assign(
     env: &mut Env<'_>,
-    orig_name: &str,
-    name: Option<Name<'_>>,
+    param: &Param,
     vacancy: Vacancy,
     value: &Word,
     location: Location,
 ) -> Result<Phrase, Error> {
     // TODO Support assignment to an array element
-    let name = match name {
-        Some(Name::Variable(name)) => name,
-        _ => {
-            let name = orig_name.to_owned();
-            let cause = ErrorCause::NonassignableParameter(NonassignableError {
-                cause: NonassignableErrorCause::NotVariable { name },
-                vacancy,
-            });
-            return Err(Error { cause, location });
-        }
-    };
+    if param.r#type != ParamType::Variable {
+        let param = param.clone();
+        let cause = NonassignableErrorCause::NotVariable { param };
+        let cause = ErrorCause::NonassignableParameter(NonassignableError { cause, vacancy });
+        return Err(Error { cause, location });
+    }
     let value_phrase = attribute(value.expand(env).await?);
     let joined_value = value_phrase.clone().ifs_join(&env.inner.variables);
     let final_value = skip_quotes(joined_value).strip().collect::<String>();
     env.inner
-        .get_or_create_variable(name, Scope::Global)
+        .get_or_create_variable(&param.id, Scope::Global)
         .assign(final_value, location)
         .map_err(|e| {
             let location = e.assigned_location.unwrap();
             let cause = ErrorCause::AssignReadOnly(AssignReadOnlyError {
-                name: name.to_owned(),
+                name: param.id.to_owned(),
                 new_value: e.new_value,
                 read_only_location: e.read_only_location,
                 vacancy: Some(vacancy),
@@ -244,7 +239,7 @@ async fn vacant_expansion_error_message(
 /// Constructs a vacant expansion error.
 async fn vacant_expansion_error(
     env: &mut Env<'_>,
-    name: String,
+    param: &Param,
     vacancy: Vacancy,
     message_word: &Word,
     location: Location,
@@ -254,7 +249,7 @@ async fn vacant_expansion_error(
         Err(error) => return error,
     };
     let cause = ErrorCause::VacantExpansion(VacantError {
-        name,
+        param: param.clone(),
         vacancy,
         message,
     });
@@ -269,8 +264,7 @@ async fn vacant_expansion_error(
 pub async fn apply(
     env: &mut Env<'_>,
     switch: &Switch,
-    orig_name: &str,
-    name: Option<Name<'_>>,
+    param: &Param,
     value: Option<&Value>,
     location: &Location,
 ) -> Option<Result<Phrase, Error>> {
@@ -284,21 +278,13 @@ pub async fn apply(
             Some(switch.word.expand(env).await.map(attribute))
         }
 
-        (Assign, Vacant(vacancy)) => Some(
-            assign(
-                env,
-                orig_name,
-                name,
-                vacancy,
-                &switch.word,
-                location.clone(),
-            )
-            .await,
-        ),
+        (Assign, Vacant(vacancy)) => {
+            Some(assign(env, param, vacancy, &switch.word, location.clone()).await)
+        }
 
         (Error, Vacant(vacancy)) => Some(Err(vacant_expansion_error(
             env,
-            orig_name.to_owned(),
+            param,
             vacancy,
             &switch.word,
             location.clone(),
@@ -315,6 +301,7 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use yash_env::variable::IFS;
+    use yash_syntax::syntax::SpecialParam;
     use yash_syntax::syntax::SwitchCondition::*;
     use yash_syntax::syntax::SwitchType::*;
 
@@ -394,9 +381,9 @@ mod tests {
             condition: Unset,
             word: "foo".parse().unwrap(),
         };
-        let name = Some(Name::Variable("var"));
+        let param = Param::variable("var");
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, "var", name, None, &location)
+        let result = apply(&mut env, &switch, &param, None, &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, None);
@@ -411,10 +398,10 @@ mod tests {
             condition: Unset,
             word: "foo".parse().unwrap(),
         };
-        let name = Some(Name::Variable("var"));
+        let param = Param::variable("var");
         let value = Value::scalar("bar");
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, "var", name, Some(&value), &location)
+        let result = apply(&mut env, &switch, &param, Some(&value), &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Some(Ok(Phrase::Field(to_field("foo")))));
@@ -429,9 +416,9 @@ mod tests {
             condition: Unset,
             word: "foo".parse().unwrap(),
         };
-        let name = Some(Name::Variable("var"));
+        let param = Param::variable("var");
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, "var", name, None, &location)
+        let result = apply(&mut env, &switch, &param, None, &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Some(Ok(Phrase::Field(to_field("foo")))));
@@ -446,10 +433,10 @@ mod tests {
             condition: Unset,
             word: "foo".parse().unwrap(),
         };
-        let name = Some(Name::Variable("var"));
+        let param = Param::variable("var");
         let value = Value::scalar("bar");
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, "var", name, Some(&value), &location)
+        let result = apply(&mut env, &switch, &param, Some(&value), &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, None);
@@ -464,10 +451,10 @@ mod tests {
             condition: Unset,
             word: "foo".parse().unwrap(),
         };
-        let name = Some(Name::Variable("var"));
+        let param = Param::variable("var");
         let location = Location::dummy("somewhere");
 
-        let result = apply(&mut env, &switch, "var", name, None, &location)
+        let result = apply(&mut env, &switch, &param, None, &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Some(Ok(Phrase::Field(to_field("foo")))));
@@ -494,10 +481,10 @@ mod tests {
             condition: Unset,
             word: "\"$@\"".parse().unwrap(),
         };
-        let name = Some(Name::Variable("var"));
+        let param = Param::variable("var");
         let location = Location::dummy("somewhere");
 
-        let result = apply(&mut env, &switch, "var", name, None, &location)
+        let result = apply(&mut env, &switch, &param, None, &location)
             .now_or_never()
             .unwrap();
 
@@ -551,10 +538,10 @@ mod tests {
             condition: Unset,
             word: "foo".parse().unwrap(),
         };
-        let name = Some(Name::Variable("var"));
+        let param = Param::variable("var");
         let value = Value::scalar("bar");
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, "var", name, Some(&value), &location)
+        let result = apply(&mut env, &switch, &param, Some(&value), &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, None);
@@ -573,11 +560,11 @@ mod tests {
             condition: UnsetOrEmpty,
             word: "foo".parse().unwrap(),
         };
-        let name = Some(Name::Variable("var"));
+        let param = Param::variable("var");
         let value = save_var.value.as_ref();
         let location = Location::dummy("somewhere");
 
-        let result = apply(&mut env, &switch, "var", name, value, &location)
+        let result = apply(&mut env, &switch, &param, value, &location)
             .now_or_never()
             .unwrap();
         assert_matches!(result, Some(Err(error)) => {
@@ -601,18 +588,18 @@ mod tests {
             condition: UnsetOrEmpty,
             word: "foo".parse().unwrap(),
         };
-        let name = Some(Name::Special('-'));
+        let param = Param::from(SpecialParam::Hyphen);
         let value = Value::scalar("");
         let location = Location::dummy("somewhere");
 
-        let result = apply(&mut env, &switch, "-", name, Some(&value), &location)
+        let result = apply(&mut env, &switch, &param, Some(&value), &location)
             .now_or_never()
             .unwrap();
         let error = result.unwrap().unwrap_err();
         assert_matches!(
             error.cause,
             ErrorCause::NonassignableParameter(error) => {
-                assert_eq!(error.cause, NonassignableErrorCause::NotVariable { name: "-".to_string() });
+                assert_eq!(error.cause, NonassignableErrorCause::NotVariable { param });
                 assert_eq!(error.vacancy, Vacancy::EmptyScalar);
             }
         );
@@ -628,14 +615,14 @@ mod tests {
             condition: Unset,
             word: "foo".parse().unwrap(),
         };
-        let name = Some(Name::Variable("var"));
+        let param = Param::variable("var");
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, "var", name, None, &location)
+        let result = apply(&mut env, &switch, &param, None, &location)
             .now_or_never()
             .unwrap();
         let error = result.unwrap().unwrap_err();
         assert_matches!(error.cause, ErrorCause::VacantExpansion(e) => {
-            assert_eq!(e.name, "var");
+            assert_eq!(e.param, param);
             assert_eq!(e.message, Some("foo".to_string()));
             assert_eq!(e.vacancy, Vacancy::Unset);
         });
@@ -650,15 +637,15 @@ mod tests {
             condition: UnsetOrEmpty,
             word: "bar".parse().unwrap(),
         };
-        let name = Some(Name::Variable("var"));
+        let param = Param::variable("var");
         let value = Value::scalar("");
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, "var", name, Some(&value), &location)
+        let result = apply(&mut env, &switch, &param, Some(&value), &location)
             .now_or_never()
             .unwrap();
         let error = result.unwrap().unwrap_err();
         assert_matches!(error.cause, ErrorCause::VacantExpansion(e) => {
-            assert_eq!(e.name, "var");
+            assert_eq!(e.param, param);
             assert_eq!(e.message, Some("bar".to_string()));
             assert_eq!(e.vacancy, Vacancy::EmptyScalar);
         });
@@ -673,15 +660,15 @@ mod tests {
             condition: UnsetOrEmpty,
             word: "".parse().unwrap(),
         };
-        let name = Some(Name::Variable("var"));
+        let param = Param::variable("var");
         let value = Value::Array(vec![]);
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, "var", name, Some(&value), &location)
+        let result = apply(&mut env, &switch, &param, Some(&value), &location)
             .now_or_never()
             .unwrap();
         let error = result.unwrap().unwrap_err();
         assert_matches!(error.cause, ErrorCause::VacantExpansion(e) => {
-            assert_eq!(e.name, "var");
+            assert_eq!(e.param, param);
             assert_eq!(e.message, None);
             assert_eq!(e.vacancy, Vacancy::ValuelessArray);
         });
@@ -697,10 +684,10 @@ mod tests {
             condition: Unset,
             word: "foo".parse().unwrap(),
         };
-        let name = Some(Name::Variable("var"));
+        let param = Param::variable("var");
         let value = Value::scalar("");
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, "var", name, Some(&value), &location)
+        let result = apply(&mut env, &switch, &param, Some(&value), &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, None);

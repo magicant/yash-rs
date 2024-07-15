@@ -46,5 +46,6 @@ pub use self::op::Operator;
 pub use self::op::ParseOperatorError;
 pub use self::op::TryFromOperatorError;
 pub use self::raw_param::is_portable_name_char;
+pub use self::raw_param::is_single_char_name;
 pub use self::raw_param::is_special_parameter_char;
 pub use self::token::is_token_delimiter_char;

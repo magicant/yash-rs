@@ -25,31 +25,32 @@ use super::Env;
 use super::Expand;
 use yash_env::option::Option::Unset;
 use yash_env::option::State::Off;
-use yash_env::variable::Expansion;
 use yash_env::variable::Value;
 use yash_syntax::source::Location;
+use yash_syntax::syntax::BracedParam;
 use yash_syntax::syntax::Modifier;
 use yash_syntax::syntax::Param;
+use yash_syntax::syntax::ParamType;
+use yash_syntax::syntax::SpecialParam;
 
 /// Reference to a parameter expansion
 pub struct ParamRef<'a> {
-    pub name: &'a str,
+    pub param: &'a Param,
     pub modifier: &'a Modifier,
     pub location: &'a Location,
 }
 
-impl<'a> From<&'a Param> for ParamRef<'a> {
-    fn from(param: &'a Param) -> Self {
+impl<'a> From<&'a BracedParam> for ParamRef<'a> {
+    fn from(bp: &'a BracedParam) -> Self {
         ParamRef {
-            name: &param.name,
-            modifier: &param.modifier,
-            location: &param.location,
+            param: &bp.param,
+            modifier: &bp.modifier,
+            location: &bp.location,
         }
     }
 }
 
 // TODO Consider exporting these modules
-mod name;
 mod resolve;
 mod switch;
 mod trim;
@@ -64,11 +65,7 @@ impl Expand for ParamRef<'_> {
         // TODO Expand and parse Index
 
         // Lookup //
-        let name = self.name.try_into().ok();
-        let resolve = match name {
-            Some(name) => resolve::resolve(name, env.inner, self.location),
-            None => Expansion::Unset,
-        };
+        let resolve = resolve::resolve(env.inner, self.param, self.location);
 
         // TODO Apply Index
 
@@ -77,7 +74,7 @@ impl Expand for ParamRef<'_> {
         // Switch //
         if let Modifier::Switch(switch) = self.modifier {
             if let Some(result) =
-                switch::apply(env, switch, self.name, name, value.as_ref(), self.location).await
+                switch::apply(env, switch, self.param, value.as_ref(), self.location).await
             {
                 return result;
             }
@@ -86,7 +83,7 @@ impl Expand for ParamRef<'_> {
             if value.is_none() && env.inner.options.get(Unset) == Off {
                 return Err(Error {
                     cause: ErrorCause::UnsetParameter {
-                        name: self.name.to_owned(),
+                        param: self.param.clone(),
                     },
                     location: self.location.clone(),
                 });
@@ -116,7 +113,7 @@ impl Expand for ParamRef<'_> {
         }
 
         let mut phrase = into_phrase(value);
-        if !env.will_split && self.name == "*" {
+        if !env.will_split && self.param.r#type == ParamType::Special(SpecialParam::Asterisk) {
             phrase = Phrase::Field(phrase.ifs_join(&env.inner.variables));
         }
         Ok(phrase)
@@ -169,12 +166,16 @@ pub mod tests {
         env
     }
 
-    pub fn param<N: ToString>(name: N) -> Param {
-        Param {
-            name: name.to_string(),
+    pub fn braced_param<P: Into<Param>>(param: P) -> BracedParam {
+        BracedParam {
+            param: param.into(),
             modifier: Modifier::None,
             location: Location::dummy(""),
         }
+    }
+
+    pub fn braced_variable<I: Into<String>>(id: I) -> BracedParam {
+        braced_param(Param::variable(id))
     }
 
     #[test]
@@ -185,7 +186,7 @@ pub mod tests {
             .assign("a1\u{30A4}", None)
             .unwrap();
         let mut env = Env::new(&mut env);
-        let param = param("foo");
+        let param = braced_variable("foo");
         let param = ParamRef::from(&param);
 
         let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
@@ -196,7 +197,7 @@ pub mod tests {
     fn length_of_unset() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
-        let mut param = param("foo");
+        let mut param = braced_variable("foo");
         param.modifier = Modifier::Length;
         let param = ParamRef::from(&param);
 
@@ -212,7 +213,7 @@ pub mod tests {
             .assign("a1\u{30A4}", None)
             .unwrap();
         let mut env = Env::new(&mut env);
-        let mut param = param("foo");
+        let mut param = braced_variable("foo");
         param.modifier = Modifier::Length;
         let param = ParamRef::from(&param);
 
@@ -228,7 +229,7 @@ pub mod tests {
             .assign(Value::array(["", "foo", "1", "bar"]), None)
             .unwrap();
         let mut env = Env::new(&mut env);
-        let mut param = param("foo");
+        let mut param = braced_variable("foo");
         param.modifier = Modifier::Length;
         let param = ParamRef::from(&param);
 
@@ -253,7 +254,7 @@ pub mod tests {
             .get_or_new("foo", Scope::Global)
             .assign("", None)
             .unwrap();
-        let mut param = param("foo");
+        let mut param = braced_variable("foo");
         param.modifier = Modifier::Switch(Switch {
             r#type: SwitchType::Alter,
             condition: SwitchCondition::Unset,
@@ -276,7 +277,7 @@ pub mod tests {
             .assign("abc", None)
             .unwrap();
         let mut env = Env::new(&mut env);
-        let mut param = param("foo");
+        let mut param = braced_variable("foo");
         param.modifier = Modifier::Trim(Trim {
             side: TrimSide::Prefix,
             length: TrimLength::Shortest,
@@ -294,7 +295,7 @@ pub mod tests {
 
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
-        let mut param = param("foo");
+        let mut param = braced_variable("foo");
         param.modifier = Modifier::Trim(Trim {
             side: TrimSide::Prefix,
             length: TrimLength::Shortest,
@@ -310,7 +311,7 @@ pub mod tests {
     fn unset_option() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
-        let param = param("foo");
+        let param = braced_variable("foo");
         let param = ParamRef::from(&param);
 
         let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
@@ -322,12 +323,11 @@ pub mod tests {
         let mut env = yash_env::Env::new_virtual();
         env.options.set(Unset, Off);
         let mut env = Env::new(&mut env);
-        let name = "foo".to_owned();
-        let param = param(&name);
-        let param = ParamRef::from(&param);
+        let param = braced_variable("foo");
+        let pr = ParamRef::from(&param);
 
-        let e = param.expand(&mut env).now_or_never().unwrap().unwrap_err();
-        assert_eq!(e.cause, ErrorCause::UnsetParameter { name });
+        let e = pr.expand(&mut env).now_or_never().unwrap().unwrap_err();
+        assert_eq!(e.cause, ErrorCause::UnsetParameter { param: param.param });
         assert_eq!(e.location, Location::dummy(""));
     }
 
@@ -336,7 +336,7 @@ pub mod tests {
         let mut env = yash_env::Env::new_virtual();
         env.options.set(Unset, Off);
         let mut env = Env::new(&mut env);
-        let mut param = param("foo");
+        let mut param = braced_variable("foo");
         param.modifier = Modifier::Switch(Switch {
             r#type: SwitchType::Alter,
             condition: SwitchCondition::Unset,
@@ -351,7 +351,7 @@ pub mod tests {
     #[test]
     fn expand_at_no_join_in_non_splitting_context() {
         let mut env = env_with_positional_params_and_ifs();
-        let param = param("@");
+        let param = braced_param(SpecialParam::At);
         let param = ParamRef::from(&param);
         let mut env = Env::new(&mut env);
         env.will_split = false;
@@ -363,7 +363,7 @@ pub mod tests {
     #[test]
     fn expand_asterisk_no_join_in_splitting_context() {
         let mut env = env_with_positional_params_and_ifs();
-        let param = param("*");
+        let param = braced_param(SpecialParam::Asterisk);
         let param = ParamRef::from(&param);
         let mut env = Env::new(&mut env);
 
@@ -374,7 +374,7 @@ pub mod tests {
     #[test]
     fn expand_asterisk_ifs_join_in_non_splitting_context() {
         let mut env = env_with_positional_params_and_ifs();
-        let param = param("*");
+        let param = braced_param(SpecialParam::Asterisk);
         let param = ParamRef::from(&param);
         let mut env = Env::new(&mut env);
         env.will_split = false;

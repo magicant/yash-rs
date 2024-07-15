@@ -33,6 +33,7 @@ use yash_env::variable::Scope::Global;
 use yash_syntax::source::Code;
 use yash_syntax::source::Location;
 use yash_syntax::source::Source;
+use yash_syntax::syntax::Param;
 use yash_syntax::syntax::Text;
 
 /// Types of errors that may occur in arithmetic expansion
@@ -135,7 +136,7 @@ impl ArithError {
 /// Error expanding an unset variable
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct UnsetVariable {
-    name: String,
+    param: Param,
 }
 
 /// Converts `yash_arith::ErrorCause` into `initial::ErrorCause`.
@@ -192,8 +193,8 @@ fn convert_error_cause(
             }
             yash_arith::EvalError::ReverseShifting => ErrorCause::ArithError(ReverseShifting),
             yash_arith::EvalError::AssignmentToValue => ErrorCause::ArithError(AssignmentToValue),
-            yash_arith::EvalError::GetVariableError(UnsetVariable { name }) => {
-                ErrorCause::UnsetParameter { name }
+            yash_arith::EvalError::GetVariableError(UnsetVariable { param }) => {
+                ErrorCause::UnsetParameter { param }
             }
             yash_arith::EvalError::AssignVariableError(e) => ErrorCause::AssignReadOnly(e),
         },
@@ -217,7 +218,7 @@ impl<'a> yash_arith::Env for VarEnv<'a> {
                 // TODO If the variable exists but is not scalar, UnsetVariable
                 // does not seem to be the right error.
                 Off => Err(UnsetVariable {
-                    name: name.to_owned(),
+                    param: Param::variable(name),
                 }),
                 On => Ok(None),
             },
@@ -363,7 +364,7 @@ mod tests {
         assert_eq!(
             result,
             Err(UnsetVariable {
-                name: "v".to_string()
+                param: Param::variable("v")
             })
         );
     }

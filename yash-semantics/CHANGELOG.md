@@ -16,16 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       `MessageBase::footers` method.
     - The `AssignReadOnlyError` struct now has a `vacancy: Option<Vacancy>`
       field.
-    - The `initial::VacantError` struct now has a `name: String` field.
+    - The `initial::VacantError` struct now has a `param: Param` field.
     - The `initial::NonassignableErrorCause` enum is a successor to the previous
-      `NonassignableError` enum. The new `NotVariable` variant has a `name:
-      String` field.
+      `NonassignableError` enum. The new `NotVariable` variant has a `param:
+      Param` field.
 
 ### Changed
 
 - Error types in the `expansion` module (some of which are reexported in the
   `assign` module) have been extended for more informative error messages:
-    - The `ErrorCause::UnsetParameter` variant now has a `name: String` field.
+    - The `ErrorCause::UnsetParameter` variant now has a `param: Param` field.
     - The `message` and `label` methods of `ErrorCause` return more informative
       messages for the `UnsetParameter` and `VacantExpansion` variants.
     - The `expansion::initial::NonassignableError` enum has been replaced with a
@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - The `MessageBase::additional_annotations` method implementation for the
       `Error` struct has been extended to produce more annotations for errors
       with `Vacancy` information.
+- External dependency versions:
+    - yash-syntax 0.10.0 → 0.11.0
 
 ## [0.3.0] - 2024-07-13
 

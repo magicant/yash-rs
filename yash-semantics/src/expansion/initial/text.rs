@@ -101,13 +101,13 @@ impl Expand for TextUnit {
                 Ok(Phrase::Field(vec![bs, c]))
             }
 
-            RawParam { name, location } => {
-                let param = ParamRef {
-                    name,
+            RawParam { param, location } => {
+                let param_ref = ParamRef {
+                    param,
                     modifier: &yash_syntax::syntax::Modifier::None,
                     location,
                 };
-                Box::pin(param.expand(env)).await // Boxing needed for recursion
+                Box::pin(param_ref.expand(env)).await // Boxing needed for recursion
             }
 
             // Boxing needed for recursion
@@ -144,13 +144,14 @@ impl Expand for Text {
 
 #[cfg(test)]
 mod tests {
+    use super::super::param::tests::braced_variable;
     use super::*;
     use crate::tests::echo_builtin;
     use futures_util::FutureExt;
     use yash_env::variable::Scope;
     use yash_env_test_helper::in_virtual_system;
     use yash_syntax::source::Location;
-    use yash_syntax::syntax::Modifier;
+    use yash_syntax::syntax::BracedParam;
     use yash_syntax::syntax::Param;
 
     #[test]
@@ -197,10 +198,11 @@ mod tests {
             .assign("x", None)
             .unwrap();
         let mut env = Env::new(&mut env);
-        let name = "foo".to_string();
-        let location = Location::dummy("");
-        let param = RawParam { name, location };
-        let result = param.expand(&mut env).now_or_never().unwrap();
+        let raw_param = RawParam {
+            param: Param::variable("foo"),
+            location: Location::dummy(""),
+        };
+        let result = raw_param.expand(&mut env).now_or_never().unwrap();
 
         let c = AttrChar {
             value: 'x',
@@ -219,11 +221,7 @@ mod tests {
             .assign("x", None)
             .unwrap();
         let mut env = Env::new(&mut env);
-        let param = BracedParam(Param {
-            name: "foo".to_string(),
-            modifier: Modifier::None,
-            location: Location::dummy(""),
-        });
+        let param = BracedParam(braced_variable("foo"));
         let result = param.expand(&mut env).now_or_never().unwrap();
 
         let c = AttrChar {

@@ -5,12 +5,34 @@ All notable changes to `yash-syntax` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.1] - Unreleased
+## [0.11.0] - Unreleased
+
+### Added
+
+- The following functions are now `const`:
+    - `parser::lex::is_portable_name_char`
+    - `parser::lex::is_special_parameter_char`
+- The `parser::lex::is_single_char_name` const function is added.
+- A new `syntax::Param` struct is introduced to represent a parameter in
+  parameter expansions (`syntax::TextUnit::RawParam` and `syntax::BracedParam`).
+  New enum types `syntax::SpecialParam` and `syntax::ParamType` are added to
+  represent the details of the parameter. Note that the former `syntax::Param`
+  struct is renamed to `syntax::BracedParam`.
+- The `parser::SyntaxError::InvalidParam` variant is added, which is returned
+  when a parameter expansion has an invalid name.
 
 ### Changed
 
+- `syntax::Param` has been renamed to `syntax::BracedParam`.
+- The `syntax::TextUnit::RawParam` variant now has a `param: syntax::Param`
+  field instead of a `name: String` field.
+- The `syntax::BracedParam` struct (formerly `syntax::Param`) now has a
+  `param: syntax::Param` field instead of a `name: String` field.
 - `source::Source::label` now returns `"<arithmetic_expansion>"` for
   `Source::Arith`. Previously, it returned `"<arith>"`.
+- The `parser::lex::WordLexer::braced_param` method now returns
+  `parser::SyntaxError::InvalidParam` if the parameter starts with a digit but
+  contains a non-digit character.
 
 ## [0.10.0] - 2024-07-12
 
@@ -289,7 +311,7 @@ command.
 - Functionalities to parse POSIX shell scripts
 - Alias substitution support
 
-[0.10.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.10.1
+[0.11.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.11.0
 [0.10.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.10.0
 [0.9.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.9.0
 [0.8.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.8.0
