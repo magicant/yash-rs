@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The first argument to `startup::prepare_input` is now `env: &'a RefCell<&mut Env>`
   instead of `system: &mut SharedSystem`. This change is to allow the function to
   construct `yash_env::input::Echo` for the returned source input.
+- Restructured the `startup` module:
+    - `prepare_input`, `SourceInput`, and `PrepareInputError` are moved from
+      `startup` to `startup::input`.
 
 ### Removed
 

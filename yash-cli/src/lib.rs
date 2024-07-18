@@ -26,10 +26,10 @@
 pub mod startup;
 // mod runner;
 
+use self::startup::args::Parse;
+use self::startup::input::prepare_input;
 use futures_util::task::LocalSpawnExt as _;
 use futures_util::FutureExt as _;
-use startup::args::Parse;
-use startup::prepare_input;
 use std::cell::RefCell;
 use std::num::NonZeroU64;
 use std::ops::ControlFlow::{Break, Continue};
