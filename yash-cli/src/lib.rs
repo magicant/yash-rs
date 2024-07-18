@@ -33,9 +33,6 @@ use futures_util::FutureExt as _;
 use std::cell::RefCell;
 use std::num::NonZeroU64;
 use std::ops::ControlFlow::{Break, Continue};
-use yash_builtin::BUILTINS;
-use yash_env::option::Option::{Interactive, Monitor, Stdin};
-use yash_env::option::State::On;
 use yash_env::signal;
 use yash_env::system::SignalHandling;
 use yash_env::Env;
@@ -56,7 +53,7 @@ async fn print_version(env: &mut Env) -> i32 {
 #[allow(clippy::await_holding_refcell_ref)]
 async fn parse_and_print(mut env: Env) -> i32 {
     // Parse the command-line arguments
-    let run = match startup::args::parse(std::env::args()) {
+    let run = match self::startup::args::parse(std::env::args()) {
         Ok(Parse::Help) => todo!("print help"),
         Ok(Parse::Version) => return print_version(&mut env).await,
         Ok(Parse::Run(run)) => run,
@@ -67,45 +64,17 @@ async fn parse_and_print(mut env: Env) -> i32 {
         }
     };
 
-    // Apply the parsed options to the environment
-    if startup::auto_interactive(&env.system, &run) {
-        env.options.set(Interactive, On);
-    }
-    if run.work.source == startup::args::Source::Stdin {
-        env.options.set(Stdin, On);
-    }
-    for &(option, state) in &run.options {
-        env.options.set(option, state);
-    }
-    if env.options.get(Interactive) == On && !run.options.iter().any(|&(o, _)| o == Monitor) {
-        env.options.set(Monitor, On);
-    }
-
-    // Apply the parsed operands to the environment
-    env.arg0 = run.arg0;
-    env.variables.positional_params_mut().values = run.positional_params;
-
-    // Initialize signal handlers
-    if env.options.get(Interactive) == On {
-        env.traps.enable_terminator_handlers(&mut env.system).ok();
-        if env.options.get(Monitor) == On {
-            env.traps.enable_stopper_handlers(&mut env.system).ok();
-        }
-    }
-
-    // Prepare built-ins
-    env.builtins.extend(BUILTINS.iter().cloned());
-
-    // Prepare variables
+    // Import environment variables
     env.variables.extend_env(std::env::vars());
-    env.init_variables();
+
+    let work = self::startup::configure_environment(&mut env, run);
 
     // TODO run profile if login
     // TODO run rcfile if interactive
 
     // Prepare the input for the main read-eval loop
     let ref_env = &RefCell::new(&mut env);
-    let input = match prepare_input(ref_env, &run.work.source) {
+    let input = match prepare_input(ref_env, &work.source) {
         Ok(input) => input,
         Err(e) => {
             let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());

@@ -16,10 +16,12 @@
 
 //! Shell startup
 
-use self::args::Run;
-use self::args::Source;
+use self::args::{Run, Source, Work};
+use yash_builtin::BUILTINS;
 use yash_env::io::Fd;
-use yash_env::option::Option::Interactive;
+use yash_env::option::Option::{Interactive, Monitor, Stdin};
+use yash_env::option::State::On;
+use yash_env::Env;
 use yash_env::System;
 
 pub mod args;
@@ -41,4 +43,49 @@ pub fn auto_interactive<S: System>(system: &S, run: &Run) -> bool {
         return false;
     }
     system.isatty(Fd::STDIN).unwrap_or(false) && system.isatty(Fd::STDERR).unwrap_or(false)
+}
+
+/// Get the environment ready for performing the work.
+///
+/// This function takes the parsed command-line arguments and applies them to
+/// the environment. It also sets up signal handlers and prepares built-ins and
+/// variables. The function returns the work to be performed, which is extracted
+/// from the `run` argument.
+///
+/// This function is _pure_ in that all system calls are performed by the
+/// `System` trait object (`env.system`).
+pub fn configure_environment(env: &mut Env, run: Run) -> Work {
+    // Apply the parsed options to the environment
+    if auto_interactive(&env.system, &run) {
+        env.options.set(Interactive, On);
+    }
+    if run.work.source == self::args::Source::Stdin {
+        env.options.set(Stdin, On);
+    }
+    for &(option, state) in &run.options {
+        env.options.set(option, state);
+    }
+    if env.options.get(Interactive) == On && !run.options.iter().any(|&(o, _)| o == Monitor) {
+        env.options.set(Monitor, On);
+    }
+
+    // Apply the parsed operands to the environment
+    env.arg0 = run.arg0;
+    env.variables.positional_params_mut().values = run.positional_params;
+
+    // Initialize signal handlers
+    if env.options.get(Interactive) == On {
+        env.traps.enable_terminator_handlers(&mut env.system).ok();
+        if env.options.get(Monitor) == On {
+            env.traps.enable_stopper_handlers(&mut env.system).ok();
+        }
+    }
+
+    // Prepare built-ins
+    env.builtins.extend(BUILTINS.iter().cloned());
+
+    // Prepare variables
+    env.init_variables();
+
+    run.work
 }

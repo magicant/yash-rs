@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - yash-prompt 0.1.0
 - The `startup::args::Work` struct contains the `source`, `profile`, and
   `rcfile` fields which were previously in the `startup::args::Run` struct.
+- The `startup::configure_environment` function implements the configuration
+  of the shell environment based on the command-line arguments.
 
 ### Changed
 
