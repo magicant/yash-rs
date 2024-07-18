@@ -71,7 +71,7 @@ async fn parse_and_print(mut env: Env) -> i32 {
     if startup::auto_interactive(&env.system, &run) {
         env.options.set(Interactive, On);
     }
-    if run.source == startup::args::Source::Stdin {
+    if run.work.source == startup::args::Source::Stdin {
         env.options.set(Stdin, On);
     }
     for &(option, state) in &run.options {
@@ -105,7 +105,7 @@ async fn parse_and_print(mut env: Env) -> i32 {
 
     // Prepare the input for the main read-eval loop
     let ref_env = &RefCell::new(&mut env);
-    let input = match prepare_input(ref_env, &run.source) {
+    let input = match prepare_input(ref_env, &run.work.source) {
         Ok(input) => input,
         Err(e) => {
             let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());

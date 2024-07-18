@@ -31,7 +31,7 @@ pub mod input;
 /// standard error are attached to a terminal, the shell is considered to be
 /// interactive." This function implements this rule.
 pub fn auto_interactive<S: System>(system: &S, run: &Run) -> bool {
-    if run.source != Source::Stdin {
+    if run.work.source != Source::Stdin {
         return false;
     }
     if run.options.iter().any(|&(o, _)| o == Interactive) {

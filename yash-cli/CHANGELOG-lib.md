@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Internal dependencies:
     - yash-prompt 0.1.0
+- The `startup::args::Work` struct contains the `source`, `profile`, and
+  `rcfile` fields which were previously in the `startup::args::Run` struct.
 
 ### Changed
 
@@ -33,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Restructured the `startup` module:
     - `prepare_input`, `SourceInput`, and `PrepareInputError` are moved from
       `startup` to `startup::input`.
+    - The `source`, `profile`, and `rcfile` fields are moved from `args::Run` to
+      `args::Work`. `args::Run` now has a `work` field of type `Work`.
 
 ### Removed
 
