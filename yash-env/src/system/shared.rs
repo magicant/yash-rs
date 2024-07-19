@@ -21,6 +21,7 @@ use super::ChildProcessStarter;
 use super::Dir;
 use super::Errno;
 use super::FdSet;
+use super::Gid;
 use super::LimitPair;
 use super::Resource;
 use super::Result;
@@ -31,6 +32,7 @@ use super::SignalSystem;
 use super::System;
 use super::SystemEx;
 use super::Times;
+use super::Uid;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessState;
@@ -453,6 +455,18 @@ impl System for &SharedSystem {
     fn chdir(&mut self, path: &CStr) -> Result<()> {
         self.0.borrow_mut().chdir(path)
     }
+    fn getuid(&self) -> Uid {
+        self.0.borrow().getuid()
+    }
+    fn geteuid(&self) -> Uid {
+        self.0.borrow().geteuid()
+    }
+    fn getgid(&self) -> Gid {
+        self.0.borrow().getgid()
+    }
+    fn getegid(&self) -> Gid {
+        self.0.borrow().getegid()
+    }
     fn getpwnam_dir(&self, name: &str) -> Result<Option<PathBuf>> {
         self.0.borrow().getpwnam_dir(name)
     }
@@ -655,6 +669,22 @@ impl System for SharedSystem {
     #[inline]
     fn chdir(&mut self, path: &CStr) -> Result<()> {
         (&mut &*self).chdir(path)
+    }
+    #[inline]
+    fn getuid(&self) -> Uid {
+        (&self).getuid()
+    }
+    #[inline]
+    fn geteuid(&self) -> Uid {
+        (&self).geteuid()
+    }
+    #[inline]
+    fn getgid(&self) -> Gid {
+        (&self).getgid()
+    }
+    #[inline]
+    fn getegid(&self) -> Gid {
+        (&self).getegid()
     }
     #[inline]
     fn getpwnam_dir(&self, name: &str) -> Result<Option<PathBuf>> {

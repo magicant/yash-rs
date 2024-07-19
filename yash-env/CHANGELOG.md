@@ -5,6 +5,17 @@ All notable changes to `yash-env` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - Unreleased
+
+### Added
+
+- The `Uid` and `Gid` types in the `system` module
+- The `System` trait now has the `getuid`, `geteuid`, `getgid`, and `getegid`
+  methods.
+- The `system::virtual::Process` struct now has the getters/setters for the
+  real/effective user/group IDs: `uid`, `set_uid`, `euid`, `set_euid`, `gid`,
+  `set_gid`, `egid`, and `set_egid`.
+
 ## [0.2.1] - 2024-07-12
 
 ### Added
@@ -132,6 +143,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial implementation of the `yash-env` crate
 
+[0.3.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.3.0
 [0.2.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.2.1
 [0.2.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.2.0
 [0.1.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.1.0

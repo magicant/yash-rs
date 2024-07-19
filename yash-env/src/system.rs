@@ -405,6 +405,18 @@ pub trait System: Debug {
     /// Changes the working directory.
     fn chdir(&mut self, path: &CStr) -> Result<()>;
 
+    /// Returns the real user ID of the current process.
+    fn getuid(&self) -> Uid;
+
+    /// Returns the effective user ID of the current process.
+    fn geteuid(&self) -> Uid;
+
+    /// Returns the real group ID of the current process.
+    fn getgid(&self) -> Gid;
+
+    /// Returns the effective group ID of the current process.
+    fn getegid(&self) -> Gid;
+
     /// Returns the home directory path of the given user.
     ///
     /// Returns `Ok(None)` if the user is not found.
@@ -533,6 +545,30 @@ pub trait Dir: Debug {
     /// Returns the next directory entry.
     fn next(&mut self) -> Result<Option<DirEntry>>;
 }
+
+/// User ID
+///
+/// This type implements the new type pattern for the raw user ID type `uid_t`
+/// declared in the [`libc`] crate. The exact representation of this type is
+/// platform-dependent while POSIX requires the type to be an integer.
+/// On non-Unix platforms, this type is hard-coded to `u32`.
+///
+/// [`libc`]: nix::libc
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(transparent)]
+pub struct Uid(#[cfg(unix)] pub nix::libc::uid_t, #[cfg(not(unix))] pub u32);
+
+/// Group ID
+///
+/// This type implements the new type pattern for the raw group ID type `gid_t`
+/// declared in the [`libc`] crate. The exact representation of this type is
+/// platform-dependent while POSIX requires the type to be an integer.
+/// On non-Unix platforms, this type is hard-coded to `u32`.
+///
+/// [`libc`]: nix::libc
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(transparent)]
+pub struct Gid(#[cfg(unix)] pub nix::libc::gid_t, #[cfg(not(unix))] pub u32);
 
 /// Extension for [`System`]
 ///

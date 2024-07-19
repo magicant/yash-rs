@@ -63,11 +63,13 @@ use super::Errno;
 use super::FdFlag;
 use super::FdSet;
 use super::FileStat;
+use super::Gid;
 use super::OFlag;
 use super::Result;
 use super::SigmaskHow;
 use super::TimeSpec;
 use super::Times;
+use super::Uid;
 use super::AT_FDCWD;
 use crate::io::Fd;
 use crate::job::Pid;
@@ -1013,6 +1015,22 @@ impl System for VirtualSystem {
         } else {
             Err(Errno::ENOTDIR)
         }
+    }
+
+    fn getuid(&self) -> Uid {
+        self.current_process().uid()
+    }
+
+    fn geteuid(&self) -> Uid {
+        self.current_process().euid()
+    }
+
+    fn getgid(&self) -> Gid {
+        self.current_process().gid()
+    }
+
+    fn getegid(&self) -> Gid {
+        self.current_process().egid()
     }
 
     fn getpwnam_dir(&self, name: &str) -> Result<Option<PathBuf>> {
