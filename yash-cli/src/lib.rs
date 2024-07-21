@@ -35,7 +35,7 @@ use std::cell::RefCell;
 use std::num::NonZeroU64;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::signal;
-use yash_env::system::SignalHandling;
+use yash_env::system::{Errno, SignalHandling};
 use yash_env::Env;
 use yash_env::RealSystem;
 use yash_env::System;
@@ -86,7 +86,10 @@ async fn parse_and_print(mut env: Env) -> i32 {
             // instead of reusing `env`.
             // env.system.print_error(&message).await;
             ref_env.borrow_mut().system.print_error(&message).await;
-            return ExitStatus::FAILURE.0;
+            return match e.errno {
+                Errno::ENOENT | Errno::ENOTDIR | Errno::EILSEQ => ExitStatus::NOT_FOUND.0,
+                _ => ExitStatus::NOEXEC.0,
+            };
         }
     };
     let line = NonZeroU64::new(1).unwrap();

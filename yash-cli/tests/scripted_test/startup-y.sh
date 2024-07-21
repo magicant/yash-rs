@@ -38,11 +38,6 @@ testcase "$LINENO" -e 2 'options -c and -s are mutually exclusive (-o)' \
 $testee: cannot specify both \`-c\` and \`-s\`
 __ERR__
 
-# TODO This test case should be in startup-p.sh
-: TODO yash is broken: the exit status should be 127, not 2 <<\__IN__
-test_O -d -e 127 'reading non-existing file' ./_no_such_file_
-__IN__
-
 (
 unset YASH_LOADPATH
 

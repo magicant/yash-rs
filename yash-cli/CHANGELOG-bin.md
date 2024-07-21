@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `${1abc}` and `${0_1}` are now syntax errors.
 - Improved error messages for some parameter expansion errors.
 
+### Fixed
+
+- When the shell cannot open a script specified by the command-line argument,
+  it now returns the exit status of 126 or 127 as required by POSIX. Previously,
+  it returned the exit status of 2.
+
 ## [0.1.0-beta.2] - 2024-07-13
 
 ### Changed
