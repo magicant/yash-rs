@@ -18,7 +18,9 @@
 
 use super::io::FdBody;
 use super::signal::{self, SignalEffect};
+use super::Gid;
 use super::Mode;
+use super::Uid;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessResult;
@@ -51,6 +53,18 @@ pub struct Process {
 
     /// Process group ID of this process
     pub(crate) pgid: Pid,
+
+    /// Real user ID of this process
+    uid: Uid,
+
+    /// Effective user ID of this process
+    euid: Uid,
+
+    /// Real group ID of this process
+    gid: Gid,
+
+    /// Effective group ID of this process
+    egid: Gid,
 
     /// Set of file descriptors open in this process
     pub(crate) fds: BTreeMap<Fd, FdBody>,
@@ -128,6 +142,10 @@ impl Process {
         Process {
             ppid,
             pgid,
+            uid: Uid(1),
+            euid: Uid(1),
+            gid: Gid(1),
+            egid: Gid(1),
             fds: BTreeMap::new(),
             umask: Mode::default(),
             cwd: PathBuf::new(),
@@ -149,6 +167,10 @@ impl Process {
     /// Some part of the parent process state is copied to the new process.
     pub fn fork_from(ppid: Pid, parent: &Process) -> Process {
         let mut child = Self::with_parent_and_group(ppid, parent.pgid);
+        child.uid = parent.uid;
+        child.euid = parent.euid;
+        child.gid = parent.gid;
+        child.egid = parent.egid;
         child.fds = parent.fds.clone();
         child.signal_handlings.clone_from(&parent.signal_handlings);
         child.blocked_signals.clone_from(&parent.blocked_signals);
@@ -168,6 +190,58 @@ impl Process {
     #[must_use]
     pub fn pgid(&self) -> Pid {
         self.pgid
+    }
+
+    /// Returns the real user ID of this process.
+    #[inline(always)]
+    #[must_use]
+    pub fn uid(&self) -> Uid {
+        self.uid
+    }
+
+    /// Sets the real user ID of this process.
+    #[inline(always)]
+    pub fn set_uid(&mut self, uid: Uid) {
+        self.uid = uid;
+    }
+
+    /// Returns the effective user ID of this process.
+    #[inline(always)]
+    #[must_use]
+    pub fn euid(&self) -> Uid {
+        self.euid
+    }
+
+    /// Sets the effective user ID of this process.
+    #[inline(always)]
+    pub fn set_euid(&mut self, euid: Uid) {
+        self.euid = euid;
+    }
+
+    /// Returns the real group ID of this process.
+    #[inline(always)]
+    #[must_use]
+    pub fn gid(&self) -> Gid {
+        self.gid
+    }
+
+    /// Sets the real group ID of this process.
+    #[inline(always)]
+    pub fn set_gid(&mut self, gid: Gid) {
+        self.gid = gid;
+    }
+
+    /// Returns the effective group ID of this process.
+    #[inline(always)]
+    #[must_use]
+    pub fn egid(&self) -> Gid {
+        self.egid
+    }
+
+    /// Sets the effective group ID of this process.
+    #[inline(always)]
+    pub fn set_egid(&mut self, egid: Gid) {
+        self.egid = egid;
     }
 
     /// Returns FDs open in this process.

@@ -30,6 +30,7 @@ use super::Errno;
 use super::FdFlag;
 use super::FdSet;
 use super::FileStat;
+use super::Gid;
 use super::Mode;
 use super::OFlag;
 use super::Result;
@@ -37,6 +38,7 @@ use super::SigmaskHow;
 use super::System;
 use super::TimeSpec;
 use super::Times;
+use super::Uid;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessResult;
@@ -598,6 +600,22 @@ impl System for RealSystem {
     fn chdir(&mut self, path: &CStr) -> Result<()> {
         nix::unistd::chdir(path)?;
         Ok(())
+    }
+
+    fn getuid(&self) -> Uid {
+        Uid(unsafe { nix::libc::getuid() })
+    }
+
+    fn geteuid(&self) -> Uid {
+        Uid(unsafe { nix::libc::geteuid() })
+    }
+
+    fn getgid(&self) -> Gid {
+        Gid(unsafe { nix::libc::getgid() })
+    }
+
+    fn getegid(&self) -> Gid {
+        Gid(unsafe { nix::libc::getegid() })
     }
 
     fn getpwnam_dir(&self, name: &str) -> Result<Option<PathBuf>> {

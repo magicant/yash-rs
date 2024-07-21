@@ -51,15 +51,22 @@ pub enum InitFile {
     File { path: String },
 }
 
+/// Specification of what the shell should do after the environment is set up
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
-/// Configuration for starting the main read-eval loop
-pub struct Run {
+pub struct Work {
     /// Input source
     pub source: Source,
     /// Initialization file for a login shell
     pub profile: InitFile,
     /// Initialization file for an interactive shell
     pub rcfile: InitFile,
+}
+
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+/// Configuration for initializing and running the shell
+pub struct Run {
+    /// What the shell should do after the environment is set up
+    pub work: Work,
     /// Shell options
     pub options: Vec<(ShellOption, State)>,
     /// Value of [`Env::arg0`]
@@ -206,17 +213,17 @@ where
         match option {
             LongOption::Shell(option, state) => result.options.push((option, state)),
             LongOption::Profile { path } => {
-                if result.profile != InitFile::None {
-                    result.profile = InitFile::File { path }
+                if result.work.profile != InitFile::None {
+                    result.work.profile = InitFile::File { path }
                 }
             }
-            LongOption::NoProfile => result.profile = InitFile::None,
+            LongOption::NoProfile => result.work.profile = InitFile::None,
             LongOption::Rcfile { path } => {
-                if result.rcfile != InitFile::None {
-                    result.rcfile = InitFile::File { path }
+                if result.work.rcfile != InitFile::None {
+                    result.work.rcfile = InitFile::File { path }
                 }
             }
-            LongOption::NoRcfile => result.rcfile = InitFile::None,
+            LongOption::NoRcfile => result.work.rcfile = InitFile::None,
             LongOption::Help => return Ok(Parse::Help),
             LongOption::Version => return Ok(Parse::Version),
         }
@@ -231,17 +238,17 @@ where
         }
 
         let command = args.next_if(|_| true).ok_or(Error::MissingCommandString)?;
-        result.source = Source::String(command);
+        result.work.source = Source::String(command);
         if let Some(name) = args.next_if(|_| true) {
             result.arg0 = name;
         }
     } else if result.options.contains(&(ShellOption::Stdin, State::On)) {
-        result.source = Source::Stdin;
+        result.work.source = Source::Stdin;
     } else {
         // No -c or -s
         if let Some(operand) = args.next_if(|_| true) {
             result.arg0.clone_from(&operand);
-            result.source = Source::File { path: operand };
+            result.work.source = Source::File { path: operand };
         }
     }
     result.positional_params = args.collect();
@@ -436,8 +443,11 @@ mod tests {
         assert_eq!(
             parse(["yash", "my-script"]),
             Ok(Parse::Run(Run {
-                source: Source::File {
-                    path: "my-script".to_string()
+                work: Work {
+                    source: Source::File {
+                        path: "my-script".to_string()
+                    },
+                    ..Work::default()
                 },
                 arg0: "my-script".to_string(),
                 ..Run::default()
@@ -448,8 +458,11 @@ mod tests {
         assert_eq!(
             parse(["yash", "path/to/script", "-option", "foo", "bar"]),
             Ok(Parse::Run(Run {
-                source: Source::File {
-                    path: "path/to/script".to_string()
+                work: Work {
+                    source: Source::File {
+                        path: "path/to/script".to_string()
+                    },
+                    ..Work::default()
                 },
                 arg0: "path/to/script".to_string(),
                 positional_params: vec![
@@ -468,7 +481,10 @@ mod tests {
         assert_eq!(
             parse(["yash", "-c", "echo"]),
             Ok(Parse::Run(Run {
-                source: Source::String("echo".to_string()),
+                work: Work {
+                    source: Source::String("echo".to_string()),
+                    ..Work::default()
+                },
                 options: vec![(ShellOption::CmdLine, State::On)],
                 arg0: "yash".to_string(),
                 ..Run::default()
@@ -479,7 +495,10 @@ mod tests {
         assert_eq!(
             parse(["yash", "-c", "echo", "name"]),
             Ok(Parse::Run(Run {
-                source: Source::String("echo".to_string()),
+                work: Work {
+                    source: Source::String("echo".to_string()),
+                    ..Work::default()
+                },
                 options: vec![(ShellOption::CmdLine, State::On)],
                 arg0: "name".to_string(),
                 ..Run::default()
@@ -490,11 +509,13 @@ mod tests {
         assert_eq!(
             parse(["yash", "-c", "echo", "name", "foo", "bar"]),
             Ok(Parse::Run(Run {
-                source: Source::String("echo".to_string()),
+                work: Work {
+                    source: Source::String("echo".to_string()),
+                    ..Work::default()
+                },
                 options: vec![(ShellOption::CmdLine, State::On)],
                 arg0: "name".to_string(),
                 positional_params: vec!["foo".to_string(), "bar".to_string()],
-                ..Run::default()
             }))
         );
 
@@ -502,7 +523,10 @@ mod tests {
         assert_eq!(
             parse(["yash", "--cmd-line", "echo"]),
             Ok(Parse::Run(Run {
-                source: Source::String("echo".to_string()),
+                work: Work {
+                    source: Source::String("echo".to_string()),
+                    ..Work::default()
+                },
                 options: vec![(ShellOption::CmdLine, State::On)],
                 arg0: "yash".to_string(),
                 ..Run::default()
@@ -521,7 +545,10 @@ mod tests {
         assert_eq!(
             parse(["yash", "-s"]),
             Ok(Parse::Run(Run {
-                source: Source::Stdin,
+                work: Work {
+                    source: Source::Stdin,
+                    ..Work::default()
+                },
                 options: vec![(ShellOption::Stdin, State::On)],
                 arg0: "yash".to_string(),
                 ..Run::default()
@@ -532,11 +559,13 @@ mod tests {
         assert_eq!(
             parse(["yash", "-s", "foo", "bar", "-baz"]),
             Ok(Parse::Run(Run {
-                source: Source::Stdin,
+                work: Work {
+                    source: Source::Stdin,
+                    ..Work::default()
+                },
                 options: vec![(ShellOption::Stdin, State::On)],
                 arg0: "yash".to_string(),
                 positional_params: vec!["foo".to_string(), "bar".to_string(), "-baz".to_string()],
-                ..Run::default()
             })),
         );
 
@@ -544,7 +573,10 @@ mod tests {
         assert_eq!(
             parse(["yash", "--stdin"]),
             Ok(Parse::Run(Run {
-                source: Source::Stdin,
+                work: Work {
+                    source: Source::Stdin,
+                    ..Work::default()
+                },
                 options: vec![(ShellOption::Stdin, State::On)],
                 arg0: "yash".to_string(),
                 ..Run::default()
@@ -779,8 +811,11 @@ mod tests {
         assert_eq!(
             parse(["yash", "--profile", "my/file"]),
             Ok(Parse::Run(Run {
-                profile: InitFile::File {
-                    path: "my/file".to_string(),
+                work: Work {
+                    profile: InitFile::File {
+                        path: "my/file".to_string(),
+                    },
+                    ..Work::default()
                 },
                 arg0: "yash".to_string(),
                 ..Run::default()
@@ -791,8 +826,11 @@ mod tests {
         assert_eq!(
             parse(["yash", "--profile=my/file"]),
             Ok(Parse::Run(Run {
-                profile: InitFile::File {
-                    path: "my/file".to_string(),
+                work: Work {
+                    profile: InitFile::File {
+                        path: "my/file".to_string(),
+                    },
+                    ..Work::default()
                 },
                 arg0: "yash".to_string(),
                 ..Run::default()
@@ -803,8 +841,11 @@ mod tests {
         assert_eq!(
             parse(["yash", "--pr=ofile"]),
             Ok(Parse::Run(Run {
-                profile: InitFile::File {
-                    path: "ofile".to_string(),
+                work: Work {
+                    profile: InitFile::File {
+                        path: "ofile".to_string(),
+                    },
+                    ..Work::default()
                 },
                 arg0: "yash".to_string(),
                 ..Run::default()
@@ -823,7 +864,10 @@ mod tests {
     #[test]
     fn noprofile_option() {
         let expected = Ok(Parse::Run(Run {
-            profile: InitFile::None,
+            work: Work {
+                profile: InitFile::None,
+                ..Work::default()
+            },
             arg0: "yash".to_string(),
             ..Run::default()
         }));
@@ -848,8 +892,11 @@ mod tests {
         assert_eq!(
             parse(["yash", "--rcfile", "my/file"]),
             Ok(Parse::Run(Run {
-                rcfile: InitFile::File {
-                    path: "my/file".to_string(),
+                work: Work {
+                    rcfile: InitFile::File {
+                        path: "my/file".to_string(),
+                    },
+                    ..Work::default()
                 },
                 arg0: "yash".to_string(),
                 ..Run::default()
@@ -860,8 +907,11 @@ mod tests {
         assert_eq!(
             parse(["yash", "--rcfile=my/file"]),
             Ok(Parse::Run(Run {
-                rcfile: InitFile::File {
-                    path: "my/file".to_string(),
+                work: Work {
+                    rcfile: InitFile::File {
+                        path: "my/file".to_string(),
+                    },
+                    ..Work::default()
                 },
                 arg0: "yash".to_string(),
                 ..Run::default()
@@ -872,8 +922,11 @@ mod tests {
         assert_eq!(
             parse(["yash", "--rc=file"]),
             Ok(Parse::Run(Run {
-                rcfile: InitFile::File {
-                    path: "file".to_string(),
+                work: Work {
+                    rcfile: InitFile::File {
+                        path: "file".to_string(),
+                    },
+                    ..Work::default()
                 },
                 arg0: "yash".to_string(),
                 ..Run::default()
@@ -892,7 +945,10 @@ mod tests {
     #[test]
     fn norcfile_option() {
         let expected = Ok(Parse::Run(Run {
-            rcfile: InitFile::None,
+            work: Work {
+                rcfile: InitFile::None,
+                ..Work::default()
+            },
             arg0: "yash".to_string(),
             ..Run::default()
         }));
@@ -959,26 +1015,30 @@ mod tests {
         assert_eq!(
             parse(["yash", "-a", "--", "file", "arg"]),
             Ok(Parse::Run(Run {
-                source: Source::File {
-                    path: "file".to_string()
+                work: Work {
+                    source: Source::File {
+                        path: "file".to_string()
+                    },
+                    ..Work::default()
                 },
                 options: vec![(ShellOption::AllExport, State::On)],
                 arg0: "file".to_string(),
                 positional_params: vec!["arg".to_string()],
-                ..Run::default()
             })),
         );
 
         assert_eq!(
             parse(["yash", "-a", "--", "--", "arg"]),
             Ok(Parse::Run(Run {
-                source: Source::File {
-                    path: "--".to_string()
+                work: Work {
+                    source: Source::File {
+                        path: "--".to_string()
+                    },
+                    ..Work::default()
                 },
                 options: vec![(ShellOption::AllExport, State::On)],
                 arg0: "--".to_string(),
                 positional_params: vec!["arg".to_string()],
-                ..Run::default()
             })),
         );
     }
@@ -996,26 +1056,30 @@ mod tests {
         assert_eq!(
             parse(["yash", "-a", "-", "file", "arg"]),
             Ok(Parse::Run(Run {
-                source: Source::File {
-                    path: "file".to_string()
+                work: Work {
+                    source: Source::File {
+                        path: "file".to_string()
+                    },
+                    ..Work::default()
                 },
                 options: vec![(ShellOption::AllExport, State::On)],
                 arg0: "file".to_string(),
                 positional_params: vec!["arg".to_string()],
-                ..Run::default()
             })),
         );
 
         assert_eq!(
             parse(["yash", "-a", "-", "-", "arg"]),
             Ok(Parse::Run(Run {
-                source: Source::File {
-                    path: "-".to_string()
+                work: Work {
+                    source: Source::File {
+                        path: "-".to_string()
+                    },
+                    ..Work::default()
                 },
                 options: vec![(ShellOption::AllExport, State::On)],
                 arg0: "-".to_string(),
                 positional_params: vec!["arg".to_string()],
-                ..Run::default()
             })),
         );
     }
@@ -1025,13 +1089,15 @@ mod tests {
         assert_eq!(
             parse(["yash", "-a", "file", "-e"]),
             Ok(Parse::Run(Run {
-                source: Source::File {
-                    path: "file".to_string()
+                work: Work {
+                    source: Source::File {
+                        path: "file".to_string()
+                    },
+                    ..Work::default()
                 },
                 options: vec![(ShellOption::AllExport, State::On)],
                 arg0: "file".to_string(),
                 positional_params: vec!["-e".to_string()],
-                ..Run::default()
             })),
         );
     }

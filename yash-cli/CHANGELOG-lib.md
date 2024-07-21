@@ -9,12 +9,33 @@ For changes to the shell binary as a whole, see [CHANGELOG-bin.md](CHANGELOG-bin
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-beta.3] - Unreleased
+
+### Added
+
+- The `startup::init_file` module contains items for running the initialization
+  files:
+    - `run_rcfile`
+    - `run_init_file`
+    - `default_rcfile_path`
+    - `resolve_rcfile_path`
+    - `DefaultFilePathError`
+
+### Changed
+
+- The shell now executes the initialization files on startup if the shell is
+  interactive.
+
 ## [0.1.0-beta.2] - 2024-07-13
 
 ### Added
 
 - Internal dependencies:
     - yash-prompt 0.1.0
+- The `startup::args::Work` struct contains the `source`, `profile`, and
+  `rcfile` fields which were previously in the `startup::args::Run` struct.
+- The `startup::configure_environment` function implements the configuration
+  of the shell environment based on the command-line arguments.
 
 ### Changed
 
@@ -30,6 +51,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The first argument to `startup::prepare_input` is now `env: &'a RefCell<&mut Env>`
   instead of `system: &mut SharedSystem`. This change is to allow the function to
   construct `yash_env::input::Echo` for the returned source input.
+- Restructured the `startup` module:
+    - `prepare_input`, `SourceInput`, and `PrepareInputError` are moved from
+      `startup` to `startup::input`.
+    - The `source`, `profile`, and `rcfile` fields are moved from `args::Run` to
+      `args::Work`. `args::Run` now has a `work` field of type `Work`.
 
 ### Removed
 
@@ -57,6 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial implementation of the `yash-cli` crate
 
+[0.1.0-beta.3]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.1.0-beta.3
 [0.1.0-beta.2]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.1.0-beta.2
 [0.1.0-beta.1]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.1.0-beta.1
 [0.1.0-alpha.1]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.1.0-alpha.1

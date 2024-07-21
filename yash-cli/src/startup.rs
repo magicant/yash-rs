@@ -16,28 +16,17 @@
 
 //! Shell startup
 
-use self::args::Run;
-use self::args::Source;
-use std::cell::RefCell;
-use std::ffi::CString;
-use thiserror::Error;
-use yash_env::input::Echo;
-use yash_env::input::FdReader;
+use self::args::{Run, Source, Work};
+use yash_builtin::BUILTINS;
 use yash_env::io::Fd;
-use yash_env::option::Option::Interactive;
+use yash_env::option::Option::{Interactive, Monitor, Stdin};
 use yash_env::option::State::On;
-use yash_env::system::Errno;
-use yash_env::system::Mode;
-use yash_env::system::OFlag;
-use yash_env::system::SystemEx as _;
 use yash_env::Env;
 use yash_env::System;
-use yash_prompt::Prompter;
-use yash_syntax::input::Input;
-use yash_syntax::input::Memory;
-use yash_syntax::source::Source as SyntaxSource;
 
 pub mod args;
+pub mod init_file;
+pub mod input;
 
 /// Tests whether the shell should be implicitly interactive.
 ///
@@ -45,7 +34,7 @@ pub mod args;
 /// standard error are attached to a terminal, the shell is considered to be
 /// interactive." This function implements this rule.
 pub fn auto_interactive<S: System>(system: &S, run: &Run) -> bool {
-    if run.source != Source::Stdin {
+    if run.work.source != Source::Stdin {
         return false;
     }
     if run.options.iter().any(|&(o, _)| o == Interactive) {
@@ -57,88 +46,47 @@ pub fn auto_interactive<S: System>(system: &S, run: &Run) -> bool {
     system.isatty(Fd::STDIN).unwrap_or(false) && system.isatty(Fd::STDERR).unwrap_or(false)
 }
 
-/// Result of [`prepare_input`].
-pub struct SourceInput<'a> {
-    /// Input to be passed to the lexer
-    pub input: Box<dyn Input + 'a>,
-    /// Description of the source
-    pub source: SyntaxSource,
-}
-
-/// Error returned by [`prepare_input`].
-#[derive(Clone, Debug, Eq, Error, PartialEq)]
-#[error("cannot open script file '{path}': {errno}")]
-pub struct PrepareInputError<'a> {
-    /// Raw error value returned by the underlying system call.
-    pub errno: Errno,
-    /// Path of the script file that could not be opened.
-    pub path: &'a str,
-}
-
-/// Prepares the input for the shell.
+/// Get the environment ready for performing the work.
 ///
-/// This function constructs an input object from the given source.
-/// If the shell is interactive and the source is the standard input,
-/// the [`Prompter`] decorator is applied to the input to show the prompt.
-/// If the source is read with a file descriptor, the [`Echo`] decorator is
-/// applied to the input to implement the [verbose](yash_env::option::Verbose)
-/// shell option.
+/// This function takes the parsed command-line arguments and applies them to
+/// the environment. It also sets up signal handlers and prepares built-ins and
+/// variables. The function returns the work to be performed, which is extracted
+/// from the `run` argument.
 ///
-/// The `RefCell` passed as the first argument should be shared with (and only
-/// with) the [`read_eval_loop`](yash_semantics::read_eval_loop) function that
-/// consumes the input and executes the parsed commands.
-pub fn prepare_input<'a>(
-    env: &'a RefCell<&mut Env>,
-    source: &'a Source,
-) -> Result<SourceInput<'a>, PrepareInputError<'a>> {
-    match source {
-        Source::Stdin => {
-            let (mut system, is_interactive) = {
-                let env = env.borrow();
-                (env.system.clone(), env.options.get(Interactive) == On)
-            };
+/// This function is _pure_ in that all system calls are performed by the
+/// `System` trait object (`env.system`).
+pub fn configure_environment(env: &mut Env, run: Run) -> Work {
+    // Apply the parsed options to the environment
+    if auto_interactive(&env.system, &run) {
+        env.options.set(Interactive, On);
+    }
+    if run.work.source == self::args::Source::Stdin {
+        env.options.set(Stdin, On);
+    }
+    for &(option, state) in &run.options {
+        env.options.set(option, state);
+    }
+    if env.options.get(Interactive) == On && !run.options.iter().any(|&(o, _)| o == Monitor) {
+        env.options.set(Monitor, On);
+    }
 
-            if system.isatty(Fd::STDIN).unwrap_or(false) || system.fd_is_pipe(Fd::STDIN) {
-                // It makes virtually no sense to make it blocking here
-                // since we will be doing non-blocking reads anyway,
-                // but POSIX requires us to do it.
-                // https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/utilities/sh.html#tag_20_117_06
-                system.set_blocking(Fd::STDIN).ok();
-            }
+    // Apply the parsed operands to the environment
+    env.arg0 = run.arg0;
+    env.variables.positional_params_mut().values = run.positional_params;
 
-            let reader = FdReader::new(Fd::STDIN, system);
-            let input: Box<dyn Input> = if is_interactive {
-                Box::new(Echo::new(Prompter::new(reader, env), env))
-            } else {
-                Box::new(Echo::new(reader, env))
-            };
-            let source = SyntaxSource::Stdin;
-            Ok(SourceInput { input, source })
-        }
-
-        Source::File { path } => {
-            let mut system = env.borrow().system.clone();
-
-            let c_path = CString::new(path.as_str()).map_err(|_| PrepareInputError {
-                errno: Errno::EILSEQ,
-                path,
-            })?;
-            let fd = system
-                .open(&c_path, OFlag::O_RDONLY | OFlag::O_CLOEXEC, Mode::empty())
-                .and_then(|fd| system.move_fd_internal(fd))
-                .map_err(|errno| PrepareInputError { errno, path })?;
-
-            // TODO Make FdReader buffered
-            let input = Box::new(Echo::new(FdReader::new(fd, system), env));
-            let path = path.to_owned();
-            let source = SyntaxSource::CommandFile { path };
-            Ok(SourceInput { input, source })
-        }
-
-        Source::String(command) => {
-            let input = Box::new(Memory::new(command));
-            let source = SyntaxSource::CommandString;
-            Ok(SourceInput { input, source })
+    // Initialize signal handlers
+    if env.options.get(Interactive) == On {
+        env.traps.enable_terminator_handlers(&mut env.system).ok();
+        if env.options.get(Monitor) == On {
+            env.traps.enable_stopper_handlers(&mut env.system).ok();
         }
     }
+
+    // Prepare built-ins
+    env.builtins.extend(BUILTINS.iter().cloned());
+
+    // Prepare variables
+    env.init_variables();
+
+    run.work
 }
