@@ -18,6 +18,7 @@
 
 mod errno;
 pub mod fd_set;
+mod id;
 pub mod real;
 pub mod resource;
 mod select;
@@ -28,6 +29,10 @@ pub use self::errno::Errno;
 pub use self::errno::RawErrno;
 pub use self::errno::Result;
 use self::fd_set::FdSet;
+pub use self::id::Gid;
+pub use self::id::RawGid;
+pub use self::id::RawUid;
+pub use self::id::Uid;
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
 #[cfg(doc)]
@@ -545,30 +550,6 @@ pub trait Dir: Debug {
     /// Returns the next directory entry.
     fn next(&mut self) -> Result<Option<DirEntry>>;
 }
-
-/// User ID
-///
-/// This type implements the new type pattern for the raw user ID type `uid_t`
-/// declared in the [`libc`] crate. The exact representation of this type is
-/// platform-dependent while POSIX requires the type to be an integer.
-/// On non-Unix platforms, this type is hard-coded to `u32`.
-///
-/// [`libc`]: nix::libc
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[repr(transparent)]
-pub struct Uid(#[cfg(unix)] pub nix::libc::uid_t, #[cfg(not(unix))] pub u32);
-
-/// Group ID
-///
-/// This type implements the new type pattern for the raw group ID type `gid_t`
-/// declared in the [`libc`] crate. The exact representation of this type is
-/// platform-dependent while POSIX requires the type to be an integer.
-/// On non-Unix platforms, this type is hard-coded to `u32`.
-///
-/// [`libc`]: nix::libc
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[repr(transparent)]
-pub struct Gid(#[cfg(unix)] pub nix::libc::gid_t, #[cfg(not(unix))] pub u32);
 
 /// Extension for [`System`]
 ///
