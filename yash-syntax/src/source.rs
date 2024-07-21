@@ -89,6 +89,9 @@ pub enum Source {
         name: String,
     },
 
+    /// File executed during shell startup
+    InitFile { path: String },
+
     /// Other source
     Other {
         /// Label that describes the source
@@ -172,6 +175,7 @@ impl Source {
             DotScript { name, .. } => name,
             Trap { condition, .. } => condition,
             VariableValue { name } => name,
+            InitFile { path } => path,
             Other { label } => label,
         }
     }

@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0-beta.3] - Unreleased
 
+### Added
+
+- The shell now runs the initialization file specified by the `ENV` environment
+  variable if it is set and the shell is interactive.
+
 ### Changed
 
 - The shell now rejects an invalid parameter as a syntax error. Specifically,

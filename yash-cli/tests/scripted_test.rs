@@ -367,6 +367,11 @@ fn startup() {
 }
 
 #[test]
+fn startup_ex() {
+    run("startup-y.sh")
+}
+
+#[test]
 fn tilde_expansion() {
     run("tilde-p.sh")
 }

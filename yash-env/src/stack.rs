@@ -76,7 +76,10 @@ pub enum Frame {
 
     /// Trap
     Trap(crate::trap::Condition),
+
     // TODO function
+    /// File executed during shell startup
+    InitFile,
 }
 
 impl From<Builtin> for Frame {
@@ -160,7 +163,7 @@ impl Stack {
         fn retains_context(frame: &Frame) -> bool {
             match frame {
                 Frame::Loop | Frame::Condition | Frame::Builtin(_) => true,
-                Frame::Subshell | Frame::DotScript | Frame::Trap(_) => false,
+                Frame::Subshell | Frame::DotScript | Frame::Trap(_) | Frame::InitFile => false,
             }
         }
 

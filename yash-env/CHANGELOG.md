@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `system::virtual::Process` struct now has the getters/setters for the
   real/effective user/group IDs: `uid`, `set_uid`, `euid`, `set_euid`, `gid`,
   `set_gid`, `egid`, and `set_egid`.
+- The `stack::Frame` enum now has the `InitFile` variant.
 
 ## [0.2.1] - 2024-07-12
 

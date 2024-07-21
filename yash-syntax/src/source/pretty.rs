@@ -148,6 +148,7 @@ impl super::Source {
             | CommandString
             | CommandFile { .. }
             | VariableValue { .. }
+            | InitFile { .. }
             | Other { .. } => (),
 
             CommandSubst { original } => {

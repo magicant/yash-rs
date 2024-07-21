@@ -9,6 +9,23 @@ For changes to the shell binary as a whole, see [CHANGELOG-bin.md](CHANGELOG-bin
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-beta.3] - Unreleased
+
+### Added
+
+- The `startup::init_file` module contains items for running the initialization
+  files:
+    - `run_rcfile`
+    - `run_init_file`
+    - `default_rcfile_path`
+    - `resolve_rcfile_path`
+    - `DefaultFilePathError`
+
+### Changed
+
+- The shell now executes the initialization files on startup if the shell is
+  interactive.
+
 ## [0.1.0-beta.2] - 2024-07-13
 
 ### Added
@@ -66,6 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial implementation of the `yash-cli` crate
 
+[0.1.0-beta.3]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.1.0-beta.3
 [0.1.0-beta.2]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.1.0-beta.2
 [0.1.0-beta.1]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.1.0-beta.1
 [0.1.0-alpha.1]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.1.0-alpha.1

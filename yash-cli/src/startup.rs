@@ -25,6 +25,7 @@ use yash_env::Env;
 use yash_env::System;
 
 pub mod args;
+pub mod init_file;
 pub mod input;
 
 /// Tests whether the shell should be implicitly interactive.

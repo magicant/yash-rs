@@ -27,6 +27,7 @@ pub mod startup;
 // mod runner;
 
 use self::startup::args::Parse;
+use self::startup::init_file::run_rcfile;
 use self::startup::input::prepare_input;
 use futures_util::task::LocalSpawnExt as _;
 use futures_util::FutureExt as _;
@@ -69,8 +70,9 @@ async fn parse_and_print(mut env: Env) -> i32 {
 
     let work = self::startup::configure_environment(&mut env, run);
 
+    // Run initialization files
     // TODO run profile if login
-    // TODO run rcfile if interactive
+    run_rcfile(&mut env, work.rcfile).await;
 
     // Prepare the input for the main read-eval loop
     let ref_env = &RefCell::new(&mut env);
