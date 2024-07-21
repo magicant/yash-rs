@@ -1,4 +1,4 @@
-# typeset-y.tst: yash-specific test of the typeset built-in
+# typeset-y.sh: yash-specific test of the typeset built-in
 
 test_oE -e 0 'typeset is an elective built-in'
 command -V typeset

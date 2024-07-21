@@ -1,4 +1,4 @@
-# ppid-p.tst: test of the $PPID variable for any POSIX-compliant shell
+# ppid-p.sh: test of the $PPID variable for any POSIX-compliant shell
 
 posix="true"
 

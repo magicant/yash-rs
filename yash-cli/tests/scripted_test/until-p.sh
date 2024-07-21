@@ -1,4 +1,4 @@
-# until-p.tst: test of until loop for any POSIX-compliant shell
+# until-p.sh: test of until loop for any POSIX-compliant shell
 
 posix="true"
 

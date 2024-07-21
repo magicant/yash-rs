@@ -1,4 +1,4 @@
-# arith-p.tst: test of arithmetic expansion for any POSIX-compliant shell
+# arith-p.sh: test of arithmetic expansion for any POSIX-compliant shell
 
 posix="true"
 setup -d

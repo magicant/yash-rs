@@ -1,4 +1,4 @@
-# return-p.tst: test of the return built-in for any POSIX-compliant shell
+# return-p.sh: test of the return built-in for any POSIX-compliant shell
 
 posix="true"
 

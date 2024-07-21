@@ -1,4 +1,4 @@
-# if-p.tst: test of if conditional construct for any POSIX-compliant shell
+# if-p.sh: test of if conditional construct for any POSIX-compliant shell
 
 posix="true"
 

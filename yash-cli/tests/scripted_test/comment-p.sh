@@ -1,4 +1,4 @@
-# comment-p.tst: test of comments for any POSIX-compliant shell
+# comment-p.sh: test of comments for any POSIX-compliant shell
 
 posix="true"
 

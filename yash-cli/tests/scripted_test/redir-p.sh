@@ -1,4 +1,4 @@
-# redir-p.tst: test of redirections for any POSIX-compliant shell
+# redir-p.sh: test of redirections for any POSIX-compliant shell
 
 posix="true"
 

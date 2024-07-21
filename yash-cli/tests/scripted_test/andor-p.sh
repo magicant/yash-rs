@@ -1,4 +1,4 @@
-# andor-p.tst: test of and-or lists for any POSIX-compliant shell
+# andor-p.sh: test of and-or lists for any POSIX-compliant shell
 
 posix="true"
 

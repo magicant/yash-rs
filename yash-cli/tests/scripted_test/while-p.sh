@@ -1,4 +1,4 @@
-# while-p.tst: test of while loop for any POSIX-compliant shell
+# while-p.sh: test of while loop for any POSIX-compliant shell
 
 posix="true"
 

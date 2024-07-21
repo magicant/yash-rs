@@ -1,4 +1,4 @@
-# cmdsub-p.tst: test of command substitution for any POSIX-compliant shell
+# cmdsub-p.sh: test of command substitution for any POSIX-compliant shell
 
 posix="true"
 

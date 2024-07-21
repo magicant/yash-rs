@@ -1,4 +1,4 @@
-# quote-p.tst: test of quoting for any POSIX-compliant shell
+# quote-p.sh: test of quoting for any POSIX-compliant shell
 
 posix="true"
 

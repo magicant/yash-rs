@@ -1,4 +1,4 @@
-# fsplit-p.tst: test of field splitting for any POSIX-compliant shell
+# fsplit-p.sh: test of field splitting for any POSIX-compliant shell
 
 posix="true"
 setup -d

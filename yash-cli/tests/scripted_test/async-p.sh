@@ -1,4 +1,4 @@
-# async-p.tst: test of asynchronous lists for any POSIX-compliant shell
+# async-p.sh: test of asynchronous lists for any POSIX-compliant shell
 
 posix="true"
 

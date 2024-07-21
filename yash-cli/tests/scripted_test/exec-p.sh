@@ -1,4 +1,4 @@
-# exec-p.tst: test of the exec built-in for any POSIX-compliant shell
+# exec-p.sh: test of the exec built-in for any POSIX-compliant shell
 
 posix="true"
 

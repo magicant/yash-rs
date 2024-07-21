@@ -1,4 +1,4 @@
-# grouping-p.tst: test of grouping commands for any POSIX-compliant shell
+# grouping-p.sh: test of grouping commands for any POSIX-compliant shell
 
 posix="true"
 

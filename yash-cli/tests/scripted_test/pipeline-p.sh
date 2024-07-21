@@ -1,4 +1,4 @@
-# pipeline-p.tst: test of pipeline for any POSIX-compliant shell
+# pipeline-p.sh: test of pipeline for any POSIX-compliant shell
 
 posix="true"
 

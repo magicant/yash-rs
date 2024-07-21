@@ -1,4 +1,4 @@
-# fnmatch-p.tst: test of pattern matching for any POSIX-compliant shell
+# fnmatch-p.sh: test of pattern matching for any POSIX-compliant shell
 
 posix="true"
 

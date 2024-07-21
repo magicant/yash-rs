@@ -1,4 +1,4 @@
-# cd-p.tst: test of the cd built-in for any POSIX-compliant shell
+# cd-p.sh: test of the cd built-in for any POSIX-compliant shell
 
 # Tests in this file may fail if the pathname of the current directory is too
 # long, making the pathname of temporary directories exceed PATH_MAX.

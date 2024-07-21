@@ -7,7 +7,7 @@ if [ "$(uname)" = Darwin ]; then
     # synchronously, making it impossible for the shell to respond to self-sent
     # signals at a predictable time. To work around this issue, the kill
     # built-in is called in a subshell on macOS, using the SIGCHLD signal as a
-    # synchronization trigger. 
+    # synchronization trigger.
     setup <<\__EOF__
 killx() (((command kill "$@"); :); :)
 alias kill=killx

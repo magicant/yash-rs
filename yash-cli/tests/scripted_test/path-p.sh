@@ -1,4 +1,4 @@
-# path-p.tst: test of pathname expansion for any POSIX-compliant shell
+# path-p.sh: test of pathname expansion for any POSIX-compliant shell
 
 posix="true"
 

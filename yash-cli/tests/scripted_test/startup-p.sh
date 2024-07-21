@@ -1,4 +1,4 @@
-# startup-p.tst: test of shell startup for any POSIX-compliant shell
+# startup-p.sh: test of shell startup for any POSIX-compliant shell
 
 test_O -e 17 'one operand with -c' -c 'exit 17'
 __IN__

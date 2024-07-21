@@ -1,4 +1,4 @@
-# function-p.tst: test of functions for any POSIX-compliant shell
+# function-p.sh: test of functions for any POSIX-compliant shell
 
 posix="true"
 

@@ -1,4 +1,4 @@
-# simple-p.tst: test of simple commands for any POSIX-compliant shell
+# simple-p.sh: test of simple commands for any POSIX-compliant shell
 
 posix="true"
 

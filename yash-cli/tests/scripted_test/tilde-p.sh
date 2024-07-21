@@ -1,4 +1,4 @@
-# tilde-p.tst: test of tilde expansion for any POSIX-compliant shell
+# tilde-p.sh: test of tilde expansion for any POSIX-compliant shell
 
 posix="true"
 setup -d

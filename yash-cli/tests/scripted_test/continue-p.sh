@@ -1,4 +1,4 @@
-# continue-p.tst: test of the continue built-in for any POSIX-compliant shell
+# continue-p.sh: test of the continue built-in for any POSIX-compliant shell
 
 posix="true"
 

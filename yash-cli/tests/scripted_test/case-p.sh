@@ -1,4 +1,4 @@
-# case-p.tst: test of case command for any POSIX-compliant shell
+# case-p.sh: test of case command for any POSIX-compliant shell
 
 posix="true"
 
