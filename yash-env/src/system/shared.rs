@@ -128,27 +128,12 @@ impl SharedSystem {
         SharedSystem(Rc::new(RefCell::new(SelectSystem::new(system))))
     }
 
-    fn set_nonblocking(&self, fd: Fd) -> Result<OFlag> {
-        let mut inner = self.0.borrow_mut();
-        let flags = inner.fcntl_getfl(fd)?;
-        if !flags.contains(OFlag::O_NONBLOCK) {
-            inner.fcntl_setfl(fd, flags | OFlag::O_NONBLOCK)?;
-        }
-        Ok(flags)
-    }
-
-    fn reset_nonblocking(&self, fd: Fd, old_flags: OFlag) {
-        if !old_flags.contains(OFlag::O_NONBLOCK) {
-            let _: Result<()> = self.0.borrow_mut().fcntl_setfl(fd, old_flags);
-        }
-    }
-
     /// Reads from the file descriptor.
     ///
     /// This function waits for one or more bytes to be available for reading.
     /// If successful, returns the number of bytes read.
     pub async fn read_async(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
-        let flags = self.set_nonblocking(fd)?;
+        let was_nonblocking = (&mut &*self).get_and_set_nonblocking(fd, true)?;
 
         // We need to retain a strong reference to the waker outside the poll_fn
         // function because SelectSystem only retains a weak reference to it.
@@ -169,7 +154,7 @@ impl SharedSystem {
         })
         .await;
 
-        self.reset_nonblocking(fd, flags);
+        _ = (&mut &*self).get_and_set_nonblocking(fd, was_nonblocking);
 
         result
     }
@@ -187,7 +172,7 @@ impl SharedSystem {
             return Ok(0);
         }
 
-        let flags = self.set_nonblocking(fd)?;
+        let was_nonblocking = (&mut &*self).get_and_set_nonblocking(fd, true)?;
         let mut written = 0;
 
         // We need to retain a strong reference to the waker outside the poll_fn
@@ -216,7 +201,7 @@ impl SharedSystem {
         })
         .await;
 
-        self.reset_nonblocking(fd, flags);
+        _ = (&mut &*self).get_and_set_nonblocking(fd, was_nonblocking);
 
         result
     }
@@ -344,11 +329,11 @@ impl System for &SharedSystem {
     fn close(&mut self, fd: Fd) -> Result<()> {
         self.0.borrow_mut().close(fd)
     }
+    fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
+        self.0.borrow_mut().get_and_set_nonblocking(fd, nonblocking)
+    }
     fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag> {
         self.0.borrow().fcntl_getfl(fd)
-    }
-    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> Result<()> {
-        self.0.borrow_mut().fcntl_setfl(fd, flags)
     }
     fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag> {
         self.0.borrow().fcntl_getfd(fd)
@@ -529,12 +514,12 @@ impl System for SharedSystem {
         (&mut &*self).close(fd)
     }
     #[inline]
-    fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag> {
-        (&self).fcntl_getfl(fd)
+    fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
+        (&mut &*self).get_and_set_nonblocking(fd, nonblocking)
     }
     #[inline]
-    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> Result<()> {
-        (&mut &*self).fcntl_setfl(fd, flags)
+    fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag> {
+        (&self).fcntl_getfl(fd)
     }
     #[inline]
     fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag> {

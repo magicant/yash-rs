@@ -250,14 +250,23 @@ impl System for RealSystem {
         }
     }
 
+    fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
+        let old_flags = unsafe { nix::libc::fcntl(fd.0, nix::libc::F_GETFL) }.errno_if_m1()?;
+        let new_flags = if nonblocking {
+            old_flags | nix::libc::O_NONBLOCK
+        } else {
+            old_flags & !nix::libc::O_NONBLOCK
+        };
+        if new_flags != old_flags {
+            unsafe { nix::libc::fcntl(fd.0, nix::libc::F_SETFL, new_flags) }.errno_if_m1()?;
+        }
+        let was_nonblocking = old_flags & nix::libc::O_NONBLOCK != 0;
+        Ok(was_nonblocking)
+    }
+
     fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag> {
         let bits = nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_GETFL)?;
         Ok(OFlag::from_bits_truncate(bits))
-    }
-
-    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> Result<()> {
-        let _ = nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_SETFL(flags))?;
-        Ok(())
     }
 
     fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag> {

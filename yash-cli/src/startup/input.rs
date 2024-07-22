@@ -89,7 +89,7 @@ pub fn prepare_input<'a>(
                 // since we will be doing non-blocking reads anyway,
                 // but POSIX requires us to do it.
                 // https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/utilities/sh.html#tag_20_117_06
-                system.set_blocking(Fd::STDIN).ok();
+                _ = system.get_and_set_nonblocking(Fd::STDIN, false);
             }
 
             let reader = FdReader::new(Fd::STDIN, system);

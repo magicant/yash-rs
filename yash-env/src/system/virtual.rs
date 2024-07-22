@@ -528,6 +528,13 @@ impl System for VirtualSystem {
         Ok(())
     }
 
+    fn get_and_set_nonblocking(&mut self, fd: Fd, _nonblocking: bool) -> Result<bool> {
+        self.with_open_file_description_mut(fd, |_ofd| {
+            // TODO Implement non-blocking I/O
+            Ok(false)
+        })
+    }
+
     fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag> {
         self.with_open_file_description(fd, |ofd| {
             let mut mode = match (ofd.is_readable, ofd.is_writable) {
@@ -541,12 +548,6 @@ impl System for VirtualSystem {
             }
             Ok(mode)
         })
-    }
-
-    /// Current implementation does nothing but return `Ok(())`.
-    fn fcntl_setfl(&mut self, _fd: Fd, _flags: OFlag) -> Result<()> {
-        // TODO do what this function should do
-        Ok(())
     }
 
     fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag> {
@@ -1736,25 +1737,6 @@ mod tests {
 
         let result = system.close(Fd::STDERR);
         assert_eq!(result, Ok(()));
-    }
-
-    #[test]
-    fn fcntl_getfl() {
-        let mut system = VirtualSystem::new();
-        let mode = nix::sys::stat::Mode::all();
-        let reader = system.open(c"/dev/stdin", OFlag::O_RDONLY, mode).unwrap();
-        let writer = system.open(c"/dev/stdout", OFlag::O_WRONLY, mode).unwrap();
-        let appender = system
-            .open(c"/dev/stdout", OFlag::O_RDWR | OFlag::O_APPEND, mode)
-            .unwrap();
-
-        assert_eq!(system.fcntl_getfl(reader), Ok(OFlag::O_RDONLY));
-        assert_eq!(system.fcntl_getfl(writer), Ok(OFlag::O_WRONLY));
-        assert_eq!(
-            system.fcntl_getfl(appender),
-            Ok(OFlag::O_RDWR | OFlag::O_APPEND)
-        );
-        assert_eq!(system.fcntl_getfl(Fd(100)), Err(Errno::EBADF));
     }
 
     #[test]

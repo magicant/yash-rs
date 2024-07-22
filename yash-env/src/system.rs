@@ -140,15 +140,17 @@ pub trait System: Debug {
     /// This function returns `Ok(())` when the FD is already closed.
     fn close(&mut self, fd: Fd) -> Result<()>;
 
+    /// Gets and sets the non-blocking mode for the file descriptor.
+    ///
+    /// This is a wrapper around the `fcntl` system call.
+    /// This function sets the non-blocking mode to the given value and returns
+    /// the previous mode.
+    fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool>;
+
     /// Returns the file status flags for the open file description.
     ///
     /// This is a thin wrapper around the `fcntl` system call.
     fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag>;
-
-    /// Sets the file status flags for the open file description.
-    ///
-    /// This is a thin wrapper around the `fcntl` system call.
-    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> Result<()>;
 
     /// Returns the attributes for the file descriptor.
     ///
@@ -588,16 +590,6 @@ pub trait SystemEx: System {
     fn fd_is_pipe(&self, fd: Fd) -> bool {
         matches!(self.fstat(fd), Ok(stat)
             if SFlag::from_bits_truncate(stat.st_mode) & SFlag::S_IFMT == SFlag::S_IFIFO)
-    }
-
-    /// Clears the `O_NONBLOCK` flag for the file descriptor.
-    fn set_blocking(&mut self, fd: Fd) -> Result<()> {
-        let flags = self.fcntl_getfl(fd)?;
-        let new_flags = flags & !OFlag::O_NONBLOCK;
-        if new_flags == flags {
-            return Ok(());
-        }
-        self.fcntl_setfl(fd, new_flags)
     }
 
     /// Switches the foreground process group with SIGTTOU blocked.
