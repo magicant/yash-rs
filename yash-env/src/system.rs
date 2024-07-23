@@ -19,6 +19,7 @@
 mod errno;
 pub mod fd_set;
 mod id;
+mod open_flag;
 pub mod real;
 pub mod resource;
 mod select;
@@ -33,6 +34,8 @@ pub use self::id::Gid;
 pub use self::id::RawGid;
 pub use self::id::RawUid;
 pub use self::id::Uid;
+pub use self::open_flag::OfdAccess;
+pub use self::open_flag::OpenFlag;
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
 #[cfg(doc)]

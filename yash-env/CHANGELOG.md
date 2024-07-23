@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- The `Uid`, `RawUid`, `Gid`, and `RawGid` types in the `system` module
+- The `OfdAccess`, `OpenFlag`, `Uid`, `RawUid`, `Gid`, and `RawGid` types in the
+  `system` module
 - The `System` trait now has the `get_and_set_nonblocking`,  `getuid`,
   `geteuid`, `getgid`, and `getegid` methods.
 - The `system::virtual::Process` struct now has the getters/setters for the
