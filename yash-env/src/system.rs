@@ -18,6 +18,7 @@
 
 mod errno;
 pub mod fd_set;
+mod file_system;
 mod id;
 mod open_flag;
 pub mod real;
@@ -30,6 +31,11 @@ pub use self::errno::Errno;
 pub use self::errno::RawErrno;
 pub use self::errno::Result;
 use self::fd_set::FdSet;
+pub use self::file_system::Dir;
+pub use self::file_system::DirEntry;
+pub use self::file_system::Mode as Mode2;
+pub use self::file_system::RawMode;
+pub use self::file_system::AT_FDCWD;
 pub use self::id::Gid;
 pub use self::id::RawGid;
 pub use self::id::RawUid;
@@ -71,7 +77,6 @@ use std::convert::Infallible;
 use std::ffi::c_int;
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::fmt::Debug;
 use std::future::Future;
@@ -468,12 +473,6 @@ pub trait System: Debug {
     fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> std::io::Result<()>;
 }
 
-/// Sentinel for the current working directory
-///
-/// This value can be passed to system calls named "*at" such as
-/// [`System::fstatat`].
-pub const AT_FDCWD: Fd = Fd(nix::libc::AT_FDCWD);
-
 /// Set of consumed CPU time
 ///
 /// This structure contains four CPU time values, all in seconds.
@@ -535,26 +534,6 @@ pub type ChildProcessTask =
 pub type ChildProcessStarter = Box<
     dyn for<'a> FnOnce(&'a mut Env, ChildProcessTask) -> Pin<Box<dyn Future<Output = Pid> + 'a>>,
 >;
-
-/// Metadata of a file contained in a directory
-///
-/// `DirEntry` objects are enumerated by a [`Dir`] implementor.
-#[derive(Clone, Copy, Debug)]
-#[non_exhaustive]
-pub struct DirEntry<'a> {
-    /// Filename
-    pub name: &'a OsStr,
-}
-
-/// Trait for enumerating directory entries
-///
-/// An implementor of `Dir` may retain a file descriptor (or any other resource
-/// alike) to access the underlying system and obtain entry information. The
-/// file descriptor is released when the implementor object is dropped.
-pub trait Dir: Debug {
-    /// Returns the next directory entry.
-    fn next(&mut self) -> Result<Option<DirEntry>>;
-}
 
 /// Extension for [`System`]
 ///

@@ -28,6 +28,9 @@ type RawUidDef = u32;
 /// while POSIX requires the type to be an integer. On non-Unix platforms, this
 /// type is hard-coded to `u32`.
 ///
+/// User IDs are usually wrapped in the [`Uid`] type for better type safety, so
+/// this type is not used directly in most cases.
+///
 /// [`libc`]: nix::libc
 pub type RawUid = RawUidDef;
 
@@ -53,6 +56,9 @@ type RawGidDef = u32;
 /// [`libc`] crate. The exact representation of this type is platform-dependent
 /// while POSIX requires the type to be an integer. On non-Unix platforms, this
 /// type is hard-coded to `u32`.
+///
+/// Group IDs are usually wrapped in the [`Gid`] type for better type safety, so
+/// this type is not used directly in most cases.
 ///
 /// [`libc`]: nix::libc
 pub type RawGid = RawGidDef;
