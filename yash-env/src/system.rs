@@ -134,6 +134,7 @@ pub trait System: Debug {
     /// Opens a file descriptor.
     ///
     /// This is a thin wrapper around the `open` system call.
+    #[deprecated = "use open2 instead"]
     fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd>;
     fn open2(
         &mut self,

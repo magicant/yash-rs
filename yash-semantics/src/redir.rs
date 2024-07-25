@@ -78,6 +78,8 @@
 use crate::expansion::expand_text;
 use crate::expansion::expand_word;
 use crate::xtrace::XTrace;
+use enumset::enum_set;
+use enumset::EnumSet;
 use std::borrow::Cow;
 use std::ffi::CString;
 use std::ffi::NulError;
@@ -94,8 +96,10 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::Errno;
 use yash_env::system::FdFlag;
-use yash_env::system::Mode;
+use yash_env::system::Mode2;
 use yash_env::system::OFlag;
+use yash_env::system::OfdAccess;
+use yash_env::system::OpenFlag;
 use yash_env::system::SFlag;
 use yash_env::Env;
 use yash_env::System;
@@ -258,12 +262,7 @@ impl FdSpec {
     }
 }
 
-const MODE: Mode = Mode::S_IRUSR
-    .union(Mode::S_IWUSR)
-    .union(Mode::S_IRGRP)
-    .union(Mode::S_IWGRP)
-    .union(Mode::S_IROTH)
-    .union(Mode::S_IWOTH);
+const MODE: Mode2 = Mode2(0o666);
 
 fn is_cloexec(env: &Env, fd: Fd) -> bool {
     matches!(env.system.fcntl_getfd(fd), Ok(flags) if flags.contains(FdFlag::FD_CLOEXEC))
@@ -280,9 +279,15 @@ fn into_c_string_value_and_origin(field: Field) -> Result<(CString, Location), E
 }
 
 /// Opens a file for redirection.
-fn open_file(env: &mut Env, option: OFlag, path: Field) -> Result<(FdSpec, Location), Error> {
+fn open_file(
+    env: &mut Env,
+    access: OfdAccess,
+    flags: EnumSet<OpenFlag>,
+    path: Field,
+) -> Result<(FdSpec, Location), Error> {
+    let system = &mut env.system;
     let (path, origin) = into_c_string_value_and_origin(path)?;
-    match env.system.open(&path, option, MODE) {
+    match system.open2(&path, access, flags, MODE) {
         Ok(fd) => Ok((FdSpec::Owned(fd), origin)),
         Err(errno) => Err(Error {
             cause: ErrorCause::OpenFile(path, errno),
@@ -293,10 +298,11 @@ fn open_file(env: &mut Env, option: OFlag, path: Field) -> Result<(FdSpec, Locat
 
 /// Opens a file for writing with the `noclobber` option.
 fn open_file_noclobber(env: &mut Env, path: Field) -> Result<(FdSpec, Location), Error> {
+    let system = &mut env.system;
     let (path, origin) = into_c_string_value_and_origin(path)?;
 
-    const FLAGS_EXCL: OFlag = OFlag::O_WRONLY.union(OFlag::O_CREAT).union(OFlag::O_EXCL);
-    match env.system.open(&path, FLAGS_EXCL, MODE) {
+    const FLAGS_EXCL: EnumSet<OpenFlag> = enum_set!(OpenFlag::Create | OpenFlag::Exclusive);
+    match system.open2(&path, OfdAccess::WriteOnly, FLAGS_EXCL, MODE) {
         Ok(fd) => return Ok((FdSpec::Owned(fd), origin)),
         Err(Errno::EEXIST) => (),
         Err(errno) => {
@@ -308,14 +314,14 @@ fn open_file_noclobber(env: &mut Env, path: Field) -> Result<(FdSpec, Location),
     }
 
     // Okay, it seems there is an existing file. Try opening it.
-    match env.system.open(&path, OFlag::O_WRONLY, MODE) {
+    match system.open2(&path, OfdAccess::WriteOnly, EnumSet::empty(), MODE) {
         Ok(fd) => {
-            let is_regular = matches!(env.system.fstat(fd), Ok(stat)
+            let is_regular = matches!(system.fstat(fd), Ok(stat)
                     if SFlag::from_bits_truncate(stat.st_mode) & SFlag::S_IFMT == SFlag::S_IFREG);
             if is_regular {
                 // We opened the FD without the O_CREAT flag, so somebody else
                 // must have created this file. Failure.
-                let _: Result<_, _> = env.system.close(fd);
+                let _: Result<_, _> = system.close(fd);
                 Err(Error {
                     cause: ErrorCause::OpenFile(path, Errno::EEXIST),
                     location: origin,
@@ -409,19 +415,21 @@ async fn open_normal(
 ) -> Result<(FdSpec, Location), Error> {
     use RedirOp::*;
     match operator {
-        FileIn => open_file(env, OFlag::O_RDONLY, operand),
+        FileIn => open_file(env, OfdAccess::ReadOnly, EnumSet::empty(), operand),
         FileOut if env.options.get(Clobber) == Off => open_file_noclobber(env, operand),
         FileOut | FileClobber => open_file(
             env,
-            OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_TRUNC,
+            OfdAccess::WriteOnly,
+            OpenFlag::Create | OpenFlag::Truncate,
             operand,
         ),
         FileAppend => open_file(
             env,
-            OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_APPEND,
+            OfdAccess::WriteOnly,
+            OpenFlag::Create | OpenFlag::Append,
             operand,
         ),
-        FileInOut => open_file(env, OFlag::O_RDWR | OFlag::O_CREAT, operand),
+        FileInOut => open_file(env, OfdAccess::ReadWrite, OpenFlag::Create.into(), operand),
         FdIn => copy_fd(env, operand, OFlag::O_RDONLY),
         FdOut => copy_fd(env, operand, OFlag::O_WRONLY),
         Pipe => todo!("pipe redirection: {:?}", operand.value),
@@ -894,7 +902,12 @@ mod tests {
         let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let fd = env
             .system
-            .open(c"foo", OFlag::O_WRONLY | OFlag::O_CREAT, Mode::all())
+            .open2(
+                c"foo",
+                OfdAccess::WriteOnly,
+                OpenFlag::Create.into(),
+                Mode2(0o777),
+            )
             .unwrap();
         env.system.fcntl_setfd(fd, FdFlag::FD_CLOEXEC).unwrap();
 

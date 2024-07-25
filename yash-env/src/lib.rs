@@ -293,10 +293,11 @@ impl Env {
             return Ok(fd);
         }
 
-        let first_fd = self.system.open(
+        let first_fd = self.system.open2(
             c"/dev/tty",
-            crate::system::OFlag::O_RDWR | crate::system::OFlag::O_CLOEXEC,
-            crate::system::Mode::empty(),
+            crate::system::OfdAccess::ReadWrite,
+            crate::system::OpenFlag::Cloexec.into(),
+            crate::system::Mode2(0),
         )?;
         let final_fd = self.system.move_fd_internal(first_fd);
         self.tty = final_fd.ok();

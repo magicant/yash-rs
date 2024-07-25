@@ -34,8 +34,9 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::stack::Frame;
 use yash_env::system::Errno;
-use yash_env::system::Mode;
-use yash_env::system::OFlag;
+use yash_env::system::Mode2;
+use yash_env::system::OfdAccess;
+use yash_env::system::OpenFlag;
 use yash_env::system::System;
 use yash_env::system::SystemEx as _;
 use yash_env::variable::PATH;
@@ -116,7 +117,12 @@ fn find_and_open_file(env: &mut Env, filename: &str) -> Result<Fd, Errno> {
 /// least [`MIN_INTERNAL_FD`](yash_env::io::MIN_INTERNAL_FD).
 fn open_file<S: System>(system: &mut S, path: &CStr) -> Result<Fd, Errno> {
     system
-        .open(path, OFlag::O_RDONLY | OFlag::O_CLOEXEC, Mode::empty())
+        .open2(
+            path,
+            OfdAccess::ReadOnly,
+            OpenFlag::Cloexec.into(),
+            Mode2(0),
+        )
         .and_then(|fd| system.move_fd_internal(fd))
 }
 
