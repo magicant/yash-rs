@@ -16,6 +16,7 @@
 
 //! Implementation of `System` that actually interacts with the system.
 
+mod open_flag;
 mod signal;
 
 use super::resource::LimitPair;
@@ -32,7 +33,10 @@ use super::FdSet;
 use super::FileStat;
 use super::Gid;
 use super::Mode;
+use super::Mode2;
 use super::OFlag;
+use super::OfdAccess;
+use super::OpenFlag;
 use super::Result;
 use super::SigmaskHow;
 use super::System;
@@ -44,6 +48,7 @@ use crate::job::Pid;
 use crate::job::ProcessResult;
 use crate::job::ProcessState;
 use crate::SignalHandling;
+use enumset::EnumSet;
 use nix::errno::Errno as NixErrno;
 use nix::libc::DIR;
 use nix::libc::{S_IFDIR, S_IFMT, S_IFREG};
@@ -227,6 +232,21 @@ impl System for RealSystem {
 
     fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd> {
         Ok(Fd(nix::fcntl::open(path, option, mode)?))
+    }
+    fn open2(
+        &mut self,
+        path: &CStr,
+        access: OfdAccess,
+        flags: EnumSet<OpenFlag>,
+        mode: Mode2,
+    ) -> Result<Fd> {
+        let mut raw_flags = access.to_real_flags().ok_or(Errno::EINVAL)?;
+        for flag in flags {
+            raw_flags |= flag.to_real_flags().ok_or(Errno::EINVAL)?;
+        }
+        unsafe { nix::libc::open(path.as_ptr(), raw_flags, mode.0) }
+            .errno_if_m1()
+            .map(Fd)
     }
 
     fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {

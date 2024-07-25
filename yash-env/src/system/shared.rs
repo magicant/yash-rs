@@ -23,6 +23,9 @@ use super::Errno;
 use super::FdSet;
 use super::Gid;
 use super::LimitPair;
+use super::Mode2;
+use super::OfdAccess;
+use super::OpenFlag;
 use super::Resource;
 use super::Result;
 use super::SelectSystem;
@@ -38,6 +41,7 @@ use crate::job::Pid;
 use crate::job::ProcessState;
 #[cfg(doc)]
 use crate::Env;
+use enumset::EnumSet;
 use nix::fcntl::AtFlags;
 use nix::fcntl::FdFlag;
 use nix::fcntl::OFlag;
@@ -323,6 +327,15 @@ impl System for &SharedSystem {
     fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd> {
         self.0.borrow_mut().open(path, option, mode)
     }
+    fn open2(
+        &mut self,
+        path: &CStr,
+        access: OfdAccess,
+        flags: EnumSet<OpenFlag>,
+        mode: Mode2,
+    ) -> Result<Fd> {
+        self.0.borrow_mut().open2(path, access, flags, mode)
+    }
     fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
         self.0.borrow_mut().open_tmpfile(parent_dir)
     }
@@ -504,6 +517,16 @@ impl System for SharedSystem {
     #[inline]
     fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd> {
         (&mut &*self).open(path, option, mode)
+    }
+    #[inline]
+    fn open2(
+        &mut self,
+        path: &CStr,
+        access: OfdAccess,
+        flags: EnumSet<OpenFlag>,
+        mode: Mode2,
+    ) -> Result<Fd> {
+        (&mut &*self).open2(path, access, flags, mode)
     }
     #[inline]
     fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {

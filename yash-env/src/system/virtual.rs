@@ -65,6 +65,8 @@ use super::FdSet;
 use super::FileStat;
 use super::Gid;
 use super::OFlag;
+use super::OfdAccess;
+use super::OpenFlag;
 use super::Result;
 use super::SigmaskHow;
 use super::TimeSpec;
@@ -77,6 +79,7 @@ use crate::job::ProcessState;
 use crate::system::ChildProcessStarter;
 use crate::SignalHandling;
 use crate::System;
+use enumset::EnumSet;
 use nix::sys::stat::SFlag;
 use std::borrow::Cow;
 use std::cell::Cell;
@@ -496,6 +499,80 @@ impl System for VirtualSystem {
         let body = FdBody {
             open_file_description,
             flag: if option.contains(OFlag::O_CLOEXEC) {
+                FdFlag::FD_CLOEXEC
+            } else {
+                FdFlag::empty()
+            },
+        };
+        let process = state.processes.get_mut(&self.process_id).unwrap();
+        process.open_fd(body).map_err(|_| Errno::EMFILE)
+    }
+    fn open2(
+        &mut self,
+        path: &CStr,
+        access: OfdAccess,
+        flags: EnumSet<OpenFlag>,
+        mode: Mode,
+    ) -> Result<Fd> {
+        let path = self.resolve_relative_path(Path::new(OsStr::from_bytes(path.to_bytes())));
+        let mut state = self.state.borrow_mut();
+        let file = match state.file_system.get(&path) {
+            Ok(inode) => {
+                if flags.contains(OpenFlag::Exclusive) {
+                    return Err(Errno::EEXIST);
+                }
+                if flags.contains(OpenFlag::Directory)
+                    && !matches!(inode.borrow().body, FileBody::Directory { .. })
+                {
+                    return Err(Errno::ENOTDIR);
+                }
+                if flags.contains(OpenFlag::Truncate) {
+                    if let FileBody::Regular { content, .. } = &mut inode.borrow_mut().body {
+                        content.clear();
+                    };
+                }
+                inode
+            }
+            Err(Errno::ENOENT) if flags.contains(OpenFlag::Create) => {
+                let mut inode = INode::new([]);
+                // TODO Apply umask
+                inode.permissions = mode;
+                let inode = Rc::new(RefCell::new(inode));
+                state.file_system.save(&path, Rc::clone(&inode))?;
+                inode
+            }
+            Err(errno) => return Err(errno),
+        };
+
+        let (is_readable, is_writable) = match access {
+            OfdAccess::ReadOnly => (true, false),
+            OfdAccess::WriteOnly => (false, true),
+            OfdAccess::ReadWrite => (true, true),
+            OfdAccess::Exec | OfdAccess::Search => (false, false),
+        };
+
+        if let FileBody::Fifo {
+            readers, writers, ..
+        } = &mut file.borrow_mut().body
+        {
+            if is_readable {
+                *readers += 1;
+            }
+            if is_writable {
+                *writers += 1;
+            }
+        }
+
+        let open_file_description = Rc::new(RefCell::new(OpenFileDescription {
+            file,
+            offset: 0,
+            is_readable,
+            is_writable,
+            is_appending: flags.contains(OpenFlag::Append),
+        }));
+        let body = FdBody {
+            open_file_description,
+            flag: if flags.contains(OpenFlag::Cloexec) {
                 FdFlag::FD_CLOEXEC
             } else {
                 FdFlag::empty()

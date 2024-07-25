@@ -61,6 +61,7 @@ use crate::signal;
 use crate::subshell::Subshell;
 use crate::trap::SignalSystem;
 use crate::Env;
+use enumset::EnumSet;
 #[doc(no_inline)]
 pub use nix::fcntl::AtFlags;
 #[doc(no_inline)]
@@ -134,6 +135,13 @@ pub trait System: Debug {
     ///
     /// This is a thin wrapper around the `open` system call.
     fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd>;
+    fn open2(
+        &mut self,
+        path: &CStr,
+        access: OfdAccess,
+        flags: EnumSet<OpenFlag>,
+        mode: Mode2,
+    ) -> Result<Fd>;
 
     /// Opens a file descriptor associated with an anonymous temporary file.
     ///
