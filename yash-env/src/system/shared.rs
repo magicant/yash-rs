@@ -324,10 +324,6 @@ impl System for &SharedSystem {
     fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
         self.0.borrow_mut().dup2(from, to)
     }
-    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd> {
-        #[allow(deprecated)]
-        self.0.borrow_mut().open(path, option, mode)
-    }
     fn open2(
         &mut self,
         path: &CStr,
@@ -514,11 +510,6 @@ impl System for SharedSystem {
     #[inline]
     fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
         (&mut &*self).dup2(from, to)
-    }
-    #[inline]
-    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd> {
-        #[allow(deprecated)]
-        (&mut &*self).open(path, option, mode)
     }
     #[inline]
     fn open2(

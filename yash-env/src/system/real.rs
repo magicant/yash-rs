@@ -230,9 +230,6 @@ impl System for RealSystem {
         }
     }
 
-    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd> {
-        Ok(Fd(nix::fcntl::open(path, option, mode)?))
-    }
     fn open2(
         &mut self,
         path: &CStr,
