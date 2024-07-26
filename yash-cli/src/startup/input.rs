@@ -115,7 +115,7 @@ pub fn prepare_input<'a>(
                     &c_path,
                     OfdAccess::ReadOnly,
                     OpenFlag::Cloexec.into(),
-                    Mode2(0),
+                    Mode2::empty(),
                 )
                 .and_then(|fd| system.move_fd_internal(fd))
                 .map_err(|errno| PrepareInputError { errno, path })?;

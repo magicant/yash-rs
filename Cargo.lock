@@ -547,6 +547,7 @@ dependencies = [
  "annotate-snippets",
  "assert_matches",
  "async-trait",
+ "bitflags",
  "either",
  "enumset",
  "futures-executor",

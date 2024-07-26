@@ -142,6 +142,7 @@ mod tests {
     use std::cell::RefCell;
     use std::rc::Rc;
     use yash_env::system::r#virtual::{FileBody, INode};
+    use yash_env::system::Mode2;
     use yash_env::variable::{Scope, PATH};
     use yash_env::VirtualSystem;
 
@@ -164,7 +165,7 @@ mod tests {
             content: Vec::new(),
             is_native_executable: true,
         };
-        content.permissions.0 |= 0o100;
+        content.permissions.set(Mode2::USER_EXEC, true);
         let content = Rc::new(RefCell::new(content));
         system
             .state
@@ -199,7 +200,7 @@ mod tests {
             content: Vec::new(),
             is_native_executable: true,
         };
-        content.permissions.0 |= 0o100;
+        content.permissions.set(Mode2::USER_EXEC, true);
         let content = Rc::new(RefCell::new(content));
         system
             .state
@@ -234,7 +235,7 @@ mod tests {
             content: Vec::new(),
             is_native_executable: true,
         };
-        content.permissions.0 |= 0o100;
+        content.permissions.set(Mode2::USER_EXEC, true);
         let content = Rc::new(RefCell::new(content));
         system
             .state
@@ -264,7 +265,7 @@ mod tests {
             content: Vec::new(),
             is_native_executable: true,
         };
-        content.permissions.0 |= 0o100;
+        content.permissions.set(Mode2::USER_EXEC, true);
         let content = Rc::new(RefCell::new(content));
         system
             .state

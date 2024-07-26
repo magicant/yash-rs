@@ -244,7 +244,13 @@ impl System for RealSystem {
         for flag in flags {
             raw_flags |= flag.to_real_flags().ok_or(Errno::EINVAL)?;
         }
-        unsafe { nix::libc::open(path.as_ptr(), raw_flags, mode.0) }
+
+        #[cfg(not(target_os = "redox"))]
+        let mode_bits = mode.bits() as std::ffi::c_uint;
+        #[cfg(target_os = "redox")]
+        let mode_bits = mode.bits() as c_int;
+
+        unsafe { nix::libc::open(path.as_ptr(), raw_flags, mode_bits) }
             .errno_if_m1()
             .map(Fd)
     }

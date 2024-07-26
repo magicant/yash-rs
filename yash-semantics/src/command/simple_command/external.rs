@@ -234,6 +234,7 @@ mod tests {
     use yash_env::option::State::On;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::INode;
+    use yash_env::system::Mode2;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
     use yash_env_test_helper::assert_stderr;
@@ -249,7 +250,7 @@ mod tests {
                 content: Vec::new(),
                 is_native_executable: true,
             };
-            content.permissions.0 |= 0o100;
+            content.permissions.set(Mode2::USER_EXEC, true);
             let content = Rc::new(RefCell::new(content));
             state
                 .borrow_mut()
@@ -293,7 +294,7 @@ mod tests {
                 content: Vec::new(),
                 is_native_executable: true,
             };
-            content.permissions.0 |= 0o100;
+            content.permissions.set(Mode2::USER_EXEC, true);
             let content = Rc::new(RefCell::new(content));
             state
                 .borrow_mut()
@@ -319,7 +320,7 @@ mod tests {
                 content: Vec::new(),
                 is_native_executable: true,
             };
-            content.permissions.0 |= 0o100;
+            content.permissions.set(Mode2::USER_EXEC, true);
             let content = Rc::new(RefCell::new(content));
             state
                 .borrow_mut()
@@ -348,7 +349,7 @@ mod tests {
     fn simple_command_returns_126_on_exec_failure() {
         in_virtual_system(|mut env, state| async move {
             let mut content = INode::default();
-            content.permissions.0 |= 0o100;
+            content.permissions.set(Mode2::USER_EXEC, true);
             let content = Rc::new(RefCell::new(content));
             state
                 .borrow_mut()
@@ -421,7 +422,7 @@ mod tests {
                 content: Vec::new(),
                 is_native_executable: true,
             };
-            content.permissions.0 |= 0o100;
+            content.permissions.set(Mode2::USER_EXEC, true);
             let content = Rc::new(RefCell::new(content));
             state
                 .borrow_mut()
@@ -449,7 +450,7 @@ mod tests {
                 content: Vec::new(),
                 is_native_executable: true,
             };
-            content.permissions.0 |= 0o100;
+            content.permissions.set(Mode2::USER_EXEC, true);
             let content = Rc::new(RefCell::new(content));
             state
                 .borrow_mut()

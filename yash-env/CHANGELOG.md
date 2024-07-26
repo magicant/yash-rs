@@ -13,10 +13,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   types in the `system` module
 - The `System` trait now has the `get_and_set_nonblocking`,  `getuid`,
   `geteuid`, `getgid`, and `getegid` methods.
+- `system::Mode` now has constants with more human-friendly names, e.g.,
+  `USER_READ` and `GROUP_WRITE`.
 - The `system::virtual::Process` struct now has the getters/setters for the
   real/effective user/group IDs: `uid`, `set_uid`, `euid`, `set_euid`, `gid`,
   `set_gid`, `egid`, and `set_egid`.
 - The `stack::Frame` enum now has the `InitFile` variant.
+- External dependencies:
+    - enumset 1.1.2
+- Internal dependencies:
+    - bitflags 2.6.0
+
+### Changed
+
+- `system::Mode` is no longer a re-export of `nix::sys::stat::Mode`.
 
 ### Removed
 

@@ -30,6 +30,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+const DEFAULT_DIRECTORY_MODE: Mode = Mode::USER_ALL.union(Mode::ALL_READ).union(Mode::ALL_EXEC);
+
 /// Collection of files.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FileSystem {
@@ -45,7 +47,7 @@ impl Default for FileSystem {
                 body: FileBody::Directory {
                     files: HashMap::new(),
                 },
-                permissions: Mode(0o755),
+                permissions: DEFAULT_DIRECTORY_MODE,
             })),
         }
     }
@@ -107,7 +109,7 @@ impl FileSystem {
                             body: FileBody::Directory {
                                 files: HashMap::new(),
                             },
-                            permissions: Mode(0o755),
+                            permissions: DEFAULT_DIRECTORY_MODE,
                         }));
                         Rc::clone(vacant.insert(child))
                     }
@@ -150,7 +152,7 @@ impl FileSystem {
                     _ => return Err(Errno::ENOTDIR),
                 };
 
-                if node_ref.permissions.0 & 0o100 == 0 {
+                if !node_ref.permissions.contains(Mode::USER_EXEC) {
                     return Err(Errno::EACCES);
                 }
 
@@ -353,7 +355,7 @@ mod tests {
 
         let dir = fs.get("/foo").unwrap();
         let dir = dir.borrow();
-        assert_eq!(dir.permissions, Mode(0o755));
+        assert_eq!(dir.permissions, Mode::from_bits_retain(0o755));
         assert_matches!(&dir.body, FileBody::Directory { files } => {
             let mut i = files.iter();
             let (name, content) = i.next().unwrap();
@@ -405,7 +407,7 @@ mod tests {
         let _ = fs.save("/dir/file", Rc::default());
         {
             let dir = fs.get("/dir").unwrap();
-            dir.borrow_mut().permissions = Mode(0o666);
+            dir.borrow_mut().permissions = Mode::from_bits_retain(0o666);
         }
         let result = fs.get("/dir/file");
         assert_eq!(result, Err(Errno::EACCES));

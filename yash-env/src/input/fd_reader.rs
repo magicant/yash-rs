@@ -225,7 +225,7 @@ mod tests {
                 path,
                 OfdAccess::ReadOnly,
                 OpenFlag::Cloexec.into(),
-                Mode2(0),
+                Mode2::empty(),
             )
             .unwrap();
         let mut reader = FdReader::new(fd, system);

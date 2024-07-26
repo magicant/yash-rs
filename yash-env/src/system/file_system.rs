@@ -17,6 +17,7 @@
 //! Items about file systems
 
 use super::Result;
+use bitflags::bitflags;
 use std::ffi::OsStr;
 use std::fmt::Debug;
 use yash_syntax::syntax::Fd;
@@ -77,7 +78,54 @@ pub type RawMode = RawModeDef;
 /// type-safe than using the raw integer value directly.
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 #[repr(transparent)]
-pub struct Mode(pub RawMode);
+pub struct Mode(RawMode);
+
+bitflags! {
+    impl Mode: RawMode {
+        /// User read permission (`0o400`)
+        const USER_READ = 0o400;
+        /// User write permission (`0o200`)
+        const USER_WRITE = 0o200;
+        /// User execute permission (`0o100`)
+        const USER_EXEC = 0o100;
+        /// User read, write, and execute permissions (`0o700`)
+        const USER_ALL = 0o700;
+        /// Group read permission (`0o040`)
+        const GROUP_READ = 0o040;
+        /// Group write permission (`0o020`)
+        const GROUP_WRITE = 0o020;
+        /// Group execute permission (`0o010`)
+        const GROUP_EXEC = 0o010;
+        /// Group read, write, and execute permissions (`0o070`)
+        const GROUP_ALL = 0o070;
+        /// Other read permission (`0o004`)
+        const OTHER_READ = 0o004;
+        /// Other write permission (`0o002`)
+        const OTHER_WRITE = 0o002;
+        /// Other execute permission (`0o001`)
+        const OTHER_EXEC = 0o001;
+        /// Other read, write, and execute permissions (`0o007`)
+        const OTHER_ALL = 0o007;
+        /// All read permission (`0o444`)
+        const ALL_READ = 0o444;
+        /// All write permission (`0o222`)
+        const ALL_WRITE = 0o222;
+        /// All execute permission (`0o111`)
+        const ALL_EXEC = 0o111;
+        /// All combinations of (user, group, other) × (read, write, execute)
+        ///
+        /// Note that this is equivalent to `Mode::USER_ALL | Mode::GROUP_ALL |
+        /// Mode::OTHER_ALL` and does not include the sticky bit, the
+        /// set-user-ID bit, or the set-group-ID bit.
+        const ALL_9 = 0o777;
+        /// Set-user-ID bit (`0o4000`)
+        const SET_USER_ID = 0o4000;
+        /// Set-group-ID bit (`0o2000`)
+        const SET_GROUP_ID = 0o2000;
+        /// Sticky bit (`0o1000`)
+        const STICKY = 0o1000;
+    }
+}
 
 impl Debug for Mode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

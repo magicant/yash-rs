@@ -262,7 +262,7 @@ impl FdSpec {
     }
 }
 
-const MODE: Mode2 = Mode2(0o666);
+const MODE: Mode2 = Mode2::ALL_READ.union(Mode2::ALL_WRITE);
 
 fn is_cloexec(env: &Env, fd: Fd) -> bool {
     matches!(env.system.fcntl_getfd(fd), Ok(flags) if flags.contains(FdFlag::FD_CLOEXEC))
@@ -906,7 +906,7 @@ mod tests {
                 c"foo",
                 OfdAccess::WriteOnly,
                 OpenFlag::Create.into(),
-                Mode2(0o777),
+                Mode2::ALL_9,
             )
             .unwrap();
         env.system.fcntl_setfd(fd, FdFlag::FD_CLOEXEC).unwrap();

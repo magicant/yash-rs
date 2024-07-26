@@ -181,7 +181,7 @@ impl VirtualSystem {
                     body: FileBody::Directory {
                         files: Default::default(),
                     },
-                    permissions: Mode(0o777),
+                    permissions: Mode::ALL_9,
                 })),
             )
             .unwrap();
@@ -323,7 +323,7 @@ fn stat(inode: &INode) -> Result<FileStat> {
         FileBody::Symlink { target } => (SFlag::S_IFLNK, target.as_os_str().len()),
     };
     let mut result: FileStat = unsafe { MaybeUninit::zeroed().assume_init() };
-    result.st_mode = type_flag.bits() | inode.permissions.0;
+    result.st_mode = type_flag.bits() | inode.permissions.bits();
     result.st_size = size as _;
     result.st_dev = 1;
     result.st_ino = std::ptr::addr_of!(*inode) as nix::libc::ino_t;
@@ -370,7 +370,7 @@ impl System for VirtualSystem {
             return false;
         };
         let inode = inode.borrow();
-        inode.permissions.0 & 0o111 != 0
+        inode.permissions.intersects(Mode::ALL_EXEC)
     }
 
     fn is_directory(&self, path: &CStr) -> bool {
@@ -462,7 +462,7 @@ impl System for VirtualSystem {
             Err(Errno::ENOENT) if option.contains(OFlag::O_CREAT) => {
                 let mut inode = INode::new([]);
                 // TODO Apply umask
-                inode.permissions = Mode(mode.bits());
+                inode.permissions = Mode::from_bits_retain(mode.bits());
                 let inode = Rc::new(RefCell::new(inode));
                 state.file_system.save(&path, Rc::clone(&inode))?;
                 inode
@@ -685,15 +685,15 @@ impl System for VirtualSystem {
             path,
             OfdAccess::ReadOnly,
             OpenFlag::Directory.into(),
-            Mode(0),
+            Mode::empty(),
         )?;
         self.fdopendir(fd)
     }
 
     fn umask(&mut self, mask: nix::sys::stat::Mode) -> nix::sys::stat::Mode {
-        let new_mask = Mode(mask.bits());
+        let new_mask = Mode::from_bits_truncate(mask.bits());
         let old_mask = std::mem::replace(&mut self.current_process_mut().umask, new_mask);
-        nix::sys::stat::Mode::from_bits_retain(old_mask.0)
+        nix::sys::stat::Mode::from_bits_retain(old_mask.bits())
     }
 
     /// Returns `now` in [`SystemState`].
@@ -1407,7 +1407,7 @@ mod tests {
         let stat = system
             .fstatat(Fd(0), c"/some/file", AtFlags::empty())
             .unwrap();
-        assert_eq!(stat.st_mode, SFlag::S_IFREG.bits() | Mode::default().0);
+        assert_eq!(stat.st_mode, SFlag::S_IFREG.bits() | Mode::default().bits());
         assert_eq!(stat.st_size, 5);
         // TODO Other stat properties
     }
@@ -1445,7 +1445,7 @@ mod tests {
         let stat = system
             .fstatat(Fd(0), c"/some/fifo", AtFlags::empty())
             .unwrap();
-        assert_eq!(stat.st_mode, SFlag::S_IFIFO.bits() | Mode::default().0);
+        assert_eq!(stat.st_mode, SFlag::S_IFIFO.bits() | Mode::default().bits());
         assert_eq!(stat.st_size, 42);
     }
 
@@ -1476,7 +1476,7 @@ mod tests {
     fn fstatat_symlink_to_regular_file() {
         let system = system_with_symlink();
         let stat = system.fstatat(Fd(0), c"/link", AtFlags::empty()).unwrap();
-        assert_eq!(stat.st_mode, SFlag::S_IFREG.bits() | Mode::default().0);
+        assert_eq!(stat.st_mode, SFlag::S_IFREG.bits() | Mode::default().bits());
     }
 
     #[test]
@@ -1485,7 +1485,7 @@ mod tests {
         let stat = system
             .fstatat(Fd(0), c"/link", AtFlags::AT_SYMLINK_NOFOLLOW)
             .unwrap();
-        assert_eq!(stat.st_mode, SFlag::S_IFLNK.bits() | Mode::default().0);
+        assert_eq!(stat.st_mode, SFlag::S_IFLNK.bits() | Mode::default().bits());
     }
 
     #[test]
@@ -1510,7 +1510,7 @@ mod tests {
         let system = VirtualSystem::new();
         let path = "/some/file";
         let mut content = INode::default();
-        content.permissions.0 |= 0o100;
+        content.permissions.set(Mode::USER_EXEC, true);
         let content = Rc::new(RefCell::new(content));
         let mut state = system.state.borrow_mut();
         state.file_system.save(path, content).unwrap();
@@ -1594,7 +1594,7 @@ mod tests {
             c"/no/such/file",
             OfdAccess::ReadOnly,
             EnumSet::empty(),
-            Mode(0),
+            Mode::empty(),
         );
         assert_eq!(result, Err(Errno::ENOENT));
     }
@@ -1606,7 +1606,7 @@ mod tests {
             c"new_file",
             OfdAccess::WriteOnly,
             OpenFlag::Create.into(),
-            Mode(0),
+            Mode::empty(),
         );
         assert_eq!(result, Ok(Fd(3)));
 
@@ -1626,12 +1626,17 @@ mod tests {
                 c"file",
                 OfdAccess::WriteOnly,
                 OpenFlag::Create.into(),
-                Mode(0),
+                Mode::empty(),
             )
             .unwrap();
         system.write(fd, &[75, 96, 133]).unwrap();
 
-        let result = system.open2(c"file", OfdAccess::ReadOnly, EnumSet::empty(), Mode(0));
+        let result = system.open2(
+            c"file",
+            OfdAccess::ReadOnly,
+            EnumSet::empty(),
+            Mode::empty(),
+        );
         assert_eq!(result, Ok(Fd(4)));
 
         let mut buffer = [0; 5];
@@ -1649,7 +1654,7 @@ mod tests {
             c"my_file",
             OfdAccess::WriteOnly,
             OpenFlag::Create | OpenFlag::Exclusive,
-            Mode(0),
+            Mode::empty(),
         );
         assert_eq!(first, Ok(Fd(3)));
 
@@ -1657,7 +1662,7 @@ mod tests {
             c"my_file",
             OfdAccess::WriteOnly,
             OpenFlag::Create | OpenFlag::Exclusive,
-            Mode(0),
+            Mode::empty(),
         );
         assert_eq!(second, Err(Errno::EEXIST));
     }
@@ -1670,7 +1675,7 @@ mod tests {
                 c"file",
                 OfdAccess::WriteOnly,
                 OpenFlag::Create.into(),
-                Mode(0o777),
+                Mode::ALL_9,
             )
             .unwrap();
         system.write(fd, &[1, 2, 3]).unwrap();
@@ -1679,12 +1684,17 @@ mod tests {
             c"file",
             OfdAccess::WriteOnly,
             OpenFlag::Truncate.into(),
-            Mode(0),
+            Mode::empty(),
         );
         assert_eq!(result, Ok(Fd(4)));
 
         let reader = system
-            .open2(c"file", OfdAccess::ReadOnly, EnumSet::empty(), Mode(0))
+            .open2(
+                c"file",
+                OfdAccess::ReadOnly,
+                EnumSet::empty(),
+                Mode::empty(),
+            )
             .unwrap();
         let count = system.read(reader, &mut [0; 1]).unwrap();
         assert_eq!(count, 0);
@@ -1698,7 +1708,7 @@ mod tests {
                 c"file",
                 OfdAccess::WriteOnly,
                 OpenFlag::Create.into(),
-                Mode(0o777),
+                Mode::ALL_9,
             )
             .unwrap();
         system.write(fd, &[1, 2, 3]).unwrap();
@@ -1707,13 +1717,18 @@ mod tests {
             c"file",
             OfdAccess::WriteOnly,
             OpenFlag::Append.into(),
-            Mode(0),
+            Mode::empty(),
         );
         assert_eq!(result, Ok(Fd(4)));
         system.write(Fd(4), &[4, 5, 6]).unwrap();
 
         let reader = system
-            .open2(c"file", OfdAccess::ReadOnly, EnumSet::empty(), Mode(0))
+            .open2(
+                c"file",
+                OfdAccess::ReadOnly,
+                EnumSet::empty(),
+                Mode::empty(),
+            )
             .unwrap();
         let mut buffer = [0; 7];
         let count = system.read(reader, &mut buffer).unwrap();
@@ -1730,14 +1745,14 @@ mod tests {
             c"/dir/file",
             OfdAccess::WriteOnly,
             OpenFlag::Create.into(),
-            Mode(0),
+            Mode::empty(),
         );
 
         let result = system.open2(
             c"/dir",
             OfdAccess::ReadOnly,
             OpenFlag::Directory.into(),
-            Mode(0),
+            Mode::empty(),
         );
         assert_eq!(result, Ok(Fd(4)));
     }
@@ -1751,14 +1766,14 @@ mod tests {
             c"/file",
             OfdAccess::WriteOnly,
             OpenFlag::Create.into(),
-            Mode(0),
+            Mode::empty(),
         );
 
         let result = system.open2(
             c"/file/file",
             OfdAccess::WriteOnly,
             OpenFlag::Create.into(),
-            Mode(0),
+            Mode::empty(),
         );
         assert_eq!(result, Err(Errno::ENOTDIR));
     }
@@ -1772,14 +1787,14 @@ mod tests {
             c"/file",
             OfdAccess::WriteOnly,
             OpenFlag::Create.into(),
-            Mode(0),
+            Mode::empty(),
         );
 
         let result = system.open2(
             c"/file",
             OfdAccess::ReadOnly,
             OpenFlag::Directory.into(),
-            Mode(0),
+            Mode::empty(),
         );
         assert_eq!(result, Err(Errno::ENOTDIR));
     }
@@ -1793,7 +1808,7 @@ mod tests {
             c"/dir/file",
             OfdAccess::WriteOnly,
             OpenFlag::Create.into(),
-            Mode(0o777),
+            Mode::ALL_9,
         );
         system.write(writer.unwrap(), &[1, 2, 3, 42]).unwrap();
 
@@ -1801,7 +1816,7 @@ mod tests {
             c"./dir/file",
             OfdAccess::ReadOnly,
             EnumSet::empty(),
-            Mode(0),
+            Mode::empty(),
         );
         let mut buffer = [0; 10];
         let count = system.read(reader.unwrap(), &mut buffer).unwrap();
@@ -1863,7 +1878,7 @@ mod tests {
             c"/dir/file",
             OfdAccess::WriteOnly,
             OpenFlag::Create.into(),
-            Mode(0o777),
+            Mode::ALL_9,
         );
 
         let mut dir = system.opendir(c"./dir").unwrap();
@@ -2341,7 +2356,7 @@ mod tests {
             content: vec![],
             is_native_executable: true,
         };
-        content.permissions.0 |= 0o100;
+        content.permissions.set(Mode::USER_EXEC, true);
         let content = Rc::new(RefCell::new(content));
         let state = Rc::clone(&system.state);
         state.borrow_mut().file_system.save(path, content).unwrap();
@@ -2621,7 +2636,7 @@ mod tests {
             content: vec![],
             is_native_executable: true,
         };
-        content.permissions.0 |= 0o100;
+        content.permissions.set(Mode::USER_EXEC, true);
         let content = Rc::new(RefCell::new(content));
         let mut state = system.state.borrow_mut();
         state.file_system.save(path, content).unwrap();
@@ -2640,7 +2655,7 @@ mod tests {
             content: vec![],
             is_native_executable: true,
         };
-        content.permissions.0 |= 0o100;
+        content.permissions.set(Mode::USER_EXEC, true);
         let content = Rc::new(RefCell::new(content));
         let mut state = system.state.borrow_mut();
         state.file_system.save(path, content).unwrap();
@@ -2662,7 +2677,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         let path = "/some/file";
         let mut content = INode::default();
-        content.permissions.0 |= 0o100;
+        content.permissions.set(Mode::USER_EXEC, true);
         let content = Rc::new(RefCell::new(content));
         let mut state = system.state.borrow_mut();
         state.file_system.save(path, content).unwrap();
@@ -2688,7 +2703,7 @@ mod tests {
             c"/dir/file",
             OfdAccess::WriteOnly,
             OpenFlag::Create.into(),
-            Mode(0),
+            Mode::empty(),
         );
 
         let result = system.chdir(c"/dir");
@@ -2713,7 +2728,7 @@ mod tests {
             c"/dir/file",
             OfdAccess::WriteOnly,
             OpenFlag::Create.into(),
-            Mode(0),
+            Mode::empty(),
         );
 
         let result = system.chdir(c"/dir/file");

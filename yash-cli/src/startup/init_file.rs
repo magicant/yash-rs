@@ -150,7 +150,7 @@ pub async fn run_init_file(env: &mut Env, path: &str) {
             &c_path,
             OfdAccess::ReadOnly,
             OpenFlag::Cloexec.into(),
-            Mode2(0),
+            Mode2::empty(),
         )?;
         system.move_fd_internal(fd)
     }
