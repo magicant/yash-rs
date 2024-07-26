@@ -221,7 +221,7 @@ mod tests {
         let mut system = SharedSystem::new(Box::new(system));
         let path = c"/foo";
         let fd = system
-            .open2(
+            .open(
                 path,
                 OfdAccess::ReadOnly,
                 OpenFlag::Cloexec.into(),

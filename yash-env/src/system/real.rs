@@ -230,7 +230,7 @@ impl System for RealSystem {
         }
     }
 
-    fn open2(
+    fn open(
         &mut self,
         path: &CStr,
         access: OfdAccess,

@@ -293,7 +293,7 @@ impl Env {
             return Ok(fd);
         }
 
-        let first_fd = self.system.open2(
+        let first_fd = self.system.open(
             c"/dev/tty",
             crate::system::OfdAccess::ReadWrite,
             crate::system::OpenFlag::Cloexec.into(),

@@ -324,14 +324,14 @@ impl System for &SharedSystem {
     fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
         self.0.borrow_mut().dup2(from, to)
     }
-    fn open2(
+    fn open(
         &mut self,
         path: &CStr,
         access: OfdAccess,
         flags: EnumSet<OpenFlag>,
         mode: Mode2,
     ) -> Result<Fd> {
-        self.0.borrow_mut().open2(path, access, flags, mode)
+        self.0.borrow_mut().open(path, access, flags, mode)
     }
     fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
         self.0.borrow_mut().open_tmpfile(parent_dir)
@@ -512,14 +512,14 @@ impl System for SharedSystem {
         (&mut &*self).dup2(from, to)
     }
     #[inline]
-    fn open2(
+    fn open(
         &mut self,
         path: &CStr,
         access: OfdAccess,
         flags: EnumSet<OpenFlag>,
         mode: Mode2,
     ) -> Result<Fd> {
-        (&mut &*self).open2(path, access, flags, mode)
+        (&mut &*self).open(path, access, flags, mode)
     }
     #[inline]
     fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {

@@ -439,7 +439,7 @@ impl System for VirtualSystem {
         Ok(to)
     }
 
-    fn open2(
+    fn open(
         &mut self,
         path: &CStr,
         access: OfdAccess,
@@ -613,7 +613,7 @@ impl System for VirtualSystem {
     }
 
     fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
-        let fd = self.open2(
+        let fd = self.open(
             path,
             OfdAccess::ReadOnly,
             OpenFlag::Directory.into(),
@@ -1522,7 +1522,7 @@ mod tests {
     #[test]
     fn open_non_existing_file_no_creation() {
         let mut system = VirtualSystem::new();
-        let result = system.open2(
+        let result = system.open(
             c"/no/such/file",
             OfdAccess::ReadOnly,
             EnumSet::empty(),
@@ -1534,7 +1534,7 @@ mod tests {
     #[test]
     fn open_creating_non_existing_file() {
         let mut system = VirtualSystem::new();
-        let result = system.open2(
+        let result = system.open(
             c"new_file",
             OfdAccess::WriteOnly,
             OpenFlag::Create.into(),
@@ -1554,7 +1554,7 @@ mod tests {
     fn open_existing_file() {
         let mut system = VirtualSystem::new();
         let fd = system
-            .open2(
+            .open(
                 c"file",
                 OfdAccess::WriteOnly,
                 OpenFlag::Create.into(),
@@ -1563,7 +1563,7 @@ mod tests {
             .unwrap();
         system.write(fd, &[75, 96, 133]).unwrap();
 
-        let result = system.open2(
+        let result = system.open(
             c"file",
             OfdAccess::ReadOnly,
             EnumSet::empty(),
@@ -1582,7 +1582,7 @@ mod tests {
     #[test]
     fn open_existing_file_excl() {
         let mut system = VirtualSystem::new();
-        let first = system.open2(
+        let first = system.open(
             c"my_file",
             OfdAccess::WriteOnly,
             OpenFlag::Create | OpenFlag::Exclusive,
@@ -1590,7 +1590,7 @@ mod tests {
         );
         assert_eq!(first, Ok(Fd(3)));
 
-        let second = system.open2(
+        let second = system.open(
             c"my_file",
             OfdAccess::WriteOnly,
             OpenFlag::Create | OpenFlag::Exclusive,
@@ -1603,7 +1603,7 @@ mod tests {
     fn open_truncating() {
         let mut system = VirtualSystem::new();
         let fd = system
-            .open2(
+            .open(
                 c"file",
                 OfdAccess::WriteOnly,
                 OpenFlag::Create.into(),
@@ -1612,7 +1612,7 @@ mod tests {
             .unwrap();
         system.write(fd, &[1, 2, 3]).unwrap();
 
-        let result = system.open2(
+        let result = system.open(
             c"file",
             OfdAccess::WriteOnly,
             OpenFlag::Truncate.into(),
@@ -1621,7 +1621,7 @@ mod tests {
         assert_eq!(result, Ok(Fd(4)));
 
         let reader = system
-            .open2(
+            .open(
                 c"file",
                 OfdAccess::ReadOnly,
                 EnumSet::empty(),
@@ -1636,7 +1636,7 @@ mod tests {
     fn open_appending() {
         let mut system = VirtualSystem::new();
         let fd = system
-            .open2(
+            .open(
                 c"file",
                 OfdAccess::WriteOnly,
                 OpenFlag::Create.into(),
@@ -1645,7 +1645,7 @@ mod tests {
             .unwrap();
         system.write(fd, &[1, 2, 3]).unwrap();
 
-        let result = system.open2(
+        let result = system.open(
             c"file",
             OfdAccess::WriteOnly,
             OpenFlag::Append.into(),
@@ -1655,7 +1655,7 @@ mod tests {
         system.write(Fd(4), &[4, 5, 6]).unwrap();
 
         let reader = system
-            .open2(
+            .open(
                 c"file",
                 OfdAccess::ReadOnly,
                 EnumSet::empty(),
@@ -1673,14 +1673,14 @@ mod tests {
         let mut system = VirtualSystem::new();
 
         // Create a regular file and its parent directory
-        let _ = system.open2(
+        let _ = system.open(
             c"/dir/file",
             OfdAccess::WriteOnly,
             OpenFlag::Create.into(),
             Mode::empty(),
         );
 
-        let result = system.open2(
+        let result = system.open(
             c"/dir",
             OfdAccess::ReadOnly,
             OpenFlag::Directory.into(),
@@ -1694,14 +1694,14 @@ mod tests {
         let mut system = VirtualSystem::new();
 
         // Create a regular file
-        let _ = system.open2(
+        let _ = system.open(
             c"/file",
             OfdAccess::WriteOnly,
             OpenFlag::Create.into(),
             Mode::empty(),
         );
 
-        let result = system.open2(
+        let result = system.open(
             c"/file/file",
             OfdAccess::WriteOnly,
             OpenFlag::Create.into(),
@@ -1715,14 +1715,14 @@ mod tests {
         let mut system = VirtualSystem::new();
 
         // Create a regular file
-        let _ = system.open2(
+        let _ = system.open(
             c"/file",
             OfdAccess::WriteOnly,
             OpenFlag::Create.into(),
             Mode::empty(),
         );
 
-        let result = system.open2(
+        let result = system.open(
             c"/file",
             OfdAccess::ReadOnly,
             OpenFlag::Directory.into(),
@@ -1736,7 +1736,7 @@ mod tests {
         // The default working directory is the root directory.
         let mut system = VirtualSystem::new();
 
-        let writer = system.open2(
+        let writer = system.open(
             c"/dir/file",
             OfdAccess::WriteOnly,
             OpenFlag::Create.into(),
@@ -1744,7 +1744,7 @@ mod tests {
         );
         system.write(writer.unwrap(), &[1, 2, 3, 42]).unwrap();
 
-        let reader = system.open2(
+        let reader = system.open(
             c"./dir/file",
             OfdAccess::ReadOnly,
             EnumSet::empty(),
@@ -1806,7 +1806,7 @@ mod tests {
         // The default working directory is the root directory.
         let mut system = VirtualSystem::new();
 
-        let _ = system.open2(
+        let _ = system.open(
             c"/dir/file",
             OfdAccess::WriteOnly,
             OpenFlag::Create.into(),
@@ -2631,7 +2631,7 @@ mod tests {
         let mut system = VirtualSystem::new();
 
         // Create a regular file and its parent directory
-        let _ = system.open2(
+        let _ = system.open(
             c"/dir/file",
             OfdAccess::WriteOnly,
             OpenFlag::Create.into(),
@@ -2656,7 +2656,7 @@ mod tests {
         let mut system = VirtualSystem::new();
 
         // Create a regular file and its parent directory
-        let _ = system.open2(
+        let _ = system.open(
             c"/dir/file",
             OfdAccess::WriteOnly,
             OpenFlag::Create.into(),

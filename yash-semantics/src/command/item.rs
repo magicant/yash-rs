@@ -116,7 +116,7 @@ fn nullify_stdin(env: &mut Env) -> std::result::Result<(), yash_env::system::Err
     env.system.close(Fd::STDIN)?;
 
     let path = c"/dev/null";
-    let fd = env.system.open2(
+    let fd = env.system.open(
         path,
         OfdAccess::ReadOnly,
         Default::default(),

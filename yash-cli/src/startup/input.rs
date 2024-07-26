@@ -111,7 +111,7 @@ pub fn prepare_input<'a>(
                 path,
             })?;
             let fd = system
-                .open2(
+                .open(
                     &c_path,
                     OfdAccess::ReadOnly,
                     OpenFlag::Cloexec.into(),

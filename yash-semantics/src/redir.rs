@@ -287,7 +287,7 @@ fn open_file(
 ) -> Result<(FdSpec, Location), Error> {
     let system = &mut env.system;
     let (path, origin) = into_c_string_value_and_origin(path)?;
-    match system.open2(&path, access, flags, MODE) {
+    match system.open(&path, access, flags, MODE) {
         Ok(fd) => Ok((FdSpec::Owned(fd), origin)),
         Err(errno) => Err(Error {
             cause: ErrorCause::OpenFile(path, errno),
@@ -302,7 +302,7 @@ fn open_file_noclobber(env: &mut Env, path: Field) -> Result<(FdSpec, Location),
     let (path, origin) = into_c_string_value_and_origin(path)?;
 
     const FLAGS_EXCL: EnumSet<OpenFlag> = enum_set!(OpenFlag::Create | OpenFlag::Exclusive);
-    match system.open2(&path, OfdAccess::WriteOnly, FLAGS_EXCL, MODE) {
+    match system.open(&path, OfdAccess::WriteOnly, FLAGS_EXCL, MODE) {
         Ok(fd) => return Ok((FdSpec::Owned(fd), origin)),
         Err(Errno::EEXIST) => (),
         Err(errno) => {
@@ -314,7 +314,7 @@ fn open_file_noclobber(env: &mut Env, path: Field) -> Result<(FdSpec, Location),
     }
 
     // Okay, it seems there is an existing file. Try opening it.
-    match system.open2(&path, OfdAccess::WriteOnly, EnumSet::empty(), MODE) {
+    match system.open(&path, OfdAccess::WriteOnly, EnumSet::empty(), MODE) {
         Ok(fd) => {
             let is_regular = matches!(system.fstat(fd), Ok(stat)
                     if SFlag::from_bits_truncate(stat.st_mode) & SFlag::S_IFMT == SFlag::S_IFREG);
@@ -902,7 +902,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
         let fd = env
             .system
-            .open2(
+            .open(
                 c"foo",
                 OfdAccess::WriteOnly,
                 OpenFlag::Create.into(),

@@ -146,7 +146,7 @@ pub async fn run_init_file(env: &mut Env, path: &str) {
 
     fn open_fd<S: System>(system: &mut S, path: String) -> Result<Fd, Errno> {
         let c_path = CString::new(path).map_err(|_| Errno::EILSEQ)?;
-        let fd = system.open2(
+        let fd = system.open(
             &c_path,
             OfdAccess::ReadOnly,
             OpenFlag::Cloexec.into(),

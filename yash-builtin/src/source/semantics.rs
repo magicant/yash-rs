@@ -117,7 +117,7 @@ fn find_and_open_file(env: &mut Env, filename: &str) -> Result<Fd, Errno> {
 /// least [`MIN_INTERNAL_FD`](yash_env::io::MIN_INTERNAL_FD).
 fn open_file<S: System>(system: &mut S, path: &CStr) -> Result<Fd, Errno> {
     system
-        .open2(
+        .open(
             path,
             OfdAccess::ReadOnly,
             OpenFlag::Cloexec.into(),

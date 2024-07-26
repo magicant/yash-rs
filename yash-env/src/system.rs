@@ -134,7 +134,7 @@ pub trait System: Debug {
     /// Opens a file descriptor.
     ///
     /// This is a thin wrapper around the `open` system call.
-    fn open2(
+    fn open(
         &mut self,
         path: &CStr,
         access: OfdAccess,
