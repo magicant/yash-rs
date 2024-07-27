@@ -67,8 +67,6 @@ pub use nix::fcntl::AtFlags;
 #[doc(no_inline)]
 pub use nix::fcntl::FdFlag;
 #[doc(no_inline)]
-pub use nix::fcntl::OFlag;
-#[doc(no_inline)]
 pub use nix::sys::signal::SigmaskHow;
 #[doc(no_inline)]
 pub use nix::sys::stat::{FileStat, Mode, SFlag};
