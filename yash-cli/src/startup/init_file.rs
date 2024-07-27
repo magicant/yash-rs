@@ -38,7 +38,7 @@ use yash_env::io::Fd;
 use yash_env::option::Option::Interactive;
 use yash_env::option::State::Off;
 use yash_env::stack::Frame;
-use yash_env::system::{Errno, Mode, OFlag, SystemEx};
+use yash_env::system::{Errno, Mode, OfdAccess, OpenFlag, SystemEx};
 use yash_env::variable::ENV;
 use yash_env::Env;
 use yash_env::System;
@@ -146,7 +146,12 @@ pub async fn run_init_file(env: &mut Env, path: &str) {
 
     fn open_fd<S: System>(system: &mut S, path: String) -> Result<Fd, Errno> {
         let c_path = CString::new(path).map_err(|_| Errno::EILSEQ)?;
-        let fd = system.open(&c_path, OFlag::O_RDONLY | OFlag::O_CLOEXEC, Mode::empty())?;
+        let fd = system.open(
+            &c_path,
+            OfdAccess::ReadOnly,
+            OpenFlag::Cloexec.into(),
+            Mode::empty(),
+        )?;
         system.move_fd_internal(fd)
     }
 

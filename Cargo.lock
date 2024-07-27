@@ -547,6 +547,7 @@ dependencies = [
  "annotate-snippets",
  "assert_matches",
  "async-trait",
+ "bitflags",
  "either",
  "enumset",
  "futures-executor",
@@ -602,6 +603,7 @@ name = "yash-semantics"
 version = "0.3.0"
 dependencies = [
  "assert_matches",
+ "enumset",
  "futures-executor",
  "futures-util",
  "itertools",

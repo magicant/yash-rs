@@ -29,6 +29,8 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
+use yash_env::system::Mode;
+use yash_env::system::OfdAccess;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::source::Location;
@@ -113,9 +115,10 @@ async fn async_body(env: &mut Env, job_control: Option<JobControl>, and_or: &And
 fn nullify_stdin(env: &mut Env) -> std::result::Result<(), yash_env::system::Errno> {
     env.system.close(Fd::STDIN)?;
 
-    use yash_env::system::{Mode, OFlag};
     let path = c"/dev/null";
-    let fd = env.system.open(path, OFlag::O_RDONLY, Mode::empty())?;
+    let fd = env
+        .system
+        .open(path, OfdAccess::ReadOnly, Default::default(), Mode::empty())?;
     assert_eq!(fd, Fd::STDIN);
     Ok(())
 }

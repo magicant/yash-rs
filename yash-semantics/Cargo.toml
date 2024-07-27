@@ -15,6 +15,7 @@ categories = ["command-line-utilities"]
 
 [dependencies]
 assert_matches = "1.5.0"
+enumset = "1.1.2"
 itertools = "0.13.0"
 thiserror = "1.0.47"
 yash-arith = { path = "../yash-arith", version = "0.2.1" }

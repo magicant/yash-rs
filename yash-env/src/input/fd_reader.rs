@@ -128,7 +128,8 @@ mod tests {
     use crate::system::r#virtual::VirtualSystem;
     use crate::system::Errno;
     use crate::system::Mode;
-    use crate::system::OFlag;
+    use crate::system::OfdAccess;
+    use crate::system::OpenFlag;
     use crate::System;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
@@ -219,7 +220,14 @@ mod tests {
         }
         let mut system = SharedSystem::new(Box::new(system));
         let path = c"/foo";
-        let fd = system.open(path, OFlag::O_RDONLY, Mode::empty()).unwrap();
+        let fd = system
+            .open(
+                path,
+                OfdAccess::ReadOnly,
+                OpenFlag::Cloexec.into(),
+                Mode::empty(),
+            )
+            .unwrap();
         let mut reader = FdReader::new(fd, system);
 
         let line = reader

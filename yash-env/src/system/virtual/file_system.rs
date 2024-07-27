@@ -30,6 +30,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+const DEFAULT_DIRECTORY_MODE: Mode = Mode::USER_ALL.union(Mode::ALL_READ).union(Mode::ALL_EXEC);
+
 /// Collection of files.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FileSystem {
@@ -45,7 +47,7 @@ impl Default for FileSystem {
                 body: FileBody::Directory {
                     files: HashMap::new(),
                 },
-                permissions: Mode(0o755),
+                permissions: DEFAULT_DIRECTORY_MODE,
             })),
         }
     }
@@ -107,7 +109,7 @@ impl FileSystem {
                             body: FileBody::Directory {
                                 files: HashMap::new(),
                             },
-                            permissions: Mode(0o755),
+                            permissions: DEFAULT_DIRECTORY_MODE,
                         }));
                         Rc::clone(vacant.insert(child))
                     }
@@ -150,7 +152,7 @@ impl FileSystem {
                     _ => return Err(Errno::ENOTDIR),
                 };
 
-                if node_ref.permissions.0 & 0o100 == 0 {
+                if !node_ref.permissions.contains(Mode::USER_EXEC) {
                     return Err(Errno::EACCES);
                 }
 
@@ -192,18 +194,19 @@ impl INode {
     }
 }
 
-/// Filetype-specific content of a file.
+/// Filetype-specific content of a file
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FileBody {
     /// Regular file
     Regular {
-        /// File content.
+        /// File content
         content: Vec<u8>,
-        /// Whether this file is a native binary that can be exec'ed.
+        /// Whether this file is a native binary that can be exec'ed
         is_native_executable: bool,
     },
+    /// Directory
     Directory {
-        /// Files contained in this directory.
+        /// Files contained in this directory
         ///
         /// The keys of the hashmap are filenames without any parent directory
         /// components. The hashmap does not contain "." or "..".
@@ -211,9 +214,13 @@ pub enum FileBody {
         // The hash map contents are reference-counted to allow making cheap
         // copies of them, which is especially handy when traversing entries.
     },
+    /// Named pipe
     Fifo {
+        /// Content of the pipe
         content: VecDeque<u8>,
+        /// Number of open file descriptions reading from this pipe
         readers: usize,
+        /// Number of open file descriptions writing to this pipe
         writers: usize,
     },
     /// Symbolic link
@@ -244,23 +251,10 @@ impl FileBody {
     }
 }
 
-/// File permission bits.
-///
-/// The `Default` mode is `0o644`, not `0o000`.
-#[derive(Copy, Clone, Eq, Hash, PartialEq)]
-pub struct Mode(pub nix::sys::stat::mode_t);
-
-impl Debug for Mode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Mode({:#o})", self.0)
-    }
-}
-
-impl Default for Mode {
-    fn default() -> Mode {
-        Mode(0o644)
-    }
-}
+/// This type alias exists only for historical reasons.
+/// Please use `yash_env::system::Mode` instead.
+#[deprecated = "use yash_env::system::Mode instead"]
+pub use super::super::Mode;
 
 /// Implementor of [`Dir`] for virtual file system
 #[derive(Clone, Debug)]
@@ -366,7 +360,7 @@ mod tests {
 
         let dir = fs.get("/foo").unwrap();
         let dir = dir.borrow();
-        assert_eq!(dir.permissions, Mode(0o755));
+        assert_eq!(dir.permissions, Mode::from_bits_retain(0o755));
         assert_matches!(&dir.body, FileBody::Directory { files } => {
             let mut i = files.iter();
             let (name, content) = i.next().unwrap();
@@ -418,7 +412,7 @@ mod tests {
         let _ = fs.save("/dir/file", Rc::default());
         {
             let dir = fs.get("/dir").unwrap();
-            dir.borrow_mut().permissions = Mode(0o666);
+            dir.borrow_mut().permissions = Mode::from_bits_retain(0o666);
         }
         let result = fs.get("/dir/file");
         assert_eq!(result, Err(Errno::EACCES));

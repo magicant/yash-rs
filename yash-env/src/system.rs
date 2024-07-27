@@ -18,7 +18,9 @@
 
 mod errno;
 pub mod fd_set;
+mod file_system;
 mod id;
+mod open_flag;
 pub mod real;
 pub mod resource;
 mod select;
@@ -29,10 +31,17 @@ pub use self::errno::Errno;
 pub use self::errno::RawErrno;
 pub use self::errno::Result;
 use self::fd_set::FdSet;
+pub use self::file_system::Dir;
+pub use self::file_system::DirEntry;
+pub use self::file_system::Mode;
+pub use self::file_system::RawMode;
+pub use self::file_system::AT_FDCWD;
 pub use self::id::Gid;
 pub use self::id::RawGid;
 pub use self::id::RawUid;
 pub use self::id::Uid;
+pub use self::open_flag::OfdAccess;
+pub use self::open_flag::OpenFlag;
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
 #[cfg(doc)]
@@ -52,23 +61,21 @@ use crate::signal;
 use crate::subshell::Subshell;
 use crate::trap::SignalSystem;
 use crate::Env;
+use enumset::EnumSet;
 #[doc(no_inline)]
 pub use nix::fcntl::AtFlags;
 #[doc(no_inline)]
 pub use nix::fcntl::FdFlag;
 #[doc(no_inline)]
-pub use nix::fcntl::OFlag;
-#[doc(no_inline)]
 pub use nix::sys::signal::SigmaskHow;
 #[doc(no_inline)]
-pub use nix::sys::stat::{FileStat, Mode, SFlag};
+pub use nix::sys::stat::{FileStat, SFlag};
 #[doc(no_inline)]
 pub use nix::sys::time::TimeSpec;
 use std::convert::Infallible;
 use std::ffi::c_int;
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::fmt::Debug;
 use std::future::Future;
@@ -125,7 +132,13 @@ pub trait System: Debug {
     /// Opens a file descriptor.
     ///
     /// This is a thin wrapper around the `open` system call.
-    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd>;
+    fn open(
+        &mut self,
+        path: &CStr,
+        access: OfdAccess,
+        flags: EnumSet<OpenFlag>,
+        mode: Mode,
+    ) -> Result<Fd>;
 
     /// Opens a file descriptor associated with an anonymous temporary file.
     ///
@@ -140,15 +153,15 @@ pub trait System: Debug {
     /// This function returns `Ok(())` when the FD is already closed.
     fn close(&mut self, fd: Fd) -> Result<()>;
 
-    /// Returns the file status flags for the open file description.
-    ///
-    /// This is a thin wrapper around the `fcntl` system call.
-    fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag>;
+    /// Returns the open file description access mode.
+    fn ofd_access(&self, fd: Fd) -> Result<OfdAccess>;
 
-    /// Sets the file status flags for the open file description.
+    /// Gets and sets the non-blocking mode for the open file description.
     ///
-    /// This is a thin wrapper around the `fcntl` system call.
-    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> Result<()>;
+    /// This is a wrapper around the `fcntl` system call.
+    /// This function sets the non-blocking mode to the given value and returns
+    /// the previous mode.
+    fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool>;
 
     /// Returns the attributes for the file descriptor.
     ///
@@ -201,7 +214,7 @@ pub trait System: Debug {
     /// You cannot tell the current mask without setting a new one. If you only
     /// want to get the current mask, you need to set it back to the original
     /// value after getting it.
-    fn umask(&mut self, mask: Mode) -> Mode;
+    fn umask(&mut self, new_mask: Mode) -> Mode;
 
     /// Returns the current time.
     #[must_use]
@@ -463,12 +476,6 @@ pub trait System: Debug {
     fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> std::io::Result<()>;
 }
 
-/// Sentinel for the current working directory
-///
-/// This value can be passed to system calls named "*at" such as
-/// [`System::fstatat`].
-pub const AT_FDCWD: Fd = Fd(nix::libc::AT_FDCWD);
-
 /// Set of consumed CPU time
 ///
 /// This structure contains four CPU time values, all in seconds.
@@ -531,26 +538,6 @@ pub type ChildProcessStarter = Box<
     dyn for<'a> FnOnce(&'a mut Env, ChildProcessTask) -> Pin<Box<dyn Future<Output = Pid> + 'a>>,
 >;
 
-/// Metadata of a file contained in a directory
-///
-/// `DirEntry` objects are enumerated by a [`Dir`] implementor.
-#[derive(Clone, Copy, Debug)]
-#[non_exhaustive]
-pub struct DirEntry<'a> {
-    /// Filename
-    pub name: &'a OsStr,
-}
-
-/// Trait for enumerating directory entries
-///
-/// An implementor of `Dir` may retain a file descriptor (or any other resource
-/// alike) to access the underlying system and obtain entry information. The
-/// file descriptor is released when the implementor object is dropped.
-pub trait Dir: Debug {
-    /// Returns the next directory entry.
-    fn next(&mut self) -> Result<Option<DirEntry>>;
-}
-
 /// Extension for [`System`]
 ///
 /// This trait provides some extension methods for `System`.
@@ -588,16 +575,6 @@ pub trait SystemEx: System {
     fn fd_is_pipe(&self, fd: Fd) -> bool {
         matches!(self.fstat(fd), Ok(stat)
             if SFlag::from_bits_truncate(stat.st_mode) & SFlag::S_IFMT == SFlag::S_IFIFO)
-    }
-
-    /// Clears the `O_NONBLOCK` flag for the file descriptor.
-    fn set_blocking(&mut self, fd: Fd) -> Result<()> {
-        let flags = self.fcntl_getfl(fd)?;
-        let new_flags = flags & !OFlag::O_NONBLOCK;
-        if new_flags == flags {
-            return Ok(());
-        }
-        self.fcntl_setfl(fd, new_flags)
     }
 
     /// Switches the foreground process group with SIGTTOU blocked.

@@ -16,6 +16,7 @@
 
 //! Implementation of `System` that actually interacts with the system.
 
+mod open_flag;
 mod signal;
 
 use super::resource::LimitPair;
@@ -32,7 +33,8 @@ use super::FdSet;
 use super::FileStat;
 use super::Gid;
 use super::Mode;
-use super::OFlag;
+use super::OfdAccess;
+use super::OpenFlag;
 use super::Result;
 use super::SigmaskHow;
 use super::System;
@@ -44,6 +46,7 @@ use crate::job::Pid;
 use crate::job::ProcessResult;
 use crate::job::ProcessState;
 use crate::SignalHandling;
+use enumset::EnumSet;
 use nix::errno::Errno as NixErrno;
 use nix::libc::DIR;
 use nix::libc::{S_IFDIR, S_IFMT, S_IFREG};
@@ -225,8 +228,26 @@ impl System for RealSystem {
         }
     }
 
-    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd> {
-        Ok(Fd(nix::fcntl::open(path, option, mode)?))
+    fn open(
+        &mut self,
+        path: &CStr,
+        access: OfdAccess,
+        flags: EnumSet<OpenFlag>,
+        mode: Mode,
+    ) -> Result<Fd> {
+        let mut raw_flags = access.to_real_flags().ok_or(Errno::EINVAL)?;
+        for flag in flags {
+            raw_flags |= flag.to_real_flags().ok_or(Errno::EINVAL)?;
+        }
+
+        #[cfg(not(target_os = "redox"))]
+        let mode_bits = mode.bits() as std::ffi::c_uint;
+        #[cfg(target_os = "redox")]
+        let mode_bits = mode.bits() as c_int;
+
+        unsafe { nix::libc::open(path.as_ptr(), raw_flags, mode_bits) }
+            .errno_if_m1()
+            .map(Fd)
     }
 
     fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
@@ -250,14 +271,23 @@ impl System for RealSystem {
         }
     }
 
-    fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag> {
-        let bits = nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_GETFL)?;
-        Ok(OFlag::from_bits_truncate(bits))
+    fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
+        let flags = unsafe { nix::libc::fcntl(fd.0, nix::libc::F_GETFL) }.errno_if_m1()?;
+        Ok(OfdAccess::from_real_flags(flags))
     }
 
-    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> Result<()> {
-        let _ = nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_SETFL(flags))?;
-        Ok(())
+    fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
+        let old_flags = unsafe { nix::libc::fcntl(fd.0, nix::libc::F_GETFL) }.errno_if_m1()?;
+        let new_flags = if nonblocking {
+            old_flags | nix::libc::O_NONBLOCK
+        } else {
+            old_flags & !nix::libc::O_NONBLOCK
+        };
+        if new_flags != old_flags {
+            unsafe { nix::libc::fcntl(fd.0, nix::libc::F_SETFL, new_flags) }.errno_if_m1()?;
+        }
+        let was_nonblocking = old_flags & nix::libc::O_NONBLOCK != 0;
+        Ok(was_nonblocking)
     }
 
     fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag> {
@@ -318,8 +348,8 @@ impl System for RealSystem {
         Ok(Box::new(RealDir(dir)))
     }
 
-    fn umask(&mut self, mask: Mode) -> Mode {
-        nix::sys::stat::umask(mask)
+    fn umask(&mut self, new_mask: Mode) -> Mode {
+        Mode::from_bits_retain(unsafe { nix::libc::umask(new_mask.bits()) })
     }
 
     fn now(&self) -> Instant {

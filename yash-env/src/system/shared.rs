@@ -23,6 +23,9 @@ use super::Errno;
 use super::FdSet;
 use super::Gid;
 use super::LimitPair;
+use super::Mode;
+use super::OfdAccess;
+use super::OpenFlag;
 use super::Resource;
 use super::Result;
 use super::SelectSystem;
@@ -38,11 +41,11 @@ use crate::job::Pid;
 use crate::job::ProcessState;
 #[cfg(doc)]
 use crate::Env;
+use enumset::EnumSet;
 use nix::fcntl::AtFlags;
 use nix::fcntl::FdFlag;
-use nix::fcntl::OFlag;
 use nix::sys::signal::SigmaskHow;
-use nix::sys::stat::{FileStat, Mode};
+use nix::sys::stat::FileStat;
 use nix::sys::time::TimeSpec;
 use std::cell::RefCell;
 use std::convert::Infallible;
@@ -128,27 +131,12 @@ impl SharedSystem {
         SharedSystem(Rc::new(RefCell::new(SelectSystem::new(system))))
     }
 
-    fn set_nonblocking(&self, fd: Fd) -> Result<OFlag> {
-        let mut inner = self.0.borrow_mut();
-        let flags = inner.fcntl_getfl(fd)?;
-        if !flags.contains(OFlag::O_NONBLOCK) {
-            inner.fcntl_setfl(fd, flags | OFlag::O_NONBLOCK)?;
-        }
-        Ok(flags)
-    }
-
-    fn reset_nonblocking(&self, fd: Fd, old_flags: OFlag) {
-        if !old_flags.contains(OFlag::O_NONBLOCK) {
-            let _: Result<()> = self.0.borrow_mut().fcntl_setfl(fd, old_flags);
-        }
-    }
-
     /// Reads from the file descriptor.
     ///
     /// This function waits for one or more bytes to be available for reading.
     /// If successful, returns the number of bytes read.
     pub async fn read_async(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
-        let flags = self.set_nonblocking(fd)?;
+        let was_nonblocking = (&mut &*self).get_and_set_nonblocking(fd, true)?;
 
         // We need to retain a strong reference to the waker outside the poll_fn
         // function because SelectSystem only retains a weak reference to it.
@@ -169,7 +157,7 @@ impl SharedSystem {
         })
         .await;
 
-        self.reset_nonblocking(fd, flags);
+        _ = (&mut &*self).get_and_set_nonblocking(fd, was_nonblocking);
 
         result
     }
@@ -187,7 +175,7 @@ impl SharedSystem {
             return Ok(0);
         }
 
-        let flags = self.set_nonblocking(fd)?;
+        let was_nonblocking = (&mut &*self).get_and_set_nonblocking(fd, true)?;
         let mut written = 0;
 
         // We need to retain a strong reference to the waker outside the poll_fn
@@ -216,7 +204,7 @@ impl SharedSystem {
         })
         .await;
 
-        self.reset_nonblocking(fd, flags);
+        _ = (&mut &*self).get_and_set_nonblocking(fd, was_nonblocking);
 
         result
     }
@@ -335,8 +323,14 @@ impl System for &SharedSystem {
     fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
         self.0.borrow_mut().dup2(from, to)
     }
-    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd> {
-        self.0.borrow_mut().open(path, option, mode)
+    fn open(
+        &mut self,
+        path: &CStr,
+        access: OfdAccess,
+        flags: EnumSet<OpenFlag>,
+        mode: Mode,
+    ) -> Result<Fd> {
+        self.0.borrow_mut().open(path, access, flags, mode)
     }
     fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
         self.0.borrow_mut().open_tmpfile(parent_dir)
@@ -344,11 +338,11 @@ impl System for &SharedSystem {
     fn close(&mut self, fd: Fd) -> Result<()> {
         self.0.borrow_mut().close(fd)
     }
-    fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag> {
-        self.0.borrow().fcntl_getfl(fd)
+    fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
+        self.0.borrow().ofd_access(fd)
     }
-    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> Result<()> {
-        self.0.borrow_mut().fcntl_setfl(fd, flags)
+    fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
+        self.0.borrow_mut().get_and_set_nonblocking(fd, nonblocking)
     }
     fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag> {
         self.0.borrow().fcntl_getfd(fd)
@@ -517,8 +511,14 @@ impl System for SharedSystem {
         (&mut &*self).dup2(from, to)
     }
     #[inline]
-    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd> {
-        (&mut &*self).open(path, option, mode)
+    fn open(
+        &mut self,
+        path: &CStr,
+        access: OfdAccess,
+        flags: EnumSet<OpenFlag>,
+        mode: Mode,
+    ) -> Result<Fd> {
+        (&mut &*self).open(path, access, flags, mode)
     }
     #[inline]
     fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
@@ -529,12 +529,12 @@ impl System for SharedSystem {
         (&mut &*self).close(fd)
     }
     #[inline]
-    fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag> {
-        (&self).fcntl_getfl(fd)
+    fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
+        (&self).ofd_access(fd)
     }
     #[inline]
-    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> Result<()> {
-        (&mut &*self).fcntl_setfl(fd, flags)
+    fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
+        (&mut &*self).get_and_set_nonblocking(fd, nonblocking)
     }
     #[inline]
     fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag> {

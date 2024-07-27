@@ -34,7 +34,8 @@ use yash_env::option::Option::Interactive;
 use yash_env::option::State::On;
 use yash_env::system::Errno;
 use yash_env::system::Mode;
-use yash_env::system::OFlag;
+use yash_env::system::OfdAccess;
+use yash_env::system::OpenFlag;
 use yash_env::system::SystemEx as _;
 use yash_env::Env;
 use yash_env::System;
@@ -89,7 +90,7 @@ pub fn prepare_input<'a>(
                 // since we will be doing non-blocking reads anyway,
                 // but POSIX requires us to do it.
                 // https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/utilities/sh.html#tag_20_117_06
-                system.set_blocking(Fd::STDIN).ok();
+                _ = system.get_and_set_nonblocking(Fd::STDIN, false);
             }
 
             let reader = FdReader::new(Fd::STDIN, system);
@@ -110,7 +111,12 @@ pub fn prepare_input<'a>(
                 path,
             })?;
             let fd = system
-                .open(&c_path, OFlag::O_RDONLY | OFlag::O_CLOEXEC, Mode::empty())
+                .open(
+                    &c_path,
+                    OfdAccess::ReadOnly,
+                    OpenFlag::Cloexec.into(),
+                    Mode::empty(),
+                )
                 .and_then(|fd| system.move_fd_internal(fd))
                 .map_err(|errno| PrepareInputError { errno, path })?;
 

@@ -9,13 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- The `Uid`, `RawUid`, `Gid`, and `RawGid` types in the `system` module
-- The `System` trait now has the `getuid`, `geteuid`, `getgid`, and `getegid`
-  methods.
+- The `OfdAccess`, `OpenFlag`, `Mode`, `RawMode`, `Uid`, `RawUid`, `Gid`, and
+  `RawGid` types in the `system` module
+- The `System` trait now has the `ofd_access`, `get_and_set_nonblocking`,
+  `getuid`, `geteuid`, `getgid`, and `getegid` methods.
+- `Mode` has been moved from `system::virtual` to `system` and now has constants
+  with more human-friendly names, e.g., `USER_READ` and `GROUP_WRITE`.
 - The `system::virtual::Process` struct now has the getters/setters for the
   real/effective user/group IDs: `uid`, `set_uid`, `euid`, `set_euid`, `gid`,
   `set_gid`, `egid`, and `set_egid`.
 - The `stack::Frame` enum now has the `InitFile` variant.
+- External dependencies:
+    - enumset 1.1.2 (previously an internal dependency)
+- Internal dependencies:
+    - bitflags 2.6.0
+
+### Changed
+
+- `system::Mode` is no longer a re-export of `nix::sys::stat::Mode`.
+- The `system::System::open` method has been redefined to take `OfdAccess` and
+  `OpenFlag` parameters instead of `nix::fcntl::OFlag`.
+- The `system::System::umask` method now takes and returns a value of the new
+  `system::Mode` type.
+
+### Deprecated
+
+- `system::virtual::Mode` in favor of `system::Mode`
+
+### Removed
+
+- The `system` module no longer reexports `nix::fcntl::OFlag`.
+- The `fcntl_getfl` and `fcntl_setfl` methods from the `System` trait
 
 ## [0.2.1] - 2024-07-12
 
