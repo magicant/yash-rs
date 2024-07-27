@@ -214,7 +214,7 @@ pub trait System: Debug {
     /// You cannot tell the current mask without setting a new one. If you only
     /// want to get the current mask, you need to set it back to the original
     /// value after getting it.
-    fn umask(&mut self, mask: Mode) -> Mode;
+    fn umask(&mut self, new_mask: Mode2) -> Mode2;
 
     /// Returns the current time.
     #[must_use]

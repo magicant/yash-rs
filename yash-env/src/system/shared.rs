@@ -45,7 +45,7 @@ use enumset::EnumSet;
 use nix::fcntl::AtFlags;
 use nix::fcntl::FdFlag;
 use nix::sys::signal::SigmaskHow;
-use nix::sys::stat::{FileStat, Mode};
+use nix::sys::stat::FileStat;
 use nix::sys::time::TimeSpec;
 use std::cell::RefCell;
 use std::convert::Infallible;
@@ -368,7 +368,7 @@ impl System for &SharedSystem {
     fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
         self.0.borrow_mut().opendir(path)
     }
-    fn umask(&mut self, mask: Mode) -> Mode {
+    fn umask(&mut self, mask: Mode2) -> Mode2 {
         self.0.borrow_mut().umask(mask)
     }
     fn now(&self) -> Instant {
@@ -569,7 +569,7 @@ impl System for SharedSystem {
         (&mut &*self).opendir(path)
     }
     #[inline]
-    fn umask(&mut self, mask: Mode) -> Mode {
+    fn umask(&mut self, mask: Mode2) -> Mode2 {
         (&mut &*self).umask(mask)
     }
     #[inline]

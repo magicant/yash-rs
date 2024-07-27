@@ -32,7 +32,6 @@ use super::FdFlag;
 use super::FdSet;
 use super::FileStat;
 use super::Gid;
-use super::Mode;
 use super::Mode2;
 use super::OfdAccess;
 use super::OpenFlag;
@@ -349,8 +348,8 @@ impl System for RealSystem {
         Ok(Box::new(RealDir(dir)))
     }
 
-    fn umask(&mut self, mask: Mode) -> Mode {
-        nix::sys::stat::umask(mask)
+    fn umask(&mut self, new_mask: Mode2) -> Mode2 {
+        Mode2::from_bits_retain(unsafe { nix::libc::umask(new_mask.bits()) })
     }
 
     fn now(&self) -> Instant {

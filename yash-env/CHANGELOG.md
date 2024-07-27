@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `system::Mode` is no longer a re-export of `nix::sys::stat::Mode`.
 - The `system::System::open` method has been redefined to take `OfdAccess` and
   `OpenFlag` parameters instead of `nix::fcntl::OFlag`.
+- The `system::System::umask` method now takes and returns a value of the new
+  `system::Mode` type.
 
 ### Removed
 
