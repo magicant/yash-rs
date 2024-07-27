@@ -97,7 +97,6 @@ use yash_env::semantics::Field;
 use yash_env::system::Errno;
 use yash_env::system::FdFlag;
 use yash_env::system::Mode2;
-use yash_env::system::OFlag;
 use yash_env::system::OfdAccess;
 use yash_env::system::OpenFlag;
 use yash_env::system::SFlag;
@@ -355,7 +354,7 @@ fn open_file_noclobber(env: &mut Env, path: Field) -> Result<(FdSpec, Location),
 fn copy_fd(
     env: &mut Env,
     target: Field,
-    expected_mode: OFlag,
+    expected_access: OfdAccess,
 ) -> Result<(FdSpec, Location), Error> {
     if target.value == "-" {
         return Ok((FdSpec::Closed, target.origin));
@@ -373,27 +372,26 @@ fn copy_fd(
     };
 
     // Check if the FD is really readable or writable
-    fn is_fd_valid(env: &mut Env, fd: Fd, expected_mode: OFlag) -> bool {
-        matches!(env.system.fcntl_getfl(fd), Ok(flags) if {
-            let mode = flags & OFlag::O_ACCMODE;
-            mode == expected_mode || mode == OFlag::O_RDWR
-        })
+    fn is_fd_valid<S: System>(system: &S, fd: Fd, expected_access: OfdAccess) -> bool {
+        system
+            .ofd_access(fd)
+            .is_ok_and(|access| access == expected_access || access == OfdAccess::ReadWrite)
     }
     fn fd_mode_error(
         fd: Fd,
-        expected_mode: OFlag,
+        expected_access: OfdAccess,
         target: Field,
     ) -> Result<(FdSpec, Location), Error> {
-        let cause = match expected_mode {
-            OFlag::O_RDONLY => ErrorCause::UnreadableFd(fd),
-            OFlag::O_WRONLY => ErrorCause::UnwritableFd(fd),
-            _ => unreachable!("unexpected mode {:?}", expected_mode),
+        let cause = match expected_access {
+            OfdAccess::ReadOnly => ErrorCause::UnreadableFd(fd),
+            OfdAccess::WriteOnly => ErrorCause::UnwritableFd(fd),
+            _ => unreachable!("unexpected expected access {expected_access:?}"),
         };
         let location = target.origin;
         Err(Error { cause, location })
     }
-    if !is_fd_valid(env, fd, expected_mode) {
-        return fd_mode_error(fd, expected_mode, target);
+    if !is_fd_valid(&env.system, fd, expected_access) {
+        return fd_mode_error(fd, expected_access, target);
     }
 
     // Ensure the FD has no CLOEXEC flag
@@ -430,8 +428,8 @@ async fn open_normal(
             operand,
         ),
         FileInOut => open_file(env, OfdAccess::ReadWrite, OpenFlag::Create.into(), operand),
-        FdIn => copy_fd(env, operand, OFlag::O_RDONLY),
-        FdOut => copy_fd(env, operand, OFlag::O_WRONLY),
+        FdIn => copy_fd(env, operand, OfdAccess::ReadOnly),
+        FdOut => copy_fd(env, operand, OfdAccess::WriteOnly),
         Pipe => todo!("pipe redirection: {:?}", operand.value),
         String => todo!("here-string: {:?}", operand.value),
     }
