@@ -537,6 +537,25 @@ impl System for VirtualSystem {
         Ok(())
     }
 
+    fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
+        fn is_directory(file_body: &FileBody) -> bool {
+            matches!(file_body, FileBody::Directory { .. })
+        }
+
+        self.with_open_file_description(fd, |ofd| match (ofd.is_readable, ofd.is_writable) {
+            (true, false) => Ok(OfdAccess::ReadOnly),
+            (false, true) => Ok(OfdAccess::WriteOnly),
+            (true, true) => Ok(OfdAccess::ReadWrite),
+            (false, false) => {
+                if is_directory(&ofd.i_node().borrow().body) {
+                    Ok(OfdAccess::Search)
+                } else {
+                    Ok(OfdAccess::Exec)
+                }
+            }
+        })
+    }
+
     fn get_and_set_nonblocking(&mut self, fd: Fd, _nonblocking: bool) -> Result<bool> {
         self.with_open_file_description_mut(fd, |_ofd| {
             // TODO Implement non-blocking I/O

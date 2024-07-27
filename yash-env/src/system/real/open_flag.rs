@@ -30,6 +30,16 @@ impl OfdAccess {
             Self::Exec | Self::Search => None,
         }
     }
+
+    #[must_use]
+    pub(super) fn from_real_flags(flags: c_int) -> Self {
+        match flags & nix::libc::O_ACCMODE {
+            nix::libc::O_RDONLY => Self::ReadOnly,
+            nix::libc::O_WRONLY => Self::WriteOnly,
+            nix::libc::O_RDWR => Self::ReadWrite,
+            _ => Self::Exec, // TODO Support O_PATH and O_SEARCH
+        }
+    }
 }
 
 impl OpenFlag {

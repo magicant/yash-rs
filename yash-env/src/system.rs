@@ -155,6 +155,9 @@ pub trait System: Debug {
     /// This function returns `Ok(())` when the FD is already closed.
     fn close(&mut self, fd: Fd) -> Result<()>;
 
+    /// Returns the open file description access mode.
+    fn ofd_access(&self, fd: Fd) -> Result<OfdAccess>;
+
     /// Gets and sets the non-blocking mode for the file descriptor.
     ///
     /// This is a wrapper around the `fcntl` system call.

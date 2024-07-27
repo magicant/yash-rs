@@ -273,6 +273,11 @@ impl System for RealSystem {
         }
     }
 
+    fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
+        let flags = unsafe { nix::libc::fcntl(fd.0, nix::libc::F_GETFL) }.errno_if_m1()?;
+        Ok(OfdAccess::from_real_flags(flags))
+    }
+
     fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
         let old_flags = unsafe { nix::libc::fcntl(fd.0, nix::libc::F_GETFL) }.errno_if_m1()?;
         let new_flags = if nonblocking {

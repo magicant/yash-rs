@@ -339,6 +339,9 @@ impl System for &SharedSystem {
     fn close(&mut self, fd: Fd) -> Result<()> {
         self.0.borrow_mut().close(fd)
     }
+    fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
+        self.0.borrow().ofd_access(fd)
+    }
     fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
         self.0.borrow_mut().get_and_set_nonblocking(fd, nonblocking)
     }
@@ -528,6 +531,10 @@ impl System for SharedSystem {
     #[inline]
     fn close(&mut self, fd: Fd) -> Result<()> {
         (&mut &*self).close(fd)
+    }
+    #[inline]
+    fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
+        (&self).ofd_access(fd)
     }
     #[inline]
     fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
