@@ -156,7 +156,7 @@ pub trait System: Debug {
     /// Returns the open file description access mode.
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess>;
 
-    /// Gets and sets the non-blocking mode for the file descriptor.
+    /// Gets and sets the non-blocking mode for the open file description.
     ///
     /// This is a wrapper around the `fcntl` system call.
     /// This function sets the non-blocking mode to the given value and returns

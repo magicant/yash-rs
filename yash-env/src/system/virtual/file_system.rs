@@ -194,18 +194,19 @@ impl INode {
     }
 }
 
-/// Filetype-specific content of a file.
+/// Filetype-specific content of a file
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FileBody {
     /// Regular file
     Regular {
-        /// File content.
+        /// File content
         content: Vec<u8>,
-        /// Whether this file is a native binary that can be exec'ed.
+        /// Whether this file is a native binary that can be exec'ed
         is_native_executable: bool,
     },
+    /// Directory
     Directory {
-        /// Files contained in this directory.
+        /// Files contained in this directory
         ///
         /// The keys of the hashmap are filenames without any parent directory
         /// components. The hashmap does not contain "." or "..".
@@ -213,9 +214,13 @@ pub enum FileBody {
         // The hash map contents are reference-counted to allow making cheap
         // copies of them, which is especially handy when traversing entries.
     },
+    /// Named pipe
     Fifo {
+        /// Content of the pipe
         content: VecDeque<u8>,
+        /// Number of open file descriptions reading from this pipe
         readers: usize,
+        /// Number of open file descriptions writing to this pipe
         writers: usize,
     },
     /// Symbolic link

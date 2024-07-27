@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `set_gid`, `egid`, and `set_egid`.
 - The `stack::Frame` enum now has the `InitFile` variant.
 - External dependencies:
-    - enumset 1.1.2
+    - enumset 1.1.2 (previously an internal dependency)
 - Internal dependencies:
     - bitflags 2.6.0
 

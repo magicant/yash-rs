@@ -25,10 +25,9 @@
 //!
 //! # File system
 //!
-//! Currently, only regular files and directories are supported.
-//!
-//! Pathname resolution is not yet fully simulated. Especially, symbolic links
-//! and the `.` and `..` components are not supported.
+//! Basic file operations are supported in the virtual system. Regular files,
+//! directories, named pipes, and symbolic links can be created in the file
+//! system. The file system is shared among all processes in the system.
 //!
 //! # Processes
 //!
