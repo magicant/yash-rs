@@ -44,7 +44,6 @@ use crate::Env;
 use enumset::EnumSet;
 use nix::fcntl::AtFlags;
 use nix::fcntl::FdFlag;
-use nix::fcntl::OFlag;
 use nix::sys::signal::SigmaskHow;
 use nix::sys::stat::{FileStat, Mode};
 use nix::sys::time::TimeSpec;
@@ -345,9 +344,6 @@ impl System for &SharedSystem {
     fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
         self.0.borrow_mut().get_and_set_nonblocking(fd, nonblocking)
     }
-    fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag> {
-        self.0.borrow().fcntl_getfl(fd)
-    }
     fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag> {
         self.0.borrow().fcntl_getfd(fd)
     }
@@ -539,10 +535,6 @@ impl System for SharedSystem {
     #[inline]
     fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
         (&mut &*self).get_and_set_nonblocking(fd, nonblocking)
-    }
-    #[inline]
-    fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag> {
-        (&self).fcntl_getfl(fd)
     }
     #[inline]
     fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag> {

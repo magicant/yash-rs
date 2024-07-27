@@ -165,11 +165,6 @@ pub trait System: Debug {
     /// the previous mode.
     fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool>;
 
-    /// Returns the file status flags for the open file description.
-    ///
-    /// This is a thin wrapper around the `fcntl` system call.
-    fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag>;
-
     /// Returns the attributes for the file descriptor.
     ///
     /// This is a thin wrapper around the `fcntl` system call.

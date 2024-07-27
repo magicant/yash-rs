@@ -34,7 +34,6 @@ use super::FileStat;
 use super::Gid;
 use super::Mode;
 use super::Mode2;
-use super::OFlag;
 use super::OfdAccess;
 use super::OpenFlag;
 use super::Result;
@@ -290,11 +289,6 @@ impl System for RealSystem {
         }
         let was_nonblocking = old_flags & nix::libc::O_NONBLOCK != 0;
         Ok(was_nonblocking)
-    }
-
-    fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag> {
-        let bits = nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_GETFL)?;
-        Ok(OFlag::from_bits_truncate(bits))
     }
 
     fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag> {

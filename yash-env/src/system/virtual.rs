@@ -64,7 +64,6 @@ use super::FdFlag;
 use super::FdSet;
 use super::FileStat;
 use super::Gid;
-use super::OFlag;
 use super::OfdAccess;
 use super::OpenFlag;
 use super::Result;
@@ -560,21 +559,6 @@ impl System for VirtualSystem {
         self.with_open_file_description_mut(fd, |_ofd| {
             // TODO Implement non-blocking I/O
             Ok(false)
-        })
-    }
-
-    fn fcntl_getfl(&self, fd: Fd) -> Result<OFlag> {
-        self.with_open_file_description(fd, |ofd| {
-            let mut mode = match (ofd.is_readable, ofd.is_writable) {
-                (true, true) => OFlag::O_RDWR,
-                (true, false) => OFlag::O_RDONLY,
-                (false, true) => OFlag::O_WRONLY,
-                (false, false) => todo!("unsupported mode"),
-            };
-            if ofd.is_appending {
-                mode |= OFlag::O_APPEND;
-            }
-            Ok(mode)
         })
     }
 
