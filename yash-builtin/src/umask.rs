@@ -112,7 +112,7 @@
 
 use crate::common::{output, report_error};
 use yash_env::semantics::Field;
-use yash_env::system::Mode2 as Mode;
+use yash_env::system::Mode;
 use yash_env::{Env, System};
 
 pub mod eval;

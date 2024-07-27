@@ -23,7 +23,7 @@ use super::Errno;
 use super::FdSet;
 use super::Gid;
 use super::LimitPair;
-use super::Mode2;
+use super::Mode;
 use super::OfdAccess;
 use super::OpenFlag;
 use super::Resource;
@@ -328,7 +328,7 @@ impl System for &SharedSystem {
         path: &CStr,
         access: OfdAccess,
         flags: EnumSet<OpenFlag>,
-        mode: Mode2,
+        mode: Mode,
     ) -> Result<Fd> {
         self.0.borrow_mut().open(path, access, flags, mode)
     }
@@ -368,7 +368,7 @@ impl System for &SharedSystem {
     fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
         self.0.borrow_mut().opendir(path)
     }
-    fn umask(&mut self, mask: Mode2) -> Mode2 {
+    fn umask(&mut self, mask: Mode) -> Mode {
         self.0.borrow_mut().umask(mask)
     }
     fn now(&self) -> Instant {
@@ -516,7 +516,7 @@ impl System for SharedSystem {
         path: &CStr,
         access: OfdAccess,
         flags: EnumSet<OpenFlag>,
-        mode: Mode2,
+        mode: Mode,
     ) -> Result<Fd> {
         (&mut &*self).open(path, access, flags, mode)
     }
@@ -569,7 +569,7 @@ impl System for SharedSystem {
         (&mut &*self).opendir(path)
     }
     #[inline]
-    fn umask(&mut self, mask: Mode2) -> Mode2 {
+    fn umask(&mut self, mask: Mode) -> Mode {
         (&mut &*self).umask(mask)
     }
     #[inline]

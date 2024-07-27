@@ -294,7 +294,7 @@ mod tests {
     use std::os::unix::ffi::OsStrExt;
     use std::path::Path;
     use std::rc::Rc;
-    use yash_env::system::Mode2;
+    use yash_env::system::Mode;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
 
@@ -482,7 +482,7 @@ mod tests {
                 .save("foo/bar", Default::default())
                 .unwrap();
             let dir = state.file_system.get("foo").unwrap();
-            dir.borrow_mut().permissions = Mode2::ALL_READ | Mode2::ALL_WRITE;
+            dir.borrow_mut().permissions = Mode::ALL_READ | Mode::ALL_WRITE;
         }
         let mut env = Env::with_system(Box::new(system));
         let f = dummy_attr_field("foo/*");

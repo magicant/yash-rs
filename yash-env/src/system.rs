@@ -33,7 +33,7 @@ pub use self::errno::Result;
 use self::fd_set::FdSet;
 pub use self::file_system::Dir;
 pub use self::file_system::DirEntry;
-pub use self::file_system::Mode as Mode2;
+pub use self::file_system::Mode;
 pub use self::file_system::RawMode;
 pub use self::file_system::AT_FDCWD;
 pub use self::id::Gid;
@@ -137,7 +137,7 @@ pub trait System: Debug {
         path: &CStr,
         access: OfdAccess,
         flags: EnumSet<OpenFlag>,
-        mode: Mode2,
+        mode: Mode,
     ) -> Result<Fd>;
 
     /// Opens a file descriptor associated with an anonymous temporary file.
@@ -214,7 +214,7 @@ pub trait System: Debug {
     /// You cannot tell the current mask without setting a new one. If you only
     /// want to get the current mask, you need to set it back to the original
     /// value after getting it.
-    fn umask(&mut self, new_mask: Mode2) -> Mode2;
+    fn umask(&mut self, new_mask: Mode) -> Mode;
 
     /// Returns the current time.
     #[must_use]

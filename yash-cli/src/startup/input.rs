@@ -33,7 +33,7 @@ use yash_env::io::Fd;
 use yash_env::option::Option::Interactive;
 use yash_env::option::State::On;
 use yash_env::system::Errno;
-use yash_env::system::Mode2;
+use yash_env::system::Mode;
 use yash_env::system::OfdAccess;
 use yash_env::system::OpenFlag;
 use yash_env::system::SystemEx as _;
@@ -115,7 +115,7 @@ pub fn prepare_input<'a>(
                     &c_path,
                     OfdAccess::ReadOnly,
                     OpenFlag::Cloexec.into(),
-                    Mode2::empty(),
+                    Mode::empty(),
                 )
                 .and_then(|fd| system.move_fd_internal(fd))
                 .map_err(|errno| PrepareInputError { errno, path })?;

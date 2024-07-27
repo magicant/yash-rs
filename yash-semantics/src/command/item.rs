@@ -29,7 +29,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
-use yash_env::system::Mode2;
+use yash_env::system::Mode;
 use yash_env::system::OfdAccess;
 use yash_env::Env;
 use yash_env::System;
@@ -116,12 +116,9 @@ fn nullify_stdin(env: &mut Env) -> std::result::Result<(), yash_env::system::Err
     env.system.close(Fd::STDIN)?;
 
     let path = c"/dev/null";
-    let fd = env.system.open(
-        path,
-        OfdAccess::ReadOnly,
-        Default::default(),
-        Mode2::empty(),
-    )?;
+    let fd = env
+        .system
+        .open(path, OfdAccess::ReadOnly, Default::default(), Mode::empty())?;
     assert_eq!(fd, Fd::STDIN);
     Ok(())
 }

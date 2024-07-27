@@ -34,7 +34,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::stack::Frame;
 use yash_env::system::Errno;
-use yash_env::system::Mode2;
+use yash_env::system::Mode;
 use yash_env::system::OfdAccess;
 use yash_env::system::OpenFlag;
 use yash_env::system::System;
@@ -121,7 +121,7 @@ fn open_file<S: System>(system: &mut S, path: &CStr) -> Result<Fd, Errno> {
             path,
             OfdAccess::ReadOnly,
             OpenFlag::Cloexec.into(),
-            Mode2::empty(),
+            Mode::empty(),
         )
         .and_then(|fd| system.move_fd_internal(fd))
 }

@@ -249,7 +249,7 @@ impl FileBody {
 /// This type alias exists only for historical reasons.
 /// Please use `yash_env::system::Mode` instead.
 #[deprecated = "use yash_env::system::Mode instead"]
-pub use super::super::Mode2 as Mode;
+pub use super::super::Mode;
 
 /// Implementor of [`Dir`] for virtual file system
 #[derive(Clone, Debug)]

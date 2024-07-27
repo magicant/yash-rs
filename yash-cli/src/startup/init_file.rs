@@ -38,7 +38,7 @@ use yash_env::io::Fd;
 use yash_env::option::Option::Interactive;
 use yash_env::option::State::Off;
 use yash_env::stack::Frame;
-use yash_env::system::{Errno, Mode2, OfdAccess, OpenFlag, SystemEx};
+use yash_env::system::{Errno, Mode, OfdAccess, OpenFlag, SystemEx};
 use yash_env::variable::ENV;
 use yash_env::Env;
 use yash_env::System;
@@ -150,7 +150,7 @@ pub async fn run_init_file(env: &mut Env, path: &str) {
             &c_path,
             OfdAccess::ReadOnly,
             OpenFlag::Cloexec.into(),
-            Mode2::empty(),
+            Mode::empty(),
         )?;
         system.move_fd_internal(fd)
     }

@@ -96,7 +96,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::Errno;
 use yash_env::system::FdFlag;
-use yash_env::system::Mode2;
+use yash_env::system::Mode;
 use yash_env::system::OfdAccess;
 use yash_env::system::OpenFlag;
 use yash_env::system::SFlag;
@@ -261,7 +261,7 @@ impl FdSpec {
     }
 }
 
-const MODE: Mode2 = Mode2::ALL_READ.union(Mode2::ALL_WRITE);
+const MODE: Mode = Mode::ALL_READ.union(Mode::ALL_WRITE);
 
 fn is_cloexec(env: &Env, fd: Fd) -> bool {
     matches!(env.system.fcntl_getfd(fd), Ok(flags) if flags.contains(FdFlag::FD_CLOEXEC))
@@ -904,7 +904,7 @@ mod tests {
                 c"foo",
                 OfdAccess::WriteOnly,
                 OpenFlag::Create.into(),
-                Mode2::ALL_9,
+                Mode::ALL_9,
             )
             .unwrap();
         env.system.fcntl_setfd(fd, FdFlag::FD_CLOEXEC).unwrap();

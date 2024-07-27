@@ -32,7 +32,7 @@ use super::FdFlag;
 use super::FdSet;
 use super::FileStat;
 use super::Gid;
-use super::Mode2;
+use super::Mode;
 use super::OfdAccess;
 use super::OpenFlag;
 use super::Result;
@@ -233,7 +233,7 @@ impl System for RealSystem {
         path: &CStr,
         access: OfdAccess,
         flags: EnumSet<OpenFlag>,
-        mode: Mode2,
+        mode: Mode,
     ) -> Result<Fd> {
         let mut raw_flags = access.to_real_flags().ok_or(Errno::EINVAL)?;
         for flag in flags {
@@ -348,8 +348,8 @@ impl System for RealSystem {
         Ok(Box::new(RealDir(dir)))
     }
 
-    fn umask(&mut self, new_mask: Mode2) -> Mode2 {
-        Mode2::from_bits_retain(unsafe { nix::libc::umask(new_mask.bits()) })
+    fn umask(&mut self, new_mask: Mode) -> Mode {
+        Mode::from_bits_retain(unsafe { nix::libc::umask(new_mask.bits()) })
     }
 
     fn now(&self) -> Instant {

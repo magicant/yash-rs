@@ -127,7 +127,7 @@ mod tests {
     use crate::system::r#virtual::INode;
     use crate::system::r#virtual::VirtualSystem;
     use crate::system::Errno;
-    use crate::system::Mode2;
+    use crate::system::Mode;
     use crate::system::OfdAccess;
     use crate::system::OpenFlag;
     use crate::System;
@@ -225,7 +225,7 @@ mod tests {
                 path,
                 OfdAccess::ReadOnly,
                 OpenFlag::Cloexec.into(),
-                Mode2::empty(),
+                Mode::empty(),
             )
             .unwrap();
         let mut reader = FdReader::new(fd, system);
