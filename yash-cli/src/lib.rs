@@ -19,9 +19,9 @@
 //! functionality. Currently, this crate is not intended to be used as a library
 //! by other crates.
 //!
-//! The main entry point for the shell is the [`bin_main`] function, which is
-//! called by the `main` function in the binary crate. The `bin_main` function
-//! sets up the shell environment and runs the main read-eval loop.
+//! The entry point for the shell is the [`main`] function, which is to be used
+//! as the `main` function in the binary crate. The function sets up the shell
+//! environment and runs the main read-eval loop.
 
 pub mod startup;
 // mod runner;
@@ -117,7 +117,7 @@ async fn parse_and_print(mut env: Env) -> i32 {
     env.exit_status.0
 }
 
-pub fn bin_main() -> i32 {
+pub fn main() -> ! {
     // SAFETY: This is the only instance of RealSystem we create in the whole
     // process.
     let system = unsafe { RealSystem::new() };
@@ -139,7 +139,7 @@ pub fn bin_main() -> i32 {
     loop {
         pool.run_until_stalled();
         if let Some(exit_status) = (&mut task).now_or_never() {
-            return exit_status;
+            std::process::exit(exit_status);
         }
         system.select(false).ok();
     }

@@ -14,8 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! TODO Elaborate
+//! Main binary crate for the yash shell CLI
+//!
+//! This crate delegates the main functionality to the `yash_cli` library crate,
+//! so there is not much to see here. The `main` function is simply re-exported
+//! from the library crate.
 
-fn main() {
-    std::process::exit(yash_cli::bin_main())
-}
+use yash_cli::main;
