@@ -53,13 +53,15 @@ impl OpenFlag {
             Self::Exclusive => Some(nix::libc::O_EXCL),
             #[cfg(not(any(target_env = "newlib", target_os = "redox")))]
             Self::NoCtty => Some(nix::libc::O_NOCTTY),
+            #[cfg(any(target_env = "newlib", target_os = "redox"))]
+            Self::NoCtty => None,
             Self::NoFollow => Some(nix::libc::O_NOFOLLOW),
             Self::NonBlock => Some(nix::libc::O_NONBLOCK),
             #[cfg(not(target_os = "redox"))]
             Self::Sync => Some(nix::libc::O_SYNC),
+            #[cfg(target_os = "redox")]
+            Self::Sync => None,
             Self::Truncate => Some(nix::libc::O_TRUNC),
-            #[allow(unreachable_patterns)]
-            _ => None,
         }
     }
 }
