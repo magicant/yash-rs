@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `OpenFlag` parameters instead of `nix::fcntl::OFlag`.
 - The `system::System::umask` method now takes and returns a value of the new
   `system::Mode` type.
+- External dependency versions:
+    - Rust 1.77.0 → 1.79.0
 
 ### Deprecated
 

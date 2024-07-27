@@ -134,12 +134,7 @@ fn is_directory(path: &CStr) -> bool {
 /// This array is used to store caught signals. All slots are initialized with
 /// 0, which indicates that the slot is available. When a signal is caught, the
 /// signal number is written into one of unoccupied slots.
-static CAUGHT_SIGNALS: [AtomicIsize; 8] = {
-    // In the array creation, the repeat operand must be const.
-    #[allow(clippy::declare_interior_mutable_const)]
-    const SIGNAL_SLOT: AtomicIsize = AtomicIsize::new(0);
-    [SIGNAL_SLOT; 8]
-};
+static CAUGHT_SIGNALS: [AtomicIsize; 8] = [const { AtomicIsize::new(0) }; 8];
 
 /// Signal catching function.
 ///

@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The shell now executes the initialization files on startup if the shell is
   interactive.
+- External dependency versions:
+    - Rust 1.77.0 → 1.79.0
 
 ### Fixed
 
