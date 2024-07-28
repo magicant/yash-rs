@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `system` module no longer reexports `nix::fcntl::OFlag`.
 - The `fcntl_getfl` and `fcntl_setfl` methods from the `System` trait
+- The `system::Errno` struct's `last` and `clear` methods are no longer public.
 
 ## [0.2.1] - 2024-07-12
 

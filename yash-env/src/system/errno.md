@@ -1,0 +1,1 @@
+On Unix-based systems, these constants are defined using the actual error codes specific to the target environment. On other systems, the constants have predefined values that are not based on any specific error codes.
