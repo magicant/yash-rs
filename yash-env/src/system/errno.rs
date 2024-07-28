@@ -40,9 +40,15 @@ pub type RawErrno = i32;
 pub struct Errno(pub RawErrno);
 
 impl Errno {
-    /// Dummy error value that does not equal any real error value.
+    /// Dummy error value that does not equal any real error value
+    ///
+    /// This value is defined as `0`.
     pub const NO_ERROR: Self = Self(0);
+}
 
+#[doc = include_str!("errno.md")]
+#[cfg(unix)]
+impl Errno {
     /// Argument list too long
     pub const E2BIG: Self = Self(nix::libc::E2BIG as _);
     /// Permission denied
@@ -205,6 +211,173 @@ impl Errno {
     pub const EWOULDBLOCK: Self = Self(nix::libc::EWOULDBLOCK as _);
     /// Cross-device link
     pub const EXDEV: Self = Self(nix::libc::EXDEV as _);
+}
+
+#[doc = include_str!("errno.md")]
+#[cfg(not(unix))]
+impl Errno {
+    /// Argument list too long
+    pub const E2BIG: Self = Self(1);
+    /// Permission denied
+    pub const EACCES: Self = Self(2);
+    /// Address in use.
+    pub const EADDRINUSE: Self = Self(3);
+    /// Address not available
+    pub const EADDRNOTAVAIL: Self = Self(4);
+    /// Address family not supported
+    pub const EAFNOSUPPORT: Self = Self(5);
+    /// Resource unavailable, try again (may be the same value as [`EWOULDBLOCK`](Self::EWOULDBLOCK))
+    pub const EAGAIN: Self = Self(6);
+    /// Connection already in progress
+    pub const EALREADY: Self = Self(7);
+    /// Bad file descriptor
+    pub const EBADF: Self = Self(8);
+    /// Bad message
+    pub const EBADMSG: Self = Self(9);
+    /// Device or resource busy
+    pub const EBUSY: Self = Self(10);
+    /// Operation canceled
+    pub const ECANCELED: Self = Self(11);
+    /// No child processes
+    pub const ECHILD: Self = Self(12);
+    /// Connection aborted
+    pub const ECONNABORTED: Self = Self(13);
+    /// Connection refused
+    pub const ECONNREFUSED: Self = Self(14);
+    /// Connection reset
+    pub const ECONNRESET: Self = Self(15);
+    /// Resource deadlock would occur
+    pub const EDEADLK: Self = Self(16);
+    /// Destination address required
+    pub const EDESTADDRREQ: Self = Self(17);
+    /// Mathematics argument out of domain of function
+    pub const EDOM: Self = Self(18);
+    /// Reserved
+    pub const EDQUOT: Self = Self(19);
+    /// File exists
+    pub const EEXIST: Self = Self(20);
+    /// Bad address
+    pub const EFAULT: Self = Self(21);
+    /// File too large
+    pub const EFBIG: Self = Self(22);
+    /// Host is unreachable
+    pub const EHOSTUNREACH: Self = Self(23);
+    /// Identifier removed
+    pub const EIDRM: Self = Self(24);
+    /// Illegal byte sequence
+    pub const EILSEQ: Self = Self(25);
+    /// Operation in progress
+    pub const EINPROGRESS: Self = Self(26);
+    /// Interrupted function
+    pub const EINTR: Self = Self(27);
+    /// Invalid argument
+    pub const EINVAL: Self = Self(28);
+    /// I/O error
+    pub const EIO: Self = Self(29);
+    /// Socket is connected
+    pub const EISCONN: Self = Self(30);
+    /// Is a directory
+    pub const EISDIR: Self = Self(31);
+    /// Too many levels of symbolic links
+    pub const ELOOP: Self = Self(32);
+    /// File descriptor value too large
+    pub const EMFILE: Self = Self(33);
+    /// Too many links
+    pub const EMLINK: Self = Self(34);
+    /// Message too large
+    pub const EMSGSIZE: Self = Self(35);
+    // Not supported on every platform /// Reserved
+    // pub const EMULTIHOP: Self = Self(36);
+    /// Filename too long
+    pub const ENAMETOOLONG: Self = Self(37);
+    /// Network is down
+    pub const ENETDOWN: Self = Self(38);
+    /// Connection aborted by network
+    pub const ENETRESET: Self = Self(39);
+    /// Network unreachable
+    pub const ENETUNREACH: Self = Self(40);
+    /// Too many files open in system
+    pub const ENFILE: Self = Self(41);
+    /// No buffer space available
+    pub const ENOBUFS: Self = Self(42);
+    // Not supported on every platform /// No message is available on the STREAM head read queue
+    // pub const ENODATA: Self = Self(43);
+    /// No such device
+    pub const ENODEV: Self = Self(44);
+    /// No such file or directory
+    pub const ENOENT: Self = Self(45);
+    /// Executable file format error
+    pub const ENOEXEC: Self = Self(46);
+    /// No locks available
+    pub const ENOLCK: Self = Self(47);
+    // Not supported on every platform /// Reserved
+    // pub const ENOLINK: Self = Self(48);
+    /// Not enough space
+    pub const ENOMEM: Self = Self(49);
+    /// No message of the desired type
+    pub const ENOMSG: Self = Self(50);
+    /// Protocol not available
+    pub const ENOPROTOOPT: Self = Self(51);
+    /// No space left on device
+    pub const ENOSPC: Self = Self(52);
+    // Obsolete: Not supported /// No STREAM resources
+    // pub const ENOSR: Self = Self(53);
+    // Obsolete: Not supported /// Not a STREAM
+    // pub const ENOSTR: Self = Self(54);
+    /// Functionality not supported
+    pub const ENOSYS: Self = Self(55);
+    /// The socket is not connected
+    pub const ENOTCONN: Self = Self(56);
+    /// Not a directory or a symbolic link to a directory
+    pub const ENOTDIR: Self = Self(57);
+    /// Directory not empty
+    pub const ENOTEMPTY: Self = Self(58);
+    // Not supported on every platform /// State not recoverable
+    // pub const ENOTRECOVERABLE: Self = Self(59);
+    /// Not a socket
+    pub const ENOTSOCK: Self = Self(60);
+    /// Not supported (may be the same value as [`EOPNOTSUPP`](Self::EOPNOTSUPP))
+    pub const ENOTSUP: Self = Self(61);
+    /// Inappropriate I/O control operation
+    pub const ENOTTY: Self = Self(62);
+    /// No such device or address
+    pub const ENXIO: Self = Self(63);
+    /// Operation not supported on socket (may be the same value as [`ENOTSUP`](Self::ENOTSUP))
+    pub const EOPNOTSUPP: Self = Self(64);
+    /// Value too large to be stored in data type
+    pub const EOVERFLOW: Self = Self(65);
+    // Not supported on every platform /// Previous owner died
+    // pub const EOWNERDEAD: Self = Self(66);
+    /// Operation not permitted
+    pub const EPERM: Self = Self(67);
+    /// Broken pipe
+    pub const EPIPE: Self = Self(68);
+    /// Protocol error
+    pub const EPROTO: Self = Self(69);
+    /// Protocol not supported
+    pub const EPROTONOSUPPORT: Self = Self(70);
+    /// Protocol wrong type for socket
+    pub const EPROTOTYPE: Self = Self(71);
+    /// Result too large
+    pub const ERANGE: Self = Self(72);
+    /// Read-only file system
+    pub const EROFS: Self = Self(73);
+    /// Invalid seek
+    pub const ESPIPE: Self = Self(74);
+    /// No such process
+    pub const ESRCH: Self = Self(75);
+    /// Reserved
+    pub const ESTALE: Self = Self(76);
+    // Obsolete: Not supported /// Stream ioctl() timeout
+    // pub const ETIME: Self = Self(77);
+    /// Connection timed out
+    pub const ETIMEDOUT: Self = Self(78);
+    /// Text file busy
+    pub const ETXTBSY: Self = Self(79);
+    /// Operation would block (may be the same value as [`EAGAIN`](Self::EAGAIN))
+    pub const EWOULDBLOCK: Self = Self(80);
+    /// Cross-device link
+    pub const EXDEV: Self = Self(81);
 }
 
 impl From<Errno> for RawErrno {
