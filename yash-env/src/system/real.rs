@@ -16,6 +16,7 @@
 
 //! Implementation of `System` that actually interacts with the system.
 
+mod errno;
 mod open_flag;
 mod signal;
 

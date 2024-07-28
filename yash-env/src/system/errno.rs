@@ -40,49 +40,6 @@ pub type RawErrno = i32;
 pub struct Errno(pub RawErrno);
 
 impl Errno {
-    /// Returns the current `errno` value.
-    ///
-    /// This function returns an `Errno` value containing the current `errno`
-    /// value, which is the error value of the last system call. Note that
-    /// this function should be called immediately after a system call that
-    /// sets `errno`, because the value of `errno` may be changed by other
-    /// system calls whether or not they succeed.
-    #[inline]
-    #[must_use]
-    pub fn last() -> Self {
-        Self(nix::Error::last() as _)
-    }
-
-    // TODO Need nix 0.28.0
-    // /// Sets the current `errno` value.
-    // ///
-    // /// This function sets the current `errno` value to the specified value.
-    // /// The next call to [`last`](Self::last) will return the specified value
-    // /// unless another system call changes the `errno` value. This function is
-    // /// useful when you want to simulate an error condition in a system call.
-    // ///
-    // /// Use [`clear`](Self::clear) to reset the `errno` value.
-    // pub fn set_last(errno: Self) {
-    //     nix::Error::set_raw(errno.0)
-    // }
-
-    /// Clears the current `errno` value.
-    ///
-    /// Some platform functions do not indicate errors in their return values,
-    /// and set the `errno` value only when an error occurs. In such cases, it
-    /// is necessary to clear the `errno` value before calling the function
-    /// and check the `errno` value after calling the function to see if an
-    /// error occurred. This function resets the current `errno` value to
-    /// [`NO_ERROR`](Self::NO_ERROR).
-    // ///
-    // /// Use [`set_last`](Self::set_last) to set the `errno` value to an
-    // /// arbitrary value.
-    #[inline]
-    pub fn clear() {
-        // Self::set_last(Self::NO_ERROR)
-        nix::Error::clear()
-    }
-
     /// Dummy error value that does not equal any real error value.
     pub const NO_ERROR: Self = Self(0);
 
