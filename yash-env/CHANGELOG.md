@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `system::virtual::Process` struct now has the getters/setters for the
   real/effective user/group IDs: `uid`, `set_uid`, `euid`, `set_euid`, `gid`,
   `set_gid`, `egid`, and `set_egid`.
+- `system::virtual::VirtualSystem::open` now applies the process's umask to the
+  mode argument.
 - The `stack::Frame` enum now has the `InitFile` variant.
 - External dependencies:
     - enumset 1.1.2 (previously an internal dependency)

@@ -445,6 +445,8 @@ impl System for VirtualSystem {
         mode: Mode,
     ) -> Result<Fd> {
         let path = self.resolve_relative_path(Path::new(OsStr::from_bytes(path.to_bytes())));
+        let umask = self.current_process().umask;
+
         let mut state = self.state.borrow_mut();
         let file = match state.file_system.get(&path) {
             Ok(inode) => {
@@ -465,8 +467,7 @@ impl System for VirtualSystem {
             }
             Err(Errno::ENOENT) if flags.contains(OpenFlag::Create) => {
                 let mut inode = INode::new([]);
-                // TODO Apply umask
-                inode.permissions = mode;
+                inode.permissions = mode.difference(umask);
                 let inode = Rc::new(RefCell::new(inode));
                 state.file_system.save(&path, Rc::clone(&inode))?;
                 inode
@@ -1545,9 +1546,28 @@ mod tests {
         system.write(Fd(3), &[42, 123]).unwrap();
         let file = system.state.borrow().file_system.get("new_file").unwrap();
         let file = file.borrow();
+        assert_eq!(file.permissions, Mode::empty());
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(content[..], [42, 123]);
         });
+    }
+
+    #[test]
+    fn open_creating_non_existing_file_umask() {
+        let mut system = VirtualSystem::new();
+        system.umask(Mode::from_bits_retain(0o125));
+        system
+            .open(
+                c"file",
+                OfdAccess::WriteOnly,
+                OpenFlag::Create.into(),
+                Mode::ALL_9,
+            )
+            .unwrap();
+
+        let file = system.state.borrow().file_system.get("file").unwrap();
+        let file = file.borrow();
+        assert_eq!(file.permissions, Mode::from_bits_retain(0o652));
     }
 
     #[test]
