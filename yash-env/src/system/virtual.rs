@@ -253,7 +253,7 @@ impl VirtualSystem {
         &self,
         _dir_fd: Fd,
         path: &Path,
-        flags: AtFlags,
+        follow_symlinks: bool,
     ) -> Result<Rc<RefCell<INode>>> {
         // TODO Resolve relative to dir_fd
         // TODO Support AT_FDCWD
@@ -263,7 +263,7 @@ impl VirtualSystem {
         for _count in 0.._POSIX_SYMLOOP_MAX {
             let resolved_path = self.resolve_relative_path(&path);
             let inode = self.state.borrow().file_system.get(&resolved_path)?;
-            if flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW) {
+            if !follow_symlinks {
                 return Ok(inode);
             }
 
@@ -353,7 +353,11 @@ impl System for VirtualSystem {
     /// - `st_ino` (computed from the address of `INode`)
     fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> Result<FileStat> {
         let path = Path::new(OsStr::from_bytes(path.to_bytes()));
-        let inode = self.resolve_existing_file(dir_fd, path, flags)?;
+        let inode = self.resolve_existing_file(
+            dir_fd,
+            path,
+            !flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW),
+        )?;
         let inode = inode.borrow();
         stat(&inode)
     }
@@ -364,20 +368,14 @@ impl System for VirtualSystem {
     /// bit in the permissions. The file owner and group are not considered.
     fn is_executable_file(&self, path: &CStr) -> bool {
         let path = Path::new(OsStr::from_bytes(path.to_bytes()));
-        let Ok(inode) = self.resolve_existing_file(AT_FDCWD, path, AtFlags::empty()) else {
-            return false;
-        };
-        let inode = inode.borrow();
-        inode.permissions.intersects(Mode::ALL_EXEC)
+        self.resolve_existing_file(AT_FDCWD, path, /* follow symlinks */ true)
+            .is_ok_and(|inode| inode.borrow().permissions.intersects(Mode::ALL_EXEC))
     }
 
     fn is_directory(&self, path: &CStr) -> bool {
         let path = Path::new(OsStr::from_bytes(path.to_bytes()));
-        let Ok(inode) = self.resolve_existing_file(AT_FDCWD, path, AtFlags::empty()) else {
-            return false;
-        };
-        let inode = inode.borrow();
-        matches!(inode.body, FileBody::Directory { .. })
+        self.resolve_existing_file(AT_FDCWD, path, /* follow symlinks */ true)
+            .is_ok_and(|inode| matches!(inode.borrow().body, FileBody::Directory { .. }))
     }
 
     fn pipe(&mut self) -> Result<(Fd, Fd)> {
@@ -1012,12 +1010,9 @@ impl System for VirtualSystem {
     }
 
     /// Changes the current working directory.
-    ///
-    /// The current implementation does not canonicalize ".", "..", or symbolic
-    /// links in the new path set to the process.
     fn chdir(&mut self, path: &CStr) -> Result<()> {
         let path = Path::new(OsStr::from_bytes(path.to_bytes()));
-        let inode = self.resolve_existing_file(AT_FDCWD, path, AtFlags::empty())?;
+        let inode = self.resolve_existing_file(AT_FDCWD, path, /* follow links */ true)?;
         if matches!(&inode.borrow().body, FileBody::Directory { .. }) {
             let mut process = self.current_process_mut();
             let new_path = process.cwd.join(path);
