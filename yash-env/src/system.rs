@@ -63,8 +63,6 @@ use crate::trap::SignalSystem;
 use crate::Env;
 use enumset::EnumSet;
 #[doc(no_inline)]
-pub use nix::fcntl::AtFlags;
-#[doc(no_inline)]
 pub use nix::fcntl::FdFlag;
 #[doc(no_inline)]
 pub use nix::sys::signal::SigmaskHow;
@@ -97,7 +95,7 @@ pub trait System: Debug {
     fn fstat(&self, fd: Fd) -> Result<FileStat>;
 
     /// Retrieves metadata of a file.
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> Result<FileStat>;
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<FileStat>;
 
     /// Whether there is an executable file at the specified path.
     #[must_use]

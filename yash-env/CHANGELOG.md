@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `system::Mode` is no longer a re-export of `nix::sys::stat::Mode`.
+- The `system::System::fstatat` method now takes a `follow_symlinks: bool`
+  parameter instead of an `AtFlags` parameter.
 - The `system::System::open` method has been redefined to take `OfdAccess` and
   `OpenFlag` parameters instead of `nix::fcntl::OFlag`.
 - The `system::System::umask` method now takes and returns a value of the new
@@ -42,7 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- The `system` module no longer reexports `nix::fcntl::OFlag`.
+- The `system` module no longer reexports `nix::fcntl::AtFlags` and
+  `nix::fcntl::OFlag`.
 - The `fcntl_getfl` and `fcntl_setfl` methods from the `System` trait
 - The `system::Errno` struct's `last` and `clear` methods are no longer public.
 

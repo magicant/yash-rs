@@ -17,7 +17,6 @@
 //! Working directory path handling
 
 use super::Env;
-use crate::system::AtFlags;
 use crate::system::Errno;
 use crate::system::AT_FDCWD;
 use crate::variable::AssignError;
@@ -72,11 +71,10 @@ impl Env {
             let Ok(cstr_pwd) = CString::new(pwd.as_bytes()) else {
                 return false;
             };
-            const AT_FLAGS: AtFlags = AtFlags::empty();
-            let Ok(s1) = self.system.fstatat(AT_FDCWD, &cstr_pwd, AT_FLAGS) else {
+            let Ok(s1) = self.system.fstatat(AT_FDCWD, &cstr_pwd, true) else {
                 return false;
             };
-            let Ok(s2) = self.system.fstatat(AT_FDCWD, c".", AT_FLAGS) else {
+            let Ok(s2) = self.system.fstatat(AT_FDCWD, c".", true) else {
                 return false;
             };
             same_files(&s1, &s2)

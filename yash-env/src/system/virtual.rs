@@ -56,7 +56,6 @@ pub use self::signal::*;
 use super::resource::LimitPair;
 use super::resource::Resource;
 use super::resource::RLIM_INFINITY;
-use super::AtFlags;
 use super::Dir;
 use super::Errno;
 use super::FdFlag;
@@ -351,13 +350,9 @@ impl System for VirtualSystem {
     /// - `st_size`
     /// - `st_dev` (always 1)
     /// - `st_ino` (computed from the address of `INode`)
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> Result<FileStat> {
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<FileStat> {
         let path = Path::new(OsStr::from_bytes(path.to_bytes()));
-        let inode = self.resolve_existing_file(
-            dir_fd,
-            path,
-            !flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW),
-        )?;
+        let inode = self.resolve_existing_file(dir_fd, path, follow_symlinks)?;
         let inode = inode.borrow();
         stat(&inode)
     }
@@ -1318,7 +1313,7 @@ mod tests {
     fn fstatat_non_existent_file() {
         let system = VirtualSystem::new();
         assert_matches!(
-            system.fstatat(Fd(0), c"/no/such/file", AtFlags::empty()),
+            system.fstatat(Fd(0), c"/no/such/file", true),
             Err(Errno::ENOENT)
         );
     }
@@ -1332,9 +1327,7 @@ mod tests {
         state.file_system.save(path, content).unwrap();
         drop(state);
 
-        let stat = system
-            .fstatat(Fd(0), c"/some/file", AtFlags::empty())
-            .unwrap();
+        let stat = system.fstatat(Fd(0), c"/some/file", true).unwrap();
         assert_eq!(stat.st_mode, SFlag::S_IFREG.bits() | Mode::default().bits());
         assert_eq!(stat.st_size, 5);
         // TODO Other stat properties
@@ -1349,7 +1342,7 @@ mod tests {
         state.file_system.save(path, content).unwrap();
         drop(state);
 
-        let stat = system.fstatat(Fd(0), c"/some/", AtFlags::empty()).unwrap();
+        let stat = system.fstatat(Fd(0), c"/some/", true).unwrap();
         assert_eq!(stat.st_mode, SFlag::S_IFDIR.bits() | 0o755);
         // TODO Other stat properties
     }
@@ -1370,9 +1363,7 @@ mod tests {
         state.file_system.save(path, content).unwrap();
         drop(state);
 
-        let stat = system
-            .fstatat(Fd(0), c"/some/fifo", AtFlags::empty())
-            .unwrap();
+        let stat = system.fstatat(Fd(0), c"/some/fifo", true).unwrap();
         assert_eq!(stat.st_mode, SFlag::S_IFIFO.bits() | Mode::default().bits());
         assert_eq!(stat.st_size, 42);
     }
@@ -1403,16 +1394,14 @@ mod tests {
     #[test]
     fn fstatat_symlink_to_regular_file() {
         let system = system_with_symlink();
-        let stat = system.fstatat(Fd(0), c"/link", AtFlags::empty()).unwrap();
+        let stat = system.fstatat(Fd(0), c"/link", true).unwrap();
         assert_eq!(stat.st_mode, SFlag::S_IFREG.bits() | Mode::default().bits());
     }
 
     #[test]
     fn fstatat_symlink_no_follow() {
         let system = system_with_symlink();
-        let stat = system
-            .fstatat(Fd(0), c"/link", AtFlags::AT_SYMLINK_NOFOLLOW)
-            .unwrap();
+        let stat = system.fstatat(Fd(0), c"/link", false).unwrap();
         assert_eq!(stat.st_mode, SFlag::S_IFLNK.bits() | Mode::default().bits());
     }
 

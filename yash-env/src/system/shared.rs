@@ -42,7 +42,6 @@ use crate::job::ProcessState;
 #[cfg(doc)]
 use crate::Env;
 use enumset::EnumSet;
-use nix::fcntl::AtFlags;
 use nix::fcntl::FdFlag;
 use nix::sys::signal::SigmaskHow;
 use nix::sys::stat::FileStat;
@@ -305,8 +304,8 @@ impl System for &SharedSystem {
     fn fstat(&self, fd: Fd) -> Result<FileStat> {
         self.0.borrow().fstat(fd)
     }
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> Result<FileStat> {
-        self.0.borrow().fstatat(dir_fd, path, flags)
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<FileStat> {
+        self.0.borrow().fstatat(dir_fd, path, follow_symlinks)
     }
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.0.borrow().is_executable_file(path)
@@ -487,8 +486,8 @@ impl System for SharedSystem {
         (&self).fstat(fd)
     }
     #[inline]
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> Result<FileStat> {
-        (&self).fstatat(dir_fd, path, flags)
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<FileStat> {
+        (&self).fstatat(dir_fd, path, follow_symlinks)
     }
     #[inline]
     fn is_executable_file(&self, path: &CStr) -> bool {

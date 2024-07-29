@@ -22,7 +22,6 @@ mod signal;
 
 use super::resource::LimitPair;
 use super::resource::Resource;
-use super::AtFlags;
 use super::ChildProcessStarter;
 use super::Dir;
 use super::DirEntry;
@@ -49,6 +48,7 @@ use crate::job::ProcessState;
 use crate::SignalHandling;
 use enumset::EnumSet;
 use nix::errno::Errno as NixErrno;
+use nix::fcntl::AtFlags;
 use nix::libc::DIR;
 use nix::libc::{S_IFDIR, S_IFMT, S_IFREG};
 use nix::sys::stat::stat;
@@ -188,7 +188,12 @@ impl System for RealSystem {
         Ok(nix::sys::stat::fstat(fd.0)?)
     }
 
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> Result<FileStat> {
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<FileStat> {
+        let flags = if follow_symlinks {
+            AtFlags::empty()
+        } else {
+            AtFlags::AT_SYMLINK_NOFOLLOW
+        };
         Ok(nix::sys::stat::fstatat(dir_fd.0, path, flags)?)
     }
 

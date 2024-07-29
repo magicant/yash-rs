@@ -58,7 +58,6 @@ use std::iter::Once;
 use std::marker::PhantomData;
 use yash_env::option::State::Off;
 use yash_env::semantics::Field;
-use yash_env::system::AtFlags;
 use yash_env::system::AT_FDCWD;
 use yash_env::Env;
 use yash_env::System;
@@ -207,13 +206,12 @@ impl SearchEnv<'_> {
     }
 
     fn file_exists(&mut self) -> bool {
-        let path = match CString::new(self.prefix.as_str()) {
-            Ok(path) => path,
-            Err(_) => return false,
+        let Ok(path) = CString::new(self.prefix.as_str()) else {
+            return false;
         };
         self.env
             .system
-            .fstatat(AT_FDCWD, &path, AtFlags::empty())
+            .fstatat(AT_FDCWD, &path, /* follow symlinks */ true)
             .is_ok()
     }
 
