@@ -56,7 +56,6 @@ pub use self::signal::*;
 use super::resource::LimitPair;
 use super::resource::Resource;
 use super::resource::RLIM_INFINITY;
-use super::AtFlags;
 use super::Dir;
 use super::Errno;
 use super::FdFlag;
@@ -253,7 +252,7 @@ impl VirtualSystem {
         &self,
         _dir_fd: Fd,
         path: &Path,
-        flags: AtFlags,
+        follow_symlinks: bool,
     ) -> Result<Rc<RefCell<INode>>> {
         // TODO Resolve relative to dir_fd
         // TODO Support AT_FDCWD
@@ -263,7 +262,7 @@ impl VirtualSystem {
         for _count in 0.._POSIX_SYMLOOP_MAX {
             let resolved_path = self.resolve_relative_path(&path);
             let inode = self.state.borrow().file_system.get(&resolved_path)?;
-            if flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW) {
+            if !follow_symlinks {
                 return Ok(inode);
             }
 
@@ -351,9 +350,9 @@ impl System for VirtualSystem {
     /// - `st_size`
     /// - `st_dev` (always 1)
     /// - `st_ino` (computed from the address of `INode`)
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> Result<FileStat> {
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<FileStat> {
         let path = Path::new(OsStr::from_bytes(path.to_bytes()));
-        let inode = self.resolve_existing_file(dir_fd, path, flags)?;
+        let inode = self.resolve_existing_file(dir_fd, path, follow_symlinks)?;
         let inode = inode.borrow();
         stat(&inode)
     }
@@ -364,20 +363,14 @@ impl System for VirtualSystem {
     /// bit in the permissions. The file owner and group are not considered.
     fn is_executable_file(&self, path: &CStr) -> bool {
         let path = Path::new(OsStr::from_bytes(path.to_bytes()));
-        let Ok(inode) = self.resolve_existing_file(AT_FDCWD, path, AtFlags::empty()) else {
-            return false;
-        };
-        let inode = inode.borrow();
-        inode.permissions.intersects(Mode::ALL_EXEC)
+        self.resolve_existing_file(AT_FDCWD, path, /* follow symlinks */ true)
+            .is_ok_and(|inode| inode.borrow().permissions.intersects(Mode::ALL_EXEC))
     }
 
     fn is_directory(&self, path: &CStr) -> bool {
         let path = Path::new(OsStr::from_bytes(path.to_bytes()));
-        let Ok(inode) = self.resolve_existing_file(AT_FDCWD, path, AtFlags::empty()) else {
-            return false;
-        };
-        let inode = inode.borrow();
-        matches!(inode.body, FileBody::Directory { .. })
+        self.resolve_existing_file(AT_FDCWD, path, /* follow symlinks */ true)
+            .is_ok_and(|inode| matches!(inode.borrow().body, FileBody::Directory { .. }))
     }
 
     fn pipe(&mut self) -> Result<(Fd, Fd)> {
@@ -1012,12 +1005,9 @@ impl System for VirtualSystem {
     }
 
     /// Changes the current working directory.
-    ///
-    /// The current implementation does not canonicalize ".", "..", or symbolic
-    /// links in the new path set to the process.
     fn chdir(&mut self, path: &CStr) -> Result<()> {
         let path = Path::new(OsStr::from_bytes(path.to_bytes()));
-        let inode = self.resolve_existing_file(AT_FDCWD, path, AtFlags::empty())?;
+        let inode = self.resolve_existing_file(AT_FDCWD, path, /* follow links */ true)?;
         if matches!(&inode.borrow().body, FileBody::Directory { .. }) {
             let mut process = self.current_process_mut();
             let new_path = process.cwd.join(path);
@@ -1323,7 +1313,7 @@ mod tests {
     fn fstatat_non_existent_file() {
         let system = VirtualSystem::new();
         assert_matches!(
-            system.fstatat(Fd(0), c"/no/such/file", AtFlags::empty()),
+            system.fstatat(Fd(0), c"/no/such/file", true),
             Err(Errno::ENOENT)
         );
     }
@@ -1337,9 +1327,7 @@ mod tests {
         state.file_system.save(path, content).unwrap();
         drop(state);
 
-        let stat = system
-            .fstatat(Fd(0), c"/some/file", AtFlags::empty())
-            .unwrap();
+        let stat = system.fstatat(Fd(0), c"/some/file", true).unwrap();
         assert_eq!(stat.st_mode, SFlag::S_IFREG.bits() | Mode::default().bits());
         assert_eq!(stat.st_size, 5);
         // TODO Other stat properties
@@ -1354,7 +1342,7 @@ mod tests {
         state.file_system.save(path, content).unwrap();
         drop(state);
 
-        let stat = system.fstatat(Fd(0), c"/some/", AtFlags::empty()).unwrap();
+        let stat = system.fstatat(Fd(0), c"/some/", true).unwrap();
         assert_eq!(stat.st_mode, SFlag::S_IFDIR.bits() | 0o755);
         // TODO Other stat properties
     }
@@ -1375,9 +1363,7 @@ mod tests {
         state.file_system.save(path, content).unwrap();
         drop(state);
 
-        let stat = system
-            .fstatat(Fd(0), c"/some/fifo", AtFlags::empty())
-            .unwrap();
+        let stat = system.fstatat(Fd(0), c"/some/fifo", true).unwrap();
         assert_eq!(stat.st_mode, SFlag::S_IFIFO.bits() | Mode::default().bits());
         assert_eq!(stat.st_size, 42);
     }
@@ -1408,16 +1394,14 @@ mod tests {
     #[test]
     fn fstatat_symlink_to_regular_file() {
         let system = system_with_symlink();
-        let stat = system.fstatat(Fd(0), c"/link", AtFlags::empty()).unwrap();
+        let stat = system.fstatat(Fd(0), c"/link", true).unwrap();
         assert_eq!(stat.st_mode, SFlag::S_IFREG.bits() | Mode::default().bits());
     }
 
     #[test]
     fn fstatat_symlink_no_follow() {
         let system = system_with_symlink();
-        let stat = system
-            .fstatat(Fd(0), c"/link", AtFlags::AT_SYMLINK_NOFOLLOW)
-            .unwrap();
+        let stat = system.fstatat(Fd(0), c"/link", false).unwrap();
         assert_eq!(stat.st_mode, SFlag::S_IFLNK.bits() | Mode::default().bits());
     }
 
