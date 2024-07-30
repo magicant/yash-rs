@@ -210,8 +210,8 @@ impl System for RealSystem {
         Ok((Fd(reader), Fd(writer)))
     }
 
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> Result<Fd> {
-        let arg = if flags.contains(FdFlag::FD_CLOEXEC) {
+    fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
+        let arg = if flags.contains(FdFlag::CloseOnExec) {
             nix::fcntl::FcntlArg::F_DUPFD_CLOEXEC
         } else {
             nix::fcntl::FcntlArg::F_DUPFD
@@ -257,7 +257,7 @@ impl System for RealSystem {
         let fd = Fd(file.into_raw_fd());
 
         // Clear the CLOEXEC flag
-        _ = self.fcntl_setfd(fd, FdFlag::empty());
+        _ = self.fcntl_setfd(fd, EnumSet::empty());
 
         Ok(fd)
     }
@@ -291,13 +291,22 @@ impl System for RealSystem {
         Ok(was_nonblocking)
     }
 
-    fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag> {
+    fn fcntl_getfd(&self, fd: Fd) -> Result<EnumSet<FdFlag>> {
         let bits = nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_GETFD)?;
-        Ok(FdFlag::from_bits_truncate(bits))
+        let bits = nix::fcntl::FdFlag::from_bits_retain(bits);
+        let mut flags = EnumSet::empty();
+        if bits.contains(nix::fcntl::FdFlag::FD_CLOEXEC) {
+            flags.insert(FdFlag::CloseOnExec);
+        }
+        Ok(flags)
     }
 
-    fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> Result<()> {
-        let _ = nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_SETFD(flags))?;
+    fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
+        let mut bits = nix::fcntl::FdFlag::empty();
+        if flags.contains(FdFlag::CloseOnExec) {
+            bits.insert(nix::fcntl::FdFlag::FD_CLOEXEC);
+        }
+        nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_SETFD(bits))?;
         Ok(())
     }
 

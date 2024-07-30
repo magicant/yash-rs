@@ -20,6 +20,7 @@ use super::signal;
 use super::ChildProcessStarter;
 use super::Dir;
 use super::Errno;
+use super::FdFlag;
 use super::FdSet;
 use super::Gid;
 use super::LimitPair;
@@ -42,7 +43,6 @@ use crate::job::ProcessState;
 #[cfg(doc)]
 use crate::Env;
 use enumset::EnumSet;
-use nix::fcntl::FdFlag;
 use nix::sys::signal::SigmaskHow;
 use nix::sys::stat::FileStat;
 use nix::sys::time::TimeSpec;
@@ -316,7 +316,7 @@ impl System for &SharedSystem {
     fn pipe(&mut self) -> Result<(Fd, Fd)> {
         self.0.borrow_mut().pipe()
     }
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> Result<Fd> {
+    fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
         self.0.borrow_mut().dup(from, to_min, flags)
     }
     fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
@@ -343,10 +343,10 @@ impl System for &SharedSystem {
     fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
         self.0.borrow_mut().get_and_set_nonblocking(fd, nonblocking)
     }
-    fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag> {
+    fn fcntl_getfd(&self, fd: Fd) -> Result<EnumSet<FdFlag>> {
         self.0.borrow().fcntl_getfd(fd)
     }
-    fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> Result<()> {
+    fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
         self.0.borrow_mut().fcntl_setfd(fd, flags)
     }
     fn isatty(&self, fd: Fd) -> Result<bool> {
@@ -502,7 +502,7 @@ impl System for SharedSystem {
         (&mut &*self).pipe()
     }
     #[inline]
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> Result<Fd> {
+    fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
         (&mut &*self).dup(from, to_min, flags)
     }
     #[inline]
@@ -536,11 +536,11 @@ impl System for SharedSystem {
         (&mut &*self).get_and_set_nonblocking(fd, nonblocking)
     }
     #[inline]
-    fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag> {
+    fn fcntl_getfd(&self, fd: Fd) -> Result<EnumSet<FdFlag>> {
         (&self).fcntl_getfd(fd)
     }
     #[inline]
-    fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> Result<()> {
+    fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
         (&mut &*self).fcntl_setfd(fd, flags)
     }
     #[inline]

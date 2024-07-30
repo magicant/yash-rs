@@ -162,7 +162,7 @@ impl VirtualSystem {
                     is_writable: true,
                     is_appending: true,
                 })),
-                flag: FdFlag::empty(),
+                flags: EnumSet::empty(),
             };
             process.set_fd(fd, body).unwrap();
         };
@@ -399,11 +399,11 @@ impl System for VirtualSystem {
 
         let reader = FdBody {
             open_file_description: Rc::new(RefCell::new(reader)),
-            flag: FdFlag::empty(),
+            flags: EnumSet::empty(),
         };
         let writer = FdBody {
             open_file_description: Rc::new(RefCell::new(writer)),
-            flag: FdFlag::empty(),
+            flags: EnumSet::empty(),
         };
 
         let mut process = self.current_process_mut();
@@ -415,17 +415,17 @@ impl System for VirtualSystem {
         Ok((reader, writer))
     }
 
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> Result<Fd> {
+    fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
         let mut process = self.current_process_mut();
         let mut body = process.fds.get(&from).ok_or(Errno::EBADF)?.clone();
-        body.flag = flags;
+        body.flags = flags;
         process.open_fd_ge(to_min, body).map_err(|_| Errno::EMFILE)
     }
 
     fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
         let mut process = self.current_process_mut();
         let mut body = process.fds.get(&from).ok_or(Errno::EBADF)?.clone();
-        body.flag = FdFlag::empty();
+        body.flags = EnumSet::empty();
         process.set_fd(to, body).map_err(|_| Errno::EBADF)?;
         Ok(to)
     }
@@ -496,10 +496,10 @@ impl System for VirtualSystem {
         }));
         let body = FdBody {
             open_file_description,
-            flag: if flags.contains(OpenFlag::CloseOnExec) {
-                FdFlag::FD_CLOEXEC
+            flags: if flags.contains(OpenFlag::CloseOnExec) {
+                EnumSet::only(FdFlag::CloseOnExec)
             } else {
-                FdFlag::empty()
+                EnumSet::empty()
             },
         };
         let process = state.processes.get_mut(&self.process_id).unwrap();
@@ -517,7 +517,7 @@ impl System for VirtualSystem {
         }));
         let body = FdBody {
             open_file_description,
-            flag: FdFlag::empty(),
+            flags: EnumSet::empty(),
         };
         let mut state = self.state.borrow_mut();
         let process = state.processes.get_mut(&self.process_id).unwrap();
@@ -555,16 +555,16 @@ impl System for VirtualSystem {
         })
     }
 
-    fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag> {
+    fn fcntl_getfd(&self, fd: Fd) -> Result<EnumSet<FdFlag>> {
         let process = self.current_process();
         let body = process.get_fd(fd).ok_or(Errno::EBADF)?;
-        Ok(body.flag)
+        Ok(body.flags)
     }
 
-    fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> Result<()> {
+    fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
         let mut process = self.current_process_mut();
         let body = process.get_fd_mut(fd).ok_or(Errno::EBADF)?;
-        body.flag = flags;
+        body.flags = flags;
         Ok(())
     }
 
@@ -1457,7 +1457,7 @@ mod tests {
     #[test]
     fn dup_shares_open_file_description() {
         let mut system = VirtualSystem::new();
-        let result = system.dup(Fd::STDOUT, Fd::STDERR, FdFlag::empty());
+        let result = system.dup(Fd::STDOUT, Fd::STDERR, EnumSet::empty());
         assert_eq!(result, Ok(Fd(3)));
 
         let process = system.current_process();
@@ -1469,12 +1469,12 @@ mod tests {
     #[test]
     fn dup_can_set_cloexec() {
         let mut system = VirtualSystem::new();
-        let result = system.dup(Fd::STDOUT, Fd::STDERR, FdFlag::FD_CLOEXEC);
+        let result = system.dup(Fd::STDOUT, Fd::STDERR, FdFlag::CloseOnExec.into());
         assert_eq!(result, Ok(Fd(3)));
 
         let process = system.current_process();
         let fd3 = process.fds.get(&Fd(3)).unwrap();
-        assert_eq!(fd3.flag, FdFlag::FD_CLOEXEC);
+        assert_eq!(fd3.flags, EnumSet::only(FdFlag::CloseOnExec));
     }
 
     #[test]
@@ -1493,7 +1493,7 @@ mod tests {
     fn dup2_clears_cloexec() {
         let mut system = VirtualSystem::new();
         let mut process = system.current_process_mut();
-        process.fds.get_mut(&Fd::STDOUT).unwrap().flag = FdFlag::FD_CLOEXEC;
+        process.fds.get_mut(&Fd::STDOUT).unwrap().flags = FdFlag::CloseOnExec.into();
         drop(process);
 
         let result = system.dup2(Fd::STDOUT, Fd(6));
@@ -1501,7 +1501,7 @@ mod tests {
 
         let process = system.current_process();
         let fd6 = process.fds.get(&Fd(6)).unwrap();
-        assert_eq!(fd6.flag, FdFlag::empty());
+        assert_eq!(fd6.flags, EnumSet::empty());
     }
 
     #[test]
@@ -1789,20 +1789,22 @@ mod tests {
         let mut system = VirtualSystem::new();
 
         let flags = system.fcntl_getfd(Fd::STDIN).unwrap();
-        assert_eq!(flags, FdFlag::empty());
+        assert_eq!(flags, EnumSet::empty());
 
-        system.fcntl_setfd(Fd::STDIN, FdFlag::FD_CLOEXEC).unwrap();
+        system
+            .fcntl_setfd(Fd::STDIN, FdFlag::CloseOnExec.into())
+            .unwrap();
 
         let flags = system.fcntl_getfd(Fd::STDIN).unwrap();
-        assert_eq!(flags, FdFlag::FD_CLOEXEC);
+        assert_eq!(flags, EnumSet::only(FdFlag::CloseOnExec));
 
         let flags = system.fcntl_getfd(Fd::STDOUT).unwrap();
-        assert_eq!(flags, FdFlag::empty());
+        assert_eq!(flags, EnumSet::empty());
 
-        system.fcntl_setfd(Fd::STDIN, FdFlag::empty()).unwrap();
+        system.fcntl_setfd(Fd::STDIN, EnumSet::empty()).unwrap();
 
         let flags = system.fcntl_getfd(Fd::STDIN).unwrap();
-        assert_eq!(flags, FdFlag::empty());
+        assert_eq!(flags, EnumSet::empty());
     }
 
     #[test]

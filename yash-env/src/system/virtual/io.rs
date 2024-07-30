@@ -20,6 +20,7 @@ use super::super::Errno;
 use super::FdFlag;
 use super::FileBody;
 use super::INode;
+use enumset::EnumSet;
 use nix::unistd::Whence;
 use std::cell::RefCell;
 use std::fmt::Debug;
@@ -240,12 +241,13 @@ pub struct FdBody {
     /// Underlying open file description.
     pub open_file_description: Rc<RefCell<OpenFileDescription>>,
     /// Flags for this file descriptor
-    pub flag: FdFlag,
+    pub flags: EnumSet<FdFlag>,
 }
 
 impl PartialEq for FdBody {
     fn eq(&self, rhs: &Self) -> bool {
-        Rc::ptr_eq(&self.open_file_description, &rhs.open_file_description) && self.flag == rhs.flag
+        Rc::ptr_eq(&self.open_file_description, &rhs.open_file_description)
+            && self.flags == rhs.flags
     }
 }
 

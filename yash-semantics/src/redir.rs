@@ -264,7 +264,7 @@ impl FdSpec {
 const MODE: Mode = Mode::ALL_READ.union(Mode::ALL_WRITE);
 
 fn is_cloexec(env: &Env, fd: Fd) -> bool {
-    matches!(env.system.fcntl_getfd(fd), Ok(flags) if flags.contains(FdFlag::FD_CLOEXEC))
+    matches!(env.system.fcntl_getfd(fd), Ok(flags) if flags.contains(FdFlag::CloseOnExec))
 }
 
 fn into_c_string_value_and_origin(field: Field) -> Result<(CString, Location), Error> {
@@ -480,7 +480,7 @@ async fn perform(
     // Save the current open file description at target_fd to a new FD
     let save = match env
         .system
-        .dup(target_fd, MIN_INTERNAL_FD, FdFlag::FD_CLOEXEC)
+        .dup(target_fd, MIN_INTERNAL_FD, FdFlag::CloseOnExec.into())
     {
         Ok(save_fd) => Some(save_fd),
         Err(Errno::EBADF) => None,
@@ -907,7 +907,9 @@ mod tests {
                 Mode::ALL_9,
             )
             .unwrap();
-        env.system.fcntl_setfd(fd, FdFlag::FD_CLOEXEC).unwrap();
+        env.system
+            .fcntl_setfd(fd, FdFlag::CloseOnExec.into())
+            .unwrap();
 
         let mut env = RedirGuard::new(&mut env);
         let redir = format!("{fd}> bar").parse().unwrap();
@@ -1420,7 +1422,9 @@ mod tests {
     #[test]
     fn fd_in_rejects_fd_with_cloexec() {
         let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
-        env.system.fcntl_setfd(Fd(0), FdFlag::FD_CLOEXEC).unwrap();
+        env.system
+            .fcntl_setfd(Fd(0), FdFlag::CloseOnExec.into())
+            .unwrap();
 
         let mut env = RedirGuard::new(&mut env);
         let redir = "3<& 0".parse().unwrap();
@@ -1529,7 +1533,9 @@ mod tests {
     #[test]
     fn fd_out_rejects_fd_with_cloexec() {
         let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
-        env.system.fcntl_setfd(Fd(1), FdFlag::FD_CLOEXEC).unwrap();
+        env.system
+            .fcntl_setfd(Fd(1), FdFlag::CloseOnExec.into())
+            .unwrap();
 
         let mut env = RedirGuard::new(&mut env);
         let redir = "4>& 1".parse().unwrap();

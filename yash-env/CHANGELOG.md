@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- The `OfdAccess`, `OpenFlag`, `Mode`, `RawMode`, `Uid`, `RawUid`, `Gid`, and
-  `RawGid` types in the `system` module
+- The `OfdAccess`, `OpenFlag`, `FdFlag`, `Mode`, `RawMode`, `Uid`, `RawUid`,
+  `Gid`, and `RawGid` types in the `system` module
 - The `System` trait now has the `ofd_access`, `get_and_set_nonblocking`,
   `getuid`, `geteuid`, `getgid`, and `getegid` methods.
 - `Mode` has been moved from `system::virtual` to `system` and now has constants
@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `system::FdFlag` is no longer a re-export of `nix::fcntl::FdFlag`.
 - `system::Mode` is no longer a re-export of `nix::sys::stat::Mode`.
 - The `system::System::fstatat` method now takes a `follow_symlinks: bool`
   parameter instead of an `AtFlags` parameter.
@@ -35,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `OpenFlag` parameters instead of `nix::fcntl::OFlag`.
 - The `system::System::umask` method now takes and returns a value of the new
   `system::Mode` type.
+- The `dup`, `fcntl_getfl`, and `fcntl_setfl` methods now operate on an
+  `EnumSet<FdFlag>` parameter instead of an `nix::fcntl::FdFlag` parameter.
+- The `flags: enumset::EnumSet<FdFlag>` field of
+  `yash_env::system::virtual::FdBody` has replaced
+  the `flag: nix::fcntl::FdFlag` field.
 - External dependency versions:
     - Rust 1.77.0 → 1.79.0
 
