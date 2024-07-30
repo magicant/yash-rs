@@ -120,7 +120,7 @@ fn open_file<S: System>(system: &mut S, path: &CStr) -> Result<Fd, Errno> {
         .open(
             path,
             OfdAccess::ReadOnly,
-            OpenFlag::Cloexec.into(),
+            OpenFlag::CloseOnExec.into(),
             Mode::empty(),
         )
         .and_then(|fd| system.move_fd_internal(fd))

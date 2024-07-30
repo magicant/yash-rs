@@ -224,7 +224,7 @@ mod tests {
             .open(
                 path,
                 OfdAccess::ReadOnly,
-                OpenFlag::Cloexec.into(),
+                OpenFlag::CloseOnExec.into(),
                 Mode::empty(),
             )
             .unwrap();

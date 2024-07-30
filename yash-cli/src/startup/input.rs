@@ -114,7 +114,7 @@ pub fn prepare_input<'a>(
                 .open(
                     &c_path,
                     OfdAccess::ReadOnly,
-                    OpenFlag::Cloexec.into(),
+                    OpenFlag::CloseOnExec.into(),
                     Mode::empty(),
                 )
                 .and_then(|fd| system.move_fd_internal(fd))

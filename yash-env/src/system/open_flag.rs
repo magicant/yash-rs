@@ -35,13 +35,19 @@ pub enum OfdAccess {
 }
 
 /// Options for opening file descriptors
+///
+/// A set of `OpenFlag` values can be passed to [`open`] to configure how the
+/// file descriptor is opened. Some of the flags become the attributes of the
+/// open file description created by the `open` function.
+///
+/// [`open`]: crate::system::System::open
 #[derive(Debug, EnumSetType, Hash)]
 #[non_exhaustive]
 pub enum OpenFlag {
     /// Always write to the end of the file
     Append,
     /// Close the file descriptor upon execution of an exec family function
-    Cloexec,
+    CloseOnExec,
     /// Create the file if it does not exist
     Create,
     /// Fail if the file is not a directory

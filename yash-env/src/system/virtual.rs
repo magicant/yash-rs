@@ -496,7 +496,7 @@ impl System for VirtualSystem {
         }));
         let body = FdBody {
             open_file_description,
-            flag: if flags.contains(OpenFlag::Cloexec) {
+            flag: if flags.contains(OpenFlag::CloseOnExec) {
                 FdFlag::FD_CLOEXEC
             } else {
                 FdFlag::empty()

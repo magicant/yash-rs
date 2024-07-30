@@ -296,7 +296,7 @@ impl Env {
         let first_fd = self.system.open(
             c"/dev/tty",
             crate::system::OfdAccess::ReadWrite,
-            crate::system::OpenFlag::Cloexec.into(),
+            crate::system::OpenFlag::CloseOnExec.into(),
             crate::system::Mode::empty(),
         )?;
         let final_fd = self.system.move_fd_internal(first_fd);

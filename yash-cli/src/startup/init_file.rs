@@ -149,7 +149,7 @@ pub async fn run_init_file(env: &mut Env, path: &str) {
         let fd = system.open(
             &c_path,
             OfdAccess::ReadOnly,
-            OpenFlag::Cloexec.into(),
+            OpenFlag::CloseOnExec.into(),
             Mode::empty(),
         )?;
         system.move_fd_internal(fd)

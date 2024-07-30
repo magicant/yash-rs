@@ -47,7 +47,7 @@ impl OpenFlag {
     pub(super) fn to_real_flags(self) -> Option<c_int> {
         match self {
             Self::Append => Some(nix::libc::O_APPEND),
-            Self::Cloexec => Some(nix::libc::O_CLOEXEC),
+            Self::CloseOnExec => Some(nix::libc::O_CLOEXEC),
             Self::Create => Some(nix::libc::O_CREAT),
             Self::Directory => Some(nix::libc::O_DIRECTORY),
             Self::Exclusive => Some(nix::libc::O_EXCL),
