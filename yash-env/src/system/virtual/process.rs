@@ -595,7 +595,7 @@ mod tests {
     use super::*;
     use crate::system::r#virtual::file_system::{FileBody, INode, Mode};
     use crate::system::r#virtual::io::OpenFileDescription;
-    use crate::system::FdFlag;
+    use enumset::EnumSet;
     use futures_util::task::LocalSpawnExt;
     use futures_util::FutureExt;
     use std::collections::VecDeque;
@@ -654,11 +654,11 @@ mod tests {
 
         let reader = FdBody {
             open_file_description: Rc::new(RefCell::new(reader)),
-            flag: FdFlag::empty(),
+            flags: EnumSet::empty(),
         };
         let writer = FdBody {
             open_file_description: Rc::new(RefCell::new(writer)),
-            flag: FdFlag::empty(),
+            flags: EnumSet::empty(),
         };
 
         let reader = process.open_fd(reader).unwrap();

@@ -17,6 +17,7 @@
 //! [System] and its implementors.
 
 mod errno;
+mod fd_flag;
 pub mod fd_set;
 mod file_system;
 mod id;
@@ -30,6 +31,7 @@ pub mod r#virtual;
 pub use self::errno::Errno;
 pub use self::errno::RawErrno;
 pub use self::errno::Result;
+pub use self::fd_flag::FdFlag;
 use self::fd_set::FdSet;
 pub use self::file_system::Dir;
 pub use self::file_system::DirEntry;
@@ -62,8 +64,6 @@ use crate::subshell::Subshell;
 use crate::trap::SignalSystem;
 use crate::Env;
 use enumset::EnumSet;
-#[doc(no_inline)]
-pub use nix::fcntl::FdFlag;
 #[doc(no_inline)]
 pub use nix::sys::signal::SigmaskHow;
 #[doc(no_inline)]
@@ -119,7 +119,7 @@ pub trait System: Debug {
     /// new FD.
     ///
     /// If successful, returns `Ok(new_fd)`. On error, returns `Err(_)`.
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> Result<Fd>;
+    fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd>;
 
     /// Duplicates a file descriptor.
     ///
@@ -164,12 +164,12 @@ pub trait System: Debug {
     /// Returns the attributes for the file descriptor.
     ///
     /// This is a thin wrapper around the `fcntl` system call.
-    fn fcntl_getfd(&self, fd: Fd) -> Result<FdFlag>;
+    fn fcntl_getfd(&self, fd: Fd) -> Result<EnumSet<FdFlag>>;
 
     /// Sets attributes for the file descriptor.
     ///
     /// This is a thin wrapper around the `fcntl` system call.
-    fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> Result<()>;
+    fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()>;
 
     /// Tests if a file descriptor is associated with a terminal device.
     fn isatty(&self, fd: Fd) -> Result<bool>;
@@ -564,7 +564,7 @@ pub trait SystemEx: System {
             return Ok(from);
         }
 
-        let new = self.dup(from, MIN_INTERNAL_FD, FdFlag::FD_CLOEXEC);
+        let new = self.dup(from, MIN_INTERNAL_FD, FdFlag::CloseOnExec.into());
         self.close(from).ok();
         new
     }

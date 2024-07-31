@@ -19,6 +19,7 @@
 use crate::trap::run_exit_trap;
 
 use super::Command;
+use enumset::EnumSet;
 use itertools::Itertools;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
@@ -34,7 +35,6 @@ use yash_env::stack::Frame;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
-use yash_env::system::FdFlag;
 use yash_env::system::SystemEx;
 use yash_env::Env;
 use yash_env::System;
@@ -306,7 +306,7 @@ impl PipeSet {
             if writer != Fd::STDOUT {
                 if self.read_previous == Some(Fd::STDOUT) {
                     self.read_previous =
-                        Some(env.system.dup(Fd::STDOUT, Fd(0), FdFlag::empty())?);
+                        Some(env.system.dup(Fd::STDOUT, Fd(0), EnumSet::empty())?);
                 }
                 env.system.dup2(writer, Fd::STDOUT)?;
                 env.system.close(writer)?;
@@ -652,8 +652,8 @@ mod tests {
         assert_eq!(pipes.next, Some((Fd(3), Fd(4))));
         let state = state.borrow();
         let process = &state.processes[&process_id];
-        assert_eq!(process.fds().get(&Fd(3)).unwrap().flag, FdFlag::empty());
-        assert_eq!(process.fds().get(&Fd(4)).unwrap().flag, FdFlag::empty());
+        assert_eq!(process.fds().get(&Fd(3)).unwrap().flags, EnumSet::empty());
+        assert_eq!(process.fds().get(&Fd(4)).unwrap().flags, EnumSet::empty());
     }
 
     #[test]
@@ -671,9 +671,9 @@ mod tests {
         assert_eq!(pipes.next, Some((Fd(4), Fd(5))));
         let state = state.borrow();
         let process = &state.processes[&process_id];
-        assert_eq!(process.fds().get(&Fd(3)).unwrap().flag, FdFlag::empty());
-        assert_eq!(process.fds().get(&Fd(4)).unwrap().flag, FdFlag::empty());
-        assert_eq!(process.fds().get(&Fd(5)).unwrap().flag, FdFlag::empty());
+        assert_eq!(process.fds().get(&Fd(3)).unwrap().flags, EnumSet::empty());
+        assert_eq!(process.fds().get(&Fd(4)).unwrap().flags, EnumSet::empty());
+        assert_eq!(process.fds().get(&Fd(5)).unwrap().flags, EnumSet::empty());
     }
 
     #[test]
@@ -691,7 +691,7 @@ mod tests {
         assert_eq!(pipes.next, None);
         let state = state.borrow();
         let process = &state.processes[&process_id];
-        assert_eq!(process.fds().get(&Fd(3)).unwrap().flag, FdFlag::empty());
+        assert_eq!(process.fds().get(&Fd(3)).unwrap().flags, EnumSet::empty());
     }
 
     // TODO test PipeSet::move_to_stdin_stdout

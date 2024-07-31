@@ -163,6 +163,7 @@ async fn report_find_and_open_file_failure(
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use enumset::EnumSet;
     use futures_util::FutureExt as _;
     use std::cell::RefCell;
     use std::path::Path;
@@ -259,7 +260,7 @@ mod tests {
 
         let process = system.current_process();
         let fd_body = process.get_fd(fd).unwrap();
-        assert_eq!(fd_body.flag, FdFlag::FD_CLOEXEC);
+        assert_eq!(fd_body.flags, EnumSet::only(FdFlag::CloseOnExec));
     }
 
     #[test]
