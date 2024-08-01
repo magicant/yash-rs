@@ -491,7 +491,19 @@ pub struct Times {
     pub children_system: f64,
 }
 
-/// How to handle a signal.
+/// Operation applied to the signal blocking mask
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum SigmaskOp {
+    /// Add signals to the mask (`SIG_BLOCK`)
+    Add,
+    /// Remove signals from the mask (`SIG_UNBLOCK`)
+    Remove,
+    /// Set the mask to the given signals (`SIG_SETMASK`)
+    Set,
+}
+
+/// How to handle a signal
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum SignalHandling {
     /// Perform the default action for the signal.

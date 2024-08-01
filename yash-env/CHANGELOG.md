@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - The `OfdAccess`, `OpenFlag`, `FdFlag`, `Mode`, `RawMode`, `Uid`, `RawUid`,
-  `Gid`, and `RawGid` types in the `system` module
+  `Gid`, `RawGid`, and `SigmaskOp` types in the `system` module
 - The `System` trait now has the `ofd_access`, `get_and_set_nonblocking`,
   `getuid`, `geteuid`, `getgid`, and `getegid` methods.
 - `Mode` has been moved from `system::virtual` to `system` and now has constants
