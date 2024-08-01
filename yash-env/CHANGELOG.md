@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `OpenFlag` parameters instead of `nix::fcntl::OFlag`.
 - The `system::System::umask` method now takes and returns a value of the new
   `system::Mode` type.
+- The `system::System::sigmask` method now takes a `SigmaskOp` parameter instead
+  of a `nix::sys::signal::SigmaskHow` parameter.
 - The `dup`, `fcntl_getfl`, and `fcntl_setfl` methods now operate on an
   `EnumSet<FdFlag>` parameter instead of an `nix::fcntl::FdFlag` parameter.
 - The `flags: enumset::EnumSet<FdFlag>` field of

@@ -33,7 +33,7 @@ use crate::signal;
 use crate::stack::Frame;
 use crate::system::ChildProcessTask;
 use crate::system::Errno;
-use crate::system::SigmaskHow::{SIG_BLOCK, SIG_SETMASK};
+use crate::system::SigmaskOp;
 use crate::system::System;
 use crate::system::SystemEx;
 use crate::Env;
@@ -286,7 +286,10 @@ impl<'a> MaskGuard<'a> {
         let success = self
             .env
             .system
-            .sigmask(Some((SIG_BLOCK, &[sigint, sigquit])), Some(&mut old_mask))
+            .sigmask(
+                Some((SigmaskOp::Add, &[sigint, sigquit])),
+                Some(&mut old_mask),
+            )
             .is_ok();
         if success {
             self.old_mask = Some(old_mask);
@@ -300,7 +303,7 @@ impl<'a> Drop for MaskGuard<'a> {
         if let Some(old_mask) = &self.old_mask {
             self.env
                 .system
-                .sigmask(Some((SIG_SETMASK, old_mask)), None)
+                .sigmask(Some((SigmaskOp::Set, old_mask)), None)
                 .ok();
         }
     }

@@ -65,7 +65,7 @@ use super::Gid;
 use super::OfdAccess;
 use super::OpenFlag;
 use super::Result;
-use super::SigmaskHow;
+use super::SigmaskOp;
 use super::TimeSpec;
 use super::Times;
 use super::Uid;
@@ -650,7 +650,7 @@ impl System for VirtualSystem {
 
     fn sigmask(
         &mut self,
-        op: Option<(SigmaskHow, &[signal::Number])>,
+        op: Option<(SigmaskOp, &[signal::Number])>,
         old_mask: Option<&mut Vec<signal::Number>>,
     ) -> Result<()> {
         let mut state = self.state.borrow_mut();
@@ -664,8 +664,8 @@ impl System for VirtualSystem {
             old_mask.extend(process.blocked_signals());
         }
 
-        if let Some((how, mask)) = op {
-            let result = process.block_signals(how, mask);
+        if let Some((op, mask)) = op {
+            let result = process.block_signals(op, mask);
             if result.process_state_changed {
                 let parent_pid = process.ppid;
                 raise_sigchld(&mut state, parent_pid);
@@ -762,8 +762,8 @@ impl System for VirtualSystem {
                 .iter()
                 .copied()
                 .collect::<Vec<signal::Number>>();
-            let result_1 = process.block_signals(SigmaskHow::SIG_SETMASK, signal_mask);
-            let result_2 = process.block_signals(SigmaskHow::SIG_SETMASK, &save_mask);
+            let result_1 = process.block_signals(SigmaskOp::Set, signal_mask);
+            let result_2 = process.block_signals(SigmaskOp::Set, &save_mask);
             assert!(!result_2.delivered);
             if result_1.caught {
                 return Err(Errno::EINTR);
@@ -2132,7 +2132,7 @@ mod tests {
     fn system_for_catching_sigchld() -> VirtualSystem {
         let mut system = VirtualSystem::new();
         system
-            .sigmask(Some((SigmaskHow::SIG_BLOCK, &[SIGCHLD])), None)
+            .sigmask(Some((SigmaskOp::Add, &[SIGCHLD])), None)
             .unwrap();
         system.sigaction(SIGCHLD, SignalHandling::Catch).unwrap();
         system

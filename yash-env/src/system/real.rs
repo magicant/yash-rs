@@ -36,7 +36,7 @@ use super::Mode;
 use super::OfdAccess;
 use super::OpenFlag;
 use super::Result;
-use super::SigmaskHow;
+use super::SigmaskOp;
 use super::System;
 use super::TimeSpec;
 use super::Times;
@@ -407,19 +407,26 @@ impl System for RealSystem {
 
     fn sigmask(
         &mut self,
-        op: Option<(SigmaskHow, &[signal::Number])>,
+        op: Option<(SigmaskOp, &[signal::Number])>,
         old_mask: Option<&mut Vec<signal::Number>>,
     ) -> Result<()> {
         unsafe {
             let (how, raw_mask) = match op {
-                None => (SigmaskHow::SIG_BLOCK, None),
-                Some((how, mask)) => {
+                None => (nix::libc::SIG_BLOCK, None),
+                Some((op, mask)) => {
+                    let how = match op {
+                        SigmaskOp::Add => nix::libc::SIG_BLOCK,
+                        SigmaskOp::Remove => nix::libc::SIG_UNBLOCK,
+                        SigmaskOp::Set => nix::libc::SIG_SETMASK,
+                    };
+
                     let mut raw_mask = MaybeUninit::<nix::libc::sigset_t>::uninit();
                     nix::libc::sigemptyset(raw_mask.as_mut_ptr()).errno_if_m1()?;
                     for &signal in mask {
                         nix::libc::sigaddset(raw_mask.as_mut_ptr(), signal.as_raw())
                             .errno_if_m1()?;
                     }
+
                     (how, Some(raw_mask))
                 }
             };
@@ -441,7 +448,7 @@ impl System for RealSystem {
                 .map_or(std::ptr::null_mut(), |(_, raw_old_mask)| {
                     raw_old_mask.as_mut_ptr()
                 });
-            let result = nix::libc::sigprocmask(how as _, raw_set_ptr, raw_old_set_ptr);
+            let result = nix::libc::sigprocmask(how, raw_set_ptr, raw_old_set_ptr);
             result.errno_if_m1().map(drop)?;
 
             if let Some((old_mask, raw_old_mask)) = old_mask_pair {

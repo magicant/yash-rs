@@ -248,12 +248,12 @@ pub trait System: Debug {
     ///
     /// This is a thin wrapper around the `sigprocmask` system call. If `op` is
     /// `Some`, this function updates the signal blocking mask by applying the
-    /// given `SigmaskHow` and signal set to the current mask. If `op` is `None`,
+    /// given `SigmaskOp` and signal set to the current mask. If `op` is `None`,
     /// this function does not change the mask.
     /// If `old_mask` is `Some`, this function sets the previous mask to it.
     fn sigmask(
         &mut self,
-        op: Option<(SigmaskHow, &[signal::Number])>,
+        op: Option<(SigmaskOp, &[signal::Number])>,
         old_mask: Option<&mut Vec<signal::Number>>,
     ) -> Result<()>;
 
@@ -606,14 +606,11 @@ pub trait SystemEx: System {
             .ok_or(Errno::EINVAL)?;
         let mut old_mask = Vec::new();
 
-        self.sigmask(
-            Some((SigmaskHow::SIG_BLOCK, &[sigttou])),
-            Some(&mut old_mask),
-        )?;
+        self.sigmask(Some((SigmaskOp::Add, &[sigttou])), Some(&mut old_mask))?;
 
         let result = self.tcsetpgrp(fd, pgid);
 
-        let result_2 = self.sigmask(Some((SigmaskHow::SIG_SETMASK, &old_mask)), None);
+        let result_2 = self.sigmask(Some((SigmaskOp::Set, &old_mask)), None);
 
         result.or(result_2)
     }
@@ -645,16 +642,14 @@ pub trait SystemEx: System {
             Err(e) => Err(e),
             Ok(old_handling) => {
                 let mut old_mask = Vec::new();
-                let result = match self.sigmask(
-                    Some((SigmaskHow::SIG_UNBLOCK, &[sigttou])),
-                    Some(&mut old_mask),
-                ) {
+                let result = match self
+                    .sigmask(Some((SigmaskOp::Remove, &[sigttou])), Some(&mut old_mask))
+                {
                     Err(e) => Err(e),
                     Ok(()) => {
                         let result = self.tcsetpgrp(fd, pgid);
 
-                        let result_2 =
-                            self.sigmask(Some((SigmaskHow::SIG_SETMASK, &old_mask)), None);
+                        let result_2 = self.sigmask(Some((SigmaskOp::Set, &old_mask)), None);
 
                         result.or(result_2)
                     }
