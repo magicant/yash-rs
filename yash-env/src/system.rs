@@ -65,8 +65,6 @@ use crate::trap::SignalSystem;
 use crate::Env;
 use enumset::EnumSet;
 #[doc(no_inline)]
-pub use nix::sys::signal::SigmaskHow;
-#[doc(no_inline)]
 pub use nix::sys::stat::{FileStat, SFlag};
 #[doc(no_inline)]
 pub use nix::sys::time::TimeSpec;
