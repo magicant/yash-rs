@@ -20,10 +20,10 @@ use super::fd_set::FdSet;
 use super::signal;
 use super::Errno;
 use super::Result;
+use super::SigmaskOp;
 use super::SignalHandling;
 use super::System;
 use crate::io::Fd;
-use nix::sys::signal::SigmaskHow;
 use nix::sys::time::TimeSpec;
 use std::cell::RefCell;
 use std::cmp::Ordering;
@@ -88,7 +88,7 @@ impl SelectSystem {
     }
 
     /// Calls `sigmask` and updates `self.wait_mask`.
-    fn sigmask(&mut self, how: SigmaskHow, signal: signal::Number) -> Result<()> {
+    fn sigmask(&mut self, op: SigmaskOp, signal: signal::Number) -> Result<()> {
         match &mut self.wait_mask {
             None => {
                 // This is the first call to sigmask. We need to get the current
@@ -96,13 +96,13 @@ impl SelectSystem {
                 // remove the signal from it.
                 let mut mask = Vec::new();
                 self.system
-                    .sigmask(Some((how, &[signal])), Some(&mut mask))?;
+                    .sigmask(Some((op, &[signal])), Some(&mut mask))?;
                 mask.retain(|&s| s != signal);
                 self.wait_mask = Some(mask);
             }
             Some(wait_mask) => {
                 // We have already called sigmask. We just need to update the mask.
-                self.system.sigmask(Some((how, &[signal])), None)?;
+                self.system.sigmask(Some((op, &[signal])), None)?;
                 wait_mask.retain(|&s| s != signal);
             }
         }
@@ -124,11 +124,11 @@ impl SelectSystem {
         match handling {
             SignalHandling::Default | SignalHandling::Ignore => {
                 let old_handling = self.system.sigaction(signal, handling)?;
-                self.sigmask(SigmaskHow::SIG_UNBLOCK, signal)?;
+                self.sigmask(SigmaskOp::Remove, signal)?;
                 Ok(old_handling)
             }
             SignalHandling::Catch => {
-                self.sigmask(SigmaskHow::SIG_BLOCK, signal)?;
+                self.sigmask(SigmaskOp::Add, signal)?;
                 self.system.sigaction(signal, handling)
             }
         }

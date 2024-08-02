@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - The `OfdAccess`, `OpenFlag`, `FdFlag`, `Mode`, `RawMode`, `Uid`, `RawUid`,
-  `Gid`, and `RawGid` types in the `system` module
+  `Gid`, `RawGid`, and `SigmaskOp` types in the `system` module
 - The `System` trait now has the `ofd_access`, `get_and_set_nonblocking`,
   `getuid`, `geteuid`, `getgid`, and `getegid` methods.
 - `Mode` has been moved from `system::virtual` to `system` and now has constants
@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `OpenFlag` parameters instead of `nix::fcntl::OFlag`.
 - The `system::System::umask` method now takes and returns a value of the new
   `system::Mode` type.
+- The `system::System::sigmask` method now takes a `SigmaskOp` parameter instead
+  of a `nix::sys::signal::SigmaskHow` parameter.
 - The `dup`, `fcntl_getfl`, and `fcntl_setfl` methods now operate on an
   `EnumSet<FdFlag>` parameter instead of an `nix::fcntl::FdFlag` parameter.
 - The `flags: enumset::EnumSet<FdFlag>` field of
@@ -50,8 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- The `system` module no longer reexports `nix::fcntl::AtFlags` and
-  `nix::fcntl::OFlag`.
+- The `system` module no longer reexports `nix::fcntl::AtFlags`,
+  `nix::fcntl::OFlag`, and `nix::sys::signal::SigmaskHow`.
 - The `fcntl_getfl` and `fcntl_setfl` methods from the `System` trait
 - The `system::Errno` struct's `last` and `clear` methods are no longer public.
 

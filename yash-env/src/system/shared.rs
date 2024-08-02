@@ -30,6 +30,7 @@ use super::OpenFlag;
 use super::Resource;
 use super::Result;
 use super::SelectSystem;
+use super::SigmaskOp;
 use super::SignalHandling;
 use super::SignalStatus;
 use super::SignalSystem;
@@ -43,7 +44,6 @@ use crate::job::ProcessState;
 #[cfg(doc)]
 use crate::Env;
 use enumset::EnumSet;
-use nix::sys::signal::SigmaskHow;
 use nix::sys::stat::FileStat;
 use nix::sys::time::TimeSpec;
 use std::cell::RefCell;
@@ -384,7 +384,7 @@ impl System for &SharedSystem {
     }
     fn sigmask(
         &mut self,
-        op: Option<(SigmaskHow, &[signal::Number])>,
+        op: Option<(SigmaskOp, &[signal::Number])>,
         old_mask: Option<&mut Vec<signal::Number>>,
     ) -> Result<()> {
         (**self.0.borrow_mut()).sigmask(op, old_mask)
@@ -590,7 +590,7 @@ impl System for SharedSystem {
     #[inline]
     fn sigmask(
         &mut self,
-        op: Option<(SigmaskHow, &[signal::Number])>,
+        op: Option<(SigmaskOp, &[signal::Number])>,
         old_mask: Option<&mut Vec<signal::Number>>,
     ) -> Result<()> {
         (&mut &*self).sigmask(op, old_mask)
