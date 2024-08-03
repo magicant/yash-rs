@@ -176,6 +176,7 @@ mod tests {
     #[test]
     fn parser_while_loop_aliasing() {
         let mut lexer = Lexer::from_memory(" while :; DO :; done", Source::Unknown);
+        #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
@@ -272,6 +273,7 @@ mod tests {
     #[test]
     fn parser_until_loop_aliasing() {
         let mut lexer = Lexer::from_memory(" until :; DO :; done", Source::Unknown);
+        #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(

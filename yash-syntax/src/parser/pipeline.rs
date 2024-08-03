@@ -218,6 +218,7 @@ mod tests {
     #[test]
     fn parser_pipeline_no_aliasing_of_bang() {
         let mut lexer = Lexer::from_memory("! ok", Source::Unknown);
+        #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
@@ -238,6 +239,7 @@ mod tests {
     #[test]
     fn parser_alias_substitution_to_newline_after_bar() {
         let mut lexer = Lexer::from_memory("foo | X\n bar", Source::Unknown);
+        #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
             "X".to_string(),

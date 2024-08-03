@@ -199,6 +199,7 @@ impl FunctionSet {
         &mut self,
         function: F,
     ) -> Result<Option<Rc<Function>>, DefineError> {
+        #[allow(clippy::mutable_key_type)]
         fn inner(
             entries: &mut HashSet<HashEntry>,
             new: Rc<Function>,

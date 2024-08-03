@@ -172,6 +172,7 @@ mod tests {
     #[test]
     fn parser_do_clause_aliasing() {
         let mut lexer = Lexer::from_memory(" do :; end ", Source::Unknown);
+        #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(

@@ -204,6 +204,7 @@ mod tests {
     #[test]
     fn parser_short_function_definition_close_parenthesis_alias() {
         let mut lexer = Lexer::from_memory(" a b ", Source::Unknown);
+        #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
@@ -244,6 +245,7 @@ mod tests {
     #[test]
     fn parser_short_function_definition_body_alias_and_newline() {
         let mut lexer = Lexer::from_memory(" a b ", Source::Unknown);
+        #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
@@ -284,6 +286,7 @@ mod tests {
     #[test]
     fn parser_short_function_definition_alias_inapplicable() {
         let mut lexer = Lexer::from_memory("()b", Source::Unknown);
+        #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(

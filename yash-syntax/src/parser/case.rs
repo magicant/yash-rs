@@ -187,6 +187,7 @@ mod tests {
     #[test]
     fn parser_case_item_esac() {
         let mut lexer = Lexer::from_memory("\nESAC", Source::Unknown);
+        #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
@@ -387,6 +388,7 @@ mod tests {
     fn parser_case_command_newline_before_in() {
         // Alias substitution results in "case x \n\n \nin esac"
         let mut lexer = Lexer::from_memory("CASE_X IN_ESAC", Source::Unknown);
+        #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
@@ -421,6 +423,7 @@ mod tests {
     fn parser_case_command_alias_on_subject() {
         // Alias substitution results in " case   in in  a|b) esac"
         let mut lexer = Lexer::from_memory("CASE in a|b) esac", Source::Unknown);
+        #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
@@ -456,6 +459,7 @@ mod tests {
     fn parser_case_command_alias_on_in() {
         // Alias substitution results in "case x  in esac"
         let mut lexer = Lexer::from_memory("CASE_X in esac", Source::Unknown);
+        #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(

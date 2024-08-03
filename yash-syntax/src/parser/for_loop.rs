@@ -330,6 +330,7 @@ mod tests {
     #[test]
     fn parser_for_loop_aliasing_on_semicolon() {
         let mut lexer = Lexer::from_memory(" FOR_A if :; done", Source::Unknown);
+        #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
@@ -360,6 +361,7 @@ mod tests {
     #[test]
     fn parser_for_loop_aliasing_on_do() {
         let mut lexer = Lexer::from_memory(" FOR_A if :; done", Source::Unknown);
+        #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
@@ -433,6 +435,7 @@ mod tests {
     fn parser_for_loop_invalid_name() {
         // Alias substitution results in "for & do :; done"
         let mut lexer = Lexer::from_memory("FOR if do :; done", Source::Unknown);
+        #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
@@ -491,6 +494,7 @@ mod tests {
     fn parser_for_loop_invalid_values_delimiter() {
         // Alias substitution results in "for A in a b & c; do :; done"
         let mut lexer = Lexer::from_memory("for_A_in_a_b if c; do :; done", Source::Unknown);
+        #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
