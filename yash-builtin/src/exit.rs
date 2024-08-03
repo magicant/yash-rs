@@ -72,13 +72,13 @@
 //! for handling the divert value and exiting the process.
 //!
 //! - If an operand specifies an exit status, the divert value will contain the
-//! specified exit status. The caller should use it as the exit status of the
-//! process.
+//!   specified exit status. The caller should use it as the exit status of the
+//!   process.
 //! - If no operand is given, the divert value will contain no exit status. The
-//! built-in's exit status is the current value of `$?`, and the caller should
-//! use it as the exit status of the process. However, if the built-in is
-//! invoked in a trap, the caller should use the value of `$?` before entering
-//! trap.
+//!   built-in's exit status is the current value of `$?`, and the caller should
+//!   use it as the exit status of the process. However, if the built-in is
+//!   invoked in a trap, the caller should use the value of `$?` before entering
+//!   trap.
 //!
 //! In case of an error, the result will have a [`Divert::Interrupt`] value
 //! instead, in which case the shell will not exit if it is interactive.

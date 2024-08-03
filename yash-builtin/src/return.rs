@@ -81,13 +81,13 @@
 //! and returning from the function or script.
 //!
 //! - If an operand specifies an exit status, the divert value will contain the
-//! specified exit status. The caller should use it as the exit status of the
-//! process.
+//!   specified exit status. The caller should use it as the exit status of the
+//!   process.
 //! - If no operand is given, the divert value will contain no exit status. The
-//! built-in's exit status is the current value of `$?`, and the caller should
-//! use it as the exit status of the function or script. However, if the
-//! built-in is invoked in a trap executed in the function or script, the caller
-//! should use the value of `$?` before entering trap.
+//!   built-in's exit status is the current value of `$?`, and the caller should
+//!   use it as the exit status of the function or script. However, if the
+//!   built-in is invoked in a trap executed in the function or script, the
+//!   caller should use the value of `$?` before entering trap.
 
 use crate::common::syntax_error;
 use std::num::ParseIntError;
