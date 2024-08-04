@@ -31,7 +31,6 @@ use super::Env;
 use super::Errno;
 use super::FdFlag;
 use super::FdSet;
-use super::FileStat;
 use super::Gid;
 use super::Mode;
 use super::OfdAccess;
@@ -192,13 +191,17 @@ impl System for RealSystem {
         Ok(Stat::from_raw(&stat))
     }
 
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<FileStat> {
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
         let flags = if follow_symlinks {
-            AtFlags::empty()
+            0
         } else {
-            AtFlags::AT_SYMLINK_NOFOLLOW
+            nix::libc::AT_SYMLINK_NOFOLLOW
         };
-        Ok(nix::sys::stat::fstatat(dir_fd.0, path, flags)?)
+
+        let mut stat = MaybeUninit::<nix::libc::stat>::uninit();
+        unsafe { nix::libc::fstatat(dir_fd.0, path.as_ptr(), stat.as_mut_ptr(), flags) }
+            .errno_if_m1()?;
+        Ok(Stat::from_raw(&stat))
     }
 
     fn is_executable_file(&self, path: &CStr) -> bool {

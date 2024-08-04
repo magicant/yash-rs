@@ -95,7 +95,7 @@ pub trait System: Debug {
     fn fstat(&self, fd: Fd) -> Result<Stat>;
 
     /// Retrieves metadata of a file.
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<FileStat>;
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat>;
 
     /// Whether there is an executable file at the specified path.
     #[must_use]

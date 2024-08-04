@@ -33,8 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `system::FdFlag` is no longer a re-export of `nix::fcntl::FdFlag`.
 - `system::Mode` is no longer a re-export of `nix::sys::stat::Mode`.
-- The `system::System::fstat` method now returns a `Stat` instead of a
-  `nix::sys::stat::FileStat`.
+- The `fstat` and `fstatat` methods of `system::System` now return a `Stat`
+  instead of a `nix::sys::stat::FileStat`.
 - The `system::System::fstatat` method now takes a `follow_symlinks: bool`
   parameter instead of an `AtFlags` parameter.
 - The `system::System::open` method has been redefined to take `OfdAccess` and

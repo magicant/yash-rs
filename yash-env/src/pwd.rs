@@ -23,7 +23,6 @@ use crate::variable::AssignError;
 use crate::variable::Scope::Global;
 use crate::variable::PWD;
 use crate::System;
-use nix::sys::stat::FileStat;
 use std::ffi::CString;
 use std::path::Path;
 use thiserror::Error;
@@ -31,11 +30,6 @@ use thiserror::Error;
 /// Tests whether a path contains a dot (`.`) or dot-dot (`..`) component.
 fn has_dot_or_dot_dot(path: &str) -> bool {
     path.split('/').any(|c| c == "." || c == "..")
-}
-
-/// Tests whether two stats refer to the same file.
-fn same_files(a: &FileStat, b: &FileStat) -> bool {
-    a.st_dev == b.st_dev && a.st_ino == b.st_ino
 }
 
 /// Error in [`Env::prepare_pwd`]
@@ -77,7 +71,7 @@ impl Env {
             let Ok(s2) = self.system.fstatat(AT_FDCWD, c".", true) else {
                 return false;
             };
-            same_files(&s1, &s2)
+            s1.identity() == s2.identity()
         })
     }
 
