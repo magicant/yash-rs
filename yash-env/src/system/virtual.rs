@@ -66,7 +66,6 @@ use super::OpenFlag;
 use super::Result;
 use super::SigmaskOp;
 use super::Stat;
-use super::TimeSpec;
 use super::Times;
 use super::Uid;
 use super::AT_FDCWD;
@@ -733,7 +732,7 @@ impl System for VirtualSystem {
         &mut self,
         readers: &mut FdSet,
         writers: &mut FdSet,
-        timeout: Option<&TimeSpec>,
+        timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
     ) -> Result<c_int> {
         let mut process = self.current_process_mut();
@@ -779,8 +778,7 @@ impl System for VirtualSystem {
         let writer_count = writers.iter().count();
         let count = (reader_count + writer_count).try_into().unwrap();
         if count == 0 {
-            if let Some(timeout) = timeout {
-                let duration = Duration::from(*timeout);
+            if let Some(duration) = timeout {
                 if !duration.is_zero() {
                     let mut state = self.state.borrow_mut();
                     let now = state.now.as_mut();
@@ -2151,9 +2149,9 @@ mod tests {
         let mut readers = FdSet::new();
         let mut writers = FdSet::new();
         readers.insert(reader).unwrap();
-        let timeout = Duration::new(42, 195).into();
+        let timeout = Duration::new(42, 195);
 
-        let result = system.select(&mut readers, &mut writers, Some(&timeout), None);
+        let result = system.select(&mut readers, &mut writers, Some(timeout), None);
         assert_eq!(result, Ok(0));
         assert_eq!(readers, FdSet::new());
         assert_eq!(writers, FdSet::new());

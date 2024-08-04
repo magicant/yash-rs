@@ -39,7 +39,6 @@ use super::Result;
 use super::SigmaskOp;
 use super::Stat;
 use super::System;
-use super::TimeSpec;
 use super::Times;
 use super::Uid;
 use crate::io::Fd;
@@ -72,10 +71,12 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::ptr::addr_of;
+use std::ptr::addr_of_mut;
 use std::ptr::NonNull;
 use std::sync::atomic::compiler_fence;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering;
+use std::time::Duration;
 use std::time::Instant;
 
 trait ErrnoIfM1: PartialEq + Sized {
@@ -129,6 +130,24 @@ fn is_regular_file(path: &CStr) -> bool {
 
 fn is_directory(path: &CStr) -> bool {
     matches!(stat(path), Ok(stat) if stat.st_mode & S_IFMT == S_IFDIR)
+}
+
+/// Converts a `Duration` to a `timespec`.
+///
+/// The return value is a `MaybeUninit` because the `timespec` struct may have
+/// padding or extension fields that are not initialized by this function.
+#[must_use]
+fn to_timespec(duration: Duration) -> MaybeUninit<nix::libc::timespec> {
+    let seconds = duration
+        .as_secs()
+        .try_into()
+        .unwrap_or(nix::libc::time_t::MAX);
+    let mut timespec = MaybeUninit::<nix::libc::timespec>::uninit();
+    unsafe {
+        addr_of_mut!((*timespec.as_mut_ptr()).tv_sec).write(seconds);
+        addr_of_mut!((*timespec.as_mut_ptr()).tv_nsec).write(duration.subsec_nanos() as _);
+    }
+    timespec
 }
 
 /// Array of slots to store caught signals.
@@ -530,7 +549,7 @@ impl System for RealSystem {
         &mut self,
         readers: &mut FdSet,
         writers: &mut FdSet,
-        timeout: Option<&TimeSpec>,
+        timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
     ) -> Result<c_int> {
         use std::ptr::{null, null_mut};
@@ -538,7 +557,7 @@ impl System for RealSystem {
         let readers = &mut readers.inner;
         let writers = &mut writers.inner;
         let errors = null_mut();
-        let timeout = timeout.map_or(null(), |timeout| timeout.as_ref());
+        let timeout_spec = to_timespec(timeout.unwrap_or_default());
 
         let raw_mask = match signal_mask {
             None => None,
@@ -553,10 +572,15 @@ impl System for RealSystem {
             }
         };
 
+        let timeout_ptr = if timeout.is_some() {
+            timeout_spec.as_ptr()
+        } else {
+            null()
+        };
         let raw_mask_ptr = raw_mask
             .as_ref()
             .map_or(null(), |raw_mask| raw_mask.as_ptr());
-        unsafe { nix::libc::pselect(nfds, readers, writers, errors, timeout, raw_mask_ptr) }
+        unsafe { nix::libc::pselect(nfds, readers, writers, errors, timeout_ptr, raw_mask_ptr) }
             .errno_if_m1()
     }
 
