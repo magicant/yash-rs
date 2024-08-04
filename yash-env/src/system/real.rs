@@ -38,6 +38,7 @@ use super::OfdAccess;
 use super::OpenFlag;
 use super::Result;
 use super::SigmaskOp;
+use super::Stat;
 use super::System;
 use super::TimeSpec;
 use super::Times;
@@ -185,8 +186,10 @@ impl RealSystem {
 }
 
 impl System for RealSystem {
-    fn fstat(&self, fd: Fd) -> Result<FileStat> {
-        Ok(nix::sys::stat::fstat(fd.0)?)
+    fn fstat(&self, fd: Fd) -> Result<Stat> {
+        let mut stat = MaybeUninit::<nix::libc::stat>::uninit();
+        unsafe { nix::libc::fstat(fd.0, stat.as_mut_ptr()) }.errno_if_m1()?;
+        Ok(Stat::from_raw(&stat))
     }
 
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<FileStat> {

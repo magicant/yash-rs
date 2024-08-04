@@ -66,6 +66,7 @@ use super::OfdAccess;
 use super::OpenFlag;
 use super::Result;
 use super::SigmaskOp;
+use super::Stat;
 use super::TimeSpec;
 use super::Times;
 use super::Uid;
@@ -337,8 +338,8 @@ impl System for VirtualSystem {
     /// - `st_size`
     /// - `st_dev` (always 1)
     /// - `st_ino` (computed from the address of `INode`)
-    fn fstat(&self, fd: Fd) -> Result<FileStat> {
-        self.with_open_file_description(fd, |ofd| stat(&ofd.file.borrow()))
+    fn fstat(&self, fd: Fd) -> Result<Stat> {
+        self.with_open_file_description(fd, |ofd| Ok(ofd.file.borrow().stat()))
     }
 
     /// Retrieves metadata of a file.

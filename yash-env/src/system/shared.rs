@@ -34,6 +34,7 @@ use super::SigmaskOp;
 use super::SignalHandling;
 use super::SignalStatus;
 use super::SignalSystem;
+use super::Stat;
 use super::System;
 use super::SystemEx;
 use super::Times;
@@ -301,7 +302,7 @@ impl SharedSystem {
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl System for &SharedSystem {
-    fn fstat(&self, fd: Fd) -> Result<FileStat> {
+    fn fstat(&self, fd: Fd) -> Result<Stat> {
         self.0.borrow().fstat(fd)
     }
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<FileStat> {
@@ -482,7 +483,7 @@ impl System for SharedSystem {
     // All methods are delegated to `impl System for &SharedSystem`,
     // which in turn delegates to the contained system instance.
     #[inline]
-    fn fstat(&self, fd: Fd) -> Result<FileStat> {
+    fn fstat(&self, fd: Fd) -> Result<Stat> {
         (&self).fstat(fd)
     }
     #[inline]
