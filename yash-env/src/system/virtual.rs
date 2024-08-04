@@ -60,12 +60,12 @@ use super::Dir;
 use super::Errno;
 use super::FdFlag;
 use super::FdSet;
-use super::FileStat;
 use super::Gid;
 use super::OfdAccess;
 use super::OpenFlag;
 use super::Result;
 use super::SigmaskOp;
+use super::Stat;
 use super::TimeSpec;
 use super::Times;
 use super::Uid;
@@ -77,7 +77,6 @@ use crate::system::ChildProcessStarter;
 use crate::SignalHandling;
 use crate::System;
 use enumset::EnumSet;
-use nix::sys::stat::SFlag;
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::cell::Ref;
@@ -97,7 +96,6 @@ use std::fmt::Debug;
 use std::future::poll_fn;
 use std::future::Future;
 use std::io::SeekFrom;
-use std::mem::MaybeUninit;
 use std::num::NonZeroI32;
 use std::ops::DerefMut as _;
 use std::os::unix::ffi::OsStrExt;
@@ -312,21 +310,6 @@ impl Default for VirtualSystem {
     }
 }
 
-fn stat(inode: &INode) -> Result<FileStat> {
-    let (type_flag, size) = match &inode.body {
-        FileBody::Regular { content, .. } => (SFlag::S_IFREG, content.len()),
-        FileBody::Directory { files } => (SFlag::S_IFDIR, files.len()),
-        FileBody::Fifo { content, .. } => (SFlag::S_IFIFO, content.len()),
-        FileBody::Symlink { target } => (SFlag::S_IFLNK, target.as_os_str().len()),
-    };
-    let mut result: FileStat = unsafe { MaybeUninit::zeroed().assume_init() };
-    result.st_mode = type_flag.bits() | inode.permissions.bits();
-    result.st_size = size as _;
-    result.st_dev = 1;
-    result.st_ino = std::ptr::addr_of!(*inode) as nix::libc::ino_t;
-    Ok(result)
-}
-
 impl System for VirtualSystem {
     /// Retrieves metadata of a file.
     ///
@@ -337,8 +320,8 @@ impl System for VirtualSystem {
     /// - `st_size`
     /// - `st_dev` (always 1)
     /// - `st_ino` (computed from the address of `INode`)
-    fn fstat(&self, fd: Fd) -> Result<FileStat> {
-        self.with_open_file_description(fd, |ofd| stat(&ofd.file.borrow()))
+    fn fstat(&self, fd: Fd) -> Result<Stat> {
+        self.with_open_file_description(fd, |ofd| Ok(ofd.file.borrow().stat()))
     }
 
     /// Retrieves metadata of a file.
@@ -350,11 +333,10 @@ impl System for VirtualSystem {
     /// - `st_size`
     /// - `st_dev` (always 1)
     /// - `st_ino` (computed from the address of `INode`)
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<FileStat> {
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
         let path = Path::new(OsStr::from_bytes(path.to_bytes()));
         let inode = self.resolve_existing_file(dir_fd, path, follow_symlinks)?;
-        let inode = inode.borrow();
-        stat(&inode)
+        Ok({ inode }.borrow().stat())
     }
 
     /// Tests whether the specified file is executable or not.
@@ -1290,6 +1272,7 @@ mod tests {
     use super::*;
     use crate::job::ProcessResult;
     use crate::semantics::ExitStatus;
+    use crate::system::FileType;
     use crate::Env;
     use assert_matches::assert_matches;
     use futures_executor::LocalPool;
@@ -1328,8 +1311,9 @@ mod tests {
         drop(state);
 
         let stat = system.fstatat(Fd(0), c"/some/file", true).unwrap();
-        assert_eq!(stat.st_mode, SFlag::S_IFREG.bits() | Mode::default().bits());
-        assert_eq!(stat.st_size, 5);
+        assert_eq!(stat.mode, Mode::default());
+        assert_eq!(stat.r#type, FileType::Regular);
+        assert_eq!(stat.size, 5);
         // TODO Other stat properties
     }
 
@@ -1343,7 +1327,8 @@ mod tests {
         drop(state);
 
         let stat = system.fstatat(Fd(0), c"/some/", true).unwrap();
-        assert_eq!(stat.st_mode, SFlag::S_IFDIR.bits() | 0o755);
+        assert_eq!(stat.mode, Mode::from_bits_retain(0o755));
+        assert_eq!(stat.r#type, FileType::Directory);
         // TODO Other stat properties
     }
 
@@ -1364,8 +1349,9 @@ mod tests {
         drop(state);
 
         let stat = system.fstatat(Fd(0), c"/some/fifo", true).unwrap();
-        assert_eq!(stat.st_mode, SFlag::S_IFIFO.bits() | Mode::default().bits());
-        assert_eq!(stat.st_size, 42);
+        assert_eq!(stat.mode, Mode::default());
+        assert_eq!(stat.r#type, FileType::Fifo);
+        assert_eq!(stat.size, 42);
     }
 
     fn system_with_symlink() -> VirtualSystem {
@@ -1395,14 +1381,14 @@ mod tests {
     fn fstatat_symlink_to_regular_file() {
         let system = system_with_symlink();
         let stat = system.fstatat(Fd(0), c"/link", true).unwrap();
-        assert_eq!(stat.st_mode, SFlag::S_IFREG.bits() | Mode::default().bits());
+        assert_eq!(stat.r#type, FileType::Regular);
     }
 
     #[test]
     fn fstatat_symlink_no_follow() {
         let system = system_with_symlink();
         let stat = system.fstatat(Fd(0), c"/link", false).unwrap();
-        assert_eq!(stat.st_mode, SFlag::S_IFLNK.bits() | Mode::default().bits());
+        assert_eq!(stat.r#type, FileType::Symlink);
     }
 
     #[test]

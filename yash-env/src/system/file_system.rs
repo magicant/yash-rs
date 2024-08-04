@@ -16,7 +16,7 @@
 
 //! Items about file systems
 
-use super::Result;
+use super::{Gid, Result, Uid};
 use bitflags::bitflags;
 use std::ffi::OsStr;
 use std::fmt::Debug;
@@ -76,6 +76,10 @@ pub type RawMode = RawModeDef;
 /// This type implements the new type pattern for the raw file permission bits
 /// type [`RawMode`]. The advantage of using this type is that it is more
 /// type-safe than using the raw integer value directly.
+///
+/// This type only defines the permission bits and does not include the file
+/// type bits (e.g., regular file, directory, symbolic link, etc.). The file
+/// types are represented by the [`FileType`] enum.
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 #[repr(transparent)]
 pub struct Mode(RawMode);
@@ -137,5 +141,69 @@ impl Debug for Mode {
 impl Default for Mode {
     fn default() -> Mode {
         Mode(0o644)
+    }
+}
+
+/// File type
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum FileType {
+    /// Regular file
+    Regular,
+    /// Directory
+    Directory,
+    /// Symbolic link
+    Symlink,
+    /// Pipe
+    Fifo,
+    /// Block special device file
+    BlockDevice,
+    /// Character special device file
+    CharacterDevice,
+    /// Socket
+    Socket,
+    /// Other file type, including unknown file types
+    Other,
+}
+
+/// File status
+///
+/// This type is a collection of file status information. It is similar to the
+/// `stat` structure defined in the POSIX standard, but it is simplified and
+/// does not include all fields of the `stat` structure.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub struct Stat {
+    /// Device ID
+    pub dev: u64,
+    /// Inode number
+    pub ino: u64,
+    /// Access permissions
+    ///
+    /// Note that this field does not include the file type bits.
+    /// The file type is stored in the `type` field.
+    pub mode: Mode,
+    /// File type
+    pub r#type: FileType,
+    /// Number of hard links
+    pub nlink: u64,
+    /// User ID of the file owner
+    pub uid: Uid,
+    /// Group ID of the file owner
+    pub gid: Gid,
+    /// Length of the file in bytes
+    pub size: u64,
+    // TODO: atime, mtime, ctime, (birthtime)
+}
+
+impl Stat {
+    /// Returns the device ID and inode number as a tuple
+    ///
+    /// This method is useful for testing whether two `Stat` objects refer to
+    /// the same file.
+    #[inline]
+    #[must_use]
+    pub const fn identity(&self) -> (u64, u64) {
+        (self.dev, self.ino)
     }
 }

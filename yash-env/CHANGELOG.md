@@ -10,11 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - The `OfdAccess`, `OpenFlag`, `FdFlag`, `Mode`, `RawMode`, `Uid`, `RawUid`,
-  `Gid`, `RawGid`, and `SigmaskOp` types in the `system` module
+  `Gid`, `RawGid`, `FileType`, `Stat`, and `SigmaskOp` types in the `system`
+  module
 - The `System` trait now has the `ofd_access`, `get_and_set_nonblocking`,
   `getuid`, `geteuid`, `getgid`, and `getegid` methods.
 - `Mode` has been moved from `system::virtual` to `system` and now has constants
   with more human-friendly names, e.g., `USER_READ` and `GROUP_WRITE`.
+- The `system::virtual::INode` struct now has the `stat` method.
+- The `system::virtual::FileBody` struct now has the `type` and `size` methods.
 - The `system::virtual::Process` struct now has the getters/setters for the
   real/effective user/group IDs: `uid`, `set_uid`, `euid`, `set_euid`, `gid`,
   `set_gid`, `egid`, and `set_egid`.
@@ -30,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `system::FdFlag` is no longer a re-export of `nix::fcntl::FdFlag`.
 - `system::Mode` is no longer a re-export of `nix::sys::stat::Mode`.
+- The `fstat` and `fstatat` methods of `system::System` now return a `Stat`
+  instead of a `nix::sys::stat::FileStat`.
 - The `system::System::fstatat` method now takes a `follow_symlinks: bool`
   parameter instead of an `AtFlags` parameter.
 - The `system::System::open` method has been redefined to take `OfdAccess` and
@@ -53,7 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - The `system` module no longer reexports `nix::fcntl::AtFlags`,
-  `nix::fcntl::OFlag`, and `nix::sys::signal::SigmaskHow`.
+  `nix::fcntl::OFlag`, `nix::sys::stat::FileStat`, `nix::sys::stat::SFlag`, and
+  `nix::sys::signal::SigmaskHow`.
 - The `fcntl_getfl` and `fcntl_setfl` methods from the `System` trait
 - The `system::Errno` struct's `last` and `clear` methods are no longer public.
 

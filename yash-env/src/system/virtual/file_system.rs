@@ -16,9 +16,7 @@
 
 //! File system in a virtual system.
 
-use super::super::Dir;
-use super::super::DirEntry;
-use super::super::Errno;
+use super::super::{Dir, DirEntry, Errno, FileType, Gid, Stat, Uid};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::VecDeque;
@@ -192,6 +190,28 @@ impl INode {
             permissions: Mode::default(),
         }
     }
+
+    /// Returns the metadata of the file.
+    ///
+    /// Currently, only the following fields are filled:
+    ///
+    /// - `ino`
+    /// - `mode`
+    /// - `type`
+    /// - `size`
+    #[must_use]
+    pub fn stat(&self) -> Stat {
+        Stat {
+            dev: 1,
+            ino: self as *const Self as u64,
+            mode: self.permissions,
+            r#type: self.body.r#type(),
+            nlink: 1,
+            uid: Uid(1),
+            gid: Gid(1),
+            size: self.body.size() as u64,
+        }
+    }
 }
 
 /// Filetype-specific content of a file
@@ -247,6 +267,28 @@ impl FileBody {
         FileBody::Regular {
             content: bytes.into(),
             is_native_executable: false,
+        }
+    }
+
+    /// Returns the type of the file.
+    #[must_use]
+    pub const fn r#type(&self) -> FileType {
+        match self {
+            Self::Regular { .. } => FileType::Regular,
+            Self::Directory { .. } => FileType::Directory,
+            Self::Fifo { .. } => FileType::Fifo,
+            Self::Symlink { .. } => FileType::Symlink,
+        }
+    }
+
+    /// Returns the size of the file.
+    #[must_use]
+    pub fn size(&self) -> usize {
+        match self {
+            Self::Regular { content, .. } => content.len(),
+            Self::Directory { files } => files.len(),
+            Self::Fifo { content, .. } => content.len(),
+            Self::Symlink { target } => target.as_os_str().len(),
         }
     }
 }

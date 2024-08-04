@@ -34,6 +34,7 @@ use super::SigmaskOp;
 use super::SignalHandling;
 use super::SignalStatus;
 use super::SignalSystem;
+use super::Stat;
 use super::System;
 use super::SystemEx;
 use super::Times;
@@ -44,7 +45,6 @@ use crate::job::ProcessState;
 #[cfg(doc)]
 use crate::Env;
 use enumset::EnumSet;
-use nix::sys::stat::FileStat;
 use nix::sys::time::TimeSpec;
 use std::cell::RefCell;
 use std::convert::Infallible;
@@ -301,10 +301,10 @@ impl SharedSystem {
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl System for &SharedSystem {
-    fn fstat(&self, fd: Fd) -> Result<FileStat> {
+    fn fstat(&self, fd: Fd) -> Result<Stat> {
         self.0.borrow().fstat(fd)
     }
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<FileStat> {
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
         self.0.borrow().fstatat(dir_fd, path, follow_symlinks)
     }
     fn is_executable_file(&self, path: &CStr) -> bool {
@@ -482,11 +482,11 @@ impl System for SharedSystem {
     // All methods are delegated to `impl System for &SharedSystem`,
     // which in turn delegates to the contained system instance.
     #[inline]
-    fn fstat(&self, fd: Fd) -> Result<FileStat> {
+    fn fstat(&self, fd: Fd) -> Result<Stat> {
         (&self).fstat(fd)
     }
     #[inline]
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<FileStat> {
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
         (&self).fstatat(dir_fd, path, follow_symlinks)
     }
     #[inline]

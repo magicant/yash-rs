@@ -35,8 +35,10 @@ pub use self::fd_flag::FdFlag;
 use self::fd_set::FdSet;
 pub use self::file_system::Dir;
 pub use self::file_system::DirEntry;
+pub use self::file_system::FileType;
 pub use self::file_system::Mode;
 pub use self::file_system::RawMode;
+pub use self::file_system::Stat;
 pub use self::file_system::AT_FDCWD;
 pub use self::id::Gid;
 pub use self::id::RawGid;
@@ -65,8 +67,6 @@ use crate::trap::SignalSystem;
 use crate::Env;
 use enumset::EnumSet;
 #[doc(no_inline)]
-pub use nix::sys::stat::{FileStat, SFlag};
-#[doc(no_inline)]
 pub use nix::sys::time::TimeSpec;
 use std::convert::Infallible;
 use std::ffi::c_int;
@@ -90,10 +90,10 @@ use std::time::Instant;
 /// `System` instance to extend the interface with asynchronous methods.
 pub trait System: Debug {
     /// Retrieves metadata of a file.
-    fn fstat(&self, fd: Fd) -> Result<FileStat>;
+    fn fstat(&self, fd: Fd) -> Result<Stat>;
 
     /// Retrieves metadata of a file.
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<FileStat>;
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat>;
 
     /// Whether there is an executable file at the specified path.
     #[must_use]
@@ -581,8 +581,8 @@ pub trait SystemEx: System {
 
     /// Tests if a file descriptor is a pipe.
     fn fd_is_pipe(&self, fd: Fd) -> bool {
-        matches!(self.fstat(fd), Ok(stat)
-            if SFlag::from_bits_truncate(stat.st_mode) & SFlag::S_IFMT == SFlag::S_IFIFO)
+        self.fstat(fd)
+            .is_ok_and(|stat| stat.r#type == FileType::Fifo)
     }
 
     /// Switches the foreground process group with SIGTTOU blocked.
