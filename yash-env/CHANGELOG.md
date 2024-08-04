@@ -58,7 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - The `system` module no longer reexports `nix::fcntl::AtFlags`,
-  `nix::fcntl::OFlag`, and `nix::sys::signal::SigmaskHow`.
+  `nix::fcntl::OFlag`, `nix::sys::stat::FileStat`, `nix::sys::stat::SFlag`, and
+  `nix::sys::signal::SigmaskHow`.
 - The `fcntl_getfl` and `fcntl_setfl` methods from the `System` trait
 - The `system::Errno` struct's `last` and `clear` methods are no longer public.
 

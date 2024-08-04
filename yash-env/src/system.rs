@@ -67,8 +67,6 @@ use crate::trap::SignalSystem;
 use crate::Env;
 use enumset::EnumSet;
 #[doc(no_inline)]
-pub use nix::sys::stat::{FileStat, SFlag};
-#[doc(no_inline)]
 pub use nix::sys::time::TimeSpec;
 use std::convert::Infallible;
 use std::ffi::c_int;
