@@ -45,7 +45,6 @@ use crate::job::ProcessState;
 #[cfg(doc)]
 use crate::Env;
 use enumset::EnumSet;
-use nix::sys::time::TimeSpec;
 use std::cell::RefCell;
 use std::convert::Infallible;
 use std::ffi::c_int;
@@ -60,6 +59,7 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::Poll;
+use std::time::Duration;
 use std::time::Instant;
 
 /// System shared by a reference counter.
@@ -410,7 +410,7 @@ impl System for &SharedSystem {
         &mut self,
         readers: &mut FdSet,
         writers: &mut FdSet,
-        timeout: Option<&TimeSpec>,
+        timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
     ) -> Result<c_int> {
         (**self.0.borrow_mut()).select(readers, writers, timeout, signal_mask)
@@ -620,7 +620,7 @@ impl System for SharedSystem {
         &mut self,
         readers: &mut FdSet,
         writers: &mut FdSet,
-        timeout: Option<&TimeSpec>,
+        timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
     ) -> Result<c_int> {
         (&mut &*self).select(readers, writers, timeout, signal_mask)

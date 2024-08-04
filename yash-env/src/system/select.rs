@@ -24,7 +24,6 @@ use super::SigmaskOp;
 use super::SignalHandling;
 use super::System;
 use crate::io::Fd;
-use nix::sys::time::TimeSpec;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::cmp::Reverse;
@@ -185,19 +184,17 @@ impl SelectSystem {
         let mut readers = self.io.readers();
         let mut writers = self.io.writers();
         let timeout = if poll {
-            Some(TimeSpec::from(Duration::ZERO))
+            Some(Duration::ZERO)
         } else {
-            self.time.first_target().map(|t| {
-                let now = self.now();
-                let duration = t.saturating_duration_since(now);
-                TimeSpec::from(duration)
-            })
+            self.time
+                .first_target()
+                .map(|instant| instant.saturating_duration_since(self.now()))
         };
 
         let inner_result = self.system.select(
             &mut readers,
             &mut writers,
-            timeout.as_ref(),
+            timeout,
             self.wait_mask.as_deref(),
         );
         let final_result = match inner_result {

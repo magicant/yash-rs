@@ -66,8 +66,6 @@ use crate::subshell::Subshell;
 use crate::trap::SignalSystem;
 use crate::Env;
 use enumset::EnumSet;
-#[doc(no_inline)]
-pub use nix::sys::time::TimeSpec;
 use std::convert::Infallible;
 use std::ffi::c_int;
 use std::ffi::CStr;
@@ -79,6 +77,7 @@ use std::io::SeekFrom;
 use std::path::Path;
 use std::path::PathBuf;
 use std::pin::Pin;
+use std::time::Duration;
 use std::time::Instant;
 
 /// API to the system-managed parts of the environment.
@@ -345,7 +344,7 @@ pub trait System: Debug {
         &mut self,
         readers: &mut FdSet,
         writers: &mut FdSet,
-        timeout: Option<&TimeSpec>,
+        timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
     ) -> Result<c_int>;
 
