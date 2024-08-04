@@ -313,15 +313,15 @@ impl Default for VirtualSystem {
 }
 
 fn stat(inode: &INode) -> Result<FileStat> {
-    let (type_flag, size) = match &inode.body {
-        FileBody::Regular { content, .. } => (SFlag::S_IFREG, content.len()),
-        FileBody::Directory { files } => (SFlag::S_IFDIR, files.len()),
-        FileBody::Fifo { content, .. } => (SFlag::S_IFIFO, content.len()),
-        FileBody::Symlink { target } => (SFlag::S_IFLNK, target.as_os_str().len()),
+    let type_flag = match &inode.body {
+        FileBody::Regular { .. } => SFlag::S_IFREG,
+        FileBody::Directory { .. } => SFlag::S_IFDIR,
+        FileBody::Fifo { .. } => SFlag::S_IFIFO,
+        FileBody::Symlink { .. } => SFlag::S_IFLNK,
     };
     let mut result: FileStat = unsafe { MaybeUninit::zeroed().assume_init() };
     result.st_mode = type_flag.bits() | inode.permissions.bits();
-    result.st_size = size as _;
+    result.st_size = inode.body.size() as _;
     result.st_dev = 1;
     result.st_ino = std::ptr::addr_of!(*inode) as nix::libc::ino_t;
     Ok(result)

@@ -10,11 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - The `OfdAccess`, `OpenFlag`, `FdFlag`, `Mode`, `RawMode`, `Uid`, `RawUid`,
-  `Gid`, `RawGid`, and `SigmaskOp` types in the `system` module
+  `Gid`, `RawGid`, `FileType`, `Stat`, and `SigmaskOp` types in the `system`
+  module
 - The `System` trait now has the `ofd_access`, `get_and_set_nonblocking`,
   `getuid`, `geteuid`, `getgid`, and `getegid` methods.
 - `Mode` has been moved from `system::virtual` to `system` and now has constants
   with more human-friendly names, e.g., `USER_READ` and `GROUP_WRITE`.
+- The `system::virtual::INode` struct now has the `stat` method.
+- The `system::virtual::FileBody` struct now has the `type` and `size` methods.
 - The `system::virtual::Process` struct now has the getters/setters for the
   real/effective user/group IDs: `uid`, `set_uid`, `euid`, `set_euid`, `gid`,
   `set_gid`, `egid`, and `set_egid`.
