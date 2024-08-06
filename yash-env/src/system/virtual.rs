@@ -312,26 +312,16 @@ impl Default for VirtualSystem {
 impl System for VirtualSystem {
     /// Retrieves metadata of a file.
     ///
-    /// The current implementation fills only the following values of the
-    /// returned `FileStat`:
-    ///
-    /// - `st_mode`
-    /// - `st_size`
-    /// - `st_dev` (always 1)
-    /// - `st_ino` (computed from the address of `Inode`)
+    /// The current implementation fills only some values of the returned
+    /// `FileStat`. See [`Inode::stat`] for details.
     fn fstat(&self, fd: Fd) -> Result<Stat> {
         self.with_open_file_description(fd, |ofd| Ok(ofd.file.borrow().stat()))
     }
 
     /// Retrieves metadata of a file.
     ///
-    /// The current implementation fills only the following values of the
-    /// returned `FileStat`:
-    ///
-    /// - `st_mode`
-    /// - `st_size`
-    /// - `st_dev` (always 1)
-    /// - `st_ino` (computed from the address of `Inode`)
+    /// The current implementation fills only some values of the returned
+    /// `FileStat`. See [`Inode::stat`] for details.
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
         let path = Path::new(OsStr::from_bytes(path.to_bytes()));
         let inode = self.resolve_existing_file(dir_fd, path, follow_symlinks)?;
