@@ -67,7 +67,7 @@ mod tests {
     use std::path::PathBuf;
     use std::rc::Rc;
     use yash_env::system::r#virtual::FileBody;
-    use yash_env::system::r#virtual::INode;
+    use yash_env::system::r#virtual::Inode;
     use yash_env::variable::Scope::Global;
     use yash_env::variable::PWD;
     use yash_env::VirtualSystem;
@@ -79,7 +79,7 @@ mod tests {
             .file_system
             .save(
                 "/foo/bar/dir",
-                Rc::new(RefCell::new(INode {
+                Rc::new(RefCell::new(Inode {
                     body: FileBody::Directory {
                         files: Default::default(),
                     },
@@ -91,7 +91,7 @@ mod tests {
             .file_system
             .save(
                 "/foo/link",
-                Rc::new(RefCell::new(INode {
+                Rc::new(RefCell::new(Inode {
                     body: FileBody::Symlink {
                         target: "bar/dir".into(),
                     },

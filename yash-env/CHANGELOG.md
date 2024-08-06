@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `getuid`, `geteuid`, `getgid`, and `getegid` methods.
 - `Mode` has been moved from `system::virtual` to `system` and now has constants
   with more human-friendly names, e.g., `USER_READ` and `GROUP_WRITE`.
-- The `system::virtual::INode` struct now has the `stat` method.
+- The `system::virtual::Inode` struct now has the `stat` method.
 - The `system::virtual::FileBody` struct now has the `type` and `size` methods.
 - The `system::virtual::Process` struct now has the getters/setters for the
   real/effective user/group IDs: `uid`, `set_uid`, `euid`, `set_euid`, `gid`,
@@ -50,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `flags: enumset::EnumSet<FdFlag>` field of
   `yash_env::system::virtual::FdBody` has replaced
   the `flag: nix::fcntl::FdFlag` field.
+- The `system::virtual::INode` struct has been renamed to `Inode`.
+- The `system::virtual::OpenFileDescription::i_node` method has been renamed to
+  `inode` and now returns a reference to `Rc<RefCell<Inode>>` rather than a
+  clone of it.
 - The `system::virtual::OpenFileDescription::seek` method now takes a
   `std::io::SeekFrom` parameter instead of an offset and whence pair.
 - External dependency versions:

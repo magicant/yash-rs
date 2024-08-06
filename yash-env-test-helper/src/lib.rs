@@ -26,7 +26,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::str::from_utf8;
-use yash_env::system::r#virtual::{Executor, FileBody, INode, SystemState, VirtualSystem};
+use yash_env::system::r#virtual::{Executor, FileBody, Inode, SystemState, VirtualSystem};
 use yash_env::Env;
 
 /// Adapter for [`LocalSpawner`] to [`Executor`]
@@ -85,7 +85,7 @@ pub fn stub_tty(state: &RefCell<SystemState>) {
     state
         .borrow_mut()
         .file_system
-        .save("/dev/tty", Rc::new(RefCell::new(INode::new([]))))
+        .save("/dev/tty", Rc::new(RefCell::new(Inode::new([]))))
         .unwrap();
 }
 

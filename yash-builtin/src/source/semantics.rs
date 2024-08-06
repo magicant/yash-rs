@@ -169,7 +169,7 @@ mod tests {
     use std::path::Path;
     use std::rc::Rc;
     use yash_env::io::MIN_INTERNAL_FD;
-    use yash_env::system::r#virtual::INode;
+    use yash_env::system::r#virtual::Inode;
     use yash_env::system::FdFlag;
     use yash_env::variable::Scope;
     use yash_env::VirtualSystem;
@@ -177,7 +177,7 @@ mod tests {
     fn system_with_file<P: AsRef<Path>, C: Into<Vec<u8>>>(path: P, content: C) -> VirtualSystem {
         let system = VirtualSystem::new();
         let mut state = system.state.borrow_mut();
-        let content = Rc::new(RefCell::new(INode::new(content)));
+        let content = Rc::new(RefCell::new(Inode::new(content)));
         state.file_system.save(path, content).unwrap();
         drop(state);
         system
@@ -186,14 +186,14 @@ mod tests {
     #[test]
     fn no_path_search_with_pathname_containing_slash() {
         let system = VirtualSystem::new();
-        let i_node = Rc::new(RefCell::new(INode::new("")));
+        let inode = Rc::new(RefCell::new(Inode::new("")));
         {
             let mut state = system.state.borrow_mut();
-            let content = Rc::new(RefCell::new(INode::new("")));
+            let content = Rc::new(RefCell::new(Inode::new("")));
             state.file_system.save("/bar/file", content).unwrap();
-            let content = Rc::new(RefCell::new(INode::new("")));
+            let content = Rc::new(RefCell::new(Inode::new("")));
             state.file_system.save("/baz/file", content).unwrap();
-            let content = Rc::clone(&i_node);
+            let content = Rc::clone(&inode);
             state.file_system.save("/file", content).unwrap();
         }
         let mut env = Env::with_system(Box::new(system.clone()));
@@ -210,7 +210,7 @@ mod tests {
         // "/".
         let fd = result.unwrap();
         _ = system.with_open_file_description(fd, |ofd| {
-            assert!(Rc::ptr_eq(&ofd.file, &i_node));
+            assert!(Rc::ptr_eq(&ofd.file, &inode));
             Ok(())
         });
     }
@@ -218,14 +218,14 @@ mod tests {
     #[test]
     fn file_found_in_path() {
         let system = VirtualSystem::new();
-        let i_node = Rc::new(RefCell::new(INode::new("")));
+        let inode = Rc::new(RefCell::new(Inode::new("")));
         {
             let mut state = system.state.borrow_mut();
-            let content = Rc::clone(&i_node);
+            let content = Rc::clone(&inode);
             state.file_system.save("/bar/file", content).unwrap();
-            let content = Rc::new(RefCell::new(INode::new("")));
+            let content = Rc::new(RefCell::new(Inode::new("")));
             state.file_system.save("/baz/file", content).unwrap();
-            let content = Rc::new(RefCell::new(INode::new("")));
+            let content = Rc::new(RefCell::new(Inode::new("")));
             state.file_system.save("/file", content).unwrap();
         }
         let mut env = Env::with_system(Box::new(system.clone()));
@@ -241,7 +241,7 @@ mod tests {
         // The expected file is "/bar/file".
         let fd = result.unwrap();
         _ = system.with_open_file_description(fd, |ofd| {
-            assert!(Rc::ptr_eq(&ofd.file, &i_node));
+            assert!(Rc::ptr_eq(&ofd.file, &inode));
             Ok(())
         });
     }

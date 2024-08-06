@@ -592,7 +592,7 @@ impl BitOrAssign for SignalResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::system::r#virtual::file_system::{FileBody, INode, Mode};
+    use crate::system::r#virtual::file_system::{FileBody, Inode, Mode};
     use crate::system::r#virtual::io::OpenFileDescription;
     use enumset::EnumSet;
     use futures_util::task::LocalSpawnExt;
@@ -628,7 +628,7 @@ mod tests {
     fn process_with_pipe() -> (Process, Fd, Fd) {
         let mut process = Process::with_parent_and_group(Pid(10), Pid(11));
 
-        let file = Rc::new(RefCell::new(INode {
+        let file = Rc::new(RefCell::new(Inode {
             body: FileBody::Fifo {
                 content: VecDeque::new(),
                 readers: 1,

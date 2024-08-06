@@ -233,7 +233,7 @@ mod tests {
     use std::str::from_utf8;
     use yash_env::option::State::On;
     use yash_env::system::r#virtual::FileBody;
-    use yash_env::system::r#virtual::INode;
+    use yash_env::system::r#virtual::Inode;
     use yash_env::system::Mode;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn simple_command_calls_execve_with_correct_arguments() {
         in_virtual_system(|mut env, state| async move {
-            let mut content = INode::default();
+            let mut content = Inode::default();
             content.body = FileBody::Regular {
                 content: Vec::new(),
                 is_native_executable: true,
@@ -289,7 +289,7 @@ mod tests {
     #[test]
     fn simple_command_returns_exit_status_from_external_utility() {
         in_virtual_system(|mut env, state| async move {
-            let mut content = INode::default();
+            let mut content = Inode::default();
             content.body = FileBody::Regular {
                 content: Vec::new(),
                 is_native_executable: true,
@@ -315,7 +315,7 @@ mod tests {
     #[test]
     fn simple_command_skips_running_external_utility_on_redirection_error() {
         in_virtual_system(|mut env, state| async move {
-            let mut content = INode::default();
+            let mut content = Inode::default();
             content.body = FileBody::Regular {
                 content: Vec::new(),
                 is_native_executable: true,
@@ -348,7 +348,7 @@ mod tests {
     #[test]
     fn simple_command_returns_126_on_exec_failure() {
         in_virtual_system(|mut env, state| async move {
-            let mut content = INode::default();
+            let mut content = Inode::default();
             content.permissions.set(Mode::USER_EXEC, true);
             let content = Rc::new(RefCell::new(content));
             state
@@ -417,7 +417,7 @@ mod tests {
             env.options.set(yash_env::option::Monitor, On);
             stub_tty(&state);
 
-            let mut content = INode::default();
+            let mut content = Inode::default();
             content.body = FileBody::Regular {
                 content: Vec::new(),
                 is_native_executable: true,
@@ -445,7 +445,7 @@ mod tests {
         in_virtual_system(|mut env, state| async move {
             env.options.set(yash_env::option::XTrace, On);
 
-            let mut content = INode::default();
+            let mut content = Inode::default();
             content.body = FileBody::Regular {
                 content: Vec::new(),
                 is_native_executable: true,

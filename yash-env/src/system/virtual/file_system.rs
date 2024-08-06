@@ -34,14 +34,14 @@ const DEFAULT_DIRECTORY_MODE: Mode = Mode::USER_ALL.union(Mode::ALL_READ).union(
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FileSystem {
     /// Root directory
-    pub root: Rc<RefCell<INode>>,
+    pub root: Rc<RefCell<Inode>>,
 }
 
 /// The default file system only contains an empty root directory.
 impl Default for FileSystem {
     fn default() -> Self {
         FileSystem {
-            root: Rc::new(RefCell::new(INode {
+            root: Rc::new(RefCell::new(Inode {
                 body: FileBody::Directory {
                     files: HashMap::new(),
                 },
@@ -62,9 +62,9 @@ impl FileSystem {
     pub fn save<P: AsRef<Path>>(
         &mut self,
         path: P,
-        content: Rc<RefCell<INode>>,
-    ) -> Result<Option<Rc<RefCell<INode>>>, Errno> {
-        fn ensure_dir(body: &mut FileBody) -> &mut HashMap<Rc<OsStr>, Rc<RefCell<INode>>> {
+        content: Rc<RefCell<Inode>>,
+    ) -> Result<Option<Rc<RefCell<Inode>>>, Errno> {
+        fn ensure_dir(body: &mut FileBody) -> &mut HashMap<Rc<OsStr>, Rc<RefCell<Inode>>> {
             match body {
                 FileBody::Directory { files } => files,
                 _ => {
@@ -81,8 +81,8 @@ impl FileSystem {
         fn main(
             fs: &mut FileSystem,
             path: &Path,
-            content: Rc<RefCell<INode>>,
-        ) -> Result<Option<Rc<RefCell<INode>>>, Errno> {
+            content: Rc<RefCell<Inode>>,
+        ) -> Result<Option<Rc<RefCell<Inode>>>, Errno> {
             let mut components = path.components();
             let file_name = match components.next_back().ok_or(Errno::ENOENT)? {
                 Component::Normal(name) => name,
@@ -103,7 +103,7 @@ impl FileSystem {
                 let child = match children.entry(Rc::from(name)) {
                     Occupied(occupied) => Rc::clone(occupied.get()),
                     Vacant(vacant) => {
-                        let child = Rc::new(RefCell::new(INode {
+                        let child = Rc::new(RefCell::new(Inode {
                             body: FileBody::Directory {
                                 files: HashMap::new(),
                             },
@@ -127,8 +127,8 @@ impl FileSystem {
     /// Returns a reference to the existing file at the specified path.
     ///
     /// TODO Reject relative path
-    pub fn get<P: AsRef<Path>>(&self, path: P) -> Result<Rc<RefCell<INode>>, Errno> {
-        fn main(fs: &FileSystem, path: &Path) -> Result<Rc<RefCell<INode>>, Errno> {
+    pub fn get<P: AsRef<Path>>(&self, path: P) -> Result<Rc<RefCell<Inode>>, Errno> {
+        fn main(fs: &FileSystem, path: &Path) -> Result<Rc<RefCell<Inode>>, Errno> {
             let components = path.components();
             let mut nodes = vec![Rc::clone(&fs.root)];
             for component in components {
@@ -172,20 +172,20 @@ impl FileSystem {
     }
 }
 
-/// File on the file system.
+/// File on the file system
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct INode {
-    /// File content.
+pub struct Inode {
+    /// File content
     pub body: FileBody,
-    /// Access permissions.
+    /// Access permissions
     pub permissions: Mode,
     // TODO owner user and group, etc.
 }
 
-impl INode {
+impl Inode {
     /// Create a regular file with the given content.
     pub fn new<T: Into<Vec<u8>>>(bytes: T) -> Self {
-        INode {
+        Inode {
             body: FileBody::new(bytes),
             permissions: Mode::default(),
         }
@@ -230,7 +230,7 @@ pub enum FileBody {
         ///
         /// The keys of the hashmap are filenames without any parent directory
         /// components. The hashmap does not contain "." or "..".
-        files: HashMap<Rc<OsStr>, Rc<RefCell<INode>>>,
+        files: HashMap<Rc<OsStr>, Rc<RefCell<Inode>>>,
         // The hash map contents are reference-counted to allow making cheap
         // copies of them, which is especially handy when traversing entries.
     },
@@ -381,11 +381,11 @@ mod tests {
     #[test]
     fn file_system_save_and_get_file() {
         let mut fs = FileSystem::default();
-        let file_1 = Rc::new(RefCell::new(INode::new([12, 34, 56])));
+        let file_1 = Rc::new(RefCell::new(Inode::new([12, 34, 56])));
         let old = fs.save("/foo/bar", Rc::clone(&file_1));
         assert_eq!(old, Ok(None));
 
-        let file_2 = Rc::new(RefCell::new(INode::new([98, 76, 54])));
+        let file_2 = Rc::new(RefCell::new(Inode::new([98, 76, 54])));
         let old = fs.save("/foo/bar", Rc::clone(&file_2));
         assert_eq!(old, Ok(Some(file_1)));
 
@@ -396,7 +396,7 @@ mod tests {
     #[test]
     fn file_system_save_and_get_directory() {
         let mut fs = FileSystem::default();
-        let file = Rc::new(RefCell::new(INode::new([12, 34, 56])));
+        let file = Rc::new(RefCell::new(Inode::new([12, 34, 56])));
         let old = fs.save("/foo/bar", Rc::clone(&file));
         assert_eq!(old, Ok(None));
 
@@ -422,7 +422,7 @@ mod tests {
     #[test]
     fn file_system_get_parents() {
         let mut fs = FileSystem::default();
-        let file = Rc::new(RefCell::new(INode::new([123])));
+        let file = Rc::new(RefCell::new(Inode::new([123])));
         _ = fs.save("/dir/dir1/file", Rc::clone(&file));
         _ = fs.save("/dir/dir2/dir3/file", Rc::default());
         assert_eq!(fs.get("/dir/dir2/dir3/../../dir1/file").unwrap(), file);

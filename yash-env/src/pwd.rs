@@ -110,7 +110,7 @@ impl Env {
 mod tests {
     use super::*;
     use crate::system::r#virtual::FileBody;
-    use crate::system::r#virtual::INode;
+    use crate::system::r#virtual::Inode;
     use crate::variable::Value;
     use crate::VirtualSystem;
     use std::cell::RefCell;
@@ -148,7 +148,7 @@ mod tests {
             .file_system
             .save(
                 "/foo/bar/dir",
-                Rc::new(RefCell::new(INode {
+                Rc::new(RefCell::new(Inode {
                     body: FileBody::Directory {
                         files: Default::default(),
                     },
@@ -160,7 +160,7 @@ mod tests {
             .file_system
             .save(
                 "/foo/link",
-                Rc::new(RefCell::new(INode {
+                Rc::new(RefCell::new(Inode {
                     body: FileBody::Symlink {
                         target: "bar/dir".into(),
                     },
@@ -251,7 +251,7 @@ mod tests {
             .file_system
             .save(
                 "/link",
-                Rc::new(RefCell::new(INode {
+                Rc::new(RefCell::new(Inode {
                     body: FileBody::Symlink { target: ".".into() },
                     permissions: Default::default(),
                 })),

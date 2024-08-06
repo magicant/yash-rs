@@ -129,7 +129,7 @@ mod tests {
     use super::*;
     use std::rc::Rc;
     use std::str::from_utf8;
-    use yash_env::system::r#virtual::INode;
+    use yash_env::system::r#virtual::Inode;
     use yash_env::system::r#virtual::VirtualSystem;
 
     #[test]
@@ -239,7 +239,7 @@ mod tests {
             .state
             .borrow_mut()
             .file_system
-            .save("/foo/bar/file", Rc::new(INode::default().into()))
+            .save("/foo/bar/file", Rc::new(Inode::default().into()))
             .unwrap();
 
         // Components AFTER the dot-dot do not have to exist.
@@ -257,7 +257,7 @@ mod tests {
             .state
             .borrow_mut()
             .file_system
-            .save("/foo/bar/file", Rc::new(INode::default().into()))
+            .save("/foo/bar/file", Rc::new(Inode::default().into()))
             .unwrap();
 
         let result = canonicalize(&system, Path::new("/foo/bar/../../baz")).unwrap();
@@ -271,7 +271,7 @@ mod tests {
             .state
             .borrow_mut()
             .file_system
-            .save("/foo/bar/file", Rc::new(INode::default().into()))
+            .save("/foo/bar/file", Rc::new(Inode::default().into()))
             .unwrap();
 
         let result = canonicalize(&system, Path::new("/foo/bar/./../baz")).unwrap();
@@ -295,7 +295,7 @@ mod tests {
     #[test]
     fn dot_dot_with_symlink() {
         let system = VirtualSystem::new();
-        let symlink = INode {
+        let symlink = Inode {
             body: yash_env::system::r#virtual::FileBody::Symlink {
                 target: PathBuf::from("."),
             },

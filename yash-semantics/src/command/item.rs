@@ -137,7 +137,7 @@ mod tests {
     use yash_env::option::Option::Monitor;
     use yash_env::option::State::On;
     use yash_env::system::r#virtual::FileBody;
-    use yash_env::system::r#virtual::INode;
+    use yash_env::system::r#virtual::Inode;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stderr;
@@ -302,7 +302,7 @@ mod tests {
         let mut state = state.borrow_mut();
         state
             .file_system
-            .save("/dev/null", Rc::new(RefCell::new(INode::new([]))))
+            .save("/dev/null", Rc::new(RefCell::new(Inode::new([]))))
             .unwrap();
         state
             .file_system

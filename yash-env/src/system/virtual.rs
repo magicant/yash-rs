@@ -149,7 +149,7 @@ impl VirtualSystem {
         let mut process = Process::with_parent_and_group(Pid(1), Pid(1));
 
         let mut set_std_fd = |path, fd| {
-            let file = Rc::new(RefCell::new(INode::new([])));
+            let file = Rc::new(RefCell::new(Inode::new([])));
             state.file_system.save(path, Rc::clone(&file)).unwrap();
             let body = FdBody {
                 open_file_description: Rc::new(RefCell::new(OpenFileDescription {
@@ -171,7 +171,7 @@ impl VirtualSystem {
             .file_system
             .save(
                 "/tmp",
-                Rc::new(RefCell::new(INode {
+                Rc::new(RefCell::new(Inode {
                     body: FileBody::Directory {
                         files: Default::default(),
                     },
@@ -250,7 +250,7 @@ impl VirtualSystem {
         _dir_fd: Fd,
         path: &Path,
         follow_symlinks: bool,
-    ) -> Result<Rc<RefCell<INode>>> {
+    ) -> Result<Rc<RefCell<Inode>>> {
         // TODO Resolve relative to dir_fd
         // TODO Support AT_FDCWD
         const _POSIX_SYMLOOP_MAX: i32 = 8;
@@ -318,7 +318,7 @@ impl System for VirtualSystem {
     /// - `st_mode`
     /// - `st_size`
     /// - `st_dev` (always 1)
-    /// - `st_ino` (computed from the address of `INode`)
+    /// - `st_ino` (computed from the address of `Inode`)
     fn fstat(&self, fd: Fd) -> Result<Stat> {
         self.with_open_file_description(fd, |ofd| Ok(ofd.file.borrow().stat()))
     }
@@ -331,7 +331,7 @@ impl System for VirtualSystem {
     /// - `st_mode`
     /// - `st_size`
     /// - `st_dev` (always 1)
-    /// - `st_ino` (computed from the address of `INode`)
+    /// - `st_ino` (computed from the address of `Inode`)
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
         let path = Path::new(OsStr::from_bytes(path.to_bytes()));
         let inode = self.resolve_existing_file(dir_fd, path, follow_symlinks)?;
@@ -355,7 +355,7 @@ impl System for VirtualSystem {
     }
 
     fn pipe(&mut self) -> Result<(Fd, Fd)> {
-        let file = Rc::new(RefCell::new(INode {
+        let file = Rc::new(RefCell::new(Inode {
             body: FileBody::Fifo {
                 content: VecDeque::new(),
                 readers: 1,
@@ -440,7 +440,7 @@ impl System for VirtualSystem {
                 inode
             }
             Err(Errno::ENOENT) if flags.contains(OpenFlag::Create) => {
-                let mut inode = INode::new([]);
+                let mut inode = Inode::new([]);
                 inode.permissions = mode.difference(umask);
                 let inode = Rc::new(RefCell::new(inode));
                 state.file_system.save(&path, Rc::clone(&inode))?;
@@ -488,7 +488,7 @@ impl System for VirtualSystem {
     }
 
     fn open_tmpfile(&mut self, _parent_dir: &Path) -> Result<Fd> {
-        let file = Rc::new(RefCell::new(INode::new([])));
+        let file = Rc::new(RefCell::new(Inode::new([])));
         let open_file_description = Rc::new(RefCell::new(OpenFileDescription {
             file,
             offset: 0,
@@ -520,7 +520,7 @@ impl System for VirtualSystem {
             (false, true) => Ok(OfdAccess::WriteOnly),
             (true, true) => Ok(OfdAccess::ReadWrite),
             (false, false) => {
-                if is_directory(&ofd.i_node().borrow().body) {
+                if is_directory(&ofd.inode().borrow().body) {
                     Ok(OfdAccess::Search)
                 } else {
                     Ok(OfdAccess::Exec)
@@ -568,7 +568,7 @@ impl System for VirtualSystem {
 
     fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
         self.with_open_file_description(fd, |ofd| {
-            let inode = ofd.i_node();
+            let inode = ofd.inode();
             let dir = VirtualDir::try_from(&inode.borrow().body)?;
             Ok(Box::new(dir) as Box<dyn Dir>)
         })
@@ -1288,7 +1288,7 @@ mod tests {
     fn fstatat_regular_file() {
         let system = VirtualSystem::new();
         let path = "/some/file";
-        let content = Rc::new(RefCell::new(INode::new([1, 2, 3, 42, 100])));
+        let content = Rc::new(RefCell::new(Inode::new([1, 2, 3, 42, 100])));
         let mut state = system.state.borrow_mut();
         state.file_system.save(path, content).unwrap();
         drop(state);
@@ -1304,7 +1304,7 @@ mod tests {
     fn fstatat_directory() {
         let system = VirtualSystem::new();
         let path = "/some/file";
-        let content = Rc::new(RefCell::new(INode::new([])));
+        let content = Rc::new(RefCell::new(Inode::new([])));
         let mut state = system.state.borrow_mut();
         state.file_system.save(path, content).unwrap();
         drop(state);
@@ -1319,7 +1319,7 @@ mod tests {
     fn fstatat_fifo() {
         let system = VirtualSystem::new();
         let path = "/some/fifo";
-        let content = Rc::new(RefCell::new(INode {
+        let content = Rc::new(RefCell::new(Inode {
             body: FileBody::Fifo {
                 content: [17; 42].into(),
                 readers: 0,
@@ -1342,13 +1342,13 @@ mod tests {
         let mut state = system.state.borrow_mut();
         state
             .file_system
-            .save("/some/file", Rc::new(RefCell::new(INode::new([]))))
+            .save("/some/file", Rc::new(RefCell::new(Inode::new([]))))
             .unwrap();
         state
             .file_system
             .save(
                 "/link",
-                Rc::new(RefCell::new(INode {
+                Rc::new(RefCell::new(Inode {
                     body: FileBody::Symlink {
                         target: "some/file".into(),
                     },
@@ -1384,7 +1384,7 @@ mod tests {
     fn is_executable_file_existing_but_non_executable_file() {
         let system = VirtualSystem::new();
         let path = "/some/file";
-        let content = Rc::new(RefCell::new(INode::default()));
+        let content = Rc::new(RefCell::new(Inode::default()));
         let mut state = system.state.borrow_mut();
         state.file_system.save(path, content).unwrap();
         drop(state);
@@ -1395,7 +1395,7 @@ mod tests {
     fn is_executable_file_with_executable_file() {
         let system = VirtualSystem::new();
         let path = "/some/file";
-        let mut content = INode::default();
+        let mut content = Inode::default();
         content.permissions.set(Mode::USER_EXEC, true);
         let content = Rc::new(RefCell::new(content));
         let mut state = system.state.borrow_mut();
@@ -2258,7 +2258,7 @@ mod tests {
     fn setpgid_with_execed_child() {
         let (system, mut executor) = virtual_system_with_executor();
         let path = "/some/file";
-        let mut content = INode::default();
+        let mut content = Inode::default();
         content.body = FileBody::Regular {
             content: vec![],
             is_native_executable: true,
@@ -2538,7 +2538,7 @@ mod tests {
     fn execve_returns_enosys_for_executable_file() {
         let mut system = VirtualSystem::new();
         let path = "/some/file";
-        let mut content = INode::default();
+        let mut content = Inode::default();
         content.body = FileBody::Regular {
             content: vec![],
             is_native_executable: true,
@@ -2557,7 +2557,7 @@ mod tests {
     fn execve_saves_arguments() {
         let mut system = VirtualSystem::new();
         let path = "/some/file";
-        let mut content = INode::default();
+        let mut content = Inode::default();
         content.body = FileBody::Regular {
             content: vec![],
             is_native_executable: true,
@@ -2583,7 +2583,7 @@ mod tests {
     fn execve_returns_enoexec_for_non_executable_file() {
         let mut system = VirtualSystem::new();
         let path = "/some/file";
-        let mut content = INode::default();
+        let mut content = Inode::default();
         content.permissions.set(Mode::USER_EXEC, true);
         let content = Rc::new(RefCell::new(content));
         let mut state = system.state.borrow_mut();

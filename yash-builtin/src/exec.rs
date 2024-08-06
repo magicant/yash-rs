@@ -141,7 +141,7 @@ mod tests {
     use futures_util::FutureExt;
     use std::cell::RefCell;
     use std::rc::Rc;
-    use yash_env::system::r#virtual::{FileBody, INode};
+    use yash_env::system::r#virtual::{FileBody, Inode};
     use yash_env::system::Mode;
     use yash_env::variable::{Scope, PATH};
     use yash_env::VirtualSystem;
@@ -160,7 +160,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system.clone()));
 
         // Prepare the external utility file
-        let mut content = INode::default();
+        let mut content = Inode::default();
         content.body = FileBody::Regular {
             content: Vec::new(),
             is_native_executable: true,
@@ -195,7 +195,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system.clone()));
 
         // Prepare the external utility file
-        let mut content = INode::default();
+        let mut content = Inode::default();
         content.body = FileBody::Regular {
             content: Vec::new(),
             is_native_executable: true,
@@ -230,7 +230,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system.clone()));
 
         // Prepare the external utility file
-        let mut content = INode::default();
+        let mut content = Inode::default();
         content.body = FileBody::Regular {
             content: Vec::new(),
             is_native_executable: true,
@@ -260,7 +260,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system.clone()));
 
         // Prepare the external utility file
-        let mut content = INode::default();
+        let mut content = Inode::default();
         content.body = FileBody::Regular {
             content: Vec::new(),
             is_native_executable: true,
@@ -291,7 +291,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system.clone()));
 
         // Prepare the file without executable permission
-        let mut content = INode::default();
+        let mut content = Inode::default();
         content.body = FileBody::Regular {
             content: Vec::new(),
             is_native_executable: true,

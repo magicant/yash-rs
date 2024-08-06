@@ -124,7 +124,7 @@ impl Input for FdReader {
 mod tests {
     use super::*;
     use crate::system::r#virtual::FileBody;
-    use crate::system::r#virtual::INode;
+    use crate::system::r#virtual::Inode;
     use crate::system::r#virtual::VirtualSystem;
     use crate::system::Errno;
     use crate::system::Mode;
@@ -215,7 +215,7 @@ mod tests {
         let system = VirtualSystem::new();
         {
             let mut state = system.state.borrow_mut();
-            let file = Rc::new(INode::new("echo file\n").into());
+            let file = Rc::new(Inode::new("echo file\n").into());
             state.file_system.save("/foo", file).unwrap();
         }
         let mut system = SharedSystem::new(Box::new(system));

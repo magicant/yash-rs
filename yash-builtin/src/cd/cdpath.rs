@@ -78,7 +78,7 @@ fn ensure_directory<S: System>(system: &S, path: PathBuf) -> Option<PathBuf> {
 mod tests {
     use super::*;
     use std::rc::Rc;
-    use yash_env::system::r#virtual::INode;
+    use yash_env::system::r#virtual::Inode;
     use yash_env::variable::Scope::Global;
     use yash_env::variable::Value;
     use yash_env::VirtualSystem;
@@ -88,7 +88,7 @@ mod tests {
             .state
             .borrow_mut()
             .file_system
-            .save(path, Rc::new(INode::default().into()))
+            .save(path, Rc::new(Inode::default().into()))
             .unwrap();
     }
 

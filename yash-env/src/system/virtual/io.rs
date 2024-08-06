@@ -19,7 +19,7 @@
 use super::super::Errno;
 use super::FdFlag;
 use super::FileBody;
-use super::INode;
+use super::Inode;
 use enumset::EnumSet;
 use std::cell::RefCell;
 use std::fmt::Debug;
@@ -42,7 +42,7 @@ pub const PIPE_SIZE: usize = PIPE_BUF * 2;
 #[derive(Clone, Debug)]
 pub struct OpenFileDescription {
     /// The file.
-    pub file: Rc<RefCell<INode>>,
+    pub file: Rc<RefCell<Inode>>,
     /// Position in bytes to perform next I/O operation at.
     pub offset: usize,
     /// Whether this file is opened for reading.
@@ -232,8 +232,8 @@ impl OpenFileDescription {
 
     /// Returns the i-node this open file description is operating on.
     #[must_use]
-    pub fn i_node(&self) -> Rc<RefCell<INode>> {
-        Rc::clone(&self.file)
+    pub fn inode(&self) -> &Rc<RefCell<Inode>> {
+        &self.file
     }
 }
 
@@ -265,7 +265,7 @@ mod tests {
     #[test]
     fn regular_file_read_unreadable() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(INode::new([]))),
+            file: Rc::new(RefCell::new(Inode::new([]))),
             offset: 0,
             is_readable: false,
             is_writable: false,
@@ -280,7 +280,7 @@ mod tests {
     #[test]
     fn regular_file_read_beyond_file_length() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(INode::new([1]))),
+            file: Rc::new(RefCell::new(Inode::new([1]))),
             offset: 1,
             is_readable: true,
             is_writable: false,
@@ -301,7 +301,7 @@ mod tests {
     #[test]
     fn regular_file_read_more_than_content() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
+            file: Rc::new(RefCell::new(Inode::new([1, 2, 3]))),
             offset: 1,
             is_readable: true,
             is_writable: false,
@@ -318,7 +318,7 @@ mod tests {
     #[test]
     fn regular_file_read_less_than_content() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(INode::new([1, 2, 3, 4, 5]))),
+            file: Rc::new(RefCell::new(Inode::new([1, 2, 3, 4, 5]))),
             offset: 1,
             is_readable: true,
             is_writable: false,
@@ -335,7 +335,7 @@ mod tests {
     #[test]
     fn regular_file_write_unwritable() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(INode::new([]))),
+            file: Rc::new(RefCell::new(Inode::new([]))),
             offset: 0,
             is_readable: false,
             is_writable: false,
@@ -349,7 +349,7 @@ mod tests {
     #[test]
     fn regular_file_write_less_than_content() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(INode::new([1, 2, 3, 4, 5]))),
+            file: Rc::new(RefCell::new(Inode::new([1, 2, 3, 4, 5]))),
             offset: 1,
             is_readable: false,
             is_writable: true,
@@ -370,7 +370,7 @@ mod tests {
     #[test]
     fn regular_file_write_more_than_content() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
+            file: Rc::new(RefCell::new(Inode::new([1, 2, 3]))),
             offset: 1,
             is_readable: false,
             is_writable: true,
@@ -391,7 +391,7 @@ mod tests {
     #[test]
     fn regular_file_write_beyond_file_length() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(INode::new([1]))),
+            file: Rc::new(RefCell::new(Inode::new([1]))),
             offset: 3,
             is_readable: false,
             is_writable: true,
@@ -412,7 +412,7 @@ mod tests {
     #[test]
     fn regular_file_write_appending() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
+            file: Rc::new(RefCell::new(Inode::new([1, 2, 3]))),
             offset: 1,
             is_readable: false,
             is_writable: true,
@@ -433,7 +433,7 @@ mod tests {
     #[test]
     fn regular_file_seek_from_start() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(INode::new([]))),
+            file: Rc::new(RefCell::new(Inode::new([]))),
             offset: 3,
             is_readable: true,
             is_writable: true,
@@ -456,7 +456,7 @@ mod tests {
     #[test]
     fn regular_file_seek_from_current() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(INode::new([]))),
+            file: Rc::new(RefCell::new(Inode::new([]))),
             offset: 5,
             is_readable: true,
             is_writable: true,
@@ -483,7 +483,7 @@ mod tests {
     #[test]
     fn regular_file_seek_from_end() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
+            file: Rc::new(RefCell::new(Inode::new([1, 2, 3]))),
             offset: 2,
             is_readable: true,
             is_writable: true,
@@ -509,7 +509,7 @@ mod tests {
 
     #[test]
     fn fifo_reader_drop() {
-        let file = Rc::new(RefCell::new(INode {
+        let file = Rc::new(RefCell::new(Inode {
             body: FileBody::Fifo {
                 content: VecDeque::new(),
                 readers: 1,
@@ -534,7 +534,7 @@ mod tests {
 
     #[test]
     fn fifo_writer_drop() {
-        let file = Rc::new(RefCell::new(INode {
+        let file = Rc::new(RefCell::new(Inode {
             body: FileBody::Fifo {
                 content: VecDeque::new(),
                 readers: 1,
@@ -559,7 +559,7 @@ mod tests {
 
     #[test]
     fn fifo_is_ready_for_writing() {
-        let file = Rc::new(RefCell::new(INode {
+        let file = Rc::new(RefCell::new(Inode {
             body: FileBody::Fifo {
                 content: VecDeque::new(),
                 readers: 1,
@@ -595,7 +595,7 @@ mod tests {
     #[test]
     fn fifo_read_empty() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(INode {
+            file: Rc::new(RefCell::new(Inode {
                 body: FileBody::Fifo {
                     content: VecDeque::new(),
                     readers: 1,
@@ -617,7 +617,7 @@ mod tests {
     #[test]
     fn fifo_read_non_empty() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(INode {
+            file: Rc::new(RefCell::new(Inode {
                 body: FileBody::Fifo {
                     content: VecDeque::from([1, 5, 7, 3, 42, 7, 6]),
                     readers: 1,
@@ -647,7 +647,7 @@ mod tests {
     #[test]
     fn fifo_read_not_ready() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(INode {
+            file: Rc::new(RefCell::new(Inode {
                 body: FileBody::Fifo {
                     content: VecDeque::new(),
                     readers: 1,
@@ -668,7 +668,7 @@ mod tests {
 
     #[test]
     fn fifo_write_vacant() {
-        let file = Rc::new(RefCell::new(INode {
+        let file = Rc::new(RefCell::new(Inode {
             body: FileBody::Fifo {
                 content: VecDeque::new(),
                 readers: 1,
@@ -698,7 +698,7 @@ mod tests {
     #[test]
     fn fifo_write_full() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(INode {
+            file: Rc::new(RefCell::new(Inode {
                 body: FileBody::Fifo {
                     content: VecDeque::new(),
                     readers: 1,
@@ -727,7 +727,7 @@ mod tests {
 
     #[test]
     fn fifo_write_atomic_full() {
-        let file = Rc::new(RefCell::new(INode {
+        let file = Rc::new(RefCell::new(Inode {
             body: FileBody::Fifo {
                 content: VecDeque::new(),
                 readers: 1,
@@ -759,7 +759,7 @@ mod tests {
     #[test]
     fn fifo_write_non_atomic_full() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(INode {
+            file: Rc::new(RefCell::new(Inode {
                 body: FileBody::Fifo {
                     content: VecDeque::new(),
                     readers: 1,
@@ -786,7 +786,7 @@ mod tests {
     #[test]
     fn fifo_write_orphan() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(INode {
+            file: Rc::new(RefCell::new(Inode {
                 body: FileBody::Fifo {
                     content: VecDeque::new(),
                     readers: 0,

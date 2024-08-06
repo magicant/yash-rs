@@ -483,7 +483,7 @@ mod tests {
     use crate::job::Job;
     use crate::subshell::Subshell;
     use crate::system::r#virtual::FileBody;
-    use crate::system::r#virtual::INode;
+    use crate::system::r#virtual::Inode;
     use crate::system::r#virtual::SystemState;
     use crate::system::r#virtual::SIGCHLD;
     use crate::trap::Action;
@@ -598,7 +598,7 @@ mod tests {
     #[test]
     fn get_tty_opens_tty() {
         let system = VirtualSystem::new();
-        let tty = Rc::new(RefCell::new(INode::new([])));
+        let tty = Rc::new(RefCell::new(Inode::new([])));
         system
             .state
             .borrow_mut()

@@ -316,7 +316,7 @@ mod tests {
     use crate::option::Option::{Interactive, Monitor};
     use crate::option::State::On;
     use crate::semantics::ExitStatus;
-    use crate::system::r#virtual::INode;
+    use crate::system::r#virtual::Inode;
     use crate::system::r#virtual::SystemState;
     use crate::system::r#virtual::{SIGCHLD, SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU};
     use crate::system::Errno;
@@ -334,7 +334,7 @@ mod tests {
         state
             .borrow_mut()
             .file_system
-            .save("/dev/tty", Rc::new(RefCell::new(INode::new([]))))
+            .save("/dev/tty", Rc::new(RefCell::new(Inode::new([]))))
             .unwrap();
     }
 

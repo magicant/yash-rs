@@ -672,7 +672,7 @@ mod tests {
     use std::cell::RefCell;
     use std::rc::Rc;
     use yash_env::system::r#virtual::FileBody;
-    use yash_env::system::r#virtual::INode;
+    use yash_env::system::r#virtual::Inode;
     use yash_env::system::resource::LimitPair;
     use yash_env::system::resource::Resource;
     use yash_env::Env;
@@ -698,7 +698,7 @@ mod tests {
     #[test]
     fn basic_file_in_redirection() {
         let system = system_with_nofile_limit();
-        let file = Rc::new(RefCell::new(INode::new([42, 123, 254])));
+        let file = Rc::new(RefCell::new(Inode::new([42, 123, 254])));
         let mut state = system.state.borrow_mut();
         state.file_system.save("foo", file).unwrap();
         drop(state);
@@ -721,7 +721,7 @@ mod tests {
     #[test]
     fn moving_fd() {
         let system = system_with_nofile_limit();
-        let file = Rc::new(RefCell::new(INode::new([42, 123, 254])));
+        let file = Rc::new(RefCell::new(Inode::new([42, 123, 254])));
         let mut state = system.state.borrow_mut();
         state.file_system.save("foo", file).unwrap();
         drop(state);
@@ -844,9 +844,9 @@ mod tests {
     fn multiple_redirections() {
         let system = system_with_nofile_limit();
         let mut state = system.state.borrow_mut();
-        let file = Rc::new(RefCell::new(INode::new([100])));
+        let file = Rc::new(RefCell::new(Inode::new([100])));
         state.file_system.save("foo", file).unwrap();
-        let file = Rc::new(RefCell::new(INode::new([200])));
+        let file = Rc::new(RefCell::new(Inode::new([200])));
         state.file_system.save("bar", file).unwrap();
         drop(state);
         let mut env = Env::with_system(Box::new(system));
@@ -873,9 +873,9 @@ mod tests {
     fn later_redirection_wins() {
         let system = system_with_nofile_limit();
         let mut state = system.state.borrow_mut();
-        let file = Rc::new(RefCell::new(INode::new([100])));
+        let file = Rc::new(RefCell::new(Inode::new([100])));
         state.file_system.save("foo", file).unwrap();
-        let file = Rc::new(RefCell::new(INode::new([200])));
+        let file = Rc::new(RefCell::new(Inode::new([200])));
         state.file_system.save("bar", file).unwrap();
         drop(state);
 
@@ -1060,7 +1060,7 @@ mod tests {
 
     #[test]
     fn file_out_truncates_existing_file() {
-        let file = Rc::new(RefCell::new(INode::new([42, 123, 254])));
+        let file = Rc::new(RefCell::new(Inode::new([42, 123, 254])));
         let system = system_with_nofile_limit();
         let mut state = system.state.borrow_mut();
         state.file_system.save("foo", Rc::clone(&file)).unwrap();
@@ -1082,7 +1082,7 @@ mod tests {
 
     #[test]
     fn file_out_noclobber_with_regular_file() {
-        let file = Rc::new(RefCell::new(INode::new([42, 123, 254])));
+        let file = Rc::new(RefCell::new(Inode::new([42, 123, 254])));
         let system = system_with_nofile_limit();
         let mut state = system.state.borrow_mut();
         state.file_system.save("foo", Rc::clone(&file)).unwrap();
@@ -1111,7 +1111,7 @@ mod tests {
 
     #[test]
     fn file_out_noclobber_with_non_regular_file() {
-        let inode = INode {
+        let inode = Inode {
             body: FileBody::Fifo {
                 content: Default::default(),
                 readers: 1,
@@ -1176,7 +1176,7 @@ mod tests {
 
     #[test]
     fn file_clobber_by_default_truncates_existing_file() {
-        let file = Rc::new(RefCell::new(INode::new([42, 123, 254])));
+        let file = Rc::new(RefCell::new(Inode::new([42, 123, 254])));
         let system = system_with_nofile_limit();
         let mut state = system.state.borrow_mut();
         state.file_system.save("foo", Rc::clone(&file)).unwrap();
@@ -1241,7 +1241,7 @@ mod tests {
 
     #[test]
     fn file_append_appends_to_existing_file() {
-        let file = Rc::new(RefCell::new(INode::new(*b"one\n")));
+        let file = Rc::new(RefCell::new(Inode::new(*b"one\n")));
         let system = system_with_nofile_limit();
         let mut state = system.state.borrow_mut();
         state.file_system.save("foo", Rc::clone(&file)).unwrap();
@@ -1305,7 +1305,7 @@ mod tests {
     #[test]
     fn file_in_out_leaves_existing_file_content() {
         let system = system_with_nofile_limit();
-        let file = Rc::new(RefCell::new(INode::new([132, 79, 210])));
+        let file = Rc::new(RefCell::new(Inode::new([132, 79, 210])));
         let mut state = system.state.borrow_mut();
         state.file_system.save("foo", file).unwrap();
         drop(state);
