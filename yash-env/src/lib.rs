@@ -614,7 +614,7 @@ mod tests {
         );
         system
             .with_open_file_description(fd, |ofd| {
-                assert!(Rc::ptr_eq(&ofd.file, &tty));
+                assert!(Rc::ptr_eq(ofd.inode(), &tty));
                 Ok(())
             })
             .unwrap();
@@ -625,7 +625,7 @@ mod tests {
         let fd = env.get_tty().unwrap();
         system
             .with_open_file_description(fd, |ofd| {
-                assert!(Rc::ptr_eq(&ofd.file, &tty));
+                assert!(Rc::ptr_eq(ofd.inode(), &tty));
                 Ok(())
             })
             .unwrap();

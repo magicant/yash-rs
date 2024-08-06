@@ -210,7 +210,7 @@ mod tests {
         // "/".
         let fd = result.unwrap();
         _ = system.with_open_file_description(fd, |ofd| {
-            assert!(Rc::ptr_eq(&ofd.file, &inode));
+            assert!(Rc::ptr_eq(ofd.inode(), &inode));
             Ok(())
         });
     }
@@ -241,7 +241,7 @@ mod tests {
         // The expected file is "/bar/file".
         let fd = result.unwrap();
         _ = system.with_open_file_description(fd, |ofd| {
-            assert!(Rc::ptr_eq(&ofd.file, &inode));
+            assert!(Rc::ptr_eq(ofd.inode(), &inode));
             Ok(())
         });
     }

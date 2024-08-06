@@ -70,6 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `nix::sys::signal::SigmaskHow`, and `nix::sys::time::TimeSpec`.
 - The `fcntl_getfl` and `fcntl_setfl` methods from the `System` trait
 - The `system::Errno` struct's `last` and `clear` methods are no longer public.
+- All the fields of the `system::virtual::OpenFileDescription` struct are now
+  private.
 - `impl TryFrom<semantics::ExitStatus> for nix::sys::signal::Signal`
 
 ## [0.2.1] - 2024-07-12

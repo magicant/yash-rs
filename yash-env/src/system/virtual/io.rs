@@ -42,15 +42,15 @@ pub const PIPE_SIZE: usize = PIPE_BUF * 2;
 #[derive(Clone, Debug)]
 pub struct OpenFileDescription {
     /// The file.
-    pub file: Rc<RefCell<Inode>>,
+    pub(super) file: Rc<RefCell<Inode>>,
     /// Position in bytes to perform next I/O operation at.
-    pub offset: usize,
+    pub(super) offset: usize,
     /// Whether this file is opened for reading.
-    pub is_readable: bool,
+    pub(super) is_readable: bool,
     /// Whether this file is opened for writing.
-    pub is_writable: bool,
+    pub(super) is_writable: bool,
     /// Whether this file is opened for appending.
-    pub is_appending: bool,
+    pub(super) is_appending: bool,
 }
 
 impl Drop for OpenFileDescription {
