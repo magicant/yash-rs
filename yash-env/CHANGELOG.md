@@ -50,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `flags: enumset::EnumSet<FdFlag>` field of
   `yash_env::system::virtual::FdBody` has replaced
   the `flag: nix::fcntl::FdFlag` field.
+- The `system::virtual::OpenFileDescription::seek` method now takes a
+  `std::io::SeekFrom` parameter instead of an offset and whence pair.
 - External dependency versions:
     - Rust 1.77.0 → 1.79.0
 

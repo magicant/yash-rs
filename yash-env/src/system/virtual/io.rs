@@ -21,9 +21,9 @@ use super::FdFlag;
 use super::FileBody;
 use super::INode;
 use enumset::EnumSet;
-use nix::unistd::Whence;
 use std::cell::RefCell;
 use std::fmt::Debug;
+use std::io::SeekFrom;
 use std::rc::Rc;
 
 /// Maximum number of bytes guaranteed to be atomic when writing to a pipe.
@@ -205,25 +205,27 @@ impl OpenFileDescription {
     }
 
     /// Moves the file offset and returns the new offset.
-    ///
-    /// The current implementation for `OpenFileDescription` does not support
-    /// `Whence::SeekHole` or `Whence::SeekData`.
-    pub fn seek(&mut self, offset: isize, whence: Whence) -> Result<usize, Errno> {
+    pub fn seek(&mut self, position: SeekFrom) -> Result<usize, Errno> {
         let len = match &self.file.borrow().body {
             FileBody::Regular { content, .. } => content.len(),
             FileBody::Directory { files, .. } => files.len(),
             FileBody::Fifo { .. } => return Err(Errno::ESPIPE),
             FileBody::Symlink { target: _ } => return Err(Errno::ENOTSUP),
         };
-        let base = match whence {
-            Whence::SeekSet => 0,
-            Whence::SeekCur => self.offset,
-            Whence::SeekEnd => len,
-            #[allow(unreachable_patterns)]
-            _ => return Err(Errno::EINVAL),
+
+        let new_offset = match position {
+            SeekFrom::Start(offset) => offset.try_into().ok(),
+            SeekFrom::Current(offset) => offset
+                .try_into()
+                .ok()
+                .and_then(|offset| self.offset.checked_add_signed(offset)),
+            SeekFrom::End(offset) => offset
+                .try_into()
+                .ok()
+                .and_then(|offset| len.checked_add_signed(offset)),
         };
 
-        let new_offset = base.checked_add_signed(offset).ok_or(Errno::EINVAL)?;
+        let new_offset = new_offset.ok_or(Errno::EINVAL)?;
         self.offset = new_offset;
         Ok(new_offset)
     }
@@ -429,7 +431,7 @@ mod tests {
     }
 
     #[test]
-    fn regular_file_seek_set() {
+    fn regular_file_seek_from_start() {
         let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode::new([]))),
             offset: 3,
@@ -438,25 +440,21 @@ mod tests {
             is_appending: false,
         };
 
-        let result = open_file.seek(10, Whence::SeekSet);
+        let result = open_file.seek(SeekFrom::Start(10));
         assert_eq!(result, Ok(10));
         assert_eq!(open_file.offset, 10);
 
-        let result = open_file.seek(0, Whence::SeekSet);
+        let result = open_file.seek(SeekFrom::Start(0));
         assert_eq!(result, Ok(0));
         assert_eq!(open_file.offset, 0);
 
-        let result = open_file.seek(3, Whence::SeekSet);
+        let result = open_file.seek(SeekFrom::Start(3));
         assert_eq!(result, Ok(3));
-        assert_eq!(open_file.offset, 3);
-
-        let result = open_file.seek(-1, Whence::SeekSet);
-        assert_eq!(result, Err(Errno::EINVAL));
         assert_eq!(open_file.offset, 3);
     }
 
     #[test]
-    fn regular_file_seek_cur() {
+    fn regular_file_seek_from_current() {
         let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode::new([]))),
             offset: 5,
@@ -465,25 +463,25 @@ mod tests {
             is_appending: false,
         };
 
-        let result = open_file.seek(10, Whence::SeekCur);
+        let result = open_file.seek(SeekFrom::Current(10));
         assert_eq!(result, Ok(15));
         assert_eq!(open_file.offset, 15);
 
-        let result = open_file.seek(0, Whence::SeekCur);
+        let result = open_file.seek(SeekFrom::Current(0));
         assert_eq!(result, Ok(15));
         assert_eq!(open_file.offset, 15);
 
-        let result = open_file.seek(-5, Whence::SeekCur);
+        let result = open_file.seek(SeekFrom::Current(-5));
         assert_eq!(result, Ok(10));
         assert_eq!(open_file.offset, 10);
 
-        let result = open_file.seek(-11, Whence::SeekCur);
+        let result = open_file.seek(SeekFrom::Current(-11));
         assert_eq!(result, Err(Errno::EINVAL));
         assert_eq!(open_file.offset, 10);
     }
 
     #[test]
-    fn regular_file_seek_end() {
+    fn regular_file_seek_from_end() {
         let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
             offset: 2,
@@ -492,19 +490,19 @@ mod tests {
             is_appending: false,
         };
 
-        let result = open_file.seek(7, Whence::SeekEnd);
+        let result = open_file.seek(SeekFrom::End(7));
         assert_eq!(result, Ok(10));
         assert_eq!(open_file.offset, 10);
 
-        let result = open_file.seek(0, Whence::SeekEnd);
+        let result = open_file.seek(SeekFrom::End(0));
         assert_eq!(result, Ok(3));
         assert_eq!(open_file.offset, 3);
 
-        let result = open_file.seek(-3, Whence::SeekEnd);
+        let result = open_file.seek(SeekFrom::End(-3));
         assert_eq!(result, Ok(0));
         assert_eq!(open_file.offset, 0);
 
-        let result = open_file.seek(-4, Whence::SeekEnd);
+        let result = open_file.seek(SeekFrom::End(-4));
         assert_eq!(result, Err(Errno::EINVAL));
         assert_eq!(open_file.offset, 0);
     }

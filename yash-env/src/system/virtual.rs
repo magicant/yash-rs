@@ -562,22 +562,7 @@ impl System for VirtualSystem {
     }
 
     fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
-        use nix::unistd::Whence::*;
-        let (offset, whence) = match position {
-            SeekFrom::Start(offset) => {
-                let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
-                (offset, SeekSet)
-            }
-            SeekFrom::End(offset) => {
-                let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
-                (offset, SeekEnd)
-            }
-            SeekFrom::Current(offset) => {
-                let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
-                (offset, SeekCur)
-            }
-        };
-        self.with_open_file_description_mut(fd, |ofd| ofd.seek(offset, whence))
+        self.with_open_file_description_mut(fd, |ofd| ofd.seek(position))
             .and_then(|new_offset| new_offset.try_into().map_err(|_| Errno::EOVERFLOW))
     }
 
