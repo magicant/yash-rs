@@ -469,10 +469,10 @@ impl System for &SharedSystem {
     fn shell_path(&self) -> CString {
         self.0.borrow().shell_path()
     }
-    fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair> {
+    fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
         self.0.borrow().getrlimit(resource)
     }
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> std::io::Result<()> {
+    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()> {
         self.0.borrow_mut().setrlimit(resource, limits)
     }
 }
@@ -698,11 +698,11 @@ impl System for SharedSystem {
         (&self).shell_path()
     }
     #[inline]
-    fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair> {
+    fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
         (&self).getrlimit(resource)
     }
     #[inline]
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> std::io::Result<()> {
+    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()> {
         (&mut &*self).setrlimit(resource, limits)
     }
 }

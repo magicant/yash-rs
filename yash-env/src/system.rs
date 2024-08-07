@@ -459,7 +459,7 @@ pub trait System: Debug {
     /// This is a thin wrapper around the `getrlimit` system call.
     ///
     /// [`RLIM_INFINITY`]: self::resource::RLIM_INFINITY
-    fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair>;
+    fn getrlimit(&self, resource: Resource) -> Result<LimitPair>;
 
     /// Sets the limits for the specified resource.
     ///
@@ -468,7 +468,7 @@ pub trait System: Debug {
     /// This is a thin wrapper around the `setrlimit` system call.
     ///
     /// [`RLIM_INFINITY`]: self::resource::RLIM_INFINITY
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> std::io::Result<()>;
+    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()>;
 }
 
 /// Set of consumed CPU time

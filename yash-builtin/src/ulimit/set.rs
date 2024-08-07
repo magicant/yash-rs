@@ -17,8 +17,8 @@
 //! Setting resource limits
 
 use super::{Error, ResourceExt as _, SetLimitType, SetLimitValue};
-use std::io::ErrorKind;
 use yash_env::system::resource::{LimitPair, Resource, RLIM_INFINITY};
+use yash_env::system::Errno;
 use yash_env::System;
 
 /// Environment for setting resource limits
@@ -27,19 +27,19 @@ use yash_env::System;
 /// setting resource limits.
 pub trait Env {
     /// See [`System::getrlimit`]
-    fn getrlimit(&self, resource: Resource) -> Result<LimitPair, std::io::Error>;
+    fn getrlimit(&self, resource: Resource) -> Result<LimitPair, Errno>;
     /// See [`System::setrlimit`]
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<(), std::io::Error>;
+    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<(), Errno>;
 }
 
 impl<T: System> Env for T {
     #[inline(always)]
-    fn getrlimit(&self, resource: Resource) -> Result<LimitPair, std::io::Error> {
+    fn getrlimit(&self, resource: Resource) -> Result<LimitPair, Errno> {
         System::getrlimit(self, resource)
     }
 
     #[inline(always)]
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<(), std::io::Error> {
+    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<(), Errno> {
         System::setrlimit(self, resource, limits)
     }
 }
@@ -51,11 +51,11 @@ pub fn set<E: Env>(
     limit_type: SetLimitType,
     new_limit: SetLimitValue,
 ) -> Result<(), super::Error> {
-    let old_limits = env.getrlimit(resource).map_err(|e| {
-        if e.kind() == ErrorKind::InvalidInput {
+    let old_limits = env.getrlimit(resource).map_err(|errno| {
+        if errno == Errno::EINVAL {
             Error::UnsupportedResource
         } else {
-            Error::Unknown(e)
+            Error::Unknown(errno)
         }
     })?;
 
@@ -90,10 +90,8 @@ pub fn set<E: Env>(
 
     match env.setrlimit(resource, new_limits) {
         Ok(()) => Ok(()),
-        Err(e) if e.kind() == ErrorKind::PermissionDenied => {
-            Err(Error::NoPermissionToRaiseHardLimit)
-        }
-        Err(e) => Err(Error::Unknown(e)),
+        Err(Errno::EPERM) => Err(Error::NoPermissionToRaiseHardLimit),
+        Err(errno) => Err(Error::Unknown(errno)),
     }
 }
 
@@ -401,15 +399,11 @@ mod tests {
     fn set_unsupported_resource() {
         struct ResourcelessSystem;
         impl Env for ResourcelessSystem {
-            fn getrlimit(&self, _resource: Resource) -> Result<LimitPair, std::io::Error> {
-                Err(ErrorKind::InvalidInput.into())
+            fn getrlimit(&self, _resource: Resource) -> Result<LimitPair, Errno> {
+                Err(Errno::EINVAL)
             }
-            fn setrlimit(
-                &mut self,
-                _resource: Resource,
-                _limits: LimitPair,
-            ) -> Result<(), std::io::Error> {
-                Err(ErrorKind::InvalidInput.into())
+            fn setrlimit(&mut self, _resource: Resource, _limits: LimitPair) -> Result<(), Errno> {
+                Err(Errno::EINVAL)
             }
         }
 

@@ -762,10 +762,8 @@ impl System for RealSystem {
         c"/bin/sh".to_owned()
     }
 
-    fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair> {
-        let raw_resource = resource
-            .as_raw_type()
-            .ok_or_else(|| std::io::Error::from_raw_os_error(nix::libc::EINVAL as _))?;
+    fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
+        let raw_resource = resource.as_raw_type().ok_or(Errno::EINVAL)?;
 
         let mut limits = MaybeUninit::<nix::libc::rlimit>::uninit();
         unsafe { nix::libc::getrlimit(raw_resource as _, limits.as_mut_ptr()) }.errno_if_m1()?;
@@ -773,10 +771,8 @@ impl System for RealSystem {
         Ok(limits.into())
     }
 
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> std::io::Result<()> {
-        let raw_resource = resource
-            .as_raw_type()
-            .ok_or_else(|| std::io::Error::from_raw_os_error(nix::libc::EINVAL as _))?;
+    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()> {
+        let raw_resource = resource.as_raw_type().ok_or(Errno::EINVAL)?;
 
         let limits = limits.into();
         unsafe { nix::libc::setrlimit(raw_resource as _, &limits) }.errno_if_m1()?;

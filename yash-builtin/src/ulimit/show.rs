@@ -24,6 +24,7 @@ use yash_env::system::resource::rlim_t;
 use yash_env::system::resource::LimitPair;
 use yash_env::system::resource::Resource;
 use yash_env::system::resource::RLIM_INFINITY;
+use yash_env::system::Errno;
 
 /// A wrapper for `rlim_t` that implements `Display`.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -48,7 +49,7 @@ impl std::fmt::Display for Limit {
 /// Each line shows the option, description, and limit for a resource.
 pub fn show_all<F>(mut getrlimit: F, limit_type: ShowLimitType) -> String
 where
-    F: FnMut(Resource) -> Result<LimitPair, std::io::Error>,
+    F: FnMut(Resource) -> Result<LimitPair, Errno>,
 {
     let mut result = String::with_capacity(1024);
     for &resource in Resource::ALL {
@@ -78,7 +79,7 @@ pub fn show_one<F>(
     limit_type: ShowLimitType,
 ) -> Result<String, Error>
 where
-    F: FnOnce(Resource) -> Result<LimitPair, std::io::Error>,
+    F: FnOnce(Resource) -> Result<LimitPair, Errno>,
 {
     match getrlimit(resource) {
         Ok(limits) => {
@@ -91,8 +92,8 @@ where
             Ok(format!("{}\n", limit))
         }
 
-        Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => Err(Error::UnsupportedResource),
-        Err(e) => Err(Error::Unknown(e)),
+        Err(Errno::EINVAL) => Err(Error::UnsupportedResource),
+        Err(errno) => Err(Error::Unknown(errno)),
     }
 }
 
@@ -141,7 +142,7 @@ mod tests {
             if resource == Resource::CPU {
                 Ok(LimitPair { soft: 5, hard: 12 })
             } else {
-                Err(Errno::EINVAL.into())
+                Err(Errno::EINVAL)
             }
         };
         let result = show_all(getrlimit, ShowLimitType::Soft);
@@ -157,7 +158,7 @@ mod tests {
                     hard: 12 << 10,
                 })
             } else {
-                Err(Errno::EINVAL.into())
+                Err(Errno::EINVAL)
             }
         };
         let result = show_all(getrlimit, ShowLimitType::Soft);
@@ -170,7 +171,7 @@ mod tests {
             if resource == Resource::CPU {
                 Ok(LimitPair { soft: 5, hard: 12 })
             } else {
-                Err(Errno::EINVAL.into())
+                Err(Errno::EINVAL)
             }
         };
         let result = show_all(getrlimit, ShowLimitType::Hard);
@@ -214,7 +215,7 @@ mod tests {
 
     #[test]
     fn show_one_unsupported_resource() {
-        let getrlimit = |_: Resource| Err(Errno::EINVAL.into());
+        let getrlimit = |_: Resource| Err(Errno::EINVAL);
         let result = show_one(getrlimit, Resource::CPU, ShowLimitType::Soft);
         assert_matches!(result, Err(Error::UnsupportedResource));
     }

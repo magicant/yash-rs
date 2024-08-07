@@ -146,6 +146,7 @@
 use crate::common::{output, report_error, report_simple_failure};
 use yash_env::semantics::Field;
 use yash_env::system::resource::{rlim_t, Resource};
+use yash_env::system::Errno;
 use yash_env::Env;
 use yash_env::System as _;
 
@@ -219,8 +220,8 @@ pub enum Error {
     #[error("limit out of range")]
     Overflow,
     /// Other error
-    #[error(transparent)]
-    Unknown(std::io::Error),
+    #[error("unexpected error: {}", .0)]
+    Unknown(Errno),
 }
 
 impl Command {

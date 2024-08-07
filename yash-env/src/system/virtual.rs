@@ -1014,9 +1014,9 @@ impl System for VirtualSystem {
         c"/bin/sh".to_owned()
     }
 
-    fn getrlimit(&self, resource: Resource) -> std::io::Result<LimitPair> {
-        let process = self.current_process();
-        Ok(process
+    fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
+        Ok(self
+            .current_process()
             .resource_limits
             .get(&resource)
             .copied()
@@ -1026,9 +1026,9 @@ impl System for VirtualSystem {
             }))
     }
 
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> std::io::Result<()> {
+    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()> {
         if limits.soft_exceeds_hard() {
-            return Err(std::io::Error::from_raw_os_error(nix::libc::EINVAL));
+            return Err(Errno::EINVAL);
         }
 
         let mut process = self.current_process_mut();
@@ -1037,7 +1037,7 @@ impl System for VirtualSystem {
             Occupied(occupied) => {
                 let occupied = occupied.into_mut();
                 if limits.hard > occupied.hard {
-                    return Err(std::io::Error::from_raw_os_error(nix::libc::EPERM));
+                    return Err(Errno::EPERM);
                 }
                 *occupied = limits;
             }
@@ -2677,8 +2677,7 @@ mod tests {
     fn setrlimit_rejects_soft_limit_higher_than_hard_limit() {
         let mut system = VirtualSystem::new();
         let result = system.setrlimit(Resource::CPU, LimitPair { soft: 2, hard: 1 });
-        let error = result.unwrap_err();
-        assert_eq!(error.raw_os_error(), Some(nix::libc::EINVAL));
+        assert_eq!(result, Err(Errno::EINVAL));
 
         // The limits should not have been changed
         let result = system.getrlimit(Resource::CPU).unwrap();
@@ -2698,8 +2697,7 @@ mod tests {
             .setrlimit(Resource::CPU, LimitPair { soft: 1, hard: 1 })
             .unwrap();
         let result = system.setrlimit(Resource::CPU, LimitPair { soft: 1, hard: 2 });
-        let error = result.unwrap_err();
-        assert_eq!(error.raw_os_error(), Some(nix::libc::EPERM));
+        assert_eq!(result, Err(Errno::EPERM));
 
         // The limits should not have been changed
         let result = system.getrlimit(Resource::CPU).unwrap();

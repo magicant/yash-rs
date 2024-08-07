@@ -45,8 +45,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of a `nix::sys::signal::SigmaskHow` parameter.
 - The `system::System::select` method now takes a `Duration` instead of a
   `nix::sys::time::TimeSpec` for the optional timeout parameter.
-- The `dup`, `fcntl_getfl`, and `fcntl_setfl` methods now operate on an
-  `EnumSet<FdFlag>` parameter instead of an `nix::fcntl::FdFlag` parameter.
+- The `dup`, `fcntl_getfl`, and `fcntl_setfl` methods of `system::System` now
+  operate on an `EnumSet<FdFlag>` parameter instead of an `nix::fcntl::FdFlag`
+  parameter.
+- The `getrlimit` and `setrlimit` methods of `system::System` now returns an
+  error of type `system::Errno` instead of `std::io::Error`.
 - The `flags: enumset::EnumSet<FdFlag>` field of
   `yash_env::system::virtual::FdBody` has replaced
   the `flag: nix::fcntl::FdFlag` field.

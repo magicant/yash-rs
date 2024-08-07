@@ -5,10 +5,18 @@ All notable changes to `yash-builtin` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.1] - Unreleased
+## [0.4.0] - Unreleased
 
 ### Changed
 
+- The `yash_builtin::ulimit::Error::Unknown` variant now contains a
+  `yash_env::system::Errno` instead of a `std::io::Error`.
+- The `getrlimit` and `setrlimit` methods of the
+  `yash_builtin::ulimit::set::Env` trait now return an error of type `Errno`
+  instead of a `std::io::Error`.
+- The `show_one` and `show_all` functions in the `yash_builtin::ulimit::show`
+  module now takes a function that returns an error of type `Errno` instead of
+  `std::io::Error`.
 - External dependency versions:
     - Rust 1.77.0 → 1.79.0
 
@@ -91,7 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial implementation of the `yash-builtin` crate
 
-[0.3.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.3.1
+[0.4.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.4.0
 [0.3.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.3.0
 [0.2.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.2.0
 [0.1.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.1.0
