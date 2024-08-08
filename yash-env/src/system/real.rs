@@ -19,6 +19,7 @@
 mod errno;
 mod file_system;
 mod open_flag;
+mod resource;
 mod signal;
 
 use super::resource::LimitPair;
