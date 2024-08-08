@@ -25,13 +25,12 @@
 /// Unsigned integer type for resource limits
 ///
 /// The size of this type may vary depending on the platform.
-#[allow(non_camel_case_types)]
-pub type rlim_t = nix::libc::rlim_t;
+pub type Limit = nix::libc::rlim_t;
 
 /// Constant to specify an unlimited resource limit
 ///
 /// The value of this constant is platform-specific.
-pub const RLIM_INFINITY: rlim_t = nix::libc::RLIM_INFINITY;
+pub const INFINITY: Limit = nix::libc::RLIM_INFINITY;
 
 // No platforms are known to define `RLIM_SAVED_CUR` and `RLIM_SAVED_MAX` that
 // have different values from `RLIM_INFINITY`, so they are not defined here.
@@ -207,18 +206,19 @@ impl Resource {
 /// Pair of soft and hard limits
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct LimitPair {
-    pub soft: rlim_t,
-    pub hard: rlim_t,
+    pub soft: Limit,
+    pub hard: Limit,
 }
 
 impl LimitPair {
     /// Returns `true` if the soft limit exceeds the hard limit
     #[must_use]
     pub fn soft_exceeds_hard(&self) -> bool {
-        self.hard != RLIM_INFINITY && (self.soft == RLIM_INFINITY || self.soft > self.hard)
+        self.hard != INFINITY && (self.soft == INFINITY || self.soft > self.hard)
     }
 }
 
+// TODO Remove this
 impl From<LimitPair> for nix::libc::rlimit {
     fn from(limits: LimitPair) -> Self {
         Self {
@@ -228,6 +228,7 @@ impl From<LimitPair> for nix::libc::rlimit {
     }
 }
 
+// TODO Remove this
 impl From<nix::libc::rlimit> for LimitPair {
     fn from(limits: nix::libc::rlimit) -> Self {
         Self {

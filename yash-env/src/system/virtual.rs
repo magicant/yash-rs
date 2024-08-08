@@ -55,7 +55,7 @@ pub use self::process::*;
 pub use self::signal::*;
 use super::resource::LimitPair;
 use super::resource::Resource;
-use super::resource::RLIM_INFINITY;
+use super::resource::INFINITY;
 use super::Dir;
 use super::Errno;
 use super::FdFlag;
@@ -1021,8 +1021,8 @@ impl System for VirtualSystem {
             .get(&resource)
             .copied()
             .unwrap_or(LimitPair {
-                soft: RLIM_INFINITY,
-                hard: RLIM_INFINITY,
+                soft: INFINITY,
+                hard: INFINITY,
             }))
     }
 
@@ -2639,8 +2639,8 @@ mod tests {
         assert_eq!(
             result,
             LimitPair {
-                soft: RLIM_INFINITY,
-                hard: RLIM_INFINITY,
+                soft: INFINITY,
+                hard: INFINITY,
             },
         );
     }
@@ -2684,8 +2684,8 @@ mod tests {
         assert_eq!(
             result,
             LimitPair {
-                soft: RLIM_INFINITY,
-                hard: RLIM_INFINITY,
+                soft: INFINITY,
+                hard: INFINITY,
             },
         );
     }

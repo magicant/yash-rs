@@ -145,7 +145,7 @@
 
 use crate::common::{output, report_error, report_simple_failure};
 use yash_env::semantics::Field;
-use yash_env::system::resource::{rlim_t, Resource};
+use yash_env::system::resource::{Limit, Resource};
 use yash_env::system::Errno;
 use yash_env::Env;
 use yash_env::System as _;
@@ -175,7 +175,7 @@ pub enum SetLimitType {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SetLimitValue {
     /// Numeric value (not scaled)
-    Number(rlim_t),
+    Number(Limit),
     /// No limit
     Unlimited,
     /// Current soft limit

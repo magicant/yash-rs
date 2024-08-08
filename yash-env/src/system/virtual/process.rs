@@ -28,7 +28,7 @@ use crate::job::ProcessResult;
 use crate::job::ProcessState;
 use crate::system::resource::LimitPair;
 use crate::system::resource::Resource;
-use crate::system::resource::RLIM_INFINITY;
+use crate::system::resource::INFINITY;
 use crate::system::SelectSystem;
 use crate::SignalHandling;
 use std::cell::Cell;
@@ -275,10 +275,10 @@ impl Process {
             .resource_limits
             .get(&Resource::NOFILE)
             .map(|l| l.soft)
-            .unwrap_or(RLIM_INFINITY);
+            .unwrap_or(INFINITY);
 
         #[allow(clippy::unnecessary_cast)]
-        if limit == RLIM_INFINITY || (fd.0 as u64) < limit as u64 {
+        if limit == INFINITY || (fd.0 as u64) < limit as u64 {
             Ok(self.fds.insert(fd, body))
         } else {
             Err(body)
