@@ -22,15 +22,25 @@
 //! [`getrlimit`]: super::System::getrlimit
 //! [`setrlimit`]: super::System::setrlimit
 
+#[cfg(unix)]
+type RawLimit = nix::libc::rlim_t;
+#[cfg(not(unix))]
+type RawLimit = u64;
+
 /// Unsigned integer type for resource limits
 ///
 /// The size of this type may vary depending on the platform.
-pub type Limit = nix::libc::rlim_t;
+pub type Limit = RawLimit;
+
+#[cfg(unix)]
+const RLIM_INFINITY: Limit = nix::libc::RLIM_INFINITY;
+#[cfg(not(unix))]
+const RLIM_INFINITY: Limit = Limit::MAX;
 
 /// Constant to specify an unlimited resource limit
 ///
 /// The value of this constant is platform-specific.
-pub const INFINITY: Limit = nix::libc::RLIM_INFINITY;
+pub const INFINITY: Limit = RLIM_INFINITY;
 
 // No platforms are known to define `RLIM_SAVED_CUR` and `RLIM_SAVED_MAX` that
 // have different values from `RLIM_INFINITY`, so they are not defined here.
