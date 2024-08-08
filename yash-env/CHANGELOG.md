@@ -79,6 +79,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All the fields of the `system::virtual::OpenFileDescription` struct are now
   private.
 - `impl TryFrom<semantics::ExitStatus> for nix::sys::signal::Signal`
+- `impl From<system::resource::LimitPair> for nix::libc::rlimit`
+- `impl From<nix::libc::rlimit> for system::resource::LimitPair`
 
 ## [0.2.1] - 2024-07-12
 

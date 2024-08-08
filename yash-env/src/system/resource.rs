@@ -227,23 +227,3 @@ impl LimitPair {
         self.hard != INFINITY && (self.soft == INFINITY || self.soft > self.hard)
     }
 }
-
-// TODO Remove this
-impl From<LimitPair> for nix::libc::rlimit {
-    fn from(limits: LimitPair) -> Self {
-        Self {
-            rlim_cur: limits.soft,
-            rlim_max: limits.hard,
-        }
-    }
-}
-
-// TODO Remove this
-impl From<nix::libc::rlimit> for LimitPair {
-    fn from(limits: nix::libc::rlimit) -> Self {
-        Self {
-            soft: limits.rlim_cur,
-            hard: limits.rlim_max,
-        }
-    }
-}
