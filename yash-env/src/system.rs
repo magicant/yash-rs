@@ -454,20 +454,20 @@ pub trait System: Debug {
     /// resource. The soft limit is the current limit, and the hard limit is the
     /// maximum value that the soft limit can be set to.
     ///
-    /// When no limit is set, the limit value is [`RLIM_INFINITY`].
+    /// When no limit is set, the limit value is [`INFINITY`].
     ///
     /// This is a thin wrapper around the `getrlimit` system call.
     ///
-    /// [`RLIM_INFINITY`]: self::resource::RLIM_INFINITY
+    /// [`INFINITY`]: self::resource::INFINITY
     fn getrlimit(&self, resource: Resource) -> Result<LimitPair>;
 
     /// Sets the limits for the specified resource.
     ///
-    /// Specify [`RLIM_INFINITY`] as the limit value to remove the limit.
+    /// Specify [`INFINITY`] as the limit value to remove the limit.
     ///
     /// This is a thin wrapper around the `setrlimit` system call.
     ///
-    /// [`RLIM_INFINITY`]: self::resource::RLIM_INFINITY
+    /// [`INFINITY`]: self::resource::INFINITY
     fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()>;
 }
 

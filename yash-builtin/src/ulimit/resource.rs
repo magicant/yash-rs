@@ -16,7 +16,7 @@
 
 //! Extension of [`Resource`] for the `ulimit` built-in
 
-use yash_env::system::resource::{rlim_t, Resource};
+use yash_env::system::resource::{Limit, Resource};
 
 /// Extension of [`Resource`] for use in the `ulimit` built-in
 pub trait ResourceExt {
@@ -41,7 +41,7 @@ pub trait ResourceExt {
     /// which means that the user sees and sets the limit in kilobytes, but the
     /// underlying system call operates in bytes.
     #[must_use]
-    fn scale(&self) -> rlim_t;
+    fn scale(&self) -> Limit;
 }
 
 impl ResourceExt for Resource {
@@ -95,7 +95,7 @@ impl ResourceExt for Resource {
         }
     }
 
-    fn scale(&self) -> rlim_t {
+    fn scale(&self) -> Limit {
         match self {
             Self::AS | Self::DATA | Self::MEMLOCK | Self::RSS | Self::STACK | Self::SWAP => 1 << 10,
             Self::CORE | Self::FSIZE => 1 << 9,

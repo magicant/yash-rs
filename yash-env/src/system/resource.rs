@@ -22,16 +22,25 @@
 //! [`getrlimit`]: super::System::getrlimit
 //! [`setrlimit`]: super::System::setrlimit
 
+#[cfg(unix)]
+type RawLimit = nix::libc::rlim_t;
+#[cfg(not(unix))]
+type RawLimit = u64;
+
 /// Unsigned integer type for resource limits
 ///
 /// The size of this type may vary depending on the platform.
-#[allow(non_camel_case_types)]
-pub type rlim_t = nix::libc::rlim_t;
+pub type Limit = RawLimit;
+
+#[cfg(unix)]
+const RLIM_INFINITY: Limit = nix::libc::RLIM_INFINITY;
+#[cfg(not(unix))]
+const RLIM_INFINITY: Limit = Limit::MAX;
 
 /// Constant to specify an unlimited resource limit
 ///
 /// The value of this constant is platform-specific.
-pub const RLIM_INFINITY: rlim_t = nix::libc::RLIM_INFINITY;
+pub const INFINITY: Limit = RLIM_INFINITY;
 
 // No platforms are known to define `RLIM_SAVED_CUR` and `RLIM_SAVED_MAX` that
 // have different values from `RLIM_INFINITY`, so they are not defined here.
@@ -41,12 +50,13 @@ pub const RLIM_INFINITY: rlim_t = nix::libc::RLIM_INFINITY;
 /// Resource type definition
 ///
 /// A `Resource` value represents a resource whose limit can be retrieved or
-/// set using `getrlimit` and `setrlimit`.
+/// set using [`getrlimit`] and [`setrlimit`].
 ///
 /// This enum contains all possible resource types that may or may not be
-/// available depending on the platform. To see if a resource is available on
-/// the current platform, check the result of
-/// [`as_raw_type`](Self::as_raw_type).
+/// available depending on the platform.
+///
+/// [`getrlimit`]: super::System::getrlimit
+/// [`setrlimit`]: super::System::setrlimit
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Resource {
@@ -118,121 +128,19 @@ impl Resource {
         Self::STACK,
         Self::SWAP,
     ];
-
-    /// Returns the platform-specific constant value of this resource type.
-    ///
-    /// This method returns `None` if the resource type is not available on the
-    /// current platform.
-    #[must_use]
-    pub const fn as_raw_type(&self) -> Option<std::ffi::c_int> {
-        match *self {
-            #[cfg(not(any(target_env = "newlib", target_os = "redox")))]
-            Self::AS => Some(nix::libc::RLIMIT_AS as _),
-            Self::CORE => Some(nix::libc::RLIMIT_CORE as _),
-            Self::CPU => Some(nix::libc::RLIMIT_CPU as _),
-            Self::DATA => Some(nix::libc::RLIMIT_DATA as _),
-            Self::FSIZE => Some(nix::libc::RLIMIT_FSIZE as _),
-            #[cfg(target_os = "freebsd")]
-            Self::KQUEUES => Some(nix::libc::RLIMIT_KQUEUES as _),
-            #[cfg(any(target_os = "linux", target_os = "android", target_os = "emscripten"))]
-            Self::LOCKS => Some(nix::libc::RLIMIT_LOCKS as _),
-            #[cfg(any(
-                target_os = "macos",
-                target_os = "ios",
-                target_os = "tvos",
-                target_os = "watchos",
-                target_os = "freebsd",
-                target_os = "dragonfly",
-                target_os = "openbsd",
-                target_os = "netbsd",
-                target_os = "linux",
-                target_os = "android",
-                target_os = "emscripten",
-                target_os = "nto"
-            ))]
-            Self::MEMLOCK => Some(nix::libc::RLIMIT_MEMLOCK as _),
-            #[cfg(any(target_os = "linux", target_os = "android", target_os = "emscripten"))]
-            Self::MSGQUEUE => Some(nix::libc::RLIMIT_MSGQUEUE as _),
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            Self::NICE => Some(nix::libc::RLIMIT_NICE as _),
-            Self::NOFILE => Some(nix::libc::RLIMIT_NOFILE as _),
-            #[cfg(any(
-                target_os = "aix",
-                target_os = "macos",
-                target_os = "ios",
-                target_os = "tvos",
-                target_os = "watchos",
-                target_os = "freebsd",
-                target_os = "dragonfly",
-                target_os = "openbsd",
-                target_os = "netbsd",
-                target_os = "linux",
-                target_os = "android",
-                target_os = "emscripten",
-                target_os = "nto"
-            ))]
-            Self::NPROC => Some(nix::libc::RLIMIT_NPROC as _),
-            #[cfg(any(
-                target_os = "aix",
-                target_os = "macos",
-                target_os = "ios",
-                target_os = "tvos",
-                target_os = "watchos",
-                target_os = "freebsd",
-                target_os = "dragonfly",
-                target_os = "openbsd",
-                target_os = "netbsd",
-                target_os = "linux",
-                target_os = "android",
-                target_os = "emscripten",
-                target_os = "nto"
-            ))]
-            Self::RSS => Some(nix::libc::RLIMIT_RSS as _),
-            #[cfg(any(target_os = "linux", target_os = "android", target_os = "emscripten"))]
-            Self::RTPRIO => Some(nix::libc::RLIMIT_RTPRIO as _),
-            #[cfg(target_os = "linux")]
-            Self::RTTIME => Some(nix::libc::RLIMIT_RTTIME as _),
-            #[cfg(any(target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd"))]
-            Self::SBSIZE => Some(nix::libc::RLIMIT_SBSIZE as _),
-            #[cfg(any(target_os = "linux", target_os = "android", target_os = "emscripten"))]
-            Self::SIGPENDING => Some(nix::libc::RLIMIT_SIGPENDING as _),
-            Self::STACK => Some(nix::libc::RLIMIT_STACK as _),
-            #[cfg(target_os = "freebsd")]
-            Self::SWAP => Some(nix::libc::RLIMIT_SWAP as _),
-            _ => None,
-        }
-    }
 }
 
 /// Pair of soft and hard limits
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct LimitPair {
-    pub soft: rlim_t,
-    pub hard: rlim_t,
+    pub soft: Limit,
+    pub hard: Limit,
 }
 
 impl LimitPair {
     /// Returns `true` if the soft limit exceeds the hard limit
     #[must_use]
     pub fn soft_exceeds_hard(&self) -> bool {
-        self.hard != RLIM_INFINITY && (self.soft == RLIM_INFINITY || self.soft > self.hard)
-    }
-}
-
-impl From<LimitPair> for nix::libc::rlimit {
-    fn from(limits: LimitPair) -> Self {
-        Self {
-            rlim_cur: limits.soft,
-            rlim_max: limits.hard,
-        }
-    }
-}
-
-impl From<nix::libc::rlimit> for LimitPair {
-    fn from(limits: nix::libc::rlimit) -> Self {
-        Self {
-            soft: limits.rlim_cur,
-            hard: limits.rlim_max,
-        }
+        self.hard != INFINITY && (self.soft == INFINITY || self.soft > self.hard)
     }
 }

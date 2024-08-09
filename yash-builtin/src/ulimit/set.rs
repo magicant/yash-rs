@@ -17,7 +17,7 @@
 //! Setting resource limits
 
 use super::{Error, ResourceExt as _, SetLimitType, SetLimitValue};
-use yash_env::system::resource::{LimitPair, Resource, RLIM_INFINITY};
+use yash_env::system::resource::{LimitPair, Resource, INFINITY};
 use yash_env::system::Errno;
 use yash_env::System;
 
@@ -62,9 +62,9 @@ pub fn set<E: Env>(
     let new_limit = match new_limit {
         SetLimitValue::Number(limit) => limit
             .checked_mul(resource.scale())
-            .filter(|limit| *limit != RLIM_INFINITY)
+            .filter(|limit| *limit != INFINITY)
             .ok_or(Error::Overflow)?,
-        SetLimitValue::Unlimited => RLIM_INFINITY,
+        SetLimitValue::Unlimited => INFINITY,
         SetLimitValue::CurrentSoft => old_limits.soft,
         SetLimitValue::CurrentHard => old_limits.hard,
     };
@@ -99,7 +99,7 @@ pub fn set<E: Env>(
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use yash_env::system::resource::{rlim_t, RLIM_INFINITY};
+    use yash_env::system::resource::Limit;
     use yash_env::VirtualSystem;
 
     #[test]
@@ -118,7 +118,7 @@ mod tests {
             limits,
             LimitPair {
                 soft: 0,
-                hard: RLIM_INFINITY
+                hard: INFINITY
             }
         );
     }
@@ -182,8 +182,8 @@ mod tests {
         assert_eq!(
             limits,
             LimitPair {
-                soft: RLIM_INFINITY,
-                hard: RLIM_INFINITY
+                soft: INFINITY,
+                hard: INFINITY
             }
         );
     }
@@ -358,7 +358,7 @@ mod tests {
             &mut system,
             Resource::FSIZE,
             SetLimitType::Both,
-            SetLimitValue::Number(rlim_t::MAX / 2),
+            SetLimitValue::Number(Limit::MAX / 2),
         );
         assert_matches!(result, Err(Error::Overflow));
     }
@@ -370,7 +370,7 @@ mod tests {
             &mut system,
             Resource::CPU,
             SetLimitType::Both,
-            SetLimitValue::Number(RLIM_INFINITY),
+            SetLimitValue::Number(INFINITY),
         );
         assert_matches!(result, Err(Error::Overflow));
     }

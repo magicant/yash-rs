@@ -20,22 +20,24 @@ use super::Error;
 use super::ResourceExt as _;
 use super::ShowLimitType;
 use std::fmt::Write as _;
-use yash_env::system::resource::rlim_t;
+use yash_env::system::resource::Limit as RawLimit;
 use yash_env::system::resource::LimitPair;
 use yash_env::system::resource::Resource;
-use yash_env::system::resource::RLIM_INFINITY;
+use yash_env::system::resource::INFINITY;
 use yash_env::system::Errno;
 
-/// A wrapper for `rlim_t` that implements `Display`.
+/// Wrapper for the raw limit value for implementing `std::fmt::Display`.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct Limit {
-    value: rlim_t,
-    scale: rlim_t,
+    /// Raw limit value
+    value: RawLimit,
+    /// Scale to divide the raw limit value when displaying
+    scale: RawLimit,
 }
 
 impl std::fmt::Display for Limit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.value == RLIM_INFINITY {
+        if self.value == INFINITY {
             "unlimited".fmt(f)
         } else {
             (self.value / self.scale).fmt(f)
@@ -107,8 +109,8 @@ mod tests {
     fn show_all_infinity() {
         let getrlimit = |_: Resource| {
             Ok(LimitPair {
-                soft: RLIM_INFINITY,
-                hard: RLIM_INFINITY,
+                soft: INFINITY,
+                hard: INFINITY,
             })
         };
         let result = show_all(getrlimit, ShowLimitType::Soft);
@@ -182,8 +184,8 @@ mod tests {
     fn show_one_infinite() {
         let getrlimit = |_: Resource| {
             Ok(LimitPair {
-                soft: RLIM_INFINITY,
-                hard: RLIM_INFINITY,
+                soft: INFINITY,
+                hard: INFINITY,
             })
         };
         let result = show_one(getrlimit, Resource::DATA, ShowLimitType::Soft).unwrap();

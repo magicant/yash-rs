@@ -50,6 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parameter.
 - The `getrlimit` and `setrlimit` methods of `system::System` now returns an
   error of type `system::Errno` instead of `std::io::Error`.
+- In the `system::resource` module:
+    - The `rlim_t` type has been renamed to `Limit`.
+    - The `RLIM_INFINITY` constant has been renamed to `INFINITY`.
 - The `flags: enumset::EnumSet<FdFlag>` field of
   `yash_env::system::virtual::FdBody` has replaced
   the `flag: nix::fcntl::FdFlag` field.
@@ -73,9 +76,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `nix::sys::signal::SigmaskHow`, and `nix::sys::time::TimeSpec`.
 - The `fcntl_getfl` and `fcntl_setfl` methods from the `System` trait
 - The `system::Errno` struct's `last` and `clear` methods are no longer public.
+- The `system::resource::Resource::as_raw_type` method is no longer public.
 - All the fields of the `system::virtual::OpenFileDescription` struct are now
   private.
 - `impl TryFrom<semantics::ExitStatus> for nix::sys::signal::Signal`
+- `impl From<system::resource::LimitPair> for nix::libc::rlimit`
+- `impl From<nix::libc::rlimit> for system::resource::LimitPair`
 
 ## [0.2.1] - 2024-07-12
 

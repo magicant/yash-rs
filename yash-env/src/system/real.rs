@@ -19,6 +19,7 @@
 mod errno;
 mod file_system;
 mod open_flag;
+mod resource;
 mod signal;
 
 use super::resource::LimitPair;
@@ -495,7 +496,7 @@ impl System for RealSystem {
             let new_action = handling.to_sigaction();
 
             let mut old_action = MaybeUninit::<nix::libc::sigaction>::uninit();
-            let old_mask_ptr = std::ptr::addr_of_mut!((*old_action.as_mut_ptr()).sa_mask);
+            let old_mask_ptr = addr_of_mut!((*old_action.as_mut_ptr()).sa_mask);
             // POSIX requires *all* sigset_t objects to be initialized before use.
             nix::libc::sigemptyset(old_mask_ptr).errno_if_m1()?;
 
@@ -767,15 +768,22 @@ impl System for RealSystem {
 
         let mut limits = MaybeUninit::<nix::libc::rlimit>::uninit();
         unsafe { nix::libc::getrlimit(raw_resource as _, limits.as_mut_ptr()) }.errno_if_m1()?;
-        let limits = unsafe { limits.assume_init() };
-        Ok(limits.into())
+        Ok(LimitPair {
+            soft: unsafe { addr_of!((*limits.as_ptr()).rlim_cur).read() },
+            hard: unsafe { addr_of!((*limits.as_ptr()).rlim_max).read() },
+        })
     }
 
     fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()> {
         let raw_resource = resource.as_raw_type().ok_or(Errno::EINVAL)?;
 
-        let limits = limits.into();
-        unsafe { nix::libc::setrlimit(raw_resource as _, &limits) }.errno_if_m1()?;
+        let mut rlimit = MaybeUninit::<nix::libc::rlimit>::uninit();
+        unsafe {
+            addr_of_mut!((*rlimit.as_mut_ptr()).rlim_cur).write(limits.soft);
+            addr_of_mut!((*rlimit.as_mut_ptr()).rlim_max).write(limits.hard);
+        }
+
+        unsafe { nix::libc::setrlimit(raw_resource as _, rlimit.as_ptr()) }.errno_if_m1()?;
         Ok(())
     }
 }
