@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `set_gid`, `egid`, and `set_egid`.
 - `system::virtual::VirtualSystem::open` now applies the process's umask to the
   mode argument.
+- The `job::RawPid` type has been added to represent the contents of `job::Pid`.
 - The `stack::Frame` enum now has the `InitFile` variant.
 - External dependencies:
     - enumset 1.1.2 (previously an internal dependency)

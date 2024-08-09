@@ -49,12 +49,30 @@ use std::iter::FusedIterator;
 use std::ops::Deref;
 use thiserror::Error;
 
+#[cfg(unix)]
+type RawPidDef = nix::libc::pid_t;
+#[cfg(not(unix))]
+type RawPidDef = i32;
+
+/// Raw process ID type
+///
+/// This is a type alias for the raw process ID type `pid_t` declared in the
+/// [`libc`] crate. The exact representation of this type is platform-dependent
+/// while POSIX requires the type to be a signed integer. On non-Unix platforms,
+/// this type is hard-coded to `i32`.
+///
+/// Process IDs are usually wrapped in the [`Pid`] type for better type safety,
+/// so this type is not used directly in most cases.
+///
+/// [`libc`]: nix::libc
+pub type RawPid = RawPidDef;
+
 /// Process ID
 ///
 /// A process ID is an integer that identifies a process in the system. This
-/// type implements the newtype pattern around the raw integral type `pid_t`
-/// declared in the [`libc`] crate. The exact representation of this type
-/// depends on the target platform.
+/// type implements the new type pattern around the raw process ID type
+/// [`RawPid`].  The advantage of using this type is that it is more type-safe
+/// than using the raw integer value directly.
 ///
 /// Although genuine process IDs are always positive integers, this type allows
 /// zero or negative values for the purpose of specifying a group of processes
@@ -70,7 +88,7 @@ use thiserror::Error;
 /// [`setpgid`]: crate::system::System::setpgid
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Pid(pub nix::libc::pid_t);
+pub struct Pid(pub RawPid);
 
 impl std::fmt::Display for Pid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
