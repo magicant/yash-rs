@@ -729,20 +729,14 @@ impl System for VirtualSystem {
         for fd in &readers.clone() {
             let body = process.fds().get(&fd).ok_or(Errno::EBADF)?;
             let ofd = body.open_file_description.borrow();
-            if !ofd.is_readable() {
-                return Err(Errno::EBADF);
-            }
-            if !ofd.is_ready_for_reading() {
+            if ofd.is_readable() && !ofd.is_ready_for_reading() {
                 readers.remove(fd);
             }
         }
         for fd in &writers.clone() {
             let body = process.fds().get(&fd).ok_or(Errno::EBADF)?;
             let ofd = body.open_file_description.borrow();
-            if !ofd.is_writable() {
-                return Err(Errno::EBADF);
-            }
-            if !ofd.is_ready_for_writing() {
+            if ofd.is_writable() && !ofd.is_ready_for_writing() {
                 writers.remove(fd);
             }
         }
@@ -2063,7 +2057,8 @@ mod tests {
         let mut fds = FdSet::new();
         fds.insert(writer).unwrap();
         let result = system.select(&mut fds, &mut FdSet::new(), None, None);
-        assert_eq!(result, Err(Errno::EBADF));
+        assert_eq!(result, Ok(1));
+        assert!(fds.contains(writer));
     }
 
     #[test]
@@ -2073,7 +2068,8 @@ mod tests {
         let mut fds = FdSet::new();
         fds.insert(reader).unwrap();
         let result = system.select(&mut FdSet::new(), &mut fds, None, None);
-        assert_eq!(result, Err(Errno::EBADF));
+        assert_eq!(result, Ok(1));
+        assert!(fds.contains(reader));
     }
 
     #[test]

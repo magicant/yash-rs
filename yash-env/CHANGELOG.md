@@ -63,6 +63,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   clone of it.
 - The `system::virtual::OpenFileDescription::seek` method now takes a
   `std::io::SeekFrom` parameter instead of an offset and whence pair.
+- The `system::virtual::VirtualSystem::select` method now treats as ready file
+  descriptors that are contained in `readers` but not readable, or in `writers`
+  but not writable. Previously, the method returned an `EBADF` error in these
+  cases.
 - External dependency versions:
     - Rust 1.77.0 → 1.79.0
 
