@@ -18,7 +18,6 @@
 
 mod errno;
 mod fd_flag;
-pub mod fd_set;
 mod file_system;
 mod id;
 mod open_flag;

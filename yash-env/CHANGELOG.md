@@ -85,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `system::resource::Resource::as_raw_type` method is no longer public.
 - All the fields of the `system::virtual::OpenFileDescription` struct are now
   private.
+- The `system::fd_set` module
 - `impl TryFrom<semantics::ExitStatus> for nix::sys::signal::Signal`
 - `impl From<system::resource::LimitPair> for nix::libc::rlimit`
 - `impl From<nix::libc::rlimit> for system::resource::LimitPair`
