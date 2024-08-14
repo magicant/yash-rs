@@ -15,6 +15,11 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! Implementation of `System` that actually interacts with the system.
+//!
+//! This module is implemented on Unix-like targets only. It provides an
+//! implementation of the `System` trait that interacts with the underlying
+//! operating system. This implementation is intended to be used in a real
+//! environment, such as a shell running on a Unix-like operating system.
 
 mod errno;
 mod file_system;

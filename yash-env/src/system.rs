@@ -21,6 +21,7 @@ mod fd_flag;
 mod file_system;
 mod id;
 mod open_flag;
+#[cfg(unix)]
 pub mod real;
 pub mod resource;
 mod select;
