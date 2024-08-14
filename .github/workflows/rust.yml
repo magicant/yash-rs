@@ -67,3 +67,13 @@ jobs:
       run: cargo test --package yash-quote
     - name: Test yash-syntax
       run: cargo test --package yash-syntax
+    - name: Test yash-env
+      run: cargo test --package yash-env
+    - name: Test yash-env-test-helper
+      run: cargo test --package yash-env-test-helper
+    - name: Test yash-semantics
+      run: cargo test --package yash-semantics
+    - name: Test yash-prompt
+      run: cargo test --package yash-prompt
+    - name: Test yash-builtin
+      run: cargo test --package yash-builtin
