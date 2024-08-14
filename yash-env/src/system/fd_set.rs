@@ -184,6 +184,28 @@ impl<'a> IntoIterator for &'a FdSet {
     }
 }
 
+impl Extend<Fd> for FdSet {
+    fn extend<T: IntoIterator<Item = Fd>>(&mut self, iter: T) {
+        for fd in iter {
+            self.insert(fd).unwrap();
+        }
+    }
+}
+
+impl FromIterator<Fd> for FdSet {
+    fn from_iter<T: IntoIterator<Item = Fd>>(iter: T) -> Self {
+        let mut set = FdSet::new();
+        set.extend(iter);
+        set
+    }
+}
+
+impl From<&[Fd]> for FdSet {
+    fn from(value: &[Fd]) -> Self {
+        value.iter().cloned().collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

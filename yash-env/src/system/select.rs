@@ -16,7 +16,6 @@
 
 //! [`SelectSystem`] and related items
 
-use super::fd_set::FdSet;
 use super::signal;
 use super::Errno;
 use super::Result;
@@ -199,7 +198,7 @@ impl SelectSystem {
         );
         let final_result = match inner_result {
             Ok(_) => {
-                self.io.wake(readers, writers);
+                self.io.wake(&readers, &writers);
                 Ok(())
             }
             Err(Errno::EBADF) => {
@@ -256,26 +255,16 @@ impl AsyncIo {
     ///
     /// The return value should be passed to the `select` or `pselect` system
     /// call.
-    pub fn readers(&self) -> FdSet {
-        let mut set = FdSet::new();
-        for reader in &self.readers {
-            set.insert(reader.fd)
-                .expect("file descriptor out of supported range");
-        }
-        set
+    pub fn readers(&self) -> Vec<Fd> {
+        self.readers.iter().map(|awaiter| awaiter.fd).collect()
     }
 
     /// Returns a set of FDs waiting for writing.
     ///
     /// The return value should be passed to the `select` or `pselect` system
     /// call.
-    pub fn writers(&self) -> FdSet {
-        let mut set = FdSet::new();
-        for writer in &self.writers {
-            set.insert(writer.fd)
-                .expect("file descriptor out of supported range");
-        }
-        set
+    pub fn writers(&self) -> Vec<Fd> {
+        self.writers.iter().map(|awaiter| awaiter.fd).collect()
     }
 
     /// Adds an awaiter for reading.
@@ -292,9 +281,12 @@ impl AsyncIo {
     ///
     /// FDs in `readers` and `writers` are considered ready and corresponding
     /// awaiters are woken. Once woken, awaiters are removed from `self`.
-    pub fn wake(&mut self, readers: FdSet, writers: FdSet) {
-        self.readers.retain(|awaiter| !readers.contains(awaiter.fd));
-        self.writers.retain(|awaiter| !writers.contains(awaiter.fd));
+    pub fn wake(&mut self, readers: &[Fd], writers: &[Fd]) {
+        // Dropping awaiters wakes the wakers.
+        self.readers
+            .retain(|awaiter| !readers.contains(&awaiter.fd));
+        self.writers
+            .retain(|awaiter| !writers.contains(&awaiter.fd));
     }
 
     /// Wakes and removes all awaiters.
@@ -470,8 +462,8 @@ mod tests {
     #[test]
     fn async_io_has_no_default_readers_or_writers() {
         let async_io = AsyncIo::new();
-        assert_eq!(async_io.readers(), FdSet::new());
-        assert_eq!(async_io.writers(), FdSet::new());
+        assert_eq!(async_io.readers(), []);
+        assert_eq!(async_io.writers(), []);
     }
 
     #[test]
@@ -482,13 +474,10 @@ mod tests {
         async_io.wait_for_writing(Fd::STDOUT, Rc::downgrade(&waker));
         async_io.wait_for_writing(Fd::STDERR, Rc::downgrade(&waker));
 
-        let mut expected_readers = FdSet::new();
-        expected_readers.insert(Fd::STDIN).unwrap();
-        let mut expected_writers = FdSet::new();
-        expected_writers.insert(Fd::STDOUT).unwrap();
-        expected_writers.insert(Fd::STDERR).unwrap();
-        assert_eq!(async_io.readers(), expected_readers);
-        assert_eq!(async_io.writers(), expected_writers);
+        assert_eq!(async_io.readers(), [Fd::STDIN]);
+        let mut writers = async_io.writers();
+        writers.sort();
+        assert_eq!(writers, [Fd::STDOUT, Fd::STDERR]);
     }
 
     #[test]
@@ -498,14 +487,10 @@ mod tests {
         async_io.wait_for_reading(Fd(3), Rc::downgrade(&waker));
         async_io.wait_for_reading(Fd(4), Rc::downgrade(&waker));
         async_io.wait_for_writing(Fd(4), Rc::downgrade(&waker));
-        let mut fds = FdSet::new();
-        fds.insert(Fd(4)).unwrap();
-        async_io.wake(fds, fds);
+        async_io.wake(&[Fd(4)], &[Fd(4)]);
 
-        let mut expected_readers = FdSet::new();
-        expected_readers.insert(Fd(3)).unwrap();
-        assert_eq!(async_io.readers(), expected_readers);
-        assert_eq!(async_io.writers(), FdSet::new());
+        assert_eq!(async_io.readers(), [Fd(3)]);
+        assert_eq!(async_io.writers(), []);
     }
 
     #[test]
@@ -516,8 +501,8 @@ mod tests {
         async_io.wait_for_writing(Fd::STDOUT, Rc::downgrade(&waker));
         async_io.wait_for_writing(Fd::STDERR, Rc::downgrade(&waker));
         async_io.wake_all();
-        assert_eq!(async_io.readers(), FdSet::new());
-        assert_eq!(async_io.writers(), FdSet::new());
+        assert_eq!(async_io.readers(), []);
+        assert_eq!(async_io.writers(), []);
     }
 
     #[test]

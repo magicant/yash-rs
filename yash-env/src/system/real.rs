@@ -31,7 +31,6 @@ use super::DirEntry;
 use super::Env;
 use super::Errno;
 use super::FdFlag;
-use super::FdSet;
 use super::Gid;
 use super::Mode;
 use super::OfdAccess;
@@ -46,6 +45,7 @@ use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessResult;
 use crate::job::ProcessState;
+use crate::system::fd_set::FdSet;
 use crate::SignalHandling;
 use enumset::EnumSet;
 use nix::errno::Errno as NixErrno;
@@ -548,15 +548,16 @@ impl System for RealSystem {
 
     fn select(
         &mut self,
-        readers: &mut FdSet,
-        writers: &mut FdSet,
+        readers: &mut Vec<Fd>,
+        writers: &mut Vec<Fd>,
         timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
     ) -> Result<c_int> {
         use std::ptr::{null, null_mut};
-        let nfds = readers.upper_bound().max(writers.upper_bound()).0;
-        let readers = &mut readers.inner;
-        let writers = &mut writers.inner;
+        // TODO FIXME: Use libc::fd_set directly
+        let mut raw_readers = FdSet::from(readers.as_slice());
+        let mut raw_writers = FdSet::from(writers.as_slice());
+        let nfds = raw_readers.upper_bound().max(raw_writers.upper_bound()).0;
         let errors = null_mut();
         let timeout_spec = to_timespec(timeout.unwrap_or_default());
 
@@ -581,8 +582,22 @@ impl System for RealSystem {
         let raw_mask_ptr = raw_mask
             .as_ref()
             .map_or(null(), |raw_mask| raw_mask.as_ptr());
-        unsafe { nix::libc::pselect(nfds, readers, writers, errors, timeout_ptr, raw_mask_ptr) }
-            .errno_if_m1()
+        let count = unsafe {
+            nix::libc::pselect(
+                nfds,
+                &mut raw_readers.inner,
+                &mut raw_writers.inner,
+                errors,
+                timeout_ptr,
+                raw_mask_ptr,
+            )
+        }
+        .errno_if_m1()?;
+
+        readers.retain(|fd| raw_readers.contains(*fd));
+        writers.retain(|fd| raw_writers.contains(*fd));
+
+        Ok(count)
     }
 
     fn getpid(&self) -> Pid {

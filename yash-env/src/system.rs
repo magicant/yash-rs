@@ -32,7 +32,6 @@ pub use self::errno::Errno;
 pub use self::errno::RawErrno;
 pub use self::errno::Result;
 pub use self::fd_flag::FdFlag;
-use self::fd_set::FdSet;
 pub use self::file_system::Dir;
 pub use self::file_system::DirEntry;
 pub use self::file_system::FileType;
@@ -342,8 +341,8 @@ pub trait System: Debug {
     /// blocking mask while waiting and restored when the function returns.
     fn select(
         &mut self,
-        readers: &mut FdSet,
-        writers: &mut FdSet,
+        readers: &mut Vec<Fd>,
+        writers: &mut Vec<Fd>,
         timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
     ) -> Result<c_int>;
