@@ -21,7 +21,6 @@ use super::ChildProcessStarter;
 use super::Dir;
 use super::Errno;
 use super::FdFlag;
-use super::FdSet;
 use super::Gid;
 use super::LimitPair;
 use super::Mode;
@@ -408,8 +407,8 @@ impl System for &SharedSystem {
     }
     fn select(
         &mut self,
-        readers: &mut FdSet,
-        writers: &mut FdSet,
+        readers: &mut Vec<Fd>,
+        writers: &mut Vec<Fd>,
         timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
     ) -> Result<c_int> {
@@ -618,8 +617,8 @@ impl System for SharedSystem {
     #[inline]
     fn select(
         &mut self,
-        readers: &mut FdSet,
-        writers: &mut FdSet,
+        readers: &mut Vec<Fd>,
+        writers: &mut Vec<Fd>,
         timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
     ) -> Result<c_int> {

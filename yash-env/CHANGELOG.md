@@ -44,7 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `system::Mode` type.
 - The `system::System::sigmask` method now takes a `SigmaskOp` parameter instead
   of a `nix::sys::signal::SigmaskHow` parameter.
-- The `system::System::select` method now takes a `Duration` instead of a
+- The `system::System::select` method now takes `Vec<io::Fd>` parameters instead
+  of `fd_set::FdSet` parameters. It also takes a `Duration` instead of a
   `nix::sys::time::TimeSpec` for the optional timeout parameter.
 - The `dup`, `fcntl_getfl`, and `fcntl_setfl` methods of `system::System` now
   operate on an `EnumSet<FdFlag>` parameter instead of an `nix::fcntl::FdFlag`
@@ -84,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `system::resource::Resource::as_raw_type` method is no longer public.
 - All the fields of the `system::virtual::OpenFileDescription` struct are now
   private.
+- The `system::fd_set` module
 - `impl TryFrom<semantics::ExitStatus> for nix::sys::signal::Signal`
 - `impl From<system::resource::LimitPair> for nix::libc::rlimit`
 - `impl From<nix::libc::rlimit> for system::resource::LimitPair`

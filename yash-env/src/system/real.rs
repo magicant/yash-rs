@@ -31,7 +31,6 @@ use super::DirEntry;
 use super::Env;
 use super::Errno;
 use super::FdFlag;
-use super::FdSet;
 use super::Gid;
 use super::Mode;
 use super::OfdAccess;
@@ -548,41 +547,71 @@ impl System for RealSystem {
 
     fn select(
         &mut self,
-        readers: &mut FdSet,
-        writers: &mut FdSet,
+        readers: &mut Vec<Fd>,
+        writers: &mut Vec<Fd>,
         timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
     ) -> Result<c_int> {
         use std::ptr::{null, null_mut};
-        let nfds = readers.upper_bound().max(writers.upper_bound()).0;
-        let readers = &mut readers.inner;
-        let writers = &mut writers.inner;
-        let errors = null_mut();
-        let timeout_spec = to_timespec(timeout.unwrap_or_default());
 
-        let raw_mask = match signal_mask {
-            None => None,
-            Some(mask) => {
-                let mut raw_mask = MaybeUninit::<nix::libc::sigset_t>::uninit();
-                unsafe { nix::libc::sigemptyset(raw_mask.as_mut_ptr()) }.errno_if_m1()?;
-                for &signal in mask {
-                    unsafe { nix::libc::sigaddset(raw_mask.as_mut_ptr(), signal.as_raw()) }
-                        .errno_if_m1()?;
+        let max_fd = readers.iter().chain(writers.iter()).max();
+        let nfds = max_fd
+            .map(|fd| fd.0.checked_add(1).ok_or(Errno::EBADF))
+            .transpose()?
+            .unwrap_or(0);
+
+        fn to_raw_fd_set(fds: &[Fd]) -> MaybeUninit<nix::libc::fd_set> {
+            let mut raw_fds = MaybeUninit::<nix::libc::fd_set>::uninit();
+            unsafe {
+                nix::libc::FD_ZERO(raw_fds.as_mut_ptr());
+                for fd in fds {
+                    nix::libc::FD_SET(fd.0, raw_fds.as_mut_ptr());
                 }
-                Some(raw_mask)
             }
-        };
+            raw_fds
+        }
+        let mut raw_readers = to_raw_fd_set(readers);
+        let mut raw_writers = to_raw_fd_set(writers);
+        let readers_ptr = raw_readers.as_mut_ptr();
+        let writers_ptr = raw_writers.as_mut_ptr();
+        let errors = null_mut();
 
+        let timeout_spec = to_timespec(timeout.unwrap_or_default());
         let timeout_ptr = if timeout.is_some() {
             timeout_spec.as_ptr()
         } else {
             null()
         };
-        let raw_mask_ptr = raw_mask
-            .as_ref()
-            .map_or(null(), |raw_mask| raw_mask.as_ptr());
-        unsafe { nix::libc::pselect(nfds, readers, writers, errors, timeout_ptr, raw_mask_ptr) }
-            .errno_if_m1()
+
+        let mut raw_mask = MaybeUninit::<nix::libc::sigset_t>::uninit();
+        let raw_mask_ptr = match signal_mask {
+            None => null(),
+            Some(signal_mask) => {
+                unsafe { nix::libc::sigemptyset(raw_mask.as_mut_ptr()) }.errno_if_m1()?;
+                for &signal in signal_mask {
+                    unsafe { nix::libc::sigaddset(raw_mask.as_mut_ptr(), signal.as_raw()) }
+                        .errno_if_m1()?;
+                }
+                raw_mask.as_ptr()
+            }
+        };
+
+        let count = unsafe {
+            nix::libc::pselect(
+                nfds,
+                readers_ptr,
+                writers_ptr,
+                errors,
+                timeout_ptr,
+                raw_mask_ptr,
+            )
+        }
+        .errno_if_m1()?;
+
+        readers.retain(|fd| unsafe { nix::libc::FD_ISSET(fd.0, readers_ptr) });
+        writers.retain(|fd| unsafe { nix::libc::FD_ISSET(fd.0, writers_ptr) });
+
+        Ok(count)
     }
 
     fn getpid(&self) -> Pid {
