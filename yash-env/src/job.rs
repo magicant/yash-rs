@@ -103,22 +103,6 @@ impl std::ops::Neg for Pid {
     }
 }
 
-/// This conversion depends a type declared in the `nix` crate, which is not
-/// covered by the semantic versioning policy of this crate.
-impl From<Pid> for nix::unistd::Pid {
-    fn from(pid: Pid) -> Self {
-        Self::from_raw(pid.0)
-    }
-}
-
-/// This conversion depends a type declared in the `nix` crate, which is not
-/// covered by the semantic versioning policy of this crate.
-impl From<nix::unistd::Pid> for Pid {
-    fn from(pid: nix::unistd::Pid) -> Self {
-        Self(pid.as_raw())
-    }
-}
-
 impl Pid {
     /// Sentinel value for the [`kill`] and [`wait`]system calls specifying all
     /// processes in the process group of the calling process.

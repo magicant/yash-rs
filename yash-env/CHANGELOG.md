@@ -87,6 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   private.
 - The `system::fd_set` module
 - `impl TryFrom<semantics::ExitStatus> for nix::sys::signal::Signal`
+- `impl From<job::Pid> for nix::unistd::Pid`
+- `impl From<nix::unistd::Pid> for job::Pid`
 - `impl From<system::resource::LimitPair> for nix::libc::rlimit`
 - `impl From<nix::libc::rlimit> for system::resource::LimitPair`
 

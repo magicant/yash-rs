@@ -119,6 +119,17 @@ impl ErrnoIfM1 for isize {
     const MINUS_1: Self = -1;
 }
 
+impl Pid {
+    #[inline(always)]
+    const fn to_nix(self) -> nix::unistd::Pid {
+        nix::unistd::Pid::from_raw(self.0)
+    }
+    #[inline(always)]
+    const fn from_nix(pid: nix::unistd::Pid) -> Self {
+        Pid(pid.as_raw())
+    }
+}
+
 // TODO Should use AT_EACCESS on all platforms
 #[cfg(not(target_os = "redox"))]
 fn is_executable(path: &CStr) -> bool {
@@ -620,30 +631,29 @@ impl System for RealSystem {
     }
 
     fn getpid(&self) -> Pid {
-        nix::unistd::getpid().into()
+        Pid(unsafe { nix::libc::getpid() })
     }
 
     fn getppid(&self) -> Pid {
-        nix::unistd::getppid().into()
+        Pid(unsafe { nix::libc::getppid() })
     }
 
     fn getpgrp(&self) -> Pid {
-        nix::unistd::getpgrp().into()
+        Pid(unsafe { nix::libc::getpgrp() })
     }
 
     fn setpgid(&mut self, pid: Pid, pgid: Pid) -> Result<()> {
-        nix::unistd::setpgid(pid.into(), pgid.into())?;
-        Ok(())
+        let result = unsafe { nix::libc::setpgid(pid.0, pgid.0) };
+        result.errno_if_m1().map(drop)
     }
 
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
-        let pgrp = nix::unistd::tcgetpgrp(fd.0)?;
-        Ok(pgrp.into())
+        unsafe { nix::libc::tcgetpgrp(fd.0) }.errno_if_m1().map(Pid)
     }
 
     fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> Result<()> {
-        nix::unistd::tcsetpgrp(fd.0, pgid.into())?;
-        Ok(())
+        let result = unsafe { nix::libc::tcsetpgrp(fd.0, pgid.0) };
+        result.errno_if_m1().map(drop)
     }
 
     /// Creates a new child process.
@@ -659,7 +669,7 @@ impl System for RealSystem {
         // making only one instance of RealSystem in the process.
         match unsafe { nix::unistd::fork()? } {
             Parent { child } => Ok(Box::new(move |_env, _task| {
-                Box::pin(async move { child.into() })
+                Box::pin(std::future::ready(Pid::from_nix(child)))
             })),
             Child => Ok(Box::new(|env, task| {
                 Box::pin(async move {
@@ -673,23 +683,26 @@ impl System for RealSystem {
     fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         use nix::sys::wait::{WaitPidFlag, WaitStatus::*};
         let options = WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED | WaitPidFlag::WNOHANG;
-        let status = nix::sys::wait::waitpid(Some(target.into()), options.into())?;
+        let status = nix::sys::wait::waitpid(Some(target.to_nix()), options.into())?;
         match status {
             StillAlive => Ok(None),
-            Continued(pid) => Ok(Some((pid.into(), ProcessState::Running))),
-            Exited(pid, exit_status) => Ok(Some((pid.into(), ProcessState::exited(exit_status)))),
+            Continued(pid) => Ok(Some((Pid::from_nix(pid), ProcessState::Running))),
+            Exited(pid, exit_status) => Ok(Some((
+                Pid::from_nix(pid),
+                ProcessState::exited(exit_status),
+            ))),
             Signaled(pid, signal, core_dump) => {
                 // SAFETY: The signal number is always a valid signal number, which is non-zero.
                 let raw_number = unsafe { NonZeroI32::new_unchecked(signal as _) };
                 let signal = signal::Number::from_raw_unchecked(raw_number);
                 let process_result = ProcessResult::Signaled { signal, core_dump };
-                Ok(Some((pid.into(), process_result.into())))
+                Ok(Some((Pid::from_nix(pid), process_result.into())))
             }
             Stopped(pid, signal) => {
                 // SAFETY: The signal number is always a valid signal number, which is non-zero.
                 let raw_number = unsafe { NonZeroI32::new_unchecked(signal as _) };
                 let signal = signal::Number::from_raw_unchecked(raw_number);
-                Ok(Some((pid.into(), ProcessState::stopped(signal))))
+                Ok(Some((Pid::from_nix(pid), ProcessState::stopped(signal))))
             }
             #[allow(unreachable_patterns)]
             _ => unreachable!(),
