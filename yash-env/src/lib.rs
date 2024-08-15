@@ -65,6 +65,8 @@ use std::ops::ControlFlow::{self, Break, Continue};
 use std::rc::Rc;
 use std::task::Context;
 use std::task::Poll;
+pub use unix_path as path;
+pub use unix_str as str;
 use yash_syntax::alias::AliasSet;
 
 /// Whole shell execution environment.
