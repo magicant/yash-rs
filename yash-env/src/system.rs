@@ -58,8 +58,11 @@ use crate::io::Fd;
 use crate::io::MIN_INTERNAL_FD;
 use crate::job::Pid;
 use crate::job::ProcessState;
+use crate::path::Path;
+use crate::path::PathBuf;
 use crate::semantics::ExitStatus;
 use crate::signal;
+use crate::str::UnixString;
 #[cfg(doc)]
 use crate::subshell::Subshell;
 use crate::trap::SignalSystem;
@@ -69,12 +72,9 @@ use std::convert::Infallible;
 use std::ffi::c_int;
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::ffi::OsString;
 use std::fmt::Debug;
 use std::future::Future;
 use std::io::SeekFrom;
-use std::path::Path;
-use std::path::PathBuf;
 use std::pin::Pin;
 use std::time::Duration;
 use std::time::Instant;
@@ -438,7 +438,7 @@ pub trait System: Debug {
     /// expected to be found.
     ///
     /// This is a thin wrapper around the `confstr(_CS_PATH, …)`.
-    fn confstr_path(&self) -> Result<OsString>;
+    fn confstr_path(&self) -> Result<UnixString>;
 
     /// Returns the path to the shell executable.
     ///

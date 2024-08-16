@@ -71,6 +71,10 @@ use super::AT_FDCWD;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessState;
+use crate::path::Path;
+use crate::path::PathBuf;
+use crate::str::UnixStr;
+use crate::str::UnixString;
 use crate::system::ChildProcessStarter;
 use crate::SignalHandling;
 use crate::System;
@@ -88,17 +92,12 @@ use std::convert::TryInto;
 use std::ffi::c_int;
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::ffi::OsStr;
-use std::ffi::OsString;
 use std::fmt::Debug;
 use std::future::poll_fn;
 use std::future::Future;
 use std::io::SeekFrom;
 use std::num::NonZeroI32;
 use std::ops::DerefMut as _;
-use std::os::unix::ffi::OsStrExt;
-use std::path::Path;
-use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::Context;
@@ -322,7 +321,7 @@ impl System for VirtualSystem {
     /// The current implementation fills only some values of the returned
     /// `FileStat`. See [`Inode::stat`] for details.
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
-        let path = Path::new(OsStr::from_bytes(path.to_bytes()));
+        let path = Path::new(UnixStr::from_bytes(path.to_bytes()));
         let inode = self.resolve_existing_file(dir_fd, path, follow_symlinks)?;
         Ok({ inode }.borrow().stat())
     }
@@ -332,13 +331,13 @@ impl System for VirtualSystem {
     /// The current implementation only checks if the file has any executable
     /// bit in the permissions. The file owner and group are not considered.
     fn is_executable_file(&self, path: &CStr) -> bool {
-        let path = Path::new(OsStr::from_bytes(path.to_bytes()));
+        let path = Path::new(UnixStr::from_bytes(path.to_bytes()));
         self.resolve_existing_file(AT_FDCWD, path, /* follow symlinks */ true)
             .is_ok_and(|inode| inode.borrow().permissions.intersects(Mode::ALL_EXEC))
     }
 
     fn is_directory(&self, path: &CStr) -> bool {
-        let path = Path::new(OsStr::from_bytes(path.to_bytes()));
+        let path = Path::new(UnixStr::from_bytes(path.to_bytes()));
         self.resolve_existing_file(AT_FDCWD, path, /* follow symlinks */ true)
             .is_ok_and(|inode| matches!(inode.borrow().body, FileBody::Directory { .. }))
     }
@@ -407,7 +406,7 @@ impl System for VirtualSystem {
         flags: EnumSet<OpenFlag>,
         mode: Mode,
     ) -> Result<Fd> {
-        let path = self.resolve_relative_path(Path::new(OsStr::from_bytes(path.to_bytes())));
+        let path = self.resolve_relative_path(Path::new(UnixStr::from_bytes(path.to_bytes())));
         let umask = self.current_process().umask;
 
         let mut state = self.state.borrow_mut();
@@ -922,7 +921,7 @@ impl System for VirtualSystem {
     /// function returns `ENOSYS` if the file at `path` is a native executable,
     /// `ENOEXEC` if a non-executable file, and `ENOENT` otherwise.
     fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {
-        let os_path = OsStr::from_bytes(path.to_bytes());
+        let os_path = UnixStr::from_bytes(path.to_bytes());
         let mut state = self.state.borrow_mut();
         let fs = &state.file_system;
         let file = fs.get(os_path)?;
@@ -954,7 +953,7 @@ impl System for VirtualSystem {
 
     /// Changes the current working directory.
     fn chdir(&mut self, path: &CStr) -> Result<()> {
-        let path = Path::new(OsStr::from_bytes(path.to_bytes()));
+        let path = Path::new(UnixStr::from_bytes(path.to_bytes()));
         let inode = self.resolve_existing_file(AT_FDCWD, path, /* follow links */ true)?;
         if matches!(&inode.borrow().body, FileBody::Directory { .. }) {
             let mut process = self.current_process_mut();
@@ -991,7 +990,7 @@ impl System for VirtualSystem {
     ///
     /// This function returns the value of [`SystemState::path`]. If it is empty,
     /// it returns the `ENOSYS` error.
-    fn confstr_path(&self) -> Result<OsString> {
+    fn confstr_path(&self) -> Result<UnixString> {
         let path = self.state.borrow().path.clone();
         if path.is_empty() {
             Err(Errno::ENOSYS)
@@ -1112,7 +1111,7 @@ pub struct SystemState {
     pub home_dirs: HashMap<String, PathBuf>,
 
     /// Standard path returned by [`VirtualSystem::confstr_path`]
-    pub path: OsString,
+    pub path: UnixString,
 }
 
 impl SystemState {
@@ -1243,8 +1242,6 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_executor::LocalPool;
     use futures_util::FutureExt;
-    use std::ffi::CString;
-    use std::ffi::OsString;
     use std::future::pending;
 
     impl Executor for futures_executor::LocalSpawner {
@@ -1774,15 +1771,15 @@ mod tests {
         let mut dir = system.opendir(c"./dir").unwrap();
         let mut files = Vec::new();
         while let Some(entry) = dir.next().unwrap() {
-            files.push(entry.name.to_os_string());
+            files.push(entry.name.to_unix_string());
         }
         files.sort_unstable();
         assert_eq!(
             files[..],
             [
-                OsString::from("."),
-                OsString::from(".."),
-                OsString::from("file")
+                UnixString::from("."),
+                UnixString::from(".."),
+                UnixString::from("file")
             ]
         );
     }

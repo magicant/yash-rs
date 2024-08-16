@@ -20,9 +20,8 @@ use crate::common::arrange_message_and_divert;
 use std::borrow::Cow;
 use std::ffi::CString;
 use std::ffi::NulError;
-use std::os::unix::ffi::OsStringExt;
-use std::path::Path;
 use thiserror::Error;
+use yash_env::path::Path;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 #[cfg(doc)]
@@ -56,7 +55,7 @@ impl From<NulError> for Error {
 }
 
 pub fn chdir(env: &mut Env, path: &Path) -> Result<(), Error> {
-    let c_path = CString::new(path.to_owned().into_os_string().into_vec())?;
+    let c_path = CString::new(path.as_unix_str().as_bytes())?;
     Ok(env.system.chdir(&c_path)?)
 }
 

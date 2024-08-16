@@ -17,8 +17,8 @@
 //! Items about file systems
 
 use super::{Gid, Result, Uid};
+use crate::str::UnixStr;
 use bitflags::bitflags;
-use std::ffi::OsStr;
 use std::fmt::Debug;
 use yash_syntax::syntax::Fd;
 
@@ -40,7 +40,7 @@ pub const AT_FDCWD: Fd = Fd(RAW_AT_FDCWD);
 #[non_exhaustive]
 pub struct DirEntry<'a> {
     /// Filename
-    pub name: &'a OsStr,
+    pub name: &'a UnixStr,
 }
 
 /// Trait for enumerating directory entries

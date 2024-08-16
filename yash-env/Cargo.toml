@@ -25,6 +25,8 @@ slab = "0.4.9"
 strum = { version = "0.26.2", features = ["derive"] }
 tempfile = "3.8.0"
 thiserror = "1.0.47"
+unix_path = "1.0.1"
+unix_str = "1.0.0"
 yash-quote = { path = "../yash-quote", version = "1.1.1" }
 yash-syntax = { path = "../yash-syntax", version = "0.10.0", features = ["annotate-snippets"] }
 

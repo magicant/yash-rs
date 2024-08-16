@@ -89,9 +89,8 @@ impl yash_semantics::command_search::SearchEnv for SearchEnv<'_> {
 mod tests {
     use super::*;
     use enumset::EnumSet;
-    use std::ffi::OsString;
-    use std::os::unix::ffi::OsStringExt as _;
     use yash_env::builtin::Type::Special;
+    use yash_env::str::UnixString;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::variable::Scope;
     use yash_env::variable::PATH;
@@ -137,7 +136,7 @@ mod tests {
     #[test]
     fn standard_path_with_invalid_utf8() {
         let system = Box::new(VirtualSystem::new());
-        system.state.borrow_mut().path = OsString::from_vec(vec![0x80]);
+        system.state.borrow_mut().path = UnixString::from_vec(vec![0x80]);
         let env = &mut Env::with_system(system);
         let params = &Search {
             standard_path: true,

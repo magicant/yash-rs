@@ -25,8 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mode argument.
 - The `job::RawPid` type has been added to represent the contents of `job::Pid`.
 - The `stack::Frame` enum now has the `InitFile` variant.
+- The crate now re-exports `unix_path` as `path` and `unix_str` as `str`.
 - External dependencies:
     - enumset 1.1.2 (previously an internal dependency)
+    - unix_path 1.0.1
+    - unix_str 1.0.0
 - Internal dependencies:
     - bitflags 2.6.0
 
@@ -34,6 +37,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `system::FdFlag` is no longer a re-export of `nix::fcntl::FdFlag`.
 - `system::Mode` is no longer a re-export of `nix::sys::stat::Mode`.
+- All APIs that handle `std::path::Path`, `std::path::PathBuf`, `std::ffi::OsStr`,
+  and `std::ffi::OsString` now use `path::Path`, `path::PathBuf`, `str::OsStr`,
+  and `str::OsString` instead.
+    - `system::DirEntry::name`
+    - `system::System::confstr_path`
+    - `system::System::getcwd`
+    - `system::System::getpwnam_dir`
+    - `system::System::open_tmpfile`
+    - `system::virtual::FileBody::Directory::files`
+    - `system::virtual::FileBody::Symlink::target`
+    - `system::virtual::FileSystem::get`
+    - `system::virtual::FileSystem::save`
+    - `system::virtual::Process::chdir`
+    - `system::virtual::SystemState::home_dirs`
+    - `system::virtual::SystemState::path`
+    - `system::virtual::VirtualDir::new`
 - The `fstat` and `fstatat` methods of `system::System` now return a `Stat`
   instead of a `nix::sys::stat::FileStat`.
 - The `system::System::fstatat` method now takes a `follow_symlinks: bool`

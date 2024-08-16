@@ -147,7 +147,7 @@
 use crate::common::report_error;
 use crate::common::report_failure;
 use crate::Result;
-use std::path::Path;
+use yash_env::path::Path;
 use yash_env::semantics::Field;
 use yash_env::variable::PWD;
 use yash_env::Env;

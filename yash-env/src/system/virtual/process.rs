@@ -26,6 +26,8 @@ use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessResult;
 use crate::job::ProcessState;
+use crate::path::Path;
+use crate::path::PathBuf;
 use crate::system::resource::LimitPair;
 use crate::system::resource::Resource;
 use crate::system::resource::INFINITY;
@@ -40,8 +42,6 @@ use std::ffi::CString;
 use std::fmt::Debug;
 use std::ops::BitOr;
 use std::ops::BitOrAssign;
-use std::path::Path;
-use std::path::PathBuf;
 use std::rc::Weak;
 use std::task::Waker;
 

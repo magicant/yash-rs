@@ -37,12 +37,11 @@
 use assert_matches::assert_matches;
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::os::unix::ffi::OsStringExt;
-use std::path::PathBuf;
 use std::rc::Rc;
 use yash_env::builtin::Builtin;
 use yash_env::builtin::Type::{Elective, Extension, Mandatory, Special, Substitutive};
 use yash_env::function::Function;
+use yash_env::path::PathBuf;
 use yash_env::variable::Expansion;
 use yash_env::variable::PATH;
 use yash_env::Env;
@@ -222,7 +221,10 @@ pub fn search_path<E: PathEnv>(env: &mut E, name: &str) -> Option<CString> {
     env.path()
         .split()
         .filter_map(|dir| {
-            CString::new(PathBuf::from_iter([dir, name]).into_os_string().into_vec()).ok()
+            let candidate = PathBuf::from_iter([dir, name])
+                .into_unix_string()
+                .into_vec();
+            CString::new(candidate).ok()
         })
         .find(|path| env.is_executable_file(path))
 }

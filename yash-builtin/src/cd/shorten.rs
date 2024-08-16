@@ -24,7 +24,7 @@
 //! target path does not start with `$PWD`.
 
 use super::Mode;
-use std::path::Path;
+use yash_env::path::Path;
 
 /// Simplifies the target path.
 ///

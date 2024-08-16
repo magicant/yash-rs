@@ -288,10 +288,9 @@ mod tests {
     use super::*;
     use crate::expansion::AttrChar;
     use crate::expansion::Origin;
-    use std::ffi::OsStr;
-    use std::os::unix::ffi::OsStrExt;
-    use std::path::Path;
     use std::rc::Rc;
+    use yash_env::path::Path;
+    use yash_env::str::UnixStr;
     use yash_env::system::Mode;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
@@ -518,7 +517,7 @@ mod tests {
 
     #[test]
     fn broken_utf8_byte_in_directory_entry_name() {
-        let mut env = env_with_dummy_files([OsStr::from_bytes(b"foo/\xFF")]);
+        let mut env = env_with_dummy_files([UnixStr::from_bytes(b"foo/\xFF")]);
         let f = dummy_attr_field("foo/*");
         let mut i = glob(&mut env, f);
         assert_eq!(i.next().unwrap().value, "foo/*");

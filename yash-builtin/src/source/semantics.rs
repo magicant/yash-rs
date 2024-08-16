@@ -23,12 +23,11 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::num::NonZeroU64;
 use std::ops::ControlFlow;
-use std::os::unix::ffi::OsStringExt as _;
-use std::path::PathBuf;
 use std::rc::Rc;
 use yash_env::input::Echo;
 use yash_env::input::FdReader;
 use yash_env::io::Fd;
+use yash_env::path::PathBuf;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -102,7 +101,7 @@ fn find_and_open_file(env: &mut Env, filename: &str) -> Result<Fd, Errno> {
     // and return the first successfully opened file descriptor.
     dirs.filter_map(|dir| {
         let path = PathBuf::from_iter([dir, filename])
-            .into_os_string()
+            .into_unix_string()
             .into_vec();
         let c_path = CString::new(path).ok()?;
         open_file(&mut env.system, &c_path).ok()
@@ -166,9 +165,9 @@ mod tests {
     use enumset::EnumSet;
     use futures_util::FutureExt as _;
     use std::cell::RefCell;
-    use std::path::Path;
     use std::rc::Rc;
     use yash_env::io::MIN_INTERNAL_FD;
+    use yash_env::path::Path;
     use yash_env::system::r#virtual::Inode;
     use yash_env::system::FdFlag;
     use yash_env::variable::Scope;
