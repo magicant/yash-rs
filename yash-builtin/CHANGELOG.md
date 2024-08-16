@@ -9,14 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The `yash_builtin::ulimit::Error::Unknown` variant now contains a
-  `yash_env::system::Errno` instead of a `std::io::Error`.
-- The `getrlimit` and `setrlimit` methods of the
-  `yash_builtin::ulimit::set::Env` trait now return an error of type `Errno`
+- All APIs that handle `std::path::Path` and `std::path::PathBuf` now use
+  `yash_env::path::Path` and `yash_env::path::PathBuf` instead.
+    - `cd::assign::new_pwd`
+    - `cd::assign::set_pwd`
+    - `cd::canonicalize::NonExistingDirectoryError::missing`
+    - `cd::canonicalize::canonicalize`
+    - `cd::cdpath::search`
+    - `cd::chdir::chdir`
+    - `cd::chdir::failure_message`
+    - `cd::chdir::report_failure`
+    - `cd::print::print_path`
+    - `cd::shorten::shorten`
+    - `cd::target::TargetError::NonExistingDirectory::missing`
+    - `cd::target::TargetError::NonExistingDirectory::target`
+    - `cd::target::target`
+- The `ulimit::Error::Unknown` variant now contains a `yash_env::system::Errno`
   instead of a `std::io::Error`.
-- The `show_one` and `show_all` functions in the `yash_builtin::ulimit::show`
-  module now takes a function that returns an error of type `Errno` instead of
-  `std::io::Error`.
+- The `getrlimit` and `setrlimit` methods of the `ulimit::set::Env` trait now
+  return an error of type `Errno` instead of a `std::io::Error`.
+- The `show_one` and `show_all` functions in the `ulimit::show` module now takes
+  a function that returns an error of type `Errno` instead of `std::io::Error`.
 - External dependency versions:
     - Rust 1.77.0 → 1.79.0
 

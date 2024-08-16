@@ -43,7 +43,7 @@ pub fn expand(name: &str, env: &Env) -> Vec<AttrChar> {
         into_attr_chars(result.chars())
     } else {
         if let Ok(Some(path)) = env.system.getpwnam_dir(name) {
-            if let Ok(path) = path.into_os_string().into_string() {
+            if let Ok(path) = path.into_unix_string().into_string() {
                 return into_attr_chars(path.chars());
             }
         }
@@ -54,7 +54,7 @@ pub fn expand(name: &str, env: &Env) -> Vec<AttrChar> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
+    use yash_env::path::PathBuf;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
     use yash_env::VirtualSystem;

@@ -17,6 +17,7 @@
 //! Working directory path handling
 
 use super::Env;
+use crate::path::Path;
 use crate::system::Errno;
 use crate::system::AT_FDCWD;
 use crate::variable::AssignError;
@@ -24,7 +25,6 @@ use crate::variable::Scope::Global;
 use crate::variable::PWD;
 use crate::System;
 use std::ffi::CString;
-use std::path::Path;
 use thiserror::Error;
 
 /// Tests whether a path contains a dot (`.`) or dot-dot (`..`) component.
@@ -95,7 +95,7 @@ impl Env {
             let dir = self
                 .system
                 .getcwd()?
-                .into_os_string()
+                .into_unix_string()
                 .into_string()
                 .map_err(|_| Errno::EILSEQ)?;
             let mut var = self.variables.get_or_new(PWD, Global);
@@ -109,12 +109,12 @@ impl Env {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::path::PathBuf;
     use crate::system::r#virtual::FileBody;
     use crate::system::r#virtual::Inode;
     use crate::variable::Value;
     use crate::VirtualSystem;
     use std::cell::RefCell;
-    use std::path::PathBuf;
     use std::rc::Rc;
 
     #[test]

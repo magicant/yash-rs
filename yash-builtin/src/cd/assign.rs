@@ -18,8 +18,8 @@
 
 use super::Mode;
 use crate::common::arrange_message_and_divert;
-use std::path::Path;
-use std::path::PathBuf;
+use yash_env::path::Path;
+use yash_env::path::PathBuf;
 use yash_env::variable::AssignError;
 use yash_env::variable::Scope::Global;
 use yash_env::variable::Value::Scalar;
@@ -51,7 +51,7 @@ pub async fn set_oldpwd(env: &mut Env, value: String) {
 /// This function examines the stack to find the command location that invoked
 /// the cd built-in.
 pub async fn set_pwd(env: &mut Env, path: PathBuf) {
-    let value = path.into_os_string().into_string().unwrap_or_default();
+    let value = path.into_unix_string().into_string().unwrap_or_default();
     set_variable(env, PWD, value).await
 }
 

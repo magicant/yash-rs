@@ -45,6 +45,10 @@ use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessResult;
 use crate::job::ProcessState;
+use crate::path::Path;
+use crate::path::PathBuf;
+use crate::str::UnixStr;
+use crate::str::UnixString;
 use crate::SignalHandling;
 use enumset::EnumSet;
 use nix::errno::Errno as NixErrno;
@@ -59,16 +63,13 @@ use std::ffi::c_int;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
-use std::ffi::OsString;
 use std::future::Future;
 use std::io::SeekFrom;
 use std::mem::MaybeUninit;
 use std::num::NonZeroI32;
-use std::os::unix::ffi::OsStrExt;
+use std::os::unix::ffi::OsStrExt as _;
 use std::os::unix::ffi::OsStringExt as _;
 use std::os::unix::io::IntoRawFd;
-use std::path::Path;
-use std::path::PathBuf;
 use std::pin::Pin;
 use std::ptr::addr_of;
 use std::ptr::addr_of_mut;
@@ -278,6 +279,7 @@ impl System for RealSystem {
     }
 
     fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
+        let parent_dir = OsStr::from_bytes(parent_dir.as_unix_str().as_bytes());
         let file = tempfile::tempfile_in(parent_dir)
             .map_err(|errno| Errno(errno.raw_os_error().unwrap_or(0)))?;
         let fd = Fd(file.into_raw_fd());
@@ -702,7 +704,9 @@ impl System for RealSystem {
     }
 
     fn getcwd(&self) -> Result<PathBuf> {
-        Ok(nix::unistd::getcwd()?)
+        let path = nix::unistd::getcwd()?;
+        let raw = path.into_os_string().into_vec();
+        Ok(PathBuf::from(UnixString::from_vec(raw)))
     }
 
     fn chdir(&mut self, path: &CStr) -> Result<()> {
@@ -728,10 +732,13 @@ impl System for RealSystem {
 
     fn getpwnam_dir(&self, name: &str) -> Result<Option<PathBuf>> {
         let user = nix::unistd::User::from_name(name)?;
-        Ok(user.map(|user| user.dir))
+        Ok(user.map(|user| {
+            let dir = user.dir.into_os_string().into_vec();
+            PathBuf::from(UnixString::from_vec(dir))
+        }))
     }
 
-    fn confstr_path(&self) -> Result<OsString> {
+    fn confstr_path(&self) -> Result<UnixString> {
         // TODO Support other platforms
         #[cfg(any(
             target_os = "macos",
@@ -740,7 +747,6 @@ impl System for RealSystem {
             target_os = "watchos"
         ))]
         unsafe {
-            use std::os::unix::ffi::OsStringExt as _;
             let size = nix::libc::confstr(nix::libc::_CS_PATH, std::ptr::null_mut(), 0);
             if size == 0 {
                 return Err(Errno::last());
@@ -755,7 +761,7 @@ impl System for RealSystem {
                 return Err(Errno::ERANGE);
             }
             buffer.set_len(final_size - 1); // The last byte is a null terminator.
-            return Ok(OsString::from_vec(buffer));
+            return Ok(UnixString::from_vec(buffer));
         }
 
         #[allow(unreachable_code)]
@@ -779,9 +785,9 @@ impl System for RealSystem {
             if let Some(full_path) = path
                 .as_bytes()
                 .split(|b| *b == b':')
-                .map(|dir| PathBuf::from_iter([OsStr::from_bytes(dir), OsStr::from_bytes(b"sh")]))
+                .map(|dir| Path::new(UnixStr::from_bytes(dir)).join("sh"))
                 .filter(|full_path| full_path.is_absolute())
-                .filter_map(|full_path| CString::new(full_path.into_os_string().into_vec()).ok())
+                .filter_map(|full_path| CString::new(full_path.into_unix_string().into_vec()).ok())
                 .find(|full_path| self.is_executable_file(full_path))
             {
                 return full_path;
@@ -834,15 +840,17 @@ impl Dir for RealDir {
         Errno::clear();
         let entry = unsafe { nix::libc::readdir(self.0.as_ptr()) };
         let errno = Errno::last();
-        match NonNull::new(entry) {
-            None if errno != Errno::NO_ERROR => Err(errno),
-            None => Ok(None),
-            Some(mut entry) => unsafe {
-                let entry = entry.as_mut();
-                let name = CStr::from_ptr(entry.d_name.as_ptr());
-                let name = OsStr::from_bytes(name.to_bytes());
-                Ok(Some(DirEntry { name }))
-            },
+        if entry.is_null() {
+            if errno == Errno::NO_ERROR {
+                Ok(None)
+            } else {
+                Err(errno)
+            }
+        } else {
+            // TODO Use as_ptr rather than cast when array_ptr_get is stabilized
+            let name = unsafe { CStr::from_ptr(addr_of!((*entry).d_name).cast()) };
+            let name = UnixStr::from_bytes(name.to_bytes());
+            Ok(Some(DirEntry { name }))
         }
     }
 }

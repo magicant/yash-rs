@@ -53,7 +53,7 @@ pub fn compute(env: &Env, mode: Mode) -> Result {
         .system
         .getcwd()
         .map_err(Error::SystemError)?
-        .into_os_string()
+        .into_unix_string()
         .into_string()
         .map_err(|_| Error::SystemError(Errno::EILSEQ))?;
     cwd.push('\n');
@@ -64,8 +64,8 @@ pub fn compute(env: &Env, mode: Mode) -> Result {
 mod tests {
     use super::*;
     use std::cell::RefCell;
-    use std::path::PathBuf;
     use std::rc::Rc;
+    use yash_env::path::PathBuf;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::Inode;
     use yash_env::variable::Scope::Global;

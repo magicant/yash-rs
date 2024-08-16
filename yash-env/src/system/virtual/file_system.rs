@@ -17,15 +17,12 @@
 //! File system in a virtual system.
 
 use super::super::{Dir, DirEntry, Errno, FileType, Gid, Stat, Uid};
+use crate::path::{Component, Path, PathBuf};
+use crate::str::UnixStr;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::VecDeque;
-use std::ffi::OsStr;
 use std::fmt::Debug;
-use std::os::unix::ffi::OsStrExt;
-use std::path::Component;
-use std::path::Path;
-use std::path::PathBuf;
 use std::rc::Rc;
 
 const DEFAULT_DIRECTORY_MODE: Mode = Mode::USER_ALL.union(Mode::ALL_READ).union(Mode::ALL_EXEC);
@@ -64,7 +61,7 @@ impl FileSystem {
         path: P,
         content: Rc<RefCell<Inode>>,
     ) -> Result<Option<Rc<RefCell<Inode>>>, Errno> {
-        fn ensure_dir(body: &mut FileBody) -> &mut HashMap<Rc<OsStr>, Rc<RefCell<Inode>>> {
+        fn ensure_dir(body: &mut FileBody) -> &mut HashMap<Rc<UnixStr>, Rc<RefCell<Inode>>> {
             match body {
                 FileBody::Directory { files } => files,
                 _ => {
@@ -141,7 +138,6 @@ impl FileSystem {
                         }
                         continue;
                     }
-                    _ => return Err(Errno::ENOENT),
                 };
 
                 let node_ref = nodes.last().unwrap().borrow();
@@ -160,7 +156,7 @@ impl FileSystem {
             }
 
             let node = nodes.pop().unwrap();
-            if path.as_os_str().as_bytes().ends_with(b"/")
+            if path.as_unix_str().as_bytes().ends_with(b"/")
                 && !matches!(&node.borrow().body, FileBody::Directory { .. })
             {
                 return Err(Errno::ENOTDIR);
@@ -230,7 +226,7 @@ pub enum FileBody {
         ///
         /// The keys of the hashmap are filenames without any parent directory
         /// components. The hashmap does not contain "." or "..".
-        files: HashMap<Rc<OsStr>, Rc<RefCell<Inode>>>,
+        files: HashMap<Rc<UnixStr>, Rc<RefCell<Inode>>>,
         // The hash map contents are reference-counted to allow making cheap
         // copies of them, which is especially handy when traversing entries.
     },
@@ -288,7 +284,7 @@ impl FileBody {
             Self::Regular { content, .. } => content.len(),
             Self::Directory { files } => files.len(),
             Self::Fifo { content, .. } => content.len(),
-            Self::Symlink { target } => target.as_os_str().len(),
+            Self::Symlink { target } => target.as_unix_str().len(),
         }
     }
 }
@@ -302,7 +298,7 @@ pub use super::super::Mode;
 #[derive(Clone, Debug)]
 pub struct VirtualDir<I> {
     iter: I,
-    current: Rc<OsStr>,
+    current: Rc<UnixStr>,
 }
 
 impl<I> VirtualDir<I> {
@@ -310,11 +306,11 @@ impl<I> VirtualDir<I> {
     #[must_use]
     pub fn new<J>(iter: J) -> Self
     where
-        J: IntoIterator<IntoIter = I, Item = Rc<OsStr>>,
+        J: IntoIterator<IntoIter = I, Item = Rc<UnixStr>>,
     {
         VirtualDir {
             iter: iter.into_iter(),
-            current: Rc::from(OsStr::new("")),
+            current: Rc::from(UnixStr::new("")),
         }
     }
 }
@@ -322,32 +318,32 @@ impl<I> VirtualDir<I> {
 /// Creates a `VirtualDir` that yields entries of a directory.
 ///
 /// This function will fail if the given file body is not a directory.
-impl TryFrom<&FileBody> for VirtualDir<std::vec::IntoIter<Rc<OsStr>>> {
+impl TryFrom<&FileBody> for VirtualDir<std::vec::IntoIter<Rc<UnixStr>>> {
     type Error = Errno;
     fn try_from(file: &FileBody) -> Result<Self, Errno> {
-        if let FileBody::Directory { files } = file {
-            let mut entries = Vec::with_capacity(files.len() + 2);
-            entries.push(Rc::from(OsStr::new(".")));
-            entries.push(Rc::from(OsStr::new("..")));
-            entries.extend(files.keys().cloned());
+        let FileBody::Directory { files } = file else {
+            return Err(Errno::ENOTDIR);
+        };
 
-            // You should not pose any assumption on the order of entries.
-            // Here, we deliberately disorder the entries.
-            let entry = entries.pop().unwrap();
-            let i = entries.len() / 2;
-            entries.insert(i, entry);
+        let mut entries = Vec::with_capacity(files.len() + 2);
+        entries.push(Rc::from(UnixStr::new(".")));
+        entries.push(Rc::from(UnixStr::new("..")));
+        entries.extend(files.keys().cloned());
 
-            Ok(Self::new(entries))
-        } else {
-            Err(Errno::ENOTDIR)
-        }
+        // You should not pose any assumption on the order of entries.
+        // Here, we deliberately disorder the entries.
+        let entry = entries.pop().unwrap();
+        let i = entries.len() / 2;
+        entries.insert(i, entry);
+
+        Ok(Self::new(entries))
     }
 }
 
 impl<I> Dir for VirtualDir<I>
 where
     I: Debug,
-    I: Iterator<Item = Rc<OsStr>>,
+    I: Iterator<Item = Rc<UnixStr>>,
 {
     fn next(&mut self) -> Result<Option<DirEntry>, Errno> {
         match self.iter.next() {
@@ -357,7 +353,7 @@ where
                 Ok(Some(DirEntry { name }))
             }
             None => {
-                self.current = Rc::from(OsStr::new(""));
+                self.current = Rc::from(UnixStr::new(""));
                 Ok(None)
             }
         }
@@ -406,7 +402,7 @@ mod tests {
         assert_matches!(&dir.body, FileBody::Directory { files } => {
             let mut i = files.iter();
             let (name, content) = i.next().unwrap();
-            assert_eq!(name.as_ref(), Path::new("bar"));
+            assert_eq!(name.as_bytes(), b"bar");
             assert_eq!(content, &file);
             assert_eq!(i.next(), None);
         });
@@ -468,7 +464,9 @@ mod tests {
 
     #[test]
     fn non_empty_virtual_dir() {
-        let iter = ["foo", "bar"].into_iter().map(|s| Rc::from(OsStr::new(s)));
+        let iter = ["foo", "bar"]
+            .into_iter()
+            .map(|s| Rc::from(UnixStr::new(s)));
         let mut dir = VirtualDir::new(iter);
         assert_matches!(dir.next(), Ok(Some(entry)) => {
             assert_eq!(entry.name, "foo");
@@ -483,7 +481,7 @@ mod tests {
     fn virtual_dir_try_from_file_body_directory() {
         let files = ["one", "2", "three"]
             .into_iter()
-            .map(|name| (Rc::from(OsStr::new(name)), Rc::default()))
+            .map(|name| (Rc::from(UnixStr::new(name)), Rc::default()))
             .collect();
         let file = FileBody::Directory { files };
         let mut dir = VirtualDir::try_from(&file).unwrap();

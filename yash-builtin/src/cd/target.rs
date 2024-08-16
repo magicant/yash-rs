@@ -19,9 +19,9 @@
 use super::Command;
 use super::Mode;
 use std::borrow::Cow;
-use std::path::Path;
-use std::path::PathBuf;
 use thiserror::Error;
+use yash_env::path::Path;
+use yash_env::path::PathBuf;
 use yash_env::variable::HOME;
 use yash_env::variable::OLDPWD;
 use yash_env::Env;

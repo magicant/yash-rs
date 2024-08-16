@@ -17,13 +17,11 @@
 //! Part of the cd built-in that canonicalizes the target directory path
 
 use std::ffi::CString;
-use std::ffi::OsStr;
-use std::ffi::OsString;
-use std::os::unix::ffi::OsStrExt;
-use std::os::unix::ffi::OsStringExt;
-use std::path::Path;
-use std::path::PathBuf;
 use thiserror::Error;
+use yash_env::path::Path;
+use yash_env::path::PathBuf;
+use yash_env::str::UnixStr;
+use yash_env::str::UnixString;
 use yash_env::System;
 
 #[derive(Debug, Clone, Eq, Error, PartialEq)]
@@ -46,7 +44,7 @@ pub fn canonicalize<S: System>(
     system: &S,
     path: &Path,
 ) -> Result<PathBuf, NonExistingDirectoryError> {
-    let path = path.as_os_str().as_bytes();
+    let path = path.as_unix_str().as_bytes();
     let leading_slashes = path.iter().take_while(|&&b| b == b'/').count();
     let mut components = path
         .split(|&b| b == b'/')
@@ -93,7 +91,7 @@ fn remove_dot_dot<S: System>(
 }
 
 fn create_path(leading_slashes: usize, components: &[&[u8]]) -> PathBuf {
-    let mut result = OsString::new();
+    let mut result = UnixString::new();
 
     match leading_slashes {
         0 => {}
@@ -105,7 +103,7 @@ fn create_path(leading_slashes: usize, components: &[&[u8]]) -> PathBuf {
         if !result.is_empty() && !result.as_bytes().ends_with(b"/") {
             result.push("/");
         }
-        result.push(OsStr::from_bytes(component));
+        result.push(UnixStr::from_bytes(component));
     }
 
     result.into()
@@ -113,13 +111,13 @@ fn create_path(leading_slashes: usize, components: &[&[u8]]) -> PathBuf {
 
 /// Returns an error if the given path is not a directory.
 fn ensure_directory<S: System>(system: &S, path: PathBuf) -> Result<(), NonExistingDirectoryError> {
-    match CString::new(path.into_os_string().into_vec()) {
+    match CString::new(path.into_unix_string().into_vec()) {
         Ok(path) if system.is_directory(&path) => Ok(()),
         Ok(path) => Err(NonExistingDirectoryError {
-            missing: OsString::from_vec(path.into_bytes()).into(),
+            missing: UnixString::from_vec(path.into_bytes()).into(),
         }),
         Err(e) => Err(NonExistingDirectoryError {
-            missing: OsString::from_vec(e.into_vec()).into(),
+            missing: UnixString::from_vec(e.into_vec()).into(),
         }),
     }
 }
@@ -128,7 +126,6 @@ fn ensure_directory<S: System>(system: &S, path: PathBuf) -> Result<(), NonExist
 mod tests {
     use super::*;
     use std::rc::Rc;
-    use std::str::from_utf8;
     use yash_env::system::r#virtual::Inode;
     use yash_env::system::r#virtual::VirtualSystem;
 
@@ -136,69 +133,63 @@ mod tests {
     fn empty_path() {
         let system = VirtualSystem::new();
         let result = canonicalize(&system, Path::new("")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok(""));
+        assert_eq!(result.as_unix_str().as_bytes(), b"");
     }
 
     #[test]
     fn single_slash_root() {
         let system = VirtualSystem::new();
         let result = canonicalize(&system, Path::new("/")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("/"));
+        assert_eq!(result.as_unix_str().as_bytes(), b"/");
     }
 
     #[test]
     fn double_slash_root() {
         let system = VirtualSystem::new();
         let result = canonicalize(&system, Path::new("//")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("//"));
+        assert_eq!(result.as_unix_str().as_bytes(), b"//");
     }
 
     #[test]
     fn triple_slash_root() {
         let system = VirtualSystem::new();
         let result = canonicalize(&system, Path::new("///")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("/"));
+        assert_eq!(result.as_unix_str().as_bytes(), b"/");
     }
 
     #[test]
     fn rootless_non_empty() {
         let system = VirtualSystem::new();
         let result = canonicalize(&system, Path::new("foo/bar")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("foo/bar"));
+        assert_eq!(result.as_unix_str().as_bytes(), b"foo/bar");
     }
 
     #[test]
     fn single_component() {
         let system = VirtualSystem::new();
         let result = canonicalize(&system, Path::new("/home")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("/home"));
+        assert_eq!(result.as_unix_str().as_bytes(), b"/home");
     }
 
     #[test]
     fn double_component() {
         let system = VirtualSystem::new();
         let result = canonicalize(&system, Path::new("/home/user")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("/home/user"));
+        assert_eq!(result.as_unix_str().as_bytes(), b"/home/user");
     }
 
     #[test]
     fn many_components() {
         let system = VirtualSystem::new();
         let result = canonicalize(&system, Path::new("///usr/local/share/yash")).unwrap();
-        assert_eq!(
-            from_utf8(result.as_os_str().as_bytes()),
-            Ok("/usr/local/share/yash")
-        );
+        assert_eq!(result.as_unix_str().as_bytes(), b"/usr/local/share/yash");
     }
 
     #[test]
     fn redundant_slashes() {
         let system = VirtualSystem::new();
         let result = canonicalize(&system, Path::new("///usr//local///share//yash")).unwrap();
-        assert_eq!(
-            from_utf8(result.as_os_str().as_bytes()),
-            Ok("/usr/local/share/yash")
-        );
+        assert_eq!(result.as_unix_str().as_bytes(), b"/usr/local/share/yash");
     }
 
     #[test]
@@ -206,10 +197,10 @@ mod tests {
         let system = VirtualSystem::new();
 
         let result = canonicalize(&system, Path::new("/foo/")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("/foo"));
+        assert_eq!(result.as_unix_str().as_bytes(), b"/foo");
 
         let result = canonicalize(&system, Path::new("/foo/bar//")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("/foo/bar"));
+        assert_eq!(result.as_unix_str().as_bytes(), b"/foo/bar");
     }
 
     #[test]
@@ -217,19 +208,16 @@ mod tests {
         let system = VirtualSystem::new();
 
         let result = canonicalize(&system, Path::new("/usr/./local/share/./yash")).unwrap();
-        assert_eq!(
-            from_utf8(result.as_os_str().as_bytes()),
-            Ok("/usr/local/share/yash")
-        );
+        assert_eq!(result.as_unix_str().as_bytes(), b"/usr/local/share/yash");
 
         let result = canonicalize(&system, Path::new("/./")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("/"));
+        assert_eq!(result.as_unix_str().as_bytes(), b"/");
 
         let result = canonicalize(&system, Path::new("//./")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("//"));
+        assert_eq!(result.as_unix_str().as_bytes(), b"//");
 
         let result = canonicalize(&system, Path::new("/foo/.")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("/foo"));
+        assert_eq!(result.as_unix_str().as_bytes(), b"/foo");
     }
 
     #[test]
@@ -244,10 +232,10 @@ mod tests {
 
         // Components AFTER the dot-dot do not have to exist.
         let result = canonicalize(&system, Path::new("/foo/bar/../baz")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("/foo/baz"));
+        assert_eq!(result.as_unix_str().as_bytes(), b"/foo/baz");
 
         let result = canonicalize(&system, Path::new("/foo/../bar/baz")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("/bar/baz"));
+        assert_eq!(result.as_unix_str().as_bytes(), b"/bar/baz");
     }
 
     #[test]
@@ -261,7 +249,7 @@ mod tests {
             .unwrap();
 
         let result = canonicalize(&system, Path::new("/foo/bar/../../baz")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("/baz"));
+        assert_eq!(result.as_unix_str().as_bytes(), b"/baz");
     }
 
     #[test]
@@ -275,7 +263,7 @@ mod tests {
             .unwrap();
 
         let result = canonicalize(&system, Path::new("/foo/bar/./../baz")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("/foo/baz"));
+        assert_eq!(result.as_unix_str().as_bytes(), b"/foo/baz");
     }
 
     #[test]
@@ -283,13 +271,13 @@ mod tests {
         // "/.." should not become "/"
         let system = VirtualSystem::new();
         let result = canonicalize(&system, Path::new("/..")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("/.."));
+        assert_eq!(result.as_unix_str().as_bytes(), b"/..");
 
         let result = canonicalize(&system, Path::new("/../..")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("/../.."));
+        assert_eq!(result.as_unix_str().as_bytes(), b"/../..");
 
         let result = canonicalize(&system, Path::new("/../../..")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("/../../.."));
+        assert_eq!(result.as_unix_str().as_bytes(), b"/../../..");
     }
 
     #[test]
@@ -309,7 +297,7 @@ mod tests {
             .unwrap();
 
         let result = canonicalize(&system, Path::new("/foo/bar/link/../baz")).unwrap();
-        assert_eq!(from_utf8(result.as_os_str().as_bytes()), Ok("/foo/bar/baz"));
+        assert_eq!(result.as_unix_str().as_bytes(), b"/foo/bar/baz");
     }
 
     #[test]

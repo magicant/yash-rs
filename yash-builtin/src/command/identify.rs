@@ -23,14 +23,12 @@ use crate::common::{output, report_failure, to_single_message};
 use std::borrow::Cow;
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::ffi::OsStr;
-use std::os::unix::ffi::OsStrExt as _;
-use std::os::unix::ffi::OsStringExt as _;
-use std::path::PathBuf;
 use std::rc::Rc;
 use yash_env::builtin::Type;
+use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
+use yash_env::str::UnixStr;
 use yash_env::Env;
 use yash_env::System;
 use yash_quote::quoted;
@@ -132,8 +130,8 @@ fn normalize_target<E: NormalizeEnv>(env: &E, target: &mut Target) -> Result<(),
             }
             if !path.as_bytes().starts_with(b"/") {
                 let mut absolute_path = env.pwd()?;
-                absolute_path.push(OsStr::from_bytes(path.as_bytes()));
-                *path = CString::new(absolute_path.into_os_string().into_vec()).map_err(|_| ())?;
+                absolute_path.push(UnixStr::from_bytes(path.as_bytes()));
+                *path = CString::new(absolute_path.into_unix_string().into_vec()).map_err(drop)?;
             }
             Ok(())
         }

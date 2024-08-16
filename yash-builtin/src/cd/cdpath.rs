@@ -17,10 +17,9 @@
 //! Part of the cd built-in that searches `$CDPATH`
 
 use std::ffi::CString;
-use std::ffi::OsString;
-use std::os::unix::ffi::OsStringExt;
-use std::path::Path;
-use std::path::PathBuf;
+use yash_env::path::Path;
+use yash_env::path::PathBuf;
+use yash_env::str::UnixString;
 use yash_env::variable::CDPATH;
 use yash_env::Env;
 use yash_env::System;
@@ -66,9 +65,9 @@ pub fn search(env: &Env, path: &Path) -> Option<PathBuf> {
 /// This function requires the ownership of the given path to create a temporary
 /// `CString` used in the underlying system call.
 fn ensure_directory<S: System>(system: &S, path: PathBuf) -> Option<PathBuf> {
-    match CString::new(path.into_os_string().into_vec()) {
+    match CString::new(path.into_unix_string().into_vec()) {
         Ok(path) if system.is_directory(&path) => {
-            Some(OsString::from_vec(path.into_bytes()).into())
+            Some(UnixString::from_vec(path.into_bytes()).into())
         }
         _ => None,
     }

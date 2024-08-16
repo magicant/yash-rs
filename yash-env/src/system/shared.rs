@@ -26,6 +26,8 @@ use super::LimitPair;
 use super::Mode;
 use super::OfdAccess;
 use super::OpenFlag;
+use super::Path;
+use super::PathBuf;
 use super::Resource;
 use super::Result;
 use super::SelectSystem;
@@ -38,6 +40,7 @@ use super::System;
 use super::SystemEx;
 use super::Times;
 use super::Uid;
+use super::UnixString;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessState;
@@ -49,12 +52,9 @@ use std::convert::Infallible;
 use std::ffi::c_int;
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::ffi::OsString;
 use std::future::poll_fn;
 use std::future::Future;
 use std::io::SeekFrom;
-use std::path::Path;
-use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::Poll;
@@ -462,7 +462,7 @@ impl System for &SharedSystem {
     fn getpwnam_dir(&self, name: &str) -> Result<Option<PathBuf>> {
         self.0.borrow().getpwnam_dir(name)
     }
-    fn confstr_path(&self) -> Result<OsString> {
+    fn confstr_path(&self) -> Result<UnixString> {
         self.0.borrow().confstr_path()
     }
     fn shell_path(&self) -> CString {
@@ -689,7 +689,7 @@ impl System for SharedSystem {
         (&self).getpwnam_dir(name)
     }
     #[inline]
-    fn confstr_path(&self) -> Result<OsString> {
+    fn confstr_path(&self) -> Result<UnixString> {
         (&self).confstr_path()
     }
     #[inline]
