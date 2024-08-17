@@ -21,6 +21,7 @@ mod fd_flag;
 mod file_system;
 mod id;
 mod open_flag;
+#[cfg(unix)]
 pub mod real;
 pub mod resource;
 mod select;
@@ -46,7 +47,7 @@ pub use self::open_flag::OfdAccess;
 pub use self::open_flag::OpenFlag;
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
-#[cfg(doc)]
+#[cfg(all(doc, unix))]
 use self::real::RealSystem;
 use self::resource::LimitPair;
 use self::resource::Resource;

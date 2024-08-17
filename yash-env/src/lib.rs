@@ -46,6 +46,7 @@ use self::semantics::ExitStatus;
 use self::stack::Frame;
 use self::stack::Stack;
 pub use self::system::r#virtual::VirtualSystem;
+#[cfg(unix)]
 pub use self::system::real::RealSystem;
 use self::system::Errno;
 pub use self::system::SharedSystem;
