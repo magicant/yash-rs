@@ -50,7 +50,6 @@ pub use self::system::r#virtual::VirtualSystem;
 pub use self::system::real::RealSystem;
 use self::system::Errno;
 pub use self::system::SharedSystem;
-use self::system::SignalHandling;
 pub use self::system::System;
 use self::system::SystemEx;
 use self::trap::TrapSet;
