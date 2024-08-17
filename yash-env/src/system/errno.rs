@@ -394,6 +394,10 @@ impl From<RawErrno> for Errno {
     }
 }
 
+/// Converts [`Errno`] to [`nix::Error`].
+///
+/// This conversion is only available on Unix-like systems.
+#[cfg(unix)]
 impl From<Errno> for nix::Error {
     #[inline]
     fn from(errno: Errno) -> Self {
@@ -401,6 +405,10 @@ impl From<Errno> for nix::Error {
     }
 }
 
+/// Converts [`nix::Error`] to [`Errno`].
+///
+/// This conversion is only available on Unix-like systems.
+#[cfg(unix)]
 impl From<nix::Error> for Errno {
     #[inline]
     fn from(error: nix::Error) -> Self {
