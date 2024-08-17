@@ -31,7 +31,7 @@ yash-quote = { path = "../yash-quote", version = "1.1.1" }
 yash-syntax = { path = "../yash-syntax", version = "0.10.0", features = ["annotate-snippets"] }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.27.0", features = ["fs", "poll", "process", "signal", "term", "user"] }
+nix = { version = "0.27.0", features = ["fs", "signal", "user"] }
 
 [dev-dependencies]
 assert_matches = "1.5.0"

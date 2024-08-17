@@ -112,6 +112,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `impl From<nix::unistd::Pid> for job::Pid`
 - `impl From<system::resource::LimitPair> for nix::libc::rlimit`
 - `impl From<nix::libc::rlimit> for system::resource::LimitPair`
+- External dependencies:
+    - nix 0.27.0 (now an internal dependency with the "fs", "signal" and "user"
+      features enabled)
 
 ## [0.2.1] - 2024-07-12
 
