@@ -105,7 +105,8 @@
 //! # Implementation notes
 //!
 //! The `-p` option depends on [`System::confstr_path`] to obtain the standard
-//! search path. See [`RealSystem::confstr_path`] for the supported platforms.
+//! search path. See the source code of [`RealSystem::confstr_path`] for the
+//! platforms supported on the real system.
 //!
 //! The [`type`] built-in is equivalent to the `command` built-in with the `-V`
 //! option.
@@ -116,8 +117,10 @@ use crate::common::report_error;
 use enumset::EnumSet;
 use enumset::EnumSetType;
 use yash_env::semantics::Field;
+#[cfg(all(doc, unix))]
+use yash_env::system::real::RealSystem;
 #[cfg(doc)]
-use yash_env::system::{real::RealSystem, System};
+use yash_env::system::System;
 use yash_env::Env;
 
 /// Category of command name resolution
