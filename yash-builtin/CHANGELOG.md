@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] - Unreleased
 
+### Added
+
+- This crate now builds on non-Unix platforms.
+
 ### Changed
 
 - All APIs that handle `std::path::Path` and `std::path::PathBuf` now use

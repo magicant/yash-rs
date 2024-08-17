@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- This crate now builds on non-Unix platforms. However,
+  `system::real::RealSystem` is only available on Unix platforms.
 - The `OfdAccess`, `OpenFlag`, `FdFlag`, `Mode`, `RawMode`, `Uid`, `RawUid`,
   `Gid`, `RawGid`, `FileType`, `Stat`, and `SigmaskOp` types in the `system`
   module
