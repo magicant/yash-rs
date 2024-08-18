@@ -47,7 +47,7 @@ use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use yash_syntax::source::Location;
 
-/// System interface for signal handling configuration.
+/// System interface for signal handling configuration
 pub trait SignalSystem {
     /// Returns the name of a signal from its number.
     #[must_use]
@@ -76,12 +76,12 @@ pub trait SignalSystem {
 
     /// Sets how a signal is handled.
     ///
-    /// This function updates the signal blocking mask and the signal action for
-    /// the specified signal, and returns the previous action.
-    fn set_signal_handling(
+    /// This function updates the signal blocking mask and the disposition for
+    /// the specified signal, and returns the previous disposition.
+    fn set_disposition(
         &mut self,
         signal: signal::Number,
-        handling: Disposition,
+        disposition: Disposition,
     ) -> Result<Disposition, Errno>;
 }
 
@@ -206,7 +206,7 @@ impl TrapSet {
         Iter { inner }
     }
 
-    /// Updates signal handlings on entering a subshell.
+    /// Updates signal dispositions on entering a subshell.
     ///
     /// ## Resetting non-ignore traps
     ///
@@ -227,19 +227,19 @@ impl TrapSet {
     ///
     /// ## Ignoring SIGINT and SIGQUIT
     ///
-    /// If `ignore_sigint_sigquit` is true, this function sets the signal
-    /// handlings for SIGINT and SIGQUIT to `Ignore`.
+    /// If `ignore_sigint_sigquit` is true, this function sets the dispositions
+    /// for SIGINT and SIGQUIT to `Ignore`.
     ///
     /// ## Ignoring SIGTSTP, SIGTTIN, and SIGTTOU
     ///
     /// If `keep_stopper_handlers` is true and the stopper handlers have been
     /// [enabled](Self::enable_stopper_handlers), this function leaves the
-    /// signal handlings for SIGTSTP, SIGTTIN, and SIGTTOU set to `Ignore`.
+    /// dispositions for SIGTSTP, SIGTTIN, and SIGTTOU set to `Ignore`.
     ///
     /// ## Errors
     ///
     /// This function ignores any errors that may occur when setting signal
-    /// handlings.
+    /// dispositions.
     pub fn enter_subshell<S: SignalSystem>(
         &mut self,
         system: &mut S,
@@ -319,14 +319,14 @@ impl TrapSet {
     fn set_internal_handler<S: SignalSystem>(
         &mut self,
         signal: signal::Name,
-        handling: Disposition,
+        disposition: Disposition,
         system: &mut S,
     ) -> Result<(), Errno> {
         let number = system
             .signal_number_from_name(signal)
             .unwrap_or_else(|| panic!("missing support for signal {signal}"));
         let entry = self.traps.entry(Condition::Signal(number));
-        GrandState::set_internal_handler(system, entry, handling)
+        GrandState::set_internal_handler(system, entry, disposition)
     }
 
     /// Installs an internal handler for `SIGCHLD`.
@@ -446,7 +446,7 @@ mod tests {
             VirtualSystem::new().signal_number_from_name(name)
         }
 
-        fn set_signal_handling(
+        fn set_disposition(
             &mut self,
             signal: signal::Number,
             disposition: Disposition,

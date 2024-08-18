@@ -237,7 +237,7 @@ pub trait System: Debug {
     /// Gets and/or sets the signal blocking mask.
     ///
     /// This is a low-level function used internally by
-    /// [`SharedSystem::set_signal_handling`]. You should not call this function
+    /// [`SharedSystem::set_disposition`]. You should not call this function
     /// directly, or you will disrupt the behavior of `SharedSystem`. The
     /// description below applies if you want to do everything yourself without
     /// depending on `SharedSystem`.
@@ -256,7 +256,7 @@ pub trait System: Debug {
     /// Gets and sets the disposition for a signal.
     ///
     /// This is a low-level function used internally by
-    /// [`SharedSystem::set_signal_handling`]. You should not call this function
+    /// [`SharedSystem::set_disposition`]. You should not call this function
     /// directly, or you will disrupt the behavior of `SharedSystem`. The
     /// description below applies if you want to do everything yourself without
     /// depending on `SharedSystem`.

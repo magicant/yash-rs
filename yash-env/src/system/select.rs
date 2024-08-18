@@ -109,7 +109,7 @@ impl SelectSystem {
 
     /// Implements signal handler update.
     ///
-    /// See [`SharedSystem::set_signal_handling`].
+    /// See [`SharedSystem::set_disposition`].
     pub fn set_signal_handling(
         &mut self,
         signal: signal::Number,

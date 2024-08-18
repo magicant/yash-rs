@@ -203,9 +203,9 @@ impl GrandState {
             Entry::Vacant(vacant) => {
                 if let Condition::Signal(signal) = cond {
                     if !override_ignore {
-                        let initial_handling =
-                            system.set_signal_handling(signal, Disposition::Ignore)?;
-                        if initial_handling == Disposition::Ignore {
+                        let initial_disposition =
+                            system.set_disposition(signal, Disposition::Ignore)?;
+                        if initial_disposition == Disposition::Ignore {
                             vacant.insert(GrandState {
                                 current_setting: Setting::InitiallyIgnored,
                                 parent_setting: None,
@@ -216,7 +216,7 @@ impl GrandState {
                     }
 
                     if override_ignore || handling != Disposition::Ignore {
-                        system.set_signal_handling(signal, handling)?;
+                        system.set_disposition(signal, handling)?;
                     }
                 }
 
@@ -237,7 +237,7 @@ impl GrandState {
                     let old_handler = state.internal_handler.max((&state.current_setting).into());
                     let new_handler = state.internal_handler.max(handling);
                     if old_handler != new_handler {
-                        system.set_signal_handling(signal, new_handler)?;
+                        system.set_disposition(signal, new_handler)?;
                     }
                 }
 
@@ -271,9 +271,9 @@ impl GrandState {
             Entry::Vacant(_) if handling == Disposition::Default => (),
 
             Entry::Vacant(vacant) => {
-                let initial_handling = system.set_signal_handling(signal, handling)?;
+                let initial_disposition = system.set_disposition(signal, handling)?;
                 vacant.insert(GrandState {
-                    current_setting: Setting::from_initial_handling(initial_handling),
+                    current_setting: Setting::from_initial_handling(initial_disposition),
                     parent_setting: None,
                     internal_handler: handling,
                 });
@@ -285,7 +285,7 @@ impl GrandState {
                 let old_handler = state.internal_handler.max(setting);
                 let new_handler = handling.max(setting);
                 if old_handler != new_handler {
-                    system.set_signal_handling(signal, new_handler)?;
+                    system.set_disposition(signal, new_handler)?;
                 }
                 state.internal_handler = handling;
             }
@@ -325,7 +325,7 @@ impl GrandState {
         };
         if old_handler != new_handler {
             if let Condition::Signal(signal) = cond {
-                system.set_signal_handling(signal, new_handler)?;
+                system.set_disposition(signal, new_handler)?;
             }
         }
         self.internal_handler = match option {
@@ -354,9 +354,9 @@ impl GrandState {
             Condition::Signal(signal) => signal,
             Condition::Exit => panic!("exit condition cannot be ignored"),
         };
-        let initial_handling = system.set_signal_handling(signal, Disposition::Ignore)?;
+        let initial_disposition = system.set_disposition(signal, Disposition::Ignore)?;
         vacant.insert(GrandState {
-            current_setting: Setting::from_initial_handling(initial_handling),
+            current_setting: Setting::from_initial_handling(initial_disposition),
             parent_setting: None,
             internal_handler: Disposition::Default,
         });
