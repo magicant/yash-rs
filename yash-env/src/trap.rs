@@ -964,7 +964,7 @@ mod tests {
 
             let state = state.borrow();
             let process = &state.processes[&env.main_pid];
-            assert_eq!(process.signal_handling(SIGINT), Disposition::Ignore);
+            assert_eq!(process.disposition(SIGINT), Disposition::Ignore);
             assert_eq!(process.state(), ProcessState::Running);
         })
     }
@@ -986,7 +986,7 @@ mod tests {
 
             let state = state.borrow();
             let process = &state.processes[&env.main_pid];
-            assert_eq!(process.signal_handling(SIGQUIT), Disposition::Ignore);
+            assert_eq!(process.disposition(SIGQUIT), Disposition::Ignore);
             assert_eq!(process.state(), ProcessState::Running);
         })
     }
@@ -1022,9 +1022,9 @@ mod tests {
 
             let state = state.borrow();
             let process = &state.processes[&env.main_pid];
-            assert_eq!(process.signal_handling(SIGTSTP), Disposition::Ignore);
-            assert_eq!(process.signal_handling(SIGTTIN), Disposition::Ignore);
-            assert_eq!(process.signal_handling(SIGTTOU), Disposition::Ignore);
+            assert_eq!(process.disposition(SIGTSTP), Disposition::Ignore);
+            assert_eq!(process.disposition(SIGTTIN), Disposition::Ignore);
+            assert_eq!(process.disposition(SIGTTOU), Disposition::Ignore);
             assert_eq!(process.state(), ProcessState::Running);
         })
     }
@@ -1047,9 +1047,9 @@ mod tests {
 
             let state = state.borrow();
             let process = &state.processes[&env.main_pid];
-            assert_eq!(process.signal_handling(SIGTSTP), Disposition::Default);
-            assert_eq!(process.signal_handling(SIGTTIN), Disposition::Default);
-            assert_eq!(process.signal_handling(SIGTTOU), Disposition::Default);
+            assert_eq!(process.disposition(SIGTSTP), Disposition::Default);
+            assert_eq!(process.disposition(SIGTTIN), Disposition::Default);
+            assert_eq!(process.disposition(SIGTTOU), Disposition::Default);
         })
     }
 

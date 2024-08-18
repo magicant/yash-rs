@@ -412,8 +412,8 @@ xtrace           off
         expected_options.extend([Interactive, Monitor]);
         assert_eq!(env.options, expected_options);
         let state = state.borrow();
-        let handling = state.processes[&env.main_pid].signal_handling(SIGTSTP);
-        assert_eq!(handling, Disposition::Ignore);
+        let disposition = state.processes[&env.main_pid].disposition(SIGTSTP);
+        assert_eq!(disposition, Disposition::Ignore);
     }
 
     #[test]
@@ -432,8 +432,8 @@ xtrace           off
         expected_options.set(Interactive, On);
         assert_eq!(env.options, expected_options);
         let state = state.borrow();
-        let handling = state.processes[&env.main_pid].signal_handling(SIGTSTP);
-        assert_eq!(handling, Disposition::Default);
+        let disposition = state.processes[&env.main_pid].disposition(SIGTSTP);
+        assert_eq!(disposition, Disposition::Default);
     }
 
     #[test]
@@ -449,8 +449,8 @@ xtrace           off
         expected_options.set(Monitor, On);
         assert_eq!(env.options, expected_options);
         let state = state.borrow();
-        let handling = state.processes[&env.main_pid].signal_handling(SIGTSTP);
-        assert_eq!(handling, Disposition::Default);
+        let disposition = state.processes[&env.main_pid].disposition(SIGTSTP);
+        assert_eq!(disposition, Disposition::Default);
     }
 
     #[test]
@@ -468,7 +468,7 @@ xtrace           off
         expected_options.extend([Interactive, Monitor]);
         assert_eq!(env.options, expected_options);
         let state = state.borrow();
-        let handling = state.processes[&env.main_pid].signal_handling(SIGTSTP);
-        assert_eq!(handling, Disposition::Default);
+        let disposition = state.processes[&env.main_pid].disposition(SIGTSTP);
+        assert_eq!(disposition, Disposition::Default);
     }
 }

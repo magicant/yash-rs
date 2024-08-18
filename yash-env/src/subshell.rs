@@ -626,8 +626,8 @@ mod tests {
 
             let state = state.borrow();
             let process = &state.processes[&child_pid];
-            assert_eq!(process.signal_handling(SIGINT), Disposition::Default);
-            assert_eq!(process.signal_handling(SIGQUIT), Disposition::Default);
+            assert_eq!(process.disposition(SIGINT), Disposition::Default);
+            assert_eq!(process.disposition(SIGQUIT), Disposition::Default);
         })
     }
 
@@ -662,8 +662,8 @@ mod tests {
             assert!(!parent_process.blocked_signals().contains(&SIGINT));
             assert!(!parent_process.blocked_signals().contains(&SIGQUIT));
             let child_process = &state.processes[&child_pid];
-            assert_eq!(child_process.signal_handling(SIGINT), Disposition::Ignore);
-            assert_eq!(child_process.signal_handling(SIGQUIT), Disposition::Ignore);
+            assert_eq!(child_process.disposition(SIGINT), Disposition::Ignore);
+            assert_eq!(child_process.disposition(SIGQUIT), Disposition::Ignore);
         })
     }
 
@@ -685,8 +685,8 @@ mod tests {
 
             let state = state.borrow();
             let process = &state.processes[&child_pid];
-            assert_eq!(process.signal_handling(SIGINT), Disposition::Default);
-            assert_eq!(process.signal_handling(SIGQUIT), Disposition::Default);
+            assert_eq!(process.disposition(SIGINT), Disposition::Default);
+            assert_eq!(process.disposition(SIGQUIT), Disposition::Default);
         })
     }
 
@@ -713,9 +713,9 @@ mod tests {
 
             let state = state.borrow();
             let child_process = &state.processes[&child_pid];
-            assert_eq!(child_process.signal_handling(SIGTSTP), Disposition::Ignore);
-            assert_eq!(child_process.signal_handling(SIGTTIN), Disposition::Ignore);
-            assert_eq!(child_process.signal_handling(SIGTTOU), Disposition::Ignore);
+            assert_eq!(child_process.disposition(SIGTSTP), Disposition::Ignore);
+            assert_eq!(child_process.disposition(SIGTTIN), Disposition::Ignore);
+            assert_eq!(child_process.disposition(SIGTTOU), Disposition::Ignore);
         })
     }
 
@@ -743,9 +743,9 @@ mod tests {
 
             let state = state.borrow();
             let child_process = &state.processes[&child_pid];
-            assert_eq!(child_process.signal_handling(SIGTSTP), Disposition::Default);
-            assert_eq!(child_process.signal_handling(SIGTTIN), Disposition::Default);
-            assert_eq!(child_process.signal_handling(SIGTTOU), Disposition::Default);
+            assert_eq!(child_process.disposition(SIGTSTP), Disposition::Default);
+            assert_eq!(child_process.disposition(SIGTTIN), Disposition::Default);
+            assert_eq!(child_process.disposition(SIGTTOU), Disposition::Default);
         })
     }
 
@@ -767,9 +767,9 @@ mod tests {
 
             let state = state.borrow();
             let child_process = &state.processes[&child_pid];
-            assert_eq!(child_process.signal_handling(SIGTSTP), Disposition::Default);
-            assert_eq!(child_process.signal_handling(SIGTTIN), Disposition::Default);
-            assert_eq!(child_process.signal_handling(SIGTTOU), Disposition::Default);
+            assert_eq!(child_process.disposition(SIGTSTP), Disposition::Default);
+            assert_eq!(child_process.disposition(SIGTTIN), Disposition::Default);
+            assert_eq!(child_process.disposition(SIGTTOU), Disposition::Default);
         })
     }
 
@@ -791,9 +791,9 @@ mod tests {
 
             let state = state.borrow();
             let child_process = &state.processes[&child_pid];
-            assert_eq!(child_process.signal_handling(SIGTSTP), Disposition::Default);
-            assert_eq!(child_process.signal_handling(SIGTTIN), Disposition::Default);
-            assert_eq!(child_process.signal_handling(SIGTTOU), Disposition::Default);
+            assert_eq!(child_process.disposition(SIGTSTP), Disposition::Default);
+            assert_eq!(child_process.disposition(SIGTTIN), Disposition::Default);
+            assert_eq!(child_process.disposition(SIGTTOU), Disposition::Default);
         })
     }
 }

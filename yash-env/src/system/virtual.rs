@@ -635,7 +635,7 @@ impl System for VirtualSystem {
         disposition: Disposition,
     ) -> Result<Disposition> {
         let mut process = self.current_process_mut();
-        Ok(process.set_signal_handling(signal, disposition))
+        Ok(process.set_disposition(signal, disposition))
     }
 
     fn caught_signals(&mut self) -> Vec<signal::Number> {

@@ -349,7 +349,7 @@ mod tests {
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let process = &state.borrow().processes[&pid];
-        assert_eq!(process.signal_handling(SIGUSR1), Disposition::Ignore);
+        assert_eq!(process.disposition(SIGUSR1), Disposition::Ignore);
     }
 
     #[test]
@@ -362,7 +362,7 @@ mod tests {
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let process = &state.borrow().processes[&pid];
-        assert_eq!(process.signal_handling(SIGUSR2), Disposition::Catch);
+        assert_eq!(process.disposition(SIGUSR2), Disposition::Catch);
     }
 
     #[test]
@@ -375,7 +375,7 @@ mod tests {
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let process = &state.borrow().processes[&pid];
-        assert_eq!(process.signal_handling(SIGPIPE), Disposition::Default);
+        assert_eq!(process.disposition(SIGPIPE), Disposition::Default);
     }
 
     #[test]
@@ -482,7 +482,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         system
             .current_process_mut()
-            .set_signal_handling(SIGINT, Disposition::Ignore);
+            .set_disposition(SIGINT, Disposition::Ignore);
         let mut env = Env::with_system(Box::new(system.clone()));
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("trap"),
@@ -494,7 +494,7 @@ mod tests {
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stderr(&system.state, |stderr| assert_eq!(stderr, ""));
         assert_eq!(
-            system.current_process().signal_handling(SIGINT),
+            system.current_process().disposition(SIGINT),
             Disposition::Ignore
         );
     }

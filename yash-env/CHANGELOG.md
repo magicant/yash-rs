@@ -58,6 +58,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `system::SignalHandling` has been renamed to `system::Disposition`.
 - In the `trap::SignalSystem` trait, the `set_signal_handling` method has been
   renamed to `set_disposition`.
+- In the `system::virtual::Process` struct, the following methods have been
+  renamed:
+    - `signal_handling` → `disposition`
+    - `set_signal_handling` → `set_disposition`
 - The `fstat` and `fstatat` methods of `system::System` now return a `Stat`
   instead of a `nix::sys::stat::FileStat`.
 - The `system::System::fstatat` method now takes a `follow_symlinks: bool`

@@ -88,11 +88,11 @@ pub struct Process {
     /// Wakers waiting for the state of this process to change to `Running`
     resumption_awaiters: Vec<Weak<Cell<Option<Waker>>>>,
 
-    /// Currently set signal handlers
+    /// Current signal dispositions
     ///
-    /// For signals not contained in this hash map, the default handler is
+    /// For signals not contained in this hash map, the default disposition is
     /// assumed.
-    signal_handlings: HashMap<signal::Number, Disposition>,
+    dispositions: HashMap<signal::Number, Disposition>,
 
     /// Set of blocked signals
     blocked_signals: BTreeSet<signal::Number>,
@@ -152,7 +152,7 @@ impl Process {
             state: ProcessState::Running,
             state_has_changed: false,
             resumption_awaiters: Vec::new(),
-            signal_handlings: HashMap::new(),
+            dispositions: HashMap::new(),
             blocked_signals: BTreeSet::new(),
             pending_signals: BTreeSet::new(),
             caught_signals: Vec::new(),
@@ -172,7 +172,7 @@ impl Process {
         child.gid = parent.gid;
         child.egid = parent.egid;
         child.fds = parent.fds.clone();
-        child.signal_handlings.clone_from(&parent.signal_handlings);
+        child.dispositions.clone_from(&parent.dispositions);
         child.blocked_signals.clone_from(&parent.blocked_signals);
         child.pending_signals = BTreeSet::new();
         child
@@ -447,31 +447,31 @@ impl Process {
         result
     }
 
-    /// Returns the current handler for a signal.
+    /// Returns the current disposition for a signal.
     ///
-    /// If no handling is set for the signal, the default handling is returned.
-    pub fn signal_handling(&self, number: signal::Number) -> Disposition {
-        let handling = self.signal_handlings.get(&number).copied();
-        handling.unwrap_or_default()
+    /// If no disposition is set for the signal, the default disposition is
+    /// returned.
+    pub fn disposition(&self, number: signal::Number) -> Disposition {
+        self.dispositions.get(&number).copied().unwrap_or_default()
     }
 
-    /// Gets and sets the handler for a signal.
+    /// Gets and sets the disposition for a signal.
     ///
-    /// This function sets the handler to `handling` and returns the previous
-    /// handler.
-    pub fn set_signal_handling(
+    /// This function sets the disposition to the given value and returns the
+    /// previous disposition.
+    pub fn set_disposition(
         &mut self,
         number: signal::Number,
-        handling: Disposition,
+        disposition: Disposition,
     ) -> Disposition {
-        let old_handling = self.signal_handlings.insert(number, handling);
-        old_handling.unwrap_or_default()
+        let old_disposition = self.dispositions.insert(number, disposition);
+        old_disposition.unwrap_or_default()
     }
 
     /// Delivers a signal to this process.
     ///
-    /// The action taken on the delivery depends on the current signal handling
-    /// for the signal.
+    /// The action taken on the delivery depends on the current signal
+    /// disposition for the signal.
     ///
     /// If the signal changes the execution state of the process, this function
     /// returns a `SignalResult` with `process_state_changed` being `true`. In
@@ -479,13 +479,13 @@ impl Process {
     /// process.
     #[must_use = "send SIGCHLD if process state has changed"]
     fn deliver_signal(&mut self, signal: signal::Number) -> SignalResult {
-        let handling = if signal == signal::SIGKILL || signal == signal::SIGSTOP {
+        let disposition = if signal == signal::SIGKILL || signal == signal::SIGSTOP {
             Disposition::Default
         } else {
-            self.signal_handling(signal)
+            self.disposition(signal)
         };
 
-        match handling {
+        match disposition {
             Disposition::Default => {
                 let name = signal::Name::try_from_raw_virtual(signal.as_raw())
                     .unwrap_or(signal::Name::Sys);
@@ -774,24 +774,24 @@ mod tests {
     }
 
     #[test]
-    fn process_set_signal_handling() {
+    fn process_set_disposition() {
         let mut process = Process::with_parent_and_group(Pid(100), Pid(11));
-        let old_handling = process.set_signal_handling(signal::SIGINT, Disposition::Ignore);
-        assert_eq!(old_handling, Disposition::Default);
-        let old_handling = process.set_signal_handling(signal::SIGTERM, Disposition::Catch);
-        assert_eq!(old_handling, Disposition::Default);
+        let old_disposition = process.set_disposition(signal::SIGINT, Disposition::Ignore);
+        assert_eq!(old_disposition, Disposition::Default);
+        let old_disposition = process.set_disposition(signal::SIGTERM, Disposition::Catch);
+        assert_eq!(old_disposition, Disposition::Default);
 
-        let old_handling = process.set_signal_handling(signal::SIGINT, Disposition::Default);
-        assert_eq!(old_handling, Disposition::Ignore);
-        let old_handling = process.set_signal_handling(signal::SIGTERM, Disposition::Ignore);
-        assert_eq!(old_handling, Disposition::Catch);
+        let old_disposition = process.set_disposition(signal::SIGINT, Disposition::Default);
+        assert_eq!(old_disposition, Disposition::Ignore);
+        let old_disposition = process.set_disposition(signal::SIGTERM, Disposition::Ignore);
+        assert_eq!(old_disposition, Disposition::Catch);
 
-        let handling = process.signal_handling(signal::SIGINT);
-        assert_eq!(handling, Disposition::Default);
-        let handling = process.signal_handling(signal::SIGTERM);
-        assert_eq!(handling, Disposition::Ignore);
-        let handling = process.signal_handling(signal::SIGQUIT);
-        assert_eq!(handling, Disposition::Default);
+        let disposition = process.disposition(signal::SIGINT);
+        assert_eq!(disposition, Disposition::Default);
+        let disposition = process.disposition(signal::SIGTERM);
+        assert_eq!(disposition, Disposition::Ignore);
+        let disposition = process.disposition(signal::SIGQUIT);
+        assert_eq!(disposition, Disposition::Default);
     }
 
     #[test]
@@ -890,7 +890,7 @@ mod tests {
     #[test]
     fn process_raise_signal_ignored() {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
-        process.set_signal_handling(signal::SIGCHLD, Disposition::Ignore);
+        process.set_disposition(signal::SIGCHLD, Disposition::Ignore);
         let result = process.raise_signal(signal::SIGCHLD);
         assert_eq!(
             result,
@@ -908,7 +908,7 @@ mod tests {
     fn process_raise_signal_ignored_and_blocked_sigcont() {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
         let _ = process.set_state(ProcessState::stopped(signal::SIGTTOU));
-        let _ = process.set_signal_handling(signal::SIGCONT, Disposition::Ignore);
+        let _ = process.set_disposition(signal::SIGCONT, Disposition::Ignore);
         let _ = process.block_signals(SigmaskOp::Add, &[signal::SIGCONT]);
         let result = process.raise_signal(signal::SIGCONT);
         assert_eq!(
@@ -927,7 +927,7 @@ mod tests {
     #[test]
     fn process_raise_signal_caught() {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
-        process.set_signal_handling(signal::SIGCHLD, Disposition::Catch);
+        process.set_disposition(signal::SIGCHLD, Disposition::Catch);
         let result = process.raise_signal(signal::SIGCHLD);
         assert_eq!(
             result,
@@ -944,7 +944,7 @@ mod tests {
     #[test]
     fn process_raise_signal_blocked() {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
-        process.set_signal_handling(signal::SIGCHLD, Disposition::Catch);
+        process.set_disposition(signal::SIGCHLD, Disposition::Catch);
         let result = process.block_signals(SigmaskOp::Add, &[signal::SIGCHLD]);
         assert_eq!(
             result,
