@@ -165,17 +165,21 @@ pub enum Command {
 pub mod syntax;
 // TODO pub mod semantics;
 
-/// Enables or disables stopper handlers depending on the `Interactive` and
-/// `Monitor` option states. The handlers are disabled in subshells.
-fn update_stopper_handlers(env: &mut Env) {
+/// Enables or disables the internal dispositions for the "stopper" signals
+/// depending on the `Interactive` and `Monitor` option states. The dispositions
+/// are disabled in subshells.
+fn update_internal_dispositions_for_stoppers(env: &mut Env) {
     if env.options.get(Interactive) == State::On
         && env.options.get(Monitor) == State::On
         && !env.stack.contains(&Subshell)
     {
-        _ = env.traps.enable_stopper_handlers(&mut env.system)
+        env.traps
+            .enable_internal_dispositions_for_stoppers(&mut env.system)
     } else {
-        _ = env.traps.disable_stopper_handlers(&mut env.system)
+        env.traps
+            .disable_internal_dispositions_for_stoppers(&mut env.system)
     }
+    .ok();
 }
 
 /// Modifies shell options and positional parameters.
@@ -188,7 +192,7 @@ fn modify(
     for (option, state) in options {
         env.options.set(option, state);
     }
-    update_stopper_handlers(env);
+    update_internal_dispositions_for_stoppers(env);
 
     // Modify positional parameters
     if let Some(fields) = positional_params {
@@ -437,7 +441,7 @@ xtrace           off
     }
 
     #[test]
-    fn stopper_handlers_not_enabled_in_non_interactive_shell() {
+    fn internal_dispositions_not_enabled_for_stoppers_in_non_interactive_shell() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
@@ -454,7 +458,7 @@ xtrace           off
     }
 
     #[test]
-    fn stopper_handlers_not_enabled_in_subshell() {
+    fn internal_dispositions_not_enabled_for_stoppers_in_subshell() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));

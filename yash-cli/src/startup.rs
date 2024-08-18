@@ -49,9 +49,9 @@ pub fn auto_interactive<S: System>(system: &S, run: &Run) -> bool {
 /// Get the environment ready for performing the work.
 ///
 /// This function takes the parsed command-line arguments and applies them to
-/// the environment. It also sets up signal handlers and prepares built-ins and
-/// variables. The function returns the work to be performed, which is extracted
-/// from the `run` argument.
+/// the environment. It also sets up signal dispositions and prepares built-ins
+/// and variables. The function returns the work to be performed, which is
+/// extracted from the `run` argument.
 ///
 /// This function is _pure_ in that all system calls are performed by the
 /// `System` trait object (`env.system`).
@@ -74,11 +74,15 @@ pub fn configure_environment(env: &mut Env, run: Run) -> Work {
     env.arg0 = run.arg0;
     env.variables.positional_params_mut().values = run.positional_params;
 
-    // Initialize signal handlers
+    // Configure internal dispositions for signals
     if env.options.get(Interactive) == On {
-        env.traps.enable_terminator_handlers(&mut env.system).ok();
+        env.traps
+            .enable_internal_dispositions_for_terminators(&mut env.system)
+            .ok();
         if env.options.get(Monitor) == On {
-            env.traps.enable_stopper_handlers(&mut env.system).ok();
+            env.traps
+                .enable_internal_dispositions_for_stoppers(&mut env.system)
+                .ok();
         }
     }
 

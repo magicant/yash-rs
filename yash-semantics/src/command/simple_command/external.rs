@@ -155,10 +155,10 @@ pub fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
 /// Substitutes the currently executing shell process with the external utility.
 ///
 /// This function performs the very last step of the simple command execution.
-/// It disables the internal signal handlers and calls the `execve` system call.
-/// If the call fails, it prints an error message to the standard error and
-/// updates `env.exit_status`, in which case the caller should immediately exit
-/// the current process with the exit status.
+/// It disables the internal signal dispositions and calls the `execve` system
+/// call. If the call fails, it prints an error message to the standard error
+/// and updates `env.exit_status`, in which case the caller should immediately
+/// exit the current process with the exit status.
 ///
 /// If the `execve` call fails with `ENOEXEC`, this function falls back on
 /// invoking the shell with the given arguments, so that the shell can interpret
@@ -170,7 +170,9 @@ pub async fn replace_current_process(
     args: Vec<CString>,
     location: Location,
 ) {
-    env.traps.disable_internal_handlers(&mut env.system).ok();
+    env.traps
+        .disable_internal_dispositions(&mut env.system)
+        .ok();
 
     let envs = env.variables.env_c_strings();
     let result = env.system.execve(path.as_c_str(), &args, &envs);
