@@ -714,7 +714,7 @@ impl SignalSystem for &SharedSystem {
         signal: signal::Number,
         disposition: Disposition,
     ) -> Result<Disposition> {
-        self.0.borrow_mut().set_signal_handling(signal, disposition)
+        self.0.borrow_mut().set_disposition(signal, disposition)
     }
 }
 
@@ -735,7 +735,7 @@ impl SignalSystem for SharedSystem {
         signal: signal::Number,
         disposition: Disposition,
     ) -> Result<Disposition> {
-        self.0.borrow_mut().set_signal_handling(signal, disposition)
+        self.0.borrow_mut().set_disposition(signal, disposition)
     }
 }
 

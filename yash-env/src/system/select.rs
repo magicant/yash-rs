@@ -107,10 +107,10 @@ impl SelectSystem {
         Ok(())
     }
 
-    /// Implements signal handler update.
+    /// Implements signal disposition update.
     ///
     /// See [`SharedSystem::set_disposition`].
-    pub fn set_signal_handling(
+    pub fn set_disposition(
         &mut self,
         signal: signal::Number,
         handling: Disposition,
