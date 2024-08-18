@@ -17,10 +17,10 @@
 //! [`SelectSystem`] and related items
 
 use super::signal;
+use super::Disposition;
 use super::Errno;
 use super::Result;
 use super::SigmaskOp;
-use super::SignalHandling;
 use super::System;
 use crate::io::Fd;
 use std::cell::RefCell;
@@ -113,19 +113,19 @@ impl SelectSystem {
     pub fn set_signal_handling(
         &mut self,
         signal: signal::Number,
-        handling: SignalHandling,
-    ) -> Result<SignalHandling> {
+        handling: Disposition,
+    ) -> Result<Disposition> {
         // The order of sigmask and sigaction is important to prevent the signal
         // from being caught. The signal must be caught only when the select
         // function temporarily unblocks the signal. This is to avoid race
         // condition.
         match handling {
-            SignalHandling::Default | SignalHandling::Ignore => {
+            Disposition::Default | Disposition::Ignore => {
                 let old_handling = self.system.sigaction(signal, handling)?;
                 self.sigmask(SigmaskOp::Remove, signal)?;
                 Ok(old_handling)
             }
-            SignalHandling::Catch => {
+            Disposition::Catch => {
                 self.sigmask(SigmaskOp::Add, signal)?;
                 self.system.sigaction(signal, handling)
             }

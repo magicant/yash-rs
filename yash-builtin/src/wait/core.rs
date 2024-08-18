@@ -57,8 +57,8 @@ pub enum Error {
 /// If there is no job to wait for, this function returns
 /// `Err(Error::NothingToWait)` immediately.
 pub async fn wait_for_any_job_or_trap(env: &mut Env) -> Result<(), Error> {
-    // We need to set the signal handling before calling `wait` so we don't miss
-    // any `SIGCHLD` that may arrive between `wait` and `wait_for_signals`.
+    // We need to install the signal handler before calling `wait` so we don't
+    // miss any `SIGCHLD` that may arrive between `wait` and `wait_for_signals`.
     // See also Env::wait_for_subshell.
     env.traps.enable_sigchld_handler(&mut env.system)?;
 

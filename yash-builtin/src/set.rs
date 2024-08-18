@@ -262,7 +262,7 @@ mod tests {
     use yash_env::option::OptionSet;
     use yash_env::option::State::*;
     use yash_env::system::r#virtual::SIGTSTP;
-    use yash_env::system::SignalHandling;
+    use yash_env::system::Disposition;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
     use yash_env::VirtualSystem;
@@ -413,7 +413,7 @@ xtrace           off
         assert_eq!(env.options, expected_options);
         let state = state.borrow();
         let handling = state.processes[&env.main_pid].signal_handling(SIGTSTP);
-        assert_eq!(handling, SignalHandling::Ignore);
+        assert_eq!(handling, Disposition::Ignore);
     }
 
     #[test]
@@ -433,7 +433,7 @@ xtrace           off
         assert_eq!(env.options, expected_options);
         let state = state.borrow();
         let handling = state.processes[&env.main_pid].signal_handling(SIGTSTP);
-        assert_eq!(handling, SignalHandling::Default);
+        assert_eq!(handling, Disposition::Default);
     }
 
     #[test]
@@ -450,7 +450,7 @@ xtrace           off
         assert_eq!(env.options, expected_options);
         let state = state.borrow();
         let handling = state.processes[&env.main_pid].signal_handling(SIGTSTP);
-        assert_eq!(handling, SignalHandling::Default);
+        assert_eq!(handling, Disposition::Default);
     }
 
     #[test]
@@ -469,6 +469,6 @@ xtrace           off
         assert_eq!(env.options, expected_options);
         let state = state.borrow();
         let handling = state.processes[&env.main_pid].signal_handling(SIGTSTP);
-        assert_eq!(handling, SignalHandling::Default);
+        assert_eq!(handling, Disposition::Default);
     }
 }

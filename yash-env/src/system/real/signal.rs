@@ -16,7 +16,7 @@
 
 //! Signal implementation for the real system
 
-use super::SignalHandling;
+use super::Disposition;
 pub use crate::signal::*;
 use std::ffi::c_int;
 use std::mem::MaybeUninit;
@@ -421,17 +421,17 @@ pub(super) fn sigset_to_vec(set: *const nix::libc::sigset_t, vec: &mut Vec<Numbe
     );
 }
 
-impl SignalHandling {
-    /// Converts the signal handling to `sigaction` for the real system.
+impl Disposition {
+    /// Converts the signal disposition to `sigaction` for the real system.
     ///
     /// This function returns the `sigaction` in an `MaybeUninit` because the
     /// `sigaction` structure may contain platform-dependent extra fields that
     /// are not initialized by this function.
     pub(super) fn to_sigaction(self) -> MaybeUninit<nix::libc::sigaction> {
         let handler = match self {
-            SignalHandling::Default => nix::libc::SIG_DFL,
-            SignalHandling::Ignore => nix::libc::SIG_IGN,
-            SignalHandling::Catch => super::catch_signal as *const extern "C" fn(c_int) as _,
+            Disposition::Default => nix::libc::SIG_DFL,
+            Disposition::Ignore => nix::libc::SIG_IGN,
+            Disposition::Catch => super::catch_signal as *const extern "C" fn(c_int) as _,
         };
 
         let mut sa = MaybeUninit::<nix::libc::sigaction>::uninit();
@@ -451,7 +451,7 @@ impl SignalHandling {
         sa
     }
 
-    /// Converts the `sigaction` to the signal handling for the real system.
+    /// Converts the `sigaction` to the signal disposition for the real system.
     pub(super) unsafe fn from_sigaction(sa: &MaybeUninit<nix::libc::sigaction>) -> Self {
         #[cfg(not(target_os = "aix"))]
         let handler = addr_of!((*sa.as_ptr()).sa_sigaction).read();

@@ -319,8 +319,8 @@ mod tests {
     use crate::system::r#virtual::Inode;
     use crate::system::r#virtual::SystemState;
     use crate::system::r#virtual::{SIGCHLD, SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU};
+    use crate::system::Disposition;
     use crate::system::Errno;
-    use crate::system::SignalHandling;
     use crate::tests::in_virtual_system;
     use crate::trap::Action;
     use assert_matches::assert_matches;
@@ -626,8 +626,8 @@ mod tests {
 
             let state = state.borrow();
             let process = &state.processes[&child_pid];
-            assert_eq!(process.signal_handling(SIGINT), SignalHandling::Default);
-            assert_eq!(process.signal_handling(SIGQUIT), SignalHandling::Default);
+            assert_eq!(process.signal_handling(SIGINT), Disposition::Default);
+            assert_eq!(process.signal_handling(SIGQUIT), Disposition::Default);
         })
     }
 
@@ -662,14 +662,8 @@ mod tests {
             assert!(!parent_process.blocked_signals().contains(&SIGINT));
             assert!(!parent_process.blocked_signals().contains(&SIGQUIT));
             let child_process = &state.processes[&child_pid];
-            assert_eq!(
-                child_process.signal_handling(SIGINT),
-                SignalHandling::Ignore
-            );
-            assert_eq!(
-                child_process.signal_handling(SIGQUIT),
-                SignalHandling::Ignore
-            );
+            assert_eq!(child_process.signal_handling(SIGINT), Disposition::Ignore);
+            assert_eq!(child_process.signal_handling(SIGQUIT), Disposition::Ignore);
         })
     }
 
@@ -691,8 +685,8 @@ mod tests {
 
             let state = state.borrow();
             let process = &state.processes[&child_pid];
-            assert_eq!(process.signal_handling(SIGINT), SignalHandling::Default);
-            assert_eq!(process.signal_handling(SIGQUIT), SignalHandling::Default);
+            assert_eq!(process.signal_handling(SIGINT), Disposition::Default);
+            assert_eq!(process.signal_handling(SIGQUIT), Disposition::Default);
         })
     }
 
@@ -719,18 +713,9 @@ mod tests {
 
             let state = state.borrow();
             let child_process = &state.processes[&child_pid];
-            assert_eq!(
-                child_process.signal_handling(SIGTSTP),
-                SignalHandling::Ignore
-            );
-            assert_eq!(
-                child_process.signal_handling(SIGTTIN),
-                SignalHandling::Ignore
-            );
-            assert_eq!(
-                child_process.signal_handling(SIGTTOU),
-                SignalHandling::Ignore
-            );
+            assert_eq!(child_process.signal_handling(SIGTSTP), Disposition::Ignore);
+            assert_eq!(child_process.signal_handling(SIGTTIN), Disposition::Ignore);
+            assert_eq!(child_process.signal_handling(SIGTTOU), Disposition::Ignore);
         })
     }
 
@@ -758,18 +743,9 @@ mod tests {
 
             let state = state.borrow();
             let child_process = &state.processes[&child_pid];
-            assert_eq!(
-                child_process.signal_handling(SIGTSTP),
-                SignalHandling::Default
-            );
-            assert_eq!(
-                child_process.signal_handling(SIGTTIN),
-                SignalHandling::Default
-            );
-            assert_eq!(
-                child_process.signal_handling(SIGTTOU),
-                SignalHandling::Default
-            );
+            assert_eq!(child_process.signal_handling(SIGTSTP), Disposition::Default);
+            assert_eq!(child_process.signal_handling(SIGTTIN), Disposition::Default);
+            assert_eq!(child_process.signal_handling(SIGTTOU), Disposition::Default);
         })
     }
 
@@ -791,18 +767,9 @@ mod tests {
 
             let state = state.borrow();
             let child_process = &state.processes[&child_pid];
-            assert_eq!(
-                child_process.signal_handling(SIGTSTP),
-                SignalHandling::Default
-            );
-            assert_eq!(
-                child_process.signal_handling(SIGTTIN),
-                SignalHandling::Default
-            );
-            assert_eq!(
-                child_process.signal_handling(SIGTTOU),
-                SignalHandling::Default
-            );
+            assert_eq!(child_process.signal_handling(SIGTSTP), Disposition::Default);
+            assert_eq!(child_process.signal_handling(SIGTTIN), Disposition::Default);
+            assert_eq!(child_process.signal_handling(SIGTTOU), Disposition::Default);
         })
     }
 
@@ -824,18 +791,9 @@ mod tests {
 
             let state = state.borrow();
             let child_process = &state.processes[&child_pid];
-            assert_eq!(
-                child_process.signal_handling(SIGTSTP),
-                SignalHandling::Default
-            );
-            assert_eq!(
-                child_process.signal_handling(SIGTTIN),
-                SignalHandling::Default
-            );
-            assert_eq!(
-                child_process.signal_handling(SIGTTOU),
-                SignalHandling::Default
-            );
+            assert_eq!(child_process.signal_handling(SIGTSTP), Disposition::Default);
+            assert_eq!(child_process.signal_handling(SIGTTIN), Disposition::Default);
+            assert_eq!(child_process.signal_handling(SIGTTOU), Disposition::Default);
         })
     }
 }

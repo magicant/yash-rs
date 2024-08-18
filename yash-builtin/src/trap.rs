@@ -333,7 +333,7 @@ mod tests {
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::system::r#virtual::{SIGINT, SIGPIPE, SIGUSR1, SIGUSR2};
-    use yash_env::system::SignalHandling;
+    use yash_env::system::Disposition;
     use yash_env::Env;
     use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stderr;
@@ -349,7 +349,7 @@ mod tests {
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let process = &state.borrow().processes[&pid];
-        assert_eq!(process.signal_handling(SIGUSR1), SignalHandling::Ignore);
+        assert_eq!(process.signal_handling(SIGUSR1), Disposition::Ignore);
     }
 
     #[test]
@@ -362,7 +362,7 @@ mod tests {
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let process = &state.borrow().processes[&pid];
-        assert_eq!(process.signal_handling(SIGUSR2), SignalHandling::Catch);
+        assert_eq!(process.signal_handling(SIGUSR2), Disposition::Catch);
     }
 
     #[test]
@@ -375,7 +375,7 @@ mod tests {
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let process = &state.borrow().processes[&pid];
-        assert_eq!(process.signal_handling(SIGPIPE), SignalHandling::Default);
+        assert_eq!(process.signal_handling(SIGPIPE), Disposition::Default);
     }
 
     #[test]
@@ -482,7 +482,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         system
             .current_process_mut()
-            .set_signal_handling(SIGINT, SignalHandling::Ignore);
+            .set_signal_handling(SIGINT, Disposition::Ignore);
         let mut env = Env::with_system(Box::new(system.clone()));
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("trap"),
@@ -495,7 +495,7 @@ mod tests {
         assert_stderr(&system.state, |stderr| assert_eq!(stderr, ""));
         assert_eq!(
             system.current_process().signal_handling(SIGINT),
-            SignalHandling::Ignore
+            Disposition::Ignore
         );
     }
 

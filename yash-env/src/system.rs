@@ -253,7 +253,7 @@ pub trait System: Debug {
         old_mask: Option<&mut Vec<signal::Number>>,
     ) -> Result<()>;
 
-    /// Gets and sets the handler for a signal.
+    /// Gets and sets the disposition for a signal.
     ///
     /// This is a low-level function used internally by
     /// [`SharedSystem::set_signal_handling`]. You should not call this function
@@ -262,16 +262,12 @@ pub trait System: Debug {
     /// depending on `SharedSystem`.
     ///
     /// This is an abstract wrapper around the `sigaction` system call. This
-    /// function returns the previous handler if successful.
+    /// function returns the previous disposition if successful.
     ///
-    /// When you set the handler to `SignalHandling::Catch`, signals sent to
+    /// When you set the disposition to `Disposition::Catch`, signals sent to
     /// this process are accumulated in the `System` instance and made available
     /// from [`caught_signals`](Self::caught_signals).
-    fn sigaction(
-        &mut self,
-        signal: signal::Number,
-        action: SignalHandling,
-    ) -> Result<SignalHandling>;
+    fn sigaction(&mut self, signal: signal::Number, action: Disposition) -> Result<Disposition>;
 
     /// Returns signals this process has caught, if any.
     ///
@@ -281,11 +277,11 @@ pub trait System: Debug {
     /// applies if you want to do everything yourself without depending on
     /// `SharedSystem`.
     ///
-    /// To catch a signal, you must set the signal handler to
-    /// [`SignalHandling::Catch`] by calling [`sigaction`](Self::sigaction)
-    /// first. Once the handler is ready, signals sent to the process are
-    /// accumulated in the `System`. You call `caught_signals` to obtain a list
-    /// of caught signals thus far.
+    /// To catch a signal, you must firstly install a signal handler by calling
+    /// [`sigaction`](Self::sigaction) with [`Disposition::Catch`]. Once the
+    /// handler is ready, signals sent to the process are accumulated in the
+    /// `System`. You call `caught_signals` to obtain a list of caught signals
+    /// thus far.
     ///
     /// This function clears the internal list of caught signals, so a next call
     /// will return an empty list unless another signal is caught since the
@@ -499,10 +495,13 @@ pub enum SigmaskOp {
     Set,
 }
 
-/// How to handle a signal
+/// How the shell process responds to a signal
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum SignalHandling {
+pub enum Disposition {
     /// Perform the default action for the signal.
+    ///
+    /// The default action depends on the signal. For example, `SIGINT` causes
+    /// the process to terminate, and `SIGTSTP` causes the process to stop.
     #[default]
     Default,
     /// Ignore the signal.
@@ -634,7 +633,7 @@ pub trait SystemEx: System {
         let sigttou = self
             .signal_number_from_name(signal::Name::Ttou)
             .ok_or(Errno::EINVAL)?;
-        match self.sigaction(sigttou, SignalHandling::Default) {
+        match self.sigaction(sigttou, Disposition::Default) {
             Err(e) => Err(e),
             Ok(old_handling) => {
                 let mut old_mask = Vec::new();
