@@ -119,8 +119,8 @@ impl Setting {
         )
     }
 
-    pub fn from_initial_handling(handling: Disposition) -> Self {
-        match handling {
+    pub fn from_initial_disposition(disposition: Disposition) -> Self {
+        match disposition {
             Disposition::Default | Disposition::Catch => Self::InitiallyDefaulted,
             Disposition::Ignore => Self::InitiallyIgnored,
         }
@@ -282,7 +282,7 @@ impl GrandState {
             Entry::Vacant(vacant) => {
                 let initial_disposition = system.set_disposition(signal, disposition)?;
                 vacant.insert(GrandState {
-                    current_setting: Setting::from_initial_handling(initial_disposition),
+                    current_setting: Setting::from_initial_disposition(initial_disposition),
                     parent_setting: None,
                     internal_disposition: disposition,
                 });
@@ -367,7 +367,7 @@ impl GrandState {
         };
         let initial_disposition = system.set_disposition(signal, Disposition::Ignore)?;
         vacant.insert(GrandState {
-            current_setting: Setting::from_initial_handling(initial_disposition),
+            current_setting: Setting::from_initial_disposition(initial_disposition),
             parent_setting: None,
             internal_disposition: Disposition::Default,
         });
