@@ -349,9 +349,10 @@ impl Env {
     /// [`wait_for_subshell_to_finish`](Self::wait_for_subshell_to_finish)
     /// instead.
     pub async fn wait_for_subshell(&mut self, target: Pid) -> Result<(Pid, ProcessState), Errno> {
-        // We need to set the signal handling before calling `wait` so we don't
+        // We need to set the internal disposition before calling `wait` so we don't
         // miss any `SIGCHLD` that may arrive between `wait` and `wait_for_signal`.
-        self.traps.enable_sigchld_handler(&mut self.system)?;
+        self.traps
+            .enable_internal_disposition_for_sigchld(&mut self.system)?;
 
         let sigchld = self
             .system

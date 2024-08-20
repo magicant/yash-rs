@@ -55,6 +55,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `system::virtual::SystemState::home_dirs`
     - `system::virtual::SystemState::path`
     - `system::virtual::VirtualDir::new`
+- `system::SignalHandling` has been renamed to `system::Disposition`.
+- In the `system::virtual::Process` struct, the following methods have been
+  renamed:
+    - `signal_handling` → `disposition`
+    - `set_signal_handling` → `set_disposition`
+- In the `trap::SignalSystem` trait, the `set_signal_handling` method has been
+  renamed to `set_disposition`.
+- In the `trap::TrapSet` struct, the following methods have been renamed:
+    - `enable_sigchld_handler` → `enable_internal_disposition_for_sigchld`
+    - `enable_terminator_handlers` → `enable_internal_dispositions_for_terminators`
+    - `enable_stopper_handlers` → `enable_internal_dispositions_for_stoppers`
+    - `disable_terminator_handlers` → `disable_internal_dispositions_for_terminators`
+    - `disable_stopper_handlers` → `disable_internal_dispositions_for_stoppers`
+    - `disable_internal_handlers` → `disable_internal_dispositions`
 - The `fstat` and `fstatat` methods of `system::System` now return a `Stat`
   instead of a `nix::sys::stat::FileStat`.
 - The `system::System::fstatat` method now takes a `follow_symlinks: bool`

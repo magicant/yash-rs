@@ -19,6 +19,7 @@
 use super::signal;
 use super::ChildProcessStarter;
 use super::Dir;
+use super::Disposition;
 use super::Errno;
 use super::FdFlag;
 use super::Gid;
@@ -32,7 +33,6 @@ use super::Resource;
 use super::Result;
 use super::SelectSystem;
 use super::SigmaskOp;
-use super::SignalHandling;
 use super::SignalStatus;
 use super::SignalSystem;
 use super::Stat;
@@ -235,8 +235,8 @@ impl SharedSystem {
 
     /// Waits for some signals to be delivered to this process.
     ///
-    /// Before calling this function, you need to [set signal
-    /// handling](Self::set_signal_handling) to `Catch`. Without doing so, this
+    /// Before calling this function, you need to [set the signal
+    /// disposition](Self::set_disposition) to `Catch`. Without doing so, this
     /// function cannot detect the receipt of the signals.
     ///
     /// Returns an array of signals that were caught.
@@ -263,8 +263,8 @@ impl SharedSystem {
 
     /// Waits for a signal to be delivered to this process.
     ///
-    /// Before calling this function, you need to [set signal
-    /// handling](Self::set_signal_handling) to `Catch`.
+    /// Before calling this function, you need to [set the signal
+    /// disposition](Self::set_disposition) to `Catch`.
     /// Without doing so, this function cannot detect the receipt of the signal.
     ///
     /// If this `SharedSystem` is part of an [`Env`], you should call
@@ -388,11 +388,7 @@ impl System for &SharedSystem {
     ) -> Result<()> {
         (**self.0.borrow_mut()).sigmask(op, old_mask)
     }
-    fn sigaction(
-        &mut self,
-        signal: signal::Number,
-        action: SignalHandling,
-    ) -> Result<SignalHandling> {
+    fn sigaction(&mut self, signal: signal::Number, action: Disposition) -> Result<Disposition> {
         self.0.borrow_mut().sigaction(signal, action)
     }
     fn caught_signals(&mut self) -> Vec<signal::Number> {
@@ -595,11 +591,7 @@ impl System for SharedSystem {
         (&mut &*self).sigmask(op, old_mask)
     }
     #[inline]
-    fn sigaction(
-        &mut self,
-        signal: signal::Number,
-        action: SignalHandling,
-    ) -> Result<SignalHandling> {
+    fn sigaction(&mut self, signal: signal::Number, action: Disposition) -> Result<Disposition> {
         (&mut &*self).sigaction(signal, action)
     }
     #[inline]
@@ -717,12 +709,12 @@ impl SignalSystem for &SharedSystem {
         System::signal_number_from_name(*self, name)
     }
 
-    fn set_signal_handling(
+    fn set_disposition(
         &mut self,
         signal: signal::Number,
-        handling: SignalHandling,
-    ) -> Result<SignalHandling> {
-        self.0.borrow_mut().set_signal_handling(signal, handling)
+        disposition: Disposition,
+    ) -> Result<Disposition> {
+        self.0.borrow_mut().set_disposition(signal, disposition)
     }
 }
 
@@ -738,12 +730,12 @@ impl SignalSystem for SharedSystem {
     }
 
     #[inline]
-    fn set_signal_handling(
+    fn set_disposition(
         &mut self,
         signal: signal::Number,
-        handling: SignalHandling,
-    ) -> Result<SignalHandling> {
-        self.0.borrow_mut().set_signal_handling(signal, handling)
+        disposition: Disposition,
+    ) -> Result<Disposition> {
+        self.0.borrow_mut().set_disposition(signal, disposition)
     }
 }
 
@@ -926,15 +918,9 @@ mod tests {
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
         let mut system = SharedSystem::new(Box::new(system));
-        system
-            .set_signal_handling(SIGCHLD, SignalHandling::Catch)
-            .unwrap();
-        system
-            .set_signal_handling(SIGINT, SignalHandling::Catch)
-            .unwrap();
-        system
-            .set_signal_handling(SIGUSR1, SignalHandling::Catch)
-            .unwrap();
+        system.set_disposition(SIGCHLD, Disposition::Catch).unwrap();
+        system.set_disposition(SIGINT, Disposition::Catch).unwrap();
+        system.set_disposition(SIGUSR1, Disposition::Catch).unwrap();
 
         let mut context = Context::from_waker(noop_waker_ref());
         let mut future = Box::pin(system.wait_for_signals());
@@ -968,9 +954,7 @@ mod tests {
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
         let mut system = SharedSystem::new(Box::new(system));
-        system
-            .set_signal_handling(SIGCHLD, SignalHandling::Catch)
-            .unwrap();
+        system.set_disposition(SIGCHLD, Disposition::Catch).unwrap();
 
         let mut context = Context::from_waker(noop_waker_ref());
         let mut future = Box::pin(system.wait_for_signal(SIGCHLD));
@@ -997,12 +981,8 @@ mod tests {
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
         let mut system = SharedSystem::new(Box::new(system));
-        system
-            .set_signal_handling(SIGINT, SignalHandling::Catch)
-            .unwrap();
-        system
-            .set_signal_handling(SIGTERM, SignalHandling::Catch)
-            .unwrap();
+        system.set_disposition(SIGINT, Disposition::Catch).unwrap();
+        system.set_disposition(SIGTERM, Disposition::Catch).unwrap();
 
         let mut context = Context::from_waker(noop_waker_ref());
         let mut future = Box::pin(system.wait_for_signal(SIGINT));
@@ -1027,12 +1007,8 @@ mod tests {
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
         let mut system = SharedSystem::new(Box::new(system));
-        system
-            .set_signal_handling(SIGINT, SignalHandling::Catch)
-            .unwrap();
-        system
-            .set_signal_handling(SIGTERM, SignalHandling::Catch)
-            .unwrap();
+        system.set_disposition(SIGINT, Disposition::Catch).unwrap();
+        system.set_disposition(SIGTERM, Disposition::Catch).unwrap();
 
         {
             let mut state = state.borrow_mut();
@@ -1060,7 +1036,7 @@ mod tests {
         let mut system_3 = system_1.clone();
         let (reader, writer) = system_1.pipe().unwrap();
         system_2
-            .set_signal_handling(SIGCHLD, SignalHandling::Catch)
+            .set_disposition(SIGCHLD, Disposition::Catch)
             .unwrap();
 
         let mut buffer = [0];

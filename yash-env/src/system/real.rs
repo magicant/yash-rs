@@ -32,6 +32,7 @@ use super::resource::Resource;
 use super::ChildProcessStarter;
 use super::Dir;
 use super::DirEntry;
+use super::Disposition;
 #[cfg(doc)]
 use super::Env;
 use super::Errno;
@@ -42,7 +43,6 @@ use super::OfdAccess;
 use super::OpenFlag;
 use super::Result;
 use super::SigmaskOp;
-use super::SignalHandling;
 use super::Stat;
 use super::System;
 use super::Times;
@@ -504,11 +504,7 @@ impl System for RealSystem {
         }
     }
 
-    fn sigaction(
-        &mut self,
-        signal: signal::Number,
-        handling: SignalHandling,
-    ) -> Result<SignalHandling> {
+    fn sigaction(&mut self, signal: signal::Number, handling: Disposition) -> Result<Disposition> {
         unsafe {
             let new_action = handling.to_sigaction();
 
@@ -524,7 +520,7 @@ impl System for RealSystem {
             )
             .errno_if_m1()?;
 
-            let old_handling = SignalHandling::from_sigaction(&old_action);
+            let old_handling = Disposition::from_sigaction(&old_action);
             Ok(old_handling)
         }
     }

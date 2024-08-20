@@ -165,17 +165,21 @@ pub enum Command {
 pub mod syntax;
 // TODO pub mod semantics;
 
-/// Enables or disables stopper handlers depending on the `Interactive` and
-/// `Monitor` option states. The handlers are disabled in subshells.
-fn update_stopper_handlers(env: &mut Env) {
+/// Enables or disables the internal dispositions for the "stopper" signals
+/// depending on the `Interactive` and `Monitor` option states. The dispositions
+/// are disabled in subshells.
+fn update_internal_dispositions_for_stoppers(env: &mut Env) {
     if env.options.get(Interactive) == State::On
         && env.options.get(Monitor) == State::On
         && !env.stack.contains(&Subshell)
     {
-        _ = env.traps.enable_stopper_handlers(&mut env.system)
+        env.traps
+            .enable_internal_dispositions_for_stoppers(&mut env.system)
     } else {
-        _ = env.traps.disable_stopper_handlers(&mut env.system)
+        env.traps
+            .disable_internal_dispositions_for_stoppers(&mut env.system)
     }
+    .ok();
 }
 
 /// Modifies shell options and positional parameters.
@@ -188,7 +192,7 @@ fn modify(
     for (option, state) in options {
         env.options.set(option, state);
     }
-    update_stopper_handlers(env);
+    update_internal_dispositions_for_stoppers(env);
 
     // Modify positional parameters
     if let Some(fields) = positional_params {
@@ -262,7 +266,7 @@ mod tests {
     use yash_env::option::OptionSet;
     use yash_env::option::State::*;
     use yash_env::system::r#virtual::SIGTSTP;
-    use yash_env::system::SignalHandling;
+    use yash_env::system::Disposition;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
     use yash_env::VirtualSystem;
@@ -412,8 +416,8 @@ xtrace           off
         expected_options.extend([Interactive, Monitor]);
         assert_eq!(env.options, expected_options);
         let state = state.borrow();
-        let handling = state.processes[&env.main_pid].signal_handling(SIGTSTP);
-        assert_eq!(handling, SignalHandling::Ignore);
+        let disposition = state.processes[&env.main_pid].disposition(SIGTSTP);
+        assert_eq!(disposition, Disposition::Ignore);
     }
 
     #[test]
@@ -432,12 +436,12 @@ xtrace           off
         expected_options.set(Interactive, On);
         assert_eq!(env.options, expected_options);
         let state = state.borrow();
-        let handling = state.processes[&env.main_pid].signal_handling(SIGTSTP);
-        assert_eq!(handling, SignalHandling::Default);
+        let disposition = state.processes[&env.main_pid].disposition(SIGTSTP);
+        assert_eq!(disposition, Disposition::Default);
     }
 
     #[test]
-    fn stopper_handlers_not_enabled_in_non_interactive_shell() {
+    fn internal_dispositions_not_enabled_for_stoppers_in_non_interactive_shell() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
@@ -449,12 +453,12 @@ xtrace           off
         expected_options.set(Monitor, On);
         assert_eq!(env.options, expected_options);
         let state = state.borrow();
-        let handling = state.processes[&env.main_pid].signal_handling(SIGTSTP);
-        assert_eq!(handling, SignalHandling::Default);
+        let disposition = state.processes[&env.main_pid].disposition(SIGTSTP);
+        assert_eq!(disposition, Disposition::Default);
     }
 
     #[test]
-    fn stopper_handlers_not_enabled_in_subshell() {
+    fn internal_dispositions_not_enabled_for_stoppers_in_subshell() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
@@ -468,7 +472,7 @@ xtrace           off
         expected_options.extend([Interactive, Monitor]);
         assert_eq!(env.options, expected_options);
         let state = state.borrow();
-        let handling = state.processes[&env.main_pid].signal_handling(SIGTSTP);
-        assert_eq!(handling, SignalHandling::Default);
+        let disposition = state.processes[&env.main_pid].disposition(SIGTSTP);
+        assert_eq!(disposition, Disposition::Default);
     }
 }

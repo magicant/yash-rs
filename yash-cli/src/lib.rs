@@ -35,7 +35,7 @@ use std::cell::RefCell;
 use std::num::NonZeroU64;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::signal;
-use yash_env::system::{Errno, SignalHandling};
+use yash_env::system::{Disposition, Errno};
 use yash_env::Env;
 use yash_env::RealSystem;
 use yash_env::System;
@@ -130,7 +130,7 @@ pub fn main() -> ! {
         .system
         .signal_number_from_name(signal::Name::Pipe)
         .unwrap();
-    _ = env.system.sigaction(sigpipe, SignalHandling::Default);
+    _ = env.system.sigaction(sigpipe, Disposition::Default);
 
     let system = env.system.clone();
     let mut pool = futures_executor::LocalPool::new();

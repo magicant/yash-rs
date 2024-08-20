@@ -25,12 +25,12 @@
 //!
 //! `TrapSet` manages two types of signal handling configurations. One is
 //! user-defined traps, which the user explicitly configures with the trap
-//! built-in. The other is internal handlers, which the shell implicitly
+//! built-in. The other is internal dispositions, which the shell implicitly
 //! installs to the system to implement additional actions it needs to perform.
-//! `TrapSet` merges the two configurations into a single [`SignalHandling`] for
+//! `TrapSet` merges the two configurations into a single [`Disposition`] for
 //! each signal and sets it to the system.
 //!
-//! No signal handling is involved for conditions other than signals, and the
+//! No signal disposition is involved for conditions other than signals, and the
 //! trap set serves only as a storage for action settings.
 
 mod cond;
@@ -40,14 +40,14 @@ pub use self::cond::Condition;
 pub use self::state::{Action, SetActionError, TrapState};
 use self::state::{EnterSubshellOption, GrandState};
 use crate::signal;
-use crate::system::{Errno, SignalHandling};
+use crate::system::{Disposition, Errno};
 #[cfg(doc)]
 use crate::system::{SharedSystem, System};
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use yash_syntax::source::Location;
 
-/// System interface for signal handling configuration.
+/// System interface for signal handling configuration
 pub trait SignalSystem {
     /// Returns the name of a signal from its number.
     #[must_use]
@@ -76,13 +76,13 @@ pub trait SignalSystem {
 
     /// Sets how a signal is handled.
     ///
-    /// This function updates the signal blocking mask and the signal action for
-    /// the specified signal, and returns the previous action.
-    fn set_signal_handling(
+    /// This function updates the signal blocking mask and the disposition for
+    /// the specified signal, and returns the previous disposition.
+    fn set_disposition(
         &mut self,
         signal: signal::Number,
-        handling: SignalHandling,
-    ) -> Result<SignalHandling, Errno>;
+        disposition: Disposition,
+    ) -> Result<Disposition, Errno>;
 }
 
 /// Iterator of trap actions configured in a [trap set](TrapSet).
@@ -206,7 +206,7 @@ impl TrapSet {
         Iter { inner }
     }
 
-    /// Updates signal handlings on entering a subshell.
+    /// Updates signal dispositions on entering a subshell.
     ///
     /// ## Resetting non-ignore traps
     ///
@@ -220,49 +220,50 @@ impl TrapSet {
     ///
     /// Note that trap actions other than `Trap::Command` remain as before.
     ///
-    /// ## Clearing internal handlers
+    /// ## Clearing internal dispositions
     ///
-    /// Internal handlers that have been installed are cleared except for the
-    /// SIGCHLD handler.
+    /// Internal dispositions that have been installed are cleared except for
+    /// the SIGCHLD signal.
     ///
     /// ## Ignoring SIGINT and SIGQUIT
     ///
-    /// If `ignore_sigint_sigquit` is true, this function sets the signal
-    /// handlings for SIGINT and SIGQUIT to `Ignore`.
+    /// If `ignore_sigint_sigquit` is true, this function sets the dispositions
+    /// for SIGINT and SIGQUIT to `Ignore`.
     ///
     /// ## Ignoring SIGTSTP, SIGTTIN, and SIGTTOU
     ///
-    /// If `keep_stopper_handlers` is true and the stopper handlers have been
-    /// [enabled](Self::enable_stopper_handlers), this function leaves the
-    /// signal handlings for SIGTSTP, SIGTTIN, and SIGTTOU set to `Ignore`.
+    /// If `keep_internal_dispositions_for_stoppers` is true and the internal
+    /// dispositions have been [enabled for SIGTSTP, SIGTTIN, and
+    /// SIGTTOU](Self::enable_internal_dispositions_for_stoppers), this function
+    /// leaves the dispositions for those signals set to `Ignore`.
     ///
     /// ## Errors
     ///
     /// This function ignores any errors that may occur when setting signal
-    /// handlings.
+    /// dispositions.
     pub fn enter_subshell<S: SignalSystem>(
         &mut self,
         system: &mut S,
         ignore_sigint_sigquit: bool,
-        keep_stopper_handlers: bool,
+        keep_internal_dispositions_for_stoppers: bool,
     ) {
         self.clear_parent_settings();
 
         for (&cond, state) in &mut self.traps {
             let option = match cond {
-                Condition::Exit => EnterSubshellOption::ClearInternalHandler,
+                Condition::Exit => EnterSubshellOption::ClearInternalDisposition,
                 Condition::Signal(number) => {
                     use signal::Name::*;
                     match system.signal_name_from_number(number) {
-                        Chld => EnterSubshellOption::KeepInternalHandler,
+                        Chld => EnterSubshellOption::KeepInternalDisposition,
                         Int | Quit if ignore_sigint_sigquit => EnterSubshellOption::Ignore,
                         Tstp | Ttin | Ttou
-                            if keep_stopper_handlers
-                                && state.internal_handler() != SignalHandling::Default =>
+                            if keep_internal_dispositions_for_stoppers
+                                && state.internal_disposition() != Disposition::Default =>
                         {
                             EnterSubshellOption::Ignore
                         }
-                        _ => EnterSubshellOption::ClearInternalHandler,
+                        _ => EnterSubshellOption::ClearInternalDisposition,
                     }
                 }
             };
@@ -316,101 +317,101 @@ impl TrapSet {
         })
     }
 
-    fn set_internal_handler<S: SignalSystem>(
+    fn set_internal_disposition<S: SignalSystem>(
         &mut self,
         signal: signal::Name,
-        handling: SignalHandling,
+        disposition: Disposition,
         system: &mut S,
     ) -> Result<(), Errno> {
         let number = system
             .signal_number_from_name(signal)
             .unwrap_or_else(|| panic!("missing support for signal {signal}"));
         let entry = self.traps.entry(Condition::Signal(number));
-        GrandState::set_internal_handler(system, entry, handling)
+        GrandState::set_internal_disposition(system, entry, disposition)
     }
 
-    /// Installs an internal handler for `SIGCHLD`.
+    /// Installs the internal disposition for `SIGCHLD`.
     ///
-    /// You should install the `SIGCHLD` handler to the system by using this
+    /// You should install the internal disposition for `SIGCHLD` by using this
     /// function before waiting for `SIGCHLD` with [`System::wait`] and
-    /// [`SharedSystem::wait_for_signal`]. The handler allows catching
+    /// [`SharedSystem::wait_for_signal`]. The disposition allows catching
     /// `SIGCHLD`.
     ///
-    /// This function remembers that the handler has been installed, so a second
-    /// call to the function will be a no-op.
-    pub fn enable_sigchld_handler<S: SignalSystem>(&mut self, system: &mut S) -> Result<(), Errno> {
-        self.set_internal_handler(signal::Name::Chld, SignalHandling::Catch, system)
-    }
-
-    /// Installs internal handlers for `SIGINT`, `SIGTERM`, and `SIGQUIT`.
-    ///
-    /// An interactive shell should install the handlers for these signals by
-    /// using this function. The `SIGINT` handler allows catching `SIGINT` and
-    /// the `SIGTERM` and `SIGQUIT` handlers ignore the signals.
-    ///
-    /// This function remembers that the handlers have been installed, so a second
-    /// call to the function will be a no-op.
-    pub fn enable_terminator_handlers<S: SignalSystem>(
-        &mut self,
-        system: &mut S,
-    ) -> Result<(), Errno> {
-        self.set_internal_handler(signal::Name::Int, SignalHandling::Catch, system)?;
-        self.set_internal_handler(signal::Name::Term, SignalHandling::Ignore, system)?;
-        self.set_internal_handler(signal::Name::Quit, SignalHandling::Ignore, system)
-    }
-
-    /// Installs internal handlers for `SIGTSTP`, `SIGTTIN`, and `SIGTTOU`.
-    ///
-    /// An interactive job-controlling shell should install the handlers for
-    /// these signals by using this function. The handlers ignore the signals.
-    ///
-    /// This function remembers that the handlers have been installed, so a
+    /// This function remembers that the disposition has been installed, so a
     /// second call to the function will be a no-op.
-    pub fn enable_stopper_handlers<S: SignalSystem>(
+    pub fn enable_internal_disposition_for_sigchld<S: SignalSystem>(
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        self.set_internal_handler(signal::Name::Tstp, SignalHandling::Ignore, system)?;
-        self.set_internal_handler(signal::Name::Ttin, SignalHandling::Ignore, system)?;
-        self.set_internal_handler(signal::Name::Ttou, SignalHandling::Ignore, system)
+        self.set_internal_disposition(signal::Name::Chld, Disposition::Catch, system)
     }
 
-    /// Uninstalls the internal handlers for `SIGINT`, `SIGTERM`, and `SIGQUIT`.
-    pub fn disable_terminator_handlers<S: SignalSystem>(
-        &mut self,
-        system: &mut S,
-    ) -> Result<(), Errno> {
-        self.set_internal_handler(signal::Name::Int, SignalHandling::Default, system)?;
-        self.set_internal_handler(signal::Name::Term, SignalHandling::Default, system)?;
-        self.set_internal_handler(signal::Name::Quit, SignalHandling::Default, system)
-    }
-
-    /// Uninstalls the internal handlers for `SIGTSTP`, `SIGTTIN`, and `SIGTTOU`.
-    pub fn disable_stopper_handlers<S: SignalSystem>(
-        &mut self,
-        system: &mut S,
-    ) -> Result<(), Errno> {
-        self.set_internal_handler(signal::Name::Tstp, SignalHandling::Default, system)?;
-        self.set_internal_handler(signal::Name::Ttin, SignalHandling::Default, system)?;
-        self.set_internal_handler(signal::Name::Ttou, SignalHandling::Default, system)
-    }
-
-    /// Uninstalls all internal handlers.
+    /// Installs the internal dispositions for `SIGINT`, `SIGTERM`, and `SIGQUIT`.
     ///
-    /// This function removes all internal handlers that have been previously
-    /// installed by `self`. It leaves handlers for any existing user-defined
-    /// traps.
-    pub fn disable_internal_handlers<S: SignalSystem>(
+    /// An interactive shell should install the internal dispositions for these
+    /// signals by using this function. The dispositions catch `SIGINT` and
+    /// ignore `SIGTERM` and `SIGQUIT`.
+    ///
+    /// This function remembers that the dispositions have been installed, so a
+    /// second call to the function will be a no-op.
+    pub fn enable_internal_dispositions_for_terminators<S: SignalSystem>(
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        {
-            let this = &mut *self;
-            let signal = signal::Name::Chld;
-            this.set_internal_handler(signal, SignalHandling::Default, system)
-        }?;
-        self.disable_terminator_handlers(system)?;
-        self.disable_stopper_handlers(system)
+        self.set_internal_disposition(signal::Name::Int, Disposition::Catch, system)?;
+        self.set_internal_disposition(signal::Name::Term, Disposition::Ignore, system)?;
+        self.set_internal_disposition(signal::Name::Quit, Disposition::Ignore, system)
+    }
+
+    /// Installs the internal dispositions for `SIGTSTP`, `SIGTTIN`, and `SIGTTOU`.
+    ///
+    /// An interactive job-controlling shell should install the internal
+    /// dispositions for these signals by using this function. The dispositions
+    /// ignore the signals.
+    ///
+    /// This function remembers that the dispositions have been installed, so a
+    /// second call to the function will be a no-op.
+    pub fn enable_internal_dispositions_for_stoppers<S: SignalSystem>(
+        &mut self,
+        system: &mut S,
+    ) -> Result<(), Errno> {
+        self.set_internal_disposition(signal::Name::Tstp, Disposition::Ignore, system)?;
+        self.set_internal_disposition(signal::Name::Ttin, Disposition::Ignore, system)?;
+        self.set_internal_disposition(signal::Name::Ttou, Disposition::Ignore, system)
+    }
+
+    /// Uninstalls the internal dispositions for `SIGINT`, `SIGTERM`, and `SIGQUIT`.
+    pub fn disable_internal_dispositions_for_terminators<S: SignalSystem>(
+        &mut self,
+        system: &mut S,
+    ) -> Result<(), Errno> {
+        self.set_internal_disposition(signal::Name::Int, Disposition::Default, system)?;
+        self.set_internal_disposition(signal::Name::Term, Disposition::Default, system)?;
+        self.set_internal_disposition(signal::Name::Quit, Disposition::Default, system)
+    }
+
+    /// Uninstalls the internal dispositions for `SIGTSTP`, `SIGTTIN`, and `SIGTTOU`.
+    pub fn disable_internal_dispositions_for_stoppers<S: SignalSystem>(
+        &mut self,
+        system: &mut S,
+    ) -> Result<(), Errno> {
+        self.set_internal_disposition(signal::Name::Tstp, Disposition::Default, system)?;
+        self.set_internal_disposition(signal::Name::Ttin, Disposition::Default, system)?;
+        self.set_internal_disposition(signal::Name::Ttou, Disposition::Default, system)
+    }
+
+    /// Uninstalls all internal dispositions.
+    ///
+    /// This function removes all internal dispositions that have been
+    /// previously installed by `self`, except for the `SIGCHLD` signal.
+    /// Dispositions for any existing user-defined traps are not affected.
+    pub fn disable_internal_dispositions<S: SignalSystem>(
+        &mut self,
+        system: &mut S,
+    ) -> Result<(), Errno> {
+        self.set_internal_disposition(signal::Name::Chld, Disposition::Default, system)?;
+        self.disable_internal_dispositions_for_terminators(system)?;
+        self.disable_internal_dispositions_for_stoppers(system)
     }
 }
 
@@ -439,7 +440,7 @@ mod tests {
     use std::collections::HashMap;
 
     #[derive(Default)]
-    pub struct DummySystem(pub HashMap<signal::Number, SignalHandling>);
+    pub struct DummySystem(pub HashMap<signal::Number, Disposition>);
 
     impl SignalSystem for DummySystem {
         fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
@@ -450,15 +451,15 @@ mod tests {
             VirtualSystem::new().signal_number_from_name(name)
         }
 
-        fn set_signal_handling(
+        fn set_disposition(
             &mut self,
             signal: signal::Number,
-            handling: SignalHandling,
-        ) -> Result<SignalHandling, Errno> {
+            disposition: Disposition,
+        ) -> Result<Disposition, Errno> {
             Ok(self
                 .0
-                .insert(signal, handling)
-                .unwrap_or(SignalHandling::Default))
+                .insert(signal, disposition)
+                .unwrap_or(Disposition::Default))
         }
     }
 
@@ -515,8 +516,8 @@ mod tests {
                 None
             )
         );
-        assert_eq!(system.0[&SIGUSR1], crate::system::SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGUSR2], crate::system::SignalHandling::Catch);
+        assert_eq!(system.0[&SIGUSR1], Disposition::Ignore);
+        assert_eq!(system.0[&SIGUSR2], Disposition::Catch);
     }
 
     #[test]
@@ -675,7 +676,7 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&SIGCHLD], crate::system::SignalHandling::Default);
+        assert_eq!(system.0[&SIGCHLD], Disposition::Default);
     }
 
     #[test]
@@ -699,11 +700,11 @@ mod tests {
                 None
             )
         );
-        assert_eq!(system.0[&SIGCHLD], crate::system::SignalHandling::Ignore);
+        assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
     }
 
     #[test]
-    fn entering_subshell_with_internal_handler_for_sigchld() {
+    fn entering_subshell_with_internal_disposition_for_sigchld() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let action = Action::Command("".into());
@@ -711,7 +712,9 @@ mod tests {
         trap_set
             .set_action(&mut system, SIGCHLD, action.clone(), origin.clone(), false)
             .unwrap();
-        trap_set.enable_sigchld_handler(&mut system).unwrap();
+        trap_set
+            .enable_internal_disposition_for_sigchld(&mut system)
+            .unwrap();
 
         trap_set.enter_subshell(&mut system, false, false);
         assert_eq!(
@@ -725,11 +728,11 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&SIGCHLD], SignalHandling::Catch);
+        assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
     }
 
     #[test]
-    fn entering_subshell_with_internal_handler_for_sigint() {
+    fn entering_subshell_with_internal_disposition_for_sigint() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let action = Action::Command("".into());
@@ -737,7 +740,9 @@ mod tests {
         trap_set
             .set_action(&mut system, SIGINT, action.clone(), origin.clone(), false)
             .unwrap();
-        trap_set.enable_terminator_handlers(&mut system).unwrap();
+        trap_set
+            .enable_internal_dispositions_for_terminators(&mut system)
+            .unwrap();
 
         trap_set.enter_subshell(&mut system, false, false);
         assert_eq!(
@@ -751,11 +756,11 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&SIGINT], SignalHandling::Default);
+        assert_eq!(system.0[&SIGINT], Disposition::Default);
     }
 
     #[test]
-    fn entering_subshell_with_internal_handler_for_sigterm() {
+    fn entering_subshell_with_internal_disposition_for_sigterm() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let action = Action::Command("".into());
@@ -763,7 +768,9 @@ mod tests {
         trap_set
             .set_action(&mut system, SIGTERM, action.clone(), origin.clone(), false)
             .unwrap();
-        trap_set.enable_terminator_handlers(&mut system).unwrap();
+        trap_set
+            .enable_internal_dispositions_for_terminators(&mut system)
+            .unwrap();
 
         trap_set.enter_subshell(&mut system, false, false);
         assert_eq!(
@@ -777,11 +784,11 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&SIGTERM], SignalHandling::Default);
+        assert_eq!(system.0[&SIGTERM], Disposition::Default);
     }
 
     #[test]
-    fn entering_subshell_with_internal_handler_for_sigquit() {
+    fn entering_subshell_with_internal_disposition_for_sigquit() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let action = Action::Command("".into());
@@ -789,7 +796,9 @@ mod tests {
         trap_set
             .set_action(&mut system, SIGQUIT, action.clone(), origin.clone(), false)
             .unwrap();
-        trap_set.enable_terminator_handlers(&mut system).unwrap();
+        trap_set
+            .enable_internal_dispositions_for_terminators(&mut system)
+            .unwrap();
 
         trap_set.enter_subshell(&mut system, false, false);
         assert_eq!(
@@ -803,11 +812,11 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&SIGQUIT], SignalHandling::Default);
+        assert_eq!(system.0[&SIGQUIT], Disposition::Default);
     }
 
     #[test]
-    fn entering_subshell_with_internal_handler_for_sigtstp() {
+    fn entering_subshell_with_internal_disposition_for_sigtstp() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let action = Action::Command("".into());
@@ -815,7 +824,9 @@ mod tests {
         trap_set
             .set_action(&mut system, SIGTSTP, action.clone(), origin.clone(), false)
             .unwrap();
-        trap_set.enable_terminator_handlers(&mut system).unwrap();
+        trap_set
+            .enable_internal_dispositions_for_terminators(&mut system)
+            .unwrap();
 
         trap_set.enter_subshell(&mut system, false, false);
         assert_eq!(
@@ -829,11 +840,11 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&SIGTSTP], SignalHandling::Default);
+        assert_eq!(system.0[&SIGTSTP], Disposition::Default);
     }
 
     #[test]
-    fn entering_subshell_with_internal_handler_for_sigttin() {
+    fn entering_subshell_with_internal_disposition_for_sigttin() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let action = Action::Command("".into());
@@ -841,7 +852,9 @@ mod tests {
         trap_set
             .set_action(&mut system, SIGTTIN, action.clone(), origin.clone(), false)
             .unwrap();
-        trap_set.enable_terminator_handlers(&mut system).unwrap();
+        trap_set
+            .enable_internal_dispositions_for_terminators(&mut system)
+            .unwrap();
 
         trap_set.enter_subshell(&mut system, false, false);
         assert_eq!(
@@ -855,11 +868,11 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&SIGTTIN], SignalHandling::Default);
+        assert_eq!(system.0[&SIGTTIN], Disposition::Default);
     }
 
     #[test]
-    fn entering_subshell_with_internal_handler_for_sigttou() {
+    fn entering_subshell_with_internal_disposition_for_sigttou() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let action = Action::Command("".into());
@@ -867,7 +880,9 @@ mod tests {
         trap_set
             .set_action(&mut system, SIGTTOU, action.clone(), origin.clone(), false)
             .unwrap();
-        trap_set.enable_terminator_handlers(&mut system).unwrap();
+        trap_set
+            .enable_internal_dispositions_for_terminators(&mut system)
+            .unwrap();
 
         trap_set.enter_subshell(&mut system, false, false);
         assert_eq!(
@@ -881,7 +896,7 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&SIGTTOU], SignalHandling::Default);
+        assert_eq!(system.0[&SIGTTOU], Disposition::Default);
     }
 
     #[test]
@@ -924,8 +939,8 @@ mod tests {
             )
         );
         assert_eq!(trap_set.get_state(SIGUSR2), (None, None));
-        assert_eq!(system.0[&SIGUSR1], crate::system::SignalHandling::Catch);
-        assert_eq!(system.0[&SIGUSR2], crate::system::SignalHandling::Default);
+        assert_eq!(system.0[&SIGUSR1], Disposition::Catch);
+        assert_eq!(system.0[&SIGUSR2], Disposition::Default);
     }
 
     #[test]
@@ -947,8 +962,8 @@ mod tests {
 
         assert_eq!(trap_set.get_state(SIGUSR1), (None, None));
         assert_eq!(trap_set.get_state(SIGUSR2), (None, None));
-        assert_eq!(system.0[&SIGUSR1], crate::system::SignalHandling::Default);
-        assert_eq!(system.0[&SIGUSR2], crate::system::SignalHandling::Default);
+        assert_eq!(system.0[&SIGUSR1], Disposition::Default);
+        assert_eq!(system.0[&SIGUSR2], Disposition::Default);
     }
 
     #[test]
@@ -968,7 +983,7 @@ mod tests {
 
             let state = state.borrow();
             let process = &state.processes[&env.main_pid];
-            assert_eq!(process.signal_handling(SIGINT), SignalHandling::Ignore);
+            assert_eq!(process.disposition(SIGINT), Disposition::Ignore);
             assert_eq!(process.state(), ProcessState::Running);
         })
     }
@@ -990,7 +1005,7 @@ mod tests {
 
             let state = state.borrow();
             let process = &state.processes[&env.main_pid];
-            assert_eq!(process.signal_handling(SIGQUIT), SignalHandling::Ignore);
+            assert_eq!(process.disposition(SIGQUIT), Disposition::Ignore);
             assert_eq!(process.state(), ProcessState::Running);
         })
     }
@@ -1000,12 +1015,12 @@ mod tests {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         trap_set.enter_subshell(&mut system, true, false);
-        assert_eq!(system.0[&SIGINT], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGQUIT], SignalHandling::Ignore);
+        assert_eq!(system.0[&SIGINT], Disposition::Ignore);
+        assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
     }
 
     #[test]
-    fn keeping_stopper_handlers_ignored() {
+    fn keeping_stopper_internal_dispositions_ignored() {
         in_virtual_system(|mut env, state| async move {
             for signal in [SIGTSTP, SIGTTIN, SIGTTOU] {
                 env.traps
@@ -1018,7 +1033,9 @@ mod tests {
                     )
                     .unwrap();
             }
-            env.traps.enable_stopper_handlers(&mut env.system).unwrap();
+            env.traps
+                .enable_internal_dispositions_for_stoppers(&mut env.system)
+                .unwrap();
             for signal in [SIGTSTP, SIGTTIN, SIGTTOU] {
                 env.system.kill(env.main_pid, Some(signal)).await.unwrap();
             }
@@ -1026,15 +1043,15 @@ mod tests {
 
             let state = state.borrow();
             let process = &state.processes[&env.main_pid];
-            assert_eq!(process.signal_handling(SIGTSTP), SignalHandling::Ignore);
-            assert_eq!(process.signal_handling(SIGTTIN), SignalHandling::Ignore);
-            assert_eq!(process.signal_handling(SIGTTOU), SignalHandling::Ignore);
+            assert_eq!(process.disposition(SIGTSTP), Disposition::Ignore);
+            assert_eq!(process.disposition(SIGTTIN), Disposition::Ignore);
+            assert_eq!(process.disposition(SIGTTOU), Disposition::Ignore);
             assert_eq!(process.state(), ProcessState::Running);
         })
     }
 
     #[test]
-    fn no_stopper_handlers_enabled_to_keep_ignored() {
+    fn no_stopper_internal_dispositions_enabled_to_be_kept_ignored() {
         in_virtual_system(|mut env, state| async move {
             for signal in [SIGTSTP, SIGTTIN, SIGTTOU] {
                 env.traps
@@ -1051,9 +1068,9 @@ mod tests {
 
             let state = state.borrow();
             let process = &state.processes[&env.main_pid];
-            assert_eq!(process.signal_handling(SIGTSTP), SignalHandling::Default);
-            assert_eq!(process.signal_handling(SIGTTIN), SignalHandling::Default);
-            assert_eq!(process.signal_handling(SIGTTOU), SignalHandling::Default);
+            assert_eq!(process.disposition(SIGTSTP), Disposition::Default);
+            assert_eq!(process.disposition(SIGTTIN), Disposition::Default);
+            assert_eq!(process.disposition(SIGTTOU), Disposition::Default);
         })
     }
 
@@ -1157,177 +1174,239 @@ mod tests {
     }
 
     #[test]
-    fn enabling_sigchld_handler() {
+    fn enabling_internal_disposition_for_sigchld() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
-        trap_set.enable_sigchld_handler(&mut system).unwrap();
-        assert_eq!(system.0[&SIGCHLD], SignalHandling::Catch);
+        trap_set
+            .enable_internal_disposition_for_sigchld(&mut system)
+            .unwrap();
+        assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
     }
 
     #[test]
-    fn enabling_terminator_handlers() {
+    fn enabling_internal_dispositions_for_terminators() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
-        trap_set.enable_terminator_handlers(&mut system).unwrap();
-        assert_eq!(system.0[&SIGINT], SignalHandling::Catch);
-        assert_eq!(system.0[&SIGTERM], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGQUIT], SignalHandling::Ignore);
+        trap_set
+            .enable_internal_dispositions_for_terminators(&mut system)
+            .unwrap();
+        assert_eq!(system.0[&SIGINT], Disposition::Catch);
+        assert_eq!(system.0[&SIGTERM], Disposition::Ignore);
+        assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
     }
 
     #[test]
-    fn enabling_stopper_handlers() {
+    fn enabling_internal_dispositions_for_stoppers() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
-        trap_set.enable_stopper_handlers(&mut system).unwrap();
-        assert_eq!(system.0[&SIGTSTP], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGTTIN], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGTTOU], SignalHandling::Ignore);
+        trap_set
+            .enable_internal_dispositions_for_stoppers(&mut system)
+            .unwrap();
+        assert_eq!(system.0[&SIGTSTP], Disposition::Ignore);
+        assert_eq!(system.0[&SIGTTIN], Disposition::Ignore);
+        assert_eq!(system.0[&SIGTTOU], Disposition::Ignore);
     }
 
     #[test]
-    fn disabling_internal_handlers_for_initially_defaulted_signals() {
+    fn disabling_internal_dispositions_for_initially_defaulted_signals() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
-        trap_set.enable_sigchld_handler(&mut system).unwrap();
-        trap_set.enable_terminator_handlers(&mut system).unwrap();
-        trap_set.enable_stopper_handlers(&mut system).unwrap();
-        trap_set.disable_internal_handlers(&mut system).unwrap();
-        assert_eq!(system.0[&SIGCHLD], SignalHandling::Default);
-        assert_eq!(system.0[&SIGINT], SignalHandling::Default);
-        assert_eq!(system.0[&SIGTERM], SignalHandling::Default);
-        assert_eq!(system.0[&SIGQUIT], SignalHandling::Default);
-        assert_eq!(system.0[&SIGTSTP], SignalHandling::Default);
-        assert_eq!(system.0[&SIGTTIN], SignalHandling::Default);
-        assert_eq!(system.0[&SIGTTOU], SignalHandling::Default);
+        trap_set
+            .enable_internal_disposition_for_sigchld(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_terminators(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_stoppers(&mut system)
+            .unwrap();
+        trap_set.disable_internal_dispositions(&mut system).unwrap();
+        assert_eq!(system.0[&SIGCHLD], Disposition::Default);
+        assert_eq!(system.0[&SIGINT], Disposition::Default);
+        assert_eq!(system.0[&SIGTERM], Disposition::Default);
+        assert_eq!(system.0[&SIGQUIT], Disposition::Default);
+        assert_eq!(system.0[&SIGTSTP], Disposition::Default);
+        assert_eq!(system.0[&SIGTTIN], Disposition::Default);
+        assert_eq!(system.0[&SIGTTOU], Disposition::Default);
     }
 
     fn ignore_signals(system: &mut DummySystem) {
         system.0.extend(
             [SIGCHLD, SIGINT, SIGTERM, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU]
                 .into_iter()
-                .map(|signal| (signal, SignalHandling::Ignore)),
+                .map(|signal| (signal, Disposition::Ignore)),
         )
     }
 
     #[test]
-    fn disabling_internal_handlers_for_initially_ignored_signals() {
+    fn disabling_internal_dispositions_for_initially_ignored_signals() {
         let mut system = DummySystem::default();
         ignore_signals(&mut system);
         let mut trap_set = TrapSet::default();
-        trap_set.enable_sigchld_handler(&mut system).unwrap();
-        trap_set.enable_terminator_handlers(&mut system).unwrap();
-        trap_set.enable_stopper_handlers(&mut system).unwrap();
-        trap_set.disable_internal_handlers(&mut system).unwrap();
-        assert_eq!(system.0[&SIGCHLD], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGINT], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGTERM], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGQUIT], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGTSTP], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGTTIN], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGTTOU], SignalHandling::Ignore);
+        trap_set
+            .enable_internal_disposition_for_sigchld(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_terminators(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_stoppers(&mut system)
+            .unwrap();
+        trap_set.disable_internal_dispositions(&mut system).unwrap();
+        assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
+        assert_eq!(system.0[&SIGINT], Disposition::Ignore);
+        assert_eq!(system.0[&SIGTERM], Disposition::Ignore);
+        assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
+        assert_eq!(system.0[&SIGTSTP], Disposition::Ignore);
+        assert_eq!(system.0[&SIGTTIN], Disposition::Ignore);
+        assert_eq!(system.0[&SIGTTOU], Disposition::Ignore);
     }
 
     #[test]
-    fn disabling_internal_handlers_after_enabling_twice() {
+    fn disabling_internal_dispositions_after_enabling_twice() {
         let mut system = DummySystem::default();
         ignore_signals(&mut system);
         let mut trap_set = TrapSet::default();
-        trap_set.enable_sigchld_handler(&mut system).unwrap();
-        trap_set.enable_sigchld_handler(&mut system).unwrap();
-        trap_set.enable_terminator_handlers(&mut system).unwrap();
-        trap_set.enable_terminator_handlers(&mut system).unwrap();
-        trap_set.enable_stopper_handlers(&mut system).unwrap();
-        trap_set.enable_stopper_handlers(&mut system).unwrap();
-        trap_set.disable_internal_handlers(&mut system).unwrap();
-        assert_eq!(system.0[&SIGCHLD], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGINT], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGTERM], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGQUIT], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGTSTP], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGTTIN], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGTTOU], SignalHandling::Ignore);
+        trap_set
+            .enable_internal_disposition_for_sigchld(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_disposition_for_sigchld(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_terminators(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_terminators(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_stoppers(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_stoppers(&mut system)
+            .unwrap();
+        trap_set.disable_internal_dispositions(&mut system).unwrap();
+        assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
+        assert_eq!(system.0[&SIGINT], Disposition::Ignore);
+        assert_eq!(system.0[&SIGTERM], Disposition::Ignore);
+        assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
+        assert_eq!(system.0[&SIGTSTP], Disposition::Ignore);
+        assert_eq!(system.0[&SIGTTIN], Disposition::Ignore);
+        assert_eq!(system.0[&SIGTTOU], Disposition::Ignore);
     }
 
     #[test]
-    fn disabling_internal_handlers_without_enabling() {
+    fn disabling_internal_dispositions_without_enabling() {
         let mut system = DummySystem::default();
         ignore_signals(&mut system);
         let mut trap_set = TrapSet::default();
-        trap_set.disable_internal_handlers(&mut system).unwrap();
-        assert_eq!(system.0[&SIGCHLD], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGINT], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGTERM], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGQUIT], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGTSTP], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGTTIN], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGTTOU], SignalHandling::Ignore);
+        trap_set.disable_internal_dispositions(&mut system).unwrap();
+        assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
+        assert_eq!(system.0[&SIGINT], Disposition::Ignore);
+        assert_eq!(system.0[&SIGTERM], Disposition::Ignore);
+        assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
+        assert_eq!(system.0[&SIGTSTP], Disposition::Ignore);
+        assert_eq!(system.0[&SIGTTIN], Disposition::Ignore);
+        assert_eq!(system.0[&SIGTTOU], Disposition::Ignore);
     }
 
     #[test]
-    fn reenabling_internal_handlers() {
+    fn reenabling_internal_dispositions() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
-        trap_set.enable_sigchld_handler(&mut system).unwrap();
-        trap_set.enable_sigchld_handler(&mut system).unwrap();
-        trap_set.enable_terminator_handlers(&mut system).unwrap();
-        trap_set.enable_terminator_handlers(&mut system).unwrap();
-        trap_set.enable_stopper_handlers(&mut system).unwrap();
-        trap_set.enable_stopper_handlers(&mut system).unwrap();
-        trap_set.disable_internal_handlers(&mut system).unwrap();
-        trap_set.enable_sigchld_handler(&mut system).unwrap();
-        trap_set.enable_terminator_handlers(&mut system).unwrap();
-        trap_set.enable_stopper_handlers(&mut system).unwrap();
-        assert_eq!(system.0[&SIGCHLD], SignalHandling::Catch);
-        assert_eq!(system.0[&SIGINT], SignalHandling::Catch);
-        assert_eq!(system.0[&SIGTERM], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGQUIT], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGTSTP], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGTTIN], SignalHandling::Ignore);
-        assert_eq!(system.0[&SIGTTOU], SignalHandling::Ignore);
+        trap_set
+            .enable_internal_disposition_for_sigchld(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_disposition_for_sigchld(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_terminators(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_terminators(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_stoppers(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_stoppers(&mut system)
+            .unwrap();
+        trap_set.disable_internal_dispositions(&mut system).unwrap();
+        trap_set
+            .enable_internal_disposition_for_sigchld(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_terminators(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_stoppers(&mut system)
+            .unwrap();
+        assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
+        assert_eq!(system.0[&SIGINT], Disposition::Catch);
+        assert_eq!(system.0[&SIGTERM], Disposition::Ignore);
+        assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
+        assert_eq!(system.0[&SIGTSTP], Disposition::Ignore);
+        assert_eq!(system.0[&SIGTTIN], Disposition::Ignore);
+        assert_eq!(system.0[&SIGTTOU], Disposition::Ignore);
     }
 
     #[test]
-    fn setting_trap_to_ignore_after_enabling_internal_handler() {
+    fn setting_trap_to_ignore_after_enabling_internal_disposition() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
-        trap_set.enable_sigchld_handler(&mut system).unwrap();
+        trap_set
+            .enable_internal_disposition_for_sigchld(&mut system)
+            .unwrap();
         let origin = Location::dummy("origin");
         let result = trap_set.set_action(&mut system, SIGCHLD, Action::Ignore, origin, false);
         assert_eq!(result, Ok(()));
-        assert_eq!(system.0[&SIGCHLD], SignalHandling::Catch);
+        assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
     }
 
     #[test]
-    fn resetting_trap_from_ignore_no_override_after_enabling_internal_handlers() {
+    fn resetting_trap_from_ignore_no_override_after_enabling_internal_dispositions() {
         let mut system = DummySystem::default();
         ignore_signals(&mut system);
         let mut trap_set = TrapSet::default();
-        trap_set.enable_sigchld_handler(&mut system).unwrap();
-        trap_set.enable_terminator_handlers(&mut system).unwrap();
-        trap_set.enable_stopper_handlers(&mut system).unwrap();
+        trap_set
+            .enable_internal_disposition_for_sigchld(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_terminators(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_stoppers(&mut system)
+            .unwrap();
 
         for signal in [SIGCHLD, SIGINT] {
             let origin = Location::dummy("origin");
             let result = trap_set.set_action(&mut system, signal, Action::Default, origin, false);
             assert_eq!(result, Err(SetActionError::InitiallyIgnored));
-            assert_eq!(system.0[&signal], SignalHandling::Catch);
+            assert_eq!(system.0[&signal], Disposition::Catch);
         }
         for signal in [SIGTERM, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU] {
             let origin = Location::dummy("origin");
             let result = trap_set.set_action(&mut system, signal, Action::Default, origin, false);
             assert_eq!(result, Err(SetActionError::InitiallyIgnored));
-            assert_eq!(system.0[&signal], SignalHandling::Ignore);
+            assert_eq!(system.0[&signal], Disposition::Ignore);
         }
     }
 
     #[test]
-    fn resetting_trap_from_ignore_override_after_enabling_internal_handlers() {
+    fn resetting_trap_from_ignore_override_after_enabling_internal_dispositions() {
         let mut system = DummySystem::default();
         ignore_signals(&mut system);
         let mut trap_set = TrapSet::default();
-        trap_set.enable_sigchld_handler(&mut system).unwrap();
-        trap_set.enable_terminator_handlers(&mut system).unwrap();
-        trap_set.enable_stopper_handlers(&mut system).unwrap();
+        trap_set
+            .enable_internal_disposition_for_sigchld(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_terminators(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_stoppers(&mut system)
+            .unwrap();
 
         for signal in [SIGCHLD, SIGINT] {
             let origin = Location::dummy("origin");
@@ -1345,7 +1424,7 @@ mod tests {
                     None
                 )
             );
-            assert_eq!(system.0[&signal], SignalHandling::Catch);
+            assert_eq!(system.0[&signal], Disposition::Catch);
         }
         for signal in [SIGTERM, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU] {
             let origin = Location::dummy("origin");
@@ -1363,25 +1442,29 @@ mod tests {
                     None
                 )
             );
-            assert_eq!(system.0[&signal], SignalHandling::Ignore);
+            assert_eq!(system.0[&signal], Disposition::Ignore);
         }
     }
 
     #[test]
-    fn disabling_internal_handler_with_ignore_trap() {
+    fn disabling_internal_disposition_with_ignore_trap() {
         let signals = [SIGCHLD, SIGINT, SIGTERM, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU];
 
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
-        trap_set.enable_sigchld_handler(&mut system).unwrap();
-        trap_set.enable_terminator_handlers(&mut system).unwrap();
+        trap_set
+            .enable_internal_disposition_for_sigchld(&mut system)
+            .unwrap();
+        trap_set
+            .enable_internal_dispositions_for_terminators(&mut system)
+            .unwrap();
         let origin = Location::dummy("origin");
         for signal in signals {
             trap_set
                 .set_action(&mut system, signal, Action::Ignore, origin.clone(), false)
                 .unwrap();
         }
-        trap_set.disable_internal_handlers(&mut system).unwrap();
+        trap_set.disable_internal_dispositions(&mut system).unwrap();
 
         for signal in signals {
             assert_eq!(
@@ -1395,7 +1478,7 @@ mod tests {
                     None
                 )
             );
-            assert_eq!(system.0[&signal], SignalHandling::Ignore);
+            assert_eq!(system.0[&signal], Disposition::Ignore);
         }
     }
 }

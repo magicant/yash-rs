@@ -57,6 +57,7 @@ use super::resource::LimitPair;
 use super::resource::Resource;
 use super::resource::INFINITY;
 use super::Dir;
+use super::Disposition;
 use super::Errno;
 use super::FdFlag;
 use super::Gid;
@@ -64,7 +65,6 @@ use super::OfdAccess;
 use super::OpenFlag;
 use super::Result;
 use super::SigmaskOp;
-use super::SignalHandling;
 use super::Stat;
 use super::Times;
 use super::Uid;
@@ -632,10 +632,10 @@ impl System for VirtualSystem {
     fn sigaction(
         &mut self,
         signal: signal::Number,
-        action: SignalHandling,
-    ) -> Result<SignalHandling> {
+        disposition: Disposition,
+    ) -> Result<Disposition> {
         let mut process = self.current_process_mut();
-        Ok(process.set_signal_handling(signal, action))
+        Ok(process.set_disposition(signal, disposition))
     }
 
     fn caught_signals(&mut self) -> Vec<signal::Number> {
@@ -2066,7 +2066,7 @@ mod tests {
         system
             .sigmask(Some((SigmaskOp::Add, &[SIGCHLD])), None)
             .unwrap();
-        system.sigaction(SIGCHLD, SignalHandling::Catch).unwrap();
+        system.sigaction(SIGCHLD, Disposition::Catch).unwrap();
         system
     }
 
@@ -2484,7 +2484,7 @@ mod tests {
     #[test]
     fn exiting_child_sends_sigchld_to_parent() {
         let (mut system, mut executor) = virtual_system_with_executor();
-        system.sigaction(SIGCHLD, SignalHandling::Catch).unwrap();
+        system.sigaction(SIGCHLD, Disposition::Catch).unwrap();
 
         let child_process = system.new_child_process().unwrap();
 
