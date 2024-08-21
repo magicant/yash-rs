@@ -43,7 +43,7 @@ pub fn auto_interactive<S: System>(system: &S, run: &Run) -> bool {
     if !run.positional_params.is_empty() {
         return false;
     }
-    system.isatty(Fd::STDIN).unwrap_or(false) && system.isatty(Fd::STDERR).unwrap_or(false)
+    system.isatty(Fd::STDIN) && system.isatty(Fd::STDERR)
 }
 
 /// Get the environment ready for performing the work.

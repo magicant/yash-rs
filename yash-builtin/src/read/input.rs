@@ -189,10 +189,7 @@ async fn print_prompt(env: &mut Env) {
     #[cfg(feature = "yash-prompt")]
     {
         use yash_env::System as _;
-        if !env.is_interactive() {
-            return;
-        }
-        if env.system.isatty(Fd::STDIN) != Ok(true) {
+        if !env.is_interactive() || !env.system.isatty(Fd::STDIN) {
             return;
         }
 

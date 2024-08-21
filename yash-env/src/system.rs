@@ -168,7 +168,11 @@ pub trait System: Debug {
     fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()>;
 
     /// Tests if a file descriptor is associated with a terminal device.
-    fn isatty(&self, fd: Fd) -> Result<bool>;
+    ///
+    /// On error, this function simply returns `false` and no detailed error
+    /// information is provided because POSIX does not require the `isatty`
+    /// function to set `errno`.
+    fn isatty(&self, fd: Fd) -> bool;
 
     /// Reads from the file descriptor.
     ///

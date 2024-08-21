@@ -348,7 +348,7 @@ impl System for &SharedSystem {
     fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
         self.0.borrow_mut().fcntl_setfd(fd, flags)
     }
-    fn isatty(&self, fd: Fd) -> Result<bool> {
+    fn isatty(&self, fd: Fd) -> bool {
         self.0.borrow().isatty(fd)
     }
     fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
@@ -539,7 +539,7 @@ impl System for SharedSystem {
         (&mut &*self).fcntl_setfd(fd, flags)
     }
     #[inline]
-    fn isatty(&self, fd: Fd) -> Result<bool> {
+    fn isatty(&self, fd: Fd) -> bool {
         (&self).isatty(fd)
     }
     #[inline]
