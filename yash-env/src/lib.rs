@@ -283,7 +283,7 @@ impl Env {
     fn should_print_error_in_color(&self) -> bool {
         // TODO Enable color depending on user config (force/auto/never)
         // TODO Check if the terminal really supports color (needs terminfo)
-        self.system.isatty(Fd::STDERR) == Ok(true)
+        self.system.isatty(Fd::STDERR)
     }
 
     /// Returns a file descriptor to the controlling terminal.

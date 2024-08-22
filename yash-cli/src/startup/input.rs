@@ -85,7 +85,7 @@ pub fn prepare_input<'a>(
                 (env.system.clone(), env.options.get(Interactive) == On)
             };
 
-            if system.isatty(Fd::STDIN).unwrap_or(false) || system.fd_is_pipe(Fd::STDIN) {
+            if system.isatty(Fd::STDIN) || system.fd_is_pipe(Fd::STDIN) {
                 // It makes virtually no sense to make it blocking here
                 // since we will be doing non-blocking reads anyway,
                 // but POSIX requires us to do it.

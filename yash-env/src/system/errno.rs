@@ -401,7 +401,7 @@ impl From<RawErrno> for Errno {
 impl From<Errno> for nix::Error {
     #[inline]
     fn from(errno: Errno) -> Self {
-        Self::from_i32(errno.0)
+        Self::from_raw(errno.0)
     }
 }
 

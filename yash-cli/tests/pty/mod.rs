@@ -28,7 +28,7 @@ use nix::pty::{grantpt, posix_openpt, ptsname, unlockpt, PtyMaster};
 use nix::sys::stat::Mode;
 use nix::unistd::{close, getpgrp, setsid, tcgetpgrp};
 use std::ffi::c_int;
-use std::os::fd::{AsRawFd as _, FromRawFd as _, OwnedFd};
+use std::os::fd::{AsRawFd as _, BorrowedFd, FromRawFd as _, OwnedFd};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -93,7 +93,8 @@ fn prepare_as_slave(slave_path: &Path) -> nix::Result<()> {
     // available in some systems. Please report if you encounter such a system.
     unsafe { libc::ioctl(raw_fd, libc::TIOCSCTTY as _, 0 as c_int) };
 
-    if tcgetpgrp(raw_fd) == Ok(getpgrp()) {
+    let fd = unsafe { BorrowedFd::borrow_raw(raw_fd) };
+    if tcgetpgrp(fd) == Ok(getpgrp()) {
         Ok(())
     } else {
         Err(nix::Error::ENOTSUP)

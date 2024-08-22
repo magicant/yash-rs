@@ -30,5 +30,5 @@ yash-syntax = { path = "../yash-syntax", version = "0.10.0" }
 [dev-dependencies]
 assert_matches = "1.5.0"
 fuzed-iterator = "1.0.0"
-nix = { version = "0.27.0", features = ["fs", "process", "term"] }
+nix = { version = "0.29.0", features = ["fs", "process", "term"] }
 tempfile = "3.8.0"

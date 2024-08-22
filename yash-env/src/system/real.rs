@@ -249,25 +249,31 @@ impl System for RealSystem {
     }
 
     fn pipe(&mut self) -> Result<(Fd, Fd)> {
-        let (reader, writer) = nix::unistd::pipe()?;
-        Ok((Fd(reader), Fd(writer)))
+        let mut fds = MaybeUninit::<[c_int; 2]>::uninit();
+        // TODO Use as_mut_ptr rather than cast when array_ptr_get is stabilized
+        unsafe { nix::libc::pipe(fds.as_mut_ptr().cast()) }.errno_if_m1()?;
+        let fds = unsafe { fds.assume_init() };
+        Ok((Fd(fds[0]), Fd(fds[1])))
     }
 
     fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
-        let arg = if flags.contains(FdFlag::CloseOnExec) {
-            nix::fcntl::FcntlArg::F_DUPFD_CLOEXEC
+        let command = if flags.contains(FdFlag::CloseOnExec) {
+            nix::libc::F_DUPFD_CLOEXEC
         } else {
-            nix::fcntl::FcntlArg::F_DUPFD
+            nix::libc::F_DUPFD
         };
-        Ok(Fd(nix::fcntl::fcntl(from.0, arg(to_min.0))?))
+        unsafe { nix::libc::fcntl(from.0, command, to_min.0) }
+            .errno_if_m1()
+            .map(Fd)
     }
 
     fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
         loop {
-            match nix::unistd::dup2(from.0, to.0) {
-                Ok(fd) => return Ok(Fd(fd)),
-                Err(NixErrno::EINTR) => (),
-                Err(e) => return Err(e.into()),
+            let result = unsafe { nix::libc::dup2(from.0, to.0) }
+                .errno_if_m1()
+                .map(Fd);
+            if result != Err(Errno::EINTR) {
+                return result;
             }
         }
     }
@@ -308,10 +314,11 @@ impl System for RealSystem {
 
     fn close(&mut self, fd: Fd) -> Result<()> {
         loop {
-            match nix::unistd::close(fd.0) {
-                Err(NixErrno::EBADF) => return Ok(()),
-                Err(NixErrno::EINTR) => (),
-                other => return Ok(other?),
+            let result = unsafe { nix::libc::close(fd.0) }.errno_if_m1().map(drop);
+            match result {
+                Err(Errno::EBADF) => return Ok(()),
+                Err(Errno::EINTR) => continue,
+                other => return other,
             }
         }
     }
@@ -336,58 +343,59 @@ impl System for RealSystem {
     }
 
     fn fcntl_getfd(&self, fd: Fd) -> Result<EnumSet<FdFlag>> {
-        let bits = nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_GETFD)?;
-        let bits = nix::fcntl::FdFlag::from_bits_retain(bits);
+        let bits = unsafe { nix::libc::fcntl(fd.0, nix::libc::F_GETFD) }.errno_if_m1()?;
         let mut flags = EnumSet::empty();
-        if bits.contains(nix::fcntl::FdFlag::FD_CLOEXEC) {
+        if bits & nix::libc::FD_CLOEXEC != 0 {
             flags.insert(FdFlag::CloseOnExec);
         }
         Ok(flags)
     }
 
     fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
-        let mut bits = nix::fcntl::FdFlag::empty();
+        let mut bits = 0 as c_int;
         if flags.contains(FdFlag::CloseOnExec) {
-            bits.insert(nix::fcntl::FdFlag::FD_CLOEXEC);
+            bits |= nix::libc::FD_CLOEXEC;
         }
-        nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_SETFD(bits))?;
-        Ok(())
+        unsafe { nix::libc::fcntl(fd.0, nix::libc::F_SETFD, bits) }
+            .errno_if_m1()
+            .map(drop)
     }
 
-    fn isatty(&self, fd: Fd) -> Result<bool> {
-        Ok(nix::unistd::isatty(fd.0)?)
+    fn isatty(&self, fd: Fd) -> bool {
+        (unsafe { nix::libc::isatty(fd.0) } != 0)
     }
 
     fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
         loop {
-            let result = nix::unistd::read(fd.0, buffer);
-            if result != Err(NixErrno::EINTR) {
-                return Ok(result?);
+            let result = unsafe { nix::libc::read(fd.0, buffer.as_mut_ptr().cast(), buffer.len()) }
+                .errno_if_m1();
+            if result != Err(Errno::EINTR) {
+                return Ok(result?.try_into().unwrap());
             }
         }
     }
 
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {
         loop {
-            let result = nix::unistd::write(fd.0, buffer);
-            if result != Err(NixErrno::EINTR) {
-                return Ok(result?);
+            let result = unsafe { nix::libc::write(fd.0, buffer.as_ptr().cast(), buffer.len()) }
+                .errno_if_m1();
+            if result != Err(Errno::EINTR) {
+                return Ok(result?.try_into().unwrap());
             }
         }
     }
 
     fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
-        use nix::unistd::Whence::*;
         let (offset, whence) = match position {
             SeekFrom::Start(offset) => {
-                let offset = offset.try_into().map_err(|_| NixErrno::EOVERFLOW)?;
-                (offset, SeekSet)
+                let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
+                (offset, nix::libc::SEEK_SET)
             }
-            SeekFrom::End(offset) => (offset, SeekEnd),
-            SeekFrom::Current(offset) => (offset, SeekCur),
+            SeekFrom::End(offset) => (offset, nix::libc::SEEK_END),
+            SeekFrom::Current(offset) => (offset, nix::libc::SEEK_CUR),
         };
-        let new_offset = nix::unistd::lseek(fd.0, offset, whence)?;
-        Ok(new_offset as u64)
+        let new_offset = unsafe { nix::libc::lseek(fd.0, offset, whence) }.errno_if_m1()?;
+        Ok(new_offset.try_into().unwrap())
     }
 
     fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {

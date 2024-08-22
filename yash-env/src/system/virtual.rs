@@ -537,8 +537,8 @@ impl System for VirtualSystem {
         Ok(())
     }
 
-    fn isatty(&self, _fd: Fd) -> Result<bool> {
-        Ok(false)
+    fn isatty(&self, _fd: Fd) -> bool {
+        false
     }
 
     fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
