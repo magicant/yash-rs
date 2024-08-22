@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - unix_str 1.0.0
 - Internal dependencies:
     - bitflags 2.6.0
+    - nix 0.29.0 (with the "fs", "signal", and "user" features enabled)
 
 ### Changed
 
