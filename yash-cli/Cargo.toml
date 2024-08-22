@@ -22,10 +22,10 @@ futures-executor = "0.3.28"
 futures-util = { version = "0.3.28", features = ["channel"] }
 thiserror = "1.0.47"
 yash-builtin = { path = "../yash-builtin", version = "0.3.0" }
-yash-env = { path = "../yash-env", version = "0.2.0" }
+yash-env = { path = "../yash-env", version = "0.3.0" }
 yash-prompt = { path = "../yash-prompt", version = "0.1.0" }
 yash-semantics = { path = "../yash-semantics", version = "0.3.0" }
-yash-syntax = { path = "../yash-syntax", version = "0.10.0" }
+yash-syntax = { path = "../yash-syntax", version = "0.11.0" }
 
 [dev-dependencies]
 assert_matches = "1.5.0"

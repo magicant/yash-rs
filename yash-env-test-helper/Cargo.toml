@@ -17,4 +17,4 @@ categories = ["command-line-utilities"]
 assert_matches = "1.5.0"
 futures-executor = "0.3.28"
 futures-util = { version = "0.3.28", features = ["channel"] }
-yash-env = { path = "../yash-env", version = "0.2.0" }
+yash-env = { path = "../yash-env", version = "0.3.0" }
