@@ -296,6 +296,11 @@ fn options() {
 }
 
 #[test]
+fn options_ex() {
+    run("option-y.sh")
+}
+
+#[test]
 fn parameter_expansion() {
     run("param-p.sh")
 }

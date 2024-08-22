@@ -26,7 +26,7 @@ use std::rc::Rc;
 use yash_env::io::Fd;
 use yash_env::job::Job;
 use yash_env::job::Pid;
-use yash_env::option::Option::Exec;
+use yash_env::option::Option::{Exec, Interactive};
 use yash_env::option::State::Off;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
@@ -68,8 +68,10 @@ use yash_syntax::syntax;
 ///
 /// # `noexec` option
 ///
-/// If the `Exec` option is `Off` in `env.options`, the entire execution of the
-/// pipeline is skipped.
+/// If the [`Exec`] and [`Interactive`] options are [`Off`] in `env.options`,
+/// the entire execution of the pipeline is skipped. (The `noexec` option is
+/// ignored if the shell is interactive, otherwise you cannot exit the shell
+/// in any way if the `ignoreeof` option is set.)
 ///
 /// # Stack
 ///
@@ -77,7 +79,7 @@ use yash_syntax::syntax;
 /// environment's stack while the pipeline is executed.
 impl Command for syntax::Pipeline {
     async fn execute(&self, env: &mut Env) -> Result {
-        if env.options.get(Exec) == Off {
+        if env.options.get(Exec) == Off && env.options.get(Interactive) == Off {
             return Continue(());
         }
 
@@ -515,6 +517,18 @@ mod tests {
         let result = pipeline.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+    }
+
+    #[test]
+    fn noexec_option_interactive() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("return", return_builtin());
+        env.options.set(Exec, Off);
+        env.options.set(Interactive, On);
+        let pipeline: syntax::Pipeline = "return -n 93".parse().unwrap();
+        let result = pipeline.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus(93));
     }
 
     #[test]

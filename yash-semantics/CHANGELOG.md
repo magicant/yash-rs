@@ -34,6 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - The `MessageBase::additional_annotations` method implementation for the
       `Error` struct has been extended to produce more annotations for errors
       with `Vacancy` information.
+- The pipeline execution now ignores the `noexec` option in interactive shells.
+    - Previously, the `<yash_syntax::syntax::Pipeline as
+      command::Command>::execute` method skipped the execution of the pipeline
+      if the `Exec` shell option was off. Now, it skips the execution only if
+      the `Exec` and `Interactive` shell options are both off.
 - External dependency versions:
     - Rust 1.77.0 → 1.79.0
     - yash-env 0.2.0 → 0.3.0
