@@ -29,6 +29,7 @@ pub mod startup;
 use self::startup::args::Parse;
 use self::startup::init_file::run_rcfile;
 use self::startup::input::prepare_input;
+use self::startup::input::SourceInput;
 use futures_util::task::LocalSpawnExt as _;
 use futures_util::FutureExt as _;
 use std::cell::RefCell;
@@ -76,13 +77,13 @@ async fn parse_and_print(mut env: Env) -> i32 {
 
     // Prepare the input for the main read-eval loop
     let ref_env = &RefCell::new(&mut env);
-    let input = match prepare_input(ref_env, &work.source) {
+    let SourceInput { input, source } = match prepare_input(ref_env, &work.source) {
         Ok(input) => input,
         Err(e) => {
             let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());
             let message = format!("{}: {}\n", arg0, e);
             // The borrow checker of Rust 1.79.0 is not smart enough to reason
-            // about the lifetime of `input` here, so we re-borrow from `ref_env`
+            // about the lifetime of `e` here, so we re-borrow from `ref_env`
             // instead of reusing `env`.
             // env.system.print_error(&message).await;
             ref_env.borrow_mut().system.print_error(&message).await;
@@ -93,15 +94,11 @@ async fn parse_and_print(mut env: Env) -> i32 {
         }
     };
     let line = NonZeroU64::new(1).unwrap();
-    let mut lexer = Lexer::new(input.input, line, input.source.into());
+    let mut lexer = Lexer::new(input, line, source.into());
 
     // Run the read-eval loop
-    let result = read_eval_loop(ref_env, &mut lexer).await;
+    let result = read_eval_loop(ref_env, &mut { lexer }).await;
 
-    // The borrow checker of Rust 1.79.0 is not smart enough to reason about the
-    // lifetime of `input` here, so we re-borrow from `ref_env` instead of reusing `env`.
-    // env.system.print_error(&message).await;
-    let env = &mut **ref_env.borrow_mut();
     env.apply_result(result);
 
     match result {
@@ -110,7 +107,7 @@ async fn parse_and_print(mut env: Env) -> i32 {
         | Break(Divert::Break { .. })
         | Break(Divert::Return(_))
         | Break(Divert::Interrupt(_))
-        | Break(Divert::Exit(_)) => run_exit_trap(env).await,
+        | Break(Divert::Exit(_)) => run_exit_trap(&mut env).await,
         Break(Divert::Abort(_)) => (),
     }
 
