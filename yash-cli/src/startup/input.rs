@@ -74,10 +74,10 @@ pub struct PrepareInputError<'a> {
 /// The `RefCell` passed as the first argument should be shared with (and only
 /// with) the [`read_eval_loop`](yash_semantics::read_eval_loop) function that
 /// consumes the input and executes the parsed commands.
-pub fn prepare_input<'a>(
-    env: &'a RefCell<&mut Env>,
-    source: &'a Source,
-) -> Result<SourceInput<'a>, PrepareInputError<'a>> {
+pub fn prepare_input<'s: 'i + 'e, 'i, 'e>(
+    env: &'i RefCell<&mut Env>,
+    source: &'s Source,
+) -> Result<SourceInput<'i>, PrepareInputError<'e>> {
     match source {
         Source::Stdin => {
             let (mut system, is_interactive) = {

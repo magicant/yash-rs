@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   interactive.
 - The `bin_main` function has been renamed to `main` and its return type is now
   `!`.
+- The signature of the `startup::input::prepare_input` function has been revised
+  with more lifetime parameters for more flexible usage.
 - External dependency versions:
     - Rust 1.77.0 → 1.79.0
     - yash-env 0.2.0 → 0.3.0
