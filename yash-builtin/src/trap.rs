@@ -130,6 +130,8 @@ use crate::common::to_single_message;
 use std::borrow::Cow;
 use std::fmt::Write;
 use thiserror::Error;
+use yash_env::option::Option::Interactive;
+use yash_env::option::State::On;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::SharedSystem;
@@ -236,6 +238,7 @@ fn set_action(
     cond: CondSpec,
     field: Field,
     action: Action,
+    override_ignore: bool,
 ) -> Result<(), Error> {
     let Some(cond2) = cond.resolve(system) else {
         let cause = ErrorCause::UnsupportedSignal;
@@ -247,8 +250,7 @@ fn set_action(
             cond2,
             action.clone(),
             field.origin.clone(),
-            // TODO an interactive shell can override originally ignored traps
-            false,
+            override_ignore,
         )
         .map_err(|cause| {
             let cause = cause.into();
@@ -266,11 +268,20 @@ impl Command {
             Self::PrintAll => Ok(display_traps(&env.traps, &env.system)),
 
             Self::SetAction { action, conditions } => {
+                let override_ignore = env.options.get(Interactive) == On;
+
                 let errors = conditions
                     .into_iter()
                     .filter_map(|(cond, field)| {
-                        set_action(&mut env.traps, &mut env.system, cond, field, action.clone())
-                            .err()
+                        set_action(
+                            &mut env.traps,
+                            &mut env.system,
+                            cond,
+                            field,
+                            action.clone(),
+                            override_ignore,
+                        )
+                        .err()
                     })
                     .collect::<Vec<Error>>();
 
@@ -478,7 +489,7 @@ mod tests {
     }
 
     #[test]
-    fn ignoring_initially_ignored_signal() {
+    fn initially_ignored_signal_not_modifiable_if_non_interactive() {
         let mut system = VirtualSystem::new();
         system
             .current_process_mut()
@@ -496,6 +507,29 @@ mod tests {
         assert_eq!(
             system.current_process().disposition(SIGINT),
             Disposition::Ignore
+        );
+    }
+
+    #[test]
+    fn modifying_initially_ignored_signal_in_interactive_mode() {
+        let mut system = VirtualSystem::new();
+        system
+            .current_process_mut()
+            .set_disposition(SIGINT, Disposition::Ignore);
+        let mut env = Env::with_system(Box::new(system.clone()));
+        env.options.set(Interactive, On);
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
+            name: Field::dummy("trap"),
+            is_special: true,
+        }));
+        let args = Field::dummies(["echo", "INT"]);
+
+        let result = main(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
+        assert_stderr(&system.state, |stderr| assert_eq!(stderr, ""));
+        assert_eq!(
+            system.current_process().disposition(SIGINT),
+            Disposition::Catch
         );
     }
 

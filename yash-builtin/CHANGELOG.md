@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `cd::target::TargetError::NonExistingDirectory::missing`
     - `cd::target::TargetError::NonExistingDirectory::target`
     - `cd::target::target`
+- The `trap::Command::execute` method now allows modifying the trap for signals
+  that were ignored on the shell startup if the shell is interactive.
 - The `ulimit::Error::Unknown` variant now contains a `yash_env::system::Errno`
   instead of a `std::io::Error`.
 - The `getrlimit` and `setrlimit` methods of the `ulimit::set::Env` trait now
