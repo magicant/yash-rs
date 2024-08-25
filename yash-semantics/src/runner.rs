@@ -33,7 +33,7 @@ use yash_syntax::parser::Parser;
 /// for executing parsed commands. It creates a [`Parser`] from the lexer to
 /// parse [command lines](Parser::command_line). The loop executes each command
 /// line before parsing the next one. The loop continues until the parser
-/// reaches the end of input or encounters a syntax error, or the command
+/// reaches the end of input or encounters a parser error, or the command
 /// execution results in a `Break(Divert::...)`.
 ///
 /// This function takes a `RefCell` containing the mutable reference to the
@@ -48,8 +48,8 @@ use yash_syntax::parser::Parser;
 /// are updated](Env::update_all_subshell_statuses) between parsing input and
 /// running commands.
 ///
-/// TODO: `Break(Divert::Interrupt(...))` should not end the loop in an
-/// interactive shell
+/// For the top-level read-eval loop of an interactive shell, see
+/// [`interactive_read_eval_loop`].
 ///
 /// # Example
 ///
@@ -100,10 +100,43 @@ use yash_syntax::parser::Parser;
 ///
 /// [`Echo`]: yash_env::input::Echo
 /// [`Input`]: yash_syntax::input::Input
+pub async fn read_eval_loop(env: &RefCell<&mut Env>, lexer: &mut Lexer<'_>) -> Result {
+    read_eval_loop_impl(env, lexer, /* is_interactive */ false).await
+}
+
+/// [`read_eval_loop`] for interactive shells
+///
+/// This function extends the [`read_eval_loop`] function to act as an
+/// interactive shell. The difference is that this function suppresses
+/// [`Interrupt`]s and continues the loop if the parser fails with a syntax
+/// error or if the command execution results in an interrupt. Note that I/O
+/// errors detected by the parser are not recovered from.
+///
+/// Also note that the following aspects of the interactive shell are *not*
+/// implemented in this function:
+///
+/// - Prompting the user for input (see the `yash-prompt` crate)
+/// - Reporting job status changes before the prompt
+/// - Applying the [`IgnoreEof`] option
+///
+/// This function is intended to be used as the top-level read-eval loop in an
+/// interactive shell. It is not suitable for non-interactive command execution
+/// such as scripts. See [`read_eval_loop`] for non-interactive execution.
+///
+/// [`Interrupt`]: crate::Divert::Interrupt
+/// [`IgnoreEof`]: yash_env::option::IgnoreEof
+pub async fn interactive_read_eval_loop(env: &RefCell<&mut Env>, lexer: &mut Lexer<'_>) -> Result {
+    read_eval_loop_impl(env, lexer, /* is_interactive */ true).await
+}
+
 // The RefCell should be local to the loop, so it is safe to keep the mutable
 // borrow across await points.
 #[allow(clippy::await_holding_refcell_ref)]
-pub async fn read_eval_loop(env: &RefCell<&mut Env>, lexer: &mut Lexer<'_>) -> Result {
+async fn read_eval_loop_impl(
+    env: &RefCell<&mut Env>,
+    lexer: &mut Lexer<'_>,
+    is_interactive: bool,
+) -> Result {
     let mut executed = false;
 
     loop {
