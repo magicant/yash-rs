@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - This crate now builds on non-Unix platforms.
+- `interactive_read_eval_loop`
+    - This function is an extension of the `read_eval_loop` function for
+      interactive shells.
 - Error types in the `expansion` module (some of which are reexported in the
   `assign` module) have been extended for more informative error messages:
     - The `ErrorCause::footer` method has been added.

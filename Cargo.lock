@@ -643,6 +643,7 @@ name = "yash-semantics"
 version = "0.3.0"
 dependencies = [
  "assert_matches",
+ "async-trait",
  "enumset",
  "futures-executor",
  "futures-util",
