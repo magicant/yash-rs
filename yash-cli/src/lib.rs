@@ -45,15 +45,15 @@ use yash_semantics::ExitStatus;
 use yash_semantics::{read_eval_loop, Divert};
 use yash_syntax::parser::lex::Lexer;
 
-async fn print_version(env: &mut Env) -> i32 {
+async fn print_version(env: &mut Env) -> ExitStatus {
     let version = env!("CARGO_PKG_VERSION");
     let result = yash_builtin::common::output(env, &format!("yash {}\n", version)).await;
-    result.exit_status().0
+    result.exit_status()
 }
 
 // The RefCell is local to this function, so it is safe to keep borrows across await points.
 #[allow(clippy::await_holding_refcell_ref)]
-async fn parse_and_print(mut env: Env) -> i32 {
+async fn parse_and_print(mut env: Env) -> ExitStatus {
     // Parse the command-line arguments
     let run = match self::startup::args::parse(std::env::args()) {
         Ok(Parse::Help) => todo!("print help"),
@@ -62,7 +62,7 @@ async fn parse_and_print(mut env: Env) -> i32 {
         Err(e) => {
             let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());
             env.system.print_error(&format!("{}: {}\n", arg0, e)).await;
-            return ExitStatus::ERROR.0;
+            return ExitStatus::ERROR;
         }
     };
 
@@ -88,8 +88,8 @@ async fn parse_and_print(mut env: Env) -> i32 {
             // env.system.print_error(&message).await;
             ref_env.borrow_mut().system.print_error(&message).await;
             return match e.errno {
-                Errno::ENOENT | Errno::ENOTDIR | Errno::EILSEQ => ExitStatus::NOT_FOUND.0,
-                _ => ExitStatus::NOEXEC.0,
+                Errno::ENOENT | Errno::ENOTDIR | Errno::EILSEQ => ExitStatus::NOT_FOUND,
+                _ => ExitStatus::NOEXEC,
             };
         }
     };
@@ -111,7 +111,7 @@ async fn parse_and_print(mut env: Env) -> i32 {
         Break(Divert::Abort(_)) => (),
     }
 
-    env.exit_status.0
+    env.exit_status
 }
 
 pub fn main() -> ! {
@@ -136,7 +136,7 @@ pub fn main() -> ! {
     loop {
         pool.run_until_stalled();
         if let Some(exit_status) = (&mut task).now_or_never() {
-            std::process::exit(exit_status);
+            std::process::exit(exit_status.0);
         }
         system.select(false).ok();
     }
