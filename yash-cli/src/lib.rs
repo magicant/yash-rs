@@ -35,14 +35,15 @@ use futures_util::FutureExt as _;
 use std::cell::RefCell;
 use std::num::NonZeroU64;
 use std::ops::ControlFlow::{Break, Continue};
+use yash_env::option::{Interactive, On};
 use yash_env::signal;
 use yash_env::system::{Disposition, Errno};
 use yash_env::Env;
 use yash_env::RealSystem;
 use yash_env::System;
 use yash_semantics::trap::run_exit_trap;
-use yash_semantics::ExitStatus;
-use yash_semantics::{read_eval_loop, Divert};
+use yash_semantics::{interactive_read_eval_loop, read_eval_loop};
+use yash_semantics::{Divert, ExitStatus};
 use yash_syntax::parser::lex::Lexer;
 
 async fn print_version(env: &mut Env) -> ExitStatus {
@@ -71,6 +72,8 @@ async fn parse_and_print(mut env: Env) -> ExitStatus {
 
     let work = self::startup::configure_environment(&mut env, run);
 
+    let is_interactive = env.options.get(Interactive) == On;
+
     // Run initialization files
     // TODO run profile if login
     run_rcfile(&mut env, work.rcfile).await;
@@ -97,7 +100,11 @@ async fn parse_and_print(mut env: Env) -> ExitStatus {
     let mut lexer = Lexer::new(input, line, source.into());
 
     // Run the read-eval loop
-    let result = read_eval_loop(ref_env, &mut { lexer }).await;
+    let result = if is_interactive {
+        interactive_read_eval_loop(ref_env, &mut { lexer }).await
+    } else {
+        read_eval_loop(ref_env, &mut { lexer }).await
+    };
 
     env.apply_result(result);
 

@@ -186,6 +186,11 @@ fn error_consequences() {
 }
 
 #[test]
+fn error_consequences_ex() {
+    run("error-y.sh")
+}
+
+#[test]
 fn eval_builtin() {
     run("eval-p.sh")
 }

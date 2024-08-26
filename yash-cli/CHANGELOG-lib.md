@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The shell now executes the initialization files on startup if the shell is
   interactive.
+- Interactive shells now use `yash_semantics::interactive_read_eval_loop` instead
+  of `yash_semantics::read_eval_loop`.
 - The `bin_main` function has been renamed to `main` and its return type is now
   `!`.
 - The signature of the `startup::input::prepare_input` function has been revised
