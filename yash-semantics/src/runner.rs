@@ -20,12 +20,14 @@ use crate::command::Command;
 use crate::trap::run_traps_for_caught_signals;
 use crate::Handle;
 use std::cell::RefCell;
-use std::ops::ControlFlow::Continue;
+use std::ops::ControlFlow::{Break, Continue};
+use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_syntax::parser::lex::Lexer;
-use yash_syntax::parser::Parser;
+use yash_syntax::parser::{ErrorCause, Parser};
+use yash_syntax::syntax::List;
 
 /// Reads input, parses it, and executes commands in a loop.
 ///
@@ -33,7 +35,7 @@ use yash_syntax::parser::Parser;
 /// for executing parsed commands. It creates a [`Parser`] from the lexer to
 /// parse [command lines](Parser::command_line). The loop executes each command
 /// line before parsing the next one. The loop continues until the parser
-/// reaches the end of input or encounters a syntax error, or the command
+/// reaches the end of input or encounters a parser error, or the command
 /// execution results in a `Break(Divert::...)`.
 ///
 /// This function takes a `RefCell` containing the mutable reference to the
@@ -48,8 +50,8 @@ use yash_syntax::parser::Parser;
 /// are updated](Env::update_all_subshell_statuses) between parsing input and
 /// running commands.
 ///
-/// TODO: `Break(Divert::Interrupt(...))` should not end the loop in an
-/// interactive shell
+/// For the top-level read-eval loop of an interactive shell, see
+/// [`interactive_read_eval_loop`].
 ///
 /// # Example
 ///
@@ -100,10 +102,43 @@ use yash_syntax::parser::Parser;
 ///
 /// [`Echo`]: yash_env::input::Echo
 /// [`Input`]: yash_syntax::input::Input
+pub async fn read_eval_loop(env: &RefCell<&mut Env>, lexer: &mut Lexer<'_>) -> Result {
+    read_eval_loop_impl(env, lexer, /* is_interactive */ false).await
+}
+
+/// [`read_eval_loop`] for interactive shells
+///
+/// This function extends the [`read_eval_loop`] function to act as an
+/// interactive shell. The difference is that this function suppresses
+/// [`Interrupt`]s and continues the loop if the parser fails with a syntax
+/// error or if the command execution results in an interrupt. Note that I/O
+/// errors detected by the parser are not recovered from.
+///
+/// Also note that the following aspects of the interactive shell are *not*
+/// implemented in this function:
+///
+/// - Prompting the user for input (see the `yash-prompt` crate)
+/// - Reporting job status changes before the prompt
+/// - Applying the [`IgnoreEof`] option
+///
+/// This function is intended to be used as the top-level read-eval loop in an
+/// interactive shell. It is not suitable for non-interactive command execution
+/// such as scripts. See [`read_eval_loop`] for non-interactive execution.
+///
+/// [`Interrupt`]: crate::Divert::Interrupt
+/// [`IgnoreEof`]: yash_env::option::IgnoreEof
+pub async fn interactive_read_eval_loop(env: &RefCell<&mut Env>, lexer: &mut Lexer<'_>) -> Result {
+    read_eval_loop_impl(env, lexer, /* is_interactive */ true).await
+}
+
 // The RefCell should be local to the loop, so it is safe to keep the mutable
 // borrow across await points.
 #[allow(clippy::await_holding_refcell_ref)]
-pub async fn read_eval_loop(env: &RefCell<&mut Env>, lexer: &mut Lexer<'_>) -> Result {
+async fn read_eval_loop_impl(
+    env: &RefCell<&mut Env>,
+    lexer: &mut Lexer<'_>,
+    is_interactive: bool,
+) -> Result {
     let mut executed = false;
 
     loop {
@@ -111,10 +146,11 @@ pub async fn read_eval_loop(env: &RefCell<&mut Env>, lexer: &mut Lexer<'_>) -> R
             lexer.flush();
         }
 
-        let list = Parser::new(lexer, env).command_line().await;
+        let command = Parser::new(lexer, env).command_line().await;
 
         let env = &mut **env.borrow_mut();
-        match list {
+
+        let (mut result, error_recoverable) = match command {
             // No more commands
             Ok(None) => {
                 if !executed {
@@ -124,17 +160,37 @@ pub async fn read_eval_loop(env: &RefCell<&mut Env>, lexer: &mut Lexer<'_>) -> R
             }
 
             // Execute the command
-            Ok(Some(command)) => {
-                run_traps_for_caught_signals(env).await?;
-                env.update_all_subshell_statuses();
-                command.execute(env).await?
-            }
+            Ok(Some(command)) => (run_command(env, &command).await, true),
 
-            // Syntax error
-            Err(error) => error.handle(env).await?,
+            // Parser error
+            Err(error) => {
+                let result = error.handle(env).await;
+                let error_recoverable = matches!(error.cause, ErrorCause::Syntax(_));
+                (result, error_recoverable)
+            }
         };
+
+        if is_interactive && error_recoverable {
+            // Recover from errors
+            if let Break(Divert::Interrupt(exit_status)) = result {
+                if let Some(exit_status) = exit_status {
+                    env.exit_status = exit_status;
+                }
+                result = Continue(());
+            }
+        }
+
+        // Break the loop if the command execution results in a divert
+        result?;
+
         executed = true;
     }
+}
+
+async fn run_command(env: &mut Env, command: &List) -> Result {
+    run_traps_for_caught_signals(env).await?;
+    env.update_all_subshell_statuses();
+    command.execute(env).await
 }
 
 #[cfg(test)]
@@ -142,20 +198,20 @@ mod tests {
     use super::*;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
+    use async_trait::async_trait;
     use futures_util::FutureExt;
     use std::num::NonZeroU64;
-    use std::ops::ControlFlow::Break;
     use std::rc::Rc;
     use yash_env::input::Echo;
     use yash_env::input::Memory;
     use yash_env::option::Option::Verbose;
     use yash_env::option::State::On;
-    use yash_env::semantics::Divert;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::system::r#virtual::SIGUSR1;
     use yash_env::trap::Action;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
+    use yash_syntax::input::Context;
     use yash_syntax::source::Location;
     use yash_syntax::source::Source;
 
@@ -243,6 +299,59 @@ mod tests {
     }
 
     #[test]
+    fn command_interrupt_interactive() {
+        // If the command execution results in an interrupt in interactive mode,
+        // the loop continues
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        let mut lexer = Lexer::from_memory("${X?}\necho $?\n", Source::Unknown);
+        let ref_env = RefCell::new(&mut env);
+
+        let result = interactive_read_eval_loop(&ref_env, &mut lexer)
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, Continue(()));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "2\n"));
+    }
+
+    #[test]
+    fn command_other_divert_interactive() {
+        // If the command execution results in a divert other than an interrupt in
+        // interactive mode, the loop breaks
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.builtins.insert("return", return_builtin());
+        let mut lexer = Lexer::from_memory("return 123\necho $?\n", Source::Unknown);
+        let ref_env = RefCell::new(&mut env);
+
+        let result = interactive_read_eval_loop(&ref_env, &mut lexer)
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, Break(Divert::Return(Some(ExitStatus(123)))));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
+    fn command_interrupt_non_interactive() {
+        // If the command execution results in an interrupt in non-interactive mode,
+        // the loop breaks
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        let mut lexer = Lexer::from_memory("${X?}\necho $?\n", Source::Unknown);
+        let ref_env = RefCell::new(&mut env);
+
+        let result = read_eval_loop(&ref_env, &mut lexer).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
     fn handling_syntax_error() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -255,7 +364,7 @@ mod tests {
     }
 
     #[test]
-    fn syntax_error_aborts_loop() {
+    fn syntax_error_aborts_non_interactive_loop() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
@@ -266,6 +375,44 @@ mod tests {
         let result = read_eval_loop(&ref_env, &mut lexer).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
+    fn syntax_error_continues_interactive_loop() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        let mut lexer = Lexer::from_memory(";;\necho $?", Source::Unknown);
+        let ref_env = RefCell::new(&mut env);
+
+        let result = interactive_read_eval_loop(&ref_env, &mut lexer)
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, Continue(()));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "2\n"));
+    }
+
+    #[test]
+    fn input_error_aborts_loop() {
+        struct BrokenInput;
+        #[async_trait(?Send)]
+        impl yash_syntax::input::Input for BrokenInput {
+            async fn next_line(&mut self, _context: &Context) -> std::io::Result<String> {
+                Err(std::io::Error::new(std::io::ErrorKind::Other, "broken"))
+            }
+        }
+
+        let input = Box::new(BrokenInput);
+        let line = NonZeroU64::new(1).unwrap();
+        let mut lexer = Lexer::new(input, line, Rc::new(Source::Unknown));
+        let mut env = Env::new_virtual();
+        let ref_env = RefCell::new(&mut env);
+
+        let result = interactive_read_eval_loop(&ref_env, &mut lexer)
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
     }
 
     #[test]

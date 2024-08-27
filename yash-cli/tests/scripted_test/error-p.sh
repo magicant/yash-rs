@@ -20,7 +20,6 @@ __IN__
 0
 __OUT__
 
-: TODO interactive shell not yet implemented <<\__OUT__
 test_o -d 'syntax error spares interactive shell' -i +m
 fi
 echo reached
@@ -43,7 +42,6 @@ __IN__
 0
 __OUT__
 
-: TODO interactive shell not yet implemented <<\__OUT__
 test_o -d 'expansion error spares interactive shell' -i +m
 unset a
 echo ${a?}
@@ -74,7 +72,6 @@ __IN__
 0
 __OUT__
 
-: TODO interactive shell not yet implemented <<\__OUT__
 test_o 'assignment error without command spares interactive shell' -i +m
 readonly a=a
 a=b
@@ -113,7 +110,6 @@ __OUT__
 # $1 = line no.
 # $2 = command name
 test_assign_i() {
-: TODO interactive shell not yet implemented <<\__OUT__
     testcase "$1" -d \
         "assignment error on command $2 spares interactive shell" \
         -i +m 3<<__IN__ 4<<\__OUT__ 5<&-
@@ -288,7 +284,6 @@ done
 printf 'not reached 2\n'
 __IN__
 
-: TODO interactive shell not yet implemented <<\__OUT__
 test_o 'assignment error in for loop spares interactive shell' -i +m
 readonly a=a
 for a in b
@@ -328,7 +323,6 @@ __OUT__
 # $1 = line no.
 # $2 = built-in name
 test_special_builtin_redirect_i() {
-: TODO interactive shell not yet implemented <<\__OUT__
     testcase "$1" -d \
         "redirection error on special built-in $2 spares interactive shell" \
         -i +m 3<<__IN__ 4<<\__OUT__ 5<&-

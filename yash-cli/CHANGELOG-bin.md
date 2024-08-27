@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reports a syntax error instead of treating it as a variable. For example,
   `${1abc}` and `${0_1}` are now syntax errors.
 - Improved error messages for some parameter expansion errors.
+- Interactive shells no longer exit on shell errors such as syntax errors.
 - Interactive shells now ignore the `noexec` option.
 - Interactive shells now allow modifying the trap for signals that were ignored
   on the shell startup.

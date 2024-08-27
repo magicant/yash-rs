@@ -47,9 +47,6 @@ use yash_syntax::parser::Parser;
 /// are updated](Env::update_all_subshell_statuses) between parsing input and
 /// running commands.
 ///
-/// TODO: `Break(Divert::Interrupt(...))` should not end the loop in an
-/// interactive shell
-///
 /// # Example
 ///
 /// ```
