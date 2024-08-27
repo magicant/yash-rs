@@ -65,6 +65,7 @@ pub type Result = std::result::Result<String, Error>;
 ///
 /// An `Input` object provides the parser with source code by reading from underlying source.
 #[async_trait(?Send)]
+#[must_use = "Input instances should be used by a parser"]
 pub trait Input {
     /// Reads a next line of the source code.
     ///

@@ -5,6 +5,12 @@ All notable changes to `yash-syntax` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1] - Unreleased
+
+### Changed
+
+- The `input::Input` trait is now `#[must_use]`.
+
 ## [0.11.0] - 2024-08-22
 
 ### Added
@@ -315,6 +321,7 @@ command.
 - Functionalities to parse POSIX shell scripts
 - Alias substitution support
 
+[0.11.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.11.1
 [0.11.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.11.0
 [0.10.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.10.0
 [0.9.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.9.0
