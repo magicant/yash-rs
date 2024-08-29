@@ -43,7 +43,11 @@
 //! };
 //! assert_eq!(report.to_string(), "[3]   Running              sleep 10");
 //! ```
+//!
+//! When you have multiple jobs to report, you can use the [`Accumulator`] to
+//! collect the reports and then print them as a single string.
 
+use super::Job;
 #[cfg(doc)]
 use super::JobList;
 use super::Pid;
@@ -140,6 +144,7 @@ impl State {
     /// If the signal number is not recognized, the signal name `Rtmin(-1)` is
     /// used as a fallback replacement.
     #[must_use]
+    // TODO This function only needs SignalSystem, not System
     pub fn from_process_state<S: System>(state: ProcessState, system: &S) -> Self {
         match state {
             ProcessState::Running => Self::Running,
@@ -194,9 +199,111 @@ impl std::fmt::Display for Report<'_> {
     }
 }
 
+/// Intermediate data to construct a report for multiple jobs
+///
+/// This structure contains parameters that modify the behavior of the job
+/// report formatting and a string buffer to accumulate the formatted reports.
+/// After constructing the accumulator, you can use it to collect multiple
+/// reports and then print them as a single string. The accumulator also
+/// remembers the indices of the jobs that have been reported, so that you can
+/// clear the `status_changed` flags of the jobs after printing the reports to
+/// avoid printing the same report multiple times.
+///
+/// ## Examples
+///
+/// ```
+/// use yash_env::job::{Job, Pid, ProcessState};
+/// use yash_env::job::fmt::Accumulator;
+/// use yash_env::system::r#virtual::{SIGSTOP, VirtualSystem};
+///
+/// let system = VirtualSystem::new();
+/// let mut accumulator = Accumulator::new();
+/// accumulator.current_job_index = Some(3);
+/// accumulator.previous_job_index = Some(0);
+///
+/// let mut job1 = Job::new(Pid(10));
+/// job1.state = ProcessState::Running;
+/// job1.name = "echo foo".to_string();
+/// accumulator.add(0, &job1, &system);
+/// let mut job2 = Job::new(Pid(20));
+/// job2.state = ProcessState::exited(0);
+/// job2.name = "echo bar".to_string();
+/// accumulator.add(2, &job2, &system);
+/// let mut job3 = Job::new(Pid(30));
+/// job3.state = ProcessState::stopped(SIGSTOP);
+/// job3.name = "echo baz".to_string();
+/// accumulator.add(3, &job3, &system);
+///
+/// assert_eq!(
+///     accumulator.print,
+///     "[1] - Running              echo foo\n\
+///      [3]   Done                 echo bar\n\
+///      [4] + Stopped(SIGSTOP)     echo baz\n"
+/// );
+/// assert_eq!(accumulator.indices_reported, [0, 2, 3]);
+/// ```
+#[derive(Clone, Debug, Default)]
+pub struct Accumulator {
+    /// Index of the current job in the job list
+    pub current_job_index: Option<usize>,
+    /// Index of the previous job in the job list
+    pub previous_job_index: Option<usize>,
+    /// Whether to show the process ID in the report
+    pub show_pid: bool,
+    /// Whether to show only the process group ID in the report
+    pub pgid_only: bool,
+    /// Accumulated reports formatted as a single string
+    pub print: String,
+    /// Indices of the jobs that have been reported
+    pub indices_reported: Vec<usize>,
+}
+
+impl Accumulator {
+    /// Creates a new `Accumulator` with default settings.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Adds a job to the accumulator.
+    ///
+    /// This function formats the given job as a [`Report`] and appends it to
+    /// the accumulated reports in the `print` field. The `index` parameter is
+    /// the index of the job in the job list. The `system` parameter is used to
+    /// convert the process state into a job [`State`].
+    ///
+    /// The `indices_reported` field is updated to include the `index`
+    /// parameter.
+    // TODO This function only needs SignalSystem, not System
+    pub fn add<S: System>(&mut self, index: usize, job: &Job, system: &S) {
+        use std::fmt::Write as _;
+
+        if self.pgid_only {
+            writeln!(self.print, "{}", job.pid)
+        } else {
+            let report = Report {
+                number: index + 1,
+                marker: if self.current_job_index == Some(index) {
+                    Marker::CurrentJob
+                } else if self.previous_job_index == Some(index) {
+                    Marker::PreviousJob
+                } else {
+                    Marker::None
+                },
+                pid: self.show_pid.then_some(job.pid),
+                state: State::from_process_state(job.state, system),
+                name: &job.name,
+            };
+            writeln!(self.print, "{report}")
+        }
+        .unwrap();
+
+        self.indices_reported.push(index);
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::super::Pid;
     use super::*;
 
     #[test]
