@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `job::fmt::Accumulator`
     - This is a utility for formatting status reports of multiple jobs.
+- `input::Reporter`
+    - This `Input` decorator reports job status changes to the user.
 
 ## [0.3.0] - 2024-08-22
 
