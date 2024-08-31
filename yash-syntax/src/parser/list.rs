@@ -191,7 +191,7 @@ impl Parser<'_, '_> {
         }
     }
 
-    /// Like [`maybe_compound_list`](Self::maybe_compound_list), but returns the future in a pinned box.
+    /// Like [`maybe_compound_list`](Self::maybe_compound_list), but returns the future in a pinning box.
     pub fn maybe_compound_list_boxed(
         &mut self,
     ) -> Pin<Box<dyn Future<Output = Result<List>> + '_>> {

@@ -759,7 +759,7 @@ impl<'a> Lexer<'a> {
         Ok(self.core.source_string(begin..end))
     }
 
-    /// Like [`Lexer::inner_program`], but returns the future in a pinned box.
+    /// Like [`Lexer::inner_program`], but returns the future in a pinning box.
     pub fn inner_program_boxed(&mut self) -> Pin<Box<dyn Future<Output = Result<String>> + '_>> {
         Box::pin(self.inner_program())
     }
