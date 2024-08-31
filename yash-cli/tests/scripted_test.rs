@@ -266,6 +266,11 @@ fn job_control() {
 }
 
 #[test]
+fn job_control_ex() {
+    run_with_pty("job-y.sh")
+}
+
+#[test]
 fn kill_builtin_1() {
     run("kill1-p.sh")
 }

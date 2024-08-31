@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `!`.
 - The signature of the `startup::input::prepare_input` function has been revised
   with more lifetime parameters for more flexible usage.
+- The `startup::input::prepare_input` function now applies the
+  `yash_env::input::Reporter` decorator to the returned source input if the shell
+  is interactive.
 - External dependency versions:
     - Rust 1.77.0 → 1.79.0
     - yash-env 0.2.0 → 0.3.0

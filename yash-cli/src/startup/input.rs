@@ -29,6 +29,7 @@ use std::ffi::CString;
 use thiserror::Error;
 use yash_env::input::Echo;
 use yash_env::input::FdReader;
+use yash_env::input::Reporter;
 use yash_env::io::Fd;
 use yash_env::option::Option::Interactive;
 use yash_env::option::State::On;
@@ -67,6 +68,8 @@ pub struct PrepareInputError<'a> {
 /// This function constructs an input object from the given source.
 /// If the shell is interactive and the source is the standard input,
 /// the [`Prompter`] decorator is applied to the input to show the prompt.
+/// If the shell is interactive, the [`Reporter`] decorator is applied to the
+/// input to show changes in job status before prompting for the next command.
 /// If the source is read with a file descriptor, the [`Echo`] decorator is
 /// applied to the input to implement the [verbose](yash_env::option::Verbose)
 /// shell option.
@@ -75,6 +78,22 @@ pub struct PrepareInputError<'a> {
 /// with) the [`read_eval_loop`](yash_semantics::read_eval_loop) function that
 /// consumes the input and executes the parsed commands.
 pub fn prepare_input<'s: 'i + 'e, 'i, 'e>(
+    env: &'i RefCell<&mut Env>,
+    source: &'s Source,
+) -> Result<SourceInput<'i>, PrepareInputError<'e>> {
+    let source_input = prepare_input_inner(env, source)?;
+
+    // if the input is interactive, apply the Reporter decorator
+    if env.borrow().options.get(Interactive) == On {
+        let SourceInput { input, source } = source_input;
+        let input = Box::new(Reporter::new(input, env));
+        Ok(SourceInput { input, source })
+    } else {
+        Ok(source_input)
+    }
+}
+
+fn prepare_input_inner<'s: 'i + 'e, 'i, 'e>(
     env: &'i RefCell<&mut Env>,
     source: &'s Source,
 ) -> Result<SourceInput<'i>, PrepareInputError<'e>> {
@@ -120,7 +139,6 @@ pub fn prepare_input<'s: 'i + 'e, 'i, 'e>(
                 .and_then(|fd| system.move_fd_internal(fd))
                 .map_err(|errno| PrepareInputError { errno, path })?;
 
-            // TODO Make FdReader buffered
             let input = Box::new(Echo::new(FdReader::new(fd, system), env));
             let path = path.to_owned();
             let source = SyntaxSource::CommandFile { path };
