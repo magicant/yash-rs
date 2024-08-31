@@ -28,3 +28,6 @@ pub use fd_reader::FdReader;
 
 mod echo;
 pub use echo::Echo;
+
+mod reporter;
+pub use reporter::Reporter;
