@@ -114,8 +114,9 @@ impl TokenId {
 pub struct Token {
     /// Content of the token.
     ///
-    /// The word value always contains at least one [unit](crate::syntax::WordUnit), regardless
-    /// of whether the token is an operator.
+    /// The word value contains at least one [unit](crate::syntax::WordUnit),
+    /// regardless of whether the token is an operator. The only exception is
+    /// when `id` is `EndOfInput`, in which case the word is empty.
     pub word: Word,
     /// Token identifier.
     pub id: TokenId,
