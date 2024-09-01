@@ -17,7 +17,9 @@
 //! Methods about passing [source](crate::source) code to the [parser](crate::parser).
 
 use async_trait::async_trait;
+use std::future::Future;
 use std::ops::DerefMut;
+use std::pin::Pin;
 
 /// Parameter passed to the input function
 ///
@@ -81,14 +83,26 @@ pub trait Input {
     async fn next_line(&mut self, context: &Context) -> Result;
 }
 
-#[async_trait(?Send)]
+// #[async_trait(?Send)]
 impl<T> Input for T
 where
     T: DerefMut,
     T::Target: Input,
 {
-    async fn next_line(&mut self, context: &Context) -> Result {
-        self.deref_mut().next_line(context).await
+    // Avoid a Box allocation by forwarding the call without using async_trait.
+    // async fn next_line(&mut self, context: &Context) -> Result {
+    //     self.deref_mut().next_line(context).await
+    // }
+    fn next_line<'s, 'c, 'f>(
+        &'s mut self,
+        context: &'c Context,
+    ) -> Pin<Box<dyn Future<Output = Result> + 'f>>
+    where
+        's: 'f,
+        'c: 'f,
+        Self: 'f,
+    {
+        self.deref_mut().next_line(context)
     }
 }
 
