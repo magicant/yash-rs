@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - This is a utility for formatting status reports of multiple jobs.
 - `input::Reporter`
     - This `Input` decorator reports job status changes to the user.
+- `input::IgnoreEof`
+    - This `Input` decorator implements the behavior of the `ignoreeof` shell option.
 
 ### Removed
 

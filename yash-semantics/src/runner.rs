@@ -119,7 +119,7 @@ pub async fn read_eval_loop(env: &RefCell<&mut Env>, lexer: &mut Lexer<'_>) -> R
 ///
 /// - Prompting the user for input (see the `yash-prompt` crate)
 /// - Reporting job status changes before the prompt (see [`Reporter`])
-/// - Applying the [`IgnoreEof`] option
+/// - Applying the `ignore-eof` option (see [`IgnoreEof`])
 ///
 /// This function is intended to be used as the top-level read-eval loop in an
 /// interactive shell. It is not suitable for non-interactive command execution
@@ -127,7 +127,7 @@ pub async fn read_eval_loop(env: &RefCell<&mut Env>, lexer: &mut Lexer<'_>) -> R
 ///
 /// [`Interrupt`]: crate::Divert::Interrupt
 /// [`Reporter`]: yash_env::input::Reporter
-/// [`IgnoreEof`]: yash_env::option::IgnoreEof
+/// [`IgnoreEof`]: yash_env::input::IgnoreEof
 pub async fn interactive_read_eval_loop(env: &RefCell<&mut Env>, lexer: &mut Lexer<'_>) -> Result {
     read_eval_loop_impl(env, lexer, /* is_interactive */ true).await
 }
