@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `input::Reporter`
     - This `Input` decorator reports job status changes to the user.
 
+### Removed
+
+- The type parameter constraint `T: 'a` is removed from the declarations of
+  `input::Echo<'a, 'b, T>` and `input::Reporter<'a, 'b, T>`.
+- The redundant lifetime constraint `T: 'a` is removed from the implementations
+  of `yash_syntax::input::Input` for `input::Echo<'a, 'b, T>` and
+  `input::Reporter<'a, 'b, T>`.
+
 ## [0.3.0] - 2024-08-22
 
 ### Added

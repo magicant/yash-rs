@@ -28,7 +28,7 @@ use yash_env::Env;
 /// by the inner `Input`.
 #[derive(Clone, Debug)]
 #[must_use = "Prompter does nothing unless used by a parser"]
-pub struct Prompter<'a, 'b, T: 'a> {
+pub struct Prompter<'a, 'b, T> {
     inner: T,
     env: &'a RefCell<&'b mut Env>,
 }
@@ -49,7 +49,7 @@ impl<'a, 'b, T> Prompter<'a, 'b, T> {
 #[async_trait(?Send)]
 impl<'a, 'b, T> Input for Prompter<'a, 'b, T>
 where
-    T: Input + 'a,
+    T: Input,
 {
     #[allow(clippy::await_holding_refcell_ref)]
     async fn next_line(&mut self, context: &Context) -> Result {

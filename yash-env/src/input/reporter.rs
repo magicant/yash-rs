@@ -28,7 +28,7 @@ use yash_syntax::syntax::Fd;
 /// report. The status is printed to the standard error before the input is read.
 /// This is done only if the [`Interactive`] and [`Monitor`] options are enabled.
 #[derive(Clone, Debug)]
-pub struct Reporter<'a, 'b, T: 'a> {
+pub struct Reporter<'a, 'b, T> {
     inner: T,
     env: &'a RefCell<&'b mut Env>,
 }
@@ -49,7 +49,7 @@ impl<'a, 'b, T> Reporter<'a, 'b, T> {
 #[async_trait(?Send)]
 impl<'a, 'b, T> Input for Reporter<'a, 'b, T>
 where
-    T: Input + 'a,
+    T: Input,
 {
     #[allow(clippy::await_holding_refcell_ref)]
     async fn next_line(&mut self, context: &Context) -> Result {

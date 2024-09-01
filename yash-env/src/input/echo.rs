@@ -32,7 +32,7 @@ use yash_syntax::input::{Context, Input, Result};
 #[derive(Clone, Debug)]
 #[doc(alias = "Verbose")]
 #[must_use = "Echo does nothing unless used by a parser"]
-pub struct Echo<'a, 'b, T: 'a> {
+pub struct Echo<'a, 'b, T> {
     inner: T,
     env: &'a RefCell<&'b mut Env>,
 }
@@ -53,7 +53,7 @@ impl<'a, 'b, T> Echo<'a, 'b, T> {
 #[async_trait(?Send)]
 impl<'a, 'b, T> Input for Echo<'a, 'b, T>
 where
-    T: Input + 'a,
+    T: Input,
 {
     // The RefCell should be local to the calling read-eval loop, so it is safe
     // to keep the mutable borrow across await points.
