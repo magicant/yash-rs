@@ -19,6 +19,7 @@
 use super::{Context, Input, Result};
 use crate::io::Fd;
 use crate::option::{IgnoreEof as IgnoreEofOption, Interactive, Off};
+use crate::system::System as _;
 use crate::Env;
 use async_trait::async_trait;
 use std::cell::RefCell;
@@ -95,7 +96,8 @@ where
             let should_break = !line.is_empty()
                 || env.options.get(Interactive) == Off
                 || env.options.get(IgnoreEofOption) == Off
-                || remaining_tries == 0;
+                || remaining_tries == 0
+                || !env.system.isatty(self.fd);
             if should_break {
                 return Ok(line);
             }
@@ -110,9 +112,12 @@ where
 mod tests {
     use super::*;
     use crate::option::On;
-    use crate::system::r#virtual::VirtualSystem;
+    use crate::system::r#virtual::{FdBody, FileBody, Inode, OpenFileDescription, VirtualSystem};
+    use crate::system::Mode;
     use crate::tests::assert_stderr;
+    use enumset::EnumSet;
     use futures_util::FutureExt as _;
+    use std::rc::Rc;
     use yash_syntax::input::Memory;
 
     /// `Input` decorator that returns EOF for the first `count` calls
@@ -137,9 +142,58 @@ mod tests {
         }
     }
 
+    fn set_stdin_to_tty(system: &mut VirtualSystem) {
+        system
+            .current_process_mut()
+            .set_fd(
+                Fd::STDIN,
+                FdBody {
+                    open_file_description: Rc::new(RefCell::new(OpenFileDescription {
+                        file: Rc::new(RefCell::new(Inode {
+                            body: FileBody::Terminal { content: vec![] },
+                            permissions: Mode::empty(),
+                        })),
+                        offset: 0,
+                        is_readable: true,
+                        is_writable: true,
+                        is_appending: false,
+                    })),
+                    flags: EnumSet::empty(),
+                },
+            )
+            .unwrap();
+    }
+
+    fn set_stdin_to_regular_file(system: &mut VirtualSystem) {
+        system
+            .current_process_mut()
+            .set_fd(
+                Fd::STDIN,
+                FdBody {
+                    open_file_description: Rc::new(RefCell::new(OpenFileDescription {
+                        file: Rc::new(RefCell::new(Inode {
+                            body: FileBody::Regular {
+                                content: vec![],
+                                is_native_executable: false,
+                            },
+                            permissions: Mode::empty(),
+                        })),
+                        offset: 0,
+                        is_readable: true,
+                        is_writable: true,
+                        is_appending: false,
+                    })),
+                    flags: EnumSet::empty(),
+                },
+            )
+            .unwrap();
+    }
+
     #[test]
     fn decorator_reads_from_inner_input() {
-        let mut env = Env::new_virtual();
+        let mut system = Box::new(VirtualSystem::new());
+        set_stdin_to_tty(&mut system);
+        let mut env = Env::with_system(system);
         env.options.set(Interactive, On);
         env.options.set(IgnoreEofOption, On);
         let ref_env = RefCell::new(&mut env);
@@ -159,7 +213,8 @@ mod tests {
 
     #[test]
     fn decorator_reads_input_again_on_eof() {
-        let system = Box::new(VirtualSystem::new());
+        let mut system = Box::new(VirtualSystem::new());
+        set_stdin_to_tty(&mut system);
         let state = system.state.clone();
         let mut env = Env::with_system(system);
         env.options.set(Interactive, On);
@@ -185,7 +240,8 @@ mod tests {
 
     #[test]
     fn decorator_reads_input_up_to_50_times() {
-        let system = Box::new(VirtualSystem::new());
+        let mut system = Box::new(VirtualSystem::new());
+        set_stdin_to_tty(&mut system);
         let state = system.state.clone();
         let mut env = Env::with_system(system);
         env.options.set(Interactive, On);
@@ -213,7 +269,8 @@ mod tests {
 
     #[test]
     fn decorator_returns_empty_line_after_reading_51_times() {
-        let system = Box::new(VirtualSystem::new());
+        let mut system = Box::new(VirtualSystem::new());
+        set_stdin_to_tty(&mut system);
         let state = system.state.clone();
         let mut env = Env::with_system(system);
         env.options.set(Interactive, On);
@@ -241,7 +298,8 @@ mod tests {
 
     #[test]
     fn decorator_returns_immediately_if_not_interactive() {
-        let system = Box::new(VirtualSystem::new());
+        let mut system = Box::new(VirtualSystem::new());
+        set_stdin_to_tty(&mut system);
         let state = system.state.clone();
         let mut env = Env::with_system(system);
         env.options.set(Interactive, Off);
@@ -267,7 +325,8 @@ mod tests {
 
     #[test]
     fn decorator_returns_immediately_if_not_ignore_eof() {
-        let system = Box::new(VirtualSystem::new());
+        let mut system = Box::new(VirtualSystem::new());
+        set_stdin_to_tty(&mut system);
         let state = system.state.clone();
         let mut env = Env::with_system(system);
         env.options.set(Interactive, On);
@@ -291,5 +350,30 @@ mod tests {
         assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
     }
 
-    // TODO decorator_returns_immediately_if_not_terminal
+    #[test]
+    fn decorator_returns_immediately_if_not_terminal() {
+        let mut system = Box::new(VirtualSystem::new());
+        set_stdin_to_regular_file(&mut system);
+        let state = system.state.clone();
+        let mut env = Env::with_system(system);
+        env.options.set(Interactive, On);
+        env.options.set(IgnoreEofOption, On);
+        let ref_env = RefCell::new(&mut env);
+        let mut decorator = IgnoreEof::new(
+            EofStub {
+                inner: Memory::new("echo foo\n"),
+                count: 1,
+            },
+            Fd::STDIN,
+            &ref_env,
+            "EOF ignored\n".to_string(),
+        );
+
+        let result = decorator
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result.unwrap(), "");
+        assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
+    }
 }

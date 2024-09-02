@@ -38,19 +38,22 @@ pub const PIPE_BUF: usize = 512;
 /// The real system may have a different configuration.
 pub const PIPE_SIZE: usize = PIPE_BUF * 2;
 
-/// State of a file opened for reading and/or writing.
+/// State of a file opened for reading and/or writing
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct OpenFileDescription {
-    /// The file.
-    pub(super) file: Rc<RefCell<Inode>>,
-    /// Position in bytes to perform next I/O operation at.
-    pub(super) offset: usize,
-    /// Whether this file is opened for reading.
-    pub(super) is_readable: bool,
-    /// Whether this file is opened for writing.
-    pub(super) is_writable: bool,
-    /// Whether this file is opened for appending.
-    pub(super) is_appending: bool,
+    /// File content and metadata
+    pub(crate) file: Rc<RefCell<Inode>>,
+    /// Position in bytes to perform next I/O operation at
+    pub(crate) offset: usize,
+    /// Whether this file is opened for reading
+    pub(crate) is_readable: bool,
+    /// Whether this file is opened for writing
+    pub(crate) is_writable: bool,
+    /// Whether this file is opened for appending
+    pub(crate) is_appending: bool,
+    // TODO is_nonblocking
+    // TODO consider making these fields public
 }
 
 impl Drop for OpenFileDescription {
