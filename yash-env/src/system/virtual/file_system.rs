@@ -212,6 +212,7 @@ impl Inode {
 
 /// Filetype-specific content of a file
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum FileBody {
     /// Regular file
     Regular {
@@ -244,6 +245,13 @@ pub enum FileBody {
         /// Path to the file referenced by this symlink
         target: PathBuf,
     },
+    /// Terminal device
+    ///
+    /// This is a dummy device that works like a regular file.
+    Terminal {
+        /// Virtual file content
+        content: Vec<u8>,
+    },
     // TODO Other filetypes
 }
 
@@ -274,6 +282,7 @@ impl FileBody {
             Self::Directory { .. } => FileType::Directory,
             Self::Fifo { .. } => FileType::Fifo,
             Self::Symlink { .. } => FileType::Symlink,
+            Self::Terminal { .. } => FileType::CharacterDevice,
         }
     }
 
@@ -285,6 +294,7 @@ impl FileBody {
             Self::Directory { files } => files.len(),
             Self::Fifo { content, .. } => content.len(),
             Self::Symlink { target } => target.as_unix_str().len(),
+            Self::Terminal { .. } => 0,
         }
     }
 }

@@ -5,7 +5,7 @@ All notable changes to `yash-env` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.1] - Unreleased
+## [0.4.0] - Unreleased
 
 ### Added
 
@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - This `Input` decorator reports job status changes to the user.
 - `input::IgnoreEof`
     - This `Input` decorator implements the behavior of the `ignoreeof` shell option.
+- `system::virtual::FileBody::Terminal`
+    - This is a new variant of `FileBody` that represents a terminal device.
+
+### Changed
+
+- `system::virtual::FileBody` is now `non_exhaustive`.
+- `system::virtual::VirtualSystem::isatty` now returns true for a file
+  descriptor associated with `FileBody::Terminal`.
 
 ### Removed
 
@@ -280,7 +288,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial implementation of the `yash-env` crate
 
-[0.3.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.3.1
+[0.4.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.4.0
 [0.3.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.3.0
 [0.2.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.2.1
 [0.2.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.2.0

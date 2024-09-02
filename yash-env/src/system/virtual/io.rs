@@ -87,7 +87,9 @@ impl OpenFileDescription {
     #[must_use]
     pub fn is_ready_for_reading(&self) -> bool {
         match &self.file.borrow().body {
-            FileBody::Regular { .. } | FileBody::Directory { .. } => true,
+            FileBody::Regular { .. } | FileBody::Directory { .. } | FileBody::Terminal { .. } => {
+                true
+            }
             FileBody::Fifo {
                 content, writers, ..
             } => !self.is_readable || !content.is_empty() || *writers == 0,
@@ -100,7 +102,9 @@ impl OpenFileDescription {
     #[must_use]
     pub fn is_ready_for_writing(&self) -> bool {
         match &self.file.borrow().body {
-            FileBody::Regular { .. } | FileBody::Directory { .. } => true,
+            FileBody::Regular { .. } | FileBody::Directory { .. } | FileBody::Terminal { .. } => {
+                true
+            }
             FileBody::Fifo {
                 content, readers, ..
             } => *readers == 0 || PIPE_SIZE - content.len() >= PIPE_BUF,
@@ -116,7 +120,7 @@ impl OpenFileDescription {
             return Err(Errno::EBADF);
         }
         match &mut self.file.borrow_mut().body {
-            FileBody::Regular { content, .. } => {
+            FileBody::Regular { content, .. } | FileBody::Terminal { content } => {
                 let len = content.len();
                 if self.offset >= len {
                     return Ok(0);
@@ -162,7 +166,7 @@ impl OpenFileDescription {
             return Err(Errno::EBADF);
         }
         match &mut self.file.borrow_mut().body {
-            FileBody::Regular { content, .. } => {
+            FileBody::Regular { content, .. } | FileBody::Terminal { content } => {
                 let len = content.len();
                 let count = buffer.len();
                 if self.is_appending {
@@ -210,7 +214,7 @@ impl OpenFileDescription {
             FileBody::Regular { content, .. } => content.len(),
             FileBody::Directory { files, .. } => files.len(),
             FileBody::Fifo { .. } => return Err(Errno::ESPIPE),
-            FileBody::Symlink { target: _ } => return Err(Errno::ENOTSUP),
+            FileBody::Symlink { .. } | FileBody::Terminal { .. } => return Err(Errno::ENOTSUP),
         };
 
         let new_offset = match position {
