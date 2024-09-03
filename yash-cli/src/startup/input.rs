@@ -29,10 +29,11 @@ use std::ffi::CString;
 use thiserror::Error;
 use yash_env::input::Echo;
 use yash_env::input::FdReader;
+use yash_env::input::IgnoreEof;
 use yash_env::input::Reporter;
 use yash_env::io::Fd;
 use yash_env::option::Option::Interactive;
-use yash_env::option::State::On;
+use yash_env::option::State::{Off, On};
 use yash_env::system::Errno;
 use yash_env::system::Mode;
 use yash_env::system::OfdAccess;
@@ -65,45 +66,33 @@ pub struct PrepareInputError<'a> {
 
 /// Prepares the input for the shell.
 ///
-/// This function constructs an input object from the given source.
-/// If the shell is interactive and the source is the standard input,
-/// the [`Prompter`] decorator is applied to the input to show the prompt.
-/// If the shell is interactive, the [`Reporter`] decorator is applied to the
-/// input to show changes in job status before prompting for the next command.
-/// If the source is read with a file descriptor, the [`Echo`] decorator is
-/// applied to the input to implement the [verbose](yash_env::option::Verbose)
-/// shell option.
+/// This function constructs an input object from the given source with the
+/// following decorators:
+///
+/// - If the source is read with a file descriptor, the [`Echo`] decorator is
+///   applied to the input to implement the [`Verbose`] shell option.
+/// - If the [`Interactive`] option is enabled and the source is read with a
+///   file descriptor, the [`Prompter`] decorator is applied to the input to
+///   show the prompt.
+/// - If the [`Interactive`] option is enabled, the [`Reporter`] decorator is
+///   applied to the input to show changes in job status before prompting for
+///   the next command.
+/// - If the [`Interactive`] option is enabled and the source is read with a
+///   file descriptor, the [`IgnoreEof`] decorator is applied to the input to
+///   implement the [`IgnoreEof`](yash_env::option::IgnoreEof) shell option.
 ///
 /// The `RefCell` passed as the first argument should be shared with (and only
 /// with) the [`read_eval_loop`](yash_semantics::read_eval_loop) function that
 /// consumes the input and executes the parsed commands.
+///
+/// [`Verbose`]: yash_env::option::Verbose
 pub fn prepare_input<'s: 'i + 'e, 'i, 'e>(
-    env: &'i RefCell<&mut Env>,
-    source: &'s Source,
-) -> Result<SourceInput<'i>, PrepareInputError<'e>> {
-    let source_input = prepare_input_inner(env, source)?;
-
-    // if the input is interactive, apply the Reporter decorator
-    if env.borrow().options.get(Interactive) == On {
-        let SourceInput { input, source } = source_input;
-        let input = Box::new(Reporter::new(input, env));
-        Ok(SourceInput { input, source })
-    } else {
-        Ok(source_input)
-    }
-}
-
-fn prepare_input_inner<'s: 'i + 'e, 'i, 'e>(
     env: &'i RefCell<&mut Env>,
     source: &'s Source,
 ) -> Result<SourceInput<'i>, PrepareInputError<'e>> {
     match source {
         Source::Stdin => {
-            let (mut system, is_interactive) = {
-                let env = env.borrow();
-                (env.system.clone(), env.options.get(Interactive) == On)
-            };
-
+            let mut system = env.borrow().system.clone();
             if system.isatty(Fd::STDIN) || system.fd_is_pipe(Fd::STDIN) {
                 // It makes virtually no sense to make it blocking here
                 // since we will be doing non-blocking reads anyway,
@@ -112,12 +101,7 @@ fn prepare_input_inner<'s: 'i + 'e, 'i, 'e>(
                 _ = system.get_and_set_nonblocking(Fd::STDIN, false);
             }
 
-            let reader = FdReader::new(Fd::STDIN, system);
-            let input: Box<dyn Input> = if is_interactive {
-                Box::new(Echo::new(Prompter::new(reader, env), env))
-            } else {
-                Box::new(Echo::new(reader, env))
-            };
+            let input = prepare_fd_input(Fd::STDIN, env);
             let source = SyntaxSource::Stdin;
             Ok(SourceInput { input, source })
         }
@@ -139,16 +123,48 @@ fn prepare_input_inner<'s: 'i + 'e, 'i, 'e>(
                 .and_then(|fd| system.move_fd_internal(fd))
                 .map_err(|errno| PrepareInputError { errno, path })?;
 
-            let input = Box::new(Echo::new(FdReader::new(fd, system), env));
+            let input = prepare_fd_input(fd, env);
             let path = path.to_owned();
             let source = SyntaxSource::CommandFile { path };
             Ok(SourceInput { input, source })
         }
 
         Source::String(command) => {
-            let input = Box::new(Memory::new(command));
+            let basic_input = Memory::new(command);
+
+            let is_interactive = env.borrow().options.get(Interactive) == On;
+            let input: Box<dyn Input> = if is_interactive {
+                Box::new(Reporter::new(basic_input, env))
+            } else {
+                Box::new(basic_input)
+            };
             let source = SyntaxSource::CommandString;
             Ok(SourceInput { input, source })
         }
+    }
+}
+
+/// Creates an input object from a file descriptor.
+///
+/// This function creates an [`FdReader`] object from the given file descriptor
+/// and wraps it with the [`Echo`] decorator. If the [`Interactive`] option is
+/// enabled, the [`Prompter`], [`Reporter`], and [`IgnoreEof`] decorators are
+/// applied to the input object.
+fn prepare_fd_input<'i>(fd: Fd, ref_env: &'i RefCell<&mut Env>) -> Box<dyn Input + 'i> {
+    let env = ref_env.borrow();
+    let system = env.system.clone();
+
+    let basic_input = Echo::new(FdReader::new(fd, system), ref_env);
+
+    if env.options.get(Interactive) == Off {
+        Box::new(basic_input)
+    } else {
+        // The order of these decorators is important. The prompt should be shown after
+        // the job status is reported, and both should be shown again if an EOF is ignored.
+        let prompter = Prompter::new(basic_input, ref_env);
+        let reporter = Reporter::new(prompter, ref_env);
+        let message =
+            "Type `exit` to leave the shell when the ignore-eof option is on.".to_string();
+        Box::new(IgnoreEof::new(reporter, fd, ref_env, message))
     }
 }

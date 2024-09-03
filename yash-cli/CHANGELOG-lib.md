@@ -31,9 +31,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `!`.
 - The signature of the `startup::input::prepare_input` function has been revised
   with more lifetime parameters for more flexible usage.
-- The `startup::input::prepare_input` function now applies the
-  `yash_env::input::Reporter` decorator to the returned source input if the shell
-  is interactive.
+- The `startup::input::prepare_input` function now additionally applies the
+  following decorators to the returned source input:
+    - `yash_env::input::Reporter` to report the job status if the shell is
+      interactive.
+    - `yash_env::input::IgnoreEof` to ignore the EOF character if the shell is
+      interactive and the input is associated with a file descriptor.
+    - `yash_prompt::Prompter` to show the prompt before reading the input if the
+      shell is interactive and the input is associated with a file descriptor.
+      (Previously, the `Prompter` was applied only to the standard input. It is
+      now also applied to the input from any file.)
 - External dependency versions:
     - Rust 1.77.0 → 1.79.0
     - yash-env 0.2.0 → 0.3.0
