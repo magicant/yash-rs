@@ -38,19 +38,22 @@ pub const PIPE_BUF: usize = 512;
 /// The real system may have a different configuration.
 pub const PIPE_SIZE: usize = PIPE_BUF * 2;
 
-/// State of a file opened for reading and/or writing.
+/// State of a file opened for reading and/or writing
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct OpenFileDescription {
-    /// The file.
-    pub(super) file: Rc<RefCell<Inode>>,
-    /// Position in bytes to perform next I/O operation at.
-    pub(super) offset: usize,
-    /// Whether this file is opened for reading.
-    pub(super) is_readable: bool,
-    /// Whether this file is opened for writing.
-    pub(super) is_writable: bool,
-    /// Whether this file is opened for appending.
-    pub(super) is_appending: bool,
+    /// File content and metadata
+    pub(crate) file: Rc<RefCell<Inode>>,
+    /// Position in bytes to perform next I/O operation at
+    pub(crate) offset: usize,
+    /// Whether this file is opened for reading
+    pub(crate) is_readable: bool,
+    /// Whether this file is opened for writing
+    pub(crate) is_writable: bool,
+    /// Whether this file is opened for appending
+    pub(crate) is_appending: bool,
+    // TODO is_nonblocking
+    // TODO consider making these fields public
 }
 
 impl Drop for OpenFileDescription {
@@ -87,7 +90,9 @@ impl OpenFileDescription {
     #[must_use]
     pub fn is_ready_for_reading(&self) -> bool {
         match &self.file.borrow().body {
-            FileBody::Regular { .. } | FileBody::Directory { .. } => true,
+            FileBody::Regular { .. } | FileBody::Directory { .. } | FileBody::Terminal { .. } => {
+                true
+            }
             FileBody::Fifo {
                 content, writers, ..
             } => !self.is_readable || !content.is_empty() || *writers == 0,
@@ -100,7 +105,9 @@ impl OpenFileDescription {
     #[must_use]
     pub fn is_ready_for_writing(&self) -> bool {
         match &self.file.borrow().body {
-            FileBody::Regular { .. } | FileBody::Directory { .. } => true,
+            FileBody::Regular { .. } | FileBody::Directory { .. } | FileBody::Terminal { .. } => {
+                true
+            }
             FileBody::Fifo {
                 content, readers, ..
             } => *readers == 0 || PIPE_SIZE - content.len() >= PIPE_BUF,
@@ -116,7 +123,7 @@ impl OpenFileDescription {
             return Err(Errno::EBADF);
         }
         match &mut self.file.borrow_mut().body {
-            FileBody::Regular { content, .. } => {
+            FileBody::Regular { content, .. } | FileBody::Terminal { content } => {
                 let len = content.len();
                 if self.offset >= len {
                     return Ok(0);
@@ -162,7 +169,7 @@ impl OpenFileDescription {
             return Err(Errno::EBADF);
         }
         match &mut self.file.borrow_mut().body {
-            FileBody::Regular { content, .. } => {
+            FileBody::Regular { content, .. } | FileBody::Terminal { content } => {
                 let len = content.len();
                 let count = buffer.len();
                 if self.is_appending {
@@ -210,7 +217,7 @@ impl OpenFileDescription {
             FileBody::Regular { content, .. } => content.len(),
             FileBody::Directory { files, .. } => files.len(),
             FileBody::Fifo { .. } => return Err(Errno::ESPIPE),
-            FileBody::Symlink { target: _ } => return Err(Errno::ENOTSUP),
+            FileBody::Symlink { .. } | FileBody::Terminal { .. } => return Err(Errno::ENOTSUP),
         };
 
         let new_offset = match position {

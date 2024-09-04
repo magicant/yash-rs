@@ -29,5 +29,8 @@ pub use fd_reader::FdReader;
 mod echo;
 pub use echo::Echo;
 
+mod ignore_eof;
+pub use ignore_eof::IgnoreEof;
+
 mod reporter;
 pub use reporter::Reporter;

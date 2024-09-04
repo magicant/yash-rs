@@ -537,8 +537,11 @@ impl System for VirtualSystem {
         Ok(())
     }
 
-    fn isatty(&self, _fd: Fd) -> bool {
-        false
+    fn isatty(&self, fd: Fd) -> bool {
+        self.with_open_file_description(fd, |ofd| {
+            Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
+        })
+        .unwrap_or(false)
     }
 
     fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {

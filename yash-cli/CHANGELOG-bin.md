@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Interactive shells now report updates to job status before showing the prompt.
 - Interactive shells no longer exit on shell errors such as syntax errors.
 - Interactive shells now ignore the `noexec` option.
+- Interactive shells now support the `ignoreeof` option.
 - Interactive shells now allow modifying the trap for signals that were ignored
   on the shell startup.
 
