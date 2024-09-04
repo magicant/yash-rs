@@ -164,7 +164,7 @@ fn prepare_fd_input<'i>(fd: Fd, ref_env: &'i RefCell<&mut Env>) -> Box<dyn Input
         let prompter = Prompter::new(basic_input, ref_env);
         let reporter = Reporter::new(prompter, ref_env);
         let message =
-            "Type `exit` to leave the shell when the ignore-eof option is on.".to_string();
+            "# Type `exit` to leave the shell when the ignore-eof option is on.\n".to_string();
         Box::new(IgnoreEof::new(reporter, fd, ref_env, message))
     }
 }
