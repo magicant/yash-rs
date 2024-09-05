@@ -27,13 +27,14 @@
 //! # Description
 //!
 //! If you specify one or more operands, the built-in waits for the specified
-//! job to finish. Otherwise, the built-in waits for all existing asynchronous
-//! jobs.
+//! jobs to finish. Otherwise, the built-in waits for all existing asynchronous
+//! jobs. If the jobs are already finished, the built-in returns without
+//! waiting.
 //!
-//! If the job is already finished, the built-in returns without waiting. If the
-//! job is job-controlled (that is, running in its own process group), it is
-//! considered finished not only when it has exited but also when it has been
-//! suspended.
+//! If a job is job-controlled (that is, running in its own process group), it
+//! is considered finished not only when it has exited but also when it has been
+//! suspended. (TODO: This behavior is contrary to POSIX 2024 and will be fixed
+//! in the future.)
 //!
 //! # Options
 //!
