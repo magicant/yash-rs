@@ -66,9 +66,8 @@ pub type Result = std::result::Result<String, Error>;
 /// Line-oriented source code reader.
 ///
 /// An `Input` object provides the parser with source code by reading from underlying source.
-#[async_trait(?Send)]
 #[must_use = "Input instances should be used by a parser"]
-pub trait Xnput {
+pub trait Input {
     /// Reads a next line of the source code.
     ///
     /// The input function is line-oriented; that is, this function returns a string that is
@@ -80,6 +79,12 @@ pub trait Xnput {
     /// this function should not be called any more.
     ///
     /// For object safety, this async method is declared to return the future in a pinning box.
+    fn next_line(&mut self, context: &Context) -> impl Future<Output = Result>;
+}
+
+#[async_trait(?Send)]
+#[must_use = "Input instances should be used by a parser"]
+pub trait Xnput {
     async fn next_line(&mut self, context: &Context) -> Result;
 }
 
