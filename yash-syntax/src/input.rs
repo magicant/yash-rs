@@ -106,6 +106,29 @@ where
     }
 }
 
+/// Object-safe adapter for the [`Input`] trait
+///
+/// `InputEx` is an object-safe version of the [`Input`] trait. It allows the
+/// trait to be used as a trait object, which is necessary for dynamic dispatch.
+///
+/// The umbrella implementation is provided for all types that implement the
+/// [`Input`] trait.
+pub trait InputEx {
+    fn next_line<'a>(
+        &'a mut self,
+        context: &'a Context,
+    ) -> Pin<Box<dyn Future<Output = Result> + 'a>>;
+}
+
+impl<T: Input> InputEx for T {
+    fn next_line<'a>(
+        &'a mut self,
+        context: &'a Context,
+    ) -> Pin<Box<dyn Future<Output = Result> + 'a>> {
+        Box::pin(Input::next_line(self, context))
+    }
+}
+
 /// Input function that reads from a string in memory.
 pub struct Memory<'a> {
     lines: std::str::SplitInclusive<'a, char>,
@@ -128,7 +151,7 @@ impl Input for Memory<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{Context, Input, Memory};
     use futures_util::FutureExt;
 
     #[test]
