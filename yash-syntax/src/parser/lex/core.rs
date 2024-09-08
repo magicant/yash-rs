@@ -21,7 +21,7 @@ use super::op::Operator;
 use crate::alias::Alias;
 use crate::alias::EmptyGlossary;
 use crate::input::Context;
-use crate::input::Input;
+use crate::input::InputEx;
 use crate::input::Memory;
 use crate::parser::core::Result;
 use crate::parser::error::Error;
@@ -154,7 +154,7 @@ fn ex<I: IntoIterator<Item = SourceChar>>(i: I) -> impl Iterator<Item = SourceCh
 
 /// Core part of the lexical analyzer.
 struct LexerCore<'a> {
-    input: Box<dyn Input + 'a>,
+    input: Box<dyn InputEx + 'a>,
     state: InputState,
     raw_code: Rc<Code>,
     source: Vec<SourceCharEx>,
@@ -165,7 +165,7 @@ impl<'a> LexerCore<'a> {
     /// Creates a new lexer core that reads using the given input function.
     #[must_use]
     fn new(
-        input: Box<dyn Input + 'a>,
+        input: Box<dyn InputEx + 'a>,
         start_line_number: NonZeroU64,
         source: Rc<Source>,
     ) -> LexerCore<'a> {
@@ -454,7 +454,7 @@ impl<'a> Lexer<'a> {
     /// Creates a new lexer that reads using the given input function.
     #[must_use]
     pub fn new(
-        input: Box<dyn Input + 'a>,
+        input: Box<dyn InputEx + 'a>,
         start_line_number: NonZeroU64,
         source: Rc<Source>,
     ) -> Lexer<'a> {
@@ -838,6 +838,7 @@ impl<'a, 'b> DerefMut for WordLexer<'a, 'b> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::input::Input;
     use crate::parser::error::ErrorCause;
     use crate::parser::error::SyntaxError;
     use assert_matches::assert_matches;

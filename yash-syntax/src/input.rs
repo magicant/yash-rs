@@ -125,7 +125,7 @@ impl<T: Input> InputEx for T {
         &'a mut self,
         context: &'a Context,
     ) -> Pin<Box<dyn Future<Output = Result> + 'a>> {
-        Box::pin(Input::next_line(self, context))
+        Input::next_line(self, context)
     }
 }
 
