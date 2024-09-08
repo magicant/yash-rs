@@ -24,8 +24,8 @@ use std::cell::Cell;
 use std::rc::Rc;
 use std::slice::from_mut;
 use yash_syntax::input::Context;
-use yash_syntax::input::Input;
 use yash_syntax::input::Result;
+use yash_syntax::input::Xnput;
 
 /// Input function that reads from a file descriptor.
 ///
@@ -83,7 +83,7 @@ impl FdReader {
 }
 
 #[async_trait(?Send)]
-impl Input for FdReader {
+impl Xnput for FdReader {
     async fn next_line(&mut self, _context: &Context) -> Result {
         // TODO Read many bytes at once if seekable
 

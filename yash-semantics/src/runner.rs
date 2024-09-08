@@ -398,7 +398,7 @@ mod tests {
     fn input_error_aborts_loop() {
         struct BrokenInput;
         #[async_trait(?Send)]
-        impl yash_syntax::input::Input for BrokenInput {
+        impl yash_syntax::input::Xnput for BrokenInput {
             async fn next_line(&mut self, _context: &Context) -> std::io::Result<String> {
                 Err(std::io::Error::new(std::io::ErrorKind::Other, "broken"))
             }

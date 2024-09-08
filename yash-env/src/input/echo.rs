@@ -21,7 +21,7 @@ use crate::option::State::On;
 use crate::Env;
 use async_trait::async_trait;
 use std::cell::RefCell;
-use yash_syntax::input::{Context, Input, Result};
+use yash_syntax::input::{Context, Result, Xnput};
 
 /// `Input` decorator that echoes the input.
 ///
@@ -51,9 +51,9 @@ impl<'a, 'b, T> Echo<'a, 'b, T> {
 }
 
 #[async_trait(?Send)]
-impl<'a, 'b, T> Input for Echo<'a, 'b, T>
+impl<'a, 'b, T> Xnput for Echo<'a, 'b, T>
 where
-    T: Input,
+    T: Xnput,
 {
     // The RefCell should be local to the calling read-eval loop, so it is safe
     // to keep the mutable borrow across await points.

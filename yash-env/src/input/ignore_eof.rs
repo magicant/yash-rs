@@ -16,7 +16,7 @@
 
 //! Defines the [`IgnoreEof`] input decorator.
 
-use super::{Context, Input, Result};
+use super::{Context, Result, Xnput};
 use crate::io::Fd;
 use crate::option::{IgnoreEof as IgnoreEofOption, Interactive, Off};
 use crate::system::System as _;
@@ -80,9 +80,9 @@ impl<'a, 'b, T> IgnoreEof<'a, 'b, T> {
 }
 
 #[async_trait(?Send)]
-impl<'a, 'b, T> Input for IgnoreEof<'a, 'b, T>
+impl<'a, 'b, T> Xnput for IgnoreEof<'a, 'b, T>
 where
-    T: Input,
+    T: Xnput,
 {
     #[allow(clippy::await_holding_refcell_ref)]
     async fn next_line(&mut self, context: &Context) -> Result {
@@ -128,9 +128,9 @@ mod tests {
     }
 
     #[async_trait(?Send)]
-    impl<T> Input for EofStub<T>
+    impl<T> Xnput for EofStub<T>
     where
-        T: Input,
+        T: Xnput,
     {
         async fn next_line(&mut self, context: &Context) -> Result {
             if let Some(remaining) = self.count.checked_sub(1) {

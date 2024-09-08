@@ -404,7 +404,7 @@ impl fmt::Display for TryFromOperatorError {
 mod tests {
     use super::*;
     use crate::input::Context;
-    use crate::input::Input;
+    use crate::input::Xnput;
     use crate::source::Source;
     use crate::syntax::TextUnit;
     use crate::syntax::WordUnit;
@@ -512,7 +512,7 @@ mod tests {
     fn lexer_operator_should_not_peek_beyond_newline() {
         struct OneLineInput(Option<String>);
         #[async_trait::async_trait(?Send)]
-        impl Input for OneLineInput {
+        impl Xnput for OneLineInput {
             async fn next_line(&mut self, _: &Context) -> crate::input::Result {
                 if let Some(line) = self.0.take() {
                     Ok(line)

@@ -68,7 +68,7 @@ pub type Result = std::result::Result<String, Error>;
 /// An `Input` object provides the parser with source code by reading from underlying source.
 #[async_trait(?Send)]
 #[must_use = "Input instances should be used by a parser"]
-pub trait Input {
+pub trait Xnput {
     /// Reads a next line of the source code.
     ///
     /// The input function is line-oriented; that is, this function returns a string that is
@@ -84,10 +84,10 @@ pub trait Input {
 }
 
 // #[async_trait(?Send)]
-impl<T> Input for T
+impl<T> Xnput for T
 where
     T: DerefMut,
-    T::Target: Input,
+    T::Target: Xnput,
 {
     // Avoid a Box allocation by forwarding the call without using async_trait.
     // async fn next_line(&mut self, context: &Context) -> Result {
@@ -120,7 +120,7 @@ impl Memory<'_> {
 }
 
 #[async_trait(?Send)]
-impl Input for Memory<'_> {
+impl Xnput for Memory<'_> {
     async fn next_line(&mut self, _context: &Context) -> Result {
         Ok(self.lines.next().unwrap_or("").to_owned())
     }

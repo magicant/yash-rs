@@ -18,7 +18,7 @@
 
 use async_trait::async_trait;
 use std::cell::RefCell;
-use yash_env::input::{Context, Input, Result};
+use yash_env::input::{Context, Result, Xnput};
 use yash_env::variable::{VariableSet, PS1, PS2};
 use yash_env::Env;
 
@@ -47,9 +47,9 @@ impl<'a, 'b, T> Prompter<'a, 'b, T> {
 }
 
 #[async_trait(?Send)]
-impl<'a, 'b, T> Input for Prompter<'a, 'b, T>
+impl<'a, 'b, T> Xnput for Prompter<'a, 'b, T>
 where
-    T: Input,
+    T: Xnput,
 {
     #[allow(clippy::await_holding_refcell_ref)]
     async fn next_line(&mut self, context: &Context) -> Result {
@@ -127,7 +127,7 @@ mod tests {
 
         struct InputMock(Rc<RefCell<SystemState>>);
         #[async_trait::async_trait(?Send)]
-        impl Input for InputMock {
+        impl Xnput for InputMock {
             async fn next_line(&mut self, _: &Context) -> Result {
                 // The Prompter is expected to have shown the prompt before
                 // calling the inner input. Let's check that here.
