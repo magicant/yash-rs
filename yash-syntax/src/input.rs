@@ -64,9 +64,9 @@ pub type Result = std::result::Result<String, Error>;
 
 /// Line-oriented source code reader
 ///
-/// An `Input` object provides the parser with source code by reading from underlying source.
+/// An `Input` implementor provides the parser with source code by reading from underlying source.
 ///
-/// [`InputEx`] is an object-safe version of this trait.
+/// [`InputObject`] is an object-safe version of this trait.
 #[must_use = "Input instances should be used by a parser"]
 pub trait Input {
     /// Reads a next line of the source code.
@@ -93,19 +93,20 @@ where
 
 /// Object-safe adapter for the [`Input`] trait
 ///
-/// `InputEx` is an object-safe version of the [`Input`] trait. It allows the
-/// trait to be used as a trait object, which is necessary for dynamic dispatch.
+/// `InputObject` is an object-safe version of the [`Input`] trait. It allows
+/// the trait to be used as a trait object, which is necessary for dynamic
+/// dispatch.
 ///
 /// The umbrella implementation is provided for all types that implement the
 /// [`Input`] trait.
-pub trait InputEx {
+pub trait InputObject {
     fn next_line<'a>(
         &'a mut self,
         context: &'a Context,
     ) -> Pin<Box<dyn Future<Output = Result> + 'a>>;
 }
 
-impl<T: Input> InputEx for T {
+impl<T: Input> InputObject for T {
     fn next_line<'a>(
         &'a mut self,
         context: &'a Context,

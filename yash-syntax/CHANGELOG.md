@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `input::InputEx` trait
+- `input::InputObject` trait
     - This new trait is an object-safe version of `input::Input`.
 
 ### Changed

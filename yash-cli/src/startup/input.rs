@@ -42,14 +42,14 @@ use yash_env::system::SystemEx as _;
 use yash_env::Env;
 use yash_env::System;
 use yash_prompt::Prompter;
-use yash_syntax::input::InputEx;
+use yash_syntax::input::InputObject;
 use yash_syntax::input::Memory;
 use yash_syntax::source::Source as SyntaxSource;
 
 /// Result of [`prepare_input`].
 pub struct SourceInput<'a> {
     /// Input to be passed to the lexer
-    pub input: Box<dyn InputEx + 'a>,
+    pub input: Box<dyn InputObject + 'a>,
     /// Description of the source
     pub source: SyntaxSource,
 }
@@ -133,7 +133,7 @@ pub fn prepare_input<'s: 'i + 'e, 'i, 'e>(
             let basic_input = Memory::new(command);
 
             let is_interactive = env.borrow().options.get(Interactive) == On;
-            let input: Box<dyn InputEx> = if is_interactive {
+            let input: Box<dyn InputObject> = if is_interactive {
                 Box::new(Reporter::new(basic_input, env))
             } else {
                 Box::new(basic_input)
@@ -150,7 +150,7 @@ pub fn prepare_input<'s: 'i + 'e, 'i, 'e>(
 /// and wraps it with the [`Echo`] decorator. If the [`Interactive`] option is
 /// enabled, the [`Prompter`], [`Reporter`], and [`IgnoreEof`] decorators are
 /// applied to the input object.
-fn prepare_fd_input<'i>(fd: Fd, ref_env: &'i RefCell<&mut Env>) -> Box<dyn InputEx + 'i> {
+fn prepare_fd_input<'i>(fd: Fd, ref_env: &'i RefCell<&mut Env>) -> Box<dyn InputObject + 'i> {
     let env = ref_env.borrow();
     let system = env.system.clone();
 
