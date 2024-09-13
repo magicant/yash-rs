@@ -511,7 +511,6 @@ mod tests {
     #[test]
     fn lexer_operator_should_not_peek_beyond_newline() {
         struct OneLineInput(Option<String>);
-        #[async_trait::async_trait(?Send)]
         impl Input for OneLineInput {
             async fn next_line(&mut self, _: &Context) -> crate::input::Result {
                 if let Some(line) = self.0.take() {

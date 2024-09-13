@@ -19,7 +19,6 @@
 use crate::option::Option::Verbose;
 use crate::option::State::On;
 use crate::Env;
-use async_trait::async_trait;
 use std::cell::RefCell;
 use yash_syntax::input::{Context, Input, Result};
 
@@ -50,7 +49,6 @@ impl<'a, 'b, T> Echo<'a, 'b, T> {
     }
 }
 
-#[async_trait(?Send)]
 impl<'a, 'b, T> Input for Echo<'a, 'b, T>
 where
     T: Input,

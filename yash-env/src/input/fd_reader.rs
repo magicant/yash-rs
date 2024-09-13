@@ -19,7 +19,6 @@
 use crate::io::Fd;
 use crate::option::State;
 use crate::system::SharedSystem;
-use async_trait::async_trait;
 use std::cell::Cell;
 use std::rc::Rc;
 use std::slice::from_mut;
@@ -82,7 +81,6 @@ impl FdReader {
     }
 }
 
-#[async_trait(?Send)]
 impl Input for FdReader {
     async fn next_line(&mut self, _context: &Context) -> Result {
         // TODO Read many bytes at once if seekable

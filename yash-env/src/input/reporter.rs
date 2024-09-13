@@ -17,7 +17,6 @@
 use crate::job::fmt::Accumulator;
 use crate::option::{Interactive, Monitor, Off};
 use crate::Env;
-use async_trait::async_trait;
 use std::cell::RefCell;
 use yash_syntax::input::{Context, Input, Result};
 use yash_syntax::syntax::Fd;
@@ -46,7 +45,6 @@ impl<'a, 'b, T> Reporter<'a, 'b, T> {
     }
 }
 
-#[async_trait(?Send)]
 impl<'a, 'b, T> Input for Reporter<'a, 'b, T>
 where
     T: Input,
@@ -122,7 +120,6 @@ mod tests {
         env.options.set(Monitor, On);
 
         struct InputMock(Rc<RefCell<SystemState>>);
-        #[async_trait::async_trait(?Send)]
         impl Input for InputMock {
             async fn next_line(&mut self, _: &Context) -> Result {
                 // The Report is expected to have shown the report before

@@ -21,7 +21,6 @@ use crate::io::Fd;
 use crate::option::{IgnoreEof as IgnoreEofOption, Interactive, Off};
 use crate::system::System as _;
 use crate::Env;
-use async_trait::async_trait;
 use std::cell::RefCell;
 
 /// `Input` decorator that ignores EOF on a terminal
@@ -79,7 +78,6 @@ impl<'a, 'b, T> IgnoreEof<'a, 'b, T> {
     }
 }
 
-#[async_trait(?Send)]
 impl<'a, 'b, T> Input for IgnoreEof<'a, 'b, T>
 where
     T: Input,
@@ -127,7 +125,6 @@ mod tests {
         count: usize,
     }
 
-    #[async_trait(?Send)]
     impl<T> Input for EofStub<T>
     where
         T: Input,

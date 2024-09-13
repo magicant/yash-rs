@@ -868,7 +868,6 @@ mod tests {
             }
         }
         impl std::error::Error for Failing {}
-        #[async_trait::async_trait(?Send)]
         impl Input for Failing {
             async fn next_line(&mut self, _: &Context) -> crate::input::Result {
                 Err(std::io::Error::new(std::io::ErrorKind::Other, Failing))
@@ -893,7 +892,6 @@ mod tests {
         struct InputMock {
             first: bool,
         }
-        #[async_trait::async_trait(?Send)]
         impl Input for InputMock {
             async fn next_line(&mut self, context: &Context) -> crate::input::Result {
                 assert_eq!(context.is_first_line(), self.first);

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `impl yash_syntax::input::Input for Prompter` now conforms to the new
+  definition of the `next_line` method.
 - External dependency versions:
     - Rust 1.77.0 → 1.79.0
     - yash-env 0.2.0 → 0.3.0
@@ -20,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Prompter<'a, 'b, T>`.
 - The redundant lifetime constraint `T: 'a` is removed from the implementation
   of `yash_syntax::input::Input` for `Prompter<'a, 'b, T>`.
+- Internal dependencies:
+    - async-trait 0.1.73
 
 ## [0.1.0] - 2024-07-13
 
