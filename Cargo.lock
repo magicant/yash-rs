@@ -34,17 +34,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b34d609dfbaf33d6889b2b7106d3ca345eacad44200913df5ba02bfd31d2ba9"
 
 [[package]]
-name = "async-trait"
-version = "0.1.81"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e0c28dcc82d7c8ead5cb13beb15405b57b8546e93215673ff8ca0349a028107"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "autocfg"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -584,7 +573,6 @@ version = "0.3.0"
 dependencies = [
  "annotate-snippets",
  "assert_matches",
- "async-trait",
  "bitflags",
  "either",
  "enumset",
@@ -626,7 +614,6 @@ dependencies = [
 name = "yash-prompt"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "futures-util",
  "yash-env",
  "yash-env-test-helper",
@@ -643,7 +630,6 @@ name = "yash-semantics"
 version = "0.3.0"
 dependencies = [
  "assert_matches",
- "async-trait",
  "enumset",
  "futures-executor",
  "futures-util",
@@ -663,7 +649,6 @@ version = "0.11.0"
 dependencies = [
  "annotate-snippets",
  "assert_matches",
- "async-trait",
  "futures-executor",
  "futures-util",
  "itertools",

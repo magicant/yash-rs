@@ -16,7 +16,6 @@
 
 //! Methods about passing [source](crate::source) code to the [parser](crate::parser).
 
-use async_trait::async_trait;
 use std::future::Future;
 use std::ops::DerefMut;
 use std::pin::Pin;
@@ -63,10 +62,11 @@ pub type Error = std::io::Error;
 /// Result of the [Input] function.
 pub type Result = std::result::Result<String, Error>;
 
-/// Line-oriented source code reader.
+/// Line-oriented source code reader
 ///
-/// An `Input` object provides the parser with source code by reading from underlying source.
-#[async_trait(?Send)]
+/// An `Input` implementor provides the parser with source code by reading from underlying source.
+///
+/// [`InputObject`] is an object-safe version of this trait.
 #[must_use = "Input instances should be used by a parser"]
 pub trait Input {
     /// Reads a next line of the source code.
@@ -78,31 +78,40 @@ pub trait Input {
     ///
     /// Errors returned from this function are considered unrecoverable. Once an error is returned,
     /// this function should not be called any more.
-    ///
-    /// For object safety, this async method is declared to return the future in a pinning box.
-    async fn next_line(&mut self, context: &Context) -> Result;
+    fn next_line(&mut self, context: &Context) -> impl Future<Output = Result>;
 }
 
-// #[async_trait(?Send)]
 impl<T> Input for T
 where
     T: DerefMut,
     T::Target: Input,
 {
-    // Avoid a Box allocation by forwarding the call without using async_trait.
-    // async fn next_line(&mut self, context: &Context) -> Result {
-    //     self.deref_mut().next_line(context).await
-    // }
-    fn next_line<'s, 'c, 'f>(
-        &'s mut self,
-        context: &'c Context,
-    ) -> Pin<Box<dyn Future<Output = Result> + 'f>>
-    where
-        's: 'f,
-        'c: 'f,
-        Self: 'f,
-    {
+    fn next_line(&mut self, context: &Context) -> impl Future<Output = Result> {
         self.deref_mut().next_line(context)
+    }
+}
+
+/// Object-safe adapter for the [`Input`] trait
+///
+/// `InputObject` is an object-safe version of the [`Input`] trait. It allows
+/// the trait to be used as a trait object, which is necessary for dynamic
+/// dispatch.
+///
+/// The umbrella implementation is provided for all types that implement the
+/// [`Input`] trait.
+pub trait InputObject {
+    fn next_line<'a>(
+        &'a mut self,
+        context: &'a Context,
+    ) -> Pin<Box<dyn Future<Output = Result> + 'a>>;
+}
+
+impl<T: Input> InputObject for T {
+    fn next_line<'a>(
+        &'a mut self,
+        context: &'a Context,
+    ) -> Pin<Box<dyn Future<Output = Result> + 'a>> {
+        Box::pin(Input::next_line(self, context))
     }
 }
 
@@ -119,7 +128,6 @@ impl Memory<'_> {
     }
 }
 
-#[async_trait(?Send)]
 impl Input for Memory<'_> {
     async fn next_line(&mut self, _context: &Context) -> Result {
         Ok(self.lines.next().unwrap_or("").to_owned())
@@ -128,7 +136,7 @@ impl Input for Memory<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{Context, Input, Memory};
     use futures_util::FutureExt;
 
     #[test]

@@ -5,11 +5,24 @@ All notable changes to `yash-syntax` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.11.1] - Unreleased
+## [0.12.0] - Unreleased
+
+### Added
+
+- `input::InputObject` trait
+    - This new trait is an object-safe version of `input::Input`.
 
 ### Changed
 
 - The `input::Input` trait is now `#[must_use]`.
+- The `input::Input::next_line` method now returns
+  `impl Future<Output = input::Result>`. This change reduces the number of
+  allocations when reading input lines.
+
+### Removed
+
+- Internal dependencies:
+    - async-trait 0.1.73
 
 ## [0.11.0] - 2024-08-22
 
@@ -321,7 +334,7 @@ command.
 - Functionalities to parse POSIX shell scripts
 - Alias substitution support
 
-[0.11.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.11.1
+[0.12.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.12.0
 [0.11.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.11.0
 [0.10.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.10.0
 [0.9.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.9.0

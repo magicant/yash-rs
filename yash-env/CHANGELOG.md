@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `system::virtual::FileBody` is now `non_exhaustive`.
 - `system::virtual::VirtualSystem::isatty` now returns true for a file
   descriptor associated with `FileBody::Terminal`.
+- `impl yash_syntax::input::Input` for `input::FdReader`, `input::Echo`,
+  `input::IgnoreEof`, and `input::Reporter` now conforms to the new definition
+  of the `next_line` method.
 
 ### Removed
 
@@ -31,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The redundant lifetime constraint `T: 'a` is removed from the implementations
   of `yash_syntax::input::Input` for `input::Echo<'a, 'b, T>` and
   `input::Reporter<'a, 'b, T>`.
+- Internal dependencies:
+    - async-trait 0.1.73
 
 ## [0.3.0] - 2024-08-22
 

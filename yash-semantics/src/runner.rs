@@ -199,7 +199,6 @@ mod tests {
     use super::*;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use async_trait::async_trait;
     use futures_util::FutureExt;
     use std::num::NonZeroU64;
     use std::rc::Rc;
@@ -397,7 +396,6 @@ mod tests {
     #[test]
     fn input_error_aborts_loop() {
         struct BrokenInput;
-        #[async_trait(?Send)]
         impl yash_syntax::input::Input for BrokenInput {
             async fn next_line(&mut self, _context: &Context) -> std::io::Result<String> {
                 Err(std::io::Error::new(std::io::ErrorKind::Other, "broken"))

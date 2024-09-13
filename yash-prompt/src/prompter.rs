@@ -16,7 +16,6 @@
 
 //! Defines the `Prompter` decorator.
 
-use async_trait::async_trait;
 use std::cell::RefCell;
 use yash_env::input::{Context, Input, Result};
 use yash_env::variable::{VariableSet, PS1, PS2};
@@ -46,7 +45,6 @@ impl<'a, 'b, T> Prompter<'a, 'b, T> {
     }
 }
 
-#[async_trait(?Send)]
 impl<'a, 'b, T> Input for Prompter<'a, 'b, T>
 where
     T: Input,
@@ -126,7 +124,6 @@ mod tests {
         define_variable(&mut env, PS1, PS1_INITIAL_VALUE_NON_ROOT);
 
         struct InputMock(Rc<RefCell<SystemState>>);
-        #[async_trait::async_trait(?Send)]
         impl Input for InputMock {
             async fn next_line(&mut self, _: &Context) -> Result {
                 // The Prompter is expected to have shown the prompt before

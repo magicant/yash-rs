@@ -14,7 +14,6 @@ keywords = ["posix", "shell"]
 categories = ["command-line-utilities"]
 
 [dependencies]
-async-trait = "0.1.73"
 futures-util = "0.3.28"
 yash-env = { path = "../yash-env", version = "0.3.0" }
 yash-semantics = { path = "../yash-semantics", version = "0.3.0" }
