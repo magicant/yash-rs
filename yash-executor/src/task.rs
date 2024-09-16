@@ -7,7 +7,7 @@ use crate::Task;
 use alloc::rc::Rc;
 use core::task::{Context, Waker};
 
-impl Task {
+impl Task<'_> {
     /// Wakes the task so that it will be polled again by the executor.
     pub fn wake(self: Rc<Self>) {
         todo!()
@@ -29,9 +29,9 @@ impl Task {
                 if self.executor.strong_count() == 0 {
                     todo!("executor has been dropped");
                 }
-                // let waker = futures_task::noop_waker();
-                // let mut context = Context::from_waker(&waker);
-                // let poll = future.as_mut().poll(&mut context);
+                let waker = futures_task::noop_waker();
+                let mut context = Context::from_waker(&waker);
+                let poll = future.as_mut().poll(&mut context);
                 true // TODO false if poll is not ready
             }
         }
@@ -59,15 +59,13 @@ mod tests {
 
     #[test]
     fn polling_ready_future() {
-        let executor = Rc::default();
         let polled = Rc::new(Cell::new(false));
+        let executor = Rc::default();
         let task = Rc::new(Task {
             executor: Rc::downgrade(&executor),
-            future: RefCell::new(Some(Box::pin(async {
-                // TODO polled.set(true);
-            }))),
+            future: RefCell::new(Some(Box::pin(async { polled.set(true) }))),
         });
         assert!(task.poll());
-        // TODO assert!(polled.get());
+        assert!(polled.get());
     }
 }

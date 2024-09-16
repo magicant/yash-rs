@@ -31,8 +31,8 @@ use core::pin::Pin;
 /// `Executor` implements `Clone` but all clones share the same set of tasks.
 /// Separately created `Executor` instances do not share tasks.
 #[derive(Clone, Debug, Default)]
-pub struct Executor {
-    state: Rc<RefCell<ExecutorState>>,
+pub struct Executor<'a> {
+    state: Rc<RefCell<ExecutorState<'a>>>,
 }
 
 /// Interface for spawning tasks
@@ -49,13 +49,13 @@ pub struct Executor {
 /// method. The [`dead()`](Self::dead) and `default()` functions return a
 /// `Spawner` that cannot spawn tasks.
 #[derive(Clone, Debug, Default)]
-pub struct Spawner {
-    state: Weak<RefCell<ExecutorState>>,
+pub struct Spawner<'a> {
+    state: Weak<RefCell<ExecutorState<'a>>>,
 }
 
 /// Internal state of the executor
 #[derive(Default)]
-struct ExecutorState {
+struct ExecutorState<'a> {
     /// Queue of woken tasks to be executed
     ///
     /// Tasks are added to the queue when they are woken up by another task or
@@ -63,13 +63,13 @@ struct ExecutorState {
     /// polls it once. If the poll method returns `Poll::Pending`, the task
     /// needs to be added back to the queue by some waker when it is ready to
     /// be polled again.
-    wake_queue: VecDeque<Rc<Task>>,
+    wake_queue: VecDeque<Rc<Task<'a>>>,
     // We don't need to store tasks that are waiting to be woken up because they
     // are retained by wakers. This also prevents leaking tasks that are never
     // woken up.
 }
 
-impl Debug for ExecutorState {
+impl Debug for ExecutorState<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("ExecutorState")
             .field(
@@ -81,15 +81,15 @@ impl Debug for ExecutorState {
 }
 
 /// State of a task to be executed
-struct Task {
+struct Task<'a> {
     /// Shared state of the executor for running this task
-    executor: Weak<RefCell<ExecutorState>>,
+    executor: Weak<RefCell<ExecutorState<'a>>>,
 
     /// The task to be executed
     ///
     /// This value becomes `None` when the task is completed to prevent polling
     /// it again.
-    future: RefCell<Option<Pin<Box<dyn Future<Output = ()>>>>>,
+    future: RefCell<Option<Pin<Box<dyn Future<Output = ()> + 'a>>>>,
 }
 
 mod executor;

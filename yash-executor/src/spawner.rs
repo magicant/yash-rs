@@ -10,7 +10,7 @@ use core::cell::RefCell;
 use core::future::Future;
 use core::pin::Pin;
 
-impl Spawner {
+impl<'a> Spawner<'a> {
     /// Creates a dummy `Spawner` that is not associated with any executor and
     /// thus cannot spawn tasks.
     #[must_use]
@@ -22,7 +22,7 @@ impl Spawner {
 
     /// Creates a new `Spawner` that will add tasks to the given executor state.
     #[must_use]
-    pub(crate) fn with_executor_state(state: Weak<RefCell<ExecutorState>>) -> Self {
+    pub(crate) fn with_executor_state(state: Weak<RefCell<ExecutorState<'a>>>) -> Self {
         Self { state }
     }
 
@@ -36,12 +36,12 @@ impl Spawner {
     pub unsafe fn spawn_pinned(
         &self,
         future: Pin<Box<dyn Future<Output = ()>>>,
-    ) -> Result<(), Pin<Box<dyn Future<Output = ()>>>> {
+    ) -> Result<(), Pin<Box<dyn Future<Output = ()> + 'a>>> {
         // if let Some(state) = self.state.upgrade() {
         //     state.borrow_mut().spawn(future);
         // }
         todo!()
     }
 
-    // TODO spawn method that takes a non-pinned future
+    // TODO spawn method that takes a non-pinned future that may return a non-unit output
 }

@@ -5,7 +5,7 @@
 
 use crate::Executor;
 
-impl Executor {
+impl<'a> Executor<'a> {
     /// Creates a new `Executor` with an empty task queue.
     #[must_use]
     pub fn new() -> Self {
@@ -15,7 +15,7 @@ impl Executor {
     // TODO wake_count
 
     // TODO spawn_pinned method
-    // TODO spawn method that takes a non-pinned future
+    // TODO spawn method that takes a non-pinned future that may return a non-unit output
 
     /// Runs a task that has been woken up.
     ///
