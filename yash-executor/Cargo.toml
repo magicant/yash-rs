@@ -1,6 +1,14 @@
 [package]
 name = "yash-executor"
 version = "0.1.0"
+authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2021"
-
-[dependencies]
+rust-version = "1.65.0"
+description = "single-threaded concurrent task executor"
+# documentation = "https://yash.osdn.jp/doc/"
+readme = "README.md"
+# homepage = "https://yash.osdn.jp/"
+repository = "https://github.com/magicant/yash-rs"
+license = "MIT OR Apache-2.0"
+keywords = ["concurrency", "executor", "single-threaded"]
+categories = ["asynchronous", "concurrency", "no-std"]

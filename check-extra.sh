@@ -10,6 +10,7 @@ cargo tomlfmt --dryrun --path yash-builtin/Cargo.toml
 cargo tomlfmt --dryrun --path yash-cli/Cargo.toml
 cargo tomlfmt --dryrun --path yash-env/Cargo.toml
 cargo tomlfmt --dryrun --path yash-env-test-helper/Cargo.toml
+cargo tomlfmt --dryrun --path yash-executor/Cargo.toml
 cargo tomlfmt --dryrun --path yash-fnmatch/Cargo.toml
 cargo tomlfmt --dryrun --path yash-prompt/Cargo.toml
 cargo tomlfmt --dryrun --path yash-quote/Cargo.toml
@@ -30,6 +31,7 @@ cargo build --package 'yash-builtin' --all-targets --no-default-features --featu
 cargo build --package 'yash-cli' --all-targets
 cargo build --package 'yash-env' --all-targets
 cargo build --package 'yash-env-test-helper' --all-targets
+cargo build --package 'yash-executor' --all-targets
 cargo build --package 'yash-fnmatch' --all-targets
 cargo build --package 'yash-prompt' --all-targets
 cargo build --package 'yash-quote' --all-targets
