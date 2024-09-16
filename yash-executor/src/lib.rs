@@ -1,20 +1,88 @@
 // This file is part of yash, an extended POSIX shell.
 // Copyright (C) 2024 WATANABE Yuki
 
+//! `yash-executor` is a library for running concurrent tasks in a
+//! single-threaded environment. This crate supports `no_std` configurations
+//! but requires the `alloc` crate.
+//!
+//! The [`Executor`] provided by this crate can be instantiated more than once
+//! to run multiple sets of tasks concurrently. Each executor maintains its
+//! own set of tasks and does not share tasks with other executors. This is
+//! different from other executor implementations that use a global or
+//! thread-local executor.
+//!
+//! TODO Elaborate
+
 #![no_std]
 extern crate alloc;
 
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+use alloc::boxed::Box;
+use alloc::collections::VecDeque;
+use alloc::rc::{Rc, Weak};
+use core::cell::RefCell;
+use core::fmt::Debug;
+use core::future::Future;
+use core::pin::Pin;
+
+/// Interface for running concurrent tasks
+///
+/// TODO Elaborate
+///
+/// `Executor` implements `Clone` but all clones share the same set of tasks.
+/// Separately created `Executor` instances do not share tasks.
+#[derive(Clone, Debug)]
+pub struct Executor {
+    state: Rc<RefCell<ExecutorState>>,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Interface for spawning tasks
+///
+/// `Spawner` provides a subset of the functionality of `Executor` to allow
+/// spawning tasks without access to the full executor.
+///
+/// `Spawner` instances can be cloned and share the same executor state.
+/// `Spawner`s maintain a weak reference to the executor state, so they do not
+/// prevent the executor from being deallocated. If the executor is deallocated,
+/// the `Spawner` will not be able to spawn any more tasks.
+#[derive(Clone, Debug)]
+pub struct Spawner {
+    state: Weak<RefCell<ExecutorState>>,
+}
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+/// Internal state of the executor
+struct ExecutorState {
+    /// Queue of woken tasks to be executed
+    ///
+    /// Tasks are added to the queue when they are woken up by another task or
+    /// when they are spawned. The executor removes a task from the queue and
+    /// polls it once. If the poll method returns `Poll::Pending`, the task
+    /// needs to be added back to the queue by some waker when it is ready to
+    /// be polled again.
+    wake_queue: VecDeque<Rc<Task>>,
+    // We don't need to store tasks that are waiting to be woken up because they
+    // are retained by wakers. This also prevents leaking tasks that are never
+    // woken up.
+}
+
+impl Debug for ExecutorState {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ExecutorState")
+            .field(
+                "wake_queue",
+                &format_args!("(len = {})", self.wake_queue.len()),
+            )
+            .finish()
     }
+}
+
+/// State of a task to be executed
+struct Task {
+    /// Shared state of the executor for running this task
+    executor: Weak<RefCell<ExecutorState>>,
+
+    /// The task to be executed
+    ///
+    /// This value becomes `None` when the task is completed to prevent polling
+    /// it again.
+    future: RefCell<Option<Pin<Box<dyn Future<Output = ()>>>>>,
 }
