@@ -30,7 +30,7 @@ use core::pin::Pin;
 ///
 /// `Executor` implements `Clone` but all clones share the same set of tasks.
 /// Separately created `Executor` instances do not share tasks.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Executor {
     state: Rc<RefCell<ExecutorState>>,
 }
@@ -44,12 +44,17 @@ pub struct Executor {
 /// `Spawner`s maintain a weak reference to the executor state, so they do not
 /// prevent the executor from being deallocated. If the executor is deallocated,
 /// the `Spawner` will not be able to spawn any more tasks.
-#[derive(Clone, Debug)]
+///
+/// To obtain a `Spawner` from an `Executor`, use the [`Executor::spawner`]
+/// method. The [`dead()`](Self::dead) and `default()` functions return a
+/// `Spawner` that cannot spawn tasks.
+#[derive(Clone, Debug, Default)]
 pub struct Spawner {
     state: Weak<RefCell<ExecutorState>>,
 }
 
 /// Internal state of the executor
+#[derive(Default)]
 struct ExecutorState {
     /// Queue of woken tasks to be executed
     ///
@@ -86,3 +91,8 @@ struct Task {
     /// it again.
     future: RefCell<Option<Pin<Box<dyn Future<Output = ()>>>>>,
 }
+
+mod executor;
+mod spawner;
+mod task;
+mod waker;
