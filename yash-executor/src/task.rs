@@ -10,7 +10,9 @@ use core::task::{Context, Waker};
 impl Task<'_> {
     /// Wakes the task so that it will be polled again by the executor.
     pub fn wake(self: Rc<Self>) {
-        todo!()
+        if let Some(executor) = self.executor.upgrade() {
+            executor.borrow_mut().wake_queue.push_back(self);
+        }
     }
 
     /// Polls the future contained in the task.
@@ -50,6 +52,28 @@ mod tests {
     use alloc::rc::Weak;
     use core::cell::{Cell, RefCell};
     use core::future::pending;
+
+    #[test]
+    fn waking_without_executor_does_nothing() {
+        let task = Rc::new(Task {
+            executor: Weak::new(),
+            future: RefCell::new(Some(Box::pin(async { unreachable!() }))),
+        });
+        task.wake();
+    }
+
+    #[test]
+    fn task_enqueues_itself_when_woken_with_executor() {
+        let executor = Rc::default();
+        let task = Rc::new(Task {
+            executor: Rc::downgrade(&executor),
+            future: RefCell::new(Some(Box::pin(async { unreachable!() }))),
+        });
+        assert_eq!(executor.borrow().wake_queue.len(), 0);
+
+        task.wake();
+        assert_eq!(executor.borrow().wake_queue.len(), 1);
+    }
 
     #[test]
     #[should_panic = "executor has been dropped"]
