@@ -42,8 +42,8 @@ pub struct Executor {
 ///
 /// `Spawner` instances can be cloned and share the same executor state.
 /// `Spawner`s maintain a weak reference to the executor state, so they do not
-/// prevent the executor from being deallocated. If the executor is deallocated,
-/// the `Spawner` will not be able to spawn any more tasks.
+/// prevent the executor from being dropped. If the executor is dropped, the
+/// `Spawner` will not be able to spawn any more tasks.
 ///
 /// To obtain a `Spawner` from an `Executor`, use the [`Executor::spawner`]
 /// method. The [`dead()`](Self::dead) and `default()` functions return a

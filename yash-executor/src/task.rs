@@ -4,11 +4,12 @@
 //! Implementation of `Task`
 
 use crate::Task;
-use alloc::boxed::Box;
+use alloc::rc::Rc;
+use core::task::{Context, Waker};
 
 impl Task {
     /// Wakes the task so that it will be polled again by the executor.
-    pub fn wake(self: Box<Self>) {
+    pub fn wake(self: Rc<Self>) {
         todo!()
     }
 
@@ -17,8 +18,56 @@ impl Task {
     /// If the future completes, this method returns `true` and will do
     /// nothing on subsequent calls. If the future is not complete, this
     /// method returns `false`.
-    pub fn poll(self) -> bool {
-        todo!()
+    ///
+    /// If `self.executor` has been dropped or the task is polled recursively,
+    /// this method panics.
+    pub fn poll(self: &Rc<Self>) -> bool {
+        let mut future = self.future.borrow_mut();
+        match future.as_mut() {
+            None => todo!(),
+            Some(future) => {
+                if self.executor.strong_count() == 0 {
+                    todo!("executor has been dropped");
+                }
+                // let waker = futures_task::noop_waker();
+                // let mut context = Context::from_waker(&waker);
+                // let poll = future.as_mut().poll(&mut context);
+                true // TODO false if poll is not ready
+            }
+        }
+
         // TODO Change self.future to None if the future is complete
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::boxed::Box;
+    use alloc::rc::Weak;
+    use core::cell::{Cell, RefCell};
+
+    #[test]
+    #[should_panic = "executor has been dropped"]
+    fn polling_without_executor() {
+        let task = Rc::new(Task {
+            executor: Weak::new(),
+            future: RefCell::new(Some(Box::pin(async { unreachable!() }))),
+        });
+        task.poll();
+    }
+
+    #[test]
+    fn polling_ready_future() {
+        let executor = Rc::default();
+        let polled = Rc::new(Cell::new(false));
+        let task = Rc::new(Task {
+            executor: Rc::downgrade(&executor),
+            future: RefCell::new(Some(Box::pin(async {
+                // TODO polled.set(true);
+            }))),
+        });
+        assert!(task.poll());
+        // TODO assert!(polled.get());
     }
 }

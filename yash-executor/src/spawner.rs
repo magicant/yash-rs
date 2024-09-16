@@ -29,9 +29,9 @@ impl Spawner {
     /// Adds the given future to the executor's task queue so that it will be
     /// polled when the executor is run.
     ///
-    /// If the executor has been deallocated, this method will return the future
+    /// If the executor has been dropped, this method will return the future
     /// back to the caller.
-    /// 
+    ///
     /// This method is unsafe because TODO
     pub unsafe fn spawn_pinned(
         &self,

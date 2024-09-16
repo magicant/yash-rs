@@ -12,3 +12,6 @@ repository = "https://github.com/magicant/yash-rs"
 license = "MIT OR Apache-2.0"
 keywords = ["concurrency", "executor", "single-threaded"]
 categories = ["asynchronous", "concurrency", "no-std"]
+
+[dependencies]
+futures-task = "0.3.30" # TODO Remove this dependency
