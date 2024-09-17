@@ -3,9 +3,10 @@
 
 //! Implementation of `Task`
 
+use crate::waker::into_waker;
 use crate::Task;
 use alloc::rc::Rc;
-use core::task::{Context, Waker};
+use core::task::Context;
 
 impl Task<'_> {
     /// Wakes the task so that it will be polled again by the executor.
@@ -33,6 +34,10 @@ impl Task<'_> {
     /// If `self.executor` has been dropped or the task is polled recursively,
     /// this method panics.
     pub fn poll(self: &Rc<Self>) -> bool {
+        if self.executor.strong_count() == 0 {
+            panic!("executor has been dropped");
+        }
+
         let mut future_or_none = self
             .future
             .try_borrow_mut()
@@ -40,10 +45,8 @@ impl Task<'_> {
         let Some(future) = future_or_none.as_mut() else {
             return true;
         };
-        if self.executor.strong_count() == 0 {
-            todo!("executor has been dropped");
-        }
-        let waker = futures_task::noop_waker();
+
+        let waker = into_waker(Rc::clone(self));
         let mut context = Context::from_waker(&waker);
         let poll = future.as_mut().poll(&mut context);
         let is_ready = poll.is_ready();

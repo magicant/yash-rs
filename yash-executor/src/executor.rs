@@ -27,6 +27,8 @@ impl<'a> Executor<'a> {
     ///
     /// The added task is not polled immediately. It will be polled when the
     /// executor runs tasks.
+    ///
+    /// TODO: This method should be unsafe
     pub fn spawn_pinned(&self, future: Pin<Box<dyn Future<Output = ()> + 'a>>) {
         let task = Task {
             executor: Rc::downgrade(&self.state),
@@ -47,7 +49,8 @@ impl<'a> Executor<'a> {
     ///
     /// This method panics if the task is polled recursively.
     pub fn step(&self) -> Option<bool> {
-        Some(self.state.borrow_mut().wake_queue.pop_front()?.poll())
+        let task = self.state.borrow_mut().wake_queue.pop_front()?;
+        Some(task.poll())
     }
 
     /// Runs tasks until there are no more tasks to run.

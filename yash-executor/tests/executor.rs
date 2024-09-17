@@ -57,7 +57,6 @@ mod step {
     }
 
     #[test]
-    #[ignore = "TODO: task needs to poll with valid waker"]
     fn supports_yielding_future() {
         let poll_count = Cell::new(0);
         let executor = Executor::new();
