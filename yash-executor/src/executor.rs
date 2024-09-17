@@ -3,7 +3,12 @@
 
 //! Implementation of `Executor`
 
-use crate::Executor;
+use crate::{Executor, Task};
+use alloc::boxed::Box;
+use alloc::rc::Rc;
+use core::cell::RefCell;
+use core::future::Future;
+use core::pin::Pin;
 
 impl<'a> Executor<'a> {
     /// Creates a new `Executor` with an empty task queue.
@@ -12,9 +17,24 @@ impl<'a> Executor<'a> {
         Self::default()
     }
 
-    // TODO wake_count
+    /// Returns the number of tasks that have been woken up but not yet polled.
+    #[must_use]
+    pub fn wake_count(&self) -> usize {
+        self.state.borrow().wake_queue.len()
+    }
 
-    // TODO spawn_pinned method
+    /// Adds a task to the task queue.
+    ///
+    /// The added task is not polled immediately. It will be polled when the
+    /// executor runs tasks.
+    pub fn spawn_pinned(&self, future: Pin<Box<dyn Future<Output = ()> + 'a>>) {
+        let task = Task {
+            executor: Rc::downgrade(&self.state),
+            future: RefCell::new(Some(future)),
+        };
+        self.state.borrow_mut().wake_queue.push_back(Rc::new(task));
+    }
+
     // TODO spawn method that takes a non-pinned future that may return a non-unit output
 
     /// Runs a task that has been woken up.
@@ -27,7 +47,7 @@ impl<'a> Executor<'a> {
     ///
     /// This method panics if the task is polled recursively.
     pub fn step(&self) -> Option<bool> {
-        todo!()
+        Some(self.state.borrow_mut().wake_queue.pop_front()?.poll())
     }
 
     /// Runs tasks until there are no more tasks to run.
@@ -38,6 +58,6 @@ impl<'a> Executor<'a> {
     ///
     /// This method panics if a task is polled recursively.
     pub fn run_until_stalled(&self) -> usize {
-        todo!()
+        0 // TODO
     }
 }
