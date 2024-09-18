@@ -3,7 +3,7 @@
 
 //! Implementation of `Executor`
 
-use crate::{Executor, Task};
+use crate::{Executor, ExecutorState, Spawner, Task};
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use core::cell::RefCell;
@@ -37,14 +37,17 @@ impl<'a> Executor<'a> {
     /// responsibility to ensure that the `Waker` is not passed to or accessed
     /// from other threads.
     pub unsafe fn spawn_pinned(&self, future: Pin<Box<dyn Future<Output = ()> + 'a>>) {
-        let task = Task {
-            executor: Rc::downgrade(&self.state),
-            future: RefCell::new(Some(future)),
-        };
-        self.state.borrow_mut().wake_queue.push_back(Rc::new(task));
+        ExecutorState::enqueue(&self.state, future);
     }
 
     // TODO spawn method that takes a non-pinned future that may return a non-unit output
+
+    /// Returns a `Spawner` that can spawn tasks.
+    #[must_use]
+    pub fn spawner(&self) -> Spawner<'a> {
+        let state = Rc::downgrade(&self.state);
+        Spawner { state }
+    }
 
     /// Runs a task that has been woken up.
     ///
@@ -75,5 +78,18 @@ impl<'a> Executor<'a> {
             }
         }
         completed
+    }
+}
+
+impl<'a> ExecutorState<'a> {
+    pub(crate) fn enqueue(
+        this: &Rc<RefCell<Self>>,
+        future: Pin<Box<dyn Future<Output = ()> + 'a>>,
+    ) {
+        let task = Task {
+            executor: Rc::downgrade(this),
+            future: RefCell::new(Some(future)),
+        };
+        this.borrow_mut().wake_queue.push_back(Rc::new(task));
     }
 }

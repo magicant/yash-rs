@@ -5,8 +5,6 @@
 
 use crate::{ExecutorState, Spawner};
 use alloc::boxed::Box;
-use alloc::rc::Weak;
-use core::cell::RefCell;
 use core::future::Future;
 use core::pin::Pin;
 
@@ -18,12 +16,6 @@ impl<'a> Spawner<'a> {
         Self {
             state: Default::default(),
         }
-    }
-
-    /// Creates a new `Spawner` that will add tasks to the given executor state.
-    #[must_use]
-    pub(crate) fn with_executor_state(state: Weak<RefCell<ExecutorState<'a>>>) -> Self {
-        Self { state }
     }
 
     /// Adds the given future to the executor's task queue so that it will be
@@ -42,12 +34,14 @@ impl<'a> Spawner<'a> {
     /// from other threads.
     pub unsafe fn spawn_pinned(
         &self,
-        future: Pin<Box<dyn Future<Output = ()>>>,
+        future: Pin<Box<dyn Future<Output = ()> + 'a>>,
     ) -> Result<(), Pin<Box<dyn Future<Output = ()> + 'a>>> {
-        // if let Some(state) = self.state.upgrade() {
-        //     state.borrow_mut().spawn(future);
-        // }
-        todo!()
+        if let Some(state) = self.state.upgrade() {
+            ExecutorState::enqueue(&state, future);
+            Ok(())
+        } else {
+            Err(future)
+        }
     }
 
     // TODO spawn method that takes a non-pinned future that may return a non-unit output
