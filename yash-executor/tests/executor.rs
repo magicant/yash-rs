@@ -80,11 +80,24 @@ mod step {
         assert_eq!(poll_count.get(), 2);
     }
 
-    // TODO supports spawning tasks within tasks
+    #[test]
+    fn supports_spawning_tasks_within_tasks() {
+        let executor1 = Executor::new();
+        let executor2 = executor1.clone();
+        executor1.spawn_pinned(Box::pin(async move {
+            executor2.spawn_pinned(Box::pin(async {}));
+        }));
+
+        executor1.step();
+        assert_eq!(executor1.wake_count(), 1);
+        executor1.step();
+        assert_eq!(executor1.wake_count(), 0);
+    }
 }
 
 mod run_until_stalled {
     use super::*;
+    use std::future::pending;
 
     #[test]
     fn returns_zero_when_no_tasks() {
@@ -92,5 +105,16 @@ mod run_until_stalled {
         assert_eq!(executor.run_until_stalled(), 0);
     }
 
-    // TODO
+    #[test]
+    fn returns_number_of_completed_tasks() {
+        let executor1 = Executor::new();
+        let executor2 = executor1.clone();
+        executor1.spawn_pinned(Box::pin(async move {
+            executor2.spawn_pinned(Box::pin(async {}));
+        }));
+        executor1.spawn_pinned(Box::pin(pending()));
+
+        assert_eq!(executor1.run_until_stalled(), 2);
+        assert_eq!(executor1.wake_count(), 0);
+    }
 }

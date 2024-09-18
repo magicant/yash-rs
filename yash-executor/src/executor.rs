@@ -61,6 +61,12 @@ impl<'a> Executor<'a> {
     ///
     /// This method panics if a task is polled recursively.
     pub fn run_until_stalled(&self) -> usize {
-        0 // TODO
+        let mut completed = 0;
+        while let Some(is_complete) = self.step() {
+            if is_complete {
+                completed += 1;
+            }
+        }
+        completed
     }
 }
