@@ -11,14 +11,14 @@ mod spawn_pinned {
         let executor = Executor::new();
         assert_eq!(executor.wake_count(), 0);
 
-        executor.spawn_pinned(Box::pin(async {}));
+        unsafe { executor.spawn_pinned(Box::pin(async {})) };
         assert_eq!(executor.wake_count(), 1);
     }
 
     #[test]
     fn does_not_poll_added_future() {
         let executor = Executor::new();
-        executor.spawn_pinned(Box::pin(async { unreachable!() }));
+        unsafe { executor.spawn_pinned(Box::pin(async { unreachable!() })) };
     }
 }
 
@@ -37,21 +37,21 @@ mod step {
     #[test]
     fn returns_false_when_task_not_complete() {
         let executor = Executor::new();
-        executor.spawn_pinned(Box::pin(pending()));
+        unsafe { executor.spawn_pinned(Box::pin(pending())) };
         assert_eq!(executor.step(), Some(false));
     }
 
     #[test]
     fn returns_true_when_task_complete() {
         let executor = Executor::new();
-        executor.spawn_pinned(Box::pin(async {}));
+        unsafe { executor.spawn_pinned(Box::pin(async {})) };
         assert_eq!(executor.step(), Some(true));
     }
 
     #[test]
     fn removes_task_from_wake_queue() {
         let executor = Executor::new();
-        executor.spawn_pinned(Box::pin(async {}));
+        unsafe { executor.spawn_pinned(Box::pin(async {})) };
         executor.step();
         assert_eq!(executor.wake_count(), 0);
     }
@@ -60,18 +60,20 @@ mod step {
     fn supports_yielding_future() {
         let poll_count = Cell::new(0);
         let executor = Executor::new();
-        executor.spawn_pinned(Box::pin(poll_fn(|cx| match poll_count.get() {
-            0 => {
-                poll_count.set(1);
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            }
-            1 => {
-                poll_count.set(2);
-                Poll::Ready(())
-            }
-            _ => unreachable!(),
-        })));
+        unsafe {
+            executor.spawn_pinned(Box::pin(poll_fn(|cx| match poll_count.get() {
+                0 => {
+                    poll_count.set(1);
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
+                }
+                1 => {
+                    poll_count.set(2);
+                    Poll::Ready(())
+                }
+                _ => unreachable!(),
+            })))
+        };
 
         executor.step();
         assert_eq!(poll_count.get(), 1);
@@ -84,9 +86,11 @@ mod step {
     fn supports_spawning_tasks_within_tasks() {
         let executor1 = Executor::new();
         let executor2 = executor1.clone();
-        executor1.spawn_pinned(Box::pin(async move {
-            executor2.spawn_pinned(Box::pin(async {}));
-        }));
+        unsafe {
+            executor1.spawn_pinned(Box::pin(async move {
+                executor2.spawn_pinned(Box::pin(async {}));
+            }))
+        };
 
         executor1.step();
         assert_eq!(executor1.wake_count(), 1);
@@ -109,10 +113,12 @@ mod run_until_stalled {
     fn returns_number_of_completed_tasks() {
         let executor1 = Executor::new();
         let executor2 = executor1.clone();
-        executor1.spawn_pinned(Box::pin(async move {
-            executor2.spawn_pinned(Box::pin(async {}));
-        }));
-        executor1.spawn_pinned(Box::pin(pending()));
+        unsafe {
+            executor1.spawn_pinned(Box::pin(async move {
+                executor2.spawn_pinned(Box::pin(async {}));
+            }));
+            executor1.spawn_pinned(Box::pin(pending()));
+        }
 
         assert_eq!(executor1.run_until_stalled(), 2);
         assert_eq!(executor1.wake_count(), 0);
