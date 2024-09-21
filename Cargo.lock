@@ -554,7 +554,6 @@ name = "yash-cli"
 version = "0.1.0-beta.2"
 dependencies = [
  "assert_matches",
- "futures-executor",
  "futures-util",
  "fuzed-iterator",
  "nix",
@@ -562,6 +561,7 @@ dependencies = [
  "thiserror",
  "yash-builtin",
  "yash-env",
+ "yash-executor",
  "yash-prompt",
  "yash-semantics",
  "yash-syntax",
@@ -602,7 +602,7 @@ dependencies = [
 
 [[package]]
 name = "yash-executor"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "futures-task",
 ]

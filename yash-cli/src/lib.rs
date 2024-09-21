@@ -30,8 +30,6 @@ use self::startup::args::Parse;
 use self::startup::init_file::run_rcfile;
 use self::startup::input::prepare_input;
 use self::startup::input::SourceInput;
-use futures_util::task::LocalSpawnExt as _;
-use futures_util::FutureExt as _;
 use std::cell::RefCell;
 use std::num::NonZeroU64;
 use std::ops::ControlFlow::{Break, Continue};
@@ -41,6 +39,7 @@ use yash_env::system::{Disposition, Errno};
 use yash_env::Env;
 use yash_env::RealSystem;
 use yash_env::System;
+use yash_executor::Executor;
 use yash_semantics::trap::run_exit_trap;
 use yash_semantics::{interactive_read_eval_loop, read_eval_loop};
 use yash_semantics::{Divert, ExitStatus};
@@ -137,14 +136,14 @@ pub fn main() -> ! {
     _ = env.system.sigaction(sigpipe, Disposition::Default);
 
     let system = env.system.clone();
-    let mut pool = futures_executor::LocalPool::new();
-    let task = parse_and_print(env);
-    let mut task = pool.spawner().spawn_local_with_handle(task).unwrap();
+    let executor = Executor::new();
+    let task = Box::pin(async {
+        let exit_status = parse_and_print(env).await;
+        std::process::exit(exit_status.0);
+    });
+    unsafe { executor.spawn_pinned(task) }
     loop {
-        pool.run_until_stalled();
-        if let Some(exit_status) = (&mut task).now_or_never() {
-            std::process::exit(exit_status.0);
-        }
+        executor.run_until_stalled();
         system.select(false).ok();
     }
 }
