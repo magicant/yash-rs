@@ -20,6 +20,16 @@ fn send_and_try_receive() {
 }
 
 #[test]
+fn sender_can_be_dropped_before_receiving() {
+    let (sender, receiver) = forwarder::<u32>();
+    let send_result = sender.send(42);
+    drop(sender);
+    assert_eq!(send_result, Ok(()));
+    let receive_result = receiver.try_receive();
+    assert_eq!(receive_result, Ok(42));
+}
+
+#[test]
 fn send_to_dropped_receiver() {
     let (sender, _) = forwarder::<()>();
     let send_result = sender.send(());

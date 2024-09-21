@@ -1,6 +1,10 @@
 // This file is part of yash, an extended POSIX shell.
 // Copyright (C) 2024 WATANABE Yuki
 
+use std::cell::Cell;
+use std::future::{pending, poll_fn};
+use std::task::Poll;
+use yash_executor::forwarder::{Receiver, TryReceiveError};
 use yash_executor::Executor;
 
 mod spawn_pinned {
@@ -22,11 +26,52 @@ mod spawn_pinned {
     }
 }
 
+mod spawn {
+    use super::*;
+
+    #[test]
+    fn increases_wake_count() {
+        let executor = Executor::new();
+        assert_eq!(executor.wake_count(), 0);
+
+        unsafe { executor.spawn(async {}) };
+        assert_eq!(executor.wake_count(), 1);
+    }
+
+    #[test]
+    fn does_not_poll_added_future() {
+        let executor = Executor::new();
+        let _: Receiver<()> = unsafe { executor.spawn(async { unreachable!() }) };
+    }
+
+    #[test]
+    fn returns_receiver_that_yields_result() {
+        let executor = Executor::new();
+        let receiver = unsafe { executor.spawn(async { 42 }) };
+        assert_eq!(receiver.try_receive(), Err(TryReceiveError::NotSent));
+
+        assert_eq!(executor.run_until_stalled(), 1);
+        assert_eq!(receiver.try_receive(), Ok(42));
+    }
+
+    #[test]
+    fn task_runs_even_if_receiver_is_dropped_early() {
+        let run = Cell::new(false);
+        let executor = Executor::new();
+        drop(unsafe {
+            executor.spawn(async {
+                run.set(true);
+                42 // The unreceived result is silently dropped
+            })
+        });
+
+        assert_eq!(executor.run_until_stalled(), 1);
+        assert!(run.get());
+    }
+}
+
 mod step {
     use super::*;
-    use std::cell::Cell;
-    use std::future::{pending, poll_fn};
-    use std::task::Poll;
 
     #[test]
     fn returns_none_when_no_tasks() {
@@ -101,7 +146,6 @@ mod step {
 
 mod run_until_stalled {
     use super::*;
-    use std::future::pending;
 
     #[test]
     fn returns_zero_when_no_tasks() {

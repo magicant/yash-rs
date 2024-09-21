@@ -108,13 +108,15 @@ impl<T> Receiver<T> {
     /// require a `Context` argument. If the value has not been sent yet, this
     /// method returns `Err(TryReceiveError::NotSent)`.
     pub fn try_receive(&self) -> Result<T, TryReceiveError> {
-        if Rc::weak_count(&self.relay) == 0 {
-            return Err(TryReceiveError::SenderDropped);
-        }
-
         let relay = &mut *self.relay.borrow_mut();
         match relay {
-            Relay::Pending | Relay::Polled(_) => Err(TryReceiveError::NotSent),
+            Relay::Pending | Relay::Polled(_) => {
+                if Rc::weak_count(&self.relay) == 0 {
+                    Err(TryReceiveError::SenderDropped)
+                } else {
+                    Err(TryReceiveError::NotSent)
+                }
+            }
             Relay::Done => Err(TryReceiveError::AlreadyReceived),
 
             Relay::Computed(_) => {

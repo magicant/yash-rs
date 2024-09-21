@@ -3,11 +3,12 @@
 
 //! Implementation of `Executor`
 
+use crate::forwarder::{forwarder, Receiver, SendError};
 use crate::{Executor, ExecutorState, Spawner, Task};
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use core::cell::RefCell;
-use core::future::Future;
+use core::future::{Future, IntoFuture};
 use core::pin::Pin;
 
 impl<'a> Executor<'a> {
@@ -40,7 +41,27 @@ impl<'a> Executor<'a> {
         ExecutorState::enqueue(&self.state, future);
     }
 
-    // TODO spawn method that takes a non-pinned future that may return a non-unit output
+    /// Adds a task to the task queue.
+    ///
+    /// This method is an extended version of [`spawn_pinned`] that can take a
+    /// non-pinned future and may return a non-unit output. The result of the
+    /// future will be sent to the returned receiver.
+    ///
+    /// The added task is not polled immediately. It will be polled when the
+    /// executor runs tasks.
+    ///
+    /// # Safety
+    ///
+    /// See [`spawn_pinned`] for safety considerations.
+    ///
+    /// [`spawn_pinned`]: Self::spawn_pinned
+    pub unsafe fn spawn<F, T>(&self, future: F) -> Receiver<T>
+    where
+        F: IntoFuture<Output = T> + 'a,
+        T: 'a,
+    {
+        ExecutorState::enqueue_forwarding(&self.state, future)
+    }
 
     /// Returns a `Spawner` that can spawn tasks.
     #[must_use]
@@ -91,5 +112,22 @@ impl<'a> ExecutorState<'a> {
             future: RefCell::new(Some(future)),
         };
         this.borrow_mut().wake_queue.push_back(Rc::new(task));
+    }
+
+    pub(crate) fn enqueue_forwarding<F, T>(this: &Rc<RefCell<Self>>, future: F) -> Receiver<T>
+    where
+        F: IntoFuture<Output = T> + 'a,
+        T: 'a,
+    {
+        let (sender, receiver) = forwarder();
+        let task = Task {
+            executor: Rc::downgrade(this),
+            future: RefCell::new(Some(Box::pin(async move {
+                let send_result = sender.send(future.await);
+                debug_assert!(!matches!(send_result, Err((_, SendError::AlreadySent))));
+            }))),
+        };
+        this.borrow_mut().wake_queue.push_back(Rc::new(task));
+        receiver
     }
 }
