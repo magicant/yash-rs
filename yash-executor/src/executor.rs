@@ -3,7 +3,7 @@
 
 //! Implementation of `Executor`
 
-use crate::forwarder::{forwarder, Receiver, SendError};
+use crate::forwarder::{forwarder, Receiver};
 use crate::{Executor, ExecutorState, Spawner, Task};
 use alloc::boxed::Box;
 use alloc::rc::Rc;
@@ -123,8 +123,7 @@ impl<'a> ExecutorState<'a> {
         let task = Task {
             executor: Rc::downgrade(this),
             future: RefCell::new(Some(Box::pin(async move {
-                let send_result = sender.send(future.await);
-                debug_assert!(!matches!(send_result, Err((_, SendError::AlreadySent))));
+                sender.send(future.await).unwrap_or_default()
             }))),
         };
         this.borrow_mut().wake_queue.push_back(Rc::new(task));

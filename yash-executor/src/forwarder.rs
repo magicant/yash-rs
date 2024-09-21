@@ -79,21 +79,6 @@ pub fn forwarder<T>() -> (Sender<T>, Receiver<T>) {
     (sender, receiver)
 }
 
-/// Error returned when sending a value fails
-///
-/// This error may be returned from the [`Sender::send`] method.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SendError {
-    /// The receiver has been dropped.
-    ReceiverDropped,
-    /// The value has already been sent.
-    AlreadySent,
-    // TODO Remove this. It is not very meaningful to distinguish between the
-    // two cases. If the receiver is dropped after it receives the value, the
-    // sender will return ReceiverDropped, where AlreadySent would be more
-    // appropriate.
-}
-
 /// Error returned when receiving a value fails
 ///
 /// This error may be returned from the [`Receiver::try_receive`] method.
@@ -113,10 +98,13 @@ impl<T> Sender<T> {
     ///
     /// The value is sent to the receiver if it has not been sent yet. If the
     /// value has already been sent or the receiver has been dropped, the value
-    /// is returned back to the caller along with an error.
-    pub fn send(&self, value: T) -> Result<(), (T, SendError)> {
+    /// is returned back to the caller.
+    pub fn send(&self, value: T) -> Result<(), T> {
         let Some(relay) = self.relay.upgrade() else {
-            return Err((value, SendError::ReceiverDropped));
+            // If the receiver has been dropped, there is no way of knowing
+            // whether the value has been received or not. We simply return the
+            // value to the caller without any further information.
+            return Err(value);
         };
 
         let relay = &mut *relay.borrow_mut();
@@ -134,7 +122,7 @@ impl<T> Sender<T> {
                 Ok(())
             }
 
-            Relay::Computed(_) | Relay::Done => Err((value, SendError::AlreadySent)),
+            Relay::Computed(_) | Relay::Done => Err(value),
         }
     }
 }
@@ -199,15 +187,6 @@ impl<T> Future for Receiver<T> {
     }
 }
 
-impl Display for SendError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            SendError::ReceiverDropped => "receiver already dropped".fmt(f),
-            SendError::AlreadySent => "result already sent".fmt(f),
-        }
-    }
-}
-
 impl Display for TryReceiveError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
@@ -218,4 +197,4 @@ impl Display for TryReceiveError {
     }
 }
 
-// TODO Bump MSRV to 1.81.0 to impl core::error::Error for SendError and TryReceiveError
+// TODO Bump MSRV to 1.81.0 to impl core::error::Error for TryReceiveError
