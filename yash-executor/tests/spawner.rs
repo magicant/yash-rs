@@ -3,69 +3,146 @@
 
 use futures_task::noop_waker_ref;
 use std::cell::Cell;
+use std::future::Future as _;
+use std::pin::pin;
 use std::task::Context;
+use yash_executor::forwarder::TryReceiveError;
 use yash_executor::{Executor, Spawner};
 
-#[test]
-fn dead_spawner_does_nothing() {
-    let run = Cell::new(false);
-    let spawner = Spawner::dead();
+mod spawn_pinned {
+    use super::*;
 
-    let result = unsafe { spawner.spawn_pinned(Box::pin(async { run.set(true) })) };
-    assert!(!run.get());
+    #[test]
+    fn dead_spawner_does_nothing() {
+        let run = Cell::new(false);
+        let spawner = Spawner::dead();
 
-    // Make sure the returned future is the same as the one passed in
-    let mut future = result.unwrap_err();
-    let mut context = Context::from_waker(noop_waker_ref());
-    let poll = future.as_mut().poll(&mut context);
-    assert!(poll.is_ready());
-    assert!(run.get());
-}
+        let result = unsafe { spawner.spawn_pinned(Box::pin(async { run.set(true) })) };
+        assert!(!run.get());
 
-#[test]
-fn spawner_does_nothing_after_executor_was_dropped() {
-    let run = Cell::new(false);
-    let spawner = Executor::new().spawner();
-
-    let result = unsafe { spawner.spawn_pinned(Box::pin(async { run.set(true) })) };
-    assert!(!run.get());
-
-    // Make sure the returned future is the same as the one passed in
-    let mut future = result.unwrap_err();
-    let mut context = Context::from_waker(noop_waker_ref());
-    let poll = future.as_mut().poll(&mut context);
-    assert!(poll.is_ready());
-    assert!(run.get());
-}
-
-#[test]
-fn spawning_task_outside_task() {
-    let run = Cell::new(false);
-    let executor = Executor::new();
-    let spawner = executor.spawner();
-
-    let result = unsafe { spawner.spawn_pinned(Box::pin(async { run.set(true) })) };
-    assert!(result.is_ok());
-    assert!(!run.get());
-    assert_eq!(executor.wake_count(), 1);
-
-    executor.step();
-    assert!(run.get());
-}
-
-#[test]
-fn spawning_task_inside_task() {
-    let executor = Executor::new();
-    let spawner = executor.spawner();
-    unsafe {
-        executor.spawn_pinned(Box::pin(async move {
-            let result = spawner.spawn_pinned(Box::pin(async {}));
-            assert!(result.is_ok());
-        }));
+        // Make sure the returned future is the same as the one passed in
+        let mut future = result.unwrap_err();
+        let mut context = Context::from_waker(noop_waker_ref());
+        let poll = future.as_mut().poll(&mut context);
+        assert!(poll.is_ready());
+        assert!(run.get());
     }
 
-    executor.step();
-    assert_eq!(executor.wake_count(), 1);
-    executor.step();
-    assert_eq!(executor.wake_count(), 0);
+    #[test]
+    fn spawner_does_nothing_after_executor_was_dropped() {
+        let run = Cell::new(false);
+        let spawner = Executor::new().spawner();
+
+        let result = unsafe { spawner.spawn_pinned(Box::pin(async { run.set(true) })) };
+        assert!(!run.get());
+
+        // Make sure the returned future is the same as the one passed in
+        let mut future = result.unwrap_err();
+        let mut context = Context::from_waker(noop_waker_ref());
+        let poll = future.as_mut().poll(&mut context);
+        assert!(poll.is_ready());
+        assert!(run.get());
+    }
+
+    #[test]
+    fn spawning_task_outside_task() {
+        let run = Cell::new(false);
+        let executor = Executor::new();
+        let spawner = executor.spawner();
+
+        let result = unsafe { spawner.spawn_pinned(Box::pin(async { run.set(true) })) };
+        assert!(result.is_ok()); // TODO assert_eq
+        assert!(!run.get());
+        assert_eq!(executor.wake_count(), 1);
+
+        executor.step();
+        assert!(run.get());
+    }
+
+    #[test]
+    fn spawning_task_inside_task() {
+        let executor = Executor::new();
+        let spawner = executor.spawner();
+        unsafe {
+            executor.spawn_pinned(Box::pin(async move {
+                let result = spawner.spawn_pinned(Box::pin(async {}));
+                assert!(result.is_ok()); // TODO assert_eq
+            }));
+        }
+
+        assert_eq!(executor.run_until_stalled(), 2);
+    }
+}
+
+mod spawn {
+    use super::*;
+
+    #[test]
+    fn dead_spawner_does_nothing() {
+        let run = Cell::new(false);
+        let spawner = Spawner::dead();
+
+        let result = unsafe { spawner.spawn(async { run.set(true) }) };
+        assert!(!run.get());
+
+        // Make sure the returned future is the same as the one passed in
+        let mut future = pin!(result.unwrap_err());
+        let mut context = Context::from_waker(noop_waker_ref());
+        let poll = future.as_mut().poll(&mut context);
+        assert!(poll.is_ready());
+        assert!(run.get());
+    }
+
+    #[test]
+    fn spawner_does_nothing_after_executor_was_dropped() {
+        let run = Cell::new(false);
+        let spawner = Executor::new().spawner();
+
+        let result = unsafe { spawner.spawn(async { run.set(true) }) };
+        assert!(!run.get());
+
+        // Make sure the returned future is the same as the one passed in
+        let mut future = pin!(result.unwrap_err());
+        let mut context = Context::from_waker(noop_waker_ref());
+        let poll = future.as_mut().poll(&mut context);
+        assert!(poll.is_ready());
+        assert!(run.get());
+    }
+
+    #[test]
+    fn spawning_task_outside_task() {
+        let executor = Executor::new();
+        let spawner = executor.spawner();
+
+        let receiver = {
+            let spawn_result = unsafe { spawner.spawn(async { 123 }) };
+            match spawn_result {
+                Ok(receiver) => receiver,
+                Err(_) => todo!("use unwrap"),
+            }
+        };
+        assert_eq!(executor.wake_count(), 1);
+        assert_eq!(receiver.try_receive(), Err(TryReceiveError::NotSent));
+
+        executor.step();
+        assert_eq!(receiver.try_receive(), Ok(123));
+    }
+
+    #[test]
+    fn spawning_task_inside_task() {
+        let executor = Executor::new();
+        let spawner = executor.spawner();
+        unsafe {
+            executor.spawn(async move {
+                let spawn_result = spawner.spawn(async { 123 });
+                let result = match spawn_result {
+                    Ok(receiver) => receiver.await,
+                    Err(_) => todo!("use unwrap"),
+                };
+                assert_eq!(result, 123);
+            });
+        }
+
+        assert_eq!(executor.run_until_stalled(), 2);
+    }
 }

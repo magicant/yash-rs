@@ -3,9 +3,10 @@
 
 //! Implementation of `Spawner`
 
+use crate::forwarder::Receiver;
 use crate::{ExecutorState, Spawner};
 use alloc::boxed::Box;
-use core::future::Future;
+use core::future::{Future, IntoFuture};
 use core::pin::Pin;
 
 impl<'a> Spawner<'a> {
@@ -44,5 +45,30 @@ impl<'a> Spawner<'a> {
         }
     }
 
-    // TODO spawn method that takes a non-pinned future that may return a non-unit output
+    /// Adds the given future to the executor's task queue so that it will be
+    /// polled when the executor is run.
+    ///
+    /// This method is an extended version of [`spawn_pinned`] that can take a
+    /// non-pinned future and may return a non-unit output. The result of the
+    /// future will be sent to the returned receiver.
+    ///
+    /// The added task is not polled immediately. It will be polled when the
+    /// executor runs tasks.
+    ///
+    /// # Safety
+    ///
+    /// See [`spawn_pinned`] for safety considerations.
+    ///
+    /// [`spawn_pinned`]: Self::spawn_pinned
+    pub unsafe fn spawn<F, T>(&self, future: F) -> Result<Receiver<T>, F>
+    where
+        F: IntoFuture<Output = T> + 'a,
+        T: 'a,
+    {
+        if let Some(state) = self.state.upgrade() {
+            Ok(ExecutorState::enqueue_forwarding(&state, future))
+        } else {
+            Err(future)
+        }
+    }
 }
