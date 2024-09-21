@@ -21,7 +21,7 @@ mod spawn_pinned {
         assert!(!run.get());
 
         // Make sure the returned future is the same as the one passed in
-        let mut future = result.unwrap_err();
+        let mut future = result.unwrap_err().0;
         let mut context = Context::from_waker(noop_waker_ref());
         let poll = future.as_mut().poll(&mut context);
         assert!(poll.is_ready());
@@ -37,7 +37,7 @@ mod spawn_pinned {
         assert!(!run.get());
 
         // Make sure the returned future is the same as the one passed in
-        let mut future = result.unwrap_err();
+        let mut future = result.unwrap_err().0;
         let mut context = Context::from_waker(noop_waker_ref());
         let poll = future.as_mut().poll(&mut context);
         assert!(poll.is_ready());
@@ -51,7 +51,7 @@ mod spawn_pinned {
         let spawner = executor.spawner();
 
         let result = unsafe { spawner.spawn_pinned(Box::pin(async { run.set(true) })) };
-        assert!(result.is_ok()); // TODO assert_eq
+        assert!(result.is_ok());
         assert!(!run.get());
         assert_eq!(executor.wake_count(), 1);
 
@@ -66,7 +66,7 @@ mod spawn_pinned {
         unsafe {
             executor.spawn_pinned(Box::pin(async move {
                 let result = spawner.spawn_pinned(Box::pin(async {}));
-                assert!(result.is_ok()); // TODO assert_eq
+                assert!(result.is_ok());
             }));
         }
 
@@ -86,7 +86,7 @@ mod spawn {
         assert!(!run.get());
 
         // Make sure the returned future is the same as the one passed in
-        let mut future = pin!(result.unwrap_err());
+        let mut future = pin!(result.unwrap_err().0);
         let mut context = Context::from_waker(noop_waker_ref());
         let poll = future.as_mut().poll(&mut context);
         assert!(poll.is_ready());
@@ -102,7 +102,7 @@ mod spawn {
         assert!(!run.get());
 
         // Make sure the returned future is the same as the one passed in
-        let mut future = pin!(result.unwrap_err());
+        let mut future = pin!(result.unwrap_err().0);
         let mut context = Context::from_waker(noop_waker_ref());
         let poll = future.as_mut().poll(&mut context);
         assert!(poll.is_ready());
@@ -114,13 +114,7 @@ mod spawn {
         let executor = Executor::new();
         let spawner = executor.spawner();
 
-        let receiver = {
-            let spawn_result = unsafe { spawner.spawn(async { 123 }) };
-            match spawn_result {
-                Ok(receiver) => receiver,
-                Err(_) => todo!("use unwrap"),
-            }
-        };
+        let receiver = { unsafe { spawner.spawn(async { 123 }) }.unwrap() };
         assert_eq!(executor.wake_count(), 1);
         assert_eq!(receiver.try_receive(), Err(TryReceiveError::NotSent));
 
@@ -134,11 +128,7 @@ mod spawn {
         let spawner = executor.spawner();
         unsafe {
             executor.spawn(async move {
-                let spawn_result = spawner.spawn(async { 123 });
-                let result = match spawn_result {
-                    Ok(receiver) => receiver.await,
-                    Err(_) => todo!("use unwrap"),
-                };
+                let result = spawner.spawn(async { 123 }).unwrap().await;
                 assert_eq!(result, 123);
             });
         }

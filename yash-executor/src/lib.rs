@@ -98,3 +98,5 @@ mod executor;
 mod spawner;
 mod task;
 mod waker;
+
+pub use spawner::SpawnError;

@@ -6,8 +6,27 @@
 use crate::forwarder::Receiver;
 use crate::{ExecutorState, Spawner};
 use alloc::boxed::Box;
+use core::fmt::Debug;
 use core::future::{Future, IntoFuture};
 use core::pin::Pin;
+
+/// Error returned when a task cannot be spawned
+///
+/// This error is returned from [`Spawner`]'s methods when the executor has been
+/// dropped and the task cannot be spawned. The error contains the task that
+/// could not be spawned, allowing the caller to reuse the task.
+///
+/// `SpawnError` implements `Debug` for all `F` regardless of whether `F` does.
+/// This allows the use of `unwrap` and `expect` on `Result<_, SpawnError<F>>`.
+#[derive(Clone, Copy, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct SpawnError<F>(pub F);
+
+impl<F> Debug for SpawnError<F> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        "SpawnError(_)".fmt(f)
+    }
+}
+// TODO Specialize Debug for F when F: Debug
 
 impl<'a> Spawner<'a> {
     /// Creates a dummy `Spawner` that is not associated with any executor and
@@ -22,8 +41,12 @@ impl<'a> Spawner<'a> {
     /// Adds the given future to the executor's task queue so that it will be
     /// polled when the executor is run.
     ///
+    /// The added task is not polled immediately. It will be polled when the
+    /// executor runs tasks.
+    ///
     /// If the executor has been dropped, this method will return the future
-    /// back to the caller.
+    /// wrapped in a `SpawnError`. The caller can then reuse the future with
+    /// another executor or handle the error in some other way.
     ///
     /// # Safety
     ///
@@ -36,12 +59,12 @@ impl<'a> Spawner<'a> {
     pub unsafe fn spawn_pinned(
         &self,
         future: Pin<Box<dyn Future<Output = ()> + 'a>>,
-    ) -> Result<(), Pin<Box<dyn Future<Output = ()> + 'a>>> {
+    ) -> Result<(), SpawnError<Pin<Box<dyn Future<Output = ()> + 'a>>>> {
         if let Some(state) = self.state.upgrade() {
             ExecutorState::enqueue(&state, future);
             Ok(())
         } else {
-            Err(future)
+            Err(SpawnError(future))
         }
     }
 
@@ -55,12 +78,16 @@ impl<'a> Spawner<'a> {
     /// The added task is not polled immediately. It will be polled when the
     /// executor runs tasks.
     ///
+    /// If the executor has been dropped, this method will return the future
+    /// wrapped in a `SpawnError`. The caller can then reuse the future with
+    /// another executor or handle the error in some other way.
+    ///
     /// # Safety
     ///
     /// See [`spawn_pinned`] for safety considerations.
     ///
     /// [`spawn_pinned`]: Self::spawn_pinned
-    pub unsafe fn spawn<F, T>(&self, future: F) -> Result<Receiver<T>, F>
+    pub unsafe fn spawn<F, T>(&self, future: F) -> Result<Receiver<T>, SpawnError<F>>
     where
         F: IntoFuture<Output = T> + 'a,
         T: 'a,
@@ -68,7 +95,7 @@ impl<'a> Spawner<'a> {
         if let Some(state) = self.state.upgrade() {
             Ok(ExecutorState::enqueue_forwarding(&state, future))
         } else {
-            Err(future)
+            Err(SpawnError(future))
         }
     }
 }
