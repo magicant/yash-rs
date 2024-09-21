@@ -56,6 +56,7 @@ impl<'a> Spawner<'a> {
     /// not protected by a lock or atomic operation, and it is your sole
     /// responsibility to ensure that the `Waker` is not passed to or accessed
     /// from other threads.
+    #[allow(clippy::type_complexity)]
     pub unsafe fn spawn_pinned(
         &self,
         future: Pin<Box<dyn Future<Output = ()> + 'a>>,

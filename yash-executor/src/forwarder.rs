@@ -118,7 +118,6 @@ impl<T> Receiver<T> {
                     Err(TryReceiveError::NotSent)
                 }
             }
-            Relay::Done => Err(TryReceiveError::AlreadyReceived),
 
             Relay::Computed(_) => {
                 let Relay::Computed(value) = core::mem::replace(relay, Relay::Done) else {
@@ -126,6 +125,8 @@ impl<T> Receiver<T> {
                 };
                 Ok(value)
             }
+
+            Relay::Done => Err(TryReceiveError::AlreadyReceived),
         }
     }
 }
