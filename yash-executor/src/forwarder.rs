@@ -96,33 +96,25 @@ pub enum TryReceiveError {
 impl<T> Sender<T> {
     /// Sends a value to the receiver.
     ///
-    /// The value is sent to the receiver if it has not been sent yet. If the
-    /// value has already been sent or the receiver has been dropped, the value
-    /// is returned back to the caller.
-    pub fn send(&self, value: T) -> Result<(), T> {
+    /// The value is sent to the receiver. If the the receiver has been dropped,
+    /// the value is returned back to the caller.
+    ///
+    /// This method consumes the sender, ensuring that the value is sent at most
+    /// once for each sender-receiver pair.
+    pub fn send(self, value: T) -> Result<(), T> {
         let Some(relay) = self.relay.upgrade() else {
-            // If the receiver has been dropped, there is no way of knowing
-            // whether the value has been received or not. We simply return the
-            // value to the caller without any further information.
             return Err(value);
         };
 
         let relay = &mut *relay.borrow_mut();
-        match relay {
-            Relay::Pending => {
-                *relay = Relay::Computed(value);
-                Ok(())
-            }
-
-            Relay::Polled(_) => {
-                let Relay::Polled(waker) = core::mem::replace(relay, Relay::Computed(value)) else {
-                    unreachable!()
-                };
+        match core::mem::replace(relay, Relay::Computed(value)) {
+            Relay::Pending => Ok(()),
+            Relay::Polled(waker) => {
                 waker.wake();
                 Ok(())
             }
-
-            Relay::Computed(_) | Relay::Done => Err(value),
+            // We can send only once, so these cases are impossible
+            Relay::Computed(_) | Relay::Done => unreachable!(),
         }
     }
 }

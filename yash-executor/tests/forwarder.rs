@@ -20,37 +20,10 @@ fn send_and_try_receive() {
 }
 
 #[test]
-fn sender_can_be_dropped_before_receiving() {
-    let (sender, receiver) = forwarder::<u32>();
-    let send_result = sender.send(42);
-    drop(sender);
-    assert_eq!(send_result, Ok(()));
-    let receive_result = receiver.try_receive();
-    assert_eq!(receive_result, Ok(42));
-}
-
-#[test]
 fn send_to_dropped_receiver() {
     let (sender, _) = forwarder::<u32>();
     let send_result = sender.send(42);
     assert_eq!(send_result, Err(42));
-}
-
-#[test]
-fn send_after_send() {
-    let (sender, _receiver) = forwarder::<u32>();
-    sender.send(1).unwrap();
-    let send_result = sender.send(2);
-    assert_eq!(send_result, Err(2));
-}
-
-#[test]
-fn send_after_received() {
-    let (sender, receiver) = forwarder::<u32>();
-    sender.send(1).unwrap();
-    receiver.try_receive().unwrap();
-    let send_result = sender.send(2);
-    assert_eq!(send_result, Err(2));
 }
 
 #[test]
