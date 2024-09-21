@@ -36,7 +36,7 @@ const VTABLE: &RawWakerVTable = &RawWakerVTable::new(clone, wake, wake_by_ref, d
 /// When the returned `Waker` is woken, the task will be enqueued to be polled
 /// by the executor.
 #[must_use]
-pub fn into_waker(task: Rc<Task>) -> Waker {
+pub(crate) fn into_waker(task: Rc<Task>) -> Waker {
     let data = Rc::into_raw(task).cast();
     let raw_waker = RawWaker::new(data, VTABLE);
     unsafe { Waker::from_raw(raw_waker) }
