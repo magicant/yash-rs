@@ -10,6 +10,7 @@
 
 use alloc::rc::{Rc, Weak};
 use core::cell::RefCell;
+use core::fmt::Display;
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll, Waker};
@@ -159,3 +160,24 @@ impl<T> Future for Receiver<T> {
         }
     }
 }
+
+impl Display for SendError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            SendError::ReceiverDropped => "receiver already dropped".fmt(f),
+            SendError::AlreadySent => "result already sent".fmt(f),
+        }
+    }
+}
+
+impl Display for TryReceiveError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            TryReceiveError::SenderDropped => "sender already dropped".fmt(f),
+            TryReceiveError::NotSent => "result not sent yet".fmt(f),
+            TryReceiveError::AlreadyReceived => "result already received".fmt(f),
+        }
+    }
+}
+
+// TODO Bump MSRV to 1.81.0 to impl core::error::Error for SendError and TryReceiveError
