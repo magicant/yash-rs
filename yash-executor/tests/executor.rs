@@ -41,7 +41,7 @@ mod spawn {
     #[test]
     fn does_not_poll_added_future() {
         let executor = Executor::new();
-        let _: Receiver<()> = unsafe { executor.spawn(async { unreachable!() }) };
+        let _receiver: Receiver<()> = unsafe { executor.spawn(async { unreachable!() }) };
     }
 
     #[test]
