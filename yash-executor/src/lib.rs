@@ -2,8 +2,8 @@
 // Copyright (C) 2024 WATANABE Yuki
 
 //! `yash-executor` is a library for running concurrent tasks in a
-//! single-threaded environment. This crate supports `no_std` configurations
-//! but requires the `alloc` crate.
+//! single-threaded context. This crate supports `no_std` configurations but
+//! requires the `alloc` crate.
 //!
 //! The [`Executor`] provided by this crate can be instantiated more than once
 //! to run multiple sets of tasks concurrently. Each executor maintains its
@@ -11,7 +11,41 @@
 //! different from other executor implementations that use a global or
 //! thread-local executor.
 //!
-//! TODO Elaborate
+//! This crate is free of locks and atomic operations at the cost of
+//! [unsafe spawning](Executor::spawn_pinned). Wakers used in this crate are
+//! thread-unsafe and not guarded by locks or atomics, so you must ensure that
+//! wakers are not shared between threads.
+//!
+//! ```
+//! # use yash_executor::Executor;
+//! # use yash_executor::forwarder::TryReceiveError;
+//! let executor = Executor::new();
+//!
+//! // Spawn a task that returns 42
+//! let receiver = unsafe { executor.spawn(async { 42 }) };
+//!
+//! // The task is not yet complete
+//! assert_eq!(receiver.try_receive(), Err(TryReceiveError::NotSent));
+//!
+//! // Run the executor until the task is complete
+//! executor.run_until_stalled();
+//!
+//! // Now we have the result
+//! assert_eq!(receiver.try_receive(), Ok(42));
+//! ```
+//!
+//! [`Spawner`]s provide a subset of the functionality of [`Executor`] to allow
+//! spawning tasks without access to the full executor. It is useful for adding
+//! tasks from within another task without creating cyclic
+//!
+//! The [`forwarder`] module provides utilities for forwarding the result of a
+//! future to another future. The [`forwarder`](forwarder::forwarder) function
+//! creates a pair of [`Sender`] and [`Receiver`] that share an internal state
+//! to communicate the result of a future. A `Receiver` is also returned from
+//! the [`Executor::spawn`] method to receive the result of a future.
+//!
+//! [`Sender`]: forwarder::Sender
+//! [`Receiver`]: forwarder::Receiver
 
 #![no_std]
 extern crate alloc;
@@ -26,7 +60,10 @@ use core::pin::Pin;
 
 /// Interface for running concurrent tasks
 ///
-/// TODO Elaborate
+/// You call the [`spawn_pinned`](Self::spawn_pinned) or [`spawn`](Self::spawn)
+/// method to add a task to the executor. Just adding a task to the executor
+/// does not run it. You need to call the [`step`](Self::step) or
+/// [`run_until_stalled`](Self::run_until_stalled) method to run the tasks.
 ///
 /// `Executor` implements `Clone` but all clones share the same set of tasks.
 /// Separately created `Executor` instances do not share tasks.
@@ -46,8 +83,23 @@ pub struct Executor<'a> {
 /// `Spawner` will not be able to spawn any more tasks.
 ///
 /// To obtain a `Spawner` from an `Executor`, use the [`Executor::spawner`]
-/// method. The [`dead()`](Self::dead) and `default()` functions return a
-/// `Spawner` that cannot spawn tasks.
+/// method. The [`dead`](Self::dead) and `default` functions return a `Spawner`
+/// that can never spawn tasks.
+///
+/// ```
+/// # use yash_executor::Executor;
+/// let executor = Executor::new();
+/// let spawner = executor.spawner();
+/// let final_receiver = unsafe {
+///     executor.spawn(async move {
+///         let receiver_1 = spawner.spawn(async { 1 }).unwrap();
+///         let receiver_2 = spawner.spawn(async { 2 }).unwrap();
+///         receiver_2.await + receiver_1.await
+///     })
+/// };
+/// executor.run_until_stalled();
+/// assert_eq!(final_receiver.try_receive(), Ok(3));
+/// ```
 #[derive(Clone, Debug, Default)]
 pub struct Spawner<'a> {
     state: Weak<RefCell<ExecutorState<'a>>>,

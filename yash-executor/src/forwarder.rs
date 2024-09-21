@@ -7,6 +7,25 @@
 //! can be used to forward the result of a future to another future. The sender
 //! half is used to send the result, and the receiver half is used to receive the
 //! result.
+//!
+//! ```
+//! # use yash_executor::forwarder::*;
+//! let (sender, receiver) = forwarder::<u32>();
+//!
+//! // The result is not yet available
+//! assert_eq!(receiver.try_receive(), Err(TryReceiveError::NotSent));
+//!
+//! // Send the result
+//! sender.send(42).unwrap();
+//!
+//! // The result is now available
+//! assert_eq!(receiver.try_receive(), Ok(42));
+//! ```
+//!
+//! If the `Sender` is dropped before sending the result, the `Receiver` will
+//! never receive the result. If the `Receiver` is dropped before receiving the
+//! result, the `Sender` will not be able to send the result, but it does not
+//! otherwise affect the task that produces the result.
 
 use alloc::rc::{Rc, Weak};
 use core::cell::RefCell;
@@ -29,12 +48,21 @@ enum Relay<T> {
 }
 
 /// Sender half of the forwarder
+///
+/// See the [module-level documentation](self) for more information.
 #[derive(Debug)]
 pub struct Sender<T> {
     relay: Weak<RefCell<Relay<T>>>,
 }
 
 /// Receiver half of the forwarder
+///
+/// Call [`try_receive`](Self::try_receive) to examine if the result has been
+/// sent from the sender. `Receiver` also implements the `Future` trait, so you
+/// can use it in an async block or function to receive the result
+/// asynchronously.
+///
+/// See also the [module-level documentation](self) for more information.
 #[derive(Debug)]
 pub struct Receiver<T> {
     relay: Rc<RefCell<Relay<T>>>,
@@ -60,6 +88,10 @@ pub enum SendError {
     ReceiverDropped,
     /// The value has already been sent.
     AlreadySent,
+    // TODO Remove this. It is not very meaningful to distinguish between the
+    // two cases. If the receiver is dropped after it receives the value, the
+    // sender will return ReceiverDropped, where AlreadySent would be more
+    // appropriate.
 }
 
 /// Error returned when receiving a value fails
@@ -67,7 +99,8 @@ pub enum SendError {
 /// This error may be returned from the [`Receiver::try_receive`] method.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TryReceiveError {
-    /// The sender has been dropped.
+    /// The sender has been dropped, which means the receiver will never receive
+    /// the value.
     SenderDropped,
     /// The value has not been sent yet.
     NotSent,
@@ -77,6 +110,10 @@ pub enum TryReceiveError {
 
 impl<T> Sender<T> {
     /// Sends a value to the receiver.
+    ///
+    /// The value is sent to the receiver if it has not been sent yet. If the
+    /// value has already been sent or the receiver has been dropped, the value
+    /// is returned back to the caller along with an error.
     pub fn send(&self, value: T) -> Result<(), (T, SendError)> {
         let Some(relay) = self.relay.upgrade() else {
             return Err((value, SendError::ReceiverDropped));
@@ -105,9 +142,9 @@ impl<T> Sender<T> {
 impl<T> Receiver<T> {
     /// Receives a value from the sender.
     ///
-    /// This method is similar to [`poll()`](Self::poll), but it does not
-    /// require a `Context` argument. If the value has not been sent yet, this
-    /// method returns `Err(TryReceiveError::NotSent)`.
+    /// This method is similar to [`poll`](Self::poll), but it does not require
+    /// a `Context` argument. If the value has not been sent yet, this method
+    /// returns `Err(TryReceiveError::NotSent)`.
     pub fn try_receive(&self) -> Result<T, TryReceiveError> {
         let relay = &mut *self.relay.borrow_mut();
         match relay {
@@ -136,10 +173,10 @@ impl<T> Future for Receiver<T> {
 
     /// Polls the receiver to receive the value.
     ///
-    /// This method is similar to [`try_receive()`](Self::try_receive), but it
+    /// This method is similar to [`try_receive`](Self::try_receive), but it
     /// requires a `Context` argument. If the value has not been sent yet, this
     /// method returns `Poll::Pending` and stores the `Waker` from the `Context`
-    /// for waking up the task when the value is sent.
+    /// for waking up the current task when the value is sent.
     ///
     /// This method should not be called after the value has been received.
     fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<T> {
