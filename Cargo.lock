@@ -605,6 +605,7 @@ name = "yash-executor"
 version = "1.0.0"
 dependencies = [
  "futures-task",
+ "pin-utils",
 ]
 
 [[package]]

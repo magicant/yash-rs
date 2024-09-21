@@ -2,10 +2,10 @@
 // Copyright (C) 2024 WATANABE Yuki
 
 use futures_task::noop_waker_ref;
+use pin_utils::pin_mut;
 use std::cell::Cell;
 use std::future::poll_fn;
 use std::future::Future as _;
-use std::pin::pin;
 use std::task::{Context, Poll};
 use yash_executor::forwarder::*;
 use yash_executor::Executor;
@@ -53,7 +53,7 @@ fn try_receive_after_received() {
 fn try_receive_does_not_modify_waker() {
     let received = Cell::new(false);
     let (sender, receiver) = forwarder::<()>();
-    let mut receiver = pin!(receiver);
+    pin_mut!(receiver); // TODO std::pin::pin requires Rust 1.68.0
     let executor = Executor::new();
     unsafe {
         executor.spawn_pinned(Box::pin(poll_fn(|context| {
@@ -122,7 +122,7 @@ fn second_poll_overwrites_waker() {
 
     let received = Cell::new(false);
     let (sender, receiver) = forwarder::<()>();
-    let mut receiver = pin!(receiver);
+    pin_mut!(receiver); // TODO std::pin::pin requires Rust 1.68.0
     let executor = Executor::new();
     unsafe {
         executor.spawn_pinned(Box::pin(poll_fn(|context| {

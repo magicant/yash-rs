@@ -2,9 +2,9 @@
 // Copyright (C) 2024 WATANABE Yuki
 
 use futures_task::noop_waker_ref;
+use pin_utils::pin_mut;
 use std::cell::Cell;
 use std::future::Future as _;
-use std::pin::pin;
 use std::task::Context;
 use yash_executor::forwarder::TryReceiveError;
 use yash_executor::{Executor, Spawner};
@@ -86,7 +86,8 @@ mod spawn {
         assert!(!run.get());
 
         // Make sure the returned future is the same as the one passed in
-        let mut future = pin!(result.unwrap_err().0);
+        let future = result.unwrap_err().0;
+        pin_mut!(future); // TODO std::pin::pin requires Rust 1.68.0
         let mut context = Context::from_waker(noop_waker_ref());
         let poll = future.as_mut().poll(&mut context);
         assert!(poll.is_ready());
@@ -102,7 +103,8 @@ mod spawn {
         assert!(!run.get());
 
         // Make sure the returned future is the same as the one passed in
-        let mut future = pin!(result.unwrap_err().0);
+        let future = result.unwrap_err().0;
+        pin_mut!(future); // TODO std::pin::pin requires Rust 1.68.0
         let mut context = Context::from_waker(noop_waker_ref());
         let poll = future.as_mut().poll(&mut context);
         assert!(poll.is_ready());
