@@ -36,7 +36,8 @@
 //!
 //! [`Spawner`]s provide a subset of the functionality of [`Executor`] to allow
 //! spawning tasks without access to the full executor. It is useful for adding
-//! tasks from within another task without creating cyclic
+//! tasks from within another task without creating cyclic dependencies, which
+//! can cause memory leaks.
 //!
 //! The [`forwarder`] module provides utilities for forwarding the result of a
 //! future to another future. The [`forwarder`](forwarder::forwarder) function

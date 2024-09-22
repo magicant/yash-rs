@@ -141,6 +141,8 @@ pub fn main() -> ! {
         let exit_status = parse_and_print(env).await;
         std::process::exit(exit_status.0);
     });
+    // SAFETY: We never create new threads in the whole process, so wakers are
+    // never shared between threads.
     unsafe { executor.spawn_pinned(task) }
     loop {
         executor.run_until_stalled();

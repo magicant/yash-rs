@@ -96,7 +96,7 @@ pub enum TryReceiveError {
 impl<T> Sender<T> {
     /// Sends a value to the receiver.
     ///
-    /// The value is sent to the receiver. If the the receiver has been dropped,
+    /// The value is sent to the receiver. If the receiver has been dropped,
     /// the value is returned back to the caller.
     ///
     /// This method consumes the sender, ensuring that the value is sent at most
