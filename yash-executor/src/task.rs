@@ -34,9 +34,7 @@ impl Task<'_> {
     /// If `self.executor` has been dropped or the task is polled recursively,
     /// this method panics.
     pub fn poll(self: &Rc<Self>) -> bool {
-        if self.executor.strong_count() == 0 {
-            panic!("executor has been dropped");
-        }
+        assert_ne!(self.executor.strong_count(), 0, "executor has been dropped");
 
         let mut future_or_none = self
             .future
