@@ -28,6 +28,10 @@ assert_eq!(p.find("string"), Some(2..6));
 
 [MIT](LICENSE-MIT) or [Apache 2.0](LICENSE-Apache), at your option
 
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
+dual licensed as above, without any additional terms or conditions.
+
 ## Similar crates
 
 `yash-fnmatch` is very similar to the

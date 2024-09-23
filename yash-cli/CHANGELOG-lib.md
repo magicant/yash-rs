@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `default_rcfile_path`
     - `resolve_rcfile_path`
     - `DefaultFilePathError`
+- Internal dependencies:
+    - yash-executor 1.0.0
 
 ### Changed
 
@@ -51,6 +53,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - When the shell cannot open a script specified by the command-line argument,
   it now returns the exit status of 126 or 127 as required by POSIX. Previously,
   it returned the exit status of 2.
+
+### Removed
+
+- Internal dependencies:
+    - futures-executor 0.3.28
+    - futures-util 0.3.28
 
 ## [0.1.0-beta.2] - 2024-07-13
 
