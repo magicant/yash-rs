@@ -17,9 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - This `Input` decorator implements the behavior of the `ignoreeof` shell option.
 - `system::virtual::FileBody::Terminal`
     - This is a new variant of `FileBody` that represents a terminal device.
+- Internal dependencies:
+    - yash-executor 1.0.0
 
 ### Changed
 
+- The child process created by `system::real::RealSystem::new_child_process`
+  now uses a new executor instead of reusing the executor inherited from the
+  parent process.
 - `system::virtual::FileBody` is now `non_exhaustive`.
 - `system::virtual::VirtualSystem::isatty` now returns true for a file
   descriptor associated with `FileBody::Terminal`.

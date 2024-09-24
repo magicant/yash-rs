@@ -84,6 +84,7 @@ use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use std::time::Instant;
+use yash_executor::Executor;
 
 trait ErrnoIfM1: PartialEq + Sized {
     const MINUS_1: Self;
@@ -677,10 +678,25 @@ impl System for RealSystem {
             Parent { child } => Ok(Box::new(move |_env, _task| {
                 Box::pin(std::future::ready(Pid::from_nix(child)))
             })),
+
             Child => Ok(Box::new(|env, task| {
                 Box::pin(async move {
-                    task(env).await;
-                    std::process::exit(env.exit_status.0)
+                    let system = env.system.clone();
+                    // Here we create a new executor to run the task. This makes sure that any
+                    // other concurrent tasks in the parent process do not interfere with the
+                    // child process.
+                    let executor = Executor::new();
+                    let task = Box::pin(async move {
+                        task(env).await;
+                        std::process::exit(env.exit_status.0)
+                    });
+                    // SAFETY: We never create new threads in the whole process, so wakers are
+                    // never shared between threads.
+                    unsafe { executor.spawn_pinned(task) }
+                    loop {
+                        executor.run_until_stalled();
+                        system.select(false).ok();
+                    }
                 })
             })),
         }

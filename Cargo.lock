@@ -586,6 +586,7 @@ dependencies = [
  "thiserror",
  "unix_path",
  "unix_str",
+ "yash-executor",
  "yash-quote",
  "yash-syntax",
 ]
