@@ -543,9 +543,7 @@ pub type ChildProcessTask =
 /// This function only starts the child, which continues to run asynchronously
 /// after the function returns its PID. To wait for the child to finish and
 /// obtain its exit status, use [`System::wait`].
-pub type ChildProcessStarter = Box<
-    dyn for<'a> FnOnce(&'a mut Env, ChildProcessTask) -> Pin<Box<dyn Future<Output = Pid> + 'a>>,
->;
+pub type ChildProcessStarter = Box<dyn FnOnce(&mut Env, ChildProcessTask) -> Pid>;
 
 /// Extension for [`System`]
 ///

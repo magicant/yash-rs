@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The child process created by `system::real::RealSystem::new_child_process`
   now uses a new executor instead of reusing the executor inherited from the
   parent process.
+- `system::ChildProcessStarter` has been redefined as
+  `Box<dyn FnOnce(&mut Env, ChildProcessTask) -> Pid>`. The function now
+  directly returns the PID of the child process instead of a future that
+  resolves to the PID.
 - `system::virtual::FileBody` is now `non_exhaustive`.
 - `system::virtual::VirtualSystem::isatty` now returns true for a file
   descriptor associated with `FileBody::Terminal`.
