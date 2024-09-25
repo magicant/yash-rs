@@ -839,7 +839,7 @@ impl System for VirtualSystem {
     /// the same process.
     ///
     /// To run the concurrent task, this function needs an executor that has
-    /// been set in the system state. If the system state does not have an
+    /// been set in the [`SystemState`]. If the system state does not have an
     /// executor, this function fails with `Errno::ENOSYS`.
     ///
     /// The process ID of the child will be the maximum of existing process IDs

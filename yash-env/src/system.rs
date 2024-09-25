@@ -381,9 +381,11 @@ pub trait System: Debug {
     /// environment can condition the state of the child process before it
     /// starts running.
     ///
-    /// If successful, this function returns a [`ChildProcessStarter`] function. The
-    /// caller must call the starter exactly once to make sure the parent and
-    /// child processes perform correctly after forking.
+    /// Because we need the parent environment to create the child environment,
+    /// this method cannot initiate the child task directly. Instead, it returns
+    /// a [`ChildProcessStarter`] function that takes the parent environment and
+    /// the child task. The caller must call the starter to make sure the parent
+    /// and child processes perform correctly after forking.
     fn new_child_process(&mut self) -> Result<ChildProcessStarter>;
 
     /// Reports updated status of a child process.
@@ -526,19 +528,21 @@ pub type ChildProcessTask =
 /// Abstract function that starts a child process
 ///
 /// [`System::new_child_process`] returns a child process starter. You need to
-/// pass the parent environment and a task to run in the child.
+/// pass the parent environment and a task to the starter to complete the child
+/// process creation. The starter provides a unified interface that hides the
+/// differences between [`RealSystem`] and [`VirtualSystem`].
 ///
-/// [`RealSystem`]'s `new_child_process` performs a `fork` system call and
-/// returns a starter in the parent and child processes. When the starter is
-/// called in the parent, it just returns the child process ID. The starter in
-/// the child process runs the task and exits the process with the exit status
-/// of the task.
+/// [`RealSystem::new_child_process`] performs a `fork` system call and returns
+/// a starter in the parent and child processes. When the starter is called in
+/// the parent, it just returns the child process ID. The starter in the child
+/// process runs the task and exits the process with the exit status of the
+/// task.
 ///
-/// For [`VirtualSystem`], no real child process is created. Instead, the
-/// starter runs the task concurrently in the current process using the executor
-/// contained in the system. A new [`Process`](virtual::Process) is added to the
-/// system to represent the child process. The starter returns its process ID.
-/// See also [`VirtualSystem::new_child_process`].
+/// [`VirtualSystem::new_child_process`] does ont create a real child process.
+/// Instead, the starter runs the task concurrently in the current process using
+/// the executor contained in the system. A new [`Process`](virtual::Process) is
+/// added to the system to represent the child process. The starter returns its
+/// process ID.
 ///
 /// This function only starts the child, which continues to run asynchronously
 /// after the function returns its PID. To wait for the child to finish and
