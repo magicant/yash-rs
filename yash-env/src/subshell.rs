@@ -199,7 +199,7 @@ where
 
         // Start the child
         let child = mask_guard.env.system.new_child_process()?;
-        let child_pid = child(mask_guard.env, task).await;
+        let child_pid = child(mask_guard.env, task);
 
         // The finishing
         if job_control.is_some() {

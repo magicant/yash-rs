@@ -839,7 +839,7 @@ impl System for VirtualSystem {
     /// the same process.
     ///
     /// To run the concurrent task, this function needs an executor that has
-    /// been set in the system state. If the system state does not have an
+    /// been set in the [`SystemState`]. If the system state does not have an
     /// executor, this function fails with `Errno::ENOSYS`.
     ///
     /// The process ID of the child will be the maximum of existing process IDs
@@ -859,43 +859,41 @@ impl System for VirtualSystem {
 
         let state = Rc::clone(&self.state);
         Ok(Box::new(move |parent_env, task| {
-            Box::pin(async move {
-                let mut system = VirtualSystem { state, process_id };
-                let mut child_env = parent_env.clone_with_system(Box::new(system.clone()));
+            let mut system = VirtualSystem { state, process_id };
+            let mut child_env = parent_env.clone_with_system(Box::new(system.clone()));
 
+            {
+                let mut process = system.current_process_mut();
+                process.selector = Rc::downgrade(&child_env.system.0);
+            }
+
+            let run_task_and_set_exit_status = Box::pin(async move {
+                let mut runner = ProcessRunner {
+                    task: task(&mut child_env),
+                    system,
+                    waker: Rc::new(Cell::new(None)),
+                };
+                (&mut runner).await;
+
+                let ProcessRunner { system, .. } = { runner };
+                let mut state = system.state.borrow_mut();
+                let process = state
+                    .processes
+                    .get_mut(&process_id)
+                    .expect("missing child process");
+                if process.state == ProcessState::Running
+                    && process.set_state(ProcessState::exited(child_env.exit_status))
                 {
-                    let mut process = system.current_process_mut();
-                    process.selector = Rc::downgrade(&child_env.system.0);
+                    let ppid = process.ppid;
+                    raise_sigchld(&mut state, ppid);
                 }
+            });
 
-                let run_task_and_set_exit_status = Box::pin(async move {
-                    let mut runner = ProcessRunner {
-                        task: task(&mut child_env),
-                        system,
-                        waker: Rc::new(Cell::new(None)),
-                    };
-                    (&mut runner).await;
+            executor
+                .spawn(run_task_and_set_exit_status)
+                .expect("the executor failed to start the child process task");
 
-                    let ProcessRunner { system, .. } = { runner };
-                    let mut state = system.state.borrow_mut();
-                    let process = state
-                        .processes
-                        .get_mut(&process_id)
-                        .expect("missing child process");
-                    if process.state == ProcessState::Running
-                        && process.set_state(ProcessState::exited(child_env.exit_status))
-                    {
-                        let ppid = process.ppid;
-                        raise_sigchld(&mut state, ppid);
-                    }
-                });
-
-                executor
-                    .spawn(run_task_and_set_exit_status)
-                    .expect("the executor failed to start the child process task");
-
-                process_id
-            })
+            process_id
         }))
     }
 
@@ -2120,13 +2118,11 @@ mod tests {
 
     #[test]
     fn setpgid_creating_new_group_from_parent() {
-        let (system, mut executor) = virtual_system_with_executor();
+        let (system, _executor) = virtual_system_with_executor();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let child = env.system.new_child_process().unwrap();
-        let future = child(&mut env, Box::new(|_env| Box::pin(pending())));
-        let pid = executor.run_until(future);
-        executor.run_until_stalled();
+        let pid = child(&mut env, Box::new(|_env| Box::pin(pending())));
 
         let result = env.system.setpgid(pid, pid);
         assert_eq!(result, Ok(()));
@@ -2141,7 +2137,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let child = env.system.new_child_process().unwrap();
-        let future = child(
+        let pid = child(
             &mut env,
             Box::new(|child_env| {
                 Box::pin(async move {
@@ -2150,7 +2146,6 @@ mod tests {
                 })
             }),
         );
-        let pid = executor.run_until(future);
         executor.run_until_stalled();
 
         let pgid = state.borrow().processes[&pid].pgid();
@@ -2159,17 +2154,14 @@ mod tests {
 
     #[test]
     fn setpgid_extending_existing_group_from_parent() {
-        let (system, mut executor) = virtual_system_with_executor();
+        let (system, _executor) = virtual_system_with_executor();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let child_1 = env.system.new_child_process().unwrap();
-        let future = child_1(&mut env, Box::new(|_env| Box::pin(pending())));
-        let pid_1 = executor.run_until(future);
+        let pid_1 = child_1(&mut env, Box::new(|_env| Box::pin(pending())));
         env.system.setpgid(pid_1, pid_1).unwrap();
         let child_2 = env.system.new_child_process().unwrap();
-        let future = child_2(&mut env, Box::new(|_env| Box::pin(pending())));
-        let pid_2 = executor.run_until(future);
-        executor.run_until_stalled();
+        let pid_2 = child_2(&mut env, Box::new(|_env| Box::pin(pending())));
 
         let result = env.system.setpgid(pid_2, pid_1);
         assert_eq!(result, Ok(()));
@@ -2180,13 +2172,11 @@ mod tests {
 
     #[test]
     fn setpgid_with_nonexisting_pid() {
-        let (system, mut executor) = virtual_system_with_executor();
+        let (system, _executor) = virtual_system_with_executor();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let child = env.system.new_child_process().unwrap();
-        let future = child(&mut env, Box::new(|_env| Box::pin(pending())));
-        let pid = executor.run_until(future);
-        executor.run_until_stalled();
+        let pid = child(&mut env, Box::new(|_env| Box::pin(pending())));
 
         let dummy_pid = Pid(123);
         let result = env.system.setpgid(dummy_pid, dummy_pid);
@@ -2203,7 +2193,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let child = env.system.new_child_process().unwrap();
-        let future = child(
+        let _pid = child(
             &mut env,
             Box::new(move |child_env| {
                 Box::pin(async move {
@@ -2212,7 +2202,6 @@ mod tests {
                 })
             }),
         );
-        let _pid = executor.run_until(future);
         executor.run_until_stalled();
 
         let pgid = state.borrow().processes[&parent_pid].pgid();
@@ -2234,7 +2223,7 @@ mod tests {
         state.borrow_mut().file_system.save(path, content).unwrap();
         let mut env = Env::with_system(Box::new(system));
         let child = env.system.new_child_process().unwrap();
-        let future = child(
+        let pid = child(
             &mut env,
             Box::new(move |child_env| {
                 Box::pin(async move {
@@ -2243,7 +2232,6 @@ mod tests {
                 })
             }),
         );
-        let pid = executor.run_until(future);
         executor.run_until_stalled();
 
         let result = env.system.setpgid(pid, pid);
@@ -2259,12 +2247,10 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let child_1 = env.system.new_child_process().unwrap();
-        let future = child_1(&mut env, Box::new(|_env| Box::pin(pending())));
-        let pid_1 = executor.run_until(future);
+        let pid_1 = child_1(&mut env, Box::new(|_env| Box::pin(pending())));
         // env.system.setpgid(pid_1, pid_1).unwrap();
         let child_2 = env.system.new_child_process().unwrap();
-        let future = child_2(&mut env, Box::new(|_env| Box::pin(pending())));
-        let pid_2 = executor.run_until(future);
+        let pid_2 = child_2(&mut env, Box::new(|_env| Box::pin(pending())));
         executor.run_until_stalled();
 
         let result = env.system.setpgid(pid_2, pid_1);
@@ -2318,7 +2304,7 @@ mod tests {
 
     #[test]
     fn new_child_process_with_executor() {
-        let (mut system, mut executor) = virtual_system_with_executor();
+        let (mut system, _executor) = virtual_system_with_executor();
 
         let result = system.new_child_process();
 
@@ -2328,21 +2314,19 @@ mod tests {
 
         let mut env = Env::with_system(Box::new(system));
         let child_process = result.unwrap();
-        let future = child_process(&mut env, Box::new(|_env| Box::pin(async {})));
-        let pid = executor.run_until(future);
+        let pid = child_process(&mut env, Box::new(|_env| Box::pin(async {})));
         assert_eq!(pid, Pid(3));
     }
 
     #[test]
     fn wait_for_running_child() {
-        let (mut system, mut executor) = virtual_system_with_executor();
+        let (mut system, _executor) = virtual_system_with_executor();
 
         let child_process = system.new_child_process();
 
         let mut env = Env::with_system(Box::new(system));
         let child_process = child_process.unwrap();
-        let future = child_process(&mut env, Box::new(|_env| Box::pin(async move {})));
-        let pid = executor.run_until(future);
+        let pid = child_process(&mut env, Box::new(|_env| Box::pin(async move {})));
 
         let result = env.system.wait(pid);
         assert_eq!(result, Ok(None))
@@ -2356,15 +2340,10 @@ mod tests {
 
         let mut env = Env::with_system(Box::new(system));
         let child_process = child_process.unwrap();
-        let future = child_process(
+        let pid = child_process(
             &mut env,
-            Box::new(|env| {
-                Box::pin(async move {
-                    env.exit_status = ExitStatus(5);
-                })
-            }),
+            Box::new(|env| Box::pin(async move { env.exit_status = ExitStatus(5) })),
         );
-        let pid = executor.run_until(future);
         executor.run_until_stalled();
 
         let result = env.system.wait(pid);
@@ -2379,7 +2358,7 @@ mod tests {
 
         let mut env = Env::with_system(Box::new(system));
         let child_process = child_process.unwrap();
-        let future = child_process(
+        let pid = child_process(
             &mut env,
             Box::new(|env| {
                 Box::pin(async move {
@@ -2389,7 +2368,6 @@ mod tests {
                 })
             }),
         );
-        let pid = executor.run_until(future);
         executor.run_until_stalled();
 
         let result = env.system.wait(pid);
@@ -2413,7 +2391,7 @@ mod tests {
 
         let mut env = Env::with_system(Box::new(system));
         let child_process = child_process.unwrap();
-        let future = child_process(
+        let pid = child_process(
             &mut env,
             Box::new(|env| {
                 Box::pin(async move {
@@ -2423,7 +2401,6 @@ mod tests {
                 })
             }),
         );
-        let pid = executor.run_until(future);
         executor.run_until_stalled();
 
         let result = env.system.wait(pid);
@@ -2438,7 +2415,7 @@ mod tests {
 
         let mut env = Env::with_system(Box::new(system));
         let child_process = child_process.unwrap();
-        let future = child_process(
+        let pid = child_process(
             &mut env,
             Box::new(|env| {
                 Box::pin(async move {
@@ -2449,7 +2426,6 @@ mod tests {
                 })
             }),
         );
-        let pid = executor.run_until(future);
         executor.run_until_stalled();
 
         env.system
@@ -2492,8 +2468,7 @@ mod tests {
         let child_process = system.new_child_process().unwrap();
 
         let mut env = Env::with_system(Box::new(system));
-        let future = child_process(&mut env, Box::new(|_env| Box::pin(async {})));
-        executor.run_until(future);
+        let _pid = child_process(&mut env, Box::new(|_env| Box::pin(async {})));
         executor.run_until_stalled();
 
         assert_eq!(env.system.caught_signals(), [SIGCHLD]);
