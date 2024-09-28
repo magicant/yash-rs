@@ -1,6 +1,6 @@
 [package]
 name = "yash-env-test-helper"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2021"
 rust-version = "1.79.0"
@@ -17,4 +17,4 @@ categories = ["command-line-utilities"]
 assert_matches = "1.5.0"
 futures-executor = "0.3.28"
 futures-util = { version = "0.3.28", features = ["channel"] }
-yash-env = { path = "../yash-env", version = "0.3.0" }
+yash-env = { path = "../yash-env", version = "0.4.0" }

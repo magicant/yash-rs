@@ -5,7 +5,7 @@ All notable changes to `yash-prompt` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - Unreleased
+## [0.2.0] - 2024-09-29
 
 ### Changed
 
@@ -13,8 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   definition of the `next_line` method.
 - External dependency versions:
     - Rust 1.77.0 → 1.79.0
-    - yash-env 0.2.0 → 0.3.0
-    - yash-syntax 0.10.0 → 0.11.0
+    - yash-env 0.2.0 → 0.4.0
+    - yash-syntax 0.10.0 → 0.12.0
+- Internal dependency versions:
+    - yash-semantics 0.3.0 → 0.4.0
 
 ### Removed
 

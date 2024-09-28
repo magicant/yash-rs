@@ -5,7 +5,7 @@ All notable changes to `yash-env` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] - Unreleased
+## [0.4.0] - 2024-09-29
 
 ### Added
 
@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `impl yash_syntax::input::Input` for `input::FdReader`, `input::Echo`,
   `input::IgnoreEof`, and `input::Reporter` now conforms to the new definition
   of the `next_line` method.
+- External dependency versions:
+    - yash-syntax 0.11.0 → 0.12.0
 
 ### Removed
 
