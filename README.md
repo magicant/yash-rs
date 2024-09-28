@@ -4,7 +4,7 @@ This is a reimplementation project of [Yet Another Shell (yash)](https://magican
 Currently, only a minimal subset of the original yash is implemented.
 It will be extended to cover more features in the future.
 
-[![Build status](https://github.com/magicant/yash-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/magicant/yash-rs/actions/workflows/rust.yml)
+[![Build status](https://github.com/magicant/yash-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/magicant/yash-rs/actions/workflows/ci.yml)
 
 ## Features
 

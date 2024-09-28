@@ -11,7 +11,7 @@ or atomics, so you must ensure that wakers are not shared between threads.
 
 [![yash-executor at crates.io](https://img.shields.io/crates/v/yash-executor.svg)](https://crates.io/crates/yash-executor)
 [![yash-executor at docs.rs](https://docs.rs/yash-executor/badge.svg)](https://docs.rs/yash-executor)
-[![Build status](https://github.com/magicant/yash-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/magicant/yash-rs/actions/workflows/rust.yml)
+[![Build status](https://github.com/magicant/yash-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/magicant/yash-rs/actions/workflows/ci.yml)
 
 - [Changelog](CHANGELOG.md)
 

@@ -6,7 +6,7 @@ This crate is part of [yash](../README.md).
 
 [![yash-env at crates.io](https://img.shields.io/crates/v/yash-env.svg)](https://crates.io/crates/yash-env)
 [![yash-env at docs.rs](https://docs.rs/yash-env/badge.svg)](https://docs.rs/yash-env)
-[![Build status](https://github.com/magicant/yash-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/magicant/yash-rs/actions/workflows/rust.yml)
+[![Build status](https://github.com/magicant/yash-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/magicant/yash-rs/actions/workflows/ci.yml)
 
 - [Changelog](CHANGELOG.md)
 

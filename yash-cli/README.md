@@ -6,7 +6,7 @@ programs.
 
 [![yash-cli at crates.io](https://img.shields.io/crates/v/yash-cli.svg)](https://crates.io/crates/yash-cli)
 [![yash-cli at docs.rs](https://docs.rs/yash-cli/badge.svg)](https://docs.rs/yash-cli)
-[![Build status](https://github.com/magicant/yash-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/magicant/yash-rs/actions/workflows/rust.yml)
+[![Build status](https://github.com/magicant/yash-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/magicant/yash-rs/actions/workflows/ci.yml)
 
 - [Changelog for the entire shell binary](CHANGELOG-bin.md)
 - [Changelog for the library crate](CHANGELOG-lib.md)
