@@ -15,11 +15,11 @@ categories = ["command-line-utilities", "parser-implementations"]
 
 [dependencies]
 annotate-snippets = { version = "0.11.4", optional = true }
-futures-util = "0.3.28"
+futures-util = "0.3.31"
 itertools = "0.13.0"
 thiserror = "1.0.47"
 
 [dev-dependencies]
 annotate-snippets = "0.11.4"
 assert_matches = "1.5.0"
-futures-executor = "0.3.28"
+futures-executor = "0.3.31"
