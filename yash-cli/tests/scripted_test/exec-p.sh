@@ -12,6 +12,14 @@ __IN__
 reached
 __OUT__
 
+: TODO Not implemented yet <<\__OUT__
+test_oE 'exec without arguments but -- separator'
+exec --
+echo $?
+__IN__
+0
+__OUT__
+
 test_Oe 'exec with redirections'
 exec >&2 2>/dev/null
 echo reached
@@ -39,6 +47,11 @@ __OUT__
 
 test_OE -e 0 'executing external command with option'
 exec cat -u /dev/null
+__IN__
+
+: TODO Not implemented yet <<\__IN__
+test_OE -e 0 'executing external command with -- separator'
+exec -- cat /dev/null
 __IN__
 
 test_OE -e 0 'process ID of executed process'

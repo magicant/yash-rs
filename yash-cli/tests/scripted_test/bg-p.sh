@@ -19,7 +19,7 @@ test_O -d -e n 'bg cannot be used when job control is disabled' +m
 bg
 __IN__
 
-test_oE 'default operand chooses most recently suspended job' -m
+test_o 'default operand chooses most recently suspended job' -m
 :&
 sh -c 'kill -s STOP $$; echo 1'
 bg >/dev/null
@@ -35,7 +35,7 @@ bg >/dev/null
 kill %
 __IN__
 
-test_OE -e 17 'resumed job is awaitable' -m
+test_O -e 17 'resumed job is awaitable' -m
 sh -c 'kill -s STOP $$; exit 17'
 bg >/dev/null
 sleep 0
@@ -51,7 +51,7 @@ sleep 0
 wait %
 __IN__
 
-test_oE 'specifying job ID' -m
+test_o 'specifying job ID' -m
 ./job1
 ./job2
 echo -
@@ -65,7 +65,7 @@ __IN__
 
 __OUT__
 
-test_oE 'specifying more than one job ID' -m
+test_o 'specifying more than one job ID' -m
 ./job1
 ./job2
 echo -
@@ -78,13 +78,13 @@ __IN__
 
 __OUT__
 
-test_OE -e 0 'bg prints resumed job' -m
+test_O -e 0 'bg prints resumed job' -m
 sleep 1&
 bg >bg.out
 grep -qx '\[[[:digit:]][[:digit:]]*][[:blank:]]*sleep 1' bg.out
 __IN__
 
-test_OE -e 0 'exit status of bg' -m
+test_O -e 0 'exit status of bg' -m
 sh -c 'kill -s STOP $$; exit 17'
 bg >/dev/null
 __IN__
