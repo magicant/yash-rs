@@ -18,7 +18,6 @@
 
 use super::super::{FileType, Gid, Mode, RawMode, Stat, Uid};
 use std::mem::MaybeUninit;
-use std::ptr::addr_of;
 
 impl FileType {
     #[must_use]
@@ -45,16 +44,16 @@ impl Stat {
     #[must_use]
     pub(super) const fn from_raw(stat: &MaybeUninit<nix::libc::stat>) -> Self {
         let ptr = stat.as_ptr();
-        let raw_mode = unsafe { addr_of!((*ptr).st_mode).read() };
+        let raw_mode = unsafe { (&raw const (*ptr).st_mode).read() };
         Self {
-            dev: unsafe { addr_of!((*ptr).st_dev).read() } as _,
-            ino: unsafe { addr_of!((*ptr).st_ino).read() } as _,
+            dev: unsafe { (&raw const (*ptr).st_dev).read() } as _,
+            ino: unsafe { (&raw const (*ptr).st_ino).read() } as _,
             mode: Mode::from_bits_truncate(raw_mode),
             r#type: FileType::from_raw(raw_mode),
-            nlink: unsafe { addr_of!((*ptr).st_nlink).read() } as _,
-            uid: Uid(unsafe { addr_of!((*ptr).st_uid).read() }),
-            gid: Gid(unsafe { addr_of!((*ptr).st_gid).read() }),
-            size: unsafe { addr_of!((*ptr).st_size).read() } as _,
+            nlink: unsafe { (&raw const (*ptr).st_nlink).read() } as _,
+            uid: Uid(unsafe { (&raw const (*ptr).st_uid).read() }),
+            gid: Gid(unsafe { (&raw const (*ptr).st_gid).read() }),
+            size: unsafe { (&raw const (*ptr).st_size).read() } as _,
         }
     }
 }

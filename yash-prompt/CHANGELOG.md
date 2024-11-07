@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- External dependency versions:
+    - Rust 1.79.0 → 1.82.0
 - Internal dependency versions:
     - futures-util 0.3.28 → 0.3.31
 

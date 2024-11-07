@@ -76,8 +76,6 @@ use std::os::unix::ffi::OsStrExt as _;
 use std::os::unix::ffi::OsStringExt as _;
 use std::os::unix::io::IntoRawFd;
 use std::pin::Pin;
-use std::ptr::addr_of;
-use std::ptr::addr_of_mut;
 use std::ptr::NonNull;
 use std::sync::atomic::compiler_fence;
 use std::sync::atomic::AtomicIsize;
@@ -162,8 +160,8 @@ fn to_timespec(duration: Duration) -> MaybeUninit<nix::libc::timespec> {
         .unwrap_or(nix::libc::time_t::MAX);
     let mut timespec = MaybeUninit::<nix::libc::timespec>::uninit();
     unsafe {
-        addr_of_mut!((*timespec.as_mut_ptr()).tv_sec).write(seconds);
-        addr_of_mut!((*timespec.as_mut_ptr()).tv_nsec).write(duration.subsec_nanos() as _);
+        (&raw mut (*timespec.as_mut_ptr()).tv_sec).write(seconds);
+        (&raw mut (*timespec.as_mut_ptr()).tv_nsec).write(duration.subsec_nanos() as _);
     }
     timespec
 }
@@ -434,10 +432,10 @@ impl System for RealSystem {
         // SAFETY: The four fields of `tms` have been initialized by `times`.
         // (But that does not mean *all* fields are initialized,
         // so we cannot use `assume_init` here.)
-        let utime = unsafe { addr_of!((*tms.as_ptr()).tms_utime).read() };
-        let stime = unsafe { addr_of!((*tms.as_ptr()).tms_stime).read() };
-        let cutime = unsafe { addr_of!((*tms.as_ptr()).tms_cutime).read() };
-        let cstime = unsafe { addr_of!((*tms.as_ptr()).tms_cstime).read() };
+        let utime = unsafe { (&raw const (*tms.as_ptr()).tms_utime).read() };
+        let stime = unsafe { (&raw const (*tms.as_ptr()).tms_stime).read() };
+        let cutime = unsafe { (&raw const (*tms.as_ptr()).tms_cutime).read() };
+        let cstime = unsafe { (&raw const (*tms.as_ptr()).tms_cstime).read() };
 
         Ok(Times {
             self_user: utime as f64 / ticks_per_second as f64,
@@ -518,7 +516,7 @@ impl System for RealSystem {
             let new_action = handling.to_sigaction();
 
             let mut old_action = MaybeUninit::<nix::libc::sigaction>::uninit();
-            let old_mask_ptr = addr_of_mut!((*old_action.as_mut_ptr()).sa_mask);
+            let old_mask_ptr = &raw mut (*old_action.as_mut_ptr()).sa_mask;
             // POSIX requires *all* sigset_t objects to be initialized before use.
             nix::libc::sigemptyset(old_mask_ptr).errno_if_m1()?;
 
@@ -838,8 +836,8 @@ impl System for RealSystem {
         let mut limits = MaybeUninit::<nix::libc::rlimit>::uninit();
         unsafe { nix::libc::getrlimit(raw_resource as _, limits.as_mut_ptr()) }.errno_if_m1()?;
         Ok(LimitPair {
-            soft: unsafe { addr_of!((*limits.as_ptr()).rlim_cur).read() },
-            hard: unsafe { addr_of!((*limits.as_ptr()).rlim_max).read() },
+            soft: unsafe { (&raw const (*limits.as_ptr()).rlim_cur).read() },
+            hard: unsafe { (&raw const (*limits.as_ptr()).rlim_max).read() },
         })
     }
 
@@ -848,8 +846,8 @@ impl System for RealSystem {
 
         let mut rlimit = MaybeUninit::<nix::libc::rlimit>::uninit();
         unsafe {
-            addr_of_mut!((*rlimit.as_mut_ptr()).rlim_cur).write(limits.soft);
-            addr_of_mut!((*rlimit.as_mut_ptr()).rlim_max).write(limits.hard);
+            (&raw mut (*rlimit.as_mut_ptr()).rlim_cur).write(limits.soft);
+            (&raw mut (*rlimit.as_mut_ptr()).rlim_max).write(limits.hard);
         }
 
         unsafe { nix::libc::setrlimit(raw_resource as _, rlimit.as_ptr()) }.errno_if_m1()?;
@@ -882,7 +880,7 @@ impl Dir for RealDir {
             }
         } else {
             // TODO Use as_ptr rather than cast when array_ptr_get is stabilized
-            let name = unsafe { CStr::from_ptr(addr_of!((*entry).d_name).cast()) };
+            let name = unsafe { CStr::from_ptr((&raw const (*entry).d_name).cast()) };
             let name = UnixStr::from_bytes(name.to_bytes());
             Ok(Some(DirEntry { name }))
         }
