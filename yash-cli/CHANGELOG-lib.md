@@ -9,6 +9,13 @@ For changes to the shell binary as a whole, see [CHANGELOG-bin.md](CHANGELOG-bin
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - Unreleased
+
+### Changed
+
+- External dependency versions:
+    - Rust 1.79.0 → 1.82.0
+
 ## [0.1.0] - 2024-09-29
 
 ### Added
@@ -121,6 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial implementation of the `yash-cli` crate
 
+[0.1.1]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.1.1
 [0.1.0]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.1.0
 [0.1.0-beta.2]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.1.0-beta.2
 [0.1.0-beta.1]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.1.0-beta.1

@@ -22,7 +22,6 @@ use std::ffi::c_int;
 use std::mem::MaybeUninit;
 use std::num::NonZeroI32;
 use std::ops::RangeInclusive;
-use std::ptr::{addr_of, addr_of_mut};
 
 /// Returns the range of real-time signals supported by the real system.
 ///
@@ -437,16 +436,16 @@ impl Disposition {
         let mut sa = MaybeUninit::<nix::libc::sigaction>::uninit();
         let sa_ptr = sa.as_mut_ptr();
         unsafe {
-            addr_of_mut!((*sa_ptr).sa_flags).write(0);
-            nix::libc::sigemptyset(addr_of_mut!((*sa_ptr).sa_mask));
+            (&raw mut (*sa_ptr).sa_flags).write(0);
+            nix::libc::sigemptyset(&raw mut ((*sa_ptr).sa_mask));
 
             #[cfg(not(target_os = "aix"))]
             #[allow(clippy::useless_transmute)] // See from_sigaction below
-            addr_of_mut!((*sa_ptr).sa_sigaction).write(std::mem::transmute(handler));
+            (&raw mut (*sa_ptr).sa_sigaction).write(std::mem::transmute(handler));
 
             #[cfg(target_os = "aix")]
             #[allow(clippy::useless_transmute)] // See from_sigaction below
-            addr_of_mut!((*sa_ptr).sa_union.__su_sigaction).write(std::mem::transmute(handler));
+            (&raw mut (*sa_ptr).sa_union.__su_sigaction).write(std::mem::transmute(handler));
         }
         sa
     }
@@ -454,10 +453,10 @@ impl Disposition {
     /// Converts the `sigaction` to the signal disposition for the real system.
     pub(super) unsafe fn from_sigaction(sa: &MaybeUninit<nix::libc::sigaction>) -> Self {
         #[cfg(not(target_os = "aix"))]
-        let handler = addr_of!((*sa.as_ptr()).sa_sigaction).read();
+        let handler = (&raw const (*sa.as_ptr()).sa_sigaction).read();
 
         #[cfg(target_os = "aix")]
-        let handler = addr_of!((*sa.as_ptr()).sa_union.__su_sigaction).read();
+        let handler = (&raw const (*sa.as_ptr()).sa_union.__su_sigaction).read();
 
         // It is platform-specific whether we really need to transmute the handler.
         #[allow(clippy::useless_transmute)]
