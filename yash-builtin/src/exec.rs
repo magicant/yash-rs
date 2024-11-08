@@ -37,7 +37,9 @@
 //!
 //! Without operands, the built-in does not start any utility. Instead, it makes
 //! any redirections performed in the calling simple command permanent in the
-//! current shell environment.
+//! current shell environment. (This is done even if there are operands, but the
+//! effect can be observed only when the utility cannot be invoked and the shell
+//! does not exit.)
 //!
 //! # Options
 //!
@@ -51,6 +53,8 @@
 //! - `--force`
 //! - `--help`
 //!
+//! The `--` separator is not yet supported.
+//!
 //! # Operands
 //!
 //! The operands are treated as a command to start an external utility.
@@ -59,7 +63,14 @@
 //!
 //! If the utility name contains a slash character, the shell will treat it as a
 //! path to the utility.
-//! Otherwise, the shell will search `$PATH` for the utility.
+//! Otherwise, the shell will [search `$PATH`](search_path) for the utility.
+//!
+//! # Errors
+//!
+//! If an operand is given and the utility cannot be invoked successfully, the
+//! built-in returns a [`Result`] having a `Divert` value of [`Abort`] to
+//! request the calling shell to exit, unless the shell is
+//! [interactive](Env::is_interactive).
 //!
 //! # Exit status
 //!
@@ -71,21 +82,10 @@
 //!
 //! If no operands are given, the exit status will be 0.
 //!
-//! # Portability
-//!
-//! POSIX does not require the exec built-in to conform to the Utility Syntax
-//! Guidelines, which means portable scripts cannot use any options or the `--`
-//! separator for the built-in.
-//!
 //! # Implementation notes
 //!
 //! This implementation uses [`Result::retain_redirs`] to flag redirections to
 //! be made permanent.
-//!
-//! If an operand is given and the utility cannot be invoked successfully, the
-//! built-in returns a [`Result`] having `Divert::Exit` to request the calling
-//! shell to exit. This behavior is not explicitly required by POSIX, but it is
-//! a common practice among existing shells.
 
 use std::ffi::CString;
 use std::ops::ControlFlow::Break;
@@ -107,7 +107,9 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     result.retain_redirs();
 
     if let Some(name) = args.first() {
-        result.set_divert(Break(Abort(None)));
+        if !env.is_interactive() {
+            result.set_divert(Break(Abort(None)));
+        }
 
         let path = if name.value.contains('/') {
             CString::new(name.value.clone()).ok()
@@ -140,11 +142,24 @@ mod tests {
     use super::*;
     use futures_util::FutureExt;
     use std::cell::RefCell;
+    use std::ops::ControlFlow::Continue;
     use std::rc::Rc;
+    use yash_env::option::Option::Interactive;
+    use yash_env::option::State::On;
     use yash_env::system::r#virtual::{FileBody, Inode};
     use yash_env::system::Mode;
     use yash_env::variable::{Scope, PATH};
     use yash_env::VirtualSystem;
+
+    fn executable_file() -> Inode {
+        let mut content = Inode::default();
+        content.body = FileBody::Regular {
+            content: Vec::new(),
+            is_native_executable: true,
+        };
+        content.permissions.set(Mode::USER_EXEC, true);
+        content
+    }
 
     #[test]
     fn retains_redirs_without_args() {
@@ -160,18 +175,11 @@ mod tests {
         let mut env = Env::with_system(Box::new(system.clone()));
 
         // Prepare the external utility file
-        let mut content = Inode::default();
-        content.body = FileBody::Regular {
-            content: Vec::new(),
-            is_native_executable: true,
-        };
-        content.permissions.set(Mode::USER_EXEC, true);
-        let content = Rc::new(RefCell::new(content));
         system
             .state
             .borrow_mut()
             .file_system
-            .save("/bin/echo", content)
+            .save("/bin/echo", Rc::new(RefCell::new(executable_file())))
             .unwrap();
 
         // Prepare the PATH variable
@@ -195,18 +203,11 @@ mod tests {
         let mut env = Env::with_system(Box::new(system.clone()));
 
         // Prepare the external utility file
-        let mut content = Inode::default();
-        content.body = FileBody::Regular {
-            content: Vec::new(),
-            is_native_executable: true,
-        };
-        content.permissions.set(Mode::USER_EXEC, true);
-        let content = Rc::new(RefCell::new(content));
         system
             .state
             .borrow_mut()
             .file_system
-            .save("/usr/bin/ls", content)
+            .save("/usr/bin/ls", Rc::new(RefCell::new(executable_file())))
             .unwrap();
 
         // Prepare the PATH variable
@@ -230,18 +231,11 @@ mod tests {
         let mut env = Env::with_system(Box::new(system.clone()));
 
         // Prepare the external utility file
-        let mut content = Inode::default();
-        content.body = FileBody::Regular {
-            content: Vec::new(),
-            is_native_executable: true,
-        };
-        content.permissions.set(Mode::USER_EXEC, true);
-        let content = Rc::new(RefCell::new(content));
         system
             .state
             .borrow_mut()
             .file_system
-            .save("/bin/echo", content)
+            .save("/bin/echo", Rc::new(RefCell::new(executable_file())))
             .unwrap();
 
         let args = Field::dummies(["/bin/echo"]);
@@ -260,18 +254,11 @@ mod tests {
         let mut env = Env::with_system(Box::new(system.clone()));
 
         // Prepare the external utility file
-        let mut content = Inode::default();
-        content.body = FileBody::Regular {
-            content: Vec::new(),
-            is_native_executable: true,
-        };
-        content.permissions.set(Mode::USER_EXEC, true);
-        let content = Rc::new(RefCell::new(content));
         system
             .state
             .borrow_mut()
             .file_system
-            .save("/bin/echo", content)
+            .save("/bin/echo", Rc::new(RefCell::new(executable_file())))
             .unwrap();
 
         // No PATH variable
@@ -291,23 +278,40 @@ mod tests {
         let mut env = Env::with_system(Box::new(system.clone()));
 
         // Prepare the file without executable permission
-        let mut content = Inode::default();
-        content.body = FileBody::Regular {
-            content: Vec::new(),
-            is_native_executable: true,
-        };
-        // content.permissions.0 |= 0o100;
-        let content = Rc::new(RefCell::new(content));
+        let mut content = executable_file();
+        content.permissions.set(Mode::USER_EXEC, false);
         system
             .state
             .borrow_mut()
             .file_system
-            .save("/bin/echo", content)
+            .save("/bin/echo", Rc::new(RefCell::new(content)))
             .unwrap();
 
         let args = Field::dummies(["/bin/echo"]);
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result.exit_status(), ExitStatus::NOEXEC);
         assert_eq!(result.divert(), Break(Abort(None)));
+    }
+
+    #[test]
+    fn utility_not_executable_interactive_no_abort() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Box::new(system.clone()));
+        env.options.set(Interactive, On);
+
+        // Prepare the file without executable permission
+        let mut content = executable_file();
+        content.permissions.set(Mode::USER_EXEC, false);
+        system
+            .state
+            .borrow_mut()
+            .file_system
+            .save("/bin/echo", Rc::new(RefCell::new(content)))
+            .unwrap();
+
+        let args = Field::dummies(["/bin/echo"]);
+        let result = main(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result.exit_status(), ExitStatus::NOEXEC);
+        assert_eq!(result.divert(), Continue(()));
     }
 }
