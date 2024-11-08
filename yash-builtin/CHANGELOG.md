@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `exec` built-in no longer exits the shell when the specified command is
+  not found in an interactive shell, as required by POSIX.1-2024.
 - External dependency versions:
     - Rust 1.79.0 → 1.82.0
 
