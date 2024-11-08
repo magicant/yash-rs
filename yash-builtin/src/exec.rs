@@ -51,6 +51,8 @@
 //! - `--force`
 //! - `--help`
 //!
+//! The `--` separator is not yet supported.
+//!
 //! # Operands
 //!
 //! The operands are treated as a command to start an external utility.
@@ -70,12 +72,6 @@
 //! 127.
 //!
 //! If no operands are given, the exit status will be 0.
-//!
-//! # Portability
-//!
-//! POSIX does not require the exec built-in to conform to the Utility Syntax
-//! Guidelines, which means portable scripts cannot use any options or the `--`
-//! separator for the built-in.
 //!
 //! # Implementation notes
 //!
