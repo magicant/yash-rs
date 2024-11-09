@@ -9,8 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- In the `parser::Parser::case_item` method, the parser now accepts an `esac`
+  token as a pattern after an opening parenthesis, as required by POSIX.1-2024.
+  The previous version of POSIX did not allow `esac` as the first pattern, so
+  the method was returning `SyntaxError::EsacAsPattern` in that case.
 - Internal dependency versions:
     - futures-util 0.3.28 → 0.3.31
+
+### Deprecated
+
+- `parser::SyntaxError::EsacAsPattern`
+    - This variant is deprecated because this error condition is no longer
+      possible as described above.
 
 ## [0.12.0] - 2024-09-29
 

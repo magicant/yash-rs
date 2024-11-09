@@ -135,6 +135,7 @@ pub enum SyntaxError {
     /// The pattern is not a valid word token.
     InvalidPattern,
     /// The first pattern of a case item is `esac`.
+    #[deprecated = "this error no longer occurs"]
     EsacAsPattern,
     /// An `esac` or `;;` appears outside a case command.
     UnopenedCase,
@@ -219,6 +220,7 @@ impl SyntaxError {
             UnclosedPatternList => "The pattern list is not properly closed by a `)`",
             MissingPattern => "A pattern is missing in the `case` command",
             InvalidPattern => "The pattern is not a valid word token",
+            #[allow(deprecated)]
             EsacAsPattern => "`esac` cannot be the first of a pattern list",
             UnclosedCase { .. } => "The `case` command is missing its closing `esac`",
             UnmatchedParenthesis => "`)` is missing after `(`",
@@ -290,6 +292,7 @@ impl SyntaxError {
             UnopenedIf => "not in an `if` command",
             UnclosedIf { .. } => "expected `fi`",
             MissingIn { .. } => "expected `in`",
+            #[allow(deprecated)]
             EsacAsPattern => "needs quoting",
             UnopenedCase => "not in a `case` command",
             UnclosedCase { .. } => "expected `esac`",
