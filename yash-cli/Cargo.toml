@@ -24,7 +24,7 @@ yash-env = { path = "../yash-env", version = "0.4.0" }
 yash-executor = { path = "../yash-executor", version = "1.0.0" }
 yash-prompt = { path = "../yash-prompt", version = "0.2.0" }
 yash-semantics = { path = "../yash-semantics", version = "0.4.0" }
-yash-syntax = { path = "../yash-syntax", version = "0.12.0" }
+yash-syntax = { path = "../yash-syntax", version = "0.12.1" }
 
 [dev-dependencies]
 assert_matches = "1.5.0"

@@ -5,7 +5,7 @@ All notable changes to `yash-syntax` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.12.1] - Unreleased
+## [0.12.1] - 2024-11-10
 
 ### Changed
 
@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   token as a pattern after an opening parenthesis, as required by POSIX.1-2024.
   The previous version of POSIX did not allow `esac` as the first pattern, so
   the method was returning `SyntaxError::EsacAsPattern` in that case.
+- External dependency versions:
+    - Rust 1.79.0 → 1.82.0
 - Internal dependency versions:
     - futures-util 0.3.28 → 0.3.31
 
