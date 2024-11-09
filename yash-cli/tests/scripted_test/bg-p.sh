@@ -84,6 +84,12 @@ bg >bg.out
 grep -qx '\[[[:digit:]][[:digit:]]*][[:blank:]]*sleep 1' bg.out
 __IN__
 
+test_O -e 17 'bg updates $!' -m
+sh -c 'kill -s STOP $$; exit 17'
+bg >/dev/null
+wait $!
+__IN__
+
 test_O -e 0 'exit status of bg' -m
 sh -c 'kill -s STOP $$; exit 17'
 bg >/dev/null
