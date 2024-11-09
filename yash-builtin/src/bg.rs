@@ -16,7 +16,7 @@
 
 //! Bg built-in
 //!
-//! The **`bg`** built-in resumes a suspended job in the background.
+//! The **`bg`** built-in resumes suspended jobs in the background.
 //!
 //! # Synopsis
 //!
@@ -28,6 +28,9 @@
 //!
 //! The built-in resumes the specified jobs by sending the `SIGCONT` signal to
 //! them.
+//!
+//! The (last) resumed job's process ID is set to the `!` special parameter
+//! ([`JobList::set_last_async_pid`]).
 //!
 //! # Options
 //!
@@ -176,6 +179,9 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<(), ResumeEr
         // report the same thing in the usual pre-prompt message.
         job.expect(ProcessState::Running);
     }
+
+    let pid = job.pid;
+    env.jobs.set_last_async_pid(pid);
 
     // The resumed job becomes the current job. This is only relevant when all
     // jobs are running since the current job is not changed if there is another
@@ -378,6 +384,20 @@ mod tests {
             state.processes[&pid].state(),
             ProcessState::stopped(SIGSTOP),
         );
+    }
+
+    #[test]
+    fn resume_job_by_index_sets_last_async_pid() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut job = Job::new(Pid(123));
+        job.job_controlled = true;
+        job.state = ProcessState::exited(ExitStatus::SUCCESS);
+        let index = env.jobs.add(job);
+
+        _ = resume_job_by_index(&mut env, index).now_or_never().unwrap();
+
+        assert_eq!(env.jobs.last_async_pid(), Pid(123));
     }
 
     #[test]

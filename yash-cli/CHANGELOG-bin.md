@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `bg` built-in now updates the `!` special parameter to the process ID of
+  the background job, as required by POSIX.1-2024.
 - The `exec` built-in no longer exits the shell when the specified command is
   not found in an interactive shell, as required by POSIX.1-2024.
 
