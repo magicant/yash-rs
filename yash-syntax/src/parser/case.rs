@@ -36,7 +36,6 @@ impl Parser<'_, '_> {
     pub async fn case_item(&mut self) -> Result<Option<CaseItem>> {
         fn pattern_error_cause(token_id: TokenId) -> SyntaxError {
             match token_id {
-                Token(Some(Esac)) => SyntaxError::EsacAsPattern,
                 Token(_) => unreachable!(),
                 Operator(CloseParen) | Operator(Bar) | Operator(Newline) | EndOfInput => {
                     SyntaxError::MissingPattern
@@ -63,8 +62,7 @@ impl Parser<'_, '_> {
             Operator(OpenParen) => {
                 let next_token = self.take_token_auto(&[Esac]).await?;
                 match next_token.id {
-                    // TODO Allow `esac` if not in POSIXly-correct mode
-                    Token(keyword) if keyword != Some(Esac) => next_token.word,
+                    Token(_) => next_token.word,
                     _ => {
                         let cause = pattern_error_cause(next_token.id).into();
                         let location = next_token.word.location;
@@ -318,12 +316,10 @@ mod tests {
         let mut lexer = Lexer::from_memory("(esac)", Source::Unknown);
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
-        let e = parser.case_item().now_or_never().unwrap().unwrap_err();
-        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EsacAsPattern));
-        assert_eq!(*e.location.code.value.borrow(), "(esac)");
-        assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(*e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.range, 1..5);
+        let item = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
+        assert_eq!(item.patterns.len(), 1);
+        assert_eq!(item.patterns[0].to_string(), "esac");
+        assert_eq!(item.body.0, []);
     }
 
     #[test]

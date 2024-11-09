@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The shell's syntax now allows `esac` as the first pattern of a case branch
+  as in `case esac in (esac|case) echo ok; esac`. Previously, it was a syntax
+  error, but POSIX.1-2024 allows it.
 - The `bg` built-in now updates the `!` special parameter to the process ID of
   the background job, as required by POSIX.1-2024.
 - The `exec` built-in no longer exits the shell when the specified command is
