@@ -16,43 +16,33 @@ resolver = "2"
 EOF
 }
 
-prepare() {
-    update_workspace_member "$1"
+# $1 = package name
+# $2, $3, ... = additional options to `cargo test`
+check() {
+    package="$1"
+    shift
+    if [ "$#" -eq 0 ]; then
+        set ''
+    fi
+
+    update_workspace_member "$package"
     cargo +nightly update -Z direct-minimal-versions
     msrv=$(cargo metadata --format-version=1 |
-        jq -r ".packages[] | select(.name == \"$1\") | .rust_version")
+        jq -r ".packages[] | select(.name == \"$package\") | .rust_version")
+
+    for options do
+        cargo +$msrv test --package "$package" $options -- $quiet
+    done
 }
 
-prepare yash-arith
-cargo +$msrv test --package yash-arith -- $quiet
-
-prepare yash-builtin
-cargo +$msrv test --package yash-builtin -- $quiet
-
-prepare yash-cli
-cargo +$msrv test --package yash-cli -- $quiet
-
-prepare yash-env
-cargo +$msrv test --package yash-env -- $quiet
-
-prepare yash-env-test-helper
-cargo +$msrv test --package yash-env-test-helper -- $quiet
-
-prepare yash-executor
-cargo +$msrv test --package yash-executor -- $quiet
-
-prepare yash-fnmatch
-cargo +$msrv test --package yash-fnmatch -- $quiet
-
-prepare yash-prompt
-cargo +$msrv test --package yash-prompt -- $quiet
-
-prepare yash-quote
-cargo +$msrv test --package yash-quote -- $quiet
-
-prepare yash-semantics
-cargo +$msrv test --package yash-semantics -- $quiet
-
-prepare yash-syntax
-cargo +$msrv test --package yash-syntax -- $quiet
-cargo +$msrv test --package yash-syntax --features annotate-snippets -- $quiet
+check yash-arith
+check yash-builtin
+check yash-cli
+check yash-env
+check yash-env-test-helper
+check yash-executor
+check yash-fnmatch
+check yash-prompt
+check yash-quote
+check yash-semantics
+check yash-syntax '' '--features annotate-snippets'
