@@ -24,6 +24,7 @@ use super::error::SyntaxError;
 use super::lex::Keyword::{Case, Esac, In};
 use super::lex::Operator::{Bar, CloseParen, Newline, OpenParen, SemicolonSemicolon};
 use super::lex::TokenId::{self, EndOfInput, Operator, Token};
+use crate::syntax::CaseContinuation;
 use crate::syntax::CaseItem;
 use crate::syntax::CompoundCommand;
 
@@ -102,8 +103,13 @@ impl Parser<'_, '_> {
         }
 
         let body = self.maybe_compound_list_boxed().await?;
+        let continuation = CaseContinuation::default();
 
-        Ok(Some(CaseItem { patterns, body }))
+        Ok(Some(CaseItem {
+            patterns,
+            body,
+            continuation,
+        }))
     }
 
     /// Parses a case conditional construct.
