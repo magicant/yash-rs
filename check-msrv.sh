@@ -16,47 +16,33 @@ resolver = "2"
 EOF
 }
 
-update_workspace_member yash-arith
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.65.0 test --package yash-arith -- $quiet
+# $1 = package name
+# $2, $3, ... = additional options to `cargo test`
+check() {
+    package="$1"
+    shift
+    if [ "$#" -eq 0 ]; then
+        set ''
+    fi
 
-update_workspace_member yash-builtin
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.82.0 test --package yash-builtin -- $quiet
+    update_workspace_member "$package"
+    cargo +nightly update -Z direct-minimal-versions
+    msrv=$(cargo metadata --format-version=1 |
+        jq -r ".packages[] | select(.name == \"$package\") | .rust_version")
 
-update_workspace_member yash-cli
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.82.0 test --package yash-cli -- $quiet
+    for options do
+        cargo +$msrv test --package "$package" $options -- $quiet
+    done
+}
 
-update_workspace_member yash-env
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.82.0 test --package yash-env -- $quiet
-
-update_workspace_member yash-env-test-helper
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.82.0 test --package yash-env-test-helper -- $quiet
-
-update_workspace_member yash-executor
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.65.0 test --package yash-executor -- $quiet
-
-update_workspace_member yash-fnmatch
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.65.0 test --package yash-fnmatch -- $quiet
-
-update_workspace_member yash-prompt
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.82.0 test --package yash-prompt -- $quiet
-
-update_workspace_member yash-quote
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.65.0 test --package yash-quote -- $quiet
-
-update_workspace_member yash-semantics
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.82.0 test --package yash-semantics -- $quiet
-
-update_workspace_member yash-syntax
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.82.0 test --package yash-syntax -- $quiet
-cargo +1.82.0 test --package yash-syntax --features annotate-snippets -- $quiet
+check yash-arith
+check yash-builtin
+check yash-cli
+check yash-env
+check yash-env-test-helper
+check yash-executor
+check yash-fnmatch
+check yash-prompt
+check yash-quote
+check yash-semantics
+check yash-syntax '' '--features annotate-snippets'
