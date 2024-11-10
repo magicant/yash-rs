@@ -236,9 +236,28 @@ const AND: Trie = Trie(&[Edge {
 }]);
 
 /// Trie of the operators that start with `;`.
-const SEMICOLON: Trie = Trie(&[Edge {
-    key: ';',
-    value: Some(Operator::SemicolonSemicolon),
+const SEMICOLON: Trie = Trie(&[
+    Edge {
+        key: '&',
+        value: Some(Operator::SemicolonAnd),
+        next: NONE,
+    },
+    Edge {
+        key: ';',
+        value: Some(Operator::SemicolonSemicolon),
+        next: SEMICOLON_SEMICOLON,
+    },
+    Edge {
+        key: '|',
+        value: Some(Operator::SemicolonBar),
+        next: NONE,
+    },
+]);
+
+/// Trie of the operators that start with `;;`.
+const SEMICOLON_SEMICOLON: Trie = Trie(&[Edge {
+    key: '&',
+    value: Some(Operator::SemicolonSemicolonAnd),
     next: NONE,
 }]);
 
