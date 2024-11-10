@@ -16,47 +16,43 @@ resolver = "2"
 EOF
 }
 
-update_workspace_member yash-arith
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.65.0 test --package yash-arith -- $quiet
+prepare() {
+    update_workspace_member "$1"
+    cargo +nightly update -Z direct-minimal-versions
+    msrv=$(cargo metadata --format-version=1 |
+        jq -r ".packages[] | select(.name == \"$1\") | .rust_version")
+}
 
-update_workspace_member yash-builtin
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.82.0 test --package yash-builtin -- $quiet
+prepare yash-arith
+cargo +$msrv test --package yash-arith -- $quiet
 
-update_workspace_member yash-cli
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.82.0 test --package yash-cli -- $quiet
+prepare yash-builtin
+cargo +$msrv test --package yash-builtin -- $quiet
 
-update_workspace_member yash-env
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.82.0 test --package yash-env -- $quiet
+prepare yash-cli
+cargo +$msrv test --package yash-cli -- $quiet
 
-update_workspace_member yash-env-test-helper
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.82.0 test --package yash-env-test-helper -- $quiet
+prepare yash-env
+cargo +$msrv test --package yash-env -- $quiet
 
-update_workspace_member yash-executor
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.65.0 test --package yash-executor -- $quiet
+prepare yash-env-test-helper
+cargo +$msrv test --package yash-env-test-helper -- $quiet
 
-update_workspace_member yash-fnmatch
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.65.0 test --package yash-fnmatch -- $quiet
+prepare yash-executor
+cargo +$msrv test --package yash-executor -- $quiet
 
-update_workspace_member yash-prompt
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.82.0 test --package yash-prompt -- $quiet
+prepare yash-fnmatch
+cargo +$msrv test --package yash-fnmatch -- $quiet
 
-update_workspace_member yash-quote
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.65.0 test --package yash-quote -- $quiet
+prepare yash-prompt
+cargo +$msrv test --package yash-prompt -- $quiet
 
-update_workspace_member yash-semantics
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.82.0 test --package yash-semantics -- $quiet
+prepare yash-quote
+cargo +$msrv test --package yash-quote -- $quiet
 
-update_workspace_member yash-syntax
-cargo +nightly update -Z direct-minimal-versions
-cargo +1.82.0 test --package yash-syntax -- $quiet
-cargo +1.82.0 test --package yash-syntax --features annotate-snippets -- $quiet
+prepare yash-semantics
+cargo +$msrv test --package yash-semantics -- $quiet
+
+prepare yash-syntax
+cargo +$msrv test --package yash-syntax -- $quiet
+cargo +$msrv test --package yash-syntax --features annotate-snippets -- $quiet
