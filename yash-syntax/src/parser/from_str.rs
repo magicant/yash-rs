@@ -269,7 +269,7 @@ impl FromStr for CaseItem {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
         unwrap_ready(async {
-            let item = parser.case_item().await?;
+            let item = parser.case_item().await?.map(|(item, _)| item);
             if item.is_some() {
                 if parser.peek_token().await?.id == TokenId::Operator(Operator::SemicolonSemicolon)
                 {
