@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - The `SemicolonAnd`, `SemicolonSemicolonAnd`, and `SemicolonBar` variants
       are added to the `parser::lex::Operator` enum.
     - The `parser::Parser::case_item` and `syntax::CaseItem::from_str` methods
-      now consume a trailing terminator token, if any.
+      now consume a trailing terminator token, if any. The terminator can be
+      not only `;;`, but also `;&`, `;|`, or `;;&`.
 
 ## [0.12.1] - 2024-11-10
 

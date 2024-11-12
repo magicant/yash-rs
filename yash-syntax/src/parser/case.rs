@@ -22,9 +22,8 @@ use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
 use super::lex::Keyword::{Case, Esac, In};
-use super::lex::Operator::{Bar, CloseParen, Newline, OpenParen, SemicolonSemicolon};
+use super::lex::Operator::{Bar, CloseParen, Newline, OpenParen};
 use super::lex::TokenId::{self, EndOfInput, Operator, Token};
-use crate::syntax::CaseContinuation;
 use crate::syntax::CaseItem;
 use crate::syntax::CompoundCommand;
 
@@ -102,11 +101,16 @@ impl Parser<'_, '_> {
         }
 
         let body = self.maybe_compound_list_boxed().await?;
-        let continuation = CaseContinuation::default();
 
-        let continued = self.peek_token().await?.id == Operator(SemicolonSemicolon);
+        let continuation = match self.peek_token().await?.id {
+            Operator(op) => op.try_into().ok(),
+            _ => None,
+        };
+        let continued = continuation.is_some();
+        let continuation = continuation.unwrap_or_default();
         if continued {
             self.take_token_raw().await?;
+            // TODO Reject Continue in strict POSIX mode
         }
 
         Ok(Some((
@@ -190,6 +194,7 @@ mod tests {
     use crate::alias::{AliasSet, EmptyGlossary, HashEntry};
     use crate::source::Location;
     use crate::source::Source;
+    use crate::syntax::CaseContinuation;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
 
@@ -315,6 +320,22 @@ mod tests {
         assert_eq!(item.body.0.len(), 1);
         assert_eq!(item.body.0[0].to_string(), ":");
         assert_eq!(item.continuation, CaseContinuation::Break);
+        assert!(continued);
+
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_case_item_with_semicolon_and() {
+        let mut lexer = Lexer::from_memory("foo);&", Source::Unknown);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+
+        let (item, continued) = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
+        assert_eq!(item.patterns.len(), 1);
+        assert_eq!(item.patterns[0].to_string(), "foo");
+        assert_eq!(item.body.0, []);
+        assert_eq!(item.continuation, CaseContinuation::FallThrough);
         assert!(continued);
 
         let next = parser.peek_token().now_or_never().unwrap().unwrap();
