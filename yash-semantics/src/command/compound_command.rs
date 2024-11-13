@@ -124,6 +124,9 @@ impl Command for syntax::FullCompoundCommand {
 ///
 /// POSIX does not specify the order in which the shell tests multiple patterns
 /// in an item. This implementation tries them in the order of appearance.
+///
+/// After executing the body of the matching item, the case command may process
+/// the next item depending on the continuation.
 impl Command for syntax::CompoundCommand {
     async fn execute(&self, env: &mut Env) -> Result {
         use syntax::CompoundCommand::*;

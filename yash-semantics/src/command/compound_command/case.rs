@@ -59,36 +59,60 @@ pub async fn execute(env: &mut Env, subject: &Word, items: &[CaseItem]) -> Resul
     };
     trace_subject(env, &subject.value).await;
 
-    'outer: for item in items {
-        for pattern in &item.patterns {
-            let mut pattern = match expand_word_attr(env, pattern).await {
-                Ok((expansion, _exit_status)) => expansion,
+    let mut falling_through = false;
+    let mut exit_status_updated = false;
+    for item in items {
+        if !falling_through {
+            match matches(env, &subject.value, &item.patterns).await {
+                Ok(true) => (),
+                Ok(false) => continue,
                 Err(error) => return error.handle(env).await,
-            };
-
-            // Unquoted backslashes should act as quoting, as required by POSIX XCU 2.13.1
-            apply_escapes(&mut pattern.chars);
-
-            let pattern =
-                match Pattern::parse_with_config(to_pattern_chars(&pattern.chars), config()) {
-                    Ok(parse) => parse,
-                    Err(_error) => {
-                        // Treat the broken pattern as a valid pattern that does not match anything
-                        continue;
-                    }
-                };
-
-            if pattern.is_match(&subject.value) {
-                if item.body.0.is_empty() {
-                    break 'outer;
-                };
-                return item.body.execute(env).await;
             }
+        }
+
+        item.body.execute(env).await?;
+        exit_status_updated = !item.body.0.is_empty();
+
+        use yash_syntax::syntax::CaseContinuation::*;
+        falling_through = match item.continuation {
+            Break => break,
+            FallThrough => true,
+            Continue => false,
+        };
+    }
+
+    if !exit_status_updated {
+        env.exit_status = ExitStatus::SUCCESS;
+    }
+    Continue(())
+}
+
+/// Returns whether the subject matches any of the patterns.
+///
+/// Each pattern is expanded and matched against the subject.
+/// Returns the error if any expansion fails.
+async fn matches(
+    env: &mut Env,
+    subject: &str,
+    patterns: &[Word],
+) -> crate::expansion::Result<bool> {
+    for pattern in patterns {
+        let mut pattern = expand_word_attr(env, pattern).await?.0.chars;
+
+        // Unquoted backslashes should act as quoting, as required by POSIX XCU 2.13.1
+        apply_escapes(&mut pattern);
+
+        let Ok(pattern) = Pattern::parse_with_config(to_pattern_chars(&pattern), config()) else {
+            // Treat the broken pattern as a valid pattern that does not match anything
+            continue;
+        };
+
+        if pattern.is_match(subject) {
+            return Ok(true);
         }
     }
 
-    env.exit_status = ExitStatus::SUCCESS;
-    Continue(())
+    Ok(false)
 }
 
 #[cfg(test)]
@@ -331,6 +355,60 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
+    fn breaking_terminator() {
+        let (mut env, state) = fixture();
+        let command: CompoundCommand = "case 1 in
+        (1) echo 1;;
+        (1) echo 2;;
+        (1) echo 3;;
+        esac"
+            .parse()
+            .unwrap();
+
+        command.execute(&mut env).now_or_never().unwrap();
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "1\n"));
+    }
+
+    #[test]
+    fn falling_through_terminator() {
+        let (mut env, state) = fixture();
+        let command: CompoundCommand = "case foo in
+        (x)   echo x;&
+        (foo) echo 1;&
+        (bar) echo 2; return -n 1;&
+        (y)   ;;
+        (foo) echo not reached;;
+        esac"
+            .parse()
+            .unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "1\n2\n"));
+    }
+
+    #[test]
+    fn continuing_terminator() {
+        let (mut env, state) = fixture();
+        let command: CompoundCommand = "case foo in
+        (x)   echo x;|
+        (foo) echo 1;|
+        (boo) echo not reached 1;|
+        (foo) ;|
+        (foo) echo 2; return -n 42;|
+        (boo) echo not reached 2;|
+        esac"
+            .parse()
+            .unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus(42));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "1\n2\n"));
     }
 
     #[test]
