@@ -151,6 +151,11 @@ fn case_command() {
 }
 
 #[test]
+fn case_command_ex() {
+    run("case-y.sh");
+}
+
+#[test]
 fn cd_builtin() {
     run("cd-p.sh")
 }
