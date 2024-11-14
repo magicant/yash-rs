@@ -1220,6 +1220,60 @@ impl fmt::Display for ElifThen {
     }
 }
 
+/// Symbol that terminates the body of a case branch and determines what to do
+/// after executing it
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum CaseContinuation {
+    /// `;;` (terminate the case construct)
+    #[default]
+    Break,
+    /// `;&` (unconditionally execute the body of the next case branch)
+    FallThrough,
+    /// `;|` or `;;&` (resume with the next case branch, performing pattern matching again)
+    Continue,
+}
+
+impl TryFrom<Operator> for CaseContinuation {
+    type Error = TryFromOperatorError;
+
+    /// Converts an operator into a case continuation.
+    ///
+    /// The `SemicolonBar` and `SemicolonSemicolonAnd` operators are converted
+    /// into `Continue`; you cannot distinguish between the two from the return
+    /// value.
+    fn try_from(op: Operator) -> Result<CaseContinuation, TryFromOperatorError> {
+        use CaseContinuation::*;
+        use Operator::*;
+        match op {
+            SemicolonSemicolon => Ok(Break),
+            SemicolonAnd => Ok(FallThrough),
+            SemicolonBar | SemicolonSemicolonAnd => Ok(Continue),
+            _ => Err(TryFromOperatorError {}),
+        }
+    }
+}
+
+impl From<CaseContinuation> for Operator {
+    /// Converts a case continuation into an operator.
+    ///
+    /// The `Continue` variant is converted into `SemicolonBar`.
+    fn from(cc: CaseContinuation) -> Operator {
+        use CaseContinuation::*;
+        use Operator::*;
+        match cc {
+            Break => SemicolonSemicolon,
+            FallThrough => SemicolonAnd,
+            Continue => SemicolonBar,
+        }
+    }
+}
+
+impl fmt::Display for CaseContinuation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Operator::from(*self).fmt(f)
+    }
+}
+
 /// Branch item of a `case` compound command
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CaseItem {
@@ -1230,15 +1284,18 @@ pub struct CaseItem {
     pub patterns: Vec<Word>,
     /// Commands that are executed if any of the patterns matched
     pub body: List,
+    /// What to do after executing the body of this item
+    pub continuation: CaseContinuation,
 }
 
 impl fmt::Display for CaseItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "({}) {};;",
+            "({}) {}{}",
             self.patterns.iter().format(" | "),
-            self.body
+            self.body,
+            self.continuation,
         )
     }
 }
@@ -2193,21 +2250,47 @@ mod tests {
     }
 
     #[test]
+    fn case_continuation_conversions() {
+        use CaseContinuation::*;
+        for cc in &[Break, FallThrough, Continue] {
+            let cc2 = CaseContinuation::try_from(Operator::from(*cc));
+            assert_eq!(cc2, Ok(*cc));
+        }
+        assert_eq!(
+            CaseContinuation::try_from(Operator::SemicolonSemicolonAnd),
+            Ok(Continue)
+        );
+    }
+
+    #[test]
     fn case_item_display() {
-        let patterns = vec!["foo".parse().unwrap()];
-        let body = "".parse::<List>().unwrap();
-        let item = CaseItem { patterns, body };
+        let item = CaseItem {
+            patterns: vec!["foo".parse().unwrap()],
+            body: "".parse::<List>().unwrap(),
+            continuation: CaseContinuation::Break,
+        };
         assert_eq!(item.to_string(), "(foo) ;;");
 
-        let patterns = vec!["bar".parse().unwrap()];
-        let body = "echo ok".parse::<List>().unwrap();
-        let item = CaseItem { patterns, body };
+        let item = CaseItem {
+            patterns: vec!["bar".parse().unwrap()],
+            body: "echo ok".parse::<List>().unwrap(),
+            continuation: CaseContinuation::Break,
+        };
         assert_eq!(item.to_string(), "(bar) echo ok;;");
 
-        let patterns = ["a", "b", "c"].iter().map(|s| s.parse().unwrap()).collect();
-        let body = "foo; bar&".parse::<List>().unwrap();
-        let item = CaseItem { patterns, body };
+        let item = CaseItem {
+            patterns: ["a", "b", "c"].iter().map(|s| s.parse().unwrap()).collect(),
+            body: "foo; bar&".parse::<List>().unwrap(),
+            continuation: CaseContinuation::Break,
+        };
         assert_eq!(item.to_string(), "(a | b | c) foo; bar&;;");
+
+        let item = CaseItem {
+            patterns: vec!["foo".parse().unwrap()],
+            body: "bar".parse::<List>().unwrap(),
+            continuation: CaseContinuation::FallThrough,
+        };
+        assert_eq!(item.to_string(), "(foo) bar;&");
     }
 
     #[test]

@@ -51,7 +51,9 @@ fn error_type_for_trailing_token_in_command_line(token_id: TokenId) -> Option<Sy
             And | AndAnd | Semicolon | Bar | BarBar => Some(InvalidCommandToken),
             OpenParen => Some(MissingSeparator),
             CloseParen => Some(UnopenedSubshell),
-            SemicolonSemicolon => Some(UnopenedCase),
+            SemicolonAnd | SemicolonSemicolon | SemicolonSemicolonAnd | SemicolonBar => {
+                Some(UnopenedCase)
+            }
             Newline | Less | LessAnd | LessOpenParen | LessLess | LessLessDash | LessLessLess
             | LessGreater | Greater | GreaterAnd | GreaterOpenParen | GreaterGreater
             | GreaterGreaterBar | GreaterBar => unreachable!(),

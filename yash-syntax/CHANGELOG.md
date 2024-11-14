@@ -5,6 +5,17 @@ All notable changes to `yash-syntax` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - Unreleased
+
+### Added
+
+- Extended the case item syntax to allow `;&`, `;|`, and `;;&` as terminators.
+    - The `SemicolonAnd`, `SemicolonSemicolonAnd`, and `SemicolonBar` variants
+      are added to the `parser::lex::Operator` enum.
+    - The `parser::Parser::case_item` and `syntax::CaseItem::from_str` methods
+      now consume a trailing terminator token, if any. The terminator can be
+      not only `;;`, but also `;&`, `;|`, or `;;&`.
+
 ## [0.12.1] - 2024-11-10
 
 ### Changed
@@ -353,6 +364,7 @@ command.
 - Functionalities to parse POSIX shell scripts
 - Alias substitution support
 
+[0.13.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.13.0
 [0.12.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.12.1
 [0.12.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.12.0
 [0.11.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.11.0

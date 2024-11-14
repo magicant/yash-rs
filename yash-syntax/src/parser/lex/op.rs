@@ -43,8 +43,14 @@ pub enum Operator {
     CloseParen,
     /// `;`
     Semicolon,
+    /// `;&`
+    SemicolonAnd,
     /// `;;`
     SemicolonSemicolon,
+    /// `;;&`
+    SemicolonSemicolonAnd,
+    /// `;|`
+    SemicolonBar,
     /// `<`
     Less,
     /// `<&`
@@ -89,7 +95,10 @@ impl Operator {
             OpenParen => "(",
             CloseParen => ")",
             Semicolon => ";",
+            SemicolonAnd => ";&",
             SemicolonSemicolon => ";;",
+            SemicolonSemicolonAnd => ";;&",
+            SemicolonBar => ";|",
             Less => "<",
             LessAnd => "<&",
             LessOpenParen => "<(",
@@ -110,13 +119,23 @@ impl Operator {
 
     /// Determines if this token can be a delimiter of a clause.
     ///
-    /// This function returns `true` for `CloseParen` and `SemicolonSemicolon`,
-    /// and `false` for others.
+    /// This function returns `true` for the following operators:
+    ///
+    /// - `CloseParen` (`)`)
+    /// - `SemicolonAnd` (`;&`)
+    /// - `SemicolonSemicolon` (`;;`)
+    /// - `SemicolonSemicolonAnd` (`;;&`)
+    /// - `SemicolonBar` (`;|`)
     #[must_use]
     pub const fn is_clause_delimiter(self) -> bool {
         use Operator::*;
         match self {
-            CloseParen | SemicolonSemicolon => true,
+            CloseParen
+            | SemicolonAnd
+            | SemicolonSemicolon
+            | SemicolonSemicolonAnd
+            | SemicolonBar => true,
+
             Newline | And | AndAnd | OpenParen | Semicolon | Less | LessAnd | LessOpenParen
             | LessLess | LessLessDash | LessLessLess | LessGreater | Greater | GreaterAnd
             | GreaterOpenParen | GreaterGreater | GreaterGreaterBar | GreaterBar | Bar | BarBar => {
@@ -217,9 +236,28 @@ const AND: Trie = Trie(&[Edge {
 }]);
 
 /// Trie of the operators that start with `;`.
-const SEMICOLON: Trie = Trie(&[Edge {
-    key: ';',
-    value: Some(Operator::SemicolonSemicolon),
+const SEMICOLON: Trie = Trie(&[
+    Edge {
+        key: '&',
+        value: Some(Operator::SemicolonAnd),
+        next: NONE,
+    },
+    Edge {
+        key: ';',
+        value: Some(Operator::SemicolonSemicolon),
+        next: SEMICOLON_SEMICOLON,
+    },
+    Edge {
+        key: '|',
+        value: Some(Operator::SemicolonBar),
+        next: NONE,
+    },
+]);
+
+/// Trie of the operators that start with `;;`.
+const SEMICOLON_SEMICOLON: Trie = Trie(&[Edge {
+    key: '&',
+    value: Some(Operator::SemicolonSemicolonAnd),
     next: NONE,
 }]);
 

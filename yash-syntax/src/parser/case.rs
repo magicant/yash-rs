@@ -22,7 +22,7 @@ use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
 use super::lex::Keyword::{Case, Esac, In};
-use super::lex::Operator::{Bar, CloseParen, Newline, OpenParen, SemicolonSemicolon};
+use super::lex::Operator::{Bar, CloseParen, Newline, OpenParen};
 use super::lex::TokenId::{self, EndOfInput, Operator, Token};
 use crate::syntax::CaseItem;
 use crate::syntax::CompoundCommand;
@@ -30,10 +30,9 @@ use crate::syntax::CompoundCommand;
 impl Parser<'_, '_> {
     /// Parses a case item.
     ///
-    /// Does not parse the optional trailing double semicolon.
-    ///
-    /// Returns `None` if the next token is `esac`.
-    pub async fn case_item(&mut self) -> Result<Option<CaseItem>> {
+    /// If the next token is `esac`, returns `None` without consuming it.
+    /// Otherwise, returns a case item and whether there may be a next item.
+    pub async fn case_item(&mut self) -> Result<Option<(CaseItem, bool)>> {
         fn pattern_error_cause(token_id: TokenId) -> SyntaxError {
             match token_id {
                 Token(_) => unreachable!(),
@@ -103,7 +102,25 @@ impl Parser<'_, '_> {
 
         let body = self.maybe_compound_list_boxed().await?;
 
-        Ok(Some(CaseItem { patterns, body }))
+        let continuation = match self.peek_token().await?.id {
+            Operator(op) => op.try_into().ok(),
+            _ => None,
+        };
+        let continued = continuation.is_some();
+        let continuation = continuation.unwrap_or_default();
+        if continued {
+            self.take_token_raw().await?;
+            // TODO Reject Continue in strict POSIX mode
+        }
+
+        Ok(Some((
+            CaseItem {
+                patterns,
+                body,
+                continuation,
+            },
+            continued,
+        )))
     }
 
     /// Parses a case conditional construct.
@@ -150,13 +167,11 @@ impl Parser<'_, '_> {
         }
 
         let mut items = Vec::new();
-        while let Some(item) = self.case_item().await? {
+        while let Some((item, continued)) = self.case_item().await? {
             items.push(item);
-
-            if self.peek_token().await?.id != Operator(SemicolonSemicolon) {
+            if !continued {
                 break;
             }
-            self.take_token_raw().await?;
         }
 
         let close = self.take_token_raw().await?;
@@ -179,6 +194,7 @@ mod tests {
     use crate::alias::{AliasSet, EmptyGlossary, HashEntry};
     use crate::source::Location;
     use crate::source::Source;
+    use crate::syntax::CaseContinuation;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
 
@@ -214,10 +230,12 @@ mod tests {
         let mut lexer = Lexer::from_memory("foo)", Source::Unknown);
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
-        let item = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
+        let (item, continued) = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(item.patterns.len(), 1);
         assert_eq!(item.patterns[0].to_string(), "foo");
         assert_eq!(item.body.0, []);
+        assert_eq!(item.continuation, CaseContinuation::Break);
+        assert!(!continued);
 
         let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -228,10 +246,12 @@ mod tests {
         let mut lexer = Lexer::from_memory("(foo)", Source::Unknown);
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
-        let item = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
+        let (item, continued) = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(item.patterns.len(), 1);
         assert_eq!(item.patterns[0].to_string(), "foo");
         assert_eq!(item.body.0, []);
+        assert_eq!(item.continuation, CaseContinuation::Break);
+        assert!(!continued);
 
         let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -242,12 +262,14 @@ mod tests {
         let mut lexer = Lexer::from_memory("1 | esac | $three)", Source::Unknown);
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
-        let item = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
+        let (item, continued) = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(item.patterns.len(), 3);
         assert_eq!(item.patterns[0].to_string(), "1");
         assert_eq!(item.patterns[1].to_string(), "esac");
         assert_eq!(item.patterns[2].to_string(), "$three");
         assert_eq!(item.body.0, []);
+        assert_eq!(item.continuation, CaseContinuation::Break);
+        assert!(!continued);
 
         let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -258,12 +280,14 @@ mod tests {
         let mut lexer = Lexer::from_memory("foo)\necho ok\n:&\n", Source::Unknown);
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
-        let item = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
+        let (item, continued) = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(item.patterns.len(), 1);
         assert_eq!(item.patterns[0].to_string(), "foo");
         assert_eq!(item.body.0.len(), 2);
         assert_eq!(item.body.0[0].to_string(), "echo ok");
         assert_eq!(item.body.0[1].to_string(), ":&");
+        assert_eq!(item.continuation, CaseContinuation::Break);
+        assert!(!continued);
 
         let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -274,13 +298,15 @@ mod tests {
         let mut lexer = Lexer::from_memory("foo);;", Source::Unknown);
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
-        let item = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
+        let (item, continued) = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(item.patterns.len(), 1);
         assert_eq!(item.patterns[0].to_string(), "foo");
         assert_eq!(item.body.0, []);
+        assert_eq!(item.continuation, CaseContinuation::Break);
+        assert!(continued);
 
         let next = parser.peek_token().now_or_never().unwrap().unwrap();
-        assert_eq!(next.id, Operator(SemicolonSemicolon));
+        assert_eq!(next.id, EndOfInput);
     }
 
     #[test]
@@ -288,14 +314,32 @@ mod tests {
         let mut lexer = Lexer::from_memory("foo):;\n;;", Source::Unknown);
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
-        let item = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
+        let (item, continued) = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(item.patterns.len(), 1);
         assert_eq!(item.patterns[0].to_string(), "foo");
         assert_eq!(item.body.0.len(), 1);
         assert_eq!(item.body.0[0].to_string(), ":");
+        assert_eq!(item.continuation, CaseContinuation::Break);
+        assert!(continued);
 
         let next = parser.peek_token().now_or_never().unwrap().unwrap();
-        assert_eq!(next.id, Operator(SemicolonSemicolon));
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_case_item_with_semicolon_and() {
+        let mut lexer = Lexer::from_memory("foo);&", Source::Unknown);
+        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+
+        let (item, continued) = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
+        assert_eq!(item.patterns.len(), 1);
+        assert_eq!(item.patterns[0].to_string(), "foo");
+        assert_eq!(item.body.0, []);
+        assert_eq!(item.continuation, CaseContinuation::FallThrough);
+        assert!(continued);
+
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
+        assert_eq!(next.id, EndOfInput);
     }
 
     #[test]
@@ -316,10 +360,12 @@ mod tests {
         let mut lexer = Lexer::from_memory("(esac)", Source::Unknown);
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
 
-        let item = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
+        let (item, continued) = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(item.patterns.len(), 1);
         assert_eq!(item.patterns[0].to_string(), "esac");
         assert_eq!(item.body.0, []);
+        assert_eq!(item.continuation, CaseContinuation::Break);
+        assert!(!continued);
     }
 
     #[test]

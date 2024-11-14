@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.1] - Unreleased
 
+### Added
+
+- A case branch now can be terminated with `;&` or `;|` instead of `;;` to fall
+  through to the next branch or to resume pattern matching from the next branch,
+  respectively. `;&` is a POSIX.1-2024 feature, and `;|` is an extension. For
+  compatibility with other shells, `;;&` is also accepted as an alias for `;|`.
+
 ### Changed
 
 - The shell's syntax now allows `esac` as the first pattern of a case branch
