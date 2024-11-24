@@ -111,6 +111,7 @@ impl Expand for WordUnit {
                 double_quote(&mut phrase);
                 Ok(phrase)
             }
+            DollarSingleQuote(_) => todo!(),
             Tilde(name) => Ok(super::tilde::expand(name, env.inner).into()),
         }
     }

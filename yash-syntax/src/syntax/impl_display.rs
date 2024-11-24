@@ -133,6 +133,7 @@ impl fmt::Display for WordUnit {
             Unquoted(dq) => dq.fmt(f),
             SingleQuote(s) => write!(f, "'{s}'"),
             DoubleQuote(content) => write!(f, "\"{content}\""),
+            DollarSingleQuote(_) => todo!(),
             Tilde(s) => write!(f, "~{s}"),
         }
     }
