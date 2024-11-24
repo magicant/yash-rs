@@ -345,6 +345,91 @@ impl MaybeLiteral for Text {
     }
 }
 
+/// Converts an escape unit into the string represented by the escape sequence.
+///
+/// Produces an empty string if the escape unit does not represent a valid
+/// Unicode scalar value.
+impl Unquote for EscapeUnit {
+    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
+        match self {
+            Self::Literal(c) => {
+                w.write_char(*c)?;
+                Ok(false)
+            }
+            Self::DoubleQuote => {
+                w.write_char('"')?;
+                Ok(true)
+            }
+            Self::SingleQuote => {
+                w.write_char('\'')?;
+                Ok(true)
+            }
+            Self::Backslash => {
+                w.write_char('\\')?;
+                Ok(true)
+            }
+            Self::Question => {
+                w.write_char('?')?;
+                Ok(true)
+            }
+            Self::Alert => {
+                w.write_char('\x07')?;
+                Ok(true)
+            }
+            Self::Backspace => {
+                w.write_char('\x08')?;
+                Ok(true)
+            }
+            Self::Escape => {
+                w.write_char('\x1B')?;
+                Ok(true)
+            }
+            Self::FormFeed => {
+                w.write_char('\x0C')?;
+                Ok(true)
+            }
+            Self::Newline => {
+                w.write_char('\n')?;
+                Ok(true)
+            }
+            Self::CarriageReturn => {
+                w.write_char('\r')?;
+                Ok(true)
+            }
+            Self::Tab => {
+                w.write_char('\t')?;
+                Ok(true)
+            }
+            Self::VerticalTab => {
+                w.write_char('\x0B')?;
+                Ok(true)
+            }
+            Self::Control(c) | Self::Octal(c) | Self::Hex(c) => {
+                // TODO: `c` should be treated as a raw byte rather than a
+                // Unicode scalar value. However, std::fmt::Write only supports
+                // UTF-8 strings.
+                w.write_char(*c as char)?;
+                Ok(true)
+            }
+            Self::Unicode(c) => {
+                w.write_char(*c)?;
+                Ok(true)
+            }
+        }
+    }
+}
+
+/// Converts an escaped string into the string represented by the escape
+/// sequences.
+///
+/// [Escape units](EscapeUnit) that do not represent valid Unicode scalar values
+/// are ignored.
+impl Unquote for EscapedString {
+    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
+        self.0.write_unquoted(w)
+    }
+}
+
 impl Unquote for WordUnit {
     fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
         match self {
@@ -747,6 +832,47 @@ mod tests {
     fn text_to_string_if_literal_failure() {
         let backslashed = Text(vec![Backslashed('a')]);
         assert_eq!(backslashed.to_string_if_literal(), None);
+    }
+
+    #[test]
+    fn escape_unit_unquote() {
+        assert_eq!(EscapeUnit::Literal('A').unquote(), ("A".to_string(), false));
+        assert_eq!(EscapeUnit::DoubleQuote.unquote(), ("\"".to_string(), true));
+        assert_eq!(EscapeUnit::SingleQuote.unquote(), ("'".to_string(), true));
+        assert_eq!(EscapeUnit::Backslash.unquote(), ("\\".to_string(), true));
+        assert_eq!(EscapeUnit::Question.unquote(), ("?".to_string(), true));
+        assert_eq!(EscapeUnit::Alert.unquote(), ("\x07".to_string(), true));
+        assert_eq!(EscapeUnit::Backspace.unquote(), ("\x08".to_string(), true));
+        assert_eq!(EscapeUnit::Escape.unquote(), ("\x1B".to_string(), true));
+        assert_eq!(EscapeUnit::FormFeed.unquote(), ("\x0C".to_string(), true));
+        assert_eq!(EscapeUnit::Newline.unquote(), ("\n".to_string(), true));
+        assert_eq!(
+            EscapeUnit::CarriageReturn.unquote(),
+            ("\r".to_string(), true)
+        );
+        assert_eq!(EscapeUnit::Tab.unquote(), ("\t".to_string(), true));
+        assert_eq!(
+            EscapeUnit::VerticalTab.unquote(),
+            ("\x0B".to_string(), true)
+        );
+        assert_eq!(
+            EscapeUnit::Control(0x01).unquote(),
+            ("\x01".to_string(), true)
+        );
+        assert_eq!(
+            EscapeUnit::Control(0x1E).unquote(),
+            ("\x1E".to_string(), true)
+        );
+        assert_eq!(
+            EscapeUnit::Control(0x7F).unquote(),
+            ("\x7F".to_string(), true)
+        );
+        assert_eq!(EscapeUnit::Octal(0o123).unquote(), ("S".to_string(), true));
+        assert_eq!(EscapeUnit::Hex(0x41).unquote(), ("A".to_string(), true));
+        assert_eq!(
+            EscapeUnit::Unicode('🦀').unquote(),
+            ("🦀".to_string(), true)
+        );
     }
 
     #[test]
