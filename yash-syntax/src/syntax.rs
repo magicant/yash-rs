@@ -77,98 +77,14 @@ use crate::parser::lex::Keyword;
 use crate::parser::lex::Operator;
 use crate::parser::lex::TryFromOperatorError;
 use crate::source::Location;
-use itertools::Itertools;
 use std::cell::OnceCell;
-use std::fmt;
-use std::fmt::Write as _;
 #[cfg(unix)]
 use std::os::unix::io::RawFd;
 use std::rc::Rc;
 use std::str::FromStr;
-use thiserror::Error;
 
 #[cfg(not(unix))]
 type RawFd = i32;
-
-/// Result of [`Unquote::write_unquoted`]
-///
-/// If there is some quotes to be removed, the result will be `Ok(true)`. If no
-/// quotes, `Ok(false)`. On error, `Err(Error)`.
-type UnquoteResult = Result<bool, fmt::Error>;
-
-/// Removing quotes from syntax without performing expansion.
-///
-/// This trail will be useful only in a limited number of use cases. In the
-/// normal word expansion process, quote removal is done after other kinds of
-/// expansions like parameter expansion, so this trait is not used.
-pub trait Unquote {
-    /// Converts `self` to a string with all quotes removed and writes to `w`.
-    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult;
-
-    /// Converts `self` to a string with all quotes removed.
-    ///
-    /// Returns a tuple of a string and a bool. The string is an unquoted version
-    /// of `self`. The bool tells whether there is any quotes contained in
-    /// `self`.
-    fn unquote(&self) -> (String, bool) {
-        let mut unquoted = String::new();
-        let is_quoted = self
-            .write_unquoted(&mut unquoted)
-            .expect("`write_unquoted` should not fail");
-        (unquoted, is_quoted)
-    }
-}
-
-/// Possibly literal syntax element
-///
-/// A syntax element is _literal_ if it is not quoted and does not contain any
-/// expansions. Such an element can be expanded to a string independently of the
-/// shell execution environment.
-///
-/// ```
-/// # use yash_syntax::syntax::MaybeLiteral;
-/// # use yash_syntax::syntax::Text;
-/// # use yash_syntax::syntax::TextUnit::Literal;
-/// let text = Text(vec![Literal('f'), Literal('o'), Literal('o')]);
-/// let expanded = text.to_string_if_literal().unwrap();
-/// assert_eq!(expanded, "foo");
-/// ```
-///
-/// ```
-/// # use yash_syntax::syntax::MaybeLiteral;
-/// # use yash_syntax::syntax::Text;
-/// # use yash_syntax::syntax::TextUnit::Backslashed;
-/// let backslashed = Text(vec![Backslashed('a')]);
-/// assert_eq!(backslashed.to_string_if_literal(), None);
-/// ```
-pub trait MaybeLiteral {
-    /// Checks if `self` is literal and, if so, converts to a string and appends
-    /// it to `result`.
-    ///
-    /// If `self` is literal, `self` converted to a string is appended to
-    /// `result` and `Ok(result)` is returned. Otherwise, `result` is not
-    /// modified and `Err(result)` is returned.
-    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Result<T, T>;
-
-    /// Checks if `self` is literal and, if so, converts to a string.
-    fn to_string_if_literal(&self) -> Option<String> {
-        self.extend_if_literal(String::new()).ok()
-    }
-}
-
-impl<T: Unquote> Unquote for [T] {
-    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
-        self.iter()
-            .try_fold(false, |quoted, item| Ok(quoted | item.write_unquoted(w)?))
-    }
-}
-
-impl<T: MaybeLiteral> MaybeLiteral for [T] {
-    fn extend_if_literal<R: Extend<char>>(&self, result: R) -> Result<R, R> {
-        self.iter()
-            .try_fold(result, |result, unit| unit.extend_if_literal(result))
-    }
-}
 
 /// Special parameter
 ///
@@ -195,79 +111,6 @@ pub enum SpecialParam {
     Exclamation,
     /// `0` (name of the shell or shell script)
     Zero,
-}
-
-impl SpecialParam {
-    /// Returns the character representing the special parameter.
-    #[must_use]
-    pub const fn as_char(self) -> char {
-        use SpecialParam::*;
-        match self {
-            At => '@',
-            Asterisk => '*',
-            Number => '#',
-            Question => '?',
-            Hyphen => '-',
-            Dollar => '$',
-            Exclamation => '!',
-            Zero => '0',
-        }
-    }
-
-    /// Returns the special parameter that corresponds to the given character.
-    ///
-    /// If the character does not represent any special parameter, `None` is
-    /// returned.
-    #[must_use]
-    pub const fn from_char(c: char) -> Option<SpecialParam> {
-        use SpecialParam::*;
-        match c {
-            '@' => Some(At),
-            '*' => Some(Asterisk),
-            '#' => Some(Number),
-            '?' => Some(Question),
-            '-' => Some(Hyphen),
-            '$' => Some(Dollar),
-            '!' => Some(Exclamation),
-            '0' => Some(Zero),
-            _ => None,
-        }
-    }
-}
-
-impl fmt::Display for SpecialParam {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.as_char().fmt(f)
-    }
-}
-
-/// Error that occurs when a character cannot be parsed as a special parameter
-///
-/// This error value is returned by the `TryFrom<char>` and `FromStr`
-/// implementations for [`SpecialParam`].
-#[derive(Clone, Debug, Eq, Error, PartialEq)]
-#[error("not a special parameter")]
-pub struct NotSpecialParam;
-
-impl TryFrom<char> for SpecialParam {
-    type Error = NotSpecialParam;
-    fn try_from(c: char) -> Result<SpecialParam, NotSpecialParam> {
-        SpecialParam::from_char(c).ok_or(NotSpecialParam)
-    }
-}
-
-impl FromStr for SpecialParam {
-    type Err = NotSpecialParam;
-    fn from_str(s: &str) -> Result<SpecialParam, NotSpecialParam> {
-        // If `s` contains a single character and nothing else, parse it as a
-        // special parameter.
-        let mut chars = s.chars();
-        chars
-            .next()
-            .filter(|_| chars.as_str().is_empty())
-            .and_then(SpecialParam::from_char)
-            .ok_or(NotSpecialParam)
-    }
 }
 
 /// Type of a parameter
@@ -298,12 +141,6 @@ pub enum ParamType {
     Positional(usize),
 }
 
-impl From<SpecialParam> for ParamType {
-    fn from(special: SpecialParam) -> ParamType {
-        ParamType::Special(special)
-    }
-}
-
 /// Parameter
 ///
 /// A parameter is an identifier that appears in a parameter expansion
@@ -330,46 +167,6 @@ pub struct Param {
     pub r#type: ParamType,
 }
 
-impl Param {
-    /// Constructs a `Param` value representing a named parameter.
-    ///
-    /// This function assumes that the argument is a valid name for a variable.
-    /// The returned `Param` value will have the `Variable` type regardless of
-    /// the argument.
-    #[must_use]
-    pub fn variable<I: Into<String>>(id: I) -> Param {
-        let id = id.into();
-        let r#type = ParamType::Variable;
-        Param { id, r#type }
-    }
-}
-
-/// Constructs a `Param` value representing a special parameter.
-impl From<SpecialParam> for Param {
-    fn from(special: SpecialParam) -> Param {
-        Param {
-            id: special.to_string(),
-            r#type: special.into(),
-        }
-    }
-}
-
-/// Constructs a `Param` value from a positional parameter index.
-impl From<usize> for Param {
-    fn from(index: usize) -> Param {
-        Param {
-            id: index.to_string(),
-            r#type: ParamType::Positional(index),
-        }
-    }
-}
-
-impl fmt::Display for Param {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.id.fmt(f)
-    }
-}
-
 // TODO Consider implementing FromStr for Param
 
 /// Flag that specifies how the value is substituted in a [switch](Switch)
@@ -385,19 +182,6 @@ pub enum SwitchType {
     Error,
 }
 
-impl fmt::Display for SwitchType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use SwitchType::*;
-        let c = match self {
-            Alter => '+',
-            Default => '-',
-            Assign => '=',
-            Error => '?',
-        };
-        f.write_char(c)
-    }
-}
-
 /// Condition that triggers a [switch](Switch)
 ///
 /// In the lexical grammar of the shell language, a switch condition is an
@@ -409,16 +193,6 @@ pub enum SwitchCondition {
     /// With a colon, the switch is triggered if the parameter is unset or
     /// empty.
     UnsetOrEmpty,
-}
-
-impl fmt::Display for SwitchCondition {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use SwitchCondition::*;
-        match self {
-            Unset => Ok(()),
-            UnsetOrEmpty => f.write_char(':'),
-        }
-    }
 }
 
 /// Parameter expansion [modifier](Modifier) that conditionally substitutes the
@@ -438,19 +212,6 @@ pub struct Switch {
     pub word: Word,
 }
 
-impl fmt::Display for Switch {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}{}{}", self.condition, self.r#type, self.word)
-    }
-}
-
-impl Unquote for Switch {
-    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
-        write!(w, "{}{}", self.condition, self.r#type)?;
-        self.word.write_unquoted(w)
-    }
-}
-
 /// Flag that specifies which side of the expanded value is removed in a
 /// [trim](Trim)
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -459,17 +220,6 @@ pub enum TrimSide {
     Prefix,
     /// End of the value
     Suffix,
-}
-
-impl fmt::Display for TrimSide {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use TrimSide::*;
-        let c = match self {
-            Prefix => '#',
-            Suffix => '%',
-        };
-        f.write_char(c)
-    }
 }
 
 /// Flag that specifies pattern matching strategy in a [trim](Trim)
@@ -495,28 +245,6 @@ pub struct Trim {
     pub length: TrimLength,
     /// Pattern to be matched with the expanded value.
     pub pattern: Word,
-}
-
-impl fmt::Display for Trim {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.side.fmt(f)?;
-        match self.length {
-            TrimLength::Shortest => (),
-            TrimLength::Longest => self.side.fmt(f)?,
-        }
-        self.pattern.fmt(f)
-    }
-}
-
-impl Unquote for Trim {
-    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
-        write!(w, "{}", self.side)?;
-        match self.length {
-            TrimLength::Shortest => (),
-            TrimLength::Longest => write!(w, "{}", self.side)?,
-        }
-        self.pattern.write_unquoted(w)
-    }
 }
 
 /// Attribute that modifies a parameter expansion
@@ -550,46 +278,6 @@ pub struct BracedParam {
     pub location: Location,
 }
 
-impl fmt::Display for BracedParam {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Modifier::*;
-        match self.modifier {
-            None => write!(f, "${{{}}}", self.param),
-            Length => write!(f, "${{#{}}}", self.param),
-            Switch(ref switch) => write!(f, "${{{}{}}}", self.param, switch),
-            Trim(ref trim) => write!(f, "${{{}{}}}", self.param, trim),
-        }
-    }
-}
-
-impl Unquote for BracedParam {
-    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
-        use Modifier::*;
-        match self.modifier {
-            None => {
-                write!(w, "${{{}}}", self.param)?;
-                Ok(false)
-            }
-            Length => {
-                write!(w, "${{#{}}}", self.param)?;
-                Ok(false)
-            }
-            Switch(ref switch) => {
-                write!(w, "${{{}", self.param)?;
-                let quoted = switch.write_unquoted(w)?;
-                w.write_char('}')?;
-                Ok(quoted)
-            }
-            Trim(ref trim) => {
-                write!(w, "${{{}", self.param)?;
-                let quoted = trim.write_unquoted(w)?;
-                w.write_char('}')?;
-                Ok(quoted)
-            }
-        }
-    }
-}
-
 /// Element of [`TextUnit::Backquote`]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BackquoteUnit {
@@ -597,30 +285,6 @@ pub enum BackquoteUnit {
     Literal(char),
     /// Backslash-escaped single character
     Backslashed(char),
-}
-
-impl fmt::Display for BackquoteUnit {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            BackquoteUnit::Literal(c) => write!(f, "{c}"),
-            BackquoteUnit::Backslashed(c) => write!(f, "\\{c}"),
-        }
-    }
-}
-
-impl Unquote for BackquoteUnit {
-    fn write_unquoted<W: std::fmt::Write>(&self, w: &mut W) -> UnquoteResult {
-        match self {
-            BackquoteUnit::Literal(c) => {
-                w.write_char(*c)?;
-                Ok(false)
-            }
-            BackquoteUnit::Backslashed(c) => {
-                w.write_char(*c)?;
-                Ok(true)
-            }
-        }
-    }
 }
 
 /// Element of a [Text], i.e., something that can be expanded
@@ -670,107 +334,12 @@ pub enum TextUnit {
 
 pub use TextUnit::*;
 
-impl fmt::Display for TextUnit {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Literal(c) => write!(f, "{c}"),
-            Backslashed(c) => write!(f, "\\{c}"),
-            RawParam { param, .. } => write!(f, "${param}"),
-            BracedParam(param) => param.fmt(f),
-            CommandSubst { content, .. } => write!(f, "$({content})"),
-            Backquote { content, .. } => {
-                f.write_char('`')?;
-                content.iter().try_for_each(|unit| unit.fmt(f))?;
-                f.write_char('`')
-            }
-            Arith { content, .. } => write!(f, "$(({content}))"),
-        }
-    }
-}
-
-impl Unquote for TextUnit {
-    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
-        match self {
-            Literal(c) => {
-                w.write_char(*c)?;
-                Ok(false)
-            }
-            Backslashed(c) => {
-                w.write_char(*c)?;
-                Ok(true)
-            }
-            RawParam { param, .. } => {
-                write!(w, "${param}")?;
-                Ok(false)
-            }
-            BracedParam(param) => param.write_unquoted(w),
-            // We don't remove quotes contained in the commands in command
-            // substitutions. Existing shells disagree with each other.
-            CommandSubst { content, .. } => {
-                write!(w, "$({content})")?;
-                Ok(false)
-            }
-            Backquote { content, .. } => {
-                w.write_char('`')?;
-                let quoted = content.write_unquoted(w)?;
-                w.write_char('`')?;
-                Ok(quoted)
-            }
-            Arith { content, .. } => {
-                w.write_str("$((")?;
-                let quoted = content.write_unquoted(w)?;
-                w.write_str("))")?;
-                Ok(quoted)
-            }
-        }
-    }
-}
-
-impl MaybeLiteral for TextUnit {
-    /// If `self` is `Literal`, appends the character to `result` and returns
-    /// `Ok(result)`. Otherwise, returns `Err(result)`.
-    fn extend_if_literal<T: Extend<char>>(&self, mut result: T) -> Result<T, T> {
-        if let Literal(c) = self {
-            // TODO Use Extend::extend_one
-            result.extend(std::iter::once(*c));
-            Ok(result)
-        } else {
-            Err(result)
-        }
-    }
-}
-
 /// String that may contain some expansions
 ///
 /// A text is a sequence of [text unit](TextUnit)s, which may contain some kinds
 /// of expansions.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Text(pub Vec<TextUnit>);
-
-impl Text {
-    /// Creates a text from an iterator of literal chars.
-    pub fn from_literal_chars<I: IntoIterator<Item = char>>(i: I) -> Text {
-        Text(i.into_iter().map(Literal).collect())
-    }
-}
-
-impl fmt::Display for Text {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.iter().try_for_each(|unit| unit.fmt(f))
-    }
-}
-
-impl Unquote for Text {
-    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
-        self.0.write_unquoted(w)
-    }
-}
-
-impl MaybeLiteral for Text {
-    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Result<T, T> {
-        self.0.extend_if_literal(result)
-    }
-}
 
 /// Element of a [Word], i.e., text with quotes and tilde expansion
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -789,46 +358,6 @@ pub enum WordUnit {
 
 pub use WordUnit::*;
 
-impl fmt::Display for WordUnit {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Unquoted(dq) => dq.fmt(f),
-            SingleQuote(s) => write!(f, "'{s}'"),
-            DoubleQuote(content) => write!(f, "\"{content}\""),
-            Tilde(s) => write!(f, "~{s}"),
-        }
-    }
-}
-
-impl Unquote for WordUnit {
-    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
-        match self {
-            Unquoted(inner) => inner.write_unquoted(w),
-            SingleQuote(inner) => {
-                w.write_str(inner)?;
-                Ok(true)
-            }
-            DoubleQuote(inner) => inner.write_unquoted(w),
-            Tilde(s) => {
-                write!(w, "~{s}")?;
-                Ok(false)
-            }
-        }
-    }
-}
-
-impl MaybeLiteral for WordUnit {
-    /// If `self` is `Unquoted(Literal(_))`, appends the character to `result`
-    /// and returns `Ok(result)`. Otherwise, returns `Err(result)`.
-    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Result<T, T> {
-        if let Unquoted(inner) = self {
-            inner.extend_if_literal(result)
-        } else {
-            Err(result)
-        }
-    }
-}
-
 /// Token that may involve expansions and quotes
 ///
 /// A word is a sequence of [word unit](WordUnit)s. It depends on context whether
@@ -843,24 +372,6 @@ pub struct Word {
     pub units: Vec<WordUnit>,
     /// Position of the word in the source code
     pub location: Location,
-}
-
-impl fmt::Display for Word {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.units.iter().try_for_each(|unit| write!(f, "{unit}"))
-    }
-}
-
-impl Unquote for Word {
-    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
-        self.units.write_unquoted(w)
-    }
-}
-
-impl MaybeLiteral for Word {
-    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Result<T, T> {
-        self.units.extend_if_literal(result)
-    }
 }
 
 /// Value of an [assignment](Assign)
@@ -881,15 +392,6 @@ pub enum Value {
 
 pub use Value::*;
 
-impl fmt::Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Scalar(word) => word.fmt(f),
-            Array(words) => write!(f, "({})", words.iter().format(" ")),
-        }
-    }
-}
-
 /// Assignment word
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Assign {
@@ -901,43 +403,6 @@ pub struct Assign {
     pub value: Value,
     /// Location of the assignment word
     pub location: Location,
-}
-
-impl fmt::Display for Assign {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}={}", &self.name, &self.value)
-    }
-}
-
-/// Fallible conversion from a word into an assignment
-impl TryFrom<Word> for Assign {
-    type Error = Word;
-    /// Converts a word into an assignment.
-    ///
-    /// For a successful conversion, the word must be of the form `name=value`,
-    /// where `name` is a non-empty [literal](Word::to_string_if_literal) word,
-    /// `=` is an unquoted equal sign, and `value` is a word. If the input word
-    /// does not match this syntax, it is returned intact in `Err`.
-    fn try_from(mut word: Word) -> Result<Assign, Word> {
-        if let Some(eq) = word.units.iter().position(|u| u == &Unquoted(Literal('='))) {
-            if eq > 0 {
-                if let Some(name) = word.units[..eq].to_string_if_literal() {
-                    assert!(!name.is_empty());
-                    word.units.drain(..=eq);
-                    word.parse_tilde_everywhere();
-                    let location = word.location.clone();
-                    let value = Scalar(word);
-                    return Ok(Assign {
-                        name,
-                        value,
-                        location,
-                    });
-                }
-            }
-        }
-
-        Err(word)
-    }
 }
 
 /// File descriptor
@@ -954,18 +419,6 @@ impl Fd {
     pub const STDOUT: Fd = Fd(1);
     /// File descriptor for the standard error
     pub const STDERR: Fd = Fd(2);
-}
-
-impl From<RawFd> for Fd {
-    fn from(raw_fd: RawFd) -> Fd {
-        Fd(raw_fd)
-    }
-}
-
-impl fmt::Display for Fd {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
 }
 
 /// Redirection operators
@@ -992,50 +445,6 @@ pub enum RedirOp {
     Pipe,
     /// `<<<` (here-string)
     String,
-}
-
-impl TryFrom<Operator> for RedirOp {
-    type Error = TryFromOperatorError;
-    fn try_from(op: Operator) -> Result<RedirOp, TryFromOperatorError> {
-        use Operator::*;
-        use RedirOp::*;
-        match op {
-            Less => Ok(FileIn),
-            LessGreater => Ok(FileInOut),
-            Greater => Ok(FileOut),
-            GreaterGreater => Ok(FileAppend),
-            GreaterBar => Ok(FileClobber),
-            LessAnd => Ok(FdIn),
-            GreaterAnd => Ok(FdOut),
-            GreaterGreaterBar => Ok(Pipe),
-            LessLessLess => Ok(String),
-            _ => Err(TryFromOperatorError {}),
-        }
-    }
-}
-
-impl From<RedirOp> for Operator {
-    fn from(op: RedirOp) -> Operator {
-        use Operator::*;
-        use RedirOp::*;
-        match op {
-            FileIn => Less,
-            FileInOut => LessGreater,
-            FileOut => Greater,
-            FileAppend => GreaterGreater,
-            FileClobber => GreaterBar,
-            FdIn => LessAnd,
-            FdOut => GreaterAnd,
-            Pipe => GreaterGreaterBar,
-            String => LessLessLess,
-        }
-    }
-}
-
-impl fmt::Display for RedirOp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Operator::from(*self).fmt(f)
-    }
 }
 
 /// Here-document
@@ -1065,19 +474,6 @@ pub struct HereDoc {
     pub content: OnceCell<Text>,
 }
 
-impl fmt::Display for HereDoc {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(if self.remove_tabs { "<<-" } else { "<<" })?;
-
-        // This space is to disambiguate `<< --` and `<<- -`
-        if let Some(Unquoted(Literal('-'))) = self.delimiter.units.first() {
-            f.write_char(' ')?;
-        }
-
-        write!(f, "{}", self.delimiter)
-    }
-}
-
 /// Part of a redirection that defines the nature of the resulting file descriptor
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RedirBody {
@@ -1095,21 +491,6 @@ impl RedirBody {
             RedirBody::Normal { operand, .. } => operand,
             RedirBody::HereDoc(here_doc) => &here_doc.delimiter,
         }
-    }
-}
-
-impl fmt::Display for RedirBody {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            RedirBody::Normal { operator, operand } => write!(f, "{operator}{operand}"),
-            RedirBody::HereDoc(h) => write!(f, "{h}"),
-        }
-    }
-}
-
-impl<T: Into<Rc<HereDoc>>> From<T> for RedirBody {
-    fn from(t: T) -> Self {
-        RedirBody::HereDoc(t.into())
     }
 }
 
@@ -1136,15 +517,6 @@ impl Redir {
             },
             RedirBody::HereDoc { .. } => Fd::STDIN,
         })
-    }
-}
-
-impl fmt::Display for Redir {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(fd) = self.fd {
-            write!(f, "{fd}")?;
-        }
-        write!(f, "{}", self.body)
     }
 }
 
@@ -1184,40 +556,11 @@ impl SimpleCommand {
     }
 }
 
-impl fmt::Display for SimpleCommand {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let i1 = self.assigns.iter().map(|x| x as &dyn fmt::Display);
-        let i2 = self.words.iter().map(|x| x as &dyn fmt::Display);
-        let i3 = self.redirs.iter().map(|x| x as &dyn fmt::Display);
-
-        if !self.assigns.is_empty() || !self.first_word_is_keyword() {
-            write!(f, "{}", i1.chain(i2).chain(i3).format(" "))
-        } else {
-            // If the simple command starts with an assignment or redirection,
-            // the first word may be a keyword which is treated as a plain word.
-            // In this case, we need to avoid the word being interpreted as a
-            // keyword by printing the assignment or redirection first.
-            write!(f, "{}", i3.chain(i2).format(" "))
-        }
-    }
-}
-
 /// `elif-then` clause
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ElifThen {
     pub condition: List,
     pub body: List,
-}
-
-impl fmt::Display for ElifThen {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "elif {:#} then ", self.condition)?;
-        if f.alternate() {
-            write!(f, "{:#}", self.body)
-        } else {
-            write!(f, "{}", self.body)
-        }
-    }
 }
 
 /// Symbol that terminates the body of a case branch and determines what to do
@@ -1233,47 +576,6 @@ pub enum CaseContinuation {
     Continue,
 }
 
-impl TryFrom<Operator> for CaseContinuation {
-    type Error = TryFromOperatorError;
-
-    /// Converts an operator into a case continuation.
-    ///
-    /// The `SemicolonBar` and `SemicolonSemicolonAnd` operators are converted
-    /// into `Continue`; you cannot distinguish between the two from the return
-    /// value.
-    fn try_from(op: Operator) -> Result<CaseContinuation, TryFromOperatorError> {
-        use CaseContinuation::*;
-        use Operator::*;
-        match op {
-            SemicolonSemicolon => Ok(Break),
-            SemicolonAnd => Ok(FallThrough),
-            SemicolonBar | SemicolonSemicolonAnd => Ok(Continue),
-            _ => Err(TryFromOperatorError {}),
-        }
-    }
-}
-
-impl From<CaseContinuation> for Operator {
-    /// Converts a case continuation into an operator.
-    ///
-    /// The `Continue` variant is converted into `SemicolonBar`.
-    fn from(cc: CaseContinuation) -> Operator {
-        use CaseContinuation::*;
-        use Operator::*;
-        match cc {
-            Break => SemicolonSemicolon,
-            FallThrough => SemicolonAnd,
-            Continue => SemicolonBar,
-        }
-    }
-}
-
-impl fmt::Display for CaseContinuation {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Operator::from(*self).fmt(f)
-    }
-}
-
 /// Branch item of a `case` compound command
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CaseItem {
@@ -1286,18 +588,6 @@ pub struct CaseItem {
     pub body: List,
     /// What to do after executing the body of this item
     pub continuation: CaseContinuation,
-}
-
-impl fmt::Display for CaseItem {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "({}) {}{}",
-            self.patterns.iter().format(" | "),
-            self.body,
-            self.continuation,
-        )
-    }
 }
 
 /// Command that contains other commands
@@ -1329,51 +619,6 @@ pub enum CompoundCommand {
     // TODO [[ ]]
 }
 
-impl fmt::Display for CompoundCommand {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use CompoundCommand::*;
-        match self {
-            Grouping(list) => write!(f, "{{ {list:#} }}"),
-            Subshell { body, .. } => write!(f, "({body})"),
-            For { name, values, body } => {
-                write!(f, "for {name}")?;
-                if let Some(values) = values {
-                    f.write_str(" in")?;
-                    for value in values {
-                        write!(f, " {value}")?;
-                    }
-                    f.write_char(';')?;
-                }
-                write!(f, " do {body:#} done")
-            }
-            While { condition, body } => write!(f, "while {condition:#} do {body:#} done"),
-            Until { condition, body } => write!(f, "until {condition:#} do {body:#} done"),
-            If {
-                condition,
-                body,
-                elifs,
-                r#else,
-            } => {
-                write!(f, "if {condition:#} then {body:#} ")?;
-                for elif in elifs {
-                    write!(f, "{elif:#} ")?;
-                }
-                if let Some(r#else) = r#else {
-                    write!(f, "else {else:#} ")?;
-                }
-                f.write_str("fi")
-            }
-            Case { subject, items } => {
-                write!(f, "case {subject} in ")?;
-                for item in items {
-                    write!(f, "{item} ")?;
-                }
-                f.write_str("esac")
-            }
-        }
-    }
-}
-
 /// Compound command with redirections
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FullCompoundCommand {
@@ -1381,14 +626,6 @@ pub struct FullCompoundCommand {
     pub command: CompoundCommand,
     /// Redirections
     pub redirs: Vec<Redir>,
-}
-
-impl fmt::Display for FullCompoundCommand {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let FullCompoundCommand { command, redirs } = self;
-        write!(f, "{command}")?;
-        redirs.iter().try_for_each(|redir| write!(f, " {redir}"))
-    }
 }
 
 /// Function definition command
@@ -1402,15 +639,6 @@ pub struct FunctionDefinition {
     pub body: Rc<FullCompoundCommand>,
 }
 
-impl fmt::Display for FunctionDefinition {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.has_keyword {
-            f.write_str("function ")?;
-        }
-        write!(f, "{}() {}", self.name, self.body)
-    }
-}
-
 /// Element of a pipe sequence
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Command {
@@ -1420,16 +648,6 @@ pub enum Command {
     Compound(FullCompoundCommand),
     /// Function definition command
     Function(FunctionDefinition),
-}
-
-impl fmt::Display for Command {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Command::Simple(c) => c.fmt(f),
-            Command::Compound(c) => c.fmt(f),
-            Command::Function(c) => c.fmt(f),
-        }
-    }
 }
 
 /// Commands separated by `|`
@@ -1446,15 +664,6 @@ pub struct Pipeline {
     pub negation: bool,
 }
 
-impl fmt::Display for Pipeline {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
-        if self.negation {
-            write!(f, "! ")?;
-        }
-        write!(f, "{}", self.commands.iter().format(" | "))
-    }
-}
-
 /// Condition that decides if a [Pipeline] in an [and-or list](AndOrList) should be executed
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AndOr {
@@ -1464,49 +673,11 @@ pub enum AndOr {
     OrElse,
 }
 
-impl TryFrom<Operator> for AndOr {
-    type Error = TryFromOperatorError;
-    fn try_from(op: Operator) -> Result<AndOr, TryFromOperatorError> {
-        match op {
-            Operator::AndAnd => Ok(AndOr::AndThen),
-            Operator::BarBar => Ok(AndOr::OrElse),
-            _ => Err(TryFromOperatorError {}),
-        }
-    }
-}
-
-impl From<AndOr> for Operator {
-    fn from(op: AndOr) -> Operator {
-        match op {
-            AndOr::AndThen => Operator::AndAnd,
-            AndOr::OrElse => Operator::BarBar,
-        }
-    }
-}
-
-impl fmt::Display for AndOr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            AndOr::AndThen => write!(f, "&&"),
-            AndOr::OrElse => write!(f, "||"),
-        }
-    }
-}
-
 /// Pipelines separated by `&&` and `||`
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AndOrList {
     pub first: Pipeline,
     pub rest: Vec<(AndOr, Pipeline)>,
-}
-
-impl fmt::Display for AndOrList {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.first)?;
-        self.rest
-            .iter()
-            .try_for_each(|(c, p)| write!(f, " {c} {p}"))
-    }
 }
 
 /// Element of a [List]
@@ -1521,1007 +692,16 @@ pub struct Item {
     pub async_flag: Option<Location>,
 }
 
-/// Allows conversion from Item to String.
-///
-/// By default, the `;` terminator is omitted from the formatted string.
-/// When the alternate flag is specified as in `{:#}`, the result is always
-/// terminated by either `;` or `&`.
-impl fmt::Display for Item {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.and_or)?;
-        if self.async_flag.is_some() {
-            write!(f, "&")
-        } else if f.alternate() {
-            write!(f, ";")
-        } else {
-            Ok(())
-        }
-    }
-}
-
 /// Sequence of [and-or lists](AndOrList) separated by `;` or `&`
 ///
 /// It depends on context whether an empty list is a valid syntax.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct List(pub Vec<Item>);
 
-/// Allows conversion from List to String.
-///
-/// By default, the last `;` terminator is omitted from the formatted string.
-/// When the alternate flag is specified as in `{:#}`, the result is always
-/// terminated by either `;` or `&`.
-impl fmt::Display for List {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some((last, others)) = self.0.split_last() {
-            for item in others {
-                write!(f, "{item:#} ")?;
-            }
-            if f.alternate() {
-                write!(f, "{last:#}")
-            } else {
-                write!(f, "{last}")
-            }
-        } else {
-            Ok(())
-        }
-    }
-}
-
-#[allow(clippy::bool_assert_comparison)]
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use assert_matches::assert_matches;
-
-    #[test]
-    fn special_param_from_str() {
-        assert_eq!("@".parse(), Ok(SpecialParam::At));
-        assert_eq!("*".parse(), Ok(SpecialParam::Asterisk));
-        assert_eq!("#".parse(), Ok(SpecialParam::Number));
-        assert_eq!("?".parse(), Ok(SpecialParam::Question));
-        assert_eq!("-".parse(), Ok(SpecialParam::Hyphen));
-        assert_eq!("$".parse(), Ok(SpecialParam::Dollar));
-        assert_eq!("!".parse(), Ok(SpecialParam::Exclamation));
-        assert_eq!("0".parse(), Ok(SpecialParam::Zero));
-
-        assert_eq!(SpecialParam::from_str(""), Err(NotSpecialParam));
-        assert_eq!(SpecialParam::from_str("##"), Err(NotSpecialParam));
-        assert_eq!(SpecialParam::from_str("1"), Err(NotSpecialParam));
-        assert_eq!(SpecialParam::from_str("00"), Err(NotSpecialParam));
-    }
-
-    #[test]
-    fn switch_display() {
-        let switch = Switch {
-            r#type: SwitchType::Alter,
-            condition: SwitchCondition::Unset,
-            word: "".parse().unwrap(),
-        };
-        assert_eq!(switch.to_string(), "+");
-
-        let switch = Switch {
-            r#type: SwitchType::Default,
-            condition: SwitchCondition::UnsetOrEmpty,
-            word: "foo".parse().unwrap(),
-        };
-        assert_eq!(switch.to_string(), ":-foo");
-
-        let switch = Switch {
-            r#type: SwitchType::Assign,
-            condition: SwitchCondition::UnsetOrEmpty,
-            word: "bar baz".parse().unwrap(),
-        };
-        assert_eq!(switch.to_string(), ":=bar baz");
-
-        let switch = Switch {
-            r#type: SwitchType::Error,
-            condition: SwitchCondition::Unset,
-            word: "?error".parse().unwrap(),
-        };
-        assert_eq!(switch.to_string(), "??error");
-    }
-
-    #[test]
-    fn switch_unquote() {
-        let switch = Switch {
-            r#type: SwitchType::Default,
-            condition: SwitchCondition::UnsetOrEmpty,
-            word: "foo bar".parse().unwrap(),
-        };
-        let (unquoted, is_quoted) = switch.unquote();
-        assert_eq!(unquoted, ":-foo bar");
-        assert_eq!(is_quoted, false);
-
-        let switch = Switch {
-            r#type: SwitchType::Error,
-            condition: SwitchCondition::Unset,
-            word: r"e\r\ror".parse().unwrap(),
-        };
-        let (unquoted, is_quoted) = switch.unquote();
-        assert_eq!(unquoted, "?error");
-        assert_eq!(is_quoted, true);
-    }
-
-    #[test]
-    fn trim_display() {
-        let trim = Trim {
-            side: TrimSide::Prefix,
-            length: TrimLength::Shortest,
-            pattern: "foo".parse().unwrap(),
-        };
-        assert_eq!(trim.to_string(), "#foo");
-
-        let trim = Trim {
-            side: TrimSide::Prefix,
-            length: TrimLength::Longest,
-            pattern: "".parse().unwrap(),
-        };
-        assert_eq!(trim.to_string(), "##");
-
-        let trim = Trim {
-            side: TrimSide::Suffix,
-            length: TrimLength::Shortest,
-            pattern: "bar".parse().unwrap(),
-        };
-        assert_eq!(trim.to_string(), "%bar");
-
-        let trim = Trim {
-            side: TrimSide::Suffix,
-            length: TrimLength::Longest,
-            pattern: "*".parse().unwrap(),
-        };
-        assert_eq!(trim.to_string(), "%%*");
-    }
-
-    #[test]
-    fn trim_unquote() {
-        let trim = Trim {
-            side: TrimSide::Prefix,
-            length: TrimLength::Shortest,
-            pattern: "".parse().unwrap(),
-        };
-        let (unquoted, is_quoted) = trim.unquote();
-        assert_eq!(unquoted, "#");
-        assert_eq!(is_quoted, false);
-
-        let trim = Trim {
-            side: TrimSide::Prefix,
-            length: TrimLength::Longest,
-            pattern: "'yes'".parse().unwrap(),
-        };
-        let (unquoted, is_quoted) = trim.unquote();
-        assert_eq!(unquoted, "##yes");
-        assert_eq!(is_quoted, true);
-
-        let trim = Trim {
-            side: TrimSide::Suffix,
-            length: TrimLength::Shortest,
-            pattern: r"\no".parse().unwrap(),
-        };
-        let (unquoted, is_quoted) = trim.unquote();
-        assert_eq!(unquoted, "%no");
-        assert_eq!(is_quoted, true);
-
-        let trim = Trim {
-            side: TrimSide::Suffix,
-            length: TrimLength::Longest,
-            pattern: "?".parse().unwrap(),
-        };
-        let (unquoted, is_quoted) = trim.unquote();
-        assert_eq!(unquoted, "%%?");
-        assert_eq!(is_quoted, false);
-    }
-
-    #[test]
-    fn braced_param_display() {
-        let param = BracedParam {
-            param: Param::variable("foo"),
-            modifier: Modifier::None,
-            location: Location::dummy(""),
-        };
-        assert_eq!(param.to_string(), "${foo}");
-
-        let param = BracedParam {
-            modifier: Modifier::Length,
-            ..param
-        };
-        assert_eq!(param.to_string(), "${#foo}");
-
-        let switch = Switch {
-            r#type: SwitchType::Assign,
-            condition: SwitchCondition::UnsetOrEmpty,
-            word: "bar baz".parse().unwrap(),
-        };
-        let param = BracedParam {
-            modifier: Modifier::Switch(switch),
-            ..param
-        };
-        assert_eq!(param.to_string(), "${foo:=bar baz}");
-
-        let trim = Trim {
-            side: TrimSide::Suffix,
-            length: TrimLength::Shortest,
-            pattern: "baz' 'bar".parse().unwrap(),
-        };
-        let param = BracedParam {
-            modifier: Modifier::Trim(trim),
-            ..param
-        };
-        assert_eq!(param.to_string(), "${foo%baz' 'bar}");
-    }
-
-    #[test]
-    fn braced_param_unquote() {
-        let param = BracedParam {
-            param: Param::variable("foo"),
-            modifier: Modifier::None,
-            location: Location::dummy(""),
-        };
-        let (unquoted, is_quoted) = param.unquote();
-        assert_eq!(unquoted, "${foo}");
-        assert_eq!(is_quoted, false);
-
-        let param = BracedParam {
-            modifier: Modifier::Length,
-            ..param
-        };
-        let (unquoted, is_quoted) = param.unquote();
-        assert_eq!(unquoted, "${#foo}");
-        assert_eq!(is_quoted, false);
-
-        let switch = Switch {
-            r#type: SwitchType::Assign,
-            condition: SwitchCondition::UnsetOrEmpty,
-            word: "'bar'".parse().unwrap(),
-        };
-        let param = BracedParam {
-            modifier: Modifier::Switch(switch),
-            ..param
-        };
-        let (unquoted, is_quoted) = param.unquote();
-        assert_eq!(unquoted, "${foo:=bar}");
-        assert_eq!(is_quoted, true);
-
-        let trim = Trim {
-            side: TrimSide::Suffix,
-            length: TrimLength::Shortest,
-            pattern: "baz' 'bar".parse().unwrap(),
-        };
-        let param = BracedParam {
-            modifier: Modifier::Trim(trim),
-            ..param
-        };
-        let (unquoted, is_quoted) = param.unquote();
-        assert_eq!(unquoted, "${foo%baz bar}");
-        assert_eq!(is_quoted, true);
-    }
-
-    #[test]
-    fn backquote_unit_display() {
-        let literal = BackquoteUnit::Literal('A');
-        assert_eq!(literal.to_string(), "A");
-        let backslashed = BackquoteUnit::Backslashed('X');
-        assert_eq!(backslashed.to_string(), r"\X");
-    }
-
-    #[test]
-    fn backquote_unit_unquote() {
-        let literal = BackquoteUnit::Literal('A');
-        let (unquoted, is_quoted) = literal.unquote();
-        assert_eq!(unquoted, "A");
-        assert_eq!(is_quoted, false);
-
-        let backslashed = BackquoteUnit::Backslashed('X');
-        let (unquoted, is_quoted) = backslashed.unquote();
-        assert_eq!(unquoted, "X");
-        assert_eq!(is_quoted, true);
-    }
-
-    #[test]
-    fn text_unit_display() {
-        let literal = Literal('A');
-        assert_eq!(literal.to_string(), "A");
-        let backslashed = Backslashed('X');
-        assert_eq!(backslashed.to_string(), r"\X");
-
-        let raw_param = RawParam {
-            param: Param::variable("PARAM"),
-            location: Location::dummy(""),
-        };
-        assert_eq!(raw_param.to_string(), "$PARAM");
-
-        let command_subst = CommandSubst {
-            content: r"foo\bar".into(),
-            location: Location::dummy(""),
-        };
-        assert_eq!(command_subst.to_string(), r"$(foo\bar)");
-
-        let backquote = Backquote {
-            content: vec![
-                BackquoteUnit::Literal('a'),
-                BackquoteUnit::Backslashed('b'),
-                BackquoteUnit::Backslashed('c'),
-                BackquoteUnit::Literal('d'),
-            ],
-            location: Location::dummy(""),
-        };
-        assert_eq!(backquote.to_string(), r"`a\b\cd`");
-
-        let arith = Arith {
-            content: Text(vec![literal, backslashed, command_subst, backquote]),
-            location: Location::dummy(""),
-        };
-        assert_eq!(arith.to_string(), r"$((A\X$(foo\bar)`a\b\cd`))");
-    }
-
-    #[test]
-    fn text_from_literal_chars() {
-        let text = Text::from_literal_chars(['a', '1'].iter().copied());
-        assert_eq!(text.0, [Literal('a'), Literal('1')]);
-    }
-
-    #[test]
-    fn text_unquote_without_quotes() {
-        let empty = Text(vec![]);
-        let (unquoted, is_quoted) = empty.unquote();
-        assert_eq!(unquoted, "");
-        assert_eq!(is_quoted, false);
-
-        let nonempty = Text(vec![
-            Literal('W'),
-            RawParam {
-                param: Param::variable("X"),
-                location: Location::dummy(""),
-            },
-            CommandSubst {
-                content: "Y".into(),
-                location: Location::dummy(""),
-            },
-            Backquote {
-                content: vec![BackquoteUnit::Literal('Z')],
-                location: Location::dummy(""),
-            },
-            Arith {
-                content: Text(vec![Literal('0')]),
-                location: Location::dummy(""),
-            },
-        ]);
-        let (unquoted, is_quoted) = nonempty.unquote();
-        assert_eq!(unquoted, "W$X$(Y)`Z`$((0))");
-        assert_eq!(is_quoted, false);
-    }
-
-    #[test]
-    fn text_unquote_with_quotes() {
-        let quoted = Text(vec![
-            Literal('a'),
-            Backslashed('b'),
-            Literal('c'),
-            Arith {
-                content: Text(vec![Literal('d')]),
-                location: Location::dummy(""),
-            },
-            Literal('e'),
-        ]);
-        let (unquoted, is_quoted) = quoted.unquote();
-        assert_eq!(unquoted, "abc$((d))e");
-        assert_eq!(is_quoted, true);
-
-        let content = vec![BackquoteUnit::Backslashed('X')];
-        let location = Location::dummy("");
-        let quoted = Text(vec![Backquote { content, location }]);
-        let (unquoted, is_quoted) = quoted.unquote();
-        assert_eq!(unquoted, "`X`");
-        assert_eq!(is_quoted, true);
-
-        let content = Text(vec![Backslashed('X')]);
-        let location = Location::dummy("");
-        let quoted = Text(vec![Arith { content, location }]);
-        let (unquoted, is_quoted) = quoted.unquote();
-        assert_eq!(unquoted, "$((X))");
-        assert_eq!(is_quoted, true);
-    }
-
-    #[test]
-    fn text_to_string_if_literal_success() {
-        let empty = Text(vec![]);
-        let s = empty.to_string_if_literal().unwrap();
-        assert_eq!(s, "");
-
-        let nonempty = Text(vec![Literal('f'), Literal('o'), Literal('o')]);
-        let s = nonempty.to_string_if_literal().unwrap();
-        assert_eq!(s, "foo");
-    }
-
-    #[test]
-    fn text_to_string_if_literal_failure() {
-        let backslashed = Text(vec![Backslashed('a')]);
-        assert_eq!(backslashed.to_string_if_literal(), None);
-    }
-
-    #[test]
-    fn word_unit_display() {
-        let unquoted = Unquoted(Literal('A'));
-        assert_eq!(unquoted.to_string(), "A");
-        let unquoted = Unquoted(Backslashed('B'));
-        assert_eq!(unquoted.to_string(), "\\B");
-
-        let single_quote = SingleQuote("".to_string());
-        assert_eq!(single_quote.to_string(), "''");
-        let single_quote = SingleQuote(r#"a"b"c\"#.to_string());
-        assert_eq!(single_quote.to_string(), r#"'a"b"c\'"#);
-
-        let double_quote = DoubleQuote(Text(vec![]));
-        assert_eq!(double_quote.to_string(), "\"\"");
-        let double_quote = DoubleQuote(Text(vec![Literal('A'), Backslashed('B')]));
-        assert_eq!(double_quote.to_string(), "\"A\\B\"");
-
-        let tilde = Tilde("".to_string());
-        assert_eq!(tilde.to_string(), "~");
-        let tilde = Tilde("foo".to_string());
-        assert_eq!(tilde.to_string(), "~foo");
-    }
-
-    #[test]
-    fn word_unquote() {
-        let mut word = Word::from_str(r#"~a/b\c'd'"e""#).unwrap();
-        let (unquoted, is_quoted) = word.unquote();
-        assert_eq!(unquoted, "~a/bcde");
-        assert_eq!(is_quoted, true);
-
-        word.parse_tilde_front();
-        let (unquoted, is_quoted) = word.unquote();
-        assert_eq!(unquoted, "~a/bcde");
-        assert_eq!(is_quoted, true);
-    }
-
-    #[test]
-    fn word_to_string_if_literal_success() {
-        let empty = Word::from_str("").unwrap();
-        let s = empty.to_string_if_literal().unwrap();
-        assert_eq!(s, "");
-
-        let nonempty = Word::from_str("~foo").unwrap();
-        let s = nonempty.to_string_if_literal().unwrap();
-        assert_eq!(s, "~foo");
-    }
-
-    #[test]
-    fn word_to_string_if_literal_failure() {
-        let location = Location::dummy("foo");
-        let backslashed = Unquoted(Backslashed('?'));
-        let word = Word {
-            units: vec![backslashed],
-            location,
-        };
-        assert_eq!(word.to_string_if_literal(), None);
-
-        let word = Word {
-            units: vec![Tilde("foo".to_string())],
-            ..word
-        };
-        assert_eq!(word.to_string_if_literal(), None);
-    }
-
-    #[test]
-    fn scalar_display() {
-        let s = Scalar(Word::from_str("my scalar value").unwrap());
-        assert_eq!(s.to_string(), "my scalar value");
-    }
-
-    #[test]
-    fn array_display_empty() {
-        let a = Array(vec![]);
-        assert_eq!(a.to_string(), "()");
-    }
-
-    #[test]
-    fn array_display_one() {
-        let a = Array(vec![Word::from_str("one").unwrap()]);
-        assert_eq!(a.to_string(), "(one)");
-    }
-
-    #[test]
-    fn array_display_many() {
-        let a = Array(vec![
-            Word::from_str("let").unwrap(),
-            Word::from_str("me").unwrap(),
-            Word::from_str("see").unwrap(),
-        ]);
-        assert_eq!(a.to_string(), "(let me see)");
-    }
-
-    #[test]
-    fn assign_display() {
-        let mut a = Assign::from_str("foo=bar").unwrap();
-        assert_eq!(a.to_string(), "foo=bar");
-
-        a.value = Array(vec![]);
-        assert_eq!(a.to_string(), "foo=()");
-    }
-
-    #[test]
-    fn assign_try_from_word_without_equal() {
-        let word = Word::from_str("foo").unwrap();
-        let result = Assign::try_from(word.clone());
-        assert_eq!(result.unwrap_err(), word);
-    }
-
-    #[test]
-    fn assign_try_from_word_with_empty_name() {
-        let word = Word::from_str("=foo").unwrap();
-        let result = Assign::try_from(word.clone());
-        assert_eq!(result.unwrap_err(), word);
-    }
-
-    #[test]
-    fn assign_try_from_word_with_non_literal_name() {
-        let mut word = Word::from_str("night=foo").unwrap();
-        word.units.insert(0, Unquoted(Backslashed('k')));
-        let result = Assign::try_from(word.clone());
-        assert_eq!(result.unwrap_err(), word);
-    }
-
-    #[test]
-    fn assign_try_from_word_with_literal_name() {
-        let word = Word::from_str("night=foo").unwrap();
-        let location = word.location.clone();
-        let assign = Assign::try_from(word).unwrap();
-        assert_eq!(assign.name, "night");
-        assert_matches!(assign.value, Scalar(value) => {
-            assert_eq!(value.to_string(), "foo");
-            assert_eq!(value.location, location);
-        });
-        assert_eq!(assign.location, location);
-    }
-
-    #[test]
-    fn assign_try_from_word_tilde() {
-        let word = Word::from_str("a=~:~b").unwrap();
-        let assign = Assign::try_from(word).unwrap();
-        assert_matches!(assign.value, Scalar(value) => {
-            assert_eq!(
-                value.units,
-                [
-                    WordUnit::Tilde("".to_string()),
-                    WordUnit::Unquoted(TextUnit::Literal(':')),
-                    WordUnit::Tilde("b".to_string()),
-                ]
-            );
-        });
-    }
-
-    #[test]
-    fn redir_op_conversions() {
-        use RedirOp::*;
-        for op in &[
-            FileIn,
-            FileInOut,
-            FileOut,
-            FileAppend,
-            FileClobber,
-            FdIn,
-            FdOut,
-            Pipe,
-            String,
-        ] {
-            let op2 = RedirOp::try_from(Operator::from(*op));
-            assert_eq!(op2, Ok(*op));
-        }
-    }
-
-    #[test]
-    fn here_doc_display() {
-        let heredoc = HereDoc {
-            delimiter: Word::from_str("END").unwrap(),
-            remove_tabs: true,
-            content: Text::from_str("here").unwrap().into(),
-        };
-        assert_eq!(heredoc.to_string(), "<<-END");
-
-        let heredoc = HereDoc {
-            delimiter: Word::from_str("XXX").unwrap(),
-            remove_tabs: false,
-            content: Text::from_str("there").unwrap().into(),
-        };
-        assert_eq!(heredoc.to_string(), "<<XXX");
-    }
-
-    #[test]
-    fn here_doc_display_disambiguation() {
-        let heredoc = HereDoc {
-            delimiter: Word::from_str("--").unwrap(),
-            remove_tabs: false,
-            content: Text::from_str("here").unwrap().into(),
-        };
-        assert_eq!(heredoc.to_string(), "<< --");
-
-        let heredoc = HereDoc {
-            delimiter: Word::from_str("-").unwrap(),
-            remove_tabs: true,
-            content: Text::from_str("here").unwrap().into(),
-        };
-        assert_eq!(heredoc.to_string(), "<<- -");
-    }
-
-    #[test]
-    fn redir_display() {
-        let heredoc = HereDoc {
-            delimiter: Word::from_str("END").unwrap(),
-            remove_tabs: false,
-            content: Text::from_str("here").unwrap().into(),
-        };
-
-        let redir = Redir {
-            fd: None,
-            body: heredoc.into(),
-        };
-        assert_eq!(redir.to_string(), "<<END");
-        let redir = Redir {
-            fd: Some(Fd(0)),
-            ..redir
-        };
-        assert_eq!(redir.to_string(), "0<<END");
-        let redir = Redir {
-            fd: Some(Fd(9)),
-            ..redir
-        };
-        assert_eq!(redir.to_string(), "9<<END");
-    }
-
-    #[test]
-    fn simple_command_display() {
-        let mut command = SimpleCommand {
-            assigns: vec![],
-            words: vec![],
-            redirs: vec![].into(),
-        };
-        assert_eq!(command.to_string(), "");
-
-        command
-            .assigns
-            .push(Assign::from_str("name=value").unwrap());
-        assert_eq!(command.to_string(), "name=value");
-
-        command
-            .assigns
-            .push(Assign::from_str("hello=world").unwrap());
-        assert_eq!(command.to_string(), "name=value hello=world");
-
-        command.words.push(Word::from_str("echo").unwrap());
-        assert_eq!(command.to_string(), "name=value hello=world echo");
-
-        command.words.push(Word::from_str("foo").unwrap());
-        assert_eq!(command.to_string(), "name=value hello=world echo foo");
-
-        Rc::make_mut(&mut command.redirs).push(Redir {
-            fd: None,
-            body: RedirBody::from(HereDoc {
-                delimiter: Word::from_str("END").unwrap(),
-                remove_tabs: false,
-                content: Text::from_str("").unwrap().into(),
-            }),
-        });
-        assert_eq!(command.to_string(), "name=value hello=world echo foo <<END");
-
-        command.assigns.clear();
-        assert_eq!(command.to_string(), "echo foo <<END");
-
-        command.words.clear();
-        assert_eq!(command.to_string(), "<<END");
-
-        Rc::make_mut(&mut command.redirs).push(Redir {
-            fd: Some(Fd(1)),
-            body: RedirBody::from(HereDoc {
-                delimiter: Word::from_str("here").unwrap(),
-                remove_tabs: true,
-                content: Text::from_str("ignored").unwrap().into(),
-            }),
-        });
-        assert_eq!(command.to_string(), "<<END 1<<-here");
-
-        command.assigns.push(Assign::from_str("foo=bar").unwrap());
-        assert_eq!(command.to_string(), "foo=bar <<END 1<<-here");
-    }
-
-    #[test]
-    fn simple_command_display_with_keyword() {
-        let command = SimpleCommand {
-            assigns: vec![],
-            words: vec!["if".parse().unwrap()],
-            redirs: vec!["<foo".parse().unwrap()].into(),
-        };
-        assert_eq!(command.to_string(), "<foo if");
-    }
-
-    #[test]
-    fn elif_then_display() {
-        let condition: List = "c 1& c 2".parse().unwrap();
-        let body = "b 1& b 2".parse().unwrap();
-        let elif = ElifThen { condition, body };
-        assert_eq!(format!("{elif}"), "elif c 1& c 2; then b 1& b 2");
-        assert_eq!(format!("{elif:#}"), "elif c 1& c 2; then b 1& b 2;");
-
-        let condition: List = "c&".parse().unwrap();
-        let body = "b&".parse().unwrap();
-        let elif = ElifThen { condition, body };
-        assert_eq!(format!("{elif}"), "elif c& then b&");
-        assert_eq!(format!("{elif:#}"), "elif c& then b&");
-    }
-
-    #[test]
-    fn case_continuation_conversions() {
-        use CaseContinuation::*;
-        for cc in &[Break, FallThrough, Continue] {
-            let cc2 = CaseContinuation::try_from(Operator::from(*cc));
-            assert_eq!(cc2, Ok(*cc));
-        }
-        assert_eq!(
-            CaseContinuation::try_from(Operator::SemicolonSemicolonAnd),
-            Ok(Continue)
-        );
-    }
-
-    #[test]
-    fn case_item_display() {
-        let item = CaseItem {
-            patterns: vec!["foo".parse().unwrap()],
-            body: "".parse::<List>().unwrap(),
-            continuation: CaseContinuation::Break,
-        };
-        assert_eq!(item.to_string(), "(foo) ;;");
-
-        let item = CaseItem {
-            patterns: vec!["bar".parse().unwrap()],
-            body: "echo ok".parse::<List>().unwrap(),
-            continuation: CaseContinuation::Break,
-        };
-        assert_eq!(item.to_string(), "(bar) echo ok;;");
-
-        let item = CaseItem {
-            patterns: ["a", "b", "c"].iter().map(|s| s.parse().unwrap()).collect(),
-            body: "foo; bar&".parse::<List>().unwrap(),
-            continuation: CaseContinuation::Break,
-        };
-        assert_eq!(item.to_string(), "(a | b | c) foo; bar&;;");
-
-        let item = CaseItem {
-            patterns: vec!["foo".parse().unwrap()],
-            body: "bar".parse::<List>().unwrap(),
-            continuation: CaseContinuation::FallThrough,
-        };
-        assert_eq!(item.to_string(), "(foo) bar;&");
-    }
-
-    #[test]
-    fn grouping_display() {
-        let list = "foo".parse::<List>().unwrap();
-        let grouping = CompoundCommand::Grouping(list);
-        assert_eq!(grouping.to_string(), "{ foo; }");
-    }
-
-    #[test]
-    fn for_display_without_values() {
-        let name = Word::from_str("foo").unwrap();
-        let values = None;
-        let body = "echo ok".parse::<List>().unwrap();
-        let r#for = CompoundCommand::For { name, values, body };
-        assert_eq!(r#for.to_string(), "for foo do echo ok; done");
-    }
-
-    #[test]
-    fn for_display_with_empty_values() {
-        let name = Word::from_str("foo").unwrap();
-        let values = Some(vec![]);
-        let body = "echo ok".parse::<List>().unwrap();
-        let r#for = CompoundCommand::For { name, values, body };
-        assert_eq!(r#for.to_string(), "for foo in; do echo ok; done");
-    }
-
-    #[test]
-    fn for_display_with_some_values() {
-        let name = Word::from_str("V").unwrap();
-        let values = Some(vec![
-            Word::from_str("a").unwrap(),
-            Word::from_str("b").unwrap(),
-        ]);
-        let body = "one; two&".parse::<List>().unwrap();
-        let r#for = CompoundCommand::For { name, values, body };
-        assert_eq!(r#for.to_string(), "for V in a b; do one; two& done");
-    }
-
-    #[test]
-    fn while_display() {
-        let condition = "true& false".parse::<List>().unwrap();
-        let body = "echo ok".parse::<List>().unwrap();
-        let r#while = CompoundCommand::While { condition, body };
-        assert_eq!(r#while.to_string(), "while true& false; do echo ok; done");
-    }
-
-    #[test]
-    fn until_display() {
-        let condition = "true& false".parse::<List>().unwrap();
-        let body = "echo ok".parse::<List>().unwrap();
-        let until = CompoundCommand::Until { condition, body };
-        assert_eq!(until.to_string(), "until true& false; do echo ok; done");
-    }
-
-    #[test]
-    fn if_display() {
-        let r#if: CompoundCommand = CompoundCommand::If {
-            condition: "c 1; c 2&".parse().unwrap(),
-            body: "b 1; b 2&".parse().unwrap(),
-            elifs: vec![],
-            r#else: None,
-        };
-        assert_eq!(r#if.to_string(), "if c 1; c 2& then b 1; b 2& fi");
-
-        let r#if: CompoundCommand = CompoundCommand::If {
-            condition: "c 1& c 2;".parse().unwrap(),
-            body: "b 1& b 2;".parse().unwrap(),
-            elifs: vec![ElifThen {
-                condition: "c 3&".parse().unwrap(),
-                body: "b 3&".parse().unwrap(),
-            }],
-            r#else: Some("b 4".parse().unwrap()),
-        };
-        assert_eq!(
-            r#if.to_string(),
-            "if c 1& c 2; then b 1& b 2; elif c 3& then b 3& else b 4; fi"
-        );
-
-        let r#if: CompoundCommand = CompoundCommand::If {
-            condition: "true".parse().unwrap(),
-            body: ":".parse().unwrap(),
-            elifs: vec![
-                ElifThen {
-                    condition: "false".parse().unwrap(),
-                    body: "a".parse().unwrap(),
-                },
-                ElifThen {
-                    condition: "echo&".parse().unwrap(),
-                    body: "b&".parse().unwrap(),
-                },
-            ],
-            r#else: None,
-        };
-        assert_eq!(
-            r#if.to_string(),
-            "if true; then :; elif false; then a; elif echo& then b& fi"
-        );
-    }
-
-    #[test]
-    fn case_display() {
-        let subject = "foo".parse().unwrap();
-        let items = Vec::<CaseItem>::new();
-        let case = CompoundCommand::Case { subject, items };
-        assert_eq!(case.to_string(), "case foo in esac");
-
-        let subject = "bar".parse().unwrap();
-        let items = vec!["foo)".parse::<CaseItem>().unwrap()];
-        let case = CompoundCommand::Case { subject, items };
-        assert_eq!(case.to_string(), "case bar in (foo) ;; esac");
-
-        let subject = "baz".parse().unwrap();
-        let items = vec![
-            "1)".parse::<CaseItem>().unwrap(),
-            "(a|b|c) :&".parse().unwrap(),
-        ];
-        let case = CompoundCommand::Case { subject, items };
-        assert_eq!(case.to_string(), "case baz in (1) ;; (a | b | c) :&;; esac");
-    }
-
-    #[test]
-    fn function_definition_display() {
-        let body = FullCompoundCommand {
-            command: "( bar )".parse::<CompoundCommand>().unwrap(),
-            redirs: vec![],
-        };
-        let fd = FunctionDefinition {
-            has_keyword: false,
-            name: Word::from_str("foo").unwrap(),
-            body: Rc::new(body),
-        };
-        assert_eq!(fd.to_string(), "foo() (bar)");
-    }
-
-    #[test]
-    fn pipeline_display() {
-        let mut p = Pipeline {
-            commands: vec![Rc::new("first".parse::<Command>().unwrap())],
-            negation: false,
-        };
-        assert_eq!(p.to_string(), "first");
-
-        p.negation = true;
-        assert_eq!(p.to_string(), "! first");
-
-        p.commands.push(Rc::new("second".parse().unwrap()));
-        assert_eq!(p.to_string(), "! first | second");
-
-        p.commands.push(Rc::new("third".parse().unwrap()));
-        p.negation = false;
-        assert_eq!(p.to_string(), "first | second | third");
-    }
-
-    #[test]
-    fn and_or_conversions() {
-        for op in &[AndOr::AndThen, AndOr::OrElse] {
-            let op2 = AndOr::try_from(Operator::from(*op));
-            assert_eq!(op2, Ok(*op));
-        }
-    }
-
-    #[test]
-    fn and_or_list_display() {
-        let p = "first".parse::<Pipeline>().unwrap();
-        let mut aol = AndOrList {
-            first: p,
-            rest: vec![],
-        };
-        assert_eq!(aol.to_string(), "first");
-
-        let p = "second".parse().unwrap();
-        aol.rest.push((AndOr::AndThen, p));
-        assert_eq!(aol.to_string(), "first && second");
-
-        let p = "third".parse().unwrap();
-        aol.rest.push((AndOr::OrElse, p));
-        assert_eq!(aol.to_string(), "first && second || third");
-    }
-
-    #[test]
-    fn list_display() {
-        let and_or = "first".parse::<AndOrList>().unwrap();
-        let item = Item {
-            and_or: Rc::new(and_or),
-            async_flag: None,
-        };
-        let mut list = List(vec![item]);
-        assert_eq!(list.to_string(), "first");
-
-        let and_or = "second".parse().unwrap();
-        let item = Item {
-            and_or: Rc::new(and_or),
-            async_flag: Some(Location::dummy("")),
-        };
-        list.0.push(item);
-        assert_eq!(list.to_string(), "first; second&");
-
-        let and_or = "third".parse().unwrap();
-        let item = Item {
-            and_or: Rc::new(and_or),
-            async_flag: None,
-        };
-        list.0.push(item);
-        assert_eq!(list.to_string(), "first; second& third");
-    }
-
-    #[test]
-    fn list_display_alternate() {
-        let and_or = "first".parse::<AndOrList>().unwrap();
-        let item = Item {
-            and_or: Rc::new(and_or),
-            async_flag: None,
-        };
-        let mut list = List(vec![item]);
-        assert_eq!(format!("{list:#}"), "first;");
-
-        let and_or = "second".parse().unwrap();
-        let item = Item {
-            and_or: Rc::new(and_or),
-            async_flag: Some(Location::dummy("")),
-        };
-        list.0.push(item);
-        assert_eq!(format!("{list:#}"), "first; second&");
-
-        let and_or = "third".parse().unwrap();
-        let item = Item {
-            and_or: Rc::new(and_or),
-            async_flag: None,
-        };
-        list.0.push(item);
-        assert_eq!(format!("{list:#}"), "first; second& third;");
-    }
-}
+/// Definitions and implementations of the [Unquote] and [MaybeLiteral] traits,
+/// and other conversions between types
+mod conversions;
+/// Implementations of [std::fmt::Display] for the shell language syntax types
+mod impl_display;
+
+pub use conversions::{MaybeLiteral, NotLiteral, NotSpecialParam, Unquote};
