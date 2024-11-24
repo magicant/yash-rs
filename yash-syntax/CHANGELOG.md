@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - The `parser::Parser::case_item` and `syntax::CaseItem::from_str` methods
       now consume a trailing terminator token, if any. The terminator can be
       not only `;;`, but also `;&`, `;|`, or `;;&`.
+- In the `syntax::MaybeLiteral` trait, the `extend_if_literal` method is
+  replaced with the `extend_literal` method, which now takes a mutable reference
+  to an `Extend<char>` object, instead of an ownership of it. The method may
+  leave intermediate results in the `Extend<char>` object if unsuccessful.
+    - The `syntax::NotLiteral` struct is added to represent the case where the
+      method is unsuccessful.
 
 ## [0.12.1] - 2024-11-10
 

@@ -117,11 +117,19 @@ pub trait Unquote {
     }
 }
 
+/// Error indicating that a syntax element is not a literal
+///
+/// This error value is returned by [`MaybeLiteral::extend_literal`] when the
+/// syntax element is not a literal.
+#[derive(Debug, Error)]
+#[error("not a literal")]
+pub struct NotLiteral;
+
 /// Possibly literal syntax element
 ///
 /// A syntax element is _literal_ if it is not quoted and does not contain any
-/// expansions. Such an element can be expanded to a string independently of the
-/// shell execution environment.
+/// expansions. Such an element may be considered as a constant string, and is
+/// a candidate for a keyword or identifier.
 ///
 /// ```
 /// # use yash_syntax::syntax::MaybeLiteral;
@@ -140,17 +148,18 @@ pub trait Unquote {
 /// assert_eq!(backslashed.to_string_if_literal(), None);
 /// ```
 pub trait MaybeLiteral {
-    /// Checks if `self` is literal and, if so, converts to a string and appends
-    /// it to `result`.
+    /// Appends the literal representation of `self` to an extendable object.
     ///
-    /// If `self` is literal, `self` converted to a string is appended to
-    /// `result` and `Ok(result)` is returned. Otherwise, `result` is not
-    /// modified and `Err(result)` is returned.
-    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Result<T, T>;
+    /// If `self` is literal, the literal representation is appended to `result`
+    /// and `Ok(())` is returned. Otherwise, `Err(NotLiteral)` is returned and
+    /// `result` may contain some characters that have been appended.
+    fn extend_literal<T: Extend<char>>(&self, result: &mut T) -> Result<(), NotLiteral>;
 
     /// Checks if `self` is literal and, if so, converts to a string.
     fn to_string_if_literal(&self) -> Option<String> {
-        self.extend_if_literal(String::new()).ok()
+        let mut result = String::new();
+        self.extend_literal(&mut result).ok()?;
+        Some(result)
     }
 }
 
@@ -162,9 +171,8 @@ impl<T: Unquote> Unquote for [T] {
 }
 
 impl<T: MaybeLiteral> MaybeLiteral for [T] {
-    fn extend_if_literal<R: Extend<char>>(&self, result: R) -> Result<R, R> {
-        self.iter()
-            .try_fold(result, |result, unit| unit.extend_if_literal(result))
+    fn extend_literal<R: Extend<char>>(&self, result: &mut R) -> Result<(), NotLiteral> {
+        self.iter().try_for_each(|item| item.extend_literal(result))
     }
 }
 
@@ -623,15 +631,14 @@ impl Unquote for TextUnit {
 }
 
 impl MaybeLiteral for TextUnit {
-    /// If `self` is `Literal`, appends the character to `result` and returns
-    /// `Ok(result)`. Otherwise, returns `Err(result)`.
-    fn extend_if_literal<T: Extend<char>>(&self, mut result: T) -> Result<T, T> {
+    /// If `self` is `Literal`, appends the character to `result`.
+    fn extend_literal<T: Extend<char>>(&self, result: &mut T) -> Result<(), NotLiteral> {
         if let Literal(c) = self {
             // TODO Use Extend::extend_one
             result.extend(std::iter::once(*c));
-            Ok(result)
+            Ok(())
         } else {
-            Err(result)
+            Err(NotLiteral)
         }
     }
 }
@@ -657,8 +664,8 @@ impl Unquote for Text {
 }
 
 impl MaybeLiteral for Text {
-    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Result<T, T> {
-        self.0.extend_if_literal(result)
+    fn extend_literal<T: Extend<char>>(&self, result: &mut T) -> Result<(), NotLiteral> {
+        self.0.extend_literal(result)
     }
 }
 
@@ -697,13 +704,12 @@ impl Unquote for WordUnit {
 }
 
 impl MaybeLiteral for WordUnit {
-    /// If `self` is `Unquoted(Literal(_))`, appends the character to `result`
-    /// and returns `Ok(result)`. Otherwise, returns `Err(result)`.
-    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Result<T, T> {
+    /// If `self` is `Unquoted(Literal(_))`, appends the character to `result`.
+    fn extend_literal<T: Extend<char>>(&self, result: &mut T) -> Result<(), NotLiteral> {
         if let Unquoted(inner) = self {
-            inner.extend_if_literal(result)
+            inner.extend_literal(result)
         } else {
-            Err(result)
+            Err(NotLiteral)
         }
     }
 }
@@ -731,8 +737,8 @@ impl Unquote for Word {
 }
 
 impl MaybeLiteral for Word {
-    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Result<T, T> {
-        self.units.extend_if_literal(result)
+    fn extend_literal<T: Extend<char>>(&self, result: &mut T) -> Result<(), NotLiteral> {
+        self.units.extend_literal(result)
     }
 }
 
