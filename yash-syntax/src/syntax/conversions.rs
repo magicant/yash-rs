@@ -419,6 +419,17 @@ impl Unquote for EscapeUnit {
     }
 }
 
+impl MaybeLiteral for EscapeUnit {
+    fn extend_literal<T: Extend<char>>(&self, result: &mut T) -> Result<(), NotLiteral> {
+        if let Self::Literal(c) = self {
+            result.extend(std::iter::once(*c));
+            Ok(())
+        } else {
+            Err(NotLiteral)
+        }
+    }
+}
+
 /// Converts an escaped string into the string represented by the escape
 /// sequences.
 ///
@@ -427,6 +438,12 @@ impl Unquote for EscapeUnit {
 impl Unquote for EscapedString {
     fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
         self.0.write_unquoted(w)
+    }
+}
+
+impl MaybeLiteral for EscapedString {
+    fn extend_literal<T: Extend<char>>(&self, result: &mut T) -> Result<(), NotLiteral> {
+        self.0.extend_literal(result)
     }
 }
 
