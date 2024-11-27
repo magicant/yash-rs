@@ -439,7 +439,7 @@ impl Unquote for WordUnit {
                 Ok(true)
             }
             DoubleQuote(inner) => inner.write_unquoted(w),
-            DollarSingleQuote(_) => todo!(),
+            DollarSingleQuote(inner) => inner.write_unquoted(w),
             Tilde(s) => {
                 write!(w, "~{s}")?;
                 Ok(false)
