@@ -127,13 +127,44 @@ impl fmt::Display for Text {
     }
 }
 
+impl fmt::Display for EscapeUnit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Literal(c) => c.fmt(f),
+            Self::DoubleQuote => f.write_str("\\\""),
+            Self::SingleQuote => f.write_str("\\'"),
+            Self::Backslash => f.write_str("\\\\"),
+            Self::Question => f.write_str("\\?"),
+            Self::Alert => f.write_str("\\a"),
+            Self::Backspace => f.write_str("\\b"),
+            Self::Escape => f.write_str("\\e"),
+            Self::FormFeed => f.write_str("\\f"),
+            Self::Newline => f.write_str("\\n"),
+            Self::CarriageReturn => f.write_str("\\r"),
+            Self::Tab => f.write_str("\\t"),
+            Self::VerticalTab => f.write_str("\\v"),
+            Self::Control(b) => write!(f, "\\c{}", (*b ^ 0x40) as char),
+            Self::Octal(b) => write!(f, "\\{b:03o}"),
+            Self::Hex(b) => write!(f, "\\x{b:02X}"),
+            Self::Unicode(c) if *c <= '\u{FFFF}' => write!(f, "\\u{:04x}", *c as u32),
+            Self::Unicode(c) => write!(f, "\\U{:08X}", *c as u32),
+        }
+    }
+}
+
+impl fmt::Display for EscapedString {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.iter().try_for_each(|unit| unit.fmt(f))
+    }
+}
+
 impl fmt::Display for WordUnit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Unquoted(dq) => dq.fmt(f),
             SingleQuote(s) => write!(f, "'{s}'"),
             DoubleQuote(content) => write!(f, "\"{content}\""),
-            DollarSingleQuote(_) => todo!(),
+            DollarSingleQuote(content) => write!(f, "$'{content}'"),
             Tilde(s) => write!(f, "~{s}"),
         }
     }
@@ -539,6 +570,33 @@ mod tests {
     }
 
     #[test]
+    fn escape_unit_display() {
+        use EscapeUnit::*;
+
+        assert_eq!(Literal('A').to_string(), "A");
+        assert_eq!(DoubleQuote.to_string(), r#"\""#);
+        assert_eq!(SingleQuote.to_string(), r"\'");
+        assert_eq!(Backslash.to_string(), r"\\");
+        assert_eq!(Question.to_string(), r"\?");
+        assert_eq!(Alert.to_string(), r"\a");
+        assert_eq!(Backspace.to_string(), r"\b");
+        assert_eq!(Escape.to_string(), r"\e");
+        assert_eq!(FormFeed.to_string(), r"\f");
+        assert_eq!(Newline.to_string(), r"\n");
+        assert_eq!(CarriageReturn.to_string(), r"\r");
+        assert_eq!(Tab.to_string(), r"\t");
+        assert_eq!(VerticalTab.to_string(), r"\v");
+        assert_eq!(Control(b'\x01').to_string(), r"\cA");
+        assert_eq!(Control(b'\x7F').to_string(), r"\c?");
+        assert_eq!(Octal(0o003).to_string(), r"\003");
+        assert_eq!(Octal(0o123).to_string(), r"\123");
+        assert_eq!(Hex(0x05).to_string(), r"\x05");
+        assert_eq!(Hex(0xAB).to_string(), r"\xAB");
+        assert_eq!(Unicode('A').to_string(), r"\u0041");
+        assert_eq!(Unicode('😊').to_string(), r"\U0001F60A");
+    }
+
+    #[test]
     fn word_unit_display() {
         let unquoted = Unquoted(Literal('A'));
         assert_eq!(unquoted.to_string(), "A");
@@ -554,6 +612,14 @@ mod tests {
         assert_eq!(double_quote.to_string(), "\"\"");
         let double_quote = DoubleQuote(Text(vec![Literal('A'), Backslashed('B')]));
         assert_eq!(double_quote.to_string(), "\"A\\B\"");
+
+        let dollar_single_quote = DollarSingleQuote(EscapedString(vec![]));
+        assert_eq!(dollar_single_quote.to_string(), "$''");
+        let dollar_single_quote = DollarSingleQuote(EscapedString(vec![
+            EscapeUnit::Literal('A'),
+            EscapeUnit::Backslash,
+        ]));
+        assert_eq!(dollar_single_quote.to_string(), r"$'A\\'");
 
         let tilde = Tilde("".to_string());
         assert_eq!(tilde.to_string(), "~");
