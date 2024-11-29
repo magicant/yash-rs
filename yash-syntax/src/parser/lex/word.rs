@@ -131,8 +131,7 @@ impl WordLexer<'_, '_> {
             }
             _ => {
                 let unit = self.text_unit(is_delimiter, is_escapable).await?;
-                /* TODO allow_single_quote && */
-                if unit == Some(TextUnit::Literal('$')) {
+                if allow_single_quote && unit == Some(TextUnit::Literal('$')) {
                     if let Some(result) = self.dollar_single_quote().await? {
                         return Ok(Some(result));
                     }
@@ -464,7 +463,24 @@ mod tests {
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
-    // TODO lexer_word_unit_not_dollar_single_quote_in_text_context
+    #[test]
+    fn lexer_word_unit_not_dollar_single_quote_in_text_context() {
+        let mut lexer = Lexer::from_memory("$''", Source::Unknown);
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Text,
+        };
+        let result = lexer
+            .word_unit(|c| {
+                assert_matches!(c, '$', "unexpected call to is_delimiter({c:?})");
+                false
+            })
+            .now_or_never()
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_matches!(result, Unquoted(Literal('$')));
+    }
 
     #[test]
     fn lexer_word_unit_double_quote_empty() {
