@@ -24,11 +24,9 @@ use crate::parser::error::Error;
 use crate::parser::error::SyntaxError;
 use crate::source::Location;
 use crate::source::SourceChar;
-use crate::syntax::EscapeUnit;
-use crate::syntax::EscapedString;
 use crate::syntax::TextUnit;
 use crate::syntax::Word;
-use crate::syntax::WordUnit::{self, DollarSingleQuote, DoubleQuote, SingleQuote, Unquoted};
+use crate::syntax::WordUnit::{self, DoubleQuote, SingleQuote, Unquoted};
 
 impl Lexer<'_> {
     /// Parses a single-quoted string.
@@ -55,78 +53,6 @@ impl Lexer<'_> {
         }
         Lexer::enable_line_continuation(lexer);
         Ok(SingleQuote(content))
-    }
-
-    /// Parses a dollar-single-quoted string.
-    ///
-    /// The initial `$` must have been consumed before calling this function.
-    /// The enclosing `'`s are consumed in this function.
-    ///
-    /// If the next character is not `'`, this function returns `None`.
-    async fn dollar_single_quote(&mut self) -> Result<Option<WordUnit>> {
-        if self.consume_char_if(|c| c == '\'').await?.is_none() {
-            return Ok(None);
-        }
-
-        let mut units = Vec::new();
-        // Loop until the closing `'` is found
-        loop {
-            let Some(c) = self.peek_char().await? else {
-                todo!("return error");
-            };
-            self.consume_char();
-
-            use EscapeUnit::*;
-            match c {
-                '\'' => break,
-
-                '\\' => {
-                    let Some(c2) = self.peek_char().await? else {
-                        todo!("return error");
-                    };
-                    self.consume_char();
-                    match c2 {
-                        '"' => units.push(DoubleQuote),
-                        '\'' => units.push(SingleQuote),
-                        '\\' => units.push(Backslash),
-                        '?' => units.push(Question),
-                        'a' => units.push(Alert),
-                        'b' => units.push(Backspace),
-                        'e' | 'E' => units.push(Escape),
-                        'f' => units.push(FormFeed),
-                        'n' => units.push(Newline),
-                        'r' => units.push(CarriageReturn),
-                        't' => units.push(Tab),
-                        'v' => units.push(VerticalTab),
-
-                        'c' => {
-                            let Some(c3) = self.peek_char().await? else {
-                                todo!("return error");
-                            };
-                            self.consume_char();
-                            match c3.to_ascii_uppercase() {
-                                '\\' => {
-                                    let Some('\\') = self.peek_char().await? else {
-                                        todo!("return error");
-                                    };
-                                    self.consume_char();
-                                    units.push(Control(0x1C));
-                                }
-
-                                c3 @ ('\u{3F}'..'\u{60}') => units.push(Control(c3 as u8 ^ 0x40)),
-
-                                _ => todo!("return error: unknown control character {c3:?}"),
-                            }
-                        }
-
-                        _ => todo!("return error: unknown escape character {c2:?}"),
-                    }
-                }
-
-                c => units.push(Literal(c)),
-            }
-        }
-        Ok(Some(DollarSingleQuote(EscapedString(units))))
     }
 
     /// Parses a double-quoted string.
@@ -254,10 +180,12 @@ mod tests {
     use crate::parser::error::ErrorCause;
     use crate::parser::lex::WordContext;
     use crate::source::Source;
+    use crate::syntax::EscapeUnit;
+    use crate::syntax::EscapedString;
     use crate::syntax::Modifier;
     use crate::syntax::Text;
     use crate::syntax::TextUnit::{Backslashed, BracedParam, CommandSubst, Literal};
-    use crate::syntax::WordUnit::Tilde;
+    use crate::syntax::WordUnit::{DollarSingleQuote, Tilde};
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
 
@@ -536,125 +464,7 @@ mod tests {
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
-    #[test]
-    fn lexer_word_unit_dollar_single_quote_named_escapes() {
-        let mut lexer = Lexer::from_memory(r#"$'\""\'\\\?\a\b\e\E\f\n\r\t\v'x"#, Source::Unknown);
-        let mut lexer = WordLexer {
-            lexer: &mut lexer,
-            context: WordContext::Word,
-        };
-        let result = lexer
-            .word_unit(|c| {
-                assert_matches!(c, '$', "unexpected call to is_delimiter({c:?})");
-                false
-            })
-            .now_or_never()
-            .unwrap()
-            .unwrap()
-            .unwrap();
-        assert_matches!(result, DollarSingleQuote(EscapedString(content)) => {
-            assert_eq!(
-                content,
-                [
-                    EscapeUnit::DoubleQuote,
-                    EscapeUnit::Literal('"'),
-                    EscapeUnit::SingleQuote,
-                    EscapeUnit::Backslash,
-                    EscapeUnit::Question,
-                    EscapeUnit::Alert,
-                    EscapeUnit::Backspace,
-                    EscapeUnit::Escape,
-                    EscapeUnit::Escape,
-                    EscapeUnit::FormFeed,
-                    EscapeUnit::Newline,
-                    EscapeUnit::CarriageReturn,
-                    EscapeUnit::Tab,
-                    EscapeUnit::VerticalTab,
-                ]
-            );
-        });
-
-        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('x')));
-    }
-
-    #[test]
-    #[ignore = "not implemented"]
-    fn lexer_word_unit_dollar_single_quote_incomplete_escapes() {
-        todo!()
-    }
-
-    #[test]
-    fn lexer_word_unit_dollar_single_quote_control_escapes() {
-        let mut lexer = Lexer::from_memory(r"$'\cA\cz\c^\c?\c\\'", Source::Unknown);
-        let mut lexer = WordLexer {
-            lexer: &mut lexer,
-            context: WordContext::Word,
-        };
-        let result = lexer
-            .word_unit(|c| {
-                assert_matches!(c, '$', "unexpected call to is_delimiter({c:?})");
-                false
-            })
-            .now_or_never()
-            .unwrap()
-            .unwrap()
-            .unwrap();
-        assert_matches!(result, DollarSingleQuote(EscapedString(content)) => {
-            assert_eq!(
-                content,
-                [
-                    EscapeUnit::Control(0x01),
-                    EscapeUnit::Control(0x1A),
-                    EscapeUnit::Control(0x1E),
-                    EscapeUnit::Control(0x7F),
-                    EscapeUnit::Control(0x1C),
-                ]
-            );
-        });
-
-        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
-    }
-
-    #[test]
-    #[ignore = "not implemented"]
-    fn lexer_word_unit_dollar_single_quote_incomplete_control_escapes() {
-        todo!()
-    }
-
-    #[test]
-    #[ignore = "not implemented"]
-    fn lexer_word_unit_dollar_single_quote_octal_escapes() {
-        todo!()
-    }
-
-    #[test]
-    #[ignore = "not implemented"]
-    fn lexer_word_unit_dollar_single_quote_hex_escapes() {
-        todo!()
-    }
-
-    #[test]
-    #[ignore = "not implemented"]
-    fn lexer_word_unit_dollar_single_quote_incomplete_hex_escape() {
-        todo!()
-    }
-
-    #[test]
-    #[ignore = "not implemented"]
-    fn lexer_word_unit_dollar_single_quote_unicode_escapes() {
-        todo!()
-    }
-
-    #[test]
-    #[ignore = "not implemented"]
-    fn lexer_word_unit_dollar_single_quote_incomplete_unicode_escapes() {
-        todo!()
-    }
-
-    // TODO Reject non-portable escapes in POSIX mode
-
-    // TODO lexer_word_unit_dollar_single_quote_unclosed
-    // TODO lexer_word_unit_dollar_single_quote_not_quote_in_text_context
+    // TODO lexer_word_unit_not_dollar_single_quote_in_text_context
 
     #[test]
     fn lexer_word_unit_double_quote_empty() {
