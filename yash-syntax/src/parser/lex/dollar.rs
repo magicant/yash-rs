@@ -29,6 +29,9 @@ impl WordLexer<'_, '_> {
     /// If the next character is `$`, a parameter expansion, command
     /// substitution, or arithmetic expansion is parsed. Otherwise, no
     /// characters are consumed and the return value is `Ok(None)`.
+    ///
+    /// This function does not parse dollar-single-quotes. They are handled in
+    /// [`word_unit`](Self::word_unit).
     pub async fn dollar_unit(&mut self) -> Result<Option<TextUnit>> {
         let start_index = self.index();
         if !self.skip_if(|c| c == '$').await? {
@@ -48,7 +51,6 @@ impl WordLexer<'_, '_> {
             return Ok(Some(result));
         }
 
-        // TODO maybe reject unrecognized dollar unit?
         self.rewind(start_index);
         Ok(None)
     }
