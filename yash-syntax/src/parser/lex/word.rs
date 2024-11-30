@@ -26,7 +26,7 @@ use crate::source::Location;
 use crate::source::SourceChar;
 use crate::syntax::TextUnit;
 use crate::syntax::Word;
-use crate::syntax::WordUnit::{self, DoubleQuote, SingleQuote, Unquoted};
+use crate::syntax::WordUnit::{self, DollarSingleQuote, DoubleQuote, SingleQuote, Unquoted};
 
 impl Lexer<'_> {
     /// Parses a single-quoted string.
@@ -132,8 +132,8 @@ impl WordLexer<'_, '_> {
             _ => {
                 let unit = self.text_unit(is_delimiter, is_escapable).await?;
                 if allow_single_quote && unit == Some(TextUnit::Literal('$')) {
-                    if let Some(result) = self.dollar_single_quote().await? {
-                        return Ok(Some(result));
+                    if let Some(result) = self.single_quoted_escaped_string().await? {
+                        return Ok(Some(DollarSingleQuote(result)));
                     }
                     // TODO Maybe reject any other characters after `$`?
                 }

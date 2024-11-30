@@ -14,22 +14,25 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Parsing dollar-single-quoted strings
+//! Parsing escaped strings
 
 use super::core::Lexer;
 use crate::parser::core::Result;
 use crate::syntax::EscapeUnit;
 use crate::syntax::EscapedString;
-use crate::syntax::WordUnit::{self, DollarSingleQuote};
 
 impl Lexer<'_> {
-    /// Parses a dollar-single-quoted string.
+    /// Parses an escaped string enclosed in single quotes.
     ///
-    /// The initial `$` must have been consumed before calling this function.
-    /// The enclosing `'`s are consumed in this function.
+    /// This function is meant to be used for parsing dollar-single-quoted
+    /// strings. The initial `$` must have been consumed before calling this
+    /// function, which expects an opening `'` to be the next character. If the
+    /// next character is not `'`, this function returns `None`.
     ///
-    /// If the next character is not `'`, this function returns `None`.
-    pub(super) async fn dollar_single_quote(&mut self) -> Result<Option<WordUnit>> {
+    /// This function consumes up to and including the closing `'`. If the
+    /// closing `'` is not found or an invalid escape sequence is found, this
+    /// function returns an error.
+    pub(super) async fn single_quoted_escaped_string(&mut self) -> Result<Option<EscapedString>> {
         if self.consume_char_if(|c| c == '\'').await?.is_none() {
             return Ok(None);
         }
@@ -110,7 +113,7 @@ impl Lexer<'_> {
                 c => units.push(Literal(c)),
             }
         }
-        Ok(Some(DollarSingleQuote(EscapedString(units))))
+        Ok(Some(EscapedString(units)))
     }
 }
 
@@ -122,19 +125,27 @@ mod tests {
     use futures_util::FutureExt;
 
     #[test]
-    fn lexer_word_unit_dollar_single_quote_empty() {
+    fn single_quoted_escaped_string_empty() {
         let mut lexer = Lexer::from_memory("''", Source::Unknown);
-        let result = lexer.dollar_single_quote().now_or_never().unwrap().unwrap();
-        assert_matches!(result, Some(DollarSingleQuote(EscapedString(content))) => {
+        let result = lexer
+            .single_quoted_escaped_string()
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_matches!(result, Some(EscapedString(content)) => {
             assert_eq!(content, []);
         });
     }
 
     #[test]
-    fn lexer_word_unit_dollar_single_quote_literals() {
+    fn single_quoted_escaped_string_literals() {
         let mut lexer = Lexer::from_memory("'foo'", Source::Unknown);
-        let result = lexer.dollar_single_quote().now_or_never().unwrap().unwrap();
-        assert_matches!(result, Some(DollarSingleQuote(EscapedString(content))) => {
+        let result = lexer
+            .single_quoted_escaped_string()
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_matches!(result, Some(EscapedString(content)) => {
             assert_eq!(
                 content,
                 [
@@ -149,10 +160,14 @@ mod tests {
     }
 
     #[test]
-    fn lexer_word_unit_dollar_single_quote_named_escapes() {
+    fn single_quoted_escaped_string_named_escapes() {
         let mut lexer = Lexer::from_memory(r#"'\""\'\\\?\a\b\e\E\f\n\r\t\v'x"#, Source::Unknown);
-        let result = lexer.dollar_single_quote().now_or_never().unwrap().unwrap();
-        assert_matches!(result, Some(DollarSingleQuote(EscapedString(content))) => {
+        let result = lexer
+            .single_quoted_escaped_string()
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_matches!(result, Some(EscapedString(content)) => {
             assert_eq!(
                 content,
                 [
@@ -179,15 +194,19 @@ mod tests {
 
     #[test]
     #[ignore = "not implemented"]
-    fn lexer_word_unit_dollar_single_quote_incomplete_escapes() {
+    fn single_quoted_escaped_string_incomplete_escapes() {
         todo!()
     }
 
     #[test]
-    fn lexer_word_unit_dollar_single_quote_control_escapes() {
+    fn single_quoted_escaped_string_control_escapes() {
         let mut lexer = Lexer::from_memory(r"'\cA\cz\c^\c?\c\\'", Source::Unknown);
-        let result = lexer.dollar_single_quote().now_or_never().unwrap().unwrap();
-        assert_matches!(result, Some(DollarSingleQuote(EscapedString(content))) => {
+        let result = lexer
+            .single_quoted_escaped_string()
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_matches!(result, Some(EscapedString(content)) => {
             assert_eq!(
                 content,
                 [
@@ -205,15 +224,19 @@ mod tests {
 
     #[test]
     #[ignore = "not implemented"]
-    fn lexer_word_unit_dollar_single_quote_incomplete_control_escapes() {
+    fn single_quoted_escaped_string_incomplete_control_escapes() {
         todo!()
     }
 
     #[test]
-    fn lexer_word_unit_dollar_single_quote_octal_escapes() {
+    fn single_quoted_escaped_string_octal_escapes() {
         let mut lexer = Lexer::from_memory(r"'\0\07\177\0123'", Source::Unknown);
-        let result = lexer.dollar_single_quote().now_or_never().unwrap().unwrap();
-        assert_matches!(result, Some(DollarSingleQuote(EscapedString(content))) => {
+        let result = lexer
+            .single_quoted_escaped_string()
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_matches!(result, Some(EscapedString(content)) => {
             assert_eq!(
                 content,
                 [
@@ -229,38 +252,42 @@ mod tests {
 
     #[test]
     #[ignore = "not implemented"]
-    fn lexer_word_unit_dollar_single_quote_non_byte_octal_escape() {
+    fn single_quoted_escaped_string_non_byte_octal_escape() {
         let mut lexer = Lexer::from_memory(r"'\700'", Source::Unknown);
-        let result = lexer.dollar_single_quote().now_or_never().unwrap().unwrap();
+        let result = lexer
+            .single_quoted_escaped_string()
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         todo!("should be an error: {result:?}");
     }
 
     #[test]
     #[ignore = "not implemented"]
-    fn lexer_word_unit_dollar_single_quote_hex_escapes() {
+    fn single_quoted_escaped_string_hex_escapes() {
         todo!()
     }
 
     #[test]
     #[ignore = "not implemented"]
-    fn lexer_word_unit_dollar_single_quote_incomplete_hex_escape() {
+    fn single_quoted_escaped_string_incomplete_hex_escape() {
         todo!()
     }
 
     #[test]
     #[ignore = "not implemented"]
-    fn lexer_word_unit_dollar_single_quote_unicode_escapes() {
+    fn single_quoted_escaped_string_unicode_escapes() {
         todo!()
     }
 
     #[test]
     #[ignore = "not implemented"]
-    fn lexer_word_unit_dollar_single_quote_incomplete_unicode_escapes() {
+    fn single_quoted_escaped_string_incomplete_unicode_escapes() {
         todo!()
     }
 
     // TODO Reject non-portable escapes in POSIX mode
 
-    // TODO lexer_word_unit_dollar_single_quote_unclosed
-    // TODO lexer_word_unit_dollar_single_quote_not_quote_in_text_context
+    // TODO single_quoted_escaped_string_unclosed
+    // TODO single_quoted_escaped_string_not_quote_in_text_context
 }
