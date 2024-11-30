@@ -92,12 +92,21 @@ impl FromStr for TextUnit {
     }
 }
 
-// Parses a text by `lexer.text(|_| false, |_| true)`.
+/// Parses a text by `lexer.text(|_| false, |_| true)`.
 impl FromStr for Text {
     type Err = Error;
     fn from_str(s: &str) -> Result<Text, Error> {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         unwrap_ready(lexer.text(|_| false, |_| true))
+    }
+}
+
+/// Parses an escaped string by `lexer.escaped_string(|_| false)`.
+impl FromStr for EscapedString {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        unwrap_ready(lexer.escaped_string(|_| false))
     }
 }
 
