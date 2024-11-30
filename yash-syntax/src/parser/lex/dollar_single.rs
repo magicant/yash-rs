@@ -177,6 +177,124 @@ mod tests {
     use futures_util::FutureExt;
 
     #[test]
+    fn escape_unit_literal() {
+        let mut lexer = Lexer::from_memory("bar", Source::Unknown);
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Literal('b')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('a')));
+    }
+
+    #[test]
+    fn escape_unit_named_escapes() {
+        let mut lexer = Lexer::from_memory(r#"\""\'\\\?\a\b\e\E\f\n\r\t\v"#, Source::Unknown);
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(DoubleQuote));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Literal('"')));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(SingleQuote));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Backslash));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Question));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Alert));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Backspace));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Escape));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Escape));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(FormFeed));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Newline));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(CarriageReturn));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Tab));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(VerticalTab));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
+    }
+
+    #[test]
+    #[ignore = "not implemented"]
+    fn escape_unit_incomplete_escapes() {
+        todo!()
+    }
+
+    #[test]
+    fn escape_unit_control_escapes() {
+        let mut lexer = Lexer::from_memory(r"\cA\cz\c^\c?\c\\", Source::Unknown);
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Control(0x01)));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Control(0x1A)));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Control(0x1E)));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Control(0x7F)));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Control(0x1C)));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
+    }
+
+    #[test]
+    #[ignore = "not implemented"]
+    fn escape_unit_incomplete_control_escapes() {
+        todo!()
+    }
+
+    #[test]
+    fn escape_unit_octal_escapes() {
+        let mut lexer = Lexer::from_memory(r"\0\07\177\0123", Source::Unknown);
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Octal(0o0)));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Octal(0o7)));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Octal(0o177)));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Octal(0o12)));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('3')));
+    }
+
+    #[test]
+    #[ignore = "not implemented"]
+    fn escape_unit_non_byte_octal_escape() {
+        let mut lexer = Lexer::from_memory(r"\700", Source::Unknown);
+        let result = lexer.escape_unit().now_or_never().unwrap();
+        todo!("should be an error: {result:?}");
+    }
+
+    #[test]
+    #[ignore = "not implemented"]
+    fn escape_unit_hexadecimal_escapes() {
+        todo!()
+    }
+
+    #[test]
+    #[ignore = "not implemented"]
+    fn escape_unit_incomplete_hexadecimal_escape() {
+        todo!()
+    }
+
+    #[test]
+    #[ignore = "not implemented"]
+    fn escape_unit_unicode_escapes() {
+        todo!()
+    }
+
+    #[test]
+    #[ignore = "not implemented"]
+    fn escape_unit_incomplete_unicode_escapes() {
+        todo!()
+    }
+
+    // TODO Reject non-portable escapes in POSIX mode
+
+    #[test]
     fn escaped_string_literals() {
         let mut lexer = Lexer::from_memory("foo", Source::Unknown);
         let EscapedString(content) = lexer
@@ -188,8 +306,8 @@ mod tests {
     }
 
     #[test]
-    fn escaped_string_named_escapes() {
-        let mut lexer = Lexer::from_memory(r#"\""\'\\\?\a\b\e\E\f\n\r\t\v"#, Source::Unknown);
+    fn escaped_string_mixed() {
+        let mut lexer = Lexer::from_memory(r"foo\bar", Source::Unknown);
         let EscapedString(content) = lexer
             .escaped_string(|_| false)
             .now_or_never()
@@ -198,116 +316,15 @@ mod tests {
         assert_eq!(
             content,
             [
-                DoubleQuote,
-                Literal('"'),
-                SingleQuote,
-                Backslash,
-                Question,
-                Alert,
+                Literal('f'),
+                Literal('o'),
+                Literal('o'),
                 Backspace,
-                Escape,
-                Escape,
-                FormFeed,
-                Newline,
-                CarriageReturn,
-                Tab,
-                VerticalTab,
+                Literal('a'),
+                Literal('r')
             ]
         );
-        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
-
-    #[test]
-    #[ignore = "not implemented"]
-    fn escaped_string_incomplete_escapes() {
-        todo!()
-    }
-
-    #[test]
-    fn escaped_string_control_escapes() {
-        let mut lexer = Lexer::from_memory(r"\cA\cz\c^\c?\c\\", Source::Unknown);
-        let EscapedString(content) = lexer
-            .escaped_string(|_| false)
-            .now_or_never()
-            .unwrap()
-            .unwrap();
-        assert_eq!(
-            content,
-            [
-                Control(0x01),
-                Control(0x1A),
-                Control(0x1E),
-                Control(0x7F),
-                Control(0x1C),
-            ]
-        );
-        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
-    }
-
-    #[test]
-    #[ignore = "not implemented"]
-    fn single_quoted_escaped_string_incomplete_control_escapes() {
-        todo!()
-    }
-
-    #[test]
-    fn single_quoted_escaped_string_octal_escapes() {
-        let mut lexer = Lexer::from_memory(r"\0\07\177\0123", Source::Unknown);
-        let EscapedString(content) = lexer
-            .escaped_string(|_| false)
-            .now_or_never()
-            .unwrap()
-            .unwrap();
-        assert_eq!(
-            content,
-            [
-                Octal(0o0),
-                Octal(0o7),
-                Octal(0o177),
-                Octal(0o12),
-                Literal('3'),
-            ]
-        );
-        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
-    }
-
-    #[test]
-    #[ignore = "not implemented"]
-    fn single_quoted_escaped_string_non_byte_octal_escape() {
-        let mut lexer = Lexer::from_memory(r"'\700'", Source::Unknown);
-        let result = lexer
-            .escaped_string(|_| false)
-            .now_or_never()
-            .unwrap()
-            .unwrap();
-        todo!("should be an error: {result:?}");
-    }
-
-    #[test]
-    #[ignore = "not implemented"]
-    fn single_quoted_escaped_string_hex_escapes() {
-        todo!()
-    }
-
-    #[test]
-    #[ignore = "not implemented"]
-    fn single_quoted_escaped_string_incomplete_hex_escape() {
-        todo!()
-    }
-
-    #[test]
-    #[ignore = "not implemented"]
-    fn single_quoted_escaped_string_unicode_escapes() {
-        todo!()
-    }
-
-    #[test]
-    #[ignore = "not implemented"]
-    fn single_quoted_escaped_string_incomplete_unicode_escapes() {
-        todo!()
-    }
-
-    // TODO Reject non-portable escapes in POSIX mode
 
     #[test]
     fn single_quoted_escaped_string_empty() {
