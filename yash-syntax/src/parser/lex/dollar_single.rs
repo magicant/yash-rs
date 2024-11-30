@@ -46,6 +46,7 @@ impl Lexer<'_> {
             match c {
                 '\'' => break,
 
+                // TODO Consider extracting this to a separate function
                 '\\' => {
                     let Some(c2) = self.peek_char().await? else {
                         todo!("return error");
@@ -85,7 +86,24 @@ impl Lexer<'_> {
                             }
                         }
 
-                        _ => todo!("return error: unknown escape character {c2:?}"),
+                        _ => {
+                            // Consume at most 3 octal digits (including c2)
+                            let Some(mut value) = c2.to_digit(8) else {
+                                todo!("return error: unknown escape character {c2:?}");
+                            };
+                            for _ in 0..2 {
+                                let Some(digit) = self.peek_char().await? else {
+                                    todo!("return error: missing closing quote");
+                                };
+                                if let Some(digit) = digit.to_digit(8) {
+                                    value = value * 8 + digit;
+                                    self.consume_char();
+                                } else {
+                                    break;
+                                }
+                            }
+                            units.push(Octal(value as u8));
+                        }
                     }
                 }
 
@@ -192,9 +210,29 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "not implemented"]
     fn lexer_word_unit_dollar_single_quote_octal_escapes() {
-        todo!()
+        let mut lexer = Lexer::from_memory(r"'\0\07\177\0123'", Source::Unknown);
+        let result = lexer.dollar_single_quote().now_or_never().unwrap().unwrap();
+        assert_matches!(result, Some(DollarSingleQuote(EscapedString(content))) => {
+            assert_eq!(
+                content,
+                [
+                    EscapeUnit::Octal(0o0),
+                    EscapeUnit::Octal(0o7),
+                    EscapeUnit::Octal(0o177),
+                    EscapeUnit::Octal(0o12),
+                    EscapeUnit::Literal('3'),
+                ]
+            );
+        });
+    }
+
+    #[test]
+    #[ignore = "not implemented"]
+    fn lexer_word_unit_dollar_single_quote_non_byte_octal_escape() {
+        let mut lexer = Lexer::from_memory(r"'\700'", Source::Unknown);
+        let result = lexer.dollar_single_quote().now_or_never().unwrap().unwrap();
+        todo!("should be an error: {result:?}");
     }
 
     #[test]
