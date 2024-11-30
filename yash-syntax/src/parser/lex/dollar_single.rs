@@ -14,16 +14,90 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Parsing escaped strings
+//! Parsing escape units and escaped strings
+
+// TODO Rename this module to `escape`
 
 use super::core::Lexer;
 use crate::parser::core::Result;
-#[cfg(doc)]
-use crate::syntax::EscapeUnit;
-use crate::syntax::EscapeUnit::*;
+use crate::syntax::EscapeUnit::{self, *};
 use crate::syntax::EscapedString;
 
 impl Lexer<'_> {
+    /// Parses an escape unit.
+    ///
+    /// This function tests if the next character is an escape sequence and
+    /// returns it if it is. If the next character is not an escape sequence, it
+    /// returns as `EscapeUnit::Literal`. If there is no next character, it
+    /// returns `Ok(None)`. It returns an error if an invalid escape sequence is
+    /// found.
+    pub async fn escape_unit(&mut self) -> Result<Option<EscapeUnit>> {
+        let Some(c1) = self.peek_char().await? else {
+            return Ok(None);
+        };
+        self.consume_char();
+        if c1 != '\\' {
+            return Ok(Some(Literal(c1)));
+        }
+
+        let Some(c2) = self.peek_char().await? else {
+            todo!("return error: missing escape character");
+        };
+        self.consume_char();
+        match c2 {
+            '"' => Ok(Some(DoubleQuote)),
+            '\'' => Ok(Some(SingleQuote)),
+            '\\' => Ok(Some(Backslash)),
+            '?' => Ok(Some(Question)),
+            'a' => Ok(Some(Alert)),
+            'b' => Ok(Some(Backspace)),
+            'e' | 'E' => Ok(Some(Escape)),
+            'f' => Ok(Some(FormFeed)),
+            'n' => Ok(Some(Newline)),
+            'r' => Ok(Some(CarriageReturn)),
+            't' => Ok(Some(Tab)),
+            'v' => Ok(Some(VerticalTab)),
+
+            'c' => {
+                let Some(c3) = self.peek_char().await? else {
+                    todo!("return error: missing control character");
+                };
+                self.consume_char();
+                match c3.to_ascii_uppercase() {
+                    '\\' => {
+                        let Some('\\') = self.peek_char().await? else {
+                            todo!("return error: missing control character");
+                        };
+                        self.consume_char();
+                        Ok(Some(Control(0x1C)))
+                    }
+
+                    c3 @ ('\u{3F}'..'\u{60}') => Ok(Some(Control(c3 as u8 ^ 0x40))),
+
+                    _ => todo!("return error: unknown control character {c3:?}"),
+                }
+            }
+
+            _ => {
+                // Consume at most 3 octal digits (including c2)
+                let Some(mut value) = c2.to_digit(8) else {
+                    todo!("return error: unknown escape character {c2:?}");
+                };
+                for _ in 0..2 {
+                    let Some(digit) = self.peek_char().await? else {
+                        todo!("break");
+                    };
+                    let Some(digit) = digit.to_digit(8) else {
+                        break;
+                    };
+                    value = value * 8 + digit;
+                    self.consume_char();
+                }
+                Ok(Some(Octal(value as u8)))
+            }
+        }
+    }
+
     /// Parses an escaped string.
     ///
     /// The `is_delimiter` function is called with each character in the string
@@ -51,70 +125,14 @@ impl Lexer<'_> {
     ) -> Result<EscapedString> {
         let mut units = Vec::new();
 
-        while let Some(c) = self.consume_char_if(|c| !is_delimiter(c)).await? {
-            let c = c.value;
-            if c == '\\' {
-                // TODO Consider extracting this to a separate function
-                let Some(c2) = self.peek_char().await? else {
-                    todo!("return error");
-                };
-                self.consume_char();
-                match c2 {
-                    '"' => units.push(DoubleQuote),
-                    '\'' => units.push(SingleQuote),
-                    '\\' => units.push(Backslash),
-                    '?' => units.push(Question),
-                    'a' => units.push(Alert),
-                    'b' => units.push(Backspace),
-                    'e' | 'E' => units.push(Escape),
-                    'f' => units.push(FormFeed),
-                    'n' => units.push(Newline),
-                    'r' => units.push(CarriageReturn),
-                    't' => units.push(Tab),
-                    'v' => units.push(VerticalTab),
-
-                    'c' => {
-                        let Some(c3) = self.peek_char().await? else {
-                            todo!("return error");
-                        };
-                        self.consume_char();
-                        match c3.to_ascii_uppercase() {
-                            '\\' => {
-                                let Some('\\') = self.peek_char().await? else {
-                                    todo!("return error");
-                                };
-                                self.consume_char();
-                                units.push(Control(0x1C));
-                            }
-
-                            c3 @ ('\u{3F}'..'\u{60}') => units.push(Control(c3 as u8 ^ 0x40)),
-
-                            _ => todo!("return error: unknown control character {c3:?}"),
-                        }
-                    }
-
-                    _ => {
-                        // Consume at most 3 octal digits (including c2)
-                        let Some(mut value) = c2.to_digit(8) else {
-                            todo!("return error: unknown escape character {c2:?}");
-                        };
-                        for _ in 0..2 {
-                            let Some(digit) = self.peek_char().await? else {
-                                todo!("return error: missing closing quote");
-                            };
-                            if let Some(digit) = digit.to_digit(8) {
-                                value = value * 8 + digit;
-                                self.consume_char();
-                            } else {
-                                break;
-                            }
-                        }
-                        units.push(Octal(value as u8));
-                    }
-                }
-            } else {
-                units.push(Literal(c));
+        while let Some(c) = self.peek_char().await? {
+            if is_delimiter(c) {
+                break;
             }
+            let Some(unit) = self.escape_unit().await? else {
+                break;
+            };
+            units.push(unit);
         }
 
         Ok(EscapedString(units))
