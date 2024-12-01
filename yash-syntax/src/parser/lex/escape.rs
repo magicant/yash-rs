@@ -18,6 +18,7 @@
 
 use super::core::Lexer;
 use crate::parser::core::Result;
+use crate::parser::{Error, SyntaxError};
 use crate::syntax::EscapeUnit::{self, *};
 use crate::syntax::EscapedString;
 
@@ -64,13 +65,16 @@ impl Lexer<'_> {
         let Some(c1) = self.peek_char().await? else {
             return Ok(None);
         };
+        let start_index = self.index();
         self.consume_char();
         if c1 != '\\' {
             return Ok(Some(Literal(c1)));
         }
 
         let Some(c2) = self.peek_char().await? else {
-            todo!("return error: missing escape character");
+            let cause = SyntaxError::IncompleteEscape.into();
+            let location = self.location().await?.clone();
+            return Err(Error { cause, location });
         };
         self.consume_char();
         match c2 {
@@ -88,14 +92,19 @@ impl Lexer<'_> {
             'v' => Ok(Some(VerticalTab)),
 
             'c' => {
+                let start_index = self.index();
                 let Some(c3) = self.peek_char().await? else {
-                    todo!("return error: missing control character");
+                    let cause = SyntaxError::IncompleteControlEscape.into();
+                    let location = self.location().await?.clone();
+                    return Err(Error { cause, location });
                 };
                 self.consume_char();
                 match c3.to_ascii_uppercase() {
                     '\\' => {
                         let Some('\\') = self.peek_char().await? else {
-                            todo!("return error: missing control character");
+                            let cause = SyntaxError::IncompleteControlBackslashEscape.into();
+                            let location = self.location().await?.clone();
+                            return Err(Error { cause, location });
                         };
                         self.consume_char();
                         Ok(Some(Control(0x1C)))
@@ -103,13 +112,19 @@ impl Lexer<'_> {
 
                     c3 @ ('\u{3F}'..'\u{60}') => Ok(Some(Control(c3 as u8 ^ 0x40))),
 
-                    _ => todo!("return error: unknown control character {c3:?}"),
+                    _ => {
+                        let cause = SyntaxError::InvalidControlEscape.into();
+                        let location = self.location_range(start_index..self.index());
+                        Err(Error { cause, location })
+                    }
                 }
             }
 
             'x' => {
                 let Some(value) = self.hex_digits(2).await? else {
-                    todo!("return error: missing hexadecimal digit");
+                    let cause = SyntaxError::IncompleteHexEscape.into();
+                    let location = self.location().await?.clone();
+                    return Err(Error { cause, location });
                 };
                 // TODO Reject a third hexadecimal digit in POSIX mode
                 Ok(Some(Hex(value as u8)))
@@ -117,22 +132,40 @@ impl Lexer<'_> {
 
             'u' => {
                 let Some(value) = self.hex_digits(4).await? else {
-                    todo!("return error: missing hexadecimal digit");
+                    let cause = SyntaxError::IncompleteShortUnicodeEscape.into();
+                    let location = self.location().await?.clone();
+                    return Err(Error { cause, location });
                 };
-                Ok(Some(Unicode(char::from_u32(value).expect("todo"))))
+                if let Some(c) = char::from_u32(value) {
+                    Ok(Some(Unicode(c)))
+                } else {
+                    let cause = SyntaxError::UnicodeEscapeOutOfRange.into();
+                    let location = self.location_range(start_index..self.index());
+                    Err(Error { cause, location })
+                }
             }
 
             'U' => {
                 let Some(value) = self.hex_digits(8).await? else {
-                    todo!("return error: missing hexadecimal digit");
+                    let cause = SyntaxError::IncompleteLongUnicodeEscape.into();
+                    let location = self.location().await?.clone();
+                    return Err(Error { cause, location });
                 };
-                Ok(Some(Unicode(char::from_u32(value).expect("todo"))))
+                if let Some(c) = char::from_u32(value) {
+                    Ok(Some(Unicode(c)))
+                } else {
+                    let cause = SyntaxError::UnicodeEscapeOutOfRange.into();
+                    let location = self.location_range(start_index..self.index());
+                    Err(Error { cause, location })
+                }
             }
 
             _ => {
                 // Consume at most 3 octal digits (including c2)
                 let Some(mut value) = c2.to_digit(8) else {
-                    todo!("return error: unknown escape character {c2:?}");
+                    let cause = SyntaxError::InvalidEscape.into();
+                    let location = self.location_range(start_index..self.index());
+                    return Err(Error { cause, location });
                 };
                 for _ in 0..2 {
                     let Some(digit) = self.peek_char().await? else {
@@ -144,7 +177,13 @@ impl Lexer<'_> {
                     value = value * 8 + digit;
                     self.consume_char();
                 }
-                Ok(Some(Octal(value as u8)))
+                if let Ok(value) = value.try_into() {
+                    Ok(Some(Octal(value)))
+                } else {
+                    let cause = SyntaxError::OctalEscapeOutOfRange.into();
+                    let location = self.location_range(start_index..self.index());
+                    Err(Error { cause, location })
+                }
             }
         }
     }
@@ -203,9 +242,10 @@ impl Lexer<'_> {
         let is_single_quote = |c| c == '\'';
 
         // Consume the opening single quote
-        if self.consume_char_if(is_single_quote).await?.is_none() {
+        let Some(quote) = self.consume_char_if(is_single_quote).await? else {
             return Ok(None);
-        }
+        };
+        let opening_location = quote.location.clone();
 
         let content = self.escaped_string(is_single_quote).await?;
 
@@ -215,7 +255,9 @@ impl Lexer<'_> {
             self.consume_char();
             Ok(Some(content))
         } else {
-            todo!("return error: missing closing quote");
+            let cause = SyntaxError::UnclosedDollarSingleQuote { opening_location }.into();
+            let location = self.location().await?.clone();
+            Err(Error { cause, location })
         }
     }
 }
@@ -223,6 +265,7 @@ impl Lexer<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::ErrorCause;
     use crate::source::Source;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
@@ -270,9 +313,17 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "not implemented"]
     fn escape_unit_incomplete_escapes() {
-        todo!()
+        let mut lexer = Lexer::from_memory(r"\", Source::Unknown);
+        let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
+        assert_matches!(
+            error.cause,
+            ErrorCause::Syntax(SyntaxError::IncompleteEscape)
+        );
+        assert_eq!(*error.location.code.value.borrow(), r"\");
+        assert_eq!(error.location.code.start_line_number.get(), 1);
+        assert_eq!(*error.location.code.source, Source::Unknown);
+        assert_eq!(error.location.range, 1..1);
     }
 
     #[test]
@@ -292,20 +343,67 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "not implemented"]
-    fn escape_unit_incomplete_control_escapes() {
-        todo!()
+    fn escape_unit_incomplete_control_escape() {
+        let mut lexer = Lexer::from_memory(r"\c", Source::Unknown);
+        let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
+        assert_matches!(
+            error.cause,
+            ErrorCause::Syntax(SyntaxError::IncompleteControlEscape)
+        );
+        assert_eq!(*error.location.code.value.borrow(), r"\c");
+        assert_eq!(error.location.code.start_line_number.get(), 1);
+        assert_eq!(*error.location.code.source, Source::Unknown);
+        assert_eq!(error.location.range, 2..2);
+    }
+
+    #[test]
+    fn escape_unit_incomplete_control_backslash_escapes() {
+        let mut lexer = Lexer::from_memory(r"\c\", Source::Unknown);
+        let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
+        assert_matches!(
+            error.cause,
+            ErrorCause::Syntax(SyntaxError::IncompleteControlBackslashEscape)
+        );
+        assert_eq!(*error.location.code.value.borrow(), r"\c\");
+        assert_eq!(error.location.code.start_line_number.get(), 1);
+        assert_eq!(*error.location.code.source, Source::Unknown);
+        assert_eq!(error.location.range, 3..3);
+
+        let mut lexer = Lexer::from_memory(r"\c\a", Source::Unknown);
+        let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
+        assert_matches!(
+            error.cause,
+            ErrorCause::Syntax(SyntaxError::IncompleteControlBackslashEscape)
+        );
+        assert_eq!(*error.location.code.value.borrow(), r"\c\a");
+        assert_eq!(error.location.code.start_line_number.get(), 1);
+        assert_eq!(*error.location.code.source, Source::Unknown);
+        assert_eq!(error.location.range, 3..4);
+    }
+
+    #[test]
+    fn escape_unit_unknown_control_escape() {
+        let mut lexer = Lexer::from_memory(r"\c!`", Source::Unknown);
+        let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
+        assert_matches!(
+            error.cause,
+            ErrorCause::Syntax(SyntaxError::InvalidControlEscape)
+        );
+        assert_eq!(*error.location.code.value.borrow(), r"\c!`");
+        assert_eq!(error.location.code.start_line_number.get(), 1);
+        assert_eq!(*error.location.code.source, Source::Unknown);
+        assert_eq!(error.location.range, 2..3);
     }
 
     #[test]
     fn escape_unit_octal_escapes() {
-        let mut lexer = Lexer::from_memory(r"\0\07\177\0123", Source::Unknown);
+        let mut lexer = Lexer::from_memory(r"\0\07\234\0123", Source::Unknown);
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
         assert_eq!(result, Some(Octal(0o0)));
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
         assert_eq!(result, Some(Octal(0o7)));
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
-        assert_eq!(result, Some(Octal(0o177)));
+        assert_eq!(result, Some(Octal(0o234)));
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
         assert_eq!(result, Some(Octal(0o12)));
         // At most 3 octal digits are consumed
@@ -323,11 +421,17 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "not implemented"]
     fn escape_unit_non_byte_octal_escape() {
-        let mut lexer = Lexer::from_memory(r"\700", Source::Unknown);
-        let result = lexer.escape_unit().now_or_never().unwrap();
-        todo!("should be an error: {result:?}");
+        let mut lexer = Lexer::from_memory(r"\400", Source::Unknown);
+        let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
+        assert_matches!(
+            error.cause,
+            ErrorCause::Syntax(SyntaxError::OctalEscapeOutOfRange)
+        );
+        assert_eq!(*error.location.code.value.borrow(), r"\400");
+        assert_eq!(error.location.code.start_line_number.get(), 1);
+        assert_eq!(*error.location.code.source, Source::Unknown);
+        assert_eq!(error.location.range, 0..4);
     }
 
     #[test]
@@ -349,9 +453,17 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "not implemented"]
     fn escape_unit_incomplete_hexadecimal_escape() {
-        todo!()
+        let mut lexer = Lexer::from_memory(r"\x", Source::Unknown);
+        let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
+        assert_matches!(
+            error.cause,
+            ErrorCause::Syntax(SyntaxError::IncompleteHexEscape)
+        );
+        assert_eq!(*error.location.code.value.borrow(), r"\x");
+        assert_eq!(error.location.code.start_line_number.get(), 1);
+        assert_eq!(*error.location.code.source, Source::Unknown);
+        assert_eq!(error.location.range, 2..2);
     }
 
     #[test]
@@ -374,12 +486,55 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "not implemented"]
     fn escape_unit_incomplete_unicode_escapes() {
-        todo!()
+        let mut lexer = Lexer::from_memory(r"\u", Source::Unknown);
+        let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
+        assert_matches!(
+            error.cause,
+            ErrorCause::Syntax(SyntaxError::IncompleteShortUnicodeEscape)
+        );
+        assert_eq!(*error.location.code.value.borrow(), r"\u");
+        assert_eq!(error.location.code.start_line_number.get(), 1);
+        assert_eq!(*error.location.code.source, Source::Unknown);
+        assert_eq!(error.location.range, 2..2);
+
+        let mut lexer = Lexer::from_memory(r"\U", Source::Unknown);
+        let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
+        assert_matches!(
+            error.cause,
+            ErrorCause::Syntax(SyntaxError::IncompleteLongUnicodeEscape)
+        );
+        assert_eq!(*error.location.code.value.borrow(), r"\U");
+        assert_eq!(error.location.code.start_line_number.get(), 1);
+        assert_eq!(*error.location.code.source, Source::Unknown);
+        assert_eq!(error.location.range, 2..2);
     }
 
-    // TODO escape_unit_invalid_unicode_escapes
+    #[test]
+    fn escape_unit_invalid_unicode_escapes() {
+        // U+D800 is not a valid Unicode scalar value
+        let mut lexer = Lexer::from_memory(r"\uD800", Source::Unknown);
+        let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
+        assert_matches!(
+            error.cause,
+            ErrorCause::Syntax(SyntaxError::UnicodeEscapeOutOfRange)
+        );
+        assert_eq!(*error.location.code.value.borrow(), r"\uD800");
+        assert_eq!(error.location.code.start_line_number.get(), 1);
+        assert_eq!(*error.location.code.source, Source::Unknown);
+        assert_eq!(error.location.range, 0..6);
+    }
+
+    #[test]
+    fn escape_unit_unknown_escape() {
+        let mut lexer = Lexer::from_memory(r"\!", Source::Unknown);
+        let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
+        assert_matches!(error.cause, ErrorCause::Syntax(SyntaxError::InvalidEscape));
+        assert_eq!(*error.location.code.value.borrow(), r"\!");
+        assert_eq!(error.location.code.start_line_number.get(), 1);
+        assert_eq!(*error.location.code.source, Source::Unknown);
+        assert_eq!(error.location.range, 0..2);
+    }
 
     // TODO Reject non-portable escapes in POSIX mode
 
@@ -448,5 +603,26 @@ mod tests {
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('x')));
     }
 
-    // TODO single_quoted_escaped_string_unclosed
+    #[test]
+    fn single_quoted_escaped_string_unclosed() {
+        let mut lexer = Lexer::from_memory("'foo", Source::Unknown);
+        let error = lexer
+            .single_quoted_escaped_string()
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+        assert_matches!(
+            error.cause,
+            ErrorCause::Syntax(SyntaxError::UnclosedDollarSingleQuote { opening_location }) => {
+                assert_eq!(*opening_location.code.value.borrow(), "'foo");
+                assert_eq!(opening_location.code.start_line_number.get(), 1);
+                assert_eq!(*opening_location.code.source, Source::Unknown);
+                assert_eq!(opening_location.range, 0..1);
+            }
+        );
+        assert_eq!(*error.location.code.value.borrow(), "'foo");
+        assert_eq!(error.location.code.start_line_number.get(), 1);
+        assert_eq!(*error.location.code.source, Source::Unknown);
+        assert_eq!(error.location.range, 4..4);
+    }
 }

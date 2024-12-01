@@ -19,6 +19,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - The `DollarSingleQuote` variant is added to the `syntax::WordUnit` enum.
     - The `EscapeUnit` enum and `EscapedString` struct are added to the
       `syntax` module.
+    - The `escape_unit` and `escaped_string` methods are added to the
+      `parser::lex::Lexer` struct.
+    - The following error variants are added to `parser::SyntaxError`:
+        - `IncompleteControlBackslashEscape`
+        - `IncompleteControlEscape`
+        - `IncompleteEscape`
+        - `IncompleteHexEscape`
+        - `IncompleteLongUnicodeEscape`
+        - `IncompleteShortUnicodeEscape`
+        - `InvalidControlEscape`
+        - `InvalidEscape`
+        - `UnclosedDollarSingleQuote`
+        - `UnicodeEscapeOutOfRange`
 - In the `syntax::MaybeLiteral` trait, the `extend_if_literal` method is
   replaced with the `extend_literal` method, which now takes a mutable reference
   to an `Extend<char>` object, instead of an ownership of it. The method may
