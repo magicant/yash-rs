@@ -22,6 +22,17 @@ use crate::syntax::EscapeUnit::{self, *};
 use crate::syntax::EscapedString;
 
 impl Lexer<'_> {
+    /// Parses a hexadecimal digit.
+    async fn hex_digit(&mut self) -> Result<Option<u8>> {
+        if let Some(c) = self.peek_char().await? {
+            if let Some(digit) = c.to_digit(16) {
+                self.consume_char();
+                return Ok(Some(digit as u8));
+            }
+        }
+        Ok(None)
+    }
+
     /// Parses an escape unit.
     ///
     /// This function tests if the next character is an escape sequence and
@@ -74,6 +85,17 @@ impl Lexer<'_> {
 
                     _ => todo!("return error: unknown control character {c3:?}"),
                 }
+            }
+
+            'x' => {
+                let Some(digit1) = self.hex_digit().await? else {
+                    todo!("return error: missing hexadecimal digit");
+                };
+                let Some(digit2) = self.hex_digit().await? else {
+                    return Ok(Some(Hex(digit1)));
+                };
+                // TODO Reject a third hexadecimal digit in POSIX mode
+                Ok(Some(Hex(digit1 << 4 | digit2)))
             }
 
             _ => {
@@ -278,9 +300,21 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "not implemented"]
     fn escape_unit_hexadecimal_escapes() {
-        todo!()
+        let mut lexer = Lexer::from_memory(r"\x0\x7F\xd4A", Source::Unknown);
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Hex(0x0)));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Hex(0x7F)));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        // At most 2 hexadecimal digits are consumed
+        assert_eq!(result, Some(Hex(0xD4)));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('A')));
+
+        let mut lexer = Lexer::from_memory(r"\xb", Source::Unknown);
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        // Reaching the end of the input is okay
+        assert_eq!(result, Some(Hex(0xB)));
     }
 
     #[test]
