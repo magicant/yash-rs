@@ -23,14 +23,34 @@ use crate::syntax::EscapedString;
 
 impl Lexer<'_> {
     /// Parses a hexadecimal digit.
-    async fn hex_digit(&mut self) -> Result<Option<u8>> {
+    async fn hex_digit(&mut self) -> Result<Option<u32>> {
         if let Some(c) = self.peek_char().await? {
             if let Some(digit) = c.to_digit(16) {
                 self.consume_char();
-                return Ok(Some(digit as u8));
+                return Ok(Some(digit));
             }
         }
         Ok(None)
+    }
+
+    /// Parses a sequence of hexadecimal digits.
+    ///
+    /// This function consumes up to `count` hexadecimal digits and returns the
+    /// value as a single number. If fewer than `count` digits are found, the
+    /// function returns the value of the digits found so far. If no digits are
+    /// found, the function returns `Ok(None)`.
+    async fn hex_digits(&mut self, count: usize) -> Result<Option<u32>> {
+        let Some(digit) = self.hex_digit().await? else {
+            return Ok(None);
+        };
+        let mut value = digit;
+        for _ in 1..count {
+            let Some(digit) = self.hex_digit().await? else {
+                break;
+            };
+            value = value << 4 | digit;
+        }
+        Ok(Some(value))
     }
 
     /// Parses an escape unit.
@@ -88,14 +108,25 @@ impl Lexer<'_> {
             }
 
             'x' => {
-                let Some(digit1) = self.hex_digit().await? else {
+                let Some(value) = self.hex_digits(2).await? else {
                     todo!("return error: missing hexadecimal digit");
                 };
-                let Some(digit2) = self.hex_digit().await? else {
-                    return Ok(Some(Hex(digit1)));
-                };
                 // TODO Reject a third hexadecimal digit in POSIX mode
-                Ok(Some(Hex(digit1 << 4 | digit2)))
+                Ok(Some(Hex(value as u8)))
+            }
+
+            'u' => {
+                let Some(value) = self.hex_digits(4).await? else {
+                    todo!("return error: missing hexadecimal digit");
+                };
+                Ok(Some(Unicode(char::from_u32(value).expect("todo"))))
+            }
+
+            'U' => {
+                let Some(value) = self.hex_digits(8).await? else {
+                    todo!("return error: missing hexadecimal digit");
+                };
+                Ok(Some(Unicode(char::from_u32(value).expect("todo"))))
             }
 
             _ => {
@@ -324,9 +355,22 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "not implemented"]
     fn escape_unit_unicode_escapes() {
-        todo!()
+        let mut lexer = Lexer::from_memory(r"\u20\u4B9d0", Source::Unknown);
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Unicode('\u{20}')));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Unicode('\u{4B9D}')));
+        // At most 4 hexadecimal digits are consumed
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('0')));
+
+        let mut lexer = Lexer::from_memory(r"\U42\U0001f4A9b", Source::Unknown);
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Unicode('\u{42}')));
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Unicode('\u{1F4A9}')));
+        // At most 8 hexadecimal digits are consumed
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('b')));
     }
 
     #[test]
@@ -334,6 +378,8 @@ mod tests {
     fn escape_unit_incomplete_unicode_escapes() {
         todo!()
     }
+
+    // TODO escape_unit_invalid_unicode_escapes
 
     // TODO Reject non-portable escapes in POSIX mode
 
