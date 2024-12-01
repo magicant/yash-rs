@@ -16,8 +16,6 @@
 
 //! Parsing escape units and escaped strings
 
-// TODO Rename this module to `escape`
-
 use super::core::Lexer;
 use crate::parser::core::Result;
 use crate::syntax::EscapeUnit::{self, *};
