@@ -83,7 +83,7 @@ impl Lexer<'_> {
                 };
                 for _ in 0..2 {
                     let Some(digit) = self.peek_char().await? else {
-                        todo!("break");
+                        break;
                     };
                     let Some(digit) = digit.to_digit(8) else {
                         break;
@@ -255,7 +255,18 @@ mod tests {
         assert_eq!(result, Some(Octal(0o177)));
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
         assert_eq!(result, Some(Octal(0o12)));
+        // At most 3 octal digits are consumed
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('3')));
+
+        let mut lexer = Lexer::from_memory(r"\787", Source::Unknown);
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        // '8' is not an octal digit
+        assert_eq!(result, Some(Octal(0o7)));
+
+        let mut lexer = Lexer::from_memory(r"\12", Source::Unknown);
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        // Reaching the end of the input is okay
+        assert_eq!(result, Some(Octal(0o12)));
     }
 
     #[test]
