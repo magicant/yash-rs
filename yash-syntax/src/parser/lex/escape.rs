@@ -61,6 +61,10 @@ impl Lexer<'_> {
     /// returns as `EscapeUnit::Literal`. If there is no next character, it
     /// returns `Ok(None)`. It returns an error if an invalid escape sequence is
     /// found.
+    ///
+    /// This function should be called in a context where [line continuations are
+    /// disabled](Self::disable_line_continuation), so that backslash-newline
+    /// pairs are not removed before they are parsed as escape sequences.
     pub async fn escape_unit(&mut self) -> Result<Option<EscapeUnit>> {
         let Some(c1) = self.peek_char().await? else {
             return Ok(None);
@@ -213,13 +217,14 @@ impl Lexer<'_> {
         &mut self,
         is_delimiter: &mut dyn FnMut(char) -> bool,
     ) -> Result<EscapedString> {
+        let mut this = self.disable_line_continuation();
         let mut units = Vec::new();
 
-        while let Some(c) = self.peek_char().await? {
+        while let Some(c) = this.peek_char().await? {
             if is_delimiter(c) {
                 break;
             }
-            let Some(unit) = self.escape_unit().await? else {
+            let Some(unit) = this.escape_unit().await? else {
                 break;
             };
             units.push(unit);
@@ -568,6 +573,29 @@ mod tests {
                 Literal('r')
             ]
         );
+    }
+
+    #[test]
+    fn no_line_continuations_in_escaped_string() {
+        let mut lexer = Lexer::from_memory("\\\\\n", Source::Unknown);
+        let EscapedString(content) = lexer
+            .escaped_string(|_| false)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_eq!(content, [Backslash, Literal('\n')]);
+
+        let mut lexer = Lexer::from_memory("\\\n", Source::Unknown);
+        let error = lexer
+            .escaped_string(|_| false)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+        assert_matches!(error.cause, ErrorCause::Syntax(SyntaxError::InvalidEscape));
+        assert_eq!(*error.location.code.value.borrow(), "\\\n");
+        assert_eq!(error.location.code.start_line_number.get(), 1);
+        assert_eq!(*error.location.code.source, Source::Unknown);
+        assert_eq!(error.location.range, 0..2);
     }
 
     #[test]
