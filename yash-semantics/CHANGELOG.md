@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `<yash_syntax::syntax::CompoundCommand as command::Command>::execute` now
   honors the `CaseContinuation` specified for the executed case item.
+- `<yash_syntax::syntax::WordUnit as expansion::Expand>::expand` now supports
+  expanding dollar-single-quotes.
 - External dependency versions:
     - Rust 1.79.0 → 1.82.0
 
