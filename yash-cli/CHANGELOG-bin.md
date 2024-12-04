@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   through to the next branch or to resume pattern matching from the next branch,
   respectively. `;&` is a POSIX.1-2024 feature, and `;|` is an extension. For
   compatibility with other shells, `;;&` is also accepted as an alias for `;|`.
+- Dollar-single-quotes are now supported as a form of quoting where backslash
+  escapes are recognized.
+    - Currently, octal and hexadecimal escapes that expand to a value greater
+      than 127 are translated to a UTF-8 sequence for the corresponding Unicode
+      scalar value. This behavior does not conform to POSIX.1-2024 and is
+      subject to change.
+    - As an extension to POSIX.1-2024, the shell also recognizes the `\u` and
+      `\U` escapes for Unicode scalar values, and the `\E` escape as a synonym
+      for `\e`.
 
 ### Changed
 
