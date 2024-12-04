@@ -33,7 +33,8 @@ const SINGLE_QUOTE: AttrChar = AttrChar {
     is_quoting: true,
 };
 
-fn expand_single_quote(value: &str) -> Phrase {
+/// Adds single quotes around the string.
+fn single_quote(value: &str) -> Phrase {
     let mut field = Vec::with_capacity(value.chars().count() + 2);
     field.push(SINGLE_QUOTE);
     field.extend(value.chars().map(|c| AttrChar {
@@ -129,7 +130,7 @@ impl Expand for WordUnit {
     async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
         match self {
             Unquoted(text_unit) => text_unit.expand(env).await,
-            SingleQuote(value) => Ok(expand_single_quote(value)),
+            SingleQuote(value) => Ok(single_quote(value)),
             DoubleQuote(text) => {
                 let would_split = std::mem::replace(&mut env.will_split, false);
                 let result = text.expand(env).await;
@@ -269,7 +270,7 @@ mod tests {
 
     #[test]
     fn empty_single_quote() {
-        let result = expand_single_quote("");
+        let result = single_quote("");
         let q = AttrChar {
             value: '\'',
             origin: Origin::Literal,
@@ -281,7 +282,7 @@ mod tests {
 
     #[test]
     fn non_empty_single_quote() {
-        let result = expand_single_quote("do");
+        let result = single_quote("do");
         let q = AttrChar {
             value: '\'',
             origin: Origin::Literal,
