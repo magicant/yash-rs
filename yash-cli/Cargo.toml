@@ -18,7 +18,7 @@ name = "yash3"
 path = "src/main.rs"
 
 [dependencies]
-thiserror = "1.0.47"
+thiserror = "2.0.4"
 yash-builtin = { path = "../yash-builtin", version = "0.4.0" }
 yash-env = { path = "../yash-env", version = "0.4.0" }
 yash-executor = { path = "../yash-executor", version = "1.0.0" }

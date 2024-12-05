@@ -16,7 +16,7 @@ categories = ["command-line-utilities"]
 [dependencies]
 regex = "1.9.4"
 regex-syntax = "0.8.2"
-thiserror = "1.0.47"
+thiserror = "2.0.4"
 
 [dev-dependencies]
 assert_matches = "1.5.0"

@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   leave intermediate results in the `Extend<char>` object if unsuccessful.
     - The `syntax::NotLiteral` struct is added to represent the case where the
       method is unsuccessful.
+- Internal dependency versions
+    - thiserror 1.0.47 → 2.0.4
 
 ## [0.12.1] - 2024-11-10
 

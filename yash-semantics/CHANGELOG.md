@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   honors the `CaseContinuation` specified for the executed case item.
 - External dependency versions:
     - Rust 1.79.0 → 1.82.0
+- Internal dependency versions
+    - thiserror 1.0.47 → 2.0.4
 
 ## [0.4.0] - 2024-09-29
 

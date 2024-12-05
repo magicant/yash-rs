@@ -191,7 +191,7 @@ impl Deref for VariableRefMut<'_> {
     }
 }
 
-impl<'a> VariableRefMut<'a> {
+impl VariableRefMut<'_> {
     /// Assigns a value to this variable.
     ///
     /// The `value` and `location` operands are set to the `value` and

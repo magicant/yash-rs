@@ -207,7 +207,7 @@ struct VarEnv<'a> {
     expansion_location: &'a Location,
 }
 
-impl<'a> yash_arith::Env for VarEnv<'a> {
+impl yash_arith::Env for VarEnv<'_> {
     type GetVariableError = UnsetVariable;
     type AssignVariableError = AssignReadOnlyError;
 
