@@ -30,22 +30,28 @@ use thiserror::Error;
 #[error("{}", self.message())]
 #[non_exhaustive]
 pub enum SyntaxError {
+    /// A backslash is at the end of the input.
+    IncompleteEscape,
+    /// A backslash is not followed by a character that makes a valid escape.
+    InvalidEscape,
     /// A `(` lacks a closing `)`.
     UnclosedParen { opening_location: Location },
-    /// A modifier does not have a valid form in a parameter expansion.
-    InvalidModifier,
-    /// A braced parameter expansion has both a prefix and suffix modifier.
-    MultipleModifier,
     /// A single quotation lacks a closing `'`.
     UnclosedSingleQuote { opening_location: Location },
     /// A double quotation lacks a closing `"`.
     UnclosedDoubleQuote { opening_location: Location },
+    /// A `$'` lacks a closing `'`.
+    UnclosedDollarSingleQuote { opening_location: Location },
     /// A parameter expansion lacks a closing `}`.
     UnclosedParam { opening_location: Location },
     /// A parameter expansion lacks a name.
     EmptyParam,
     /// A parameter expansion has an invalid name.
     InvalidParam,
+    /// A modifier does not have a valid form in a parameter expansion.
+    InvalidModifier,
+    /// A braced parameter expansion has both a prefix and suffix modifier.
+    MultipleModifier,
     /// A command substitution started with `$(` but lacks a closing `)`.
     UnclosedCommandSubstitution { opening_location: Location },
     /// A command substitution started with `` ` `` but lacks a closing `` ` ``.
@@ -161,6 +167,22 @@ pub enum SyntaxError {
     MissingCommandAfterBar,
     /// There is a redundant token.
     RedundantToken,
+    /// A control escape (`\c...`) is incomplete in a dollar-single-quoted string.
+    IncompleteControlEscape,
+    /// A control-backslash escape (`\c\\`) is incomplete in a dollar-single-quoted string.
+    IncompleteControlBackslashEscape,
+    /// A control escape (`\c...`) does not have a valid control character.
+    InvalidControlEscape,
+    /// An octal escape is out of range (greater than `\377`) in a dollar-single-quoted string.
+    OctalEscapeOutOfRange,
+    /// An hexadecimal escape (`\x...`) is incomplete in a dollar-single-quoted string.
+    IncompleteHexEscape,
+    /// A Unicode escape (`\u...`) is incomplete in a dollar-single-quoted string.
+    IncompleteShortUnicodeEscape,
+    /// A Unicode escape (`\U...`) is incomplete in a dollar-single-quoted string.
+    IncompleteLongUnicodeEscape,
+    /// A Unicode escape (`\u...` or `\U...`) is out of range in a dollar-single-quoted string.
+    UnicodeEscapeOutOfRange,
 }
 
 impl SyntaxError {
@@ -169,14 +191,17 @@ impl SyntaxError {
     pub fn message(&self) -> &'static str {
         use SyntaxError::*;
         match self {
+            IncompleteEscape => "The backslash is escaping nothing",
+            InvalidEscape => "The backslash escape is invalid",
             UnclosedParen { .. } => "The parenthesis is not closed",
-            InvalidModifier => "The parameter expansion contains a malformed modifier",
-            MultipleModifier => "A suffix modifier cannot be used together with a prefix modifier",
             UnclosedSingleQuote { .. } => "The single quote is not closed",
             UnclosedDoubleQuote { .. } => "The double quote is not closed",
+            UnclosedDollarSingleQuote { .. } => "The dollar single quote is not closed",
             UnclosedParam { .. } => "The parameter expansion is not closed",
             EmptyParam => "The parameter name is missing",
             InvalidParam => "The parameter name is invalid",
+            InvalidModifier => "The parameter expansion contains a malformed modifier",
+            MultipleModifier => "A suffix modifier cannot be used together with a prefix modifier",
             UnclosedCommandSubstitution { .. } => "The command substitution is not closed",
             UnclosedBackquote { .. } => "The backquote is not closed",
             UnclosedArith { .. } => "The arithmetic expansion is not closed",
@@ -233,6 +258,15 @@ impl SyntaxError {
             MissingCommandAfterBang => "A command is missing after `!`",
             MissingCommandAfterBar => "A command is missing after `|`",
             RedundantToken => "There is a redundant token",
+            IncompleteControlEscape => "The control escape is incomplete",
+            IncompleteControlBackslashEscape => "The control-backslash escape is incomplete",
+            InvalidControlEscape => "The control escape is invalid",
+            OctalEscapeOutOfRange => "The octal escape is out of range",
+            IncompleteHexEscape => "The hexadecimal escape is incomplete",
+            IncompleteShortUnicodeEscape | IncompleteLongUnicodeEscape => {
+                "The Unicode escape is incomplete"
+            }
+            UnicodeEscapeOutOfRange => "The Unicode escape is out of range",
         }
     }
 
@@ -241,6 +275,8 @@ impl SyntaxError {
     pub fn label(&self) -> &'static str {
         use SyntaxError::*;
         match self {
+            IncompleteEscape => "expected an escaped character after the backslash",
+            InvalidEscape => "invalid escape sequence",
             UnclosedParen { .. }
             | UnclosedCommandSubstitution { .. }
             | UnclosedArrayValue { .. }
@@ -262,13 +298,13 @@ impl SyntaxError {
             | MissingCommandAfterBar => "expected a command",
             InvalidForValue | MissingCaseSubject | InvalidCaseSubject | MissingPattern
             | InvalidPattern => "expected a word",
-            InvalidModifier => "broken modifier",
-            MultipleModifier => "conflicting modifier",
-            UnclosedSingleQuote { .. } => "expected `'`",
+            UnclosedSingleQuote { .. } | UnclosedDollarSingleQuote { .. } => "expected `'`",
             UnclosedDoubleQuote { .. } => "expected `\"`",
             UnclosedParam { .. } | UnclosedGrouping { .. } => "expected `}`",
             EmptyParam => "expected a parameter name",
             InvalidParam => "not a valid named or positional parameter",
+            InvalidModifier => "broken modifier",
+            MultipleModifier => "conflicting modifier",
             UnclosedBackquote { .. } => "expected '`'",
             UnclosedArith { .. } => "expected `))`",
             InvalidCommandToken => "does not begin a valid command",
@@ -301,6 +337,14 @@ impl SyntaxError {
             DoubleNegation => "only one `!` allowed",
             BangAfterBar => "`!` not allowed here",
             RedundantToken => "unexpected token",
+            IncompleteControlEscape => r"expected a control character after `\c`",
+            IncompleteControlBackslashEscape => r"expected another backslash after `\c\`",
+            InvalidControlEscape => "not a valid control character",
+            OctalEscapeOutOfRange => r"expected a value between \0 and \377",
+            IncompleteHexEscape => r"expected a hexadecimal digit after `\x`",
+            IncompleteShortUnicodeEscape => r"expected a hexadecimal digit after `\u`",
+            IncompleteLongUnicodeEscape => r"expected a hexadecimal digit after `\U`",
+            UnicodeEscapeOutOfRange => "not a valid Unicode scalar value",
         }
     }
 
@@ -315,7 +359,9 @@ impl SyntaxError {
             | UnclosedArrayValue { opening_location } => {
                 Some((opening_location, "the opening parenthesis was here"))
             }
-            UnclosedSingleQuote { opening_location } | UnclosedDoubleQuote { opening_location } => {
+            UnclosedSingleQuote { opening_location }
+            | UnclosedDoubleQuote { opening_location }
+            | UnclosedDollarSingleQuote { opening_location } => {
                 Some((opening_location, "the opening quote was here"))
             }
             UnclosedParam { opening_location } => {

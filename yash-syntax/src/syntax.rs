@@ -341,6 +341,65 @@ pub use TextUnit::*;
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Text(pub Vec<TextUnit>);
 
+/// Element of an [`EscapedString`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum EscapeUnit {
+    /// Literal single character
+    Literal(char),
+    /// Backslash-escaped double-quote character (`\"`)
+    DoubleQuote,
+    /// Backslash-escaped single-quote character (`\'`)
+    SingleQuote,
+    /// Backslash-escaped backslash character (`\\`)
+    Backslash,
+    /// Backslash-escaped question mark character (`\?`)
+    Question,
+    /// Backslash notation for the bell character (`\a`, ASCII 7)
+    Alert,
+    /// Backslash notation for the backspace character (`\b`, ASCII 8)
+    Backspace,
+    /// Backslash notation for the escape character (`\e`, ASCII 27)
+    Escape,
+    /// Backslash notation for the form feed character (`\f`, ASCII 12)
+    FormFeed,
+    /// Backslash notation for the newline character (`\n`, ASCII 10)
+    Newline,
+    /// Backslash notation for the carriage return character (`\r`, ASCII 13)
+    CarriageReturn,
+    /// Backslash notation for the horizontal tab character (`\t`, ASCII 9)
+    Tab,
+    /// Backslash notation for the vertical tab character (`\v`, ASCII 11)
+    VerticalTab,
+    /// Control character notation (`\c...`)
+    ///
+    /// The associated value is the control character represented by the
+    /// following character in the input.
+    Control(u8),
+    /// Single-byte octal notation (`\OOO`)
+    ///
+    /// The associated value is the byte represented by the three octal digits
+    /// following the backslash.
+    Octal(u8),
+    /// Single-byte hexadecimal notation (`\xHH`)
+    ///
+    /// The associated value is the byte represented by the two hexadecimal
+    /// digits following the `x`.
+    Hex(u8),
+    /// Unicode notation (`\uHHHH` or `\UHHHHHHHH`)
+    ///
+    /// The associated value is the Unicode scalar value represented by the four
+    /// or eight hexadecimal digits following the `u` or `U`.
+    Unicode(char),
+}
+
+/// String that may contain some escapes
+///
+/// An escaped string is a sequence of [escape unit](EscapeUnit)s, which may
+/// contain some kinds of escapes. This type is used for the value of a
+/// [dollar-single-quoted string](WordUnit::DollarSingleQuote).
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct EscapedString(pub Vec<EscapeUnit>);
+
 /// Element of a [Word], i.e., text with quotes and tilde expansion
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum WordUnit {
@@ -350,6 +409,8 @@ pub enum WordUnit {
     SingleQuote(String),
     /// Text surrounded with a pair of double quotations
     DoubleQuote(Text),
+    /// String surrounded with a pair of single quotations and preceded by a dollar sign
+    DollarSingleQuote(EscapedString),
     /// Tilde expansion
     ///
     /// The `String` value does not contain the initial tilde.

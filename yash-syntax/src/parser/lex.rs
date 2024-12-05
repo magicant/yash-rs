@@ -26,6 +26,7 @@ mod backquote;
 mod braced_param;
 mod command_subst;
 mod dollar;
+mod escape;
 mod heredoc;
 mod keyword;
 mod misc;

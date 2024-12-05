@@ -92,12 +92,34 @@ impl FromStr for TextUnit {
     }
 }
 
-// Parses a text by `lexer.text(|_| false, |_| true)`.
+/// Parses a text by `lexer.text(|_| false, |_| true)`.
 impl FromStr for Text {
     type Err = Error;
     fn from_str(s: &str) -> Result<Text, Error> {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         unwrap_ready(lexer.text(|_| false, |_| true))
+    }
+}
+
+impl FromStr for EscapeUnit {
+    /// Optional error value
+    ///
+    /// The error is `None` if the input is empty.
+    /// A proper error is returned in `Some(_)` in case of a syntax error.
+    type Err = Option<Error>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        unwrap_ready(lexer.escape_unit()).shift()
+    }
+}
+
+/// Parses an escaped string by `lexer.escaped_string(|_| false)`.
+impl FromStr for EscapedString {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        unwrap_ready(lexer.escaped_string(|_| false))
     }
 }
 
@@ -455,6 +477,23 @@ mod tests {
             assert_matches!(&parse.0[2], CommandSubst { content, .. } => {
                 assert_eq!(&**content, "c");
             });
+        })
+    }
+
+    #[test]
+    fn escape_unit_from_str() {
+        block_on(async {
+            let parse: EscapeUnit = r"\n".parse().unwrap();
+            assert_eq!(parse, EscapeUnit::Newline);
+        })
+    }
+
+    #[test]
+    fn escaped_string_from_str() {
+        block_on(async {
+            let parse: EscapedString = r"a\nb".parse().unwrap();
+            use EscapeUnit::*;
+            assert_eq!(parse.0, [Literal('a'), Newline, Literal('b')]);
         })
     }
 

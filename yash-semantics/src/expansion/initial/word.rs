@@ -22,25 +22,49 @@ use super::super::Error;
 use super::Env;
 use super::Expand;
 use super::Phrase;
+use yash_syntax::syntax::Unquote as _;
 use yash_syntax::syntax::Word;
 use yash_syntax::syntax::WordUnit::{self, *};
 
-fn expand_single_quote(value: &str) -> Phrase {
-    const QUOTE: AttrChar = AttrChar {
-        value: '\'',
-        origin: Origin::Literal,
-        is_quoted: false,
-        is_quoting: true,
-    };
+const SINGLE_QUOTE: AttrChar = AttrChar {
+    value: '\'',
+    origin: Origin::Literal,
+    is_quoted: false,
+    is_quoting: true,
+};
+
+/// Adds single quotes around the string.
+fn single_quote(value: &str) -> Phrase {
     let mut field = Vec::with_capacity(value.chars().count() + 2);
-    field.push(QUOTE);
+    field.push(SINGLE_QUOTE);
     field.extend(value.chars().map(|c| AttrChar {
         value: c,
         origin: Origin::Literal,
         is_quoted: true,
         is_quoting: false,
     }));
-    field.push(QUOTE);
+    field.push(SINGLE_QUOTE);
+    Phrase::Field(field)
+}
+
+/// Adds dollar-single-quotes around the string.
+fn dollar_single_quote(s: &str) -> Phrase {
+    const DOLLAR: AttrChar = AttrChar {
+        value: '$',
+        origin: Origin::Literal,
+        is_quoted: false,
+        is_quoting: true,
+    };
+    let mut field = Vec::with_capacity(s.chars().count() + 3);
+    field.push(DOLLAR);
+    field.push(SINGLE_QUOTE);
+    field.extend(s.chars().map(|c| AttrChar {
+        value: c,
+        origin: Origin::Literal,
+        is_quoted: true,
+        is_quoting: false,
+    }));
+    field.push(SINGLE_QUOTE);
     Phrase::Field(field)
 }
 
@@ -90,6 +114,11 @@ fn double_quote(phrase: &mut Phrase) {
 /// A double-quoted text expands to a phrase in a non-splitting context and
 /// surrounds each field in the phrase with `"`.
 ///
+/// # Dollar-single-quote
+///
+/// `DollarSingleQuote(string)` expands to
+/// `dollar_single_quote(&string.unquote().0)` surrounded by `$'` and `'`.
+///
 /// # Tilde
 ///
 /// `Tilde("")` expands to the value of the `HOME` scalar variable.
@@ -101,7 +130,7 @@ impl Expand for WordUnit {
     async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
         match self {
             Unquoted(text_unit) => text_unit.expand(env).await,
-            SingleQuote(value) => Ok(expand_single_quote(value)),
+            SingleQuote(value) => Ok(single_quote(value)),
             DoubleQuote(text) => {
                 let would_split = std::mem::replace(&mut env.will_split, false);
                 let result = text.expand(env).await;
@@ -111,6 +140,7 @@ impl Expand for WordUnit {
                 double_quote(&mut phrase);
                 Ok(phrase)
             }
+            DollarSingleQuote(string) => Ok(dollar_single_quote(&string.unquote().0)),
             Tilde(name) => Ok(super::tilde::expand(name, env.inner).into()),
         }
     }
@@ -240,7 +270,7 @@ mod tests {
 
     #[test]
     fn empty_single_quote() {
-        let result = expand_single_quote("");
+        let result = single_quote("");
         let q = AttrChar {
             value: '\'',
             origin: Origin::Literal,
@@ -252,7 +282,7 @@ mod tests {
 
     #[test]
     fn non_empty_single_quote() {
-        let result = expand_single_quote("do");
+        let result = single_quote("do");
         let q = AttrChar {
             value: '\'',
             origin: Origin::Literal,
@@ -267,6 +297,45 @@ mod tests {
         };
         let o = AttrChar { value: 'o', ..d };
         assert_eq!(result, Phrase::Field(vec![q, d, o, q]));
+    }
+
+    #[test]
+    fn expand_dollar_single_quote() {
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let unit = DollarSingleQuote(r"\\\n".parse().unwrap());
+        let result = unit.expand(&mut env).now_or_never().unwrap();
+
+        let dollar = AttrChar {
+            value: '$',
+            origin: Origin::Literal,
+            is_quoted: false,
+            is_quoting: true,
+        };
+        let quote = AttrChar {
+            value: '\'',
+            origin: Origin::Literal,
+            is_quoted: false,
+            is_quoting: true,
+        };
+        let backslash = AttrChar {
+            value: '\\',
+            origin: Origin::Literal,
+            is_quoted: true,
+            is_quoting: false,
+        };
+        let newline = AttrChar {
+            value: '\n',
+            origin: Origin::Literal,
+            is_quoted: true,
+            is_quoting: false,
+        };
+        assert_eq!(
+            result,
+            Ok(Phrase::Field(vec![
+                dollar, quote, backslash, newline, quote
+            ]))
+        );
     }
 
     #[test]

@@ -24,8 +24,9 @@ use crate::parser::error::Error;
 use crate::parser::error::SyntaxError;
 use crate::source::Location;
 use crate::source::SourceChar;
+use crate::syntax::TextUnit;
 use crate::syntax::Word;
-use crate::syntax::WordUnit::{self, DoubleQuote, SingleQuote, Unquoted};
+use crate::syntax::WordUnit::{self, DollarSingleQuote, DoubleQuote, SingleQuote, Unquoted};
 
 impl Lexer<'_> {
     /// Parses a single-quoted string.
@@ -128,10 +129,16 @@ impl WordLexer<'_, '_> {
                 self.consume_char();
                 self.double_quote(location).await.map(Some)
             }
-            _ => Ok(self
-                .text_unit(is_delimiter, is_escapable)
-                .await?
-                .map(Unquoted)),
+            _ => {
+                let unit = self.text_unit(is_delimiter, is_escapable).await?;
+                if allow_single_quote && unit == Some(TextUnit::Literal('$')) {
+                    if let Some(result) = self.single_quoted_escaped_string().await? {
+                        return Ok(Some(DollarSingleQuote(result)));
+                    }
+                    // TODO Maybe reject any other characters after `$`?
+                }
+                Ok(unit.map(Unquoted))
+            }
         }
     }
 
@@ -172,10 +179,12 @@ mod tests {
     use crate::parser::error::ErrorCause;
     use crate::parser::lex::WordContext;
     use crate::source::Source;
+    use crate::syntax::EscapeUnit;
+    use crate::syntax::EscapedString;
     use crate::syntax::Modifier;
     use crate::syntax::Text;
-    use crate::syntax::TextUnit::{self, Backslashed, BracedParam, CommandSubst, Literal};
-    use crate::syntax::WordUnit::Tilde;
+    use crate::syntax::TextUnit::{Backslashed, BracedParam, CommandSubst, Literal};
+    use crate::syntax::WordUnit::{DollarSingleQuote, Tilde};
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
 
@@ -299,6 +308,27 @@ mod tests {
     }
 
     #[test]
+    fn lexer_word_unit_orphan_dollar_is_literal() {
+        let mut lexer = Lexer::from_memory("$", Source::Unknown);
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
+        let result = lexer
+            .word_unit(|c| {
+                assert_eq!(c, '$', "unexpected call to is_delimiter({c:?})");
+                false
+            })
+            .now_or_never()
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(result, Unquoted(Literal('$')));
+
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
+    }
+
+    #[test]
     fn lexer_word_unit_single_quote_empty() {
         let mut lexer = Lexer::from_memory("''", Source::Unknown);
         let mut lexer = WordLexer {
@@ -380,6 +410,76 @@ mod tests {
         assert_eq!(result, Unquoted(Literal('\'')));
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
+    }
+
+    #[test]
+    fn lexer_word_unit_dollar_single_quote_empty() {
+        let mut lexer = Lexer::from_memory("$''", Source::Unknown);
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
+        let result = lexer
+            .word_unit(|c| {
+                assert_matches!(c, '$', "unexpected call to is_delimiter({c:?})");
+                false
+            })
+            .now_or_never()
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_matches!(result, DollarSingleQuote(EscapedString(content)) => {
+            assert_eq!(content, []);
+        });
+    }
+
+    #[test]
+    fn lexer_word_unit_dollar_single_quote_nonempty() {
+        let mut lexer = Lexer::from_memory(r"$'foo'", Source::Unknown);
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
+        let result = lexer
+            .word_unit(|c| {
+                assert_matches!(c, '$', "unexpected call to is_delimiter({c:?})");
+                false
+            })
+            .now_or_never()
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_matches!(result, DollarSingleQuote(EscapedString(content)) => {
+            assert_eq!(
+                content,
+                [
+                    EscapeUnit::Literal('f'),
+                    EscapeUnit::Literal('o'),
+                    EscapeUnit::Literal('o'),
+                ]
+            );
+        });
+
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
+    }
+
+    #[test]
+    fn lexer_word_unit_not_dollar_single_quote_in_text_context() {
+        let mut lexer = Lexer::from_memory("$''", Source::Unknown);
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Text,
+        };
+        let result = lexer
+            .word_unit(|c| {
+                assert_matches!(c, '$', "unexpected call to is_delimiter({c:?})");
+                false
+            })
+            .now_or_never()
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_matches!(result, Unquoted(Literal('$')));
     }
 
     #[test]
@@ -494,19 +594,16 @@ mod tests {
 
         let word = lexer.word(|_| false).now_or_never().unwrap().unwrap();
         assert_eq!(word.units.len(), 4);
-        assert_eq!(word.units[0], WordUnit::Unquoted(TextUnit::Literal('0')));
-        assert_matches!(&word.units[1], WordUnit::Unquoted(TextUnit::CommandSubst { content, location }) => {
+        assert_eq!(word.units[0], WordUnit::Unquoted(Literal('0')));
+        assert_matches!(&word.units[1], WordUnit::Unquoted(CommandSubst { content, location }) => {
             assert_eq!(&**content, ":");
             assert_eq!(*location.code.value.borrow(), r"0$(:)X\#");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(*location.code.source, Source::Unknown);
             assert_eq!(location.range, 1..5);
         });
-        assert_eq!(word.units[2], WordUnit::Unquoted(TextUnit::Literal('X')));
-        assert_eq!(
-            word.units[3],
-            WordUnit::Unquoted(TextUnit::Backslashed('#'))
-        );
+        assert_eq!(word.units[2], WordUnit::Unquoted(Literal('X')));
+        assert_eq!(word.units[3], WordUnit::Unquoted(Backslashed('#')));
         assert_eq!(*word.location.code.value.borrow(), r"0$(:)X\#");
         assert_eq!(word.location.code.start_line_number.get(), 1);
         assert_eq!(*word.location.code.source, Source::Unknown);
