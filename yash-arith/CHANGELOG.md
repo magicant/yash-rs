@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - External dependency versions
     - Rust 1.58.0 → 1.65.0
+- Internal dependency versions
+    - thiserror 1.0.47 → 2.0.4
 
 ## [0.2.1] - 2023-11-12
 
