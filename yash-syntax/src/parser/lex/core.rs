@@ -779,14 +779,14 @@ pub struct PlainLexer<'a, 'b> {
     lexer: &'a mut Lexer<'b>,
 }
 
-impl<'a, 'b> Deref for PlainLexer<'a, 'b> {
+impl<'b> Deref for PlainLexer<'_, 'b> {
     type Target = Lexer<'b>;
     fn deref(&self) -> &Lexer<'b> {
         self.lexer
     }
 }
 
-impl<'a, 'b> DerefMut for PlainLexer<'a, 'b> {
+impl<'b> DerefMut for PlainLexer<'_, 'b> {
     fn deref_mut(&mut self) -> &mut Lexer<'b> {
         self.lexer
     }
@@ -822,14 +822,14 @@ pub struct WordLexer<'a, 'b> {
     pub context: WordContext,
 }
 
-impl<'a, 'b> Deref for WordLexer<'a, 'b> {
+impl<'b> Deref for WordLexer<'_, 'b> {
     type Target = Lexer<'b>;
     fn deref(&self) -> &Lexer<'b> {
         self.lexer
     }
 }
 
-impl<'a, 'b> DerefMut for WordLexer<'a, 'b> {
+impl<'b> DerefMut for WordLexer<'_, 'b> {
     fn deref_mut(&mut self) -> &mut Lexer<'b> {
         self.lexer
     }

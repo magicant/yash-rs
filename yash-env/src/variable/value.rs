@@ -120,7 +120,7 @@ pub struct QuotedValue<'a> {
 }
 
 /// Writes a quoted version of the value to the formatter.
-impl<'a> std::fmt::Display for QuotedValue<'a> {
+impl std::fmt::Display for QuotedValue<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.value {
             Scalar(value) => yash_quote::quoted(value).fmt(f),

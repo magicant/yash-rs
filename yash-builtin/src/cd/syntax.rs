@@ -38,9 +38,8 @@ pub enum Error {
     #[error(transparent)]
     CommonError(#[from] crate::common::syntax::ParseError<'static>),
 
-    /// The operand is an empty string.
+    // /// The operand is an empty string.
     // TODO: EmptyOperand(Field),
-
     /// More than one operand is given.
     #[error("unexpected operand")]
     UnexpectedOperands(Vec<Field>),

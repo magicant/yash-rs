@@ -298,7 +298,7 @@ impl<'a> MaskGuard<'a> {
     }
 }
 
-impl<'a> Drop for MaskGuard<'a> {
+impl Drop for MaskGuard<'_> {
     fn drop(&mut self) {
         if let Some(old_mask) = &self.old_mask {
             self.env
