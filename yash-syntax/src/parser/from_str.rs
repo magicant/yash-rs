@@ -69,26 +69,36 @@ impl<T, E> Shift for Result<Option<T>, E> {
 }
 
 impl FromStr for BracedParam {
+    /// Optional error value
+    ///
+    /// The error is `None` if the input is empty or does not start with `${`.
+    /// A proper error is returned in `Some(_)` in case of a syntax error in the
+    /// parameter.
     type Err = Option<Error>;
+
     fn from_str(s: &str) -> Result<BracedParam, Option<Error>> {
-        match TextUnit::from_str(s) {
-            Err(e) => Err(Some(e)),
-            Ok(TextUnit::BracedParam(param)) => Ok(param),
-            Ok(_) => Err(None),
+        match TextUnit::from_str(s)? {
+            TextUnit::BracedParam(param) => Ok(param),
+            _ => Err(None),
         }
     }
 }
 
 /// Parses a [`TextUnit`] by `lexer.text_unit(|_| false, |_| true)`.
 impl FromStr for TextUnit {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<TextUnit, Error> {
+    /// Optional error value
+    ///
+    /// The error is `None` if the input is empty.
+    /// A proper error is returned in `Some(_)` in case of a syntax error.
+    type Err = Option<Error>;
+
+    fn from_str(s: &str) -> Result<TextUnit, Option<Error>> {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        unwrap_ready(lexer.text_unit(|_| false, |_| true)).map(Option::unwrap)
+        unwrap_ready(lexer.text_unit(|_| false, |_| true)).shift()
     }
 }
 
@@ -124,14 +134,19 @@ impl FromStr for EscapedString {
 }
 
 impl FromStr for WordUnit {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<WordUnit, Error> {
+    /// Optional error value
+    ///
+    /// The error is `None` if the input is empty.
+    /// A proper error is returned in `Some(_)` in case of a syntax error.
+    type Err = Option<Error>;
+
+    fn from_str(s: &str) -> Result<WordUnit, Option<Error>> {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        unwrap_ready(lexer.word_unit(|_| false)).map(Option::unwrap)
+        unwrap_ready(lexer.word_unit(|_| false)).shift()
     }
 }
 
@@ -456,6 +471,12 @@ mod tests {
         block_on(async {
             let parse: BracedParam = "${foo}".parse().unwrap();
             assert_eq!(parse.to_string(), "${foo}");
+
+            let error = "".parse::<BracedParam>().unwrap_err();
+            assert!(error.is_none(), "{error:?}");
+
+            let error = "foo".parse::<BracedParam>().unwrap_err();
+            assert!(error.is_none(), "{error:?}");
         })
     }
 
@@ -464,6 +485,9 @@ mod tests {
         block_on(async {
             let parse: TextUnit = "a".parse().unwrap();
             assert_eq!(parse.to_string(), "a");
+
+            let error = "".parse::<TextUnit>().unwrap_err();
+            assert!(error.is_none(), "{error:?}");
         })
     }
 
@@ -502,6 +526,9 @@ mod tests {
         block_on(async {
             let parse: WordUnit = "a".parse().unwrap();
             assert_eq!(parse.to_string(), "a");
+
+            let error = "".parse::<WordUnit>().unwrap_err();
+            assert!(error.is_none(), "{error:?}");
         })
     }
 

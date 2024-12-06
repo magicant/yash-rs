@@ -45,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Error messages returned from `parser::SyntaxError::message` are no longer
   capitalized.
+- The implementations of `std::str::FromStr` for `TextUnit` and `WordUnit` in
+  the `syntax` module now return `Option<Error>` instead of `Error` for the
+  error type. Previously, the `from_str` method was panicking when the input
+  string was empty.
 
 ## [0.12.1] - 2024-11-10
 
