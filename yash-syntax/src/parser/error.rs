@@ -191,82 +191,82 @@ impl SyntaxError {
     pub fn message(&self) -> &'static str {
         use SyntaxError::*;
         match self {
-            IncompleteEscape => "The backslash is escaping nothing",
-            InvalidEscape => "The backslash escape is invalid",
-            UnclosedParen { .. } => "The parenthesis is not closed",
-            UnclosedSingleQuote { .. } => "The single quote is not closed",
-            UnclosedDoubleQuote { .. } => "The double quote is not closed",
-            UnclosedDollarSingleQuote { .. } => "The dollar single quote is not closed",
-            UnclosedParam { .. } => "The parameter expansion is not closed",
-            EmptyParam => "The parameter name is missing",
-            InvalidParam => "The parameter name is invalid",
-            InvalidModifier => "The parameter expansion contains a malformed modifier",
-            MultipleModifier => "A suffix modifier cannot be used together with a prefix modifier",
-            UnclosedCommandSubstitution { .. } => "The command substitution is not closed",
-            UnclosedBackquote { .. } => "The backquote is not closed",
-            UnclosedArith { .. } => "The arithmetic expansion is not closed",
-            InvalidCommandToken => "The command starts with an inappropriate token",
-            MissingSeparator => "A separator is missing between the commands",
-            FdOutOfRange => "The file descriptor is too large",
-            MissingRedirOperand => "The redirection operator is missing its operand",
-            MissingHereDocDelimiter => "The here-document operator is missing its delimiter",
-            MissingHereDocContent => "Content of the here-document is missing",
+            IncompleteEscape => "the backslash is escaping nothing",
+            InvalidEscape => "the backslash escape is invalid",
+            UnclosedParen { .. } => "the parenthesis is not closed",
+            UnclosedSingleQuote { .. } => "the single quote is not closed",
+            UnclosedDoubleQuote { .. } => "the double quote is not closed",
+            UnclosedDollarSingleQuote { .. } => "the dollar single quote is not closed",
+            UnclosedParam { .. } => "the parameter expansion is not closed",
+            EmptyParam => "the parameter name is missing",
+            InvalidParam => "the parameter name is invalid",
+            InvalidModifier => "the parameter expansion contains a malformed modifier",
+            MultipleModifier => "a suffix modifier cannot be used together with a prefix modifier",
+            UnclosedCommandSubstitution { .. } => "the command substitution is not closed",
+            UnclosedBackquote { .. } => "the backquote is not closed",
+            UnclosedArith { .. } => "the arithmetic expansion is not closed",
+            InvalidCommandToken => "the command starts with an inappropriate token",
+            MissingSeparator => "a separator is missing between the commands",
+            FdOutOfRange => "the file descriptor is too large",
+            MissingRedirOperand => "the redirection operator is missing its operand",
+            MissingHereDocDelimiter => "the here-document operator is missing its delimiter",
+            MissingHereDocContent => "content of the here-document is missing",
             UnclosedHereDocContent { .. } => {
-                "The delimiter to close the here-document content is missing"
+                "the delimiter to close the here-document content is missing"
             }
-            UnclosedArrayValue { .. } => "The array assignment value is not closed",
+            UnclosedArrayValue { .. } => "the array assignment value is not closed",
             UnopenedGrouping | UnopenedSubshell | UnopenedLoop | UnopenedDoClause | UnopenedIf
-            | UnopenedCase | InAsCommandName => "The compound command delimiter is unmatched",
-            UnclosedGrouping { .. } => "The grouping is not closed",
-            EmptyGrouping => "The grouping is missing its content",
-            UnclosedSubshell { .. } => "The subshell is not closed",
-            EmptySubshell => "The subshell is missing its content",
-            UnclosedDoClause { .. } => "The `do` clause is missing its closing `done`",
-            EmptyDoClause => "The `do` clause is missing its content",
-            MissingForName => "The variable name is missing in the `for` loop",
-            InvalidForName => "The variable name is invalid",
-            InvalidForValue => "The operator token is invalid in the word list of the `for` loop",
-            MissingForBody { .. } => "The `for` loop is missing its `do` clause",
-            UnclosedWhileClause { .. } => "The `while` loop is missing its `do` clause",
-            EmptyWhileCondition => "The `while` loop is missing its condition",
-            UnclosedUntilClause { .. } => "The `until` loop is missing its `do` clause",
-            EmptyUntilCondition => "The `until` loop is missing its condition",
-            IfMissingThen { .. } => "The `if` command is missing the `then` clause",
-            EmptyIfCondition => "The `if` command is missing its condition",
-            EmptyIfBody => "The `if` command is missing its body",
-            ElifMissingThen { .. } => "The `elif` clause is missing the `then` clause",
-            EmptyElifCondition => "The `elif` clause is missing its condition",
-            EmptyElifBody => "The `elif` clause is missing its body",
-            EmptyElse => "The `else` clause is missing its content",
-            UnclosedIf { .. } => "The `if` command is missing its closing `fi`",
-            MissingCaseSubject => "The subject is missing after `case`",
-            InvalidCaseSubject => "The `case` command subject is not a valid word",
+            | UnopenedCase | InAsCommandName => "the compound command delimiter is unmatched",
+            UnclosedGrouping { .. } => "the grouping is not closed",
+            EmptyGrouping => "the grouping is missing its content",
+            UnclosedSubshell { .. } => "the subshell is not closed",
+            EmptySubshell => "the subshell is missing its content",
+            UnclosedDoClause { .. } => "the `do` clause is missing its closing `done`",
+            EmptyDoClause => "the `do` clause is missing its content",
+            MissingForName => "the variable name is missing in the `for` loop",
+            InvalidForName => "the variable name is invalid",
+            InvalidForValue => "the operator token is invalid in the word list of the `for` loop",
+            MissingForBody { .. } => "the `for` loop is missing its `do` clause",
+            UnclosedWhileClause { .. } => "the `while` loop is missing its `do` clause",
+            EmptyWhileCondition => "the `while` loop is missing its condition",
+            UnclosedUntilClause { .. } => "the `until` loop is missing its `do` clause",
+            EmptyUntilCondition => "the `until` loop is missing its condition",
+            IfMissingThen { .. } => "the `if` command is missing the `then` clause",
+            EmptyIfCondition => "the `if` command is missing its condition",
+            EmptyIfBody => "the `if` command is missing its body",
+            ElifMissingThen { .. } => "the `elif` clause is missing the `then` clause",
+            EmptyElifCondition => "the `elif` clause is missing its condition",
+            EmptyElifBody => "the `elif` clause is missing its body",
+            EmptyElse => "the `else` clause is missing its content",
+            UnclosedIf { .. } => "the `if` command is missing its closing `fi`",
+            MissingCaseSubject => "the subject is missing after `case`",
+            InvalidCaseSubject => "the `case` command subject is not a valid word",
             MissingIn { .. } => "`in` is missing in the `case` command",
-            UnclosedPatternList => "The pattern list is not properly closed by a `)`",
-            MissingPattern => "A pattern is missing in the `case` command",
-            InvalidPattern => "The pattern is not a valid word token",
+            UnclosedPatternList => "the pattern list is not properly closed by a `)`",
+            MissingPattern => "a pattern is missing in the `case` command",
+            InvalidPattern => "the pattern is not a valid word token",
             #[allow(deprecated)]
             EsacAsPattern => "`esac` cannot be the first of a pattern list",
-            UnclosedCase { .. } => "The `case` command is missing its closing `esac`",
+            UnclosedCase { .. } => "the `case` command is missing its closing `esac`",
             UnmatchedParenthesis => "`)` is missing after `(`",
-            MissingFunctionBody => "The function body is missing",
-            InvalidFunctionBody => "The function body must be a compound command",
-            MissingPipeline(AndOr::AndThen) => "A command is missing after `&&`",
-            MissingPipeline(AndOr::OrElse) => "A command is missing after `||`",
+            MissingFunctionBody => "the function body is missing",
+            InvalidFunctionBody => "the function body must be a compound command",
+            MissingPipeline(AndOr::AndThen) => "a command is missing after `&&`",
+            MissingPipeline(AndOr::OrElse) => "a command is missing after `||`",
             DoubleNegation => "`!` cannot be used twice in a row",
             BangAfterBar => "`!` cannot be used in the middle of a pipeline",
-            MissingCommandAfterBang => "A command is missing after `!`",
-            MissingCommandAfterBar => "A command is missing after `|`",
-            RedundantToken => "There is a redundant token",
-            IncompleteControlEscape => "The control escape is incomplete",
-            IncompleteControlBackslashEscape => "The control-backslash escape is incomplete",
-            InvalidControlEscape => "The control escape is invalid",
-            OctalEscapeOutOfRange => "The octal escape is out of range",
-            IncompleteHexEscape => "The hexadecimal escape is incomplete",
+            MissingCommandAfterBang => "a command is missing after `!`",
+            MissingCommandAfterBar => "a command is missing after `|`",
+            RedundantToken => "there is a redundant token",
+            IncompleteControlEscape => "the control escape is incomplete",
+            IncompleteControlBackslashEscape => "the control-backslash escape is incomplete",
+            InvalidControlEscape => "the control escape is invalid",
+            OctalEscapeOutOfRange => "the octal escape is out of range",
+            IncompleteHexEscape => "the hexadecimal escape is incomplete",
             IncompleteShortUnicodeEscape | IncompleteLongUnicodeEscape => {
-                "The Unicode escape is incomplete"
+                "the Unicode escape is incomplete"
             }
-            UnicodeEscapeOutOfRange => "The Unicode escape is out of range",
+            UnicodeEscapeOutOfRange => "the Unicode escape is out of range",
         }
     }
 
@@ -530,7 +530,7 @@ mod tests {
         };
         assert_eq!(
             error.to_string(),
-            "The here-document operator is missing its delimiter"
+            "the here-document operator is missing its delimiter"
         );
     }
 
@@ -550,7 +550,7 @@ mod tests {
         assert_eq!(message.r#type, AnnotationType::Error);
         assert_eq!(
             message.title,
-            "The here-document operator is missing its delimiter"
+            "the here-document operator is missing its delimiter"
         );
         assert_eq!(message.annotations.len(), 1);
         assert_eq!(message.annotations[0].r#type, AnnotationType::Error);
