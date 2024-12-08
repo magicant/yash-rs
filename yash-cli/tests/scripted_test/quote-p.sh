@@ -402,12 +402,14 @@ __OUT__
 test_oE 'dollar-single-quotes'
 bracket $'' $'a' $'a
 b' -$'\"\'\'"\\\a\b\e\f\n\r\t\v\x20\1000'-
-bracket $'\cA\c^\c\\\c?'
+bracket $'\cA\c^\c\\\c?' $'\\
+'
 __IN__
 [][a][a
 b][-"''"\
 	 @0-]
-[]
+[][\
+]
 __OUT__
 
 test_oE 'double quotes'
