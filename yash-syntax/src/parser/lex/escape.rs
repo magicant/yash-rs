@@ -114,6 +114,7 @@ impl Lexer<'_> {
                         Ok(Some(Control(0x1C)))
                     }
 
+                    // TODO Reject '\u{40}' in POSIX mode
                     c3 @ ('\u{3F}'..'\u{60}') => Ok(Some(Control(c3 as u8 ^ 0x40))),
 
                     _ => {
