@@ -342,6 +342,11 @@ fn quotation() {
 }
 
 #[test]
+fn quotation_ex() {
+    run("quote-y.sh");
+}
+
+#[test]
 fn read_builtin() {
     run("read-p.sh")
 }
