@@ -178,6 +178,7 @@ async fn read_eval_loop_impl(
                     env.exit_status = exit_status;
                 }
                 result = Continue(());
+                lexer.flush();
             }
         }
 
@@ -383,7 +384,9 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
-        let mut lexer = Lexer::from_memory(";;\necho $?", Source::Unknown);
+        // The ";;" causes a syntax error, the following "(" is ignored, and the
+        // loop continues with the command "echo $?" on the next line.
+        let mut lexer = Lexer::from_memory(";; (\necho $?", Source::Unknown);
         let ref_env = RefCell::new(&mut env);
 
         let result = interactive_read_eval_loop(&ref_env, &mut lexer)

@@ -36,6 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `exec` built-in no longer exits the shell when the specified command is
   not found in an interactive shell, as required by POSIX.1-2024.
 
+### Fixed
+
+- The interactive shell now discards the entire line when a syntax error occurs
+  in the middle of a command line. Previously, it would continue parsing the
+  rest of the line, which could lead to confusing behavior.
+
 ## [0.1.0] - 2024-09-29
 
 ### Added

@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Internal dependency versions
     - thiserror 1.0.47 → 2.0.4
 
+### Fixed
+
+- The `interactive_read_eval_loop` function now flushes the lexer on recovery
+  from a syntax error, so that the next line is read in a fresh state.
+  Previously, the lexer would continue from the next token after the error,
+  confusingly parsing the rest of the line before reading the next line.
+
 ## [0.4.0] - 2024-09-29
 
 ### Added
