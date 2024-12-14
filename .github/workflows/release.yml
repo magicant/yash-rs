@@ -32,3 +32,4 @@ jobs:
         with:
           bin: yash3
           target: ${{ matrix.target }}
+          token: ${{ secrets.GITHUB_TOKEN }}
