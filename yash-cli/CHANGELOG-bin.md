@@ -8,7 +8,7 @@ implementing library crate are in [CHANGELOG-lib.md](CHANGELOG-lib.md).
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.1] - Unreleased
+## [0.2.0] - 2024-12-14
 
 ### Added
 
@@ -97,7 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release of the shell
 
-[0.1.1]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.1.1
+[0.2.0]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.2.0
 [0.1.0]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.1.0
 [0.1.0-beta.2]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.1.0-beta.2
 [0.1.0-beta.1]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.1.0-beta.1

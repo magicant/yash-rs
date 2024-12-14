@@ -5,7 +5,7 @@ All notable changes to `yash-syntax` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.13.0] - Unreleased
+## [0.13.0] - 2024-12-14
 
 ### Added
 
@@ -38,8 +38,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   leave intermediate results in the `Extend<char>` object if unsuccessful.
     - The `syntax::NotLiteral` struct is added to represent the case where the
       method is unsuccessful.
-- Internal dependency versions
-    - thiserror 1.0.47 → 2.0.4
 
 ### Changed
 
@@ -49,6 +47,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the `syntax` module now return `Option<Error>` instead of `Error` for the
   error type. Previously, the `from_str` method was panicking when the input
   string was empty.
+- Internal dependency versions
+    - thiserror 1.0.47 → 2.0.4
+
+### Removed
+
+- As mentioned above, the `extend_if_literal` method of the
+  `syntax::MaybeLiteral` trait is removed in favor of the new `extend_literal`
+  method.
 
 ## [0.12.1] - 2024-11-10
 

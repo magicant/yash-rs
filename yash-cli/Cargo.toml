@@ -1,6 +1,6 @@
 [package]
 name = "yash-cli"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2021"
 rust-version = "1.82.0"
@@ -19,12 +19,12 @@ path = "src/main.rs"
 
 [dependencies]
 thiserror = "2.0.4"
-yash-builtin = { path = "../yash-builtin", version = "0.4.0" }
-yash-env = { path = "../yash-env", version = "0.4.0" }
+yash-builtin = { path = "../yash-builtin", version = "0.5.0" }
+yash-env = { path = "../yash-env", version = "0.5.0" }
 yash-executor = { path = "../yash-executor", version = "1.0.0" }
-yash-prompt = { path = "../yash-prompt", version = "0.2.0" }
-yash-semantics = { path = "../yash-semantics", version = "0.4.0" }
-yash-syntax = { path = "../yash-syntax", version = "0.12.1" }
+yash-prompt = { path = "../yash-prompt", version = "0.3.0" }
+yash-semantics = { path = "../yash-semantics", version = "0.5.0" }
+yash-syntax = { path = "../yash-syntax", version = "0.13.0" }
 
 [dev-dependencies]
 assert_matches = "1.5.0"

@@ -1,6 +1,6 @@
 [package]
 name = "yash-env"
-version = "0.4.1"
+version = "0.5.0"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2021"
 rust-version = "1.82.0"
@@ -27,7 +27,7 @@ thiserror = "2.0.4"
 unix_path = "1.0.1"
 unix_str = "1.0.0"
 yash-quote = { path = "../yash-quote", version = "1.1.1" }
-yash-syntax = { path = "../yash-syntax", version = "0.12.0", features = ["annotate-snippets"] }
+yash-syntax = { path = "../yash-syntax", version = "0.13.0", features = ["annotate-snippets"] }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.29.0", features = ["fs", "signal", "user"] }
