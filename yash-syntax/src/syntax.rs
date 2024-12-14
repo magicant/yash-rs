@@ -581,14 +581,41 @@ impl Redir {
     }
 }
 
+/// Word of a simple command
+///
+/// This enum represents a word that appears in a [`SimpleCommand`]. Most words
+/// are regular words, but some words are expanded as if they were assignments.
+/// For example, in the command `export PATH FOO=bar`, `PATH` is a regular word
+/// and `FOO=bar` is an assignment word.
+///
+/// Note that any assignments preceding the command words are represented as
+/// [`Assign`]s in the [`SimpleCommand`] struct, not as [`SimpleCommandWord`]s.
+/// For example, in the command `FOO=bar printenv FOO`, `FOO=bar` is an
+/// assignment and `printenv` and `FOO` are command words.
+///
+/// A word is considered an assignment word if it can be converted to an
+/// [`Assign`] and if it follows another word that names a declaration utility.
+/// (TODO: What commands are declaration utilities?)
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SimpleCommandWord {
+    /// Normal word
+    Regular(Word),
+    /// Word to be expanded in assignment context
+    Assign(Assign),
+}
+
 /// Command that involves assignments, redirections, and word expansions
 ///
 /// In the shell language syntax, a valid simple command must contain at least one of assignments,
 /// redirections, and words. The parser must not produce a completely empty simple command.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SimpleCommand {
+    /// Assignments
     pub assigns: Vec<Assign>,
+    // TODO Use SimpleCommandWord instead of Word
+    /// Main command words
     pub words: Vec<Word>,
+    /// Redirections
     pub redirs: Rc<Vec<Redir>>,
 }
 
