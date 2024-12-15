@@ -612,9 +612,8 @@ pub enum SimpleCommandWord {
 pub struct SimpleCommand {
     /// Assignments
     pub assigns: Vec<Assign>,
-    // TODO Use SimpleCommandWord instead of Word
     /// Main command words
-    pub words: Vec<Word>,
+    pub words: Vec<SimpleCommandWord>,
     /// Redirections
     pub redirs: Rc<Vec<Redir>>,
 }
@@ -634,7 +633,7 @@ impl SimpleCommand {
     /// Tests whether the first word of the simple command is a keyword.
     #[must_use]
     fn first_word_is_keyword(&self) -> bool {
-        let Some(word) = self.words.first() else {
+        let Some(SimpleCommandWord::Regular(word)) = self.words.first() else {
             return false;
         };
         let Some(literal) = word.to_string_if_literal() else {

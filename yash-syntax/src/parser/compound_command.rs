@@ -99,8 +99,7 @@ mod tests {
     use crate::alias::{AliasSet, EmptyGlossary, HashEntry};
     use crate::source::Location;
     use crate::source::Source;
-    use crate::syntax::Command;
-    use crate::syntax::SimpleCommand;
+    use crate::syntax::{Command, SimpleCommand, SimpleCommandWord};
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
 
@@ -253,7 +252,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
         let c = SimpleCommand {
             assigns: vec![],
-            words: vec!["foo".parse().unwrap()],
+            words: vec![SimpleCommandWord::Regular("foo".parse().unwrap())],
             redirs: vec![].into(),
         };
 

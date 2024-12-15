@@ -760,10 +760,14 @@ mod tests {
             .push(Assign::from_str("hello=world").unwrap());
         assert_eq!(command.to_string(), "name=value hello=world");
 
-        command.words.push(Word::from_str("echo").unwrap());
+        command
+            .words
+            .push(SimpleCommandWord::Regular(Word::from_str("echo").unwrap()));
         assert_eq!(command.to_string(), "name=value hello=world echo");
 
-        command.words.push(Word::from_str("foo").unwrap());
+        command
+            .words
+            .push(SimpleCommandWord::Regular(Word::from_str("foo").unwrap()));
         assert_eq!(command.to_string(), "name=value hello=world echo foo");
 
         Rc::make_mut(&mut command.redirs).push(Redir {
@@ -800,7 +804,7 @@ mod tests {
     fn simple_command_display_with_keyword() {
         let command = SimpleCommand {
             assigns: vec![],
-            words: vec!["if".parse().unwrap()],
+            words: vec![SimpleCommandWord::Regular("if".parse().unwrap())],
             redirs: vec!["<foo".parse().unwrap()].into(),
         };
         assert_eq!(command.to_string(), "<foo if");

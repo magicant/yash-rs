@@ -28,13 +28,14 @@ use crate::syntax::Assign;
 use crate::syntax::Redir;
 use crate::syntax::Scalar;
 use crate::syntax::SimpleCommand;
+use crate::syntax::SimpleCommandWord;
 use crate::syntax::Word;
 
 /// Simple command builder.
 #[derive(Default)]
 struct Builder {
     assigns: Vec<Assign>,
-    words: Vec<Word>,
+    words: Vec<SimpleCommandWord>,
     redirs: Vec<Redir>,
 }
 
@@ -123,13 +124,13 @@ impl Parser<'_, '_> {
 
             // Tell assignment from word
             if !result.words.is_empty() {
-                result.words.push(token.word);
+                result.words.push(SimpleCommandWord::Regular(token.word));
                 continue;
             }
             let mut assign = match Assign::try_from(token.word) {
                 Ok(assign) => assign,
                 Err(word) => {
-                    result.words.push(word);
+                    result.words.push(SimpleCommandWord::Regular(word));
                     continue;
                 }
             };
