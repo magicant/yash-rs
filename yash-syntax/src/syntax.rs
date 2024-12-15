@@ -581,14 +581,70 @@ impl Redir {
     }
 }
 
+/// Expansion style of a simple command word
+///
+/// This enum value indicates how a [word] in a [simple command] was parsed and
+/// how it should be expanded.
+///
+/// Most words are parsed and expanded normally (`Regular`), but some words are
+/// parsed and expanded like assignments (`Assign`). The `Assign` style is
+/// applied to words that appear after a declaration utility name and can be
+/// parsed as assignments. For example, in the command `export foo bar=baz`,
+/// `foo` is parsed as a normal word, but `bar=baz` is parsed as an assignment.
+/// Both `foo` and `bar=baz` are words in the same simple command and are passed
+/// as arguments to the `export` utility, but they are expanded slightly
+/// differently. The normal word `foo` is subject to normal word expansions
+/// including field splitting and pathname expansion, which may produce multiple
+/// fields from a single word. The assignment-like word `bar=baz` is not subject
+/// to field splitting and pathname expansion, and the entire word is treated as
+/// a single field. The latter behavior is similar to the expansion of
+/// assignments that appear before (or without) a command name in a simple
+/// command.
+///
+/// The assignment-like expansion behavior is only applied to words that follow
+/// a declaration utility name. For other utilities, all words are expanded
+/// normally. The utility name itself is always expanded normally.
+///
+/// (TODO: What commands are declaration utilities?)
+///
+/// Note that the expansion behavior is not implemented in this crate. The
+/// `yash-semantics` crate expands words according to the expansion behavior
+/// specified by the parser.
+///
+/// [word]: Word
+/// [simple command]: SimpleCommand
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ExpansionBehavior {
+    /// Normal word expansion
+    ///
+    /// When a word is parsed as a normal word, tilde expansion is recognized
+    /// only at the beginning of the word. When expanded, the word can yield
+    /// any number of fields as a result of field splitting and pathname
+    /// expansion.
+    #[default]
+    Regular,
+
+    /// Assignment-like expansion
+    ///
+    /// When a word is parsed as an assignment, tilde expansion is recognized
+    /// after the first unquoted equal sign and after every unquoted colon.
+    /// When expanded, the word should be treated as a single field without
+    /// performing field splitting or pathname expansion.
+    Assign,
+}
+
 /// Command that involves assignments, redirections, and word expansions
 ///
 /// In the shell language syntax, a valid simple command must contain at least one of assignments,
 /// redirections, and words. The parser must not produce a completely empty simple command.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SimpleCommand {
+    /// Assignments
     pub assigns: Vec<Assign>,
+    // TODO Change to Vec<(Word, ExpansionBehavior)>
+    /// Command name and arguments
     pub words: Vec<Word>,
+    /// Redirections
     pub redirs: Rc<Vec<Redir>>,
 }
 
