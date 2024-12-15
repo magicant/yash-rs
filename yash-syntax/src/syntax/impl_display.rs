@@ -234,6 +234,15 @@ impl fmt::Display for Redir {
     }
 }
 
+impl fmt::Display for SimpleCommandWord {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SimpleCommandWord::Regular(word) => word.fmt(f),
+            SimpleCommandWord::Assign(assign) => assign.fmt(f),
+        }
+    }
+}
+
 impl fmt::Display for SimpleCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let i1 = self.assigns.iter().map(|x| x as &dyn fmt::Display);
@@ -721,6 +730,15 @@ mod tests {
             ..redir
         };
         assert_eq!(redir.to_string(), "9<<END");
+    }
+
+    #[test]
+    fn simple_command_word_display() {
+        let word = SimpleCommandWord::Regular(Word::from_str("echo").unwrap());
+        assert_eq!(word.to_string(), "echo");
+
+        let word = SimpleCommandWord::Assign(Assign::from_str("foo=bar").unwrap());
+        assert_eq!(word.to_string(), "foo=bar");
     }
 
     #[test]
