@@ -243,10 +243,10 @@ impl fmt::Display for SimpleCommand {
         if !self.assigns.is_empty() || !self.first_word_is_keyword() {
             write!(f, "{}", i1.chain(i2).chain(i3).format(" "))
         } else {
-            // If the simple command starts with an assignment or redirection,
-            // the first word may be a keyword which is treated as a plain word.
-            // In this case, we need to avoid the word being interpreted as a
-            // keyword by printing the assignment or redirection first.
+            // We usually display the words before the redirections, but when
+            // the first word is a keyword and there are no assignments, we
+            // display the redirections first to make sure the simple command is
+            // not mistaken for a compound command.
             write!(f, "{}", i3.chain(i2).format(" "))
         }
     }
