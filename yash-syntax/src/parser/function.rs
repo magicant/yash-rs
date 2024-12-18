@@ -26,6 +26,7 @@ use super::lex::TokenId::{Operator, Token};
 use crate::syntax::Command;
 use crate::syntax::FunctionDefinition;
 use crate::syntax::SimpleCommand;
+use crate::syntax::SimpleCommandWord;
 use std::rc::Rc;
 
 impl Parser<'_, '_> {
@@ -56,6 +57,9 @@ impl Parser<'_, '_> {
 
         let name = intro.words.pop().unwrap();
         debug_assert!(intro.is_empty());
+        let SimpleCommandWord::Regular(name) = name else {
+            todo!("what if the name is not a regular word?");
+        };
         // TODO reject invalid name if POSIXly-correct
 
         loop {
@@ -124,7 +128,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
         let c = SimpleCommand {
             assigns: vec![],
-            words: vec!["foo".parse().unwrap()],
+            words: vec![SimpleCommandWord::Regular("foo".parse().unwrap())],
             redirs: vec![].into(),
         };
 
@@ -141,7 +145,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
         let c = SimpleCommand {
             assigns: vec![],
-            words: vec!["foo".parse().unwrap()],
+            words: vec![SimpleCommandWord::Regular("foo".parse().unwrap())],
             redirs: vec![].into(),
         };
 
@@ -163,7 +167,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
         let c = SimpleCommand {
             assigns: vec![],
-            words: vec!["foo".parse().unwrap()],
+            words: vec![SimpleCommandWord::Regular("foo".parse().unwrap())],
             redirs: vec![].into(),
         };
 
@@ -185,7 +189,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
         let c = SimpleCommand {
             assigns: vec![],
-            words: vec!["foo".parse().unwrap()],
+            words: vec![SimpleCommandWord::Regular("foo".parse().unwrap())],
             redirs: vec![].into(),
         };
 
@@ -304,7 +308,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
         let c = SimpleCommand {
             assigns: vec![],
-            words: vec!["f".parse().unwrap()],
+            words: vec![SimpleCommandWord::Regular("f".parse().unwrap())],
             redirs: vec![].into(),
         };
 

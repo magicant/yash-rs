@@ -191,9 +191,13 @@ impl FromStr for Assign {
         match c.assigns.pop() {
             Some(last) if c.assigns.is_empty() => {
                 if let Some(word) = c.words.pop() {
+                    let location = match word {
+                        SimpleCommandWord::Regular(word) => word.location,
+                        SimpleCommandWord::Assign(assign) => assign.location,
+                    };
                     Err(Some(Error {
                         cause: ErrorCause::Syntax(SyntaxError::RedundantToken),
-                        location: word.location,
+                        location,
                     }))
                 } else if let Some(redir) = c.redirs.first() {
                     Err(Some(Error {
