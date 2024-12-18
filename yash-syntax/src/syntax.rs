@@ -581,6 +581,17 @@ impl Redir {
     }
 }
 
+/// Expansion style of a simple command word
+///
+/// TODO Elaborate
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExpansionMode {
+    /// Expand the word to a single field
+    Single,
+    /// Expand the word to multiple fields
+    Multiple,
+}
+
 /// Command that involves assignments, redirections, and word expansions
 ///
 /// In the shell language syntax, a valid simple command must contain at least one of assignments,
