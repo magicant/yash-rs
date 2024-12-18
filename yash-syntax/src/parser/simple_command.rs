@@ -25,6 +25,7 @@ use super::lex::Operator::{CloseParen, Newline, OpenParen};
 use super::lex::TokenId::{Operator, Token};
 use crate::syntax::Array;
 use crate::syntax::Assign;
+use crate::syntax::ExpansionMode;
 use crate::syntax::Redir;
 use crate::syntax::Scalar;
 use crate::syntax::SimpleCommand;
@@ -34,7 +35,7 @@ use crate::syntax::Word;
 #[derive(Default)]
 struct Builder {
     assigns: Vec<Assign>,
-    words: Vec<Word>,
+    words: Vec<(Word, ExpansionMode)>,
     redirs: Vec<Redir>,
 }
 
@@ -123,13 +124,14 @@ impl Parser<'_, '_> {
 
             // Tell assignment from word
             if !result.words.is_empty() {
-                result.words.push(token.word);
+                // TODO Provide the correct expansion mode
+                result.words.push((token.word, ExpansionMode::Multiple));
                 continue;
             }
             let mut assign = match Assign::try_from(token.word) {
                 Ok(assign) => assign,
                 Err(word) => {
-                    result.words.push(word);
+                    result.words.push((word, ExpansionMode::Multiple));
                     continue;
                 }
             };
@@ -336,7 +338,8 @@ mod tests {
         assert_eq!(sc.assigns, []);
         assert_eq!(*sc.redirs, []);
         assert_eq!(sc.words.len(), 1);
-        assert_eq!(sc.words[0].to_string(), "word");
+        assert_eq!(sc.words[0].0.to_string(), "word");
+        assert_eq!(sc.words[0].1, ExpansionMode::Multiple);
     }
 
     #[test]
@@ -349,9 +352,12 @@ mod tests {
         assert_eq!(sc.assigns, []);
         assert_eq!(*sc.redirs, []);
         assert_eq!(sc.words.len(), 3);
-        assert_eq!(sc.words[0].to_string(), ":");
-        assert_eq!(sc.words[1].to_string(), "if");
-        assert_eq!(sc.words[2].to_string(), "then");
+        assert_eq!(sc.words[0].0.to_string(), ":");
+        assert_eq!(sc.words[0].1, ExpansionMode::Multiple);
+        assert_eq!(sc.words[1].0.to_string(), "if");
+        assert_eq!(sc.words[1].1, ExpansionMode::Multiple);
+        assert_eq!(sc.words[2].0.to_string(), "then");
+        assert_eq!(sc.words[2].1, ExpansionMode::Multiple);
     }
 
     #[test]
@@ -416,7 +422,8 @@ mod tests {
         assert_eq!(sc.words.len(), 1);
         assert_eq!(sc.assigns[0].name, "if");
         assert_eq!(sc.assigns[0].value.to_string(), "then");
-        assert_eq!(sc.words[0].to_string(), "else");
+        assert_eq!(sc.words[0].0.to_string(), "else");
+        assert_eq!(sc.words[0].1, ExpansionMode::Multiple);
     }
 
     #[test]
@@ -429,7 +436,8 @@ mod tests {
         assert_eq!(sc.assigns, []);
         assert_eq!(sc.words.len(), 1);
         assert_eq!(sc.redirs.len(), 1);
-        assert_eq!(sc.words[0].to_string(), "word");
+        assert_eq!(sc.words[0].0.to_string(), "word");
+        assert_eq!(sc.words[0].1, ExpansionMode::Multiple);
         assert_eq!(sc.redirs[0].fd, None);
         assert_matches!(sc.redirs[0].body, RedirBody::Normal { ref operator, ref operand } => {
             assert_eq!(operator, &RedirOp::FileIn);
@@ -468,7 +476,8 @@ mod tests {
         assert_eq!(sc.redirs.len(), 1);
         assert_eq!(sc.assigns[0].name, "if");
         assert_eq!(sc.assigns[0].value.to_string(), "then");
-        assert_eq!(sc.words[0].to_string(), "else");
+        assert_eq!(sc.words[0].0.to_string(), "else");
+        assert_eq!(sc.words[0].1, ExpansionMode::Multiple);
         assert_eq!(sc.redirs[0].fd, None);
         assert_matches!(sc.redirs[0].body, RedirBody::Normal { ref operator, ref operand } => {
             assert_eq!(operator, &RedirOp::FileIn);

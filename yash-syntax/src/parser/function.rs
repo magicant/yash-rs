@@ -54,7 +54,7 @@ impl Parser<'_, '_> {
             });
         }
 
-        let name = intro.words.pop().unwrap();
+        let name = intro.words.pop().unwrap().0;
         debug_assert!(intro.is_empty());
         // TODO reject invalid name if POSIXly-correct
 
@@ -95,6 +95,7 @@ mod tests {
     use crate::alias::{AliasSet, EmptyGlossary, HashEntry};
     use crate::source::Location;
     use crate::source::Source;
+    use crate::syntax::ExpansionMode;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
 
@@ -124,7 +125,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
         let c = SimpleCommand {
             assigns: vec![],
-            words: vec!["foo".parse().unwrap()],
+            words: vec![("foo".parse().unwrap(), ExpansionMode::Multiple)],
             redirs: vec![].into(),
         };
 
@@ -141,7 +142,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
         let c = SimpleCommand {
             assigns: vec![],
-            words: vec!["foo".parse().unwrap()],
+            words: vec![("foo".parse().unwrap(), ExpansionMode::Multiple)],
             redirs: vec![].into(),
         };
 
@@ -163,7 +164,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
         let c = SimpleCommand {
             assigns: vec![],
-            words: vec!["foo".parse().unwrap()],
+            words: vec![("foo".parse().unwrap(), ExpansionMode::Multiple)],
             redirs: vec![].into(),
         };
 
@@ -185,7 +186,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
         let c = SimpleCommand {
             assigns: vec![],
-            words: vec!["foo".parse().unwrap()],
+            words: vec![("foo".parse().unwrap(), ExpansionMode::Multiple)],
             redirs: vec![].into(),
         };
 
@@ -304,7 +305,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
         let c = SimpleCommand {
             assigns: vec![],
-            words: vec!["f".parse().unwrap()],
+            words: vec![("f".parse().unwrap(), ExpansionMode::Multiple)],
             redirs: vec![].into(),
         };
 

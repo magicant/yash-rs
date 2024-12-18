@@ -598,8 +598,11 @@ pub enum ExpansionMode {
 /// redirections, and words. The parser must not produce a completely empty simple command.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SimpleCommand {
+    /// Assignments
     pub assigns: Vec<Assign>,
-    pub words: Vec<Word>,
+    /// Command name and arguments
+    pub words: Vec<(Word, ExpansionMode)>,
+    /// Redirections
     pub redirs: Rc<Vec<Redir>>,
 }
 
@@ -618,7 +621,7 @@ impl SimpleCommand {
     /// Tests whether the first word of the simple command is a keyword.
     #[must_use]
     fn first_word_is_keyword(&self) -> bool {
-        let Some(word) = self.words.first() else {
+        let Some((word, _)) = self.words.first() else {
             return false;
         };
         let Some(literal) = word.to_string_if_literal() else {

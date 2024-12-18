@@ -162,7 +162,9 @@ use yash_syntax::syntax::Assign;
 /// detail semantics may differ in other shell implementations.
 impl Command for syntax::SimpleCommand {
     async fn execute(&self, env: &mut Env) -> Result {
-        let (fields, exit_status) = match expand_words(env, &self.words).await {
+        // TODO Honor the expansion mode
+        let words = self.words.iter().map(|(word, _)| word);
+        let (fields, exit_status) = match expand_words(env, words).await {
             Ok(result) => result,
             Err(error) => return error.handle(env).await,
         };
