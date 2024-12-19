@@ -100,6 +100,7 @@ mod tests {
     use crate::source::Location;
     use crate::source::Source;
     use crate::syntax::Command;
+    use crate::syntax::ExpansionMode;
     use crate::syntax::SimpleCommand;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
@@ -253,7 +254,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
         let c = SimpleCommand {
             assigns: vec![],
-            words: vec!["foo".parse().unwrap()],
+            words: vec![("foo".parse().unwrap(), ExpansionMode::Multiple)],
             redirs: vec![].into(),
         };
 

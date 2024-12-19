@@ -237,7 +237,7 @@ impl fmt::Display for Redir {
 impl fmt::Display for SimpleCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let i1 = self.assigns.iter().map(|x| x as &dyn fmt::Display);
-        let i2 = self.words.iter().map(|x| x as &dyn fmt::Display);
+        let i2 = self.words.iter().map(|x| &x.0 as &dyn fmt::Display);
         let i3 = self.redirs.iter().map(|x| x as &dyn fmt::Display);
 
         if !self.assigns.is_empty() || !self.first_word_is_keyword() {
@@ -742,10 +742,14 @@ mod tests {
             .push(Assign::from_str("hello=world").unwrap());
         assert_eq!(command.to_string(), "name=value hello=world");
 
-        command.words.push(Word::from_str("echo").unwrap());
+        command
+            .words
+            .push((Word::from_str("echo").unwrap(), ExpansionMode::Multiple));
         assert_eq!(command.to_string(), "name=value hello=world echo");
 
-        command.words.push(Word::from_str("foo").unwrap());
+        command
+            .words
+            .push((Word::from_str("foo").unwrap(), ExpansionMode::Single));
         assert_eq!(command.to_string(), "name=value hello=world echo foo");
 
         Rc::make_mut(&mut command.redirs).push(Redir {
@@ -782,7 +786,7 @@ mod tests {
     fn simple_command_display_with_keyword() {
         let command = SimpleCommand {
             assigns: vec![],
-            words: vec!["if".parse().unwrap()],
+            words: vec![("if".parse().unwrap(), ExpansionMode::Multiple)],
             redirs: vec!["<foo".parse().unwrap()].into(),
         };
         assert_eq!(command.to_string(), "<foo if");

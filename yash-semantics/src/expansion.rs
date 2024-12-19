@@ -98,6 +98,7 @@ use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Footer;
 use yash_syntax::source::pretty::MessageBase;
 use yash_syntax::source::Location;
+use yash_syntax::syntax::ExpansionMode;
 use yash_syntax::syntax::Param;
 use yash_syntax::syntax::Text;
 use yash_syntax::syntax::Word;
@@ -361,6 +362,82 @@ pub async fn expand_word(
     Ok((field, exit_status))
 }
 
+/// Expands a word to fields.
+///
+/// This function performs the initial expansion and multi-field expansion,
+/// including quote removal and attribute stripping. The results are appended to
+/// the given collection. The return value is the exit status of the last
+/// command substitution performed during the expansion, if any.
+pub async fn expand_word_multiple<R>(
+    env: &mut yash_env::Env,
+    word: &Word,
+    results: &mut R,
+) -> Result<Option<ExitStatus>>
+where
+    R: Extend<Field>,
+{
+    let mut env = initial::Env::new(env);
+
+    // initial expansion //
+    let phrase = word.expand(&mut env).await?;
+
+    // TODO brace expansion //
+
+    // field splitting //
+    let ifs = env
+        .inner
+        .variables
+        .get_scalar(IFS)
+        .map(Ifs::new)
+        .unwrap_or_default();
+    let mut split_fields = Vec::with_capacity(phrase.field_count());
+    for chars in phrase {
+        let origin = word.location.clone();
+        let attr_field = AttrField { chars, origin };
+        split::split_into(attr_field, &ifs, &mut split_fields);
+    }
+    drop(ifs);
+
+    // pathname expansion (including quote removal and attribute stripping) //
+    for field in split_fields {
+        results.extend(glob(env.inner, field));
+    }
+
+    Ok(env.last_command_subst_exit_status)
+}
+
+/// Expands a word to fields.
+///
+/// This function expands a word to fields using the specified expansion mode
+/// and appends the results to the given collection.
+///
+/// If the specified mode is [`ExpansionMode::Multiple`], this function performs
+/// the initial expansion and multi-field expansion, including quote removal and
+/// attribute stripping (see [`expand_word_multiple`]). If the mode is
+/// [`ExpansionMode::Single`], this function performs the initial expansion,
+/// quote removal, and attribute stripping, but not multi-field expansion (see
+/// [`expand_word`]).
+///
+/// The results are appended to the given collection.
+pub async fn expand_word_with_mode<R>(
+    env: &mut yash_env::Env,
+    word: &Word,
+    mode: ExpansionMode,
+    results: &mut R,
+) -> Result<Option<ExitStatus>>
+where
+    R: Extend<Field>,
+{
+    match mode {
+        ExpansionMode::Single => {
+            let (field, exit_status) = expand_word(env, word).await?;
+            results.extend(std::iter::once(field));
+            Ok(exit_status)
+        }
+        ExpansionMode::Multiple => expand_word_multiple(env, word, results).await,
+    }
+}
+
 /// Expands words to fields.
 ///
 /// This function performs the initial expansion and multi-field expansion,
@@ -373,40 +450,17 @@ pub async fn expand_words<'a, I: IntoIterator<Item = &'a Word>>(
     env: &mut yash_env::Env,
     words: I,
 ) -> Result<(Vec<Field>, Option<ExitStatus>)> {
-    let mut env = initial::Env::new(env);
+    let mut fields = Vec::new();
+    let mut last_exit_status = None;
 
-    // initial expansion //
-    let words = words.into_iter();
-    let mut fields = Vec::with_capacity(words.size_hint().0);
     for word in words {
-        let phrase = word.expand(&mut env).await?;
-        fields.extend(phrase.into_iter().map(|chars| AttrField {
-            chars,
-            origin: word.location.clone(),
-        }));
+        let exit_status = expand_word_multiple(env, word, &mut fields).await?;
+        if exit_status.is_some() {
+            last_exit_status = exit_status;
+        }
     }
 
-    // TODO brace expansion
-
-    // field splitting //
-    let ifs = env
-        .inner
-        .variables
-        .get_scalar(IFS)
-        .map(Ifs::new)
-        .unwrap_or_default();
-    let mut split_fields = Vec::with_capacity(fields.len());
-    for field in fields {
-        split::split_into(field, &ifs, &mut split_fields);
-    }
-    drop(ifs);
-
-    // pathname expansion (including quote removal and attribute stripping) //
-    let mut fields = Vec::with_capacity(split_fields.len());
-    for field in split_fields {
-        fields.extend(glob(env.inner, field));
-    }
-    Ok((fields, env.last_command_subst_exit_status))
+    Ok((fields, last_exit_status))
 }
 
 /// Expands an assignment value.
@@ -504,12 +558,15 @@ mod tests {
     }
 
     #[test]
-    fn expand_words_performs_initial_expansion() {
+    fn expand_word_multiple_performs_initial_expansion() {
         in_virtual_system(|mut env, _state| async move {
             env.builtins.insert("echo", echo_builtin());
             env.builtins.insert("return", return_builtin());
-            let words = &["[$(echo echoed; return -n 42)]".parse().unwrap()];
-            let (fields, exit_status) = expand_words(&mut env, words).await.unwrap();
+            let word = "[$(echo echoed; return -n 42)]".parse().unwrap();
+            let mut fields = Vec::new();
+            let exit_status = expand_word_multiple(&mut env, &word, &mut fields)
+                .await
+                .unwrap();
             assert_eq!(exit_status, Some(ExitStatus(42)));
             assert_matches!(fields.as_slice(), [f] => {
                 assert_eq!(f.value, "[echoed]");
@@ -518,15 +575,18 @@ mod tests {
     }
 
     #[test]
-    fn expand_words_performs_field_splitting_possibly_with_default_ifs() {
+    fn expand_word_multiple_performs_field_splitting_possibly_with_default_ifs() {
         let mut env = yash_env::Env::new_virtual();
         env.variables
             .get_or_new("v", Scope::Global)
             .assign("foo  bar ", None)
             .unwrap();
-        let words = &["$v".parse().unwrap()];
-        let result = expand_words(&mut env, words).now_or_never().unwrap();
-        let (fields, exit_status) = result.unwrap();
+        let word = "$v".parse().unwrap();
+        let mut fields = Vec::new();
+        let exit_status = expand_word_multiple(&mut env, &word, &mut fields)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(exit_status, None);
         assert_matches!(fields.as_slice(), [f1, f2] => {
             assert_eq!(f1.value, "foo");
@@ -535,7 +595,7 @@ mod tests {
     }
 
     #[test]
-    fn expand_words_performs_field_splitting_with_current_ifs() {
+    fn expand_word_multiple_performs_field_splitting_with_current_ifs() {
         let mut env = yash_env::Env::new_virtual();
         env.variables
             .get_or_new("v", Scope::Global)
@@ -545,9 +605,12 @@ mod tests {
             .get_or_new(IFS, Scope::Global)
             .assign(" o", None)
             .unwrap();
-        let words = &["$v".parse().unwrap()];
-        let result = expand_words(&mut env, words).now_or_never().unwrap();
-        let (fields, exit_status) = result.unwrap();
+        let word = "$v".parse().unwrap();
+        let mut fields = Vec::new();
+        let exit_status = expand_word_multiple(&mut env, &word, &mut fields)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(exit_status, None);
         assert_matches!(fields.as_slice(), [f1, f2, f3] => {
             assert_eq!(f1.value, "f");
@@ -557,14 +620,46 @@ mod tests {
     }
 
     #[test]
-    fn expand_words_performs_quote_removal() {
+    fn expand_word_multiple_performs_quote_removal() {
         let mut env = yash_env::Env::new_virtual();
-        let words = &["\"foo\"'$v'".parse().unwrap()];
-        let result = expand_words(&mut env, words).now_or_never().unwrap();
-        let (fields, exit_status) = result.unwrap();
+        let word = "\"foo\"'$v'".parse().unwrap();
+        let mut fields = Vec::new();
+        let exit_status = expand_word_multiple(&mut env, &word, &mut fields)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(exit_status, None);
         assert_matches!(fields.as_slice(), [f] => {
             assert_eq!(f.value, "foo$v");
+        });
+    }
+
+    #[test]
+    fn expand_words_returns_exit_status_of_last_command_substitution() {
+        in_virtual_system(|mut env, _state| async move {
+            env.builtins.insert("return", return_builtin());
+            let word1 = "$(return -n 12)".parse().unwrap();
+            let word2 = "$(return -n 34)$(return -n 56)".parse().unwrap();
+            let (_, exit_status) = expand_words(&mut env, &[word1, word2]).await.unwrap();
+            assert_eq!(exit_status, Some(ExitStatus(56)));
+        })
+    }
+
+    #[test]
+    fn expand_words_performs_field_splitting() {
+        let mut env = yash_env::Env::new_virtual();
+        env.variables
+            .get_or_new("v", Scope::Global)
+            .assign(" foo  bar ", None)
+            .unwrap();
+        let word = "$v".parse().unwrap();
+        let (fields, _) = expand_words(&mut env, &[word])
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_matches!(fields.as_slice(), [f1, f2] => {
+            assert_eq!(f1.value, "foo");
+            assert_eq!(f2.value, "bar");
         });
     }
 

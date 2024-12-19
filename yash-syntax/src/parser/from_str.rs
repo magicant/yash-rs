@@ -193,7 +193,7 @@ impl FromStr for Assign {
                 if let Some(word) = c.words.pop() {
                     Err(Some(Error {
                         cause: ErrorCause::Syntax(SyntaxError::RedundantToken),
-                        location: word.location,
+                        location: word.0.location,
                     }))
                 } else if let Some(redir) = c.redirs.first() {
                     Err(Some(Error {
