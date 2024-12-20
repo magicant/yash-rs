@@ -26,10 +26,28 @@ use super::lex::TokenId::{Operator, Token};
 use crate::syntax::Array;
 use crate::syntax::Assign;
 use crate::syntax::ExpansionMode;
+use crate::syntax::MaybeLiteral as _;
 use crate::syntax::Redir;
 use crate::syntax::Scalar;
 use crate::syntax::SimpleCommand;
 use crate::syntax::Word;
+
+/// Determines the expansion mode of a word.
+///
+/// TODO Elaborate
+fn determine_expansion_mode(word: Word) -> (Word, ExpansionMode) {
+    use crate::syntax::{TextUnit::Literal, WordUnit::Unquoted};
+    if let Some(eq) = word.units.iter().position(|u| *u == Unquoted(Literal('='))) {
+        if let Some(name) = word.units[..eq].to_string_if_literal() {
+            if !name.is_empty() {
+                let mut word = word;
+                word.parse_tilde_everywhere_after(eq + 1);
+                return (word, ExpansionMode::Single);
+            }
+        }
+    }
+    (word, ExpansionMode::Multiple)
+}
 
 /// Simple command builder.
 #[derive(Default)]
@@ -173,8 +191,51 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::RedirBody;
     use crate::syntax::RedirOp;
+    use crate::syntax::TextUnit;
+    use crate::syntax::WordUnit;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
+
+    #[test]
+    fn determine_expansion_mode_empty_name() {
+        let in_word = "=".parse::<Word>().unwrap();
+        let (out_word, mode) = determine_expansion_mode(in_word.clone());
+        assert_eq!(out_word, in_word);
+        assert_eq!(mode, ExpansionMode::Multiple);
+    }
+
+    #[test]
+    fn determine_expansion_mode_nonempty_name() {
+        let in_word = "foo=".parse::<Word>().unwrap();
+        let (out_word, mode) = determine_expansion_mode(in_word.clone());
+        assert_eq!(out_word, in_word);
+        assert_eq!(mode, ExpansionMode::Single);
+    }
+
+    #[test]
+    fn determine_expansion_mode_non_literal_name() {
+        let in_word = "${X}=".parse::<Word>().unwrap();
+        let (out_word, mode) = determine_expansion_mode(in_word.clone());
+        assert_eq!(out_word, in_word);
+        assert_eq!(mode, ExpansionMode::Multiple);
+    }
+
+    #[test]
+    fn determine_expansion_mode_tilde_expansions_after_equal() {
+        let word = "~=~:~b".parse().unwrap();
+        let (word, mode) = determine_expansion_mode(word);
+        assert_eq!(
+            word.units,
+            [
+                WordUnit::Unquoted(TextUnit::Literal('~')),
+                WordUnit::Unquoted(TextUnit::Literal('=')),
+                WordUnit::Tilde("".to_string()),
+                WordUnit::Unquoted(TextUnit::Literal(':')),
+                WordUnit::Tilde("b".to_string()),
+            ]
+        );
+        assert_eq!(mode, ExpansionMode::Single);
+    }
 
     #[test]
     fn parser_array_values_no_open_parenthesis() {
