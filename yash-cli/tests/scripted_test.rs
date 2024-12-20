@@ -181,6 +181,16 @@ fn continue_builtin() {
 }
 
 #[test]
+fn declaration_utilities() {
+    run("declutil-p.sh")
+}
+
+#[test]
+fn declaration_utilities_ex() {
+    run("declutil-y.sh")
+}
+
+#[test]
 fn errexit_option() {
     run("errexit-p.sh")
 }
