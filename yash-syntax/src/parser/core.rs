@@ -93,9 +93,66 @@ impl<T> Rec<T> {
     }
 }
 
-/// The shell syntax parser.
+/// Set of parameters for constructing a [parser](Parser).
 ///
-/// This `struct` contains a set of data used in syntax parsing.
+/// `Config` is a builder for constructing a parser. A [new](Self::new)
+/// configuration starts with default settings. You can customize them by
+/// calling methods that can be chained. Finally, you can create a parser by
+/// providing the lexer to the [`input`](Self::input) method.
+#[derive(Debug)]
+#[must_use = "Config must be used to create a parser"]
+pub struct Config<'a> {
+    /// Collection of aliases the parser applies to substitute command words
+    aliases: &'a dyn crate::alias::Glossary,
+}
+
+impl<'a> Config<'a> {
+    /// Creates a new configuration with default settings.
+    ///
+    /// You can also call [`Parser::config`] to create a new configuration.
+    pub fn new() -> Self {
+        let aliases = &crate::alias::EmptyGlossary;
+        Self { aliases }
+    }
+
+    /// Sets the glossary of aliases.
+    ///
+    /// The parser uses the glossary to look up aliases and substitute command
+    /// words. The default glossary is [empty](crate::alias::EmptyGlossary).
+    #[inline]
+    pub fn aliases(&mut self, aliases: &'a dyn Glossary) -> &mut Self {
+        self.aliases = aliases;
+        self
+    }
+
+    /// Creates a parser with the given lexer.
+    pub fn input<'b>(&self, lexer: &'a mut Lexer<'b>) -> Parser<'a, 'b> {
+        Parser {
+            lexer,
+            glossary: self.aliases,
+            token: None,
+            unread_here_docs: Vec::new(),
+        }
+    }
+}
+
+impl Default for Config<'_> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// The shell syntax parser
+///
+/// A parser manages a set of data used in syntax parsing. It keeps a reference
+/// to a [lexer](Lexer) that provides tokens to parse. It also has some
+/// parameters that can be set by a [configuration](Config) and affect the
+/// parsing process.
+///
+/// The [`new`](Self::new) function directly creates a parser with default
+/// settings. If you want to customize the settings, you can use the
+/// [`config`](Self::config) function to create a configuration and then create a
+/// parser with the configuration.
 ///
 /// # Parsing here-documents
 ///
@@ -111,6 +168,7 @@ impl<T> Rec<T> {
 /// Then the [`command_line`](Self::command_line) function is for you.
 /// See also the [module documentation](super).
 #[derive(Debug)]
+#[must_use = "Parser must be used to parse syntax"]
 pub struct Parser<'a, 'b> {
     /// Lexer that provides tokens.
     lexer: &'a mut Lexer<'b>,
@@ -133,16 +191,21 @@ pub struct Parser<'a, 'b> {
 }
 
 impl<'a, 'b> Parser<'a, 'b> {
-    /// Creates a new parser based on the given lexer and glossary.
+    /// Creates a new configuration with default settings.
+    ///
+    /// This is a synonym for [`Config::new`]. Customize the settings by calling
+    /// methods of the returned configuration and then create a parser by calling
+    /// its [`input`](Config::input) method.
+    #[inline(always)]
+    pub fn config() -> Config<'a> {
+        Config::new()
+    }
+
+    /// Creates a new parser based on the given lexer and alias glossary.
     ///
     /// The parser uses the lexer to read tokens and the glossary to look up aliases.
     pub fn new(lexer: &'a mut Lexer<'b>, glossary: &'a dyn Glossary) -> Parser<'a, 'b> {
-        Parser {
-            lexer,
-            glossary,
-            token: None,
-            unread_here_docs: vec![],
-        }
+        Self::config().aliases(glossary).input(lexer)
     }
 
     /// Reads a next token if the current token is `None`.

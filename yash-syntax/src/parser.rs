@@ -89,6 +89,7 @@ mod while_loop;
 
 pub mod lex;
 
+pub use self::core::Config;
 pub use self::core::Parser;
 pub use self::core::Rec;
 pub use self::core::Result;
