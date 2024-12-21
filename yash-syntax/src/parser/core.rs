@@ -129,7 +129,7 @@ impl<'a> Config<'a> {
     pub fn input<'b>(&self, lexer: &'a mut Lexer<'b>) -> Parser<'a, 'b> {
         Parser {
             lexer,
-            glossary: self.aliases,
+            aliases: self.aliases,
             token: None,
             unread_here_docs: Vec::new(),
         }
@@ -174,7 +174,7 @@ pub struct Parser<'a, 'b> {
     lexer: &'a mut Lexer<'b>,
 
     /// Collection of aliases the parser applies to substitute command words.
-    glossary: &'a dyn Glossary,
+    aliases: &'a dyn crate::alias::Glossary,
 
     /// Token to parse next.
     ///
@@ -246,11 +246,11 @@ impl<'a, 'b> Parser<'a, 'b> {
     /// [taken](Self::take_token_raw).
     fn substitute_alias(&mut self, token: Token, is_command_name: bool) -> Rec<Token> {
         // TODO Only POSIXly-valid alias name should be recognized in POSIXly-correct mode.
-        if !self.glossary.is_empty() {
+        if !self.aliases.is_empty() {
             if let Token(_) = token.id {
                 if let Some(name) = token.word.to_string_if_literal() {
                     if !token.word.location.code.source.is_alias_for(&name) {
-                        if let Some(alias) = self.glossary.look_up(&name) {
+                        if let Some(alias) = self.aliases.look_up(&name) {
                             if is_command_name
                                 || alias.global
                                 || self.lexer.is_after_blank_ending_alias(token.index)
