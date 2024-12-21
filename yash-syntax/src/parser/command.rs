@@ -49,7 +49,6 @@ mod tests {
     use super::super::lex::Lexer;
     use super::super::lex::TokenId::EndOfInput;
     use super::*;
-    use crate::alias::EmptyGlossary;
     use crate::source::Source;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
@@ -57,7 +56,7 @@ mod tests {
     #[test]
     fn parser_command_simple() {
         let mut lexer = Lexer::from_memory("foo < bar", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.command().now_or_never().unwrap();
         let command = result.unwrap().unwrap().unwrap();
@@ -72,7 +71,7 @@ mod tests {
     #[test]
     fn parser_command_compound() {
         let mut lexer = Lexer::from_memory("(foo) < bar", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.command().now_or_never().unwrap();
         let command = result.unwrap().unwrap().unwrap();
@@ -87,7 +86,7 @@ mod tests {
     #[test]
     fn parser_command_function() {
         let mut lexer = Lexer::from_memory("fun () ( echo )", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.command().now_or_never().unwrap();
         let command = result.unwrap().unwrap().unwrap();
@@ -102,7 +101,7 @@ mod tests {
     #[test]
     fn parser_command_eof() {
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.command().now_or_never().unwrap().unwrap();
         assert_eq!(result, Rec::Parsed(None));

@@ -45,8 +45,7 @@
 //!
 //! // Then, create a new parser borrowing the lexer.
 //! use yash_syntax::parser::Parser;
-//! use yash_syntax::alias::EmptyGlossary;
-//! let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+//! let mut parser = Parser::new(&mut lexer);
 //!
 //! // Lastly, call the parser's function to get an AST.
 //! use futures_executor::block_on;

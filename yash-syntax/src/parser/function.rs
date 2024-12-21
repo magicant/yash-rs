@@ -92,7 +92,7 @@ mod tests {
     use super::super::lex::Lexer;
     use super::super::lex::TokenId::EndOfInput;
     use super::*;
-    use crate::alias::{AliasSet, EmptyGlossary, HashEntry};
+    use crate::alias::{AliasSet, HashEntry};
     use crate::source::Location;
     use crate::source::Source;
     use crate::syntax::ExpansionMode;
@@ -102,7 +102,7 @@ mod tests {
     #[test]
     fn parser_short_function_definition_not_one_word_name() {
         let mut lexer = Lexer::from_memory("(", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
             assigns: vec![],
             words: vec![],
@@ -122,7 +122,7 @@ mod tests {
     #[test]
     fn parser_short_function_definition_eof() {
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
             assigns: vec![],
             words: vec![("foo".parse().unwrap(), ExpansionMode::Multiple)],
@@ -139,7 +139,7 @@ mod tests {
     #[test]
     fn parser_short_function_definition_unmatched_parenthesis() {
         let mut lexer = Lexer::from_memory("( ", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
             assigns: vec![],
             words: vec![("foo".parse().unwrap(), ExpansionMode::Multiple)],
@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn parser_short_function_definition_missing_function_body() {
         let mut lexer = Lexer::from_memory("( ) ", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
             assigns: vec![],
             words: vec![("foo".parse().unwrap(), ExpansionMode::Multiple)],
@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn parser_short_function_definition_invalid_function_body() {
         let mut lexer = Lexer::from_memory("() foo ; ", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
             assigns: vec![],
             words: vec![("foo".parse().unwrap(), ExpansionMode::Multiple)],
@@ -226,7 +226,7 @@ mod tests {
             false,
             origin,
         ));
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
 
         parser.simple_command().now_or_never().unwrap().unwrap(); // alias
         let sc = parser.simple_command().now_or_never().unwrap();
@@ -267,7 +267,7 @@ mod tests {
             false,
             origin,
         ));
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
 
         parser.simple_command().now_or_never().unwrap().unwrap(); // alias
         let sc = parser.simple_command().now_or_never().unwrap();
@@ -302,7 +302,7 @@ mod tests {
             false,
             origin,
         ));
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
         let c = SimpleCommand {
             assigns: vec![],
             words: vec![("f".parse().unwrap(), ExpansionMode::Multiple)],

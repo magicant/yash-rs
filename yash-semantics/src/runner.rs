@@ -147,7 +147,8 @@ async fn read_eval_loop_impl(
             lexer.flush();
         }
 
-        let command = Parser::new(lexer, env).command_line().await;
+        let mut parser = Parser::config().aliases(env).input(lexer);
+        let command = parser.command_line().await;
 
         let env = &mut **env.borrow_mut();
 
