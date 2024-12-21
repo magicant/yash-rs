@@ -104,6 +104,9 @@ impl<T> Rec<T> {
 pub struct Config<'a> {
     /// Collection of aliases the parser applies to substitute command words
     aliases: &'a dyn crate::alias::Glossary,
+
+    /// Glossary that determines whether a command name is a declaration utility
+    decl_utils: &'a dyn crate::decl_util::Glossary,
 }
 
 impl<'a> Config<'a> {
@@ -111,8 +114,10 @@ impl<'a> Config<'a> {
     ///
     /// You can also call [`Parser::config`] to create a new configuration.
     pub fn new() -> Self {
-        let aliases = &crate::alias::EmptyGlossary;
-        Self { aliases }
+        Self {
+            aliases: &crate::alias::EmptyGlossary,
+            decl_utils: &crate::decl_util::PosixGlossary,
+        }
     }
 
     /// Sets the glossary of aliases.
@@ -125,11 +130,35 @@ impl<'a> Config<'a> {
         self
     }
 
+    /// Sets the glossary of declaration utilities.
+    ///
+    /// The parser uses the glossary to determine whether a command name is a
+    /// declaration utility. The default glossary is [`PosixGlossary`], which
+    /// recognizes the declaration utilities defined by POSIX. You can make
+    /// arbitrary command names declaration utilities by providing a custom
+    /// glossary. To meet the POSIX standard, the glossary's
+    /// [`is_declaration_utility`] method must return:
+    ///
+    /// - `Some(true)` for `export` and `readonly`
+    /// - `None` for `command`
+    ///
+    /// [`PosixGlossary`]: crate::decl_util::PosixGlossary
+    /// [`is_declaration_utility`]: crate::decl_util::Glossary::is_declaration_utility
+    #[inline]
+    pub fn declaration_utilities(
+        &mut self,
+        decl_utils: &'a dyn crate::decl_util::Glossary,
+    ) -> &mut Self {
+        self.decl_utils = decl_utils;
+        self
+    }
+
     /// Creates a parser with the given lexer.
     pub fn input<'b>(&self, lexer: &'a mut Lexer<'b>) -> Parser<'a, 'b> {
         Parser {
             lexer,
             aliases: self.aliases,
+            decl_utils: self.decl_utils,
             token: None,
             unread_here_docs: Vec::new(),
         }
@@ -170,19 +199,23 @@ impl Default for Config<'_> {
 #[derive(Debug)]
 #[must_use = "Parser must be used to parse syntax"]
 pub struct Parser<'a, 'b> {
-    /// Lexer that provides tokens.
+    /// Lexer that provides tokens
     lexer: &'a mut Lexer<'b>,
 
-    /// Collection of aliases the parser applies to substitute command words.
+    /// Collection of aliases the parser applies to substitute command words
     aliases: &'a dyn crate::alias::Glossary,
 
-    /// Token to parse next.
+    /// Glossary that determines whether a command name is a declaration utility
+    #[expect(unused)]
+    decl_utils: &'a dyn crate::decl_util::Glossary,
+
+    /// Token to parse next
     ///
     /// This value is an option of a result. It is `None` when the next token is not yet parsed by
     /// the lexer. It is `Some(Err(_))` if the lexer has failed.
     token: Option<Result<Token>>,
 
-    /// Here-documents without contents.
+    /// Here-documents without contents
     ///
     /// The here-document is added to this list when the parser finds a
     /// here-document operator. After consuming the next newline token, the
