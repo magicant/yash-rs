@@ -49,22 +49,6 @@ fn determine_expansion_mode(word: Word) -> (Word, ExpansionMode) {
     (word, ExpansionMode::Multiple)
 }
 
-/// Determines whether a word names a declaration utility.
-///
-/// TODO Elaborate
-///
-/// TODO Allow the caller to specify the declaration utilities.
-fn word_names_declaration_utility(word: &Word) -> Option<bool> {
-    match word.units.to_string_if_literal() {
-        None => Some(false),
-        Some(name) => match name.as_str() {
-            "export" | "readonly" => Some(true),
-            "command" => None,
-            _ => Some(false),
-        },
-    }
-}
-
 /// Simple command builder.
 #[derive(Default)]
 struct Builder {
@@ -163,7 +147,7 @@ impl Parser<'_, '_> {
                 continue;
             }
             if is_declaration_utility.is_none() {
-                is_declaration_utility = word_names_declaration_utility(&token.word);
+                is_declaration_utility = self.word_names_declaration_utility(&token.word);
             }
 
             // Tell assignment from word
@@ -208,6 +192,7 @@ mod tests {
     use super::super::lex::Lexer;
     use super::super::lex::TokenId::EndOfInput;
     use super::*;
+    use crate::decl_util::EmptyGlossary;
     use crate::source::Source;
     use crate::syntax::RedirBody;
     use crate::syntax::RedirOp;
@@ -700,6 +685,51 @@ mod tests {
         assert_eq!(sc.words[4].1, ExpansionMode::Multiple);
     }
 
-    // TODO non_default_declaration_utility_determiner
+    #[test]
+    fn no_declaration_utilities_with_empty_glossary() {
+        // "export" is not a declaration utility in the empty glossary.
+        let mut lexer = Lexer::from_memory("export a=b", Source::Unknown);
+        let mut parser = Parser::config()
+            .declaration_utilities(&EmptyGlossary)
+            .input(&mut lexer);
+
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns, []);
+        assert_eq!(sc.words.len(), 2);
+        assert_eq!(*sc.redirs, []);
+        assert_eq!(sc.words[0].0.to_string(), "export");
+        assert_eq!(sc.words[0].1, ExpansionMode::Multiple);
+        assert_eq!(sc.words[1].0.to_string(), "a=b");
+        assert_eq!(sc.words[1].1, ExpansionMode::Multiple);
+    }
+
+    #[test]
+    fn custom_declaration_utility_glossary() {
+        // "foo" is a declaration utility in the custom glossary.
+        #[derive(Debug)]
+        struct CustomGlossary;
+        impl crate::decl_util::Glossary for CustomGlossary {
+            fn is_declaration_utility(&self, name: &str) -> Option<bool> {
+                Some(name == "foo")
+            }
+        }
+
+        let mut lexer = Lexer::from_memory("foo a=b", Source::Unknown);
+        let mut parser = Parser::config()
+            .declaration_utilities(&CustomGlossary)
+            .input(&mut lexer);
+
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns, []);
+        assert_eq!(sc.words.len(), 2);
+        assert_eq!(*sc.redirs, []);
+        assert_eq!(sc.words[0].0.to_string(), "foo");
+        assert_eq!(sc.words[0].1, ExpansionMode::Multiple);
+        assert_eq!(sc.words[1].0.to_string(), "a=b");
+        assert_eq!(sc.words[1].1, ExpansionMode::Single);
+    }
+
     // TODO We should not allow assignments to be recognized as declaration utility names
 }

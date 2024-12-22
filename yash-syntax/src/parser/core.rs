@@ -29,6 +29,7 @@ use crate::alias::Glossary;
 use crate::parser::lex::is_blank;
 use crate::syntax::HereDoc;
 use crate::syntax::MaybeLiteral;
+use crate::syntax::Word;
 use std::rc::Rc;
 
 /// Entire result of parsing.
@@ -206,7 +207,6 @@ pub struct Parser<'a, 'b> {
     aliases: &'a dyn crate::alias::Glossary,
 
     /// Glossary that determines whether a command name is a declaration utility
-    #[expect(unused)]
     decl_utils: &'a dyn crate::decl_util::Glossary,
 
     /// Token to parse next
@@ -420,6 +420,17 @@ impl<'a, 'b> Parser<'a, 'b> {
                 cause: SyntaxError::MissingHereDocContent.into(),
                 location: here_doc.delimiter.location.clone(),
             }),
+        }
+    }
+
+    /// Determines whether a word names a declaration utility.
+    ///
+    /// See [`decl_utils`](crate::decl_util) for more information.
+    pub(super) fn word_names_declaration_utility(&self, word: &Word) -> Option<bool> {
+        if let Some(name) = word.to_string_if_literal() {
+            self.decl_utils.is_declaration_utility(&name)
+        } else {
+            Some(false)
         }
     }
 }
