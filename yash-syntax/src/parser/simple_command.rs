@@ -142,22 +142,32 @@ impl Parser<'_, '_> {
             };
 
             // Handle command argument word
-            if !result.words.is_empty() && is_declaration_utility == Some(true) {
-                result.words.push(determine_expansion_mode(token.word));
+            if let Some(is_declaration_utility) = is_declaration_utility {
+                // The word determined (not) to be a declaration utility
+                // must already be in the words list.
+                debug_assert!(!result.words.is_empty());
+
+                result.words.push(if is_declaration_utility {
+                    determine_expansion_mode(token.word)
+                } else {
+                    (token.word, ExpansionMode::Multiple)
+                });
                 continue;
-            }
-            if is_declaration_utility.is_none() {
-                is_declaration_utility = self.word_names_declaration_utility(&token.word);
             }
 
             // Tell assignment from word
-            if !result.words.is_empty() {
-                result.words.push((token.word, ExpansionMode::Multiple));
-                continue;
-            }
-            let mut assign = match Assign::try_from(token.word) {
+            let assign_or_word = if result.words.is_empty() {
+                // We don't have any words yet, so this token may be an assignment or a word.
+                Assign::try_from(token.word)
+            } else {
+                // We already have some words, so remaining tokens are all words.
+                Err(token.word)
+            };
+            let mut assign = match assign_or_word {
                 Ok(assign) => assign,
                 Err(word) => {
+                    debug_assert!(is_declaration_utility.is_none());
+                    is_declaration_utility = self.word_names_declaration_utility(&word);
                     result.words.push((word, ExpansionMode::Multiple));
                     continue;
                 }
@@ -731,5 +741,25 @@ mod tests {
         assert_eq!(sc.words[1].1, ExpansionMode::Single);
     }
 
-    // TODO We should not allow assignments to be recognized as declaration utility names
+    #[test]
+    fn assignment_is_not_considered_for_declaration_utility() {
+        #[derive(Debug)]
+        struct CustomGlossary;
+        impl crate::decl_util::Glossary for CustomGlossary {
+            fn is_declaration_utility(&self, _name: &str) -> Option<bool> {
+                unreachable!("is_declaration_utility should not be called for assignments");
+            }
+        }
+
+        let mut lexer = Lexer::from_memory("a=b", Source::Unknown);
+        let mut parser = Parser::config()
+            .declaration_utilities(&CustomGlossary)
+            .input(&mut lexer);
+
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns.len(), 1);
+        assert_eq!(sc.words, []);
+        assert_eq!(*sc.redirs, [])
+    }
 }
