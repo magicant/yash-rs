@@ -563,6 +563,7 @@ mod tests {
             Builtin {
                 r#type: Special,
                 execute: stub_builtin,
+                is_declaration_utility: Some(false),
             },
         );
         let pipeline: syntax::Pipeline = "foo".parse().unwrap();
@@ -591,6 +592,7 @@ mod tests {
             Builtin {
                 r#type: Special,
                 execute: stub_builtin,
+                is_declaration_utility: Some(false),
             },
         );
         let pipeline: syntax::Pipeline = "! foo".parse().unwrap();
@@ -614,6 +616,7 @@ mod tests {
                 Builtin {
                     r#type: Special,
                     execute: stub_builtin,
+                    is_declaration_utility: Some(false),
                 },
             );
             env.options.set(Monitor, On);

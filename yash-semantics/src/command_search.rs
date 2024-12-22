@@ -294,6 +294,7 @@ mod tests {
             Builtin {
                 r#type: Special,
                 execute: |_, _| unreachable!(),
+                is_declaration_utility: Some(false),
             },
         );
         let function = Function::new("foo", full_compound_command(""), Location::dummy(""));
@@ -309,6 +310,7 @@ mod tests {
         let builtin = Builtin {
             r#type: Special,
             execute: |_, _| unreachable!(),
+            is_declaration_utility: Some(false),
         };
         env.builtins.insert("foo", builtin);
 
@@ -341,6 +343,7 @@ mod tests {
         let builtin = Builtin {
             r#type: Special,
             execute: |_, _| unreachable!(),
+            is_declaration_utility: Some(false),
         };
         env.builtins.insert("foo", builtin);
         let function = Function::new(
@@ -364,6 +367,7 @@ mod tests {
         let builtin = Builtin {
             r#type: Mandatory,
             execute: |_, _| unreachable!(),
+            is_declaration_utility: Some(false),
         };
         env.builtins.insert("foo", builtin);
 
@@ -381,6 +385,7 @@ mod tests {
         let builtin = Builtin {
             r#type: Elective,
             execute: |_, _| unreachable!(),
+            is_declaration_utility: Some(false),
         };
         env.builtins.insert("foo", builtin);
 
@@ -398,6 +403,7 @@ mod tests {
         let builtin = Builtin {
             r#type: Extension,
             execute: |_, _| unreachable!(),
+            is_declaration_utility: Some(false),
         };
         env.builtins.insert("foo", builtin);
 
@@ -417,6 +423,7 @@ mod tests {
             Builtin {
                 r#type: Mandatory,
                 execute: |_, _| unreachable!(),
+                is_declaration_utility: Some(false),
             },
         );
 
@@ -440,6 +447,7 @@ mod tests {
             Builtin {
                 r#type: Elective,
                 execute: |_, _| unreachable!(),
+                is_declaration_utility: Some(false),
             },
         );
 
@@ -463,6 +471,7 @@ mod tests {
             Builtin {
                 r#type: Extension,
                 execute: |_, _| unreachable!(),
+                is_declaration_utility: Some(false),
             },
         );
 
@@ -484,6 +493,7 @@ mod tests {
         let builtin = Builtin {
             r#type: Substitutive,
             execute: |_, _| unreachable!(),
+            is_declaration_utility: Some(false),
         };
         env.builtins.insert("foo", builtin);
         env.path = Expansion::from("/bin");
@@ -504,6 +514,7 @@ mod tests {
         let builtin = Builtin {
             r#type: Substitutive,
             execute: |_, _| unreachable!(),
+            is_declaration_utility: Some(false),
         };
         env.builtins.insert("foo", builtin);
 
@@ -517,6 +528,7 @@ mod tests {
         let builtin = Builtin {
             r#type: Substitutive,
             execute: |_, _| unreachable!(),
+            is_declaration_utility: Some(false),
         };
         env.builtins.insert("foo", builtin);
         env.path = Expansion::from("/bin");

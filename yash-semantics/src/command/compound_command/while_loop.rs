@@ -198,8 +198,14 @@ mod tests {
             })
         }
         let (mut env, _state) = fixture();
-        let r#type = yash_env::builtin::Type::Mandatory;
-        env.builtins.insert("check", Builtin { r#type, execute });
+        env.builtins.insert(
+            "check",
+            Builtin {
+                r#type: yash_env::builtin::Type::Mandatory,
+                execute,
+                is_declaration_utility: Some(false),
+            },
+        );
         let command: CompoundCommand = "while check; do check; return; done".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
@@ -444,8 +450,14 @@ mod tests {
             })
         }
         let (mut env, _state) = fixture();
-        let r#type = yash_env::builtin::Type::Mandatory;
-        env.builtins.insert("check", Builtin { r#type, execute });
+        env.builtins.insert(
+            "check",
+            Builtin {
+                r#type: yash_env::builtin::Type::Mandatory,
+                execute,
+                is_declaration_utility: Some(false),
+            },
+        );
         let command: CompoundCommand = "until ! check; do check; return; done".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();

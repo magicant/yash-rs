@@ -115,6 +115,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(source::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -122,6 +123,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(ready(colon::main(env, args))),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -129,6 +131,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(alias::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -136,6 +139,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(bg::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -143,6 +147,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(r#break::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -150,6 +155,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(cd::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     #[cfg(feature = "yash-semantics")]
@@ -158,6 +164,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(command::main(env, args)),
+            is_declaration_utility: None,
         },
     ),
     (
@@ -165,6 +172,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(r#continue::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     #[cfg(feature = "yash-semantics")]
@@ -173,6 +181,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(eval::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     #[cfg(feature = "yash-semantics")]
@@ -181,6 +190,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(exec::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -188,6 +198,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(exit::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -195,6 +206,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(export::main(env, args)),
+            is_declaration_utility: Some(true),
         },
     ),
     (
@@ -202,6 +214,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(r#false::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -209,6 +222,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(fg::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -216,6 +230,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(getopts::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -223,6 +238,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(jobs::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -230,6 +246,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(kill::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -237,6 +254,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(pwd::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     #[cfg(feature = "yash-semantics")]
@@ -245,6 +263,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(read::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -252,6 +271,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(readonly::main(env, args)),
+            is_declaration_utility: Some(true),
         },
     ),
     (
@@ -259,6 +279,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(r#return::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -266,6 +287,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(set::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -273,6 +295,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(shift::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     #[cfg(feature = "yash-semantics")]
@@ -281,6 +304,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(source::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -288,6 +312,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(times::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -295,6 +320,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(trap::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -302,6 +328,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(r#true::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     #[cfg(feature = "yash-semantics")]
@@ -310,6 +337,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(r#type::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -317,6 +345,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Elective,
             execute: |env, args| Box::pin(typeset::main(env, args)),
+            is_declaration_utility: Some(true),
         },
     ),
     (
@@ -324,6 +353,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(ulimit::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -331,6 +361,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(umask::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -338,6 +369,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(unalias::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     (
@@ -345,6 +377,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(unset::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
     #[cfg(feature = "yash-semantics")]
@@ -353,6 +386,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(wait::main(env, args)),
+            is_declaration_utility: Some(false),
         },
     ),
 ];

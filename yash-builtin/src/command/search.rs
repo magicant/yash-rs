@@ -194,6 +194,7 @@ mod tests {
         let builtin = Builtin {
             r#type: Special,
             execute: |_, _| unreachable!(),
+            is_declaration_utility: Some(false),
         };
         env.builtins.insert(":", builtin);
         let params = &Search {
@@ -212,6 +213,7 @@ mod tests {
         let builtin = Builtin {
             r#type: Special,
             execute: |_, _| unreachable!(),
+            is_declaration_utility: Some(false),
         };
         env.builtins.insert(":", builtin);
         let params = &Search {

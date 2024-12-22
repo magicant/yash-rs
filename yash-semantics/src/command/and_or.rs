@@ -324,6 +324,7 @@ mod tests {
             Builtin {
                 r#type: Special,
                 execute: stub_builtin_condition,
+                is_declaration_utility: Some(false),
             },
         );
         env.builtins.insert(
@@ -331,6 +332,7 @@ mod tests {
             Builtin {
                 r#type: Special,
                 execute: stub_builtin_no_condition,
+                is_declaration_utility: Some(false),
             },
         );
 

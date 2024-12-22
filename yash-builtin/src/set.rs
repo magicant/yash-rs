@@ -355,6 +355,7 @@ xtrace           off
             Builtin {
                 r#type: Special,
                 execute: |env, args| Box::pin(main(env, args)),
+                is_declaration_utility: Some(false),
             },
         );
         env.options = Default::default();

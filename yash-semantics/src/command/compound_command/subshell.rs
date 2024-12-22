@@ -126,6 +126,7 @@ mod tests {
                 yash_env::builtin::Builtin {
                     r#type: yash_env::builtin::Type::Special,
                     execute: exit_builtin,
+                    is_declaration_utility: Some(false),
                 },
             );
 
@@ -238,6 +239,7 @@ mod tests {
                 yash_env::builtin::Builtin {
                     r#type: yash_env::builtin::Type::Special,
                     execute: trap_builtin,
+                    is_declaration_utility: Some(false),
                 },
             );
 
