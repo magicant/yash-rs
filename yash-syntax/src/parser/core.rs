@@ -143,6 +143,10 @@ impl<'a> Config<'a> {
     /// - `Some(true)` for `export` and `readonly`
     /// - `None` for `command`
     ///
+    /// For detailed information on declaration utilities, see the
+    /// [`decl_utils`] module.
+    ///
+    /// [`decl_utils`]: crate::decl_util
     /// [`PosixGlossary`]: crate::decl_util::PosixGlossary
     /// [`is_declaration_utility`]: crate::decl_util::Glossary::is_declaration_utility
     #[inline]
