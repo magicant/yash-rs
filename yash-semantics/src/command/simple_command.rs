@@ -39,6 +39,8 @@ use yash_env::variable::Scope;
 use yash_env::Env;
 use yash_syntax::syntax;
 use yash_syntax::syntax::Assign;
+use yash_syntax::syntax::ExpansionMode;
+use yash_syntax::syntax::Word;
 
 /// Executes the simple command.
 ///
@@ -242,8 +244,6 @@ use external::execute_external_utility;
 pub use external::replace_current_process;
 pub use external::start_external_utility_in_subshell_and_wait;
 pub use external::to_c_strings;
-use yash_syntax::syntax::ExpansionMode;
-use yash_syntax::syntax::Word;
 
 #[cfg(test)]
 mod tests {
