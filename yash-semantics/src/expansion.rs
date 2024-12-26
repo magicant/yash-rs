@@ -17,10 +17,11 @@
 //! Word expansion.
 //!
 //! The word expansion involves many kinds of operations described below.
-//! The [`expand_words`] function carries out all of them and produces any
-//! number of fields depending on the expanded word. The [`expand_word_attr`]
+//! The [`expand_word_multiple`] function performs all of them and produces
+//! any number of fields depending on the expanded word. The [`expand_word_attr`]
 //! and [`expand_word`] functions omit some of them to ensure that the result is
-//! a single field.
+//! a single field. Other functions in this module are provided for convenience
+//! in specific situations.
 //!
 //! # Initial expansion
 //!
@@ -43,6 +44,7 @@
 //! ## Brace expansion
 //!
 //! The brace expansion produces copies of a field containing a pair of braces.
+//! (TODO: This feature is not yet implemented.)
 //!
 //! ## Field splitting
 //!
@@ -60,10 +62,11 @@
 //!
 //! The [quote removal](self::quote_removal) drops characters quoting other
 //! characters, and the [attribute stripping](self::attr_strip) converts
-//! [`AttrField`]s into bare [`Field`]s. In [`expand_words`], the quote removal
-//! is performed between the field splitting and pathname expansion, and the
-//! attribute stripping is part of the pathname expansion. In [`expand_word`],
-//! they are carried out as the last step of the whole expansion.
+//! [`AttrField`]s into bare [`Field`]s. In [`expand_word_multiple`], the quote
+//! removal is performed between the field splitting and pathname expansion, and
+//! the attribute stripping is part of the pathname expansion. In
+//! [`expand_word`], they are carried out as the last step of the whole
+//! expansion.
 
 pub mod attr;
 pub mod attr_strip;
@@ -352,6 +355,7 @@ pub async fn expand_word_attr(
 ///
 /// To expand a word to an [`AttrField`] without performing quote removal or
 /// attribute stripping, use [`expand_word_attr`].
+/// To expand a word to multiple fields, use [`expand_word_multiple`].
 /// To expand multiple words to multiple fields, use [`expand_words`].
 pub async fn expand_word(
     env: &mut yash_env::Env,
@@ -368,6 +372,9 @@ pub async fn expand_word(
 /// including quote removal and attribute stripping. The results are appended to
 /// the given collection. The return value is the exit status of the last
 /// command substitution performed during the expansion, if any.
+///
+/// To expand a single word to a single field, use [`expand_word`].
+/// To expand multiple words to fields, use [`expand_words`].
 pub async fn expand_word_multiple<R>(
     env: &mut yash_env::Env,
     word: &Word,
@@ -446,6 +453,7 @@ where
 /// substitution performed during the expansion, if any.
 ///
 /// To expand a single word to a single field, use [`expand_word`].
+/// To expand a single word to multiple fields, use [`expand_word_multiple`].
 pub async fn expand_words<'a, I: IntoIterator<Item = &'a Word>>(
     env: &mut yash_env::Env,
     words: I,

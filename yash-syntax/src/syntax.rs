@@ -583,7 +583,10 @@ impl Redir {
 
 /// Expansion style of a simple command word
 ///
-/// TODO Elaborate
+/// This enum specifies how a [`Word`] in a [`SimpleCommand`] should be expanded
+/// at runtime. The expansion mode is determined by whether the command name is
+/// a declaration utility and whether the word is in the form of an assignment.
+/// See the [`decl_util` module](crate::decl_util) for details.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ExpansionMode {
     /// Expand the word to a single field
