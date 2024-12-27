@@ -34,7 +34,13 @@ use crate::syntax::Word;
 
 /// Determines the expansion mode of a word.
 ///
-/// TODO Elaborate
+/// This function converts a raw token into a word-mode pair assuming that the
+/// token is a command argument word for a declaration utility.
+///
+/// This function tests if the word is in the form of `name=value`. If it is,
+/// the expansion mode is `ExpansionMode::Single`, and tilde expansions are
+/// parsed after the equal sign. Otherwise, the expansion mode is
+/// `ExpansionMode::Multiple`, and the word is returned as is.
 fn determine_expansion_mode(word: Word) -> (Word, ExpansionMode) {
     use crate::syntax::{TextUnit::Literal, WordUnit::Unquoted};
     if let Some(eq) = word.units.iter().position(|u| *u == Unquoted(Literal('='))) {
