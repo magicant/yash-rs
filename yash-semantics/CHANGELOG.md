@@ -5,6 +5,22 @@ All notable changes to `yash-semantics` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - Unreleased
+
+### Added
+
+- Added the `expand_word_multiple` and `expand_word_with_mode` functions to the
+  `expansion` module.
+
+### Changed
+
+- The execution of a simple command
+  (`impl command::Command for yash_syntax::syntax::SimpleCommand`)
+  now honors the `ExpansionMode` specified for the words in the command.
+- External dependency versions:
+    - yash-env 0.5.0 → 0.6.0
+    - yash-syntax 0.13.0 → 0.14.0
+
 ## [0.5.0] - 2024-12-14
 
 ### Changed
@@ -150,6 +166,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial implementation of the `yash-semantics` crate
 
+[0.6.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.6.0
 [0.5.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.5.0
 [0.4.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.4.0
 [0.3.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.3.0

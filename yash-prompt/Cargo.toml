@@ -1,6 +1,6 @@
 [package]
 name = "yash-prompt"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2021"
 rust-version = "1.82.0"
@@ -12,12 +12,13 @@ repository = "https://github.com/magicant/yash-rs"
 license = "GPL-3.0-or-later"
 keywords = ["posix", "shell"]
 categories = ["command-line-utilities"]
+publish = false
 
 [dependencies]
 futures-util = "0.3.31"
-yash-env = { path = "../yash-env", version = "0.5.0" }
-yash-semantics = { path = "../yash-semantics", version = "0.5.0" }
-yash-syntax = { path = "../yash-syntax", version = "0.13.0" }
+yash-env = { path = "../yash-env", version = "0.6.0" }
+yash-semantics = { path = "../yash-semantics", version = "0.6.0" }
+yash-syntax = { path = "../yash-syntax", version = "0.14.0" }
 
 [dev-dependencies]
-yash-env-test-helper = { path = "../yash-env-test-helper", version = "0.3.0" }
+yash-env-test-helper = { path = "../yash-env-test-helper", version = "0.4.0" }
