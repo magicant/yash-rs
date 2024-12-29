@@ -2,8 +2,9 @@
 
 All notable changes to the shell are documented in this file.
 
-This file lists changes to the shell binary as a whole. Changes to the
-implementing library crate are in [CHANGELOG-lib.md](CHANGELOG-lib.md).
+This file lists changes to the shell executable as a whole. Changes to the
+implementing library crate are not documented since it is not intended to be
+used by other programs.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
