@@ -53,6 +53,7 @@ pub fn exit_builtin() -> Builtin {
     Builtin {
         r#type: Special,
         execute: exit_builtin_main,
+        is_declaration_utility: Some(false),
     }
 }
 
@@ -79,6 +80,7 @@ pub fn return_builtin() -> Builtin {
     Builtin {
         r#type: Special,
         execute: return_builtin_main,
+        is_declaration_utility: Some(false),
     }
 }
 
@@ -99,6 +101,7 @@ pub fn break_builtin() -> Builtin {
     Builtin {
         r#type: Special,
         execute: break_builtin_main,
+        is_declaration_utility: Some(false),
     }
 }
 
@@ -119,6 +122,7 @@ pub fn continue_builtin() -> Builtin {
     Builtin {
         r#type: Special,
         execute: continue_builtin_main,
+        is_declaration_utility: Some(false),
     }
 }
 
@@ -137,6 +141,7 @@ pub fn suspend_builtin() -> Builtin {
     Builtin {
         r#type: Special,
         execute: suspend_builtin_main,
+        is_declaration_utility: Some(false),
     }
 }
 
@@ -175,6 +180,7 @@ pub fn local_builtin() -> Builtin {
     Builtin {
         r#type: Mandatory,
         execute: local_builtin_main,
+        is_declaration_utility: Some(true),
     }
 }
 
@@ -198,6 +204,7 @@ pub fn echo_builtin() -> Builtin {
     Builtin {
         r#type: Mandatory,
         execute: echo_builtin_main,
+        is_declaration_utility: Some(false),
     }
 }
 
@@ -230,5 +237,6 @@ pub fn cat_builtin() -> Builtin {
     Builtin {
         r#type: Mandatory,
         execute: cat_builtin_main,
+        is_declaration_utility: Some(false),
     }
 }

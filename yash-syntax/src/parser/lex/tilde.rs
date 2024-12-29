@@ -145,9 +145,49 @@ impl Word {
     ///     ]
     /// );
     /// ```
+    ///
+    /// See also
+    /// [`parse_tilde_everywhere_after`](Self::parse_tilde_everywhere_after),
+    /// which allows you to parse tilde expansions only after a specified index.
     #[inline]
     pub fn parse_tilde_everywhere(&mut self) {
-        let mut i = 0;
+        self.parse_tilde_everywhere_after(0);
+    }
+
+    /// Parses tilde expansions in the word after the specified index.
+    ///
+    /// This function works the same as
+    /// [`parse_tilde_everywhere`](Self::parse_tilde_everywhere) except that it
+    /// starts parsing tilde expansions after the specified index of
+    /// `self.units`. Tilde expansions are parsed at the specified index and
+    /// after each unquoted colon.
+    ///
+    /// ```
+    /// # use std::str::FromStr;
+    /// # use yash_syntax::syntax::{TextUnit::Literal, Word, WordUnit::{Tilde, Unquoted}};
+    /// let mut word = Word::from_str("~=~a/b:~c").unwrap();
+    /// word.parse_tilde_everywhere_after(2);
+    /// assert_eq!(
+    ///     word.units,
+    ///     [
+    ///         // The initial tilde is not parsed because it is before index 2.
+    ///         Unquoted(Literal('~')),
+    ///         Unquoted(Literal('=')),
+    ///         // This tilde is parsed because it is at index 2,
+    ///         // even though it is not after a colon.
+    ///         Tilde("a".to_string()),
+    ///         Unquoted(Literal('/')),
+    ///         Unquoted(Literal('b')),
+    ///         Unquoted(Literal(':')),
+    ///         Tilde("c".to_string()),
+    ///     ]
+    /// );
+    /// ```
+    ///
+    /// Compare [`parse_tilde_everywhere`](Self::parse_tilde_everywhere), which
+    /// is equivalent to `parse_tilde_everywhere_after(0)`.
+    pub fn parse_tilde_everywhere_after(&mut self, index: usize) {
+        let mut i = index;
         loop {
             // Parse a tilde expansion at index `i`.
             if let Some((len, name)) = parse_tilde(&self.units[i..], true) {

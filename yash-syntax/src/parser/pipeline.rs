@@ -105,7 +105,7 @@ mod tests {
     use super::super::error::ErrorCause;
     use super::super::lex::Lexer;
     use super::*;
-    use crate::alias::{AliasSet, EmptyGlossary, HashEntry};
+    use crate::alias::{AliasSet, HashEntry};
     use crate::source::Location;
     use crate::source::Source;
     use futures_util::FutureExt;
@@ -113,7 +113,7 @@ mod tests {
     #[test]
     fn parser_pipeline_eof() {
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let option = parser.pipeline().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(option, None);
@@ -122,7 +122,7 @@ mod tests {
     #[test]
     fn parser_pipeline_one() {
         let mut lexer = Lexer::from_memory("foo", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.pipeline().now_or_never().unwrap();
         let p = result.unwrap().unwrap().unwrap();
@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn parser_pipeline_many() {
         let mut lexer = Lexer::from_memory("one | two | \n\t\n three", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.pipeline().now_or_never().unwrap();
         let p = result.unwrap().unwrap().unwrap();
@@ -148,7 +148,7 @@ mod tests {
     #[test]
     fn parser_pipeline_negated() {
         let mut lexer = Lexer::from_memory("! foo", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.pipeline().now_or_never().unwrap();
         let p = result.unwrap().unwrap().unwrap();
@@ -160,7 +160,7 @@ mod tests {
     #[test]
     fn parser_pipeline_double_negation() {
         let mut lexer = Lexer::from_memory(" !  !", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let e = parser.pipeline().now_or_never().unwrap().unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::DoubleNegation));
@@ -173,7 +173,7 @@ mod tests {
     #[test]
     fn parser_pipeline_missing_command_after_negation() {
         let mut lexer = Lexer::from_memory("!\nfoo", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let e = parser.pipeline().now_or_never().unwrap().unwrap_err();
         assert_eq!(
@@ -189,7 +189,7 @@ mod tests {
     #[test]
     fn parser_pipeline_missing_command_after_bar() {
         let mut lexer = Lexer::from_memory("foo | ;", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let e = parser.pipeline().now_or_never().unwrap().unwrap_err();
         assert_eq!(
@@ -205,7 +205,7 @@ mod tests {
     #[test]
     fn parser_pipeline_bang_after_bar() {
         let mut lexer = Lexer::from_memory("foo | !", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let e = parser.pipeline().now_or_never().unwrap().unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::BangAfterBar));
@@ -227,7 +227,7 @@ mod tests {
             true,
             origin,
         ));
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
 
         let result = parser.pipeline().now_or_never().unwrap();
         let p = result.unwrap().unwrap().unwrap();
@@ -247,7 +247,7 @@ mod tests {
             false,
             Location::dummy(""),
         ));
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
 
         let result = parser.pipeline().now_or_never().unwrap();
         let p = result.unwrap().unwrap().unwrap();

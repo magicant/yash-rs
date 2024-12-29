@@ -192,6 +192,7 @@ mod tests {
             Builtin {
                 r#type: Special,
                 execute: stub_builtin,
+                is_declaration_utility: Some(false),
             },
         );
         let condition = "foo".parse().unwrap();

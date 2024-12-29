@@ -343,6 +343,7 @@ mod tests {
         let builtin = Builtin {
             r#type: Type::Substitutive,
             execute: |_, _| unreachable!(),
+            is_declaration_utility: Some(false),
         };
         let mut builtin_target = Target::Builtin {
             builtin,
@@ -492,6 +493,7 @@ mod tests {
             builtin: Builtin {
                 r#type: Type::Special,
                 execute: |_, _| unreachable!(),
+                is_declaration_utility: Some(false),
             },
             path: None,
         };
@@ -512,6 +514,7 @@ mod tests {
             builtin: Builtin {
                 r#type: Type::Substitutive,
                 execute: |_, _| unreachable!(),
+                is_declaration_utility: Some(false),
             },
             path: Some(c"/bin/echo".to_owned()),
         };

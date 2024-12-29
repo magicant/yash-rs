@@ -25,16 +25,41 @@ use super::lex::Operator::{CloseParen, Newline, OpenParen};
 use super::lex::TokenId::{Operator, Token};
 use crate::syntax::Array;
 use crate::syntax::Assign;
+use crate::syntax::ExpansionMode;
+use crate::syntax::MaybeLiteral as _;
 use crate::syntax::Redir;
 use crate::syntax::Scalar;
 use crate::syntax::SimpleCommand;
 use crate::syntax::Word;
 
+/// Determines the expansion mode of a word.
+///
+/// This function converts a raw token into a word-mode pair assuming that the
+/// token is a command argument word for a declaration utility.
+///
+/// This function tests if the word is in the form of `name=value`. If it is,
+/// the expansion mode is `ExpansionMode::Single`, and tilde expansions are
+/// parsed after the equal sign. Otherwise, the expansion mode is
+/// `ExpansionMode::Multiple`, and the word is returned as is.
+fn determine_expansion_mode(word: Word) -> (Word, ExpansionMode) {
+    use crate::syntax::{TextUnit::Literal, WordUnit::Unquoted};
+    if let Some(eq) = word.units.iter().position(|u| *u == Unquoted(Literal('='))) {
+        if let Some(name) = word.units[..eq].to_string_if_literal() {
+            if !name.is_empty() {
+                let mut word = word;
+                word.parse_tilde_everywhere_after(eq + 1);
+                return (word, ExpansionMode::Single);
+            }
+        }
+    }
+    (word, ExpansionMode::Multiple)
+}
+
 /// Simple command builder.
 #[derive(Default)]
 struct Builder {
     assigns: Vec<Assign>,
-    words: Vec<Word>,
+    words: Vec<(Word, ExpansionMode)>,
     redirs: Vec<Redir>,
 }
 
@@ -93,6 +118,7 @@ impl Parser<'_, '_> {
     /// If there is no valid command at the current position, this function
     /// returns `Ok(Rec::Parsed(None))`.
     pub async fn simple_command(&mut self) -> Result<Rec<Option<SimpleCommand>>> {
+        let mut is_declaration_utility = None;
         let mut result = Builder::default();
 
         loop {
@@ -121,15 +147,34 @@ impl Parser<'_, '_> {
                 Rec::Parsed(token) => token,
             };
 
-            // Tell assignment from word
-            if !result.words.is_empty() {
-                result.words.push(token.word);
+            // Handle command argument word
+            if let Some(is_declaration_utility) = is_declaration_utility {
+                // The word determined (not) to be a declaration utility
+                // must already be in the words list.
+                debug_assert!(!result.words.is_empty());
+
+                result.words.push(if is_declaration_utility {
+                    determine_expansion_mode(token.word)
+                } else {
+                    (token.word, ExpansionMode::Multiple)
+                });
                 continue;
             }
-            let mut assign = match Assign::try_from(token.word) {
+
+            // Tell assignment from word
+            let assign_or_word = if result.words.is_empty() {
+                // We don't have any words yet, so this token may be an assignment or a word.
+                Assign::try_from(token.word)
+            } else {
+                // We already have some words, so remaining tokens are all words.
+                Err(token.word)
+            };
+            let mut assign = match assign_or_word {
                 Ok(assign) => assign,
                 Err(word) => {
-                    result.words.push(word);
+                    debug_assert!(is_declaration_utility.is_none());
+                    is_declaration_utility = self.word_names_declaration_utility(&word);
+                    result.words.push((word, ExpansionMode::Multiple));
                     continue;
                 }
             };
@@ -153,11 +198,7 @@ impl Parser<'_, '_> {
             result.assigns.push(assign);
         }
 
-        Ok(Rec::Parsed(if result.is_empty() {
-            None
-        } else {
-            Some(result.into())
-        }))
+        Ok(Rec::Parsed((!result.is_empty()).then(|| result.into())))
     }
 }
 
@@ -167,17 +208,60 @@ mod tests {
     use super::super::lex::Lexer;
     use super::super::lex::TokenId::EndOfInput;
     use super::*;
-    use crate::alias::EmptyGlossary;
+    use crate::decl_util::EmptyGlossary;
     use crate::source::Source;
     use crate::syntax::RedirBody;
     use crate::syntax::RedirOp;
+    use crate::syntax::TextUnit;
+    use crate::syntax::WordUnit;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
+
+    #[test]
+    fn determine_expansion_mode_empty_name() {
+        let in_word = "=".parse::<Word>().unwrap();
+        let (out_word, mode) = determine_expansion_mode(in_word.clone());
+        assert_eq!(out_word, in_word);
+        assert_eq!(mode, ExpansionMode::Multiple);
+    }
+
+    #[test]
+    fn determine_expansion_mode_nonempty_name() {
+        let in_word = "foo=".parse::<Word>().unwrap();
+        let (out_word, mode) = determine_expansion_mode(in_word.clone());
+        assert_eq!(out_word, in_word);
+        assert_eq!(mode, ExpansionMode::Single);
+    }
+
+    #[test]
+    fn determine_expansion_mode_non_literal_name() {
+        let in_word = "${X}=".parse::<Word>().unwrap();
+        let (out_word, mode) = determine_expansion_mode(in_word.clone());
+        assert_eq!(out_word, in_word);
+        assert_eq!(mode, ExpansionMode::Multiple);
+    }
+
+    #[test]
+    fn determine_expansion_mode_tilde_expansions_after_equal() {
+        let word = "~=~:~b".parse().unwrap();
+        let (word, mode) = determine_expansion_mode(word);
+        assert_eq!(
+            word.units,
+            [
+                WordUnit::Unquoted(TextUnit::Literal('~')),
+                WordUnit::Unquoted(TextUnit::Literal('=')),
+                WordUnit::Tilde("".to_string()),
+                WordUnit::Unquoted(TextUnit::Literal(':')),
+                WordUnit::Tilde("b".to_string()),
+            ]
+        );
+        assert_eq!(mode, ExpansionMode::Single);
+    }
 
     #[test]
     fn parser_array_values_no_open_parenthesis() {
         let mut lexer = Lexer::from_memory(")", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
         let result = parser.array_values().now_or_never().unwrap().unwrap();
         assert_eq!(result, None);
     }
@@ -185,7 +269,7 @@ mod tests {
     #[test]
     fn parser_array_values_empty() {
         let mut lexer = Lexer::from_memory("()", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
         let result = parser.array_values().now_or_never().unwrap();
         let words = result.unwrap().unwrap();
         assert_eq!(words, []);
@@ -197,7 +281,7 @@ mod tests {
     #[test]
     fn parser_array_values_many() {
         let mut lexer = Lexer::from_memory("(a b c)", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
         let result = parser.array_values().now_or_never().unwrap();
         let words = result.unwrap().unwrap();
         assert_eq!(words.len(), 3);
@@ -215,7 +299,7 @@ mod tests {
         )",
             Source::Unknown,
         );
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
         let result = parser.array_values().now_or_never().unwrap();
         let words = result.unwrap().unwrap();
         assert_eq!(words.len(), 3);
@@ -227,7 +311,7 @@ mod tests {
     #[test]
     fn parser_array_values_unclosed() {
         let mut lexer = Lexer::from_memory("(a b", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
         let e = parser.array_values().now_or_never().unwrap().unwrap_err();
         assert_matches!(e.cause,
              ErrorCause::Syntax(SyntaxError::UnclosedArrayValue { opening_location }) => {
@@ -245,7 +329,7 @@ mod tests {
     #[test]
     fn parser_array_values_invalid_word() {
         let mut lexer = Lexer::from_memory("(a;b)", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
         let e = parser.array_values().now_or_never().unwrap().unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedArrayValue { opening_location }) => {
@@ -263,7 +347,7 @@ mod tests {
     #[test]
     fn parser_simple_command_eof() {
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.simple_command().now_or_never().unwrap();
         assert_eq!(result, Ok(Rec::Parsed(None)));
@@ -272,7 +356,7 @@ mod tests {
     #[test]
     fn parser_simple_command_keyword() {
         let mut lexer = Lexer::from_memory("then", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.simple_command().now_or_never().unwrap();
         assert_eq!(result, Ok(Rec::Parsed(None)));
@@ -281,7 +365,7 @@ mod tests {
     #[test]
     fn parser_simple_command_one_assignment() {
         let mut lexer = Lexer::from_memory("my=assignment", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -299,7 +383,7 @@ mod tests {
     #[test]
     fn parser_simple_command_many_assignments() {
         let mut lexer = Lexer::from_memory("a= b=! c=X", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -329,35 +413,39 @@ mod tests {
     #[test]
     fn parser_simple_command_one_word() {
         let mut lexer = Lexer::from_memory("word", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns, []);
         assert_eq!(*sc.redirs, []);
         assert_eq!(sc.words.len(), 1);
-        assert_eq!(sc.words[0].to_string(), "word");
+        assert_eq!(sc.words[0].0.to_string(), "word");
+        assert_eq!(sc.words[0].1, ExpansionMode::Multiple);
     }
 
     #[test]
     fn parser_simple_command_many_words() {
         let mut lexer = Lexer::from_memory(": if then", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns, []);
         assert_eq!(*sc.redirs, []);
         assert_eq!(sc.words.len(), 3);
-        assert_eq!(sc.words[0].to_string(), ":");
-        assert_eq!(sc.words[1].to_string(), "if");
-        assert_eq!(sc.words[2].to_string(), "then");
+        assert_eq!(sc.words[0].0.to_string(), ":");
+        assert_eq!(sc.words[0].1, ExpansionMode::Multiple);
+        assert_eq!(sc.words[1].0.to_string(), "if");
+        assert_eq!(sc.words[1].1, ExpansionMode::Multiple);
+        assert_eq!(sc.words[2].0.to_string(), "then");
+        assert_eq!(sc.words[2].1, ExpansionMode::Multiple);
     }
 
     #[test]
     fn parser_simple_command_one_redirection() {
         let mut lexer = Lexer::from_memory("<foo", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -377,7 +465,7 @@ mod tests {
     #[test]
     fn parser_simple_command_many_redirections() {
         let mut lexer = Lexer::from_memory("<one >two >>three", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -407,7 +495,7 @@ mod tests {
     #[test]
     fn parser_simple_command_assignment_word() {
         let mut lexer = Lexer::from_memory("if=then else", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -416,20 +504,22 @@ mod tests {
         assert_eq!(sc.words.len(), 1);
         assert_eq!(sc.assigns[0].name, "if");
         assert_eq!(sc.assigns[0].value.to_string(), "then");
-        assert_eq!(sc.words[0].to_string(), "else");
+        assert_eq!(sc.words[0].0.to_string(), "else");
+        assert_eq!(sc.words[0].1, ExpansionMode::Multiple);
     }
 
     #[test]
     fn parser_simple_command_word_redirection() {
         let mut lexer = Lexer::from_memory("word <redirection", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns, []);
         assert_eq!(sc.words.len(), 1);
         assert_eq!(sc.redirs.len(), 1);
-        assert_eq!(sc.words[0].to_string(), "word");
+        assert_eq!(sc.words[0].0.to_string(), "word");
+        assert_eq!(sc.words[0].1, ExpansionMode::Multiple);
         assert_eq!(sc.redirs[0].fd, None);
         assert_matches!(sc.redirs[0].body, RedirBody::Normal { ref operator, ref operand } => {
             assert_eq!(operator, &RedirOp::FileIn);
@@ -440,7 +530,7 @@ mod tests {
     #[test]
     fn parser_simple_command_redirection_assignment() {
         let mut lexer = Lexer::from_memory("<foo a=b", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -459,7 +549,7 @@ mod tests {
     #[test]
     fn parser_simple_command_assignment_redirection_word() {
         let mut lexer = Lexer::from_memory("if=then <foo else", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -468,7 +558,8 @@ mod tests {
         assert_eq!(sc.redirs.len(), 1);
         assert_eq!(sc.assigns[0].name, "if");
         assert_eq!(sc.assigns[0].value.to_string(), "then");
-        assert_eq!(sc.words[0].to_string(), "else");
+        assert_eq!(sc.words[0].0.to_string(), "else");
+        assert_eq!(sc.words[0].1, ExpansionMode::Multiple);
         assert_eq!(sc.redirs[0].fd, None);
         assert_matches!(sc.redirs[0].body, RedirBody::Normal { ref operator, ref operand } => {
             assert_eq!(operator, &RedirOp::FileIn);
@@ -479,7 +570,7 @@ mod tests {
     #[test]
     fn parser_simple_command_array_assignment() {
         let mut lexer = Lexer::from_memory("a=()", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -498,7 +589,7 @@ mod tests {
     #[test]
     fn parser_simple_command_empty_assignment_followed_by_blank_and_parenthesis() {
         let mut lexer = Lexer::from_memory("a= ()", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -519,7 +610,7 @@ mod tests {
     #[test]
     fn parser_simple_command_non_empty_assignment_followed_by_parenthesis() {
         let mut lexer = Lexer::from_memory("a=b()", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.simple_command().now_or_never().unwrap();
         let sc = result.unwrap().unwrap().unwrap();
@@ -535,5 +626,146 @@ mod tests {
 
         let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, Operator(OpenParen));
+    }
+
+    #[test]
+    fn word_with_single_expansion_mode_in_declaration_utility() {
+        // "export" is a declaration utility, so the expansion mode of the word
+        // "a=b" should be single.
+        let mut lexer = Lexer::from_memory("export a=b", Source::Unknown);
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns, []);
+        assert_eq!(sc.words.len(), 2);
+        assert_eq!(*sc.redirs, []);
+        assert_eq!(sc.words[0].0.to_string(), "export");
+        assert_eq!(sc.words[0].1, ExpansionMode::Multiple);
+        assert_eq!(sc.words[1].0.to_string(), "a=b");
+        assert_eq!(sc.words[1].1, ExpansionMode::Single);
+    }
+
+    #[test]
+    fn word_with_multiple_expansion_mode_in_declaration_utility() {
+        // The expansion mode of the word "foo" should be multiple because it
+        // cannot be parsed as an assignment.
+        let mut lexer = Lexer::from_memory("export foo", Source::Unknown);
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns, []);
+        assert_eq!(sc.words.len(), 2);
+        assert_eq!(*sc.redirs, []);
+        assert_eq!(sc.words[0].0.to_string(), "export");
+        assert_eq!(sc.words[0].1, ExpansionMode::Multiple);
+        assert_eq!(sc.words[1].0.to_string(), "foo");
+        assert_eq!(sc.words[1].1, ExpansionMode::Multiple);
+    }
+
+    #[test]
+    fn word_with_multiple_expansion_mode_in_non_declaration_utility() {
+        // "foo" is not a declaration utility, so the expansion mode of the word
+        // "a=b" should be multiple.
+        let mut lexer = Lexer::from_memory("foo a=b", Source::Unknown);
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns, []);
+        assert_eq!(sc.words.len(), 2);
+        assert_eq!(*sc.redirs, []);
+        assert_eq!(sc.words[0].0.to_string(), "foo");
+        assert_eq!(sc.words[0].1, ExpansionMode::Multiple);
+        assert_eq!(sc.words[1].0.to_string(), "a=b");
+        assert_eq!(sc.words[1].1, ExpansionMode::Multiple);
+    }
+
+    #[test]
+    fn declaration_utility_determined_by_non_first_word() {
+        // "command" delegates to the next word to determine whether it is a
+        // declaration utility.
+        let mut lexer = Lexer::from_memory("command command export foo a=b", Source::Unknown);
+        let mut parser = Parser::new(&mut lexer);
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.words[4].0.to_string(), "a=b");
+        assert_eq!(sc.words[4].1, ExpansionMode::Single);
+
+        let mut lexer = Lexer::from_memory("command command foo export a=b", Source::Unknown);
+        let mut parser = Parser::new(&mut lexer);
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.words[4].0.to_string(), "a=b");
+        assert_eq!(sc.words[4].1, ExpansionMode::Multiple);
+    }
+
+    #[test]
+    fn no_declaration_utilities_with_empty_glossary() {
+        // "export" is not a declaration utility in the empty glossary.
+        let mut lexer = Lexer::from_memory("export a=b", Source::Unknown);
+        let mut parser = Parser::config()
+            .declaration_utilities(&EmptyGlossary)
+            .input(&mut lexer);
+
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns, []);
+        assert_eq!(sc.words.len(), 2);
+        assert_eq!(*sc.redirs, []);
+        assert_eq!(sc.words[0].0.to_string(), "export");
+        assert_eq!(sc.words[0].1, ExpansionMode::Multiple);
+        assert_eq!(sc.words[1].0.to_string(), "a=b");
+        assert_eq!(sc.words[1].1, ExpansionMode::Multiple);
+    }
+
+    #[test]
+    fn custom_declaration_utility_glossary() {
+        // "foo" is a declaration utility in the custom glossary.
+        #[derive(Debug)]
+        struct CustomGlossary;
+        impl crate::decl_util::Glossary for CustomGlossary {
+            fn is_declaration_utility(&self, name: &str) -> Option<bool> {
+                Some(name == "foo")
+            }
+        }
+
+        let mut lexer = Lexer::from_memory("foo a=b", Source::Unknown);
+        let mut parser = Parser::config()
+            .declaration_utilities(&CustomGlossary)
+            .input(&mut lexer);
+
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns, []);
+        assert_eq!(sc.words.len(), 2);
+        assert_eq!(*sc.redirs, []);
+        assert_eq!(sc.words[0].0.to_string(), "foo");
+        assert_eq!(sc.words[0].1, ExpansionMode::Multiple);
+        assert_eq!(sc.words[1].0.to_string(), "a=b");
+        assert_eq!(sc.words[1].1, ExpansionMode::Single);
+    }
+
+    #[test]
+    fn assignment_is_not_considered_for_declaration_utility() {
+        #[derive(Debug)]
+        struct CustomGlossary;
+        impl crate::decl_util::Glossary for CustomGlossary {
+            fn is_declaration_utility(&self, _name: &str) -> Option<bool> {
+                unreachable!("is_declaration_utility should not be called for assignments");
+            }
+        }
+
+        let mut lexer = Lexer::from_memory("a=b", Source::Unknown);
+        let mut parser = Parser::config()
+            .declaration_utilities(&CustomGlossary)
+            .input(&mut lexer);
+
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns.len(), 1);
+        assert_eq!(sc.words, []);
+        assert_eq!(*sc.redirs, [])
     }
 }

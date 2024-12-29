@@ -29,6 +29,7 @@ use crate::alias::Glossary;
 use crate::parser::lex::is_blank;
 use crate::syntax::HereDoc;
 use crate::syntax::MaybeLiteral;
+use crate::syntax::Word;
 use std::rc::Rc;
 
 /// Entire result of parsing.
@@ -93,9 +94,99 @@ impl<T> Rec<T> {
     }
 }
 
-/// The shell syntax parser.
+/// Set of parameters for constructing a [parser](Parser).
 ///
-/// This `struct` contains a set of data used in syntax parsing.
+/// `Config` is a builder for constructing a parser. A [new](Self::new)
+/// configuration starts with default settings. You can customize them by
+/// calling methods that can be chained. Finally, you can create a parser by
+/// providing the lexer to the [`input`](Self::input) method.
+#[derive(Debug)]
+#[must_use = "Config must be used to create a parser"]
+pub struct Config<'a> {
+    /// Collection of aliases the parser applies to substitute command words
+    aliases: &'a dyn crate::alias::Glossary,
+
+    /// Glossary that determines whether a command name is a declaration utility
+    decl_utils: &'a dyn crate::decl_util::Glossary,
+}
+
+impl<'a> Config<'a> {
+    /// Creates a new configuration with default settings.
+    ///
+    /// You can also call [`Parser::config`] to create a new configuration.
+    pub fn new() -> Self {
+        Self {
+            aliases: &crate::alias::EmptyGlossary,
+            decl_utils: &crate::decl_util::PosixGlossary,
+        }
+    }
+
+    /// Sets the glossary of aliases.
+    ///
+    /// The parser uses the glossary to look up aliases and substitute command
+    /// words. The default glossary is [empty](crate::alias::EmptyGlossary).
+    #[inline]
+    pub fn aliases(&mut self, aliases: &'a dyn Glossary) -> &mut Self {
+        self.aliases = aliases;
+        self
+    }
+
+    /// Sets the glossary of declaration utilities.
+    ///
+    /// The parser uses the glossary to determine whether a command name is a
+    /// declaration utility. The default glossary is [`PosixGlossary`], which
+    /// recognizes the declaration utilities defined by POSIX. You can make
+    /// arbitrary command names declaration utilities by providing a custom
+    /// glossary. To meet the POSIX standard, the glossary's
+    /// [`is_declaration_utility`] method must return:
+    ///
+    /// - `Some(true)` for `export` and `readonly`
+    /// - `None` for `command`
+    ///
+    /// For detailed information on declaration utilities, see the
+    /// [`decl_utils`] module.
+    ///
+    /// [`decl_utils`]: crate::decl_util
+    /// [`PosixGlossary`]: crate::decl_util::PosixGlossary
+    /// [`is_declaration_utility`]: crate::decl_util::Glossary::is_declaration_utility
+    #[inline]
+    pub fn declaration_utilities(
+        &mut self,
+        decl_utils: &'a dyn crate::decl_util::Glossary,
+    ) -> &mut Self {
+        self.decl_utils = decl_utils;
+        self
+    }
+
+    /// Creates a parser with the given lexer.
+    pub fn input<'b>(&self, lexer: &'a mut Lexer<'b>) -> Parser<'a, 'b> {
+        Parser {
+            lexer,
+            aliases: self.aliases,
+            decl_utils: self.decl_utils,
+            token: None,
+            unread_here_docs: Vec::new(),
+        }
+    }
+}
+
+impl Default for Config<'_> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// The shell syntax parser
+///
+/// A parser manages a set of data used in syntax parsing. It keeps a reference
+/// to a [lexer](Lexer) that provides tokens to parse. It also has some
+/// parameters that can be set by a [configuration](Config) and affect the
+/// parsing process.
+///
+/// The [`new`](Self::new) function directly creates a parser with default
+/// settings. If you want to customize the settings, you can use the
+/// [`config`](Self::config) function to create a configuration and then create a
+/// parser with the configuration.
 ///
 /// # Parsing here-documents
 ///
@@ -111,20 +202,24 @@ impl<T> Rec<T> {
 /// Then the [`command_line`](Self::command_line) function is for you.
 /// See also the [module documentation](super).
 #[derive(Debug)]
+#[must_use = "Parser must be used to parse syntax"]
 pub struct Parser<'a, 'b> {
-    /// Lexer that provides tokens.
+    /// Lexer that provides tokens
     lexer: &'a mut Lexer<'b>,
 
-    /// Collection of aliases the parser applies to substitute command words.
-    glossary: &'a dyn Glossary,
+    /// Collection of aliases the parser applies to substitute command words
+    aliases: &'a dyn crate::alias::Glossary,
 
-    /// Token to parse next.
+    /// Glossary that determines whether a command name is a declaration utility
+    decl_utils: &'a dyn crate::decl_util::Glossary,
+
+    /// Token to parse next
     ///
     /// This value is an option of a result. It is `None` when the next token is not yet parsed by
     /// the lexer. It is `Some(Err(_))` if the lexer has failed.
     token: Option<Result<Token>>,
 
-    /// Here-documents without contents.
+    /// Here-documents without contents
     ///
     /// The here-document is added to this list when the parser finds a
     /// here-document operator. After consuming the next newline token, the
@@ -133,16 +228,22 @@ pub struct Parser<'a, 'b> {
 }
 
 impl<'a, 'b> Parser<'a, 'b> {
-    /// Creates a new parser based on the given lexer and glossary.
+    /// Creates a new configuration with default settings.
     ///
-    /// The parser uses the lexer to read tokens and the glossary to look up aliases.
-    pub fn new(lexer: &'a mut Lexer<'b>, glossary: &'a dyn Glossary) -> Parser<'a, 'b> {
-        Parser {
-            lexer,
-            glossary,
-            token: None,
-            unread_here_docs: vec![],
-        }
+    /// This is a synonym for [`Config::new`]. Customize the settings by calling
+    /// methods of the returned configuration and then create a parser by calling
+    /// its [`input`](Config::input) method.
+    #[inline(always)]
+    pub fn config() -> Config<'a> {
+        Config::new()
+    }
+
+    /// Creates a new parser based on the given lexer.
+    ///
+    /// The parser uses the lexer to read tokens. All other settings are default.
+    /// To customize the settings, use the [`config`](Self::config) function.
+    pub fn new(lexer: &'a mut Lexer<'b>) -> Parser<'a, 'b> {
+        Self::config().input(lexer)
     }
 
     /// Reads a next token if the current token is `None`.
@@ -182,11 +283,11 @@ impl<'a, 'b> Parser<'a, 'b> {
     /// [taken](Self::take_token_raw).
     fn substitute_alias(&mut self, token: Token, is_command_name: bool) -> Rec<Token> {
         // TODO Only POSIXly-valid alias name should be recognized in POSIXly-correct mode.
-        if !self.glossary.is_empty() {
+        if !self.aliases.is_empty() {
             if let Token(_) = token.id {
                 if let Some(name) = token.word.to_string_if_literal() {
                     if !token.word.location.code.source.is_alias_for(&name) {
-                        if let Some(alias) = self.glossary.look_up(&name) {
+                        if let Some(alias) = self.aliases.look_up(&name) {
                             if is_command_name
                                 || alias.global
                                 || self.lexer.is_after_blank_ending_alias(token.index)
@@ -325,6 +426,17 @@ impl<'a, 'b> Parser<'a, 'b> {
             }),
         }
     }
+
+    /// Determines whether a word names a declaration utility.
+    ///
+    /// See [`decl_utils`](crate::decl_util) for more information.
+    pub(super) fn word_names_declaration_utility(&self, word: &Word) -> Option<bool> {
+        if let Some(name) = word.to_string_if_literal() {
+            self.decl_utils.is_declaration_utility(&name)
+        } else {
+            Some(false)
+        }
+    }
 }
 
 #[allow(clippy::bool_assert_comparison)]
@@ -350,7 +462,7 @@ mod tests {
             false,
             Location::dummy("?"),
         ));
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
 
         let result = parser.take_token_manual(true).now_or_never().unwrap();
         assert_matches!(result, Ok(Rec::AliasSubstituted));
@@ -371,7 +483,7 @@ mod tests {
             false,
             Location::dummy("?"),
         ));
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
 
         let result = parser.take_token_manual(false).now_or_never().unwrap();
         let token = result.unwrap().unwrap();
@@ -395,7 +507,7 @@ mod tests {
             false,
             Location::dummy("?"),
         ));
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
 
         let result = parser.take_token_manual(true).now_or_never().unwrap();
         let token = result.unwrap().unwrap();
@@ -413,7 +525,7 @@ mod tests {
             false,
             Location::dummy("?"),
         ));
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
 
         let result = parser.take_token_manual(true).now_or_never().unwrap();
         let token = result.unwrap().unwrap();
@@ -424,9 +536,7 @@ mod tests {
     #[test]
     fn parser_take_token_manual_no_match() {
         let mut lexer = Lexer::from_memory("X", Source::Unknown);
-        #[allow(clippy::mutable_key_type)]
-        let aliases = AliasSet::new();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.take_token_manual(true).now_or_never().unwrap();
         let token = result.unwrap().unwrap();
@@ -450,7 +560,7 @@ mod tests {
             false,
             Location::dummy("?"),
         ));
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
 
         let result = parser.take_token_manual(true).now_or_never().unwrap();
         assert_matches!(result, Ok(Rec::AliasSubstituted));
@@ -488,7 +598,7 @@ mod tests {
             false,
             Location::dummy("?"),
         ));
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
 
         let result = parser.take_token_manual(true).now_or_never().unwrap();
         assert_matches!(result, Ok(Rec::AliasSubstituted));
@@ -522,7 +632,7 @@ mod tests {
             false,
             Location::dummy("?"),
         ));
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
 
         let result = parser.take_token_manual(true).now_or_never().unwrap();
         assert_matches!(result, Ok(Rec::AliasSubstituted));
@@ -547,7 +657,7 @@ mod tests {
             true,
             Location::dummy("?"),
         ));
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
 
         let result = parser.take_token_manual(false).now_or_never().unwrap();
         assert_matches!(result, Ok(Rec::AliasSubstituted));
@@ -568,7 +678,7 @@ mod tests {
             true,
             Location::dummy("?"),
         ));
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
 
         let token = parser.take_token_auto(&[]).now_or_never().unwrap().unwrap();
         assert_eq!(token.to_string(), "x");
@@ -585,7 +695,7 @@ mod tests {
             true,
             Location::dummy("?"),
         ));
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
 
         let token = parser
             .take_token_auto(&[Keyword::If])
@@ -606,7 +716,7 @@ mod tests {
             true,
             Location::dummy("?"),
         ));
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
 
         let token = parser.take_token_auto(&[]).now_or_never().unwrap().unwrap();
         assert_eq!(token.to_string(), "x");
@@ -629,7 +739,7 @@ mod tests {
             true,
             Location::dummy("?"),
         ));
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
 
         let token = parser
             .take_token_auto(&[Keyword::If])
@@ -642,9 +752,7 @@ mod tests {
     #[test]
     fn parser_has_blank_true() {
         let mut lexer = Lexer::from_memory(" ", Source::Unknown);
-        #[allow(clippy::mutable_key_type)]
-        let aliases = AliasSet::new();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer);
         let result = parser.has_blank().now_or_never().unwrap();
         assert_eq!(result, Ok(true));
     }
@@ -652,9 +760,7 @@ mod tests {
     #[test]
     fn parser_has_blank_false() {
         let mut lexer = Lexer::from_memory("(", Source::Unknown);
-        #[allow(clippy::mutable_key_type)]
-        let aliases = AliasSet::new();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer);
         let result = parser.has_blank().now_or_never().unwrap();
         assert_eq!(result, Ok(false));
     }
@@ -662,9 +768,7 @@ mod tests {
     #[test]
     fn parser_has_blank_eof() {
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        #[allow(clippy::mutable_key_type)]
-        let aliases = AliasSet::new();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer);
         let result = parser.has_blank().now_or_never().unwrap();
         assert_eq!(result, Ok(false));
     }
@@ -672,9 +776,7 @@ mod tests {
     #[test]
     fn parser_has_blank_true_with_line_continuations() {
         let mut lexer = Lexer::from_memory("\\\n\\\n ", Source::Unknown);
-        #[allow(clippy::mutable_key_type)]
-        let aliases = AliasSet::new();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer);
         let result = parser.has_blank().now_or_never().unwrap();
         assert_eq!(result, Ok(true));
     }
@@ -682,9 +784,7 @@ mod tests {
     #[test]
     fn parser_has_blank_false_with_line_continuations() {
         let mut lexer = Lexer::from_memory("\\\n\\\n\\\n(", Source::Unknown);
-        #[allow(clippy::mutable_key_type)]
-        let aliases = AliasSet::new();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer);
         let result = parser.has_blank().now_or_never().unwrap();
         assert_eq!(result, Ok(false));
     }
@@ -693,9 +793,7 @@ mod tests {
     #[should_panic(expected = "There should be no pending token")]
     fn parser_has_blank_with_pending_token() {
         let mut lexer = Lexer::from_memory("foo", Source::Unknown);
-        #[allow(clippy::mutable_key_type)]
-        let aliases = AliasSet::new();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer);
         parser.peek_token().now_or_never().unwrap().unwrap();
         let _ = parser.has_blank().now_or_never().unwrap();
     }
@@ -703,9 +801,7 @@ mod tests {
     #[test]
     fn parser_reading_no_here_doc_contents() {
         let mut lexer = Lexer::from_memory("X", Source::Unknown);
-        #[allow(clippy::mutable_key_type)]
-        let aliases = AliasSet::new();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer);
         parser.here_doc_contents().now_or_never().unwrap().unwrap();
 
         let location = lexer.location().now_or_never().unwrap().unwrap();
@@ -718,9 +814,7 @@ mod tests {
         let delimiter = "END".parse().unwrap();
 
         let mut lexer = Lexer::from_memory("END\nX", Source::Unknown);
-        #[allow(clippy::mutable_key_type)]
-        let aliases = AliasSet::new();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer);
         let remove_tabs = false;
         let here_doc = Rc::new(HereDoc {
             delimiter,
@@ -745,9 +839,7 @@ mod tests {
         let delimiter3 = "THREE".parse().unwrap();
 
         let mut lexer = Lexer::from_memory("1\nONE\nTWO\n3\nTHREE\nX", Source::Unknown);
-        #[allow(clippy::mutable_key_type)]
-        let aliases = AliasSet::new();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer);
         let here_doc1 = Rc::new(HereDoc {
             delimiter: delimiter1,
             remove_tabs: false,
@@ -784,9 +876,7 @@ mod tests {
         let delimiter2 = "TWO".parse().unwrap();
 
         let mut lexer = Lexer::from_memory("1\nONE\n2\nTWO\n", Source::Unknown);
-        #[allow(clippy::mutable_key_type)]
-        let aliases = AliasSet::new();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer);
         let here_doc1 = Rc::new(HereDoc {
             delimiter: delimiter1,
             remove_tabs: false,
@@ -813,9 +903,7 @@ mod tests {
     #[should_panic(expected = "No token must be peeked before reading here-doc contents")]
     fn parser_here_doc_contents_must_be_called_without_pending_token() {
         let mut lexer = Lexer::from_memory("X", Source::Unknown);
-        #[allow(clippy::mutable_key_type)]
-        let aliases = AliasSet::new();
-        let mut parser = Parser::new(&mut lexer, &aliases);
+        let mut parser = Parser::new(&mut lexer);
         parser.peek_token().now_or_never().unwrap().unwrap();
         parser.here_doc_contents().now_or_never().unwrap().unwrap();
     }

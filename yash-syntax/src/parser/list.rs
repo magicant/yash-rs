@@ -207,7 +207,6 @@ mod tests {
     use super::super::error::ErrorCause;
     use super::super::lex::Lexer;
     use super::*;
-    use crate::alias::EmptyGlossary;
     use crate::source::Source;
     use crate::syntax::AndOrList;
     use crate::syntax::Command;
@@ -219,7 +218,7 @@ mod tests {
     #[test]
     fn parser_list_eof() {
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let list = parser.list().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(list.0, vec![]);
@@ -228,7 +227,7 @@ mod tests {
     #[test]
     fn parser_list_one_item_without_last_semicolon() {
         let mut lexer = Lexer::from_memory("foo", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let list = parser.list().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(list.0.len(), 1);
@@ -239,7 +238,7 @@ mod tests {
     #[test]
     fn parser_list_one_item_with_last_semicolon() {
         let mut lexer = Lexer::from_memory("foo;", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let list = parser.list().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(list.0.len(), 1);
@@ -250,7 +249,7 @@ mod tests {
     #[test]
     fn parser_list_many_items() {
         let mut lexer = Lexer::from_memory("foo & bar ; baz&", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let list = parser.list().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(list.0.len(), 3);
@@ -276,7 +275,7 @@ mod tests {
     #[test]
     fn parser_command_line_eof() {
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.command_line().now_or_never().unwrap().unwrap();
         assert!(result.is_none());
@@ -285,7 +284,7 @@ mod tests {
     #[test]
     fn parser_command_line_command_and_newline() {
         let mut lexer = Lexer::from_memory("<<END\nfoo\nEND\n", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.command_line().now_or_never().unwrap();
         let List(items) = result.unwrap().unwrap();
@@ -311,7 +310,7 @@ mod tests {
     #[test]
     fn parser_command_line_command_without_newline() {
         let mut lexer = Lexer::from_memory("foo", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.command_line().now_or_never().unwrap();
         let list = result.unwrap().unwrap();
@@ -321,7 +320,7 @@ mod tests {
     #[test]
     fn parser_command_line_newline_only() {
         let mut lexer = Lexer::from_memory("\n", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.command_line().now_or_never().unwrap();
         let list = result.unwrap().unwrap();
@@ -331,7 +330,7 @@ mod tests {
     #[test]
     fn parser_command_line_here_doc_without_newline() {
         let mut lexer = Lexer::from_memory("<<END", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let e = parser.command_line().now_or_never().unwrap().unwrap_err();
         assert_eq!(
@@ -347,7 +346,7 @@ mod tests {
     #[test]
     fn parser_command_line_wrong_delimiter_1() {
         let mut lexer = Lexer::from_memory("foo)", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let e = parser.command_line().now_or_never().unwrap().unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::UnopenedSubshell));
@@ -360,7 +359,7 @@ mod tests {
     #[test]
     fn parser_command_line_wrong_delimiter_2() {
         let mut lexer = Lexer::from_memory("foo bar (", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let e = parser.command_line().now_or_never().unwrap().unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingSeparator));
@@ -373,7 +372,7 @@ mod tests {
     #[test]
     fn parser_command_line_wrong_delimiter_3() {
         let mut lexer = Lexer::from_memory("foo bar; ;", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let e = parser.command_line().now_or_never().unwrap().unwrap_err();
         assert_eq!(
@@ -389,7 +388,7 @@ mod tests {
     #[test]
     fn parser_maybe_compound_list_empty() {
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.maybe_compound_list().now_or_never().unwrap();
         let list = result.unwrap();
@@ -399,7 +398,7 @@ mod tests {
     #[test]
     fn parser_maybe_compound_list_some_commands() {
         let mut lexer = Lexer::from_memory("echo; ls& cat", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.maybe_compound_list().now_or_never().unwrap();
         let list = result.unwrap();
@@ -409,7 +408,7 @@ mod tests {
     #[test]
     fn parser_maybe_compound_list_some_commands_with_newline() {
         let mut lexer = Lexer::from_memory("echo& ls\n\ncat\n\n", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.maybe_compound_list().now_or_never().unwrap();
         let list = result.unwrap();
@@ -421,7 +420,7 @@ mod tests {
     #[test]
     fn parser_maybe_compound_list_empty_with_delimiter() {
         let mut lexer = Lexer::from_memory("}", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.maybe_compound_list().now_or_never().unwrap();
         let list = result.unwrap();
@@ -433,7 +432,7 @@ mod tests {
     #[test]
     fn parser_maybe_compound_list_empty_with_invalid_delimiter() {
         let mut lexer = Lexer::from_memory(";", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.maybe_compound_list().now_or_never().unwrap();
         let e = result.unwrap_err();
@@ -450,7 +449,7 @@ mod tests {
     #[test]
     fn parser_maybe_compound_list_some_commands_with_invalid_delimiter() {
         let mut lexer = Lexer::from_memory("echo; ls\n &", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer, &EmptyGlossary);
+        let mut parser = Parser::new(&mut lexer);
 
         let result = parser.maybe_compound_list().now_or_never().unwrap();
         let e = result.unwrap_err();

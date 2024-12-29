@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Type definitions for built-in utilities.
+//! Type definitions for built-in utilities
 //!
 //! This module provides data types for defining built-in utilities.
 //!
@@ -33,7 +33,7 @@ use std::pin::Pin;
 
 pub mod getopts;
 
-/// Types of built-in utilities.
+/// Types of built-in utilities
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Type {
     /// Special built-in
@@ -102,7 +102,7 @@ pub enum Type {
     Substitutive,
 }
 
-/// Result of built-in utility execution.
+/// Result of built-in utility execution
 ///
 /// The result type contains an exit status and optional flags that may affect
 /// the behavior of the shell following the built-in execution.
@@ -234,7 +234,7 @@ impl From<ExitStatus> for Result {
     }
 }
 
-/// Type of functions that implement the behavior of a built-in.
+/// Type of functions that implement the behavior of a built-in
 ///
 /// The function takes two arguments.
 /// The first is an environment in which the built-in is executed.
@@ -242,13 +242,23 @@ impl From<ExitStatus> for Result {
 /// (not including the leading command name word).
 pub type Main = fn(&mut Env, Vec<Field>) -> Pin<Box<dyn Future<Output = Result> + '_>>;
 
-/// Built-in utility definition.
+/// Built-in utility definition
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Builtin {
-    /// Type of the built-in.
+    /// Type of the built-in
     pub r#type: Type,
-    /// Function that implements the behavior of the built-in.
+
+    /// Function that implements the behavior of the built-in
     pub execute: Main,
+
+    /// Whether the built-in is a declaration utility
+    ///
+    /// The [`yash_syntax::decl_util::Glossary`] implementation for [`Env`] uses
+    /// this field to determine whether a command name is a declaration utility.
+    /// See the [method description] for the value this field should have.
+    ///
+    /// [method description]: yash_syntax::decl_util::Glossary::is_declaration_utility
+    pub is_declaration_utility: Option<bool>,
 }
 
 impl Debug for Builtin {

@@ -129,6 +129,7 @@ mod tests {
                         )
                     }))
                 },
+                is_declaration_utility: Some(false),
             },
         );
         let command: syntax::SimpleCommand = "foo".parse().unwrap();
@@ -184,6 +185,7 @@ mod tests {
                         result
                     })
                 },
+                is_declaration_utility: Some(false),
             },
         );
         let command: syntax::SimpleCommand = "exec >/tmp/file".parse().unwrap();
@@ -284,6 +286,7 @@ mod tests {
             Builtin {
                 r#type: yash_env::builtin::Type::Mandatory,
                 execute: builtin_main,
+                is_declaration_utility: Some(false),
             },
         );
         env.builtins.insert(
@@ -291,6 +294,7 @@ mod tests {
             Builtin {
                 r#type: yash_env::builtin::Type::Special,
                 execute: special_main,
+                is_declaration_utility: Some(false),
             },
         );
         let command: syntax::SimpleCommand = "builtin".parse().unwrap();

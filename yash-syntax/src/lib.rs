@@ -39,6 +39,7 @@
 //! aliases that are recognized while parsing.
 
 pub mod alias;
+pub mod decl_util;
 pub mod input;
 pub mod parser;
 pub mod source;

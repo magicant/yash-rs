@@ -465,6 +465,7 @@ impl Env {
 
 mod alias;
 pub mod builtin;
+mod decl_util;
 pub mod function;
 pub mod input;
 pub mod io;

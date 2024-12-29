@@ -581,14 +581,31 @@ impl Redir {
     }
 }
 
+/// Expansion style of a simple command word
+///
+/// This enum specifies how a [`Word`] in a [`SimpleCommand`] should be expanded
+/// at runtime. The expansion mode is determined by whether the command name is
+/// a declaration utility and whether the word is in the form of an assignment.
+/// See the [`decl_util` module](crate::decl_util) for details.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExpansionMode {
+    /// Expand the word to a single field
+    Single,
+    /// Expand the word to multiple fields
+    Multiple,
+}
+
 /// Command that involves assignments, redirections, and word expansions
 ///
 /// In the shell language syntax, a valid simple command must contain at least one of assignments,
 /// redirections, and words. The parser must not produce a completely empty simple command.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SimpleCommand {
+    /// Assignments
     pub assigns: Vec<Assign>,
-    pub words: Vec<Word>,
+    /// Command name and arguments
+    pub words: Vec<(Word, ExpansionMode)>,
+    /// Redirections
     pub redirs: Rc<Vec<Redir>>,
 }
 
@@ -607,7 +624,7 @@ impl SimpleCommand {
     /// Tests whether the first word of the simple command is a keyword.
     #[must_use]
     fn first_word_is_keyword(&self) -> bool {
-        let Some(word) = self.words.first() else {
+        let Some((word, _)) = self.words.first() else {
             return false;
         };
         let Some(literal) = word.to_string_if_literal() else {

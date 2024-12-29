@@ -5,6 +5,32 @@ All notable changes to `yash-syntax` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - Unreleased
+
+This version adds support for declaration utilities. It also reorganizes how the
+parser is configured on construction, so that the parser can be constructed with
+more flexible and readable configurations.
+
+### Added
+
+- The `syntax::ExpansionMode` enum is added to represent how a word is expanded.
+- The `decl_util` module is added, which contains the `Glossary` trait and the
+  `EmptyGlossary` and `PosixGlossary` structs.
+- Added the `Config` struct to the `parser` module. Currently, it allows
+  setting glossaries for aliases and declaration utilities.
+- The `syntax::Word::parse_tilde_everywhere_after` method is added.
+
+### Changed
+
+- The `syntax::SimpleCommand::words` field is now a `Vec<(Word, ExpansionMode)>`
+  instead of a `Vec<Word>`.
+- The `parser::Parser::new` function now only takes a `&mut Lexer` argument.
+  The `&dyn alias::Glossary` argument has been removed in favor of the `Config`
+  struct.
+- When a simple command is parsed, the parser now checks if the command name is
+  a declaration utility. If it is, following words in an assignment form are
+  parsed like assignments.
+
 ## [0.13.0] - 2024-12-14
 
 ### Added
@@ -404,6 +430,7 @@ command.
 - Functionalities to parse POSIX shell scripts
 - Alias substitution support
 
+[0.14.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.14.0
 [0.13.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.13.0
 [0.12.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.12.1
 [0.12.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.12.0

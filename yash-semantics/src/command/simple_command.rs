@@ -23,7 +23,7 @@
 
 use crate::command::Command;
 use crate::command_search::search;
-use crate::expansion::expand_words;
+use crate::expansion::expand_word_with_mode;
 use crate::xtrace::XTrace;
 use crate::Handle;
 use std::ffi::CString;
@@ -31,7 +31,6 @@ use std::ops::ControlFlow::Continue;
 #[cfg(doc)]
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
-#[cfg(doc)]
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 #[cfg(doc)]
@@ -40,6 +39,8 @@ use yash_env::variable::Scope;
 use yash_env::Env;
 use yash_syntax::syntax;
 use yash_syntax::syntax::Assign;
+use yash_syntax::syntax::ExpansionMode;
+use yash_syntax::syntax::Word;
 
 /// Executes the simple command.
 ///
@@ -191,6 +192,21 @@ impl Command for syntax::SimpleCommand {
 
         env.apply_errexit()
     }
+}
+
+async fn expand_words(
+    env: &mut Env,
+    words: &[(Word, ExpansionMode)],
+) -> crate::expansion::Result<(Vec<Field>, Option<ExitStatus>)> {
+    let mut fields = Vec::new();
+    let mut last_exit_status = None;
+    for (word, mode) in words {
+        let exit_status = expand_word_with_mode(env, word, *mode, &mut fields).await?;
+        if exit_status.is_some() {
+            last_exit_status = exit_status;
+        }
+    }
+    Ok((fields, last_exit_status))
 }
 
 async fn perform_assignments(

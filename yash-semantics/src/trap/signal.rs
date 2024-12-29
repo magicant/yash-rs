@@ -211,8 +211,14 @@ mod tests {
         }
         let system = VirtualSystem::default();
         let mut env = Env::with_system(Box::new(system.clone()));
-        let r#type = yash_env::builtin::Type::Mandatory;
-        env.builtins.insert("check", Builtin { r#type, execute });
+        env.builtins.insert(
+            "check",
+            Builtin {
+                r#type: yash_env::builtin::Type::Mandatory,
+                execute,
+                is_declaration_utility: Some(false),
+            },
+        );
         env.traps
             .set_action(
                 &mut env.system,

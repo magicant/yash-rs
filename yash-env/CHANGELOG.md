@@ -5,6 +5,18 @@ All notable changes to `yash-env` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - Unreleased
+
+### Added
+
+- The `Env` struct now implements `yash_syntax::decl_util::Glossary`.
+- The `builtin::Builtin` struct now has the `is_declaration_utility` field.
+
+### Changed
+
+- External dependency versions:
+    - yash-syntax 0.13.0 → 0.14.0
+
 ## [0.5.0] - 2024-12-14
 
 ### Changed
@@ -315,6 +327,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial implementation of the `yash-env` crate
 
+[0.6.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.6.0
 [0.5.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.5.0
 [0.4.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.4.0
 [0.3.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.3.0

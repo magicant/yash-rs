@@ -142,7 +142,10 @@ impl<'a, 'b> ReadEvalLoop<'a, 'b> {
                 verbose.set(self.env.options.get(Verbose));
             }
 
-            let mut parser = Parser::new(self.lexer, &self.env.aliases);
+            let mut parser = Parser::config()
+                .aliases(&self.env)
+                .declaration_utilities(&self.env)
+                .input(self.lexer);
             match parser.command_line().await {
                 Ok(Some(command)) => {
                     run_traps_for_caught_signals(self.env).await?;

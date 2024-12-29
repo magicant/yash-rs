@@ -114,6 +114,7 @@ mod tests {
             Builtin {
                 r#type: Special,
                 execute: |_, _| unreachable!(),
+                is_declaration_utility: Some(false),
             },
         );
         let invoke = Invoke {
@@ -152,6 +153,7 @@ mod tests {
                         make_result()
                     })
                 },
+                is_declaration_utility: Some(false),
             },
             path: None,
         };
@@ -181,6 +183,7 @@ mod tests {
                         )
                     })
                 },
+                is_declaration_utility: Some(false),
             },
         );
         let body: FullCompoundCommand = "{ : \"$@\"; }".parse().unwrap();
