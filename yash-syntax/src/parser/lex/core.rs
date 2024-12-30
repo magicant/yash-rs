@@ -153,6 +153,10 @@ fn ex<I: IntoIterator<Item = SourceChar>>(i: I) -> impl Iterator<Item = SourceCh
 
 /// Core part of the lexical analyzer
 struct LexerCore<'a> {
+    // The `input` field could be a `&'a mut dyn InputObject + 'a`, but it is
+    // `Box<dyn InputObject + 'a>` to allow the lexer to take ownership of the
+    // input object. This is necessary for `Lexer::with_code` and similarly
+    // constructed lexers.
     input: Box<dyn InputObject + 'a>,
     state: InputState,
     raw_code: Rc<Code>,
