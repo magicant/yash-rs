@@ -128,6 +128,12 @@ impl Memory<'_> {
     }
 }
 
+impl<'a> From<&'a str> for Memory<'a> {
+    fn from(code: &'a str) -> Memory<'a> {
+        Memory::new(code)
+    }
+}
+
 impl Input for Memory<'_> {
     async fn next_line(&mut self, _context: &Context) -> Result {
         Ok(self.lines.next().unwrap_or("").to_owned())

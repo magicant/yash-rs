@@ -21,6 +21,7 @@ more flexible and readable configurations.
 - Added the `Config` struct to the `parser::lex` module. Currently, it allows
   setting the starting line number and the source information for the lexer.
 - The `syntax::Word::parse_tilde_everywhere_after` method is added.
+- The `From<&str>` trait is now implemented for `input::Memory`.
 
 ### Changed
 
