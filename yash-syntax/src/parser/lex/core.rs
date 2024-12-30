@@ -441,6 +441,7 @@ impl fmt::Debug for LexerCore<'_> {
 /// [`skip_blanks_and_comment`](Lexer::skip_blanks_and_comment) depend on those primitives to
 /// parse more complex structures in the source code.
 #[derive(Debug)]
+#[must_use]
 pub struct Lexer<'a> {
     // `Lexer` is a thin wrapper around `LexerCore`. `Lexer` delegates most
     // functions to `LexerCore`. `Lexer` adds automatic line-continuation
@@ -451,7 +452,6 @@ pub struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     /// Creates a new lexer that reads using the given input function.
-    #[must_use]
     pub fn new(
         input: Box<dyn InputObject + 'a>,
         start_line_number: NonZeroU64,
@@ -467,7 +467,6 @@ impl<'a> Lexer<'a> {
     ///
     /// This is a convenience function that creates a lexer that reads from a
     /// string using a [`Memory`] input function. The line number starts from 1.
-    #[must_use]
     pub fn from_memory<S: Into<Rc<Source>>>(code: &'a str, source: S) -> Lexer<'a> {
         fn inner(code: &str, source: Rc<Source>) -> Lexer {
             let line = NonZeroU64::new(1).unwrap();

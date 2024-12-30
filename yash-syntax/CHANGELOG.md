@@ -30,6 +30,7 @@ more flexible and readable configurations.
 - When a simple command is parsed, the parser now checks if the command name is
   a declaration utility. If it is, following words in an assignment form are
   parsed like assignments.
+- The `parser::lex::Lexer` struct is now `#[must_use]`.
 
 ## [0.13.0] - 2024-12-14
 
