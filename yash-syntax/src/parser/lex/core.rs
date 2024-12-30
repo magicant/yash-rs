@@ -474,11 +474,12 @@ impl Config {
 
     /// Creates a lexer with the given input object.
     pub fn input<'a>(self, input: Box<dyn InputObject + 'a>) -> Lexer<'a> {
-        Lexer::new(
-            input,
-            self.start_line_number,
-            self.source.unwrap_or_else(|| Rc::new(Source::Unknown)),
-        )
+        let start_line_number = self.start_line_number;
+        let source = self.source.unwrap_or_else(|| Rc::new(Source::Unknown));
+        Lexer {
+            core: LexerCore::new(input, start_line_number, source),
+            line_continuation_enabled: true,
+        }
     }
 }
 
@@ -537,15 +538,12 @@ impl<'a> Lexer<'a> {
     }
 
     /// Creates a new lexer that reads using the given input function.
-    pub fn new(
-        input: Box<dyn InputObject + 'a>,
-        start_line_number: NonZeroU64,
-        source: Rc<Source>,
-    ) -> Lexer<'a> {
-        Lexer {
-            core: LexerCore::new(input, start_line_number, source),
-            line_continuation_enabled: true,
-        }
+    ///
+    /// This is a convenience function that creates a lexer with the given input
+    /// object and the default configuration. To customize the configuration,
+    /// use the [`config`](Self::config) function.
+    pub fn new(input: Box<dyn InputObject + 'a>) -> Lexer<'a> {
+        Self::config().input(input)
     }
 
     /// Creates a new lexer with a fixed source code.
@@ -554,8 +552,9 @@ impl<'a> Lexer<'a> {
     /// string using a [`Memory`] input function. The line number starts from 1.
     pub fn from_memory<S: Into<Rc<Source>>>(code: &'a str, source: S) -> Lexer<'a> {
         fn inner(code: &str, source: Rc<Source>) -> Lexer {
-            let line = NonZeroU64::new(1).unwrap();
-            Lexer::new(Box::new(Memory::new(code)), line, source)
+            let mut config = Lexer::config();
+            config.source = Some(source);
+            config.input(Box::new(Memory::new(code)))
         }
         inner(code, source.into())
     }

@@ -447,8 +447,6 @@ mod tests {
     use crate::syntax::TextUnit;
     use crate::syntax::WordUnit;
     use futures_util::FutureExt;
-    use std::num::NonZeroU64;
-    use std::rc::Rc;
 
     fn ensure_sorted(trie: &Trie) {
         assert!(
@@ -559,12 +557,7 @@ mod tests {
             }
         }
 
-        let line_number = NonZeroU64::new(1).unwrap();
-        let mut lexer = Lexer::new(
-            Box::new(OneLineInput(Some("\n".to_owned()))),
-            line_number,
-            Rc::new(Source::Unknown),
-        );
+        let mut lexer = Lexer::new(Box::new(OneLineInput(Some("\n".to_owned()))));
 
         let t = lexer.operator().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(t.word.units, [WordUnit::Unquoted(TextUnit::Literal('\n'))]);

@@ -43,7 +43,6 @@
 //! # use futures_util::future::FutureExt as _;
 //! # async {
 //! use std::cell::RefCell;
-//! use std::num::NonZeroU64;
 //! use std::ops::ControlFlow::Continue;
 //! use yash_env::Env;
 //! use yash_env::input::FdReader;
@@ -58,7 +57,9 @@
 //! let reader = FdReader::new(Fd::STDIN, env.system.clone());
 //! let mut ref_env = RefCell::new(&mut env);
 //! let input = Box::new(Prompter::new(reader, &ref_env));
-//! let mut lexer = Lexer::new(input, NonZeroU64::MIN, Source::Stdin.into());
+//! let mut config = Lexer::config();
+//! config.source = Some(Source::Stdin.into());
+//! let mut lexer = config.input(input);
 //! let result = read_eval_loop(&ref_env, &mut lexer).await;
 //! drop(lexer);
 //! assert_eq!(result, Continue(()));

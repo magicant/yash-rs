@@ -33,6 +33,9 @@ more flexible and readable configurations.
   a declaration utility. If it is, following words in an assignment form are
   parsed like assignments.
 - The `parser::lex::Lexer` struct is now `#[must_use]`.
+- The `parser::lex::Lexer::new` method now only takes a `Box<dyn InputObject>`
+  argument. The `start_line_number: NonZeroU64` and `source: Rc<Source>`
+  arguments have been removed in favor of construction with a `Config` struct.
 
 ## [0.13.0] - 2024-12-14
 

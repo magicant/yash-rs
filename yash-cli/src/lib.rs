@@ -31,7 +31,6 @@ use self::startup::init_file::run_rcfile;
 use self::startup::input::prepare_input;
 use self::startup::input::SourceInput;
 use std::cell::RefCell;
-use std::num::NonZeroU64;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::option::{Interactive, On};
 use yash_env::signal;
@@ -95,8 +94,9 @@ async fn parse_and_print(mut env: Env) -> ExitStatus {
             };
         }
     };
-    let line = NonZeroU64::new(1).unwrap();
-    let mut lexer = Lexer::new(input, line, source.into());
+    let mut config = Lexer::config();
+    config.source = Some(source.into());
+    let mut lexer = config.input(input);
 
     // Run the read-eval loop
     let result = if is_interactive {

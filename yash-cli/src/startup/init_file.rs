@@ -30,7 +30,6 @@
 use super::args::InitFile;
 use std::cell::RefCell;
 use std::ffi::CString;
-use std::num::NonZeroU64;
 use std::rc::Rc;
 use thiserror::Error;
 use yash_env::input::{Echo, FdReader};
@@ -171,12 +170,12 @@ pub async fn run_init_file(env: &mut Env, path: &str) {
     let env = &mut *env.push_frame(Frame::InitFile);
     let system = env.system.clone();
     let ref_env = RefCell::new(&mut *env);
-    let input = Box::new(Echo::new(FdReader::new(fd, system), &ref_env));
-    let start_line_number = NonZeroU64::MIN;
-    let source = Rc::new(Source::InitFile {
+    let mut config = Lexer::config();
+    config.source = Some(Rc::new(Source::InitFile {
         path: path.to_owned(),
-    });
-    let mut lexer = Lexer::new(input, start_line_number, source);
+    }));
+    let input = Box::new(Echo::new(FdReader::new(fd, system), &ref_env));
+    let mut lexer = config.input(input);
     read_eval_loop(&ref_env, &mut { lexer }).await;
 
     if let Err(errno) = env.system.close(fd) {

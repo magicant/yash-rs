@@ -33,15 +33,11 @@
 //! ```
 //! // First, prepare an input object that the lexer reads from.
 //! use yash_syntax::input::Memory;
-//! use yash_syntax::source::Source;
-//! # // TODO demonstrate with a Source other than Unknown
 //! let input = Box::new(Memory::new("echo $?"));
 //!
 //! // Next, create a lexer.
-//! use std::num::NonZeroU64;
 //! use yash_syntax::parser::lex::Lexer;
-//! let line = NonZeroU64::new(1).unwrap();
-//! let mut lexer = Lexer::new(input, line, Source::Unknown.into());
+//! let mut lexer = Lexer::new(input);
 //!
 //! // Then, create a new parser borrowing the lexer.
 //! use yash_syntax::parser::Parser;
