@@ -17,7 +17,9 @@ more flexible and readable configurations.
 - The `decl_util` module is added, which contains the `Glossary` trait and the
   `EmptyGlossary` and `PosixGlossary` structs.
 - Added the `Config` struct to the `parser` module. Currently, it allows
-  setting glossaries for aliases and declaration utilities.
+  setting glossaries for aliases and declaration utilities for the parser.
+- Added the `Config` struct to the `parser::lex` module. Currently, it allows
+  setting the starting line number and the source information for the lexer.
 - The `syntax::Word::parse_tilde_everywhere_after` method is added.
 
 ### Changed

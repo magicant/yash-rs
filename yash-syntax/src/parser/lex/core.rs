@@ -430,6 +430,64 @@ impl fmt::Debug for LexerCore<'_> {
     }
 }
 
+/// Configuration for the [lexer](Lexer)
+///
+/// `Config` is a builder for the lexer. A [new](Self::new) instance is created
+/// with default settings. You can then customize the settings by modifying the
+/// corresponding fields. Finally, you can pass an input object to the
+/// [`input`](Self::input) method to create a lexer.
+#[derive(Debug)]
+#[must_use = "you must call `input` to create a lexer"]
+#[non_exhaustive]
+pub struct Config {
+    /// Line number for the first line of the input
+    ///
+    /// The lexer counts the line number from this value to annotate the
+    /// location of the tokens. The line number is saved in the
+    /// `start_line_number` field of the [`Code`] instance that is contained in
+    /// the [`Location`] instance of the token.
+    ///
+    /// The default value is 1.
+    pub start_line_number: NonZeroU64,
+
+    /// Source of the input
+    ///
+    /// The source is used to annotate the location of the tokens. This value
+    /// is saved in the `source` field of the [`Code`] instance that is
+    /// contained in the [`Location`] instance of the token.
+    ///
+    /// The default value is `None`, in which case the source is set to
+    /// [`Source::Unknown`].
+    pub source: Option<Rc<Source>>,
+}
+
+impl Config {
+    /// Creates a new configuration with default settings.
+    ///
+    /// You can also call [`Lexer::config`] to create a new configuration.
+    pub fn new() -> Self {
+        Config {
+            start_line_number: NonZeroU64::MIN,
+            source: None,
+        }
+    }
+
+    /// Creates a lexer with the given input object.
+    pub fn input<'a>(self, input: Box<dyn InputObject + 'a>) -> Lexer<'a> {
+        Lexer::new(
+            input,
+            self.start_line_number,
+            self.source.unwrap_or_else(|| Rc::new(Source::Unknown)),
+        )
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Lexical analyzer.
 ///
 /// A lexer reads lines using an input function and parses the characters into tokens. It has an
@@ -439,7 +497,25 @@ impl fmt::Debug for LexerCore<'_> {
 /// `Lexer` has primitive functions such as [`peek_char`](Lexer::peek_char) that provide access
 /// to the character at the current position. Derived functions such as
 /// [`skip_blanks_and_comment`](Lexer::skip_blanks_and_comment) depend on those primitives to
-/// parse more complex structures in the source code.
+/// parse more complex structures in the source code. Usually, the lexer is used by a
+/// [parser](super::super::Parser) to read the source code and produce a syntax
+/// tree, so you don't need to call these functions directly.
+///
+/// To construct a lexer, you can use the [`Lexer::new`] function with an input object.
+/// You can also use the [`Lexer::config`] function to create a configuration that allows you to
+/// customize the settings before creating a lexer.
+///
+/// ```
+/// # use yash_syntax::input::Memory;
+/// # use yash_syntax::parser::{lex::Lexer, Parser};
+/// # use yash_syntax::source::Source;
+/// let mut config = Lexer::config();
+/// config.start_line_number = 10.try_into().unwrap();
+/// config.source = Some(Source::CommandString.into());
+/// let mut lexer = config.input(Box::new(Memory::new("echo hello\n")));
+/// let mut parser = Parser::new(&mut lexer);
+/// _ = parser.command_line();
+/// ```
 #[derive(Debug)]
 #[must_use]
 pub struct Lexer<'a> {
@@ -451,6 +527,15 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
+    /// Creates a new configuration with default settings.
+    ///
+    /// This is a synonym for [`Config::new`]. You can modify the settings and
+    /// then create a lexer with the [`input`](Config::input) method.
+    #[inline(always)]
+    pub fn config() -> Config {
+        Config::new()
+    }
+
     /// Creates a new lexer that reads using the given input function.
     pub fn new(
         input: Box<dyn InputObject + 'a>,
