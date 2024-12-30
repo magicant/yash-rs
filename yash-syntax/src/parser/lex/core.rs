@@ -457,7 +457,11 @@ pub struct Config {
     /// contained in the [`Location`] instance of the token.
     ///
     /// The default value is `None`, in which case the source is set to
-    /// [`Source::Unknown`].
+    /// [`Source::Unknown`]. It is recommended to set this to a more informative
+    /// value, so that the locations in the parsed syntax tree can be traced
+    /// back to the source code. Especially, the correct source is necessary to
+    /// indicate the location of possible errors that occur during parsing and
+    /// execution.
     pub source: Option<Rc<Source>>,
 }
 
@@ -542,6 +546,12 @@ impl<'a> Lexer<'a> {
     /// This is a convenience function that creates a lexer with the given input
     /// object and the default configuration. To customize the configuration,
     /// use the [`config`](Self::config) function.
+    ///
+    /// This function is best used for testing or for simple cases where you
+    /// don't need to customize the lexer. For practical use, it is recommended
+    /// to use the [`config`](Self::config) function to create a configuration
+    /// and provide it with supplementary information, especially
+    /// [`source`](Config::source), before creating a lexer.
     pub fn new(input: Box<dyn InputObject + 'a>) -> Lexer<'a> {
         Self::config().input(input)
     }
