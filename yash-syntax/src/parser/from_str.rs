@@ -49,7 +49,7 @@ async fn reject_redundant_token(parser: &mut Parser<'_, '_>) -> Result<(), Error
     }
 }
 
-/// Helper for implementing FromStr.
+/// Helper for implementing FromStr
 trait Shift {
     type Output;
     fn shift(self) -> Self::Output;

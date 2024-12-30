@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Extension of the core for implementing the rest of the lexer.
+//! Extension of the core for implementing the rest of the lexer
 
 use super::core::is_blank;
 use super::core::Lexer;

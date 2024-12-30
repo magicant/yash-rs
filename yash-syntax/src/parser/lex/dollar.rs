@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Part of the lexer that parses dollar units.
+//! Part of the lexer that parses dollar units
 //!
 //! Note that the detail lexer for each type of dollar units in another
 //! dedicated module.

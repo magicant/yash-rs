@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Part of the lexer that parses suffix modifiers.
+//! Part of the lexer that parses suffix modifiers
 
 use super::core::Lexer;
 use super::core::WordContext;

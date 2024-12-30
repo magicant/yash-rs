@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Methods about passing [source](crate::source) code to the [parser](crate::parser).
+//! Methods about passing [source](crate::source) code to the [parser](crate::parser)
 
 use std::future::Future;
 use std::ops::DerefMut;
@@ -56,10 +56,10 @@ impl Context {
     }
 }
 
-/// Error returned by the [Input] function.
+/// Error returned by the [Input] function
 pub type Error = std::io::Error;
 
-/// Result of the [Input] function.
+/// Result of the [Input] function
 pub type Result = std::result::Result<String, Error>;
 
 /// Line-oriented source code reader
@@ -115,7 +115,7 @@ impl<T: Input> InputObject for T {
     }
 }
 
-/// Input function that reads from a string in memory.
+/// Input function that reads from a string in memory
 pub struct Memory<'a> {
     lines: std::str::SplitInclusive<'a, char>,
 }

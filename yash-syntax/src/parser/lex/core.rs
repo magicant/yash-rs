@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Fundamental building blocks for the lexical analyzer.
+//! Fundamental building blocks for the lexical analyzer
 
 use super::keyword::Keyword;
 use super::op::Operator;
@@ -46,7 +46,7 @@ pub fn is_blank(c: char) -> bool {
     c != '\n' && c.is_whitespace()
 }
 
-/// Result of [`LexerCore::peek_char`].
+/// Result of [`LexerCore::peek_char`]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum PeekChar<'a> {
     Char(&'a SourceChar),
@@ -64,7 +64,7 @@ impl<'a> PeekChar<'a> {
     }
 }
 
-/// Token identifier, or classification of tokens.
+/// Token identifier, or classification of tokens
 ///
 /// This enum classifies a token as defined in POSIX XCU 2.10.1 Shell Grammar Lexical
 /// Conventions, but does not exactly reflect further distinction defined in
@@ -85,7 +85,7 @@ pub enum TokenId {
     Operator(Operator),
     /// `IO_NUMBER`
     IoNumber,
-    /// Imaginary token identifier for the end of input.
+    /// Imaginary token identifier for the end of input
     EndOfInput,
 }
 
@@ -108,18 +108,18 @@ impl TokenId {
     }
 }
 
-/// Result of lexical analysis produced by the [`Lexer`].
+/// Result of lexical analysis produced by the [`Lexer`]
 #[derive(Debug)]
 pub struct Token {
-    /// Content of the token.
+    /// Content of the token
     ///
     /// The word value contains at least one [unit](crate::syntax::WordUnit),
     /// regardless of whether the token is an operator. The only exception is
     /// when `id` is `EndOfInput`, in which case the word is empty.
     pub word: Word,
-    /// Token identifier.
+    /// Token identifier
     pub id: TokenId,
-    /// Position of the first character of the word.
+    /// Position of the first character of the word
     pub index: usize,
 }
 
@@ -129,7 +129,7 @@ impl fmt::Display for Token {
     }
 }
 
-/// State of the input function in a lexer.
+/// State of the input function in a lexer
 #[derive(Clone, Debug)]
 enum InputState {
     Alive,
@@ -151,7 +151,7 @@ fn ex<I: IntoIterator<Item = SourceChar>>(i: I) -> impl Iterator<Item = SourceCh
     })
 }
 
-/// Core part of the lexical analyzer.
+/// Core part of the lexical analyzer
 struct LexerCore<'a> {
     input: Box<dyn InputObject + 'a>,
     state: InputState,
@@ -493,7 +493,7 @@ impl Default for Config {
     }
 }
 
-/// Lexical analyzer.
+/// Lexical analyzer
 ///
 /// A lexer reads lines using an input function and parses the characters into tokens. It has an
 /// internal buffer containing the characters that have been read and the position (or the
@@ -876,7 +876,7 @@ impl<'a> Lexer<'a> {
     }
 }
 
-/// Reference to [`Lexer`] with line continuation disabled.
+/// Reference to [`Lexer`] with line continuation disabled
 ///
 /// This struct implements the RAII pattern for temporarily disabling line
 /// continuation. When you disable the line continuation of a lexer, you get an
@@ -908,7 +908,7 @@ impl Drop for PlainLexer<'_, '_> {
     }
 }
 
-/// Context in which a [word](crate::syntax::Word) is parsed.
+/// Context in which a [word](crate::syntax::Word) is parsed
 ///
 /// The parse of the word of a [switch](crate::syntax::Switch) depends on
 /// whether the parameter expansion containing the switch is part of a text or a
@@ -925,7 +925,7 @@ pub enum WordContext {
 }
 
 /// Lexer with additional information for parsing [texts](crate::syntax::Text)
-/// and [words](crate::syntax::Word).
+/// and [words](crate::syntax::Word)
 #[derive(Debug)]
 pub struct WordLexer<'a, 'b> {
     pub lexer: &'a mut Lexer<'b>,

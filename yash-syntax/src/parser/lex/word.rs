@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Part of the lexer that parses words.
+//! Part of the lexer that parses words
 
 use super::core::Lexer;
 use super::core::WordContext;
@@ -102,7 +102,7 @@ impl WordLexer<'_, '_> {
         self.word_unit_dyn(&is_delimiter).await
     }
 
-    /// Dynamic version of [`Self::word_unit`].
+    /// Dynamic version of [`Self::word_unit`]
     async fn word_unit_dyn(
         &mut self,
         is_delimiter: &dyn Fn(char) -> bool,

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Syntax parser for the shell language.
+//! Syntax parser for the shell language
 //!
 //! The shell language parsing system has two important components: the lexical
 //! analyzer and the syntax parser.

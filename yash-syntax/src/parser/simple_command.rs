@@ -55,7 +55,7 @@ fn determine_expansion_mode(word: Word) -> (Word, ExpansionMode) {
     (word, ExpansionMode::Multiple)
 }
 
-/// Simple command builder.
+/// Simple command builder
 #[derive(Default)]
 struct Builder {
     assigns: Vec<Assign>,

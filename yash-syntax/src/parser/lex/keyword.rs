@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Types and functions for parsing reserved words.
+//! Types and functions for parsing reserved words
 
 use std::fmt;
 use std::str::FromStr;
@@ -33,7 +33,7 @@ impl fmt::Display for ParseKeywordError {
     }
 }
 
-/// Token identifier for reserved words.
+/// Token identifier for reserved words
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Keyword {
     Bang,

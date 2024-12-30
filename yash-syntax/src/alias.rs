@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Defining aliases.
+//! Defining aliases
 //!
 //! This module provides data structures for defining aliases in the shell
 //! execution environment.
@@ -28,21 +28,21 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use std::rc::Rc;
 
-/// Name-value pair that defines an alias.
+/// Name-value pair that defines an alias
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Alias {
-    /// Name of the alias that is matched against a command word by the syntax parser.
+    /// Name of the alias that is matched against a command word by the syntax parser
     pub name: String,
-    /// String that substitutes part of the source code when it is found to match the alias name.
+    /// String that substitutes part of the source code when it is found to match the alias name
     pub replacement: String,
-    /// Whether this alias is a global alias or not.
+    /// Whether this alias is a global alias or not
     pub global: bool,
     /// Location of the word in the simple command that invoked the alias built-in to define this
-    /// alias.
+    /// alias
     pub origin: Location,
 }
 
-/// Wrapper of [`Alias`] for inserting into a hash set.
+/// Wrapper of [`Alias`] for inserting into a hash set
 ///
 /// A `HashEntry` wraps an `Alias` in `Rc` so that the alias definition can be referred to even
 /// after the definition is removed. The `Hash` and `PartialEq` implementation for `HashEntry`
@@ -94,10 +94,10 @@ impl Borrow<str> for HashEntry {
     }
 }
 
-/// Collection of aliases.
+/// Collection of aliases
 pub type AliasSet = HashSet<HashEntry>;
 
-/// Interface used by the parser to look up aliases.
+/// Interface used by the parser to look up aliases
 ///
 /// This trait is an abstract interface that represents an immutable collection
 /// of aliases. The parser uses this trait to look up aliases when it encounters
@@ -137,7 +137,7 @@ impl Glossary for AliasSet {
     }
 }
 
-/// Empty glossary that does not contain any aliases.
+/// Empty glossary that does not contain any aliases
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct EmptyGlossary;
 

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Fundamentals for implementing the parser.
+//! Fundamentals for implementing the parser
 //!
 //! This module includes common types that are used as building blocks for constructing the syntax
 //! parser.
@@ -32,11 +32,11 @@ use crate::syntax::MaybeLiteral;
 use crate::syntax::Word;
 use std::rc::Rc;
 
-/// Entire result of parsing.
+/// Entire result of parsing
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Modifier that makes a result of parsing optional in order to trigger the parser to restart
-/// parsing after alias substitution.
+/// parsing after alias substitution
 ///
 /// `Rec` stands for "recursion", as it is used to make the parser work recursively.
 ///
@@ -55,9 +55,9 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// variant. The caller then continues the remaining parse.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Rec<T> {
-    /// Result of alias substitution.
+    /// Result of alias substitution
     AliasSubstituted,
-    /// Successful parse result.
+    /// Successful parse result
     Parsed(T),
 }
 
@@ -94,7 +94,7 @@ impl<T> Rec<T> {
     }
 }
 
-/// Set of parameters for constructing a [parser](Parser).
+/// Set of parameters for constructing a [parser](Parser)
 ///
 /// `Config` is a builder for constructing a parser. A [new](Self::new)
 /// configuration starts with default settings. You can customize them by

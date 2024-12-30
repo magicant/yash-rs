@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Part of the lexer that parses texts.
+//! Part of the lexer that parses texts
 
 use super::core::Lexer;
 use super::core::WordContext;
@@ -58,7 +58,7 @@ impl WordLexer<'_, '_> {
             .await
     }
 
-    /// Dynamic version of [`Self::text_unit`].
+    /// Dynamic version of [`Self::text_unit`]
     async fn text_unit_dyn(
         &mut self,
         is_delimiter: &mut dyn FnMut(char) -> bool,
@@ -124,7 +124,7 @@ impl Lexer<'_> {
         self.text_dyn(&mut is_delimiter, &mut is_escapable).await
     }
 
-    /// Dynamic version of [`Self::text`].
+    /// Dynamic version of [`Self::text`]
     async fn text_dyn(
         &mut self,
         is_delimiter: &mut dyn FnMut(char) -> bool,
@@ -168,7 +168,7 @@ impl Lexer<'_> {
             .await
     }
 
-    /// Dynamic version of [`Self::text_with_parentheses`].
+    /// Dynamic version of [`Self::text_with_parentheses`]
     async fn text_with_parentheses_dyn(
         &mut self,
         is_delimiter: &mut dyn FnMut(char) -> bool,

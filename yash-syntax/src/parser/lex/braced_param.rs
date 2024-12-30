@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Part of the lexer that parses braced parameter expansion.
+//! Part of the lexer that parses braced parameter expansion
 
 use super::core::WordLexer;
 use super::raw_param::is_portable_name_char;
