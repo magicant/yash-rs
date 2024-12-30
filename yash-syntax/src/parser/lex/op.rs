@@ -466,7 +466,7 @@ mod tests {
 
     #[test]
     fn lexer_operator_longest_match() {
-        let mut lexer = Lexer::from_memory("<<-", Source::Unknown);
+        let mut lexer = Lexer::with_code("<<-");
 
         let t = lexer.operator().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(t.word.units.len(), 3);
@@ -484,7 +484,7 @@ mod tests {
 
     #[test]
     fn lexer_operator_delimited_by_another_operator() {
-        let mut lexer = Lexer::from_memory("<<>", Source::Unknown);
+        let mut lexer = Lexer::with_code("<<>");
 
         let t = lexer.operator().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
@@ -504,7 +504,7 @@ mod tests {
 
     #[test]
     fn lexer_operator_delimited_by_eof() {
-        let mut lexer = Lexer::from_memory("<<", Source::Unknown);
+        let mut lexer = Lexer::with_code("<<");
 
         let t = lexer.operator().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
@@ -521,7 +521,7 @@ mod tests {
 
     #[test]
     fn lexer_operator_containing_line_continuations() {
-        let mut lexer = Lexer::from_memory("\\\n\\\n<\\\n<\\\n>", Source::Unknown);
+        let mut lexer = Lexer::with_code("\\\n\\\n<\\\n<\\\n>");
 
         let t = lexer.operator().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
@@ -538,7 +538,7 @@ mod tests {
 
     #[test]
     fn lexer_operator_none() {
-        let mut lexer = Lexer::from_memory("\\\n ", Source::Unknown);
+        let mut lexer = Lexer::with_code("\\\n ");
 
         let r = lexer.operator().now_or_never().unwrap().unwrap();
         assert!(r.is_none(), "unexpected success: {r:?}");

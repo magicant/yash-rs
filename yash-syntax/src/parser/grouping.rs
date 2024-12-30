@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn parser_grouping_short() {
-        let mut lexer = Lexer::from_memory("{ :; }", Source::Unknown);
+        let mut lexer = Lexer::with_code("{ :; }");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -118,7 +118,7 @@ mod tests {
 
     #[test]
     fn parser_grouping_long() {
-        let mut lexer = Lexer::from_memory("{ foo; bar& }", Source::Unknown);
+        let mut lexer = Lexer::with_code("{ foo; bar& }");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -130,7 +130,7 @@ mod tests {
 
     #[test]
     fn parser_grouping_unclosed() {
-        let mut lexer = Lexer::from_memory(" { oh no ", Source::Unknown);
+        let mut lexer = Lexer::with_code(" { oh no ");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn parser_grouping_empty_posix() {
-        let mut lexer = Lexer::from_memory("{ }", Source::Unknown);
+        let mut lexer = Lexer::with_code("{ }");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -164,7 +164,7 @@ mod tests {
 
     #[test]
     fn parser_grouping_aliasing() {
-        let mut lexer = Lexer::from_memory(" { :; end ", Source::Unknown);
+        let mut lexer = Lexer::with_code(" { :; end ");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn parser_subshell_short() {
-        let mut lexer = Lexer::from_memory("(:)", Source::Unknown);
+        let mut lexer = Lexer::with_code("(:)");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -213,7 +213,7 @@ mod tests {
 
     #[test]
     fn parser_subshell_long() {
-        let mut lexer = Lexer::from_memory("( foo& bar; )", Source::Unknown);
+        let mut lexer = Lexer::with_code("( foo& bar; )");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -229,7 +229,7 @@ mod tests {
 
     #[test]
     fn parser_subshell_unclosed() {
-        let mut lexer = Lexer::from_memory(" ( oh no", Source::Unknown);
+        let mut lexer = Lexer::with_code(" ( oh no");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -249,7 +249,7 @@ mod tests {
 
     #[test]
     fn parser_subshell_empty_posix() {
-        let mut lexer = Lexer::from_memory("( )", Source::Unknown);
+        let mut lexer = Lexer::with_code("( )");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();

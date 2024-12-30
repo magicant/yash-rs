@@ -80,7 +80,7 @@ mod tests {
 
     #[test]
     fn parser_and_or_list_eof() {
-        let mut lexer = Lexer::from_memory("", Source::Unknown);
+        let mut lexer = Lexer::with_code("");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.and_or_list().now_or_never().unwrap();
@@ -89,7 +89,7 @@ mod tests {
 
     #[test]
     fn parser_and_or_list_one() {
-        let mut lexer = Lexer::from_memory("foo", Source::Unknown);
+        let mut lexer = Lexer::with_code("foo");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.and_or_list().now_or_never().unwrap();
@@ -100,7 +100,7 @@ mod tests {
 
     #[test]
     fn parser_and_or_list_many() {
-        let mut lexer = Lexer::from_memory("first && second || \n\n third;", Source::Unknown);
+        let mut lexer = Lexer::with_code("first && second || \n\n third;");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.and_or_list().now_or_never().unwrap();
@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn parser_and_or_list_missing_command_after_and_and() {
-        let mut lexer = Lexer::from_memory("foo &&", Source::Unknown);
+        let mut lexer = Lexer::with_code("foo &&");
         let mut parser = Parser::new(&mut lexer);
 
         let e = parser.and_or_list().now_or_never().unwrap().unwrap_err();

@@ -278,7 +278,7 @@ mod tests {
 
     #[test]
     fn escape_unit_literal() {
-        let mut lexer = Lexer::from_memory("bar", Source::Unknown);
+        let mut lexer = Lexer::with_code("bar");
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
         assert_eq!(result, Some(Literal('b')));
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('a')));
@@ -286,7 +286,7 @@ mod tests {
 
     #[test]
     fn escape_unit_named_escapes() {
-        let mut lexer = Lexer::from_memory(r#"\""\'\\\?\a\b\e\E\f\n\r\t\v"#, Source::Unknown);
+        let mut lexer = Lexer::with_code(r#"\""\'\\\?\a\b\e\E\f\n\r\t\v"#);
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
         assert_eq!(result, Some(DoubleQuote));
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
@@ -320,7 +320,7 @@ mod tests {
 
     #[test]
     fn escape_unit_incomplete_escapes() {
-        let mut lexer = Lexer::from_memory(r"\", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\");
         let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
         assert_matches!(
             error.cause,
@@ -334,7 +334,7 @@ mod tests {
 
     #[test]
     fn escape_unit_control_escapes() {
-        let mut lexer = Lexer::from_memory(r"\cA\cz\c^\c?\c\\", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\cA\cz\c^\c?\c\\");
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
         assert_eq!(result, Some(Control(0x01)));
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
@@ -350,7 +350,7 @@ mod tests {
 
     #[test]
     fn escape_unit_incomplete_control_escape() {
-        let mut lexer = Lexer::from_memory(r"\c", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\c");
         let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
         assert_matches!(
             error.cause,
@@ -364,7 +364,7 @@ mod tests {
 
     #[test]
     fn escape_unit_incomplete_control_backslash_escapes() {
-        let mut lexer = Lexer::from_memory(r"\c\", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\c\");
         let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
         assert_matches!(
             error.cause,
@@ -375,7 +375,7 @@ mod tests {
         assert_eq!(*error.location.code.source, Source::Unknown);
         assert_eq!(error.location.range, 3..3);
 
-        let mut lexer = Lexer::from_memory(r"\c\a", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\c\a");
         let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
         assert_matches!(
             error.cause,
@@ -389,7 +389,7 @@ mod tests {
 
     #[test]
     fn escape_unit_unknown_control_escape() {
-        let mut lexer = Lexer::from_memory(r"\c!`", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\c!`");
         let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
         assert_matches!(
             error.cause,
@@ -403,7 +403,7 @@ mod tests {
 
     #[test]
     fn escape_unit_octal_escapes() {
-        let mut lexer = Lexer::from_memory(r"\0\07\234\0123", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\0\07\234\0123");
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
         assert_eq!(result, Some(Octal(0o0)));
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
@@ -415,12 +415,12 @@ mod tests {
         // At most 3 octal digits are consumed
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('3')));
 
-        let mut lexer = Lexer::from_memory(r"\787", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\787");
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
         // '8' is not an octal digit
         assert_eq!(result, Some(Octal(0o7)));
 
-        let mut lexer = Lexer::from_memory(r"\12", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\12");
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
         // Reaching the end of the input is okay
         assert_eq!(result, Some(Octal(0o12)));
@@ -428,7 +428,7 @@ mod tests {
 
     #[test]
     fn escape_unit_non_byte_octal_escape() {
-        let mut lexer = Lexer::from_memory(r"\400", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\400");
         let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
         assert_matches!(
             error.cause,
@@ -442,7 +442,7 @@ mod tests {
 
     #[test]
     fn escape_unit_hexadecimal_escapes() {
-        let mut lexer = Lexer::from_memory(r"\x0\x7F\xd4A", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\x0\x7F\xd4A");
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
         assert_eq!(result, Some(Hex(0x0)));
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
@@ -452,7 +452,7 @@ mod tests {
         assert_eq!(result, Some(Hex(0xD4)));
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('A')));
 
-        let mut lexer = Lexer::from_memory(r"\xb", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\xb");
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
         // Reaching the end of the input is okay
         assert_eq!(result, Some(Hex(0xB)));
@@ -460,7 +460,7 @@ mod tests {
 
     #[test]
     fn escape_unit_incomplete_hexadecimal_escape() {
-        let mut lexer = Lexer::from_memory(r"\x", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\x");
         let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
         assert_matches!(
             error.cause,
@@ -474,7 +474,7 @@ mod tests {
 
     #[test]
     fn escape_unit_unicode_escapes() {
-        let mut lexer = Lexer::from_memory(r"\u20\u4B9d0", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\u20\u4B9d0");
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
         assert_eq!(result, Some(Unicode('\u{20}')));
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
@@ -482,7 +482,7 @@ mod tests {
         // At most 4 hexadecimal digits are consumed
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('0')));
 
-        let mut lexer = Lexer::from_memory(r"\U42\U0001f4A9b", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\U42\U0001f4A9b");
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
         assert_eq!(result, Some(Unicode('\u{42}')));
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
@@ -493,7 +493,7 @@ mod tests {
 
     #[test]
     fn escape_unit_incomplete_unicode_escapes() {
-        let mut lexer = Lexer::from_memory(r"\u", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\u");
         let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
         assert_matches!(
             error.cause,
@@ -504,7 +504,7 @@ mod tests {
         assert_eq!(*error.location.code.source, Source::Unknown);
         assert_eq!(error.location.range, 2..2);
 
-        let mut lexer = Lexer::from_memory(r"\U", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\U");
         let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
         assert_matches!(
             error.cause,
@@ -519,7 +519,7 @@ mod tests {
     #[test]
     fn escape_unit_invalid_unicode_escapes() {
         // U+D800 is not a valid Unicode scalar value
-        let mut lexer = Lexer::from_memory(r"\uD800", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\uD800");
         let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
         assert_matches!(
             error.cause,
@@ -533,7 +533,7 @@ mod tests {
 
     #[test]
     fn escape_unit_unknown_escape() {
-        let mut lexer = Lexer::from_memory(r"\!", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\!");
         let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
         assert_matches!(error.cause, ErrorCause::Syntax(SyntaxError::InvalidEscape));
         assert_eq!(*error.location.code.value.borrow(), r"\!");
@@ -546,7 +546,7 @@ mod tests {
 
     #[test]
     fn escaped_string_literals() {
-        let mut lexer = Lexer::from_memory("foo", Source::Unknown);
+        let mut lexer = Lexer::with_code("foo");
         let EscapedString(content) = lexer
             .escaped_string(|_| false)
             .now_or_never()
@@ -557,7 +557,7 @@ mod tests {
 
     #[test]
     fn escaped_string_mixed() {
-        let mut lexer = Lexer::from_memory(r"foo\bar", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"foo\bar");
         let EscapedString(content) = lexer
             .escaped_string(|_| false)
             .now_or_never()
@@ -578,7 +578,7 @@ mod tests {
 
     #[test]
     fn no_line_continuations_in_escaped_string() {
-        let mut lexer = Lexer::from_memory("\\\\\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("\\\\\n");
         let EscapedString(content) = lexer
             .escaped_string(|_| false)
             .now_or_never()
@@ -586,7 +586,7 @@ mod tests {
             .unwrap();
         assert_eq!(content, [Backslash, Literal('\n')]);
 
-        let mut lexer = Lexer::from_memory("\\\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("\\\n");
         let error = lexer
             .escaped_string(|_| false)
             .now_or_never()
@@ -601,7 +601,7 @@ mod tests {
 
     #[test]
     fn single_quoted_escaped_string_empty() {
-        let mut lexer = Lexer::from_memory("''", Source::Unknown);
+        let mut lexer = Lexer::with_code("''");
         let result = lexer
             .single_quoted_escaped_string()
             .now_or_never()
@@ -612,7 +612,7 @@ mod tests {
 
     #[test]
     fn single_quoted_escaped_string_nonempty() {
-        let mut lexer = Lexer::from_memory(r"'foo\e'x", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"'foo\e'x");
         let result = lexer
             .single_quoted_escaped_string()
             .now_or_never()
@@ -634,7 +634,7 @@ mod tests {
 
     #[test]
     fn single_quoted_escaped_string_unclosed() {
-        let mut lexer = Lexer::from_memory("'foo", Source::Unknown);
+        let mut lexer = Lexer::with_code("'foo");
         let error = lexer
             .single_quoted_escaped_string()
             .now_or_never()

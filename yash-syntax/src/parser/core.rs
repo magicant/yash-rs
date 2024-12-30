@@ -446,14 +446,13 @@ mod tests {
     use crate::alias::AliasSet;
     use crate::alias::HashEntry;
     use crate::source::Location;
-    use crate::source::Source;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use std::cell::OnceCell;
 
     #[test]
     fn parser_take_token_manual_successful_substitution() {
-        let mut lexer = Lexer::from_memory("X", Source::Unknown);
+        let mut lexer = Lexer::with_code("X");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
@@ -474,7 +473,7 @@ mod tests {
 
     #[test]
     fn parser_take_token_manual_not_command_name() {
-        let mut lexer = Lexer::from_memory("X", Source::Unknown);
+        let mut lexer = Lexer::with_code("X");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
@@ -492,7 +491,7 @@ mod tests {
 
     #[test]
     fn parser_take_token_manual_not_literal() {
-        let mut lexer = Lexer::from_memory(r"\X", Source::Unknown);
+        let mut lexer = Lexer::with_code(r"\X");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
@@ -516,7 +515,7 @@ mod tests {
 
     #[test]
     fn parser_take_token_manual_operator() {
-        let mut lexer = Lexer::from_memory(";", Source::Unknown);
+        let mut lexer = Lexer::with_code(";");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
@@ -535,7 +534,7 @@ mod tests {
 
     #[test]
     fn parser_take_token_manual_no_match() {
-        let mut lexer = Lexer::from_memory("X", Source::Unknown);
+        let mut lexer = Lexer::with_code("X");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.take_token_manual(true).now_or_never().unwrap();
@@ -545,7 +544,7 @@ mod tests {
 
     #[test]
     fn parser_take_token_manual_recursive_substitution() {
-        let mut lexer = Lexer::from_memory("X", Source::Unknown);
+        let mut lexer = Lexer::with_code("X");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
@@ -583,7 +582,7 @@ mod tests {
 
     #[test]
     fn parser_take_token_manual_after_blank_ending_substitution() {
-        let mut lexer = Lexer::from_memory("X\tY", Source::Unknown);
+        let mut lexer = Lexer::with_code("X\tY");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
@@ -617,7 +616,7 @@ mod tests {
 
     #[test]
     fn parser_take_token_manual_not_after_blank_ending_substitution() {
-        let mut lexer = Lexer::from_memory("X\tY", Source::Unknown);
+        let mut lexer = Lexer::with_code("X\tY");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
@@ -648,7 +647,7 @@ mod tests {
 
     #[test]
     fn parser_take_token_manual_global() {
-        let mut lexer = Lexer::from_memory("X", Source::Unknown);
+        let mut lexer = Lexer::with_code("X");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
@@ -669,7 +668,7 @@ mod tests {
 
     #[test]
     fn parser_take_token_auto_non_keyword() {
-        let mut lexer = Lexer::from_memory("X", Source::Unknown);
+        let mut lexer = Lexer::with_code("X");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
@@ -686,7 +685,7 @@ mod tests {
 
     #[test]
     fn parser_take_token_auto_keyword_matched() {
-        let mut lexer = Lexer::from_memory("if", Source::Unknown);
+        let mut lexer = Lexer::with_code("if");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
@@ -707,7 +706,7 @@ mod tests {
 
     #[test]
     fn parser_take_token_auto_keyword_unmatched() {
-        let mut lexer = Lexer::from_memory("if", Source::Unknown);
+        let mut lexer = Lexer::with_code("if");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
@@ -724,7 +723,7 @@ mod tests {
 
     #[test]
     fn parser_take_token_auto_alias_substitution_to_keyword_matched() {
-        let mut lexer = Lexer::from_memory("X", Source::Unknown);
+        let mut lexer = Lexer::with_code("X");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
@@ -751,7 +750,7 @@ mod tests {
 
     #[test]
     fn parser_has_blank_true() {
-        let mut lexer = Lexer::from_memory(" ", Source::Unknown);
+        let mut lexer = Lexer::with_code(" ");
         let mut parser = Parser::new(&mut lexer);
         let result = parser.has_blank().now_or_never().unwrap();
         assert_eq!(result, Ok(true));
@@ -759,7 +758,7 @@ mod tests {
 
     #[test]
     fn parser_has_blank_false() {
-        let mut lexer = Lexer::from_memory("(", Source::Unknown);
+        let mut lexer = Lexer::with_code("(");
         let mut parser = Parser::new(&mut lexer);
         let result = parser.has_blank().now_or_never().unwrap();
         assert_eq!(result, Ok(false));
@@ -767,7 +766,7 @@ mod tests {
 
     #[test]
     fn parser_has_blank_eof() {
-        let mut lexer = Lexer::from_memory("", Source::Unknown);
+        let mut lexer = Lexer::with_code("");
         let mut parser = Parser::new(&mut lexer);
         let result = parser.has_blank().now_or_never().unwrap();
         assert_eq!(result, Ok(false));
@@ -775,7 +774,7 @@ mod tests {
 
     #[test]
     fn parser_has_blank_true_with_line_continuations() {
-        let mut lexer = Lexer::from_memory("\\\n\\\n ", Source::Unknown);
+        let mut lexer = Lexer::with_code("\\\n\\\n ");
         let mut parser = Parser::new(&mut lexer);
         let result = parser.has_blank().now_or_never().unwrap();
         assert_eq!(result, Ok(true));
@@ -783,7 +782,7 @@ mod tests {
 
     #[test]
     fn parser_has_blank_false_with_line_continuations() {
-        let mut lexer = Lexer::from_memory("\\\n\\\n\\\n(", Source::Unknown);
+        let mut lexer = Lexer::with_code("\\\n\\\n\\\n(");
         let mut parser = Parser::new(&mut lexer);
         let result = parser.has_blank().now_or_never().unwrap();
         assert_eq!(result, Ok(false));
@@ -792,7 +791,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "There should be no pending token")]
     fn parser_has_blank_with_pending_token() {
-        let mut lexer = Lexer::from_memory("foo", Source::Unknown);
+        let mut lexer = Lexer::with_code("foo");
         let mut parser = Parser::new(&mut lexer);
         parser.peek_token().now_or_never().unwrap().unwrap();
         let _ = parser.has_blank().now_or_never().unwrap();
@@ -800,7 +799,7 @@ mod tests {
 
     #[test]
     fn parser_reading_no_here_doc_contents() {
-        let mut lexer = Lexer::from_memory("X", Source::Unknown);
+        let mut lexer = Lexer::with_code("X");
         let mut parser = Parser::new(&mut lexer);
         parser.here_doc_contents().now_or_never().unwrap().unwrap();
 
@@ -813,7 +812,7 @@ mod tests {
     fn parser_reading_one_here_doc_content() {
         let delimiter = "END".parse().unwrap();
 
-        let mut lexer = Lexer::from_memory("END\nX", Source::Unknown);
+        let mut lexer = Lexer::with_code("END\nX");
         let mut parser = Parser::new(&mut lexer);
         let remove_tabs = false;
         let here_doc = Rc::new(HereDoc {
@@ -838,7 +837,7 @@ mod tests {
         let delimiter2 = "TWO".parse().unwrap();
         let delimiter3 = "THREE".parse().unwrap();
 
-        let mut lexer = Lexer::from_memory("1\nONE\nTWO\n3\nTHREE\nX", Source::Unknown);
+        let mut lexer = Lexer::with_code("1\nONE\nTWO\n3\nTHREE\nX");
         let mut parser = Parser::new(&mut lexer);
         let here_doc1 = Rc::new(HereDoc {
             delimiter: delimiter1,
@@ -875,7 +874,7 @@ mod tests {
         let delimiter1 = "ONE".parse().unwrap();
         let delimiter2 = "TWO".parse().unwrap();
 
-        let mut lexer = Lexer::from_memory("1\nONE\n2\nTWO\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("1\nONE\n2\nTWO\n");
         let mut parser = Parser::new(&mut lexer);
         let here_doc1 = Rc::new(HereDoc {
             delimiter: delimiter1,
@@ -902,7 +901,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "No token must be peeked before reading here-doc contents")]
     fn parser_here_doc_contents_must_be_called_without_pending_token() {
-        let mut lexer = Lexer::from_memory("X", Source::Unknown);
+        let mut lexer = Lexer::with_code("X");
         let mut parser = Parser::new(&mut lexer);
         parser.peek_token().now_or_never().unwrap().unwrap();
         parser.here_doc_contents().now_or_never().unwrap().unwrap();

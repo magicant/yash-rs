@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn lexer_raw_param_special_parameter() {
-        let mut lexer = Lexer::from_memory("$@;", Source::Unknown);
+        let mut lexer = Lexer::with_code("$@;");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
@@ -116,7 +116,7 @@ mod tests {
 
     #[test]
     fn lexer_raw_param_digit() {
-        let mut lexer = Lexer::from_memory("$12", Source::Unknown);
+        let mut lexer = Lexer::with_code("$12");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn lexer_raw_param_posix_name() {
-        let mut lexer = Lexer::from_memory("$az_AZ_019<", Source::Unknown);
+        let mut lexer = Lexer::with_code("$az_AZ_019<");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
@@ -152,7 +152,7 @@ mod tests {
 
     #[test]
     fn lexer_raw_param_posix_name_line_continuations() {
-        let mut lexer = Lexer::from_memory("$a\\\n\\\nb\\\n\\\nc\\\n>", Source::Unknown);
+        let mut lexer = Lexer::with_code("$a\\\n\\\nb\\\n\\\nc\\\n>");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
@@ -170,7 +170,7 @@ mod tests {
 
     #[test]
     fn lexer_raw_param_not_parameter() {
-        let mut lexer = Lexer::from_memory("$;", Source::Unknown);
+        let mut lexer = Lexer::with_code("$;");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
         assert_eq!(lexer.raw_param(0).now_or_never().unwrap(), Ok(None));

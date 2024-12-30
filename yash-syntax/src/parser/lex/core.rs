@@ -559,7 +559,27 @@ impl<'a> Lexer<'a> {
     /// Creates a new lexer with a fixed source code.
     ///
     /// This is a convenience function that creates a lexer that reads from a
-    /// string using a [`Memory`] input function. The line number starts from 1.
+    /// string using [`Memory`] with the default configuration.
+    ///
+    /// This function is best used for testing or for simple cases where you
+    /// don't need to customize the lexer. For practical use, it is recommended
+    /// to use the [`config`](Self::config) function to create a configuration
+    /// and provide it with supplementary information, especially
+    /// [`source`](Config::source), before creating a lexer.
+    pub fn with_code(code: &'a str) -> Lexer<'a> {
+        Self::new(Box::new(Memory::new(code)))
+    }
+
+    /// Creates a new lexer with a fixed source code.
+    ///
+    /// This is a convenience function that creates a lexer that reads from a
+    /// string using [`Memory`] with the specified source starting from line
+    /// number 1.
+    ///
+    /// This function is soft-deprecated. Use [`with_code`](Self::with_code)
+    /// instead if the source is `Unknown`. Otherwise, use
+    /// [`config`](Self::config) to set the source and [`input`](Config::input)
+    /// to create a lexer, which is more descriptive.
     pub fn from_memory<S: Into<Rc<Source>>>(code: &'a str, source: S) -> Lexer<'a> {
         fn inner(code: &str, source: Rc<Source>) -> Lexer {
             let mut config = Lexer::config();
@@ -676,15 +696,14 @@ impl<'a> Lexer<'a> {
     ///
     /// ```
     /// # use yash_syntax::parser::lex::Lexer;
-    /// # use yash_syntax::source::Source;
-    /// futures_executor::block_on(async {
-    ///     let mut lexer = Lexer::from_memory("abc", Source::Unknown);
-    ///     assert_eq!(lexer.index(), 0);
-    ///     let _ = lexer.peek_char().await;
-    ///     assert_eq!(lexer.index(), 0);
-    ///     lexer.consume_char();
-    ///     assert_eq!(lexer.index(), 1);
-    /// })
+    /// # futures_executor::block_on(async {
+    /// let mut lexer = Lexer::with_code("abc");
+    /// assert_eq!(lexer.index(), 0);
+    /// let _ = lexer.peek_char().await;
+    /// assert_eq!(lexer.index(), 0);
+    /// lexer.consume_char();
+    /// assert_eq!(lexer.index(), 1);
+    /// # })
     /// ```
     #[must_use]
     pub fn index(&self) -> usize {
@@ -699,16 +718,15 @@ impl<'a> Lexer<'a> {
     ///
     /// ```
     /// # use yash_syntax::parser::lex::Lexer;
-    /// # use yash_syntax::source::Source;
-    /// futures_executor::block_on(async {
-    ///     let mut lexer = Lexer::from_memory("abc", Source::Unknown);
-    ///     let saved_index = lexer.index();
-    ///     assert_eq!(lexer.peek_char().await, Ok(Some('a')));
-    ///     lexer.consume_char();
-    ///     assert_eq!(lexer.peek_char().await, Ok(Some('b')));
-    ///     lexer.rewind(saved_index);
-    ///     assert_eq!(lexer.peek_char().await, Ok(Some('a')));
-    /// })
+    /// # futures_executor::block_on(async {
+    /// let mut lexer = Lexer::with_code("abc");
+    /// let saved_index = lexer.index();
+    /// assert_eq!(lexer.peek_char().await, Ok(Some('a')));
+    /// lexer.consume_char();
+    /// assert_eq!(lexer.peek_char().await, Ok(Some('b')));
+    /// lexer.rewind(saved_index);
+    /// assert_eq!(lexer.peek_char().await, Ok(Some('a')));
+    /// # })
     /// ```
     pub fn rewind(&mut self, index: usize) {
         self.core.rewind(index)
@@ -1494,27 +1512,27 @@ mod tests {
 
     #[test]
     fn lexer_with_empty_source() {
-        let mut lexer = Lexer::from_memory("", Source::Unknown);
+        let mut lexer = Lexer::with_code("");
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
     fn lexer_peek_char_with_line_continuation_enabled_stopping_on_non_backslash() {
-        let mut lexer = Lexer::from_memory("\\\n\n\\", Source::Unknown);
+        let mut lexer = Lexer::with_code("\\\n\n\\");
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('\n')));
         assert_eq!(lexer.index(), 2);
     }
 
     #[test]
     fn lexer_peek_char_with_line_continuation_enabled_stopping_on_non_newline() {
-        let mut lexer = Lexer::from_memory("\\\n\\\n\\\n\\\\", Source::Unknown);
+        let mut lexer = Lexer::with_code("\\\n\\\n\\\n\\\\");
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('\\')));
         assert_eq!(lexer.index(), 6);
     }
 
     #[test]
     fn lexer_peek_char_with_line_continuation_disabled() {
-        let mut lexer = Lexer::from_memory("\\\n\\\n\\\\", Source::Unknown);
+        let mut lexer = Lexer::with_code("\\\n\\\n\\\\");
         let mut lexer = lexer.disable_line_continuation();
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('\\')));
         assert_eq!(lexer.index(), 0);
@@ -1522,7 +1540,7 @@ mod tests {
 
     #[test]
     fn lexer_flush() {
-        let mut lexer = Lexer::from_memory(" \n\n\t\n", Source::Unknown);
+        let mut lexer = Lexer::with_code(" \n\n\t\n");
         let location_1 = lexer.location().now_or_never().unwrap().unwrap().clone();
         assert_eq!(*location_1.code.value.borrow(), " \n");
 
@@ -1549,7 +1567,7 @@ mod tests {
 
     #[test]
     fn lexer_consume_char_if() {
-        let mut lexer = Lexer::from_memory("word\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("word\n");
 
         let mut called = 0;
         let c = lexer
@@ -1651,7 +1669,7 @@ mod tests {
 
     #[test]
     fn lexer_location_range_with_empty_range() {
-        let mut lexer = Lexer::from_memory("", Source::Unknown);
+        let mut lexer = Lexer::with_code("");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         let location = lexer.location_range(0..0);
         assert_eq!(*location.code.value.borrow(), "");
@@ -1695,20 +1713,20 @@ mod tests {
     #[test]
     #[should_panic]
     fn lexer_location_range_with_unconsumed_code() {
-        let lexer = Lexer::from_memory("echo ok", Source::Unknown);
+        let lexer = Lexer::with_code("echo ok");
         let _ = lexer.location_range(0..0);
     }
 
     #[test]
     #[should_panic(expected = "The index 1 must not be larger than the current index 0")]
     fn lexer_location_range_with_range_out_of_bounds() {
-        let lexer = Lexer::from_memory("", Source::Unknown);
+        let lexer = Lexer::with_code("");
         let _ = lexer.location_range(1..2);
     }
 
     #[test]
     fn lexer_location_range_with_alias_substitution() {
-        let mut lexer = Lexer::from_memory(" a;", Source::Unknown);
+        let mut lexer = Lexer::with_code(" a;");
         let alias_def = Rc::new(Alias {
             name: "a".to_string(),
             replacement: "abc".to_string(),
@@ -1740,14 +1758,14 @@ mod tests {
 
     #[test]
     fn lexer_inner_program_success() {
-        let mut lexer = Lexer::from_memory("x y )", Source::Unknown);
+        let mut lexer = Lexer::with_code("x y )");
         let source = lexer.inner_program().now_or_never().unwrap().unwrap();
         assert_eq!(source, "x y ");
     }
 
     #[test]
     fn lexer_inner_program_failure() {
-        let mut lexer = Lexer::from_memory("<< )", Source::Unknown);
+        let mut lexer = Lexer::with_code("<< )");
         let e = lexer.inner_program().now_or_never().unwrap().unwrap_err();
         assert_eq!(
             e.cause,

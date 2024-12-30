@@ -65,7 +65,7 @@ mod tests {
 
     #[test]
     fn lexer_command_substitution_success() {
-        let mut lexer = Lexer::from_memory("$( foo bar )baz", Source::Unknown);
+        let mut lexer = Lexer::with_code("$( foo bar )baz");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
@@ -88,7 +88,7 @@ mod tests {
 
     #[test]
     fn lexer_command_substitution_none() {
-        let mut lexer = Lexer::from_memory("$ foo bar )baz", Source::Unknown);
+        let mut lexer = Lexer::with_code("$ foo bar )baz");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn lexer_command_substitution_unclosed() {
-        let mut lexer = Lexer::from_memory("$( foo bar baz", Source::Unknown);
+        let mut lexer = Lexer::with_code("$( foo bar baz");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 

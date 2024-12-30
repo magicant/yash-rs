@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn parser_while_loop_short() {
-        let mut lexer = Lexer::from_memory("while true; do :; done", Source::Unknown);
+        let mut lexer = Lexer::with_code("while true; do :; done");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -122,7 +122,7 @@ mod tests {
 
     #[test]
     fn parser_while_loop_long() {
-        let mut lexer = Lexer::from_memory("while false; true& do foo; bar& done", Source::Unknown);
+        let mut lexer = Lexer::with_code("while false; true& do foo; bar& done");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -138,7 +138,7 @@ mod tests {
 
     #[test]
     fn parser_while_loop_unclosed() {
-        let mut lexer = Lexer::from_memory("while :", Source::Unknown);
+        let mut lexer = Lexer::with_code("while :");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -158,7 +158,7 @@ mod tests {
 
     #[test]
     fn parser_while_loop_empty_posix() {
-        let mut lexer = Lexer::from_memory(" while do :; done", Source::Unknown);
+        let mut lexer = Lexer::with_code(" while do :; done");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn parser_while_loop_aliasing() {
-        let mut lexer = Lexer::from_memory(" while :; DO :; done", Source::Unknown);
+        let mut lexer = Lexer::with_code(" while :; DO :; done");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn parser_until_loop_short() {
-        let mut lexer = Lexer::from_memory("until true; do :; done", Source::Unknown);
+        let mut lexer = Lexer::with_code("until true; do :; done");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -219,7 +219,7 @@ mod tests {
 
     #[test]
     fn parser_until_loop_long() {
-        let mut lexer = Lexer::from_memory("until false; true& do foo; bar& done", Source::Unknown);
+        let mut lexer = Lexer::with_code("until false; true& do foo; bar& done");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -235,7 +235,7 @@ mod tests {
 
     #[test]
     fn parser_until_loop_unclosed() {
-        let mut lexer = Lexer::from_memory("until :", Source::Unknown);
+        let mut lexer = Lexer::with_code("until :");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -255,7 +255,7 @@ mod tests {
 
     #[test]
     fn parser_until_loop_empty_posix() {
-        let mut lexer = Lexer::from_memory("  until do :; done", Source::Unknown);
+        let mut lexer = Lexer::with_code("  until do :; done");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -272,7 +272,7 @@ mod tests {
 
     #[test]
     fn parser_until_loop_aliasing() {
-        let mut lexer = Lexer::from_memory(" until :; DO :; done", Source::Unknown);
+        let mut lexer = Lexer::with_code(" until :; DO :; done");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");

@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_less() {
-        let mut lexer = Lexer::from_memory("</dev/null\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("</dev/null\n");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.redirection().now_or_never().unwrap();
@@ -164,7 +164,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_less_greater() {
-        let mut lexer = Lexer::from_memory("<> /dev/null\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("<> /dev/null\n");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.redirection().now_or_never().unwrap();
@@ -178,7 +178,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_greater() {
-        let mut lexer = Lexer::from_memory(">/dev/null\n", Source::Unknown);
+        let mut lexer = Lexer::with_code(">/dev/null\n");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.redirection().now_or_never().unwrap();
@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_greater_greater() {
-        let mut lexer = Lexer::from_memory(" >> /dev/null\n", Source::Unknown);
+        let mut lexer = Lexer::with_code(" >> /dev/null\n");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.redirection().now_or_never().unwrap();
@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_greater_bar() {
-        let mut lexer = Lexer::from_memory(">| /dev/null\n", Source::Unknown);
+        let mut lexer = Lexer::with_code(">| /dev/null\n");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.redirection().now_or_never().unwrap();
@@ -220,7 +220,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_less_and() {
-        let mut lexer = Lexer::from_memory("<& -\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("<& -\n");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.redirection().now_or_never().unwrap();
@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_greater_and() {
-        let mut lexer = Lexer::from_memory(">& 3\n", Source::Unknown);
+        let mut lexer = Lexer::with_code(">& 3\n");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.redirection().now_or_never().unwrap();
@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_greater_greater_bar() {
-        let mut lexer = Lexer::from_memory(">>| 3\n", Source::Unknown);
+        let mut lexer = Lexer::with_code(">>| 3\n");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.redirection().now_or_never().unwrap();
@@ -262,7 +262,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_less_less_less() {
-        let mut lexer = Lexer::from_memory("<<< foo\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("<<< foo\n");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.redirection().now_or_never().unwrap();
@@ -276,7 +276,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_less_less() {
-        let mut lexer = Lexer::from_memory("<<end \nend\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("<<end \nend\n");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.redirection().now_or_never().unwrap();
@@ -296,7 +296,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_less_less_dash() {
-        let mut lexer = Lexer::from_memory("<<-end \nend\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("<<-end \nend\n");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.redirection().now_or_never().unwrap();
@@ -316,7 +316,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_with_io_number() {
-        let mut lexer = Lexer::from_memory("12< /dev/null\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("12< /dev/null\n");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.redirection().now_or_never().unwrap();
@@ -333,10 +333,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_fd_out_of_range() {
-        let mut lexer = Lexer::from_memory(
-            "9999999999999999999999999999999999999999< x",
-            Source::Unknown,
-        );
+        let mut lexer = Lexer::with_code("9999999999999999999999999999999999999999< x");
         let mut parser = Parser::new(&mut lexer);
 
         let e = parser.redirection().now_or_never().unwrap().unwrap_err();
@@ -352,7 +349,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_not_operator() {
-        let mut lexer = Lexer::from_memory("x", Source::Unknown);
+        let mut lexer = Lexer::with_code("x");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.redirection().now_or_never().unwrap();
@@ -361,7 +358,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_non_word_operand() {
-        let mut lexer = Lexer::from_memory(" < >", Source::Unknown);
+        let mut lexer = Lexer::with_code(" < >");
         let mut parser = Parser::new(&mut lexer);
 
         let e = parser.redirection().now_or_never().unwrap().unwrap_err();
@@ -377,7 +374,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_eof_operand() {
-        let mut lexer = Lexer::from_memory("  < ", Source::Unknown);
+        let mut lexer = Lexer::with_code("  < ");
         let mut parser = Parser::new(&mut lexer);
 
         let e = parser.redirection().now_or_never().unwrap().unwrap_err();
@@ -393,7 +390,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_not_heredoc_delimiter() {
-        let mut lexer = Lexer::from_memory("<< <<", Source::Unknown);
+        let mut lexer = Lexer::with_code("<< <<");
         let mut parser = Parser::new(&mut lexer);
 
         let e = parser.redirection().now_or_never().unwrap().unwrap_err();
@@ -409,7 +406,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_eof_heredoc_delimiter() {
-        let mut lexer = Lexer::from_memory("<<", Source::Unknown);
+        let mut lexer = Lexer::with_code("<<");
         let mut parser = Parser::new(&mut lexer);
 
         let e = parser.redirection().now_or_never().unwrap().unwrap_err();

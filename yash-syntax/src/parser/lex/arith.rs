@@ -95,7 +95,7 @@ mod tests {
 
     #[test]
     fn lexer_arithmetic_expansion_empty() {
-        let mut lexer = Lexer::from_memory("$(());", Source::Unknown);
+        let mut lexer = Lexer::with_code("$(());");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
@@ -114,7 +114,7 @@ mod tests {
 
     #[test]
     fn lexer_arithmetic_expansion_none() {
-        let mut lexer = Lexer::from_memory("$( foo bar )baz", Source::Unknown);
+        let mut lexer = Lexer::with_code("$( foo bar )baz");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
         assert_eq!(
@@ -126,7 +126,7 @@ mod tests {
 
     #[test]
     fn lexer_arithmetic_expansion_line_continuations() {
-        let mut lexer = Lexer::from_memory("$(\\\n\\\n(\\\n)\\\n\\\n);", Source::Unknown);
+        let mut lexer = Lexer::with_code("$(\\\n\\\n(\\\n)\\\n\\\n);");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn lexer_arithmetic_expansion_escapes() {
-        let mut lexer = Lexer::from_memory(r#".$((\\\"\`\$));"#, Source::Unknown);
+        let mut lexer = Lexer::with_code(r#".$((\\\"\`\$));"#);
         lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
         lexer.peek_char().now_or_never().unwrap().unwrap();
@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn lexer_arithmetic_expansion_unclosed_first() {
-        let mut lexer = Lexer::from_memory("$((1", Source::Unknown);
+        let mut lexer = Lexer::with_code("$((1");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
@@ -196,7 +196,7 @@ mod tests {
 
     #[test]
     fn lexer_arithmetic_expansion_unclosed_second() {
-        let mut lexer = Lexer::from_memory("$((1)", Source::Unknown);
+        let mut lexer = Lexer::with_code("$((1)");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
@@ -217,7 +217,7 @@ mod tests {
 
     #[test]
     fn lexer_arithmetic_expansion_unclosed_but_maybe_command_substitution() {
-        let mut lexer = Lexer::from_memory("$((1) ", Source::Unknown);
+        let mut lexer = Lexer::with_code("$((1) ");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
         assert_eq!(

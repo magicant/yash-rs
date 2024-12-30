@@ -55,9 +55,8 @@ use yash_syntax::parser::Parser;
 /// # use yash_env::Env;
 /// # use yash_semantics::*;
 /// # use yash_syntax::parser::lex::Lexer;
-/// # use yash_syntax::source::Source;
 /// let mut env = Env::new_virtual();
-/// let mut lexer = Lexer::from_memory("case foo in (bar) ;; esac", Source::Unknown);
+/// let mut lexer = Lexer::with_code("case foo in (bar) ;; esac");
 /// let result = ReadEvalLoop::new(&mut env, &mut lexer).run().await;
 /// assert_eq!(result, Continue(()));
 /// assert_eq!(env.exit_status, ExitStatus::SUCCESS);
@@ -184,13 +183,12 @@ mod tests {
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
     use yash_syntax::source::Location;
-    use yash_syntax::source::Source;
 
     #[test]
     fn exit_status_zero_with_no_commands() {
         let mut env = Env::new_virtual();
         env.exit_status = ExitStatus(5);
-        let mut lexer = Lexer::from_memory("", Source::Unknown);
+        let mut lexer = Lexer::with_code("");
         #[allow(deprecated)]
         let rel = ReadEvalLoop::new(&mut env, &mut lexer);
         let result = rel.run().now_or_never().unwrap();
@@ -206,7 +204,7 @@ mod tests {
         env.exit_status = ExitStatus(42);
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
-        let mut lexer = Lexer::from_memory("echo $?; return -n 7", Source::Unknown);
+        let mut lexer = Lexer::with_code("echo $?; return -n 7");
         #[allow(deprecated)]
         let rel = ReadEvalLoop::new(&mut env, &mut lexer);
         let result = rel.run().now_or_never().unwrap();
@@ -221,7 +219,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
-        let mut lexer = Lexer::from_memory("echo 1\necho 2\necho 3;", Source::Unknown);
+        let mut lexer = Lexer::with_code("echo 1\necho 2\necho 3;");
         #[allow(deprecated)]
         let rel = ReadEvalLoop::new(&mut env, &mut lexer);
         let result = rel.run().now_or_never().unwrap();
@@ -242,7 +240,7 @@ mod tests {
             origin: Location::dummy(""),
         })));
         env.builtins.insert("echo", echo_builtin());
-        let mut lexer = Lexer::from_memory("echo", Source::Unknown);
+        let mut lexer = Lexer::with_code("echo");
         #[allow(deprecated)]
         let rel = ReadEvalLoop::new(&mut env, &mut lexer);
         let result = rel.run().now_or_never().unwrap();
@@ -286,7 +284,7 @@ mod tests {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        let mut lexer = Lexer::from_memory(";;", Source::Unknown);
+        let mut lexer = Lexer::with_code(";;");
         #[allow(deprecated)]
         let rel = ReadEvalLoop::new(&mut env, &mut lexer);
         let result = rel.run().now_or_never().unwrap();
@@ -300,7 +298,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
-        let mut lexer = Lexer::from_memory(";;\necho !", Source::Unknown);
+        let mut lexer = Lexer::with_code(";;\necho !");
         #[allow(deprecated)]
         let rel = ReadEvalLoop::new(&mut env, &mut lexer);
         let result = rel.run().now_or_never().unwrap();
@@ -329,7 +327,7 @@ mod tests {
             .get_mut(&system.process_id)
             .unwrap()
             .raise_signal(SIGUSR1);
-        let mut lexer = Lexer::from_memory("echo $?", Source::Unknown);
+        let mut lexer = Lexer::with_code("echo $?");
         #[allow(deprecated)]
         let rel = ReadEvalLoop::new(&mut env, &mut lexer);
         let result = rel.run().now_or_never().unwrap();
