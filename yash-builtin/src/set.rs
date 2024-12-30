@@ -352,11 +352,7 @@ xtrace           off
 
         env.builtins.insert(
             "set",
-            Builtin {
-                r#type: Special,
-                execute: |env, args| Box::pin(main(env, args)),
-                is_declaration_utility: Some(false),
-            },
+            Builtin::new(Special, |env, args| Box::pin(main(env, args))),
         );
         env.options = Default::default();
 

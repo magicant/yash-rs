@@ -289,14 +289,8 @@ mod tests {
     #[test]
     fn nothing_is_found_with_name_unmatched() {
         let mut env = DummyEnv::default();
-        env.builtins.insert(
-            "foo",
-            Builtin {
-                r#type: Special,
-                execute: |_, _| unreachable!(),
-                is_declaration_utility: Some(false),
-            },
-        );
+        env.builtins
+            .insert("foo", Builtin::new(Special, |_, _| unreachable!()));
         let function = Function::new("foo", full_compound_command(""), Location::dummy(""));
         env.functions.define(function).unwrap();
 
@@ -307,11 +301,7 @@ mod tests {
     #[test]
     fn special_builtin_is_found() {
         let mut env = DummyEnv::default();
-        let builtin = Builtin {
-            r#type: Special,
-            execute: |_, _| unreachable!(),
-            is_declaration_utility: Some(false),
-        };
+        let builtin = Builtin::new(Special, |_, _| unreachable!());
         env.builtins.insert("foo", builtin);
 
         assert_matches!(
@@ -340,11 +330,7 @@ mod tests {
     #[test]
     fn special_builtin_takes_priority_over_function() {
         let mut env = DummyEnv::default();
-        let builtin = Builtin {
-            r#type: Special,
-            execute: |_, _| unreachable!(),
-            is_declaration_utility: Some(false),
-        };
+        let builtin = Builtin::new(Special, |_, _| unreachable!());
         env.builtins.insert("foo", builtin);
         let function = Function::new(
             "foo",
@@ -364,11 +350,7 @@ mod tests {
     #[test]
     fn mandatory_builtin_is_found_if_not_hidden_by_function() {
         let mut env = DummyEnv::default();
-        let builtin = Builtin {
-            r#type: Mandatory,
-            execute: |_, _| unreachable!(),
-            is_declaration_utility: Some(false),
-        };
+        let builtin = Builtin::new(Mandatory, |_, _| unreachable!());
         env.builtins.insert("foo", builtin);
 
         assert_matches!(
@@ -382,11 +364,7 @@ mod tests {
     #[test]
     fn elective_builtin_is_found_if_not_hidden_by_function() {
         let mut env = DummyEnv::default();
-        let builtin = Builtin {
-            r#type: Elective,
-            execute: |_, _| unreachable!(),
-            is_declaration_utility: Some(false),
-        };
+        let builtin = Builtin::new(Elective, |_, _| unreachable!());
         env.builtins.insert("foo", builtin);
 
         assert_matches!(
@@ -400,11 +378,7 @@ mod tests {
     #[test]
     fn extension_builtin_is_found_if_not_hidden_by_function_or_option() {
         let mut env = DummyEnv::default();
-        let builtin = Builtin {
-            r#type: Extension,
-            execute: |_, _| unreachable!(),
-            is_declaration_utility: Some(false),
-        };
+        let builtin = Builtin::new(Extension, |_, _| unreachable!());
         env.builtins.insert("foo", builtin);
 
         assert_matches!(
@@ -418,14 +392,8 @@ mod tests {
     #[test]
     fn function_takes_priority_over_mandatory_builtin() {
         let mut env = DummyEnv::default();
-        env.builtins.insert(
-            "foo",
-            Builtin {
-                r#type: Mandatory,
-                execute: |_, _| unreachable!(),
-                is_declaration_utility: Some(false),
-            },
-        );
+        env.builtins
+            .insert("foo", Builtin::new(Mandatory, |_, _| unreachable!()));
 
         let function = Rc::new(Function::new(
             "foo",
@@ -442,14 +410,8 @@ mod tests {
     #[test]
     fn function_takes_priority_over_elective_builtin() {
         let mut env = DummyEnv::default();
-        env.builtins.insert(
-            "foo",
-            Builtin {
-                r#type: Elective,
-                execute: |_, _| unreachable!(),
-                is_declaration_utility: Some(false),
-            },
-        );
+        env.builtins
+            .insert("foo", Builtin::new(Elective, |_, _| unreachable!()));
 
         let function = Rc::new(Function::new(
             "foo",
@@ -466,14 +428,8 @@ mod tests {
     #[test]
     fn function_takes_priority_over_extension_builtin() {
         let mut env = DummyEnv::default();
-        env.builtins.insert(
-            "foo",
-            Builtin {
-                r#type: Extension,
-                execute: |_, _| unreachable!(),
-                is_declaration_utility: Some(false),
-            },
-        );
+        env.builtins
+            .insert("foo", Builtin::new(Extension, |_, _| unreachable!()));
 
         let function = Rc::new(Function::new(
             "foo",
@@ -490,11 +446,7 @@ mod tests {
     #[test]
     fn substitutive_builtin_is_found_if_external_executable_exists() {
         let mut env = DummyEnv::default();
-        let builtin = Builtin {
-            r#type: Substitutive,
-            execute: |_, _| unreachable!(),
-            is_declaration_utility: Some(false),
-        };
+        let builtin = Builtin::new(Substitutive, |_, _| unreachable!());
         env.builtins.insert("foo", builtin);
         env.path = Expansion::from("/bin");
         env.executables.insert("/bin/foo".to_string());
@@ -511,11 +463,7 @@ mod tests {
     #[test]
     fn substitutive_builtin_is_not_found_without_external_executable() {
         let mut env = DummyEnv::default();
-        let builtin = Builtin {
-            r#type: Substitutive,
-            execute: |_, _| unreachable!(),
-            is_declaration_utility: Some(false),
-        };
+        let builtin = Builtin::new(Substitutive, |_, _| unreachable!());
         env.builtins.insert("foo", builtin);
 
         let target = search(&mut env, "foo");
@@ -525,11 +473,7 @@ mod tests {
     #[test]
     fn function_takes_priority_over_substitutive_builtin() {
         let mut env = DummyEnv::default();
-        let builtin = Builtin {
-            r#type: Substitutive,
-            execute: |_, _| unreachable!(),
-            is_declaration_utility: Some(false),
-        };
+        let builtin = Builtin::new(Substitutive, |_, _| unreachable!());
         env.builtins.insert("foo", builtin);
         env.path = Expansion::from("/bin");
         env.executables.insert("/bin/foo".to_string());

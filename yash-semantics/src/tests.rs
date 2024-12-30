@@ -50,11 +50,7 @@ fn exit_builtin_main(
 
 /// Returns a minimal implementation of the `exit` built-in.
 pub fn exit_builtin() -> Builtin {
-    Builtin {
-        r#type: Special,
-        execute: exit_builtin_main,
-        is_declaration_utility: Some(false),
-    }
+    Builtin::new(Special, exit_builtin_main)
 }
 
 fn return_builtin_main(
@@ -77,11 +73,7 @@ fn return_builtin_main(
 
 /// Returns a minimal implementation of the `return` built-in.
 pub fn return_builtin() -> Builtin {
-    Builtin {
-        r#type: Special,
-        execute: return_builtin_main,
-        is_declaration_utility: Some(false),
-    }
+    Builtin::new(Special, return_builtin_main)
 }
 
 fn break_builtin_main(
@@ -98,11 +90,7 @@ fn break_builtin_main(
 
 /// Returns a minimal implementation of the `break` built-in.
 pub fn break_builtin() -> Builtin {
-    Builtin {
-        r#type: Special,
-        execute: break_builtin_main,
-        is_declaration_utility: Some(false),
-    }
+    Builtin::new(Special, break_builtin_main)
 }
 
 fn continue_builtin_main(
@@ -119,11 +107,7 @@ fn continue_builtin_main(
 
 /// Returns a minimal implementation of the `continue` built-in.
 pub fn continue_builtin() -> Builtin {
-    Builtin {
-        r#type: Special,
-        execute: continue_builtin_main,
-        is_declaration_utility: Some(false),
-    }
+    Builtin::new(Special, continue_builtin_main)
 }
 
 fn suspend_builtin_main(
@@ -138,11 +122,7 @@ fn suspend_builtin_main(
 
 /// Returns a minimal implementation of the `suspend` built-in.
 pub fn suspend_builtin() -> Builtin {
-    Builtin {
-        r#type: Special,
-        execute: suspend_builtin_main,
-        is_declaration_utility: Some(false),
-    }
+    Builtin::new(Special, suspend_builtin_main)
 }
 
 fn local_builtin_main(
@@ -177,11 +157,9 @@ fn local_builtin_main(
 }
 
 pub fn local_builtin() -> Builtin {
-    Builtin {
-        r#type: Mandatory,
-        execute: local_builtin_main,
-        is_declaration_utility: Some(true),
-    }
+    let mut builtin = Builtin::new(Mandatory, local_builtin_main);
+    builtin.is_declaration_utility = Some(true);
+    builtin
 }
 
 fn echo_builtin_main(
@@ -201,11 +179,7 @@ fn echo_builtin_main(
 
 /// Returns a minimal implementation of the `echo` built-in.
 pub fn echo_builtin() -> Builtin {
-    Builtin {
-        r#type: Mandatory,
-        execute: echo_builtin_main,
-        is_declaration_utility: Some(false),
-    }
+    Builtin::new(Mandatory, echo_builtin_main)
 }
 
 fn cat_builtin_main(
@@ -234,9 +208,5 @@ fn cat_builtin_main(
 
 /// Returns a minimal implementation of the `cat` built-in.
 pub fn cat_builtin() -> Builtin {
-    Builtin {
-        r#type: Mandatory,
-        execute: cat_builtin_main,
-        is_declaration_utility: Some(false),
-    }
+    Builtin::new(Mandatory, cat_builtin_main)
 }

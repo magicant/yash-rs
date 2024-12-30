@@ -244,6 +244,7 @@ pub type Main = fn(&mut Env, Vec<Field>) -> Pin<Box<dyn Future<Output = Result> 
 
 /// Built-in utility definition
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub struct Builtin {
     /// Type of the built-in
     pub r#type: Type,
@@ -265,6 +266,22 @@ impl Debug for Builtin {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Builtin")
             .field("type", &self.r#type)
+            .field("is_declaration_utility", &self.is_declaration_utility)
             .finish_non_exhaustive()
+    }
+}
+
+impl Builtin {
+    /// Creates a new built-in utility definition.
+    ///
+    /// The `type` and `execute` fields are set to the given arguments.
+    /// The `is_declaration_utility` field is set to `Some(false)`, indicating
+    /// that the built-in is not a declaration utility.
+    pub const fn new(r#type: Type, execute: Main) -> Self {
+        Self {
+            r#type,
+            execute,
+            is_declaration_utility: Some(false),
+        }
     }
 }

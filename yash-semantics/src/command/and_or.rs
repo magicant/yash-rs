@@ -319,22 +319,10 @@ mod tests {
         }
 
         let mut env = Env::new_virtual();
-        env.builtins.insert(
-            "head",
-            Builtin {
-                r#type: Special,
-                execute: stub_builtin_condition,
-                is_declaration_utility: Some(false),
-            },
-        );
-        env.builtins.insert(
-            "tail",
-            Builtin {
-                r#type: Special,
-                execute: stub_builtin_no_condition,
-                is_declaration_utility: Some(false),
-            },
-        );
+        env.builtins
+            .insert("head", Builtin::new(Special, stub_builtin_condition));
+        env.builtins
+            .insert("tail", Builtin::new(Special, stub_builtin_no_condition));
 
         let list: AndOrList = "tail".parse().unwrap();
         let result = list.execute(&mut env).now_or_never().unwrap();

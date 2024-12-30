@@ -340,11 +340,7 @@ mod tests {
             }
         );
 
-        let builtin = Builtin {
-            r#type: Type::Substitutive,
-            execute: |_, _| unreachable!(),
-            is_declaration_utility: Some(false),
-        };
+        let builtin = Builtin::new(Type::Substitutive, |_, _| unreachable!());
         let mut builtin_target = Target::Builtin {
             builtin,
             path: Some(c"/usr/bin/echo".to_owned()),
@@ -490,11 +486,7 @@ mod tests {
     fn describe_builtin_without_path() {
         let name = &Field::dummy(":");
         let target = &Target::Builtin {
-            builtin: Builtin {
-                r#type: Type::Special,
-                execute: |_, _| unreachable!(),
-                is_declaration_utility: Some(false),
-            },
+            builtin: Builtin::new(Type::Special, |_, _| unreachable!()),
             path: None,
         };
 
@@ -511,11 +503,7 @@ mod tests {
     fn describe_builtin_with_path() {
         let name = &Field::dummy("echo");
         let target = &Target::Builtin {
-            builtin: Builtin {
-                r#type: Type::Substitutive,
-                execute: |_, _| unreachable!(),
-                is_declaration_utility: Some(false),
-            },
+            builtin: Builtin::new(Type::Substitutive, |_, _| unreachable!()),
             path: Some(c"/bin/echo".to_owned()),
         };
 

@@ -103,11 +103,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert(
             "check",
-            Builtin {
-                r#type: yash_env::builtin::Type::Mandatory,
-                execute,
-                is_declaration_utility: Some(false),
-            },
+            Builtin::new(yash_env::builtin::Type::Mandatory, execute),
         );
         env.traps
             .set_action(

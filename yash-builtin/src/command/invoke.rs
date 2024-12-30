@@ -109,14 +109,8 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        env.builtins.insert(
-            "foo",
-            Builtin {
-                r#type: Special,
-                execute: |_, _| unreachable!(),
-                is_declaration_utility: Some(false),
-            },
-        );
+        env.builtins
+            .insert("foo", Builtin::new(Special, |_, _| unreachable!()));
         let invoke = Invoke {
             fields: Field::dummies(["foo"]),
             search: Search {
@@ -145,16 +139,12 @@ mod tests {
 
         let mut env = Env::new_virtual();
         let target = Target::Builtin {
-            builtin: Builtin {
-                r#type: Special,
-                execute: |_, args| {
-                    Box::pin(async move {
-                        assert_eq!(args, Field::dummies(["bar", "baz"]));
-                        make_result()
-                    })
-                },
-                is_declaration_utility: Some(false),
-            },
+            builtin: Builtin::new(Special, |_, args| {
+                Box::pin(async move {
+                    assert_eq!(args, Field::dummies(["bar", "baz"]));
+                    make_result()
+                })
+            }),
             path: None,
         };
 
@@ -169,22 +159,15 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert(
             ":",
-            Builtin {
-                r#type: Special,
-                execute: |_, args| {
-                    Box::pin(async move {
-                        assert_matches!(args.as_slice(), [bar, baz] => {
-                            assert_eq!(bar.value, "bar");
-                            assert_eq!(baz.value, "baz");
-                        });
-                        crate::Result::with_exit_status_and_divert(
-                            ExitStatus(42),
-                            Break(Return(None)),
-                        )
-                    })
-                },
-                is_declaration_utility: Some(false),
-            },
+            Builtin::new(Special, |_, args| {
+                Box::pin(async move {
+                    assert_matches!(args.as_slice(), [bar, baz] => {
+                        assert_eq!(bar.value, "bar");
+                        assert_eq!(baz.value, "baz");
+                    });
+                    crate::Result::with_exit_status_and_divert(ExitStatus(42), Break(Return(None)))
+                })
+            }),
         );
         let body: FullCompoundCommand = "{ : \"$@\"; }".parse().unwrap();
         let origin = Location::dummy("some location");

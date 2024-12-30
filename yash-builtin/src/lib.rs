@@ -112,282 +112,150 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
     #[cfg(feature = "yash-semantics")]
     (
         ".",
-        Builtin {
-            r#type: Special,
-            execute: |env, args| Box::pin(source::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Special, |env, args| Box::pin(source::main(env, args))),
     ),
     (
         ":",
-        Builtin {
-            r#type: Special,
-            execute: |env, args| Box::pin(ready(colon::main(env, args))),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Special, |env, args| Box::pin(ready(colon::main(env, args)))),
     ),
     (
         "alias",
-        Builtin {
-            r#type: Mandatory,
-            execute: |env, args| Box::pin(alias::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Mandatory, |env, args| Box::pin(alias::main(env, args))),
     ),
     (
         "bg",
-        Builtin {
-            r#type: Mandatory,
-            execute: |env, args| Box::pin(bg::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Mandatory, |env, args| Box::pin(bg::main(env, args))),
     ),
     (
         "break",
-        Builtin {
-            r#type: Special,
-            execute: |env, args| Box::pin(r#break::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Special, |env, args| Box::pin(r#break::main(env, args))),
     ),
     (
         "cd",
-        Builtin {
-            r#type: Mandatory,
-            execute: |env, args| Box::pin(cd::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Mandatory, |env, args| Box::pin(cd::main(env, args))),
     ),
     #[cfg(feature = "yash-semantics")]
-    (
-        "command",
-        Builtin {
-            r#type: Mandatory,
-            execute: |env, args| Box::pin(command::main(env, args)),
-            is_declaration_utility: None,
-        },
-    ),
+    ("command", {
+        let mut builtin = Builtin::new(Mandatory, |env, args| Box::pin(command::main(env, args)));
+        builtin.is_declaration_utility = None;
+        builtin
+    }),
     (
         "continue",
-        Builtin {
-            r#type: Special,
-            execute: |env, args| Box::pin(r#continue::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Special, |env, args| Box::pin(r#continue::main(env, args))),
     ),
     #[cfg(feature = "yash-semantics")]
     (
         "eval",
-        Builtin {
-            r#type: Special,
-            execute: |env, args| Box::pin(eval::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Special, |env, args| Box::pin(eval::main(env, args))),
     ),
     #[cfg(feature = "yash-semantics")]
     (
         "exec",
-        Builtin {
-            r#type: Special,
-            execute: |env, args| Box::pin(exec::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Special, |env, args| Box::pin(exec::main(env, args))),
     ),
     (
         "exit",
-        Builtin {
-            r#type: Special,
-            execute: |env, args| Box::pin(exit::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Special, |env, args| Box::pin(exit::main(env, args))),
     ),
-    (
-        "export",
-        Builtin {
-            r#type: Special,
-            execute: |env, args| Box::pin(export::main(env, args)),
-            is_declaration_utility: Some(true),
-        },
-    ),
+    ("export", {
+        let mut builtin = Builtin::new(Special, |env, args| Box::pin(export::main(env, args)));
+        builtin.is_declaration_utility = Some(true);
+        builtin
+    }),
     (
         "false",
-        Builtin {
-            r#type: Mandatory,
-            execute: |env, args| Box::pin(r#false::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Mandatory, |env, args| Box::pin(r#false::main(env, args))),
     ),
     (
         "fg",
-        Builtin {
-            r#type: Mandatory,
-            execute: |env, args| Box::pin(fg::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Mandatory, |env, args| Box::pin(fg::main(env, args))),
     ),
     (
         "getopts",
-        Builtin {
-            r#type: Mandatory,
-            execute: |env, args| Box::pin(getopts::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Mandatory, |env, args| Box::pin(getopts::main(env, args))),
     ),
     (
         "jobs",
-        Builtin {
-            r#type: Mandatory,
-            execute: |env, args| Box::pin(jobs::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Mandatory, |env, args| Box::pin(jobs::main(env, args))),
     ),
     (
         "kill",
-        Builtin {
-            r#type: Mandatory,
-            execute: |env, args| Box::pin(kill::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Mandatory, |env, args| Box::pin(kill::main(env, args))),
     ),
     (
         "pwd",
-        Builtin {
-            r#type: Mandatory,
-            execute: |env, args| Box::pin(pwd::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Mandatory, |env, args| Box::pin(pwd::main(env, args))),
     ),
     #[cfg(feature = "yash-semantics")]
     (
         "read",
-        Builtin {
-            r#type: Mandatory,
-            execute: |env, args| Box::pin(read::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Mandatory, |env, args| Box::pin(read::main(env, args))),
     ),
-    (
-        "readonly",
-        Builtin {
-            r#type: Special,
-            execute: |env, args| Box::pin(readonly::main(env, args)),
-            is_declaration_utility: Some(true),
-        },
-    ),
+    ("readonly", {
+        let mut builtin = Builtin::new(Special, |env, args| Box::pin(readonly::main(env, args)));
+        builtin.is_declaration_utility = Some(true);
+        builtin
+    }),
     (
         "return",
-        Builtin {
-            r#type: Special,
-            execute: |env, args| Box::pin(r#return::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Special, |env, args| Box::pin(r#return::main(env, args))),
     ),
     (
         "set",
-        Builtin {
-            r#type: Special,
-            execute: |env, args| Box::pin(set::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Special, |env, args| Box::pin(set::main(env, args))),
     ),
     (
         "shift",
-        Builtin {
-            r#type: Special,
-            execute: |env, args| Box::pin(shift::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Special, |env, args| Box::pin(shift::main(env, args))),
     ),
     #[cfg(feature = "yash-semantics")]
     (
         "source",
-        Builtin {
-            r#type: Special,
-            execute: |env, args| Box::pin(source::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Special, |env, args| Box::pin(source::main(env, args))),
     ),
     (
         "times",
-        Builtin {
-            r#type: Special,
-            execute: |env, args| Box::pin(times::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Special, |env, args| Box::pin(times::main(env, args))),
     ),
     (
         "trap",
-        Builtin {
-            r#type: Special,
-            execute: |env, args| Box::pin(trap::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Special, |env, args| Box::pin(trap::main(env, args))),
     ),
     (
         "true",
-        Builtin {
-            r#type: Mandatory,
-            execute: |env, args| Box::pin(r#true::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Mandatory, |env, args| Box::pin(r#true::main(env, args))),
     ),
     #[cfg(feature = "yash-semantics")]
     (
         "type",
-        Builtin {
-            r#type: Mandatory,
-            execute: |env, args| Box::pin(r#type::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Mandatory, |env, args| Box::pin(r#type::main(env, args))),
     ),
-    (
-        "typeset",
-        Builtin {
-            r#type: Elective,
-            execute: |env, args| Box::pin(typeset::main(env, args)),
-            is_declaration_utility: Some(true),
-        },
-    ),
+    ("typeset", {
+        let mut builtin = Builtin::new(Elective, |env, args| Box::pin(typeset::main(env, args)));
+        builtin.is_declaration_utility = Some(true);
+        builtin
+    }),
     (
         "ulimit",
-        Builtin {
-            r#type: Mandatory,
-            execute: |env, args| Box::pin(ulimit::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Mandatory, |env, args| Box::pin(ulimit::main(env, args))),
     ),
     (
         "umask",
-        Builtin {
-            r#type: Mandatory,
-            execute: |env, args| Box::pin(umask::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Mandatory, |env, args| Box::pin(umask::main(env, args))),
     ),
     (
         "unalias",
-        Builtin {
-            r#type: Mandatory,
-            execute: |env, args| Box::pin(unalias::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Mandatory, |env, args| Box::pin(unalias::main(env, args))),
     ),
     (
         "unset",
-        Builtin {
-            r#type: Special,
-            execute: |env, args| Box::pin(unset::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Special, |env, args| Box::pin(unset::main(env, args))),
     ),
     #[cfg(feature = "yash-semantics")]
     (
         "wait",
-        Builtin {
-            r#type: Mandatory,
-            execute: |env, args| Box::pin(wait::main(env, args)),
-            is_declaration_utility: Some(false),
-        },
+        Builtin::new(Mandatory, |env, args| Box::pin(wait::main(env, args))),
     ),
 ];
 

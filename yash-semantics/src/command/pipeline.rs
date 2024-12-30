@@ -558,14 +558,8 @@ mod tests {
         }
 
         let mut env = Env::new_virtual();
-        env.builtins.insert(
-            "foo",
-            Builtin {
-                r#type: Special,
-                execute: stub_builtin,
-                is_declaration_utility: Some(false),
-            },
-        );
+        env.builtins
+            .insert("foo", Builtin::new(Special, stub_builtin));
         let pipeline: syntax::Pipeline = "foo".parse().unwrap();
         let result = pipeline.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
@@ -587,14 +581,8 @@ mod tests {
         }
 
         let mut env = Env::new_virtual();
-        env.builtins.insert(
-            "foo",
-            Builtin {
-                r#type: Special,
-                execute: stub_builtin,
-                is_declaration_utility: Some(false),
-            },
-        );
+        env.builtins
+            .insert("foo", Builtin::new(Special, stub_builtin));
         let pipeline: syntax::Pipeline = "! foo".parse().unwrap();
         let result = pipeline.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
@@ -611,14 +599,8 @@ mod tests {
         }
 
         in_virtual_system(|mut env, state| async move {
-            env.builtins.insert(
-                "foo",
-                Builtin {
-                    r#type: Special,
-                    execute: stub_builtin,
-                    is_declaration_utility: Some(false),
-                },
-            );
+            env.builtins
+                .insert("foo", Builtin::new(Special, stub_builtin));
             env.options.set(Monitor, On);
             stub_tty(&state);
 

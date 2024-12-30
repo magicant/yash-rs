@@ -11,9 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `Env` struct now implements `yash_syntax::decl_util::Glossary`.
 - The `builtin::Builtin` struct now has the `is_declaration_utility` field.
+- The `builtin::Builtin` struct now can be constructed with the associated
+  function `new`.
 
 ### Changed
 
+- The `builtin::Builtin` struct is now `non_exhaustive`.
 - External dependency versions:
     - yash-syntax 0.13.0 → 0.14.0
 

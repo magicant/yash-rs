@@ -119,18 +119,14 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert(
             "foo",
-            Builtin {
-                r#type: yash_env::builtin::Type::Special,
-                execute: |_env, _args| {
-                    Box::pin(std::future::ready({
-                        yash_env::builtin::Result::with_exit_status_and_divert(
-                            ExitStatus(37),
-                            Break(Divert::Return(None)),
-                        )
-                    }))
-                },
-                is_declaration_utility: Some(false),
-            },
+            Builtin::new(yash_env::builtin::Type::Special, |_env, _args| {
+                Box::pin(std::future::ready({
+                    yash_env::builtin::Result::with_exit_status_and_divert(
+                        ExitStatus(37),
+                        Break(Divert::Return(None)),
+                    )
+                }))
+            }),
         );
         let command: syntax::SimpleCommand = "foo".parse().unwrap();
         let result = command.execute(&mut env).now_or_never().unwrap();
@@ -176,17 +172,13 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert(
             "exec",
-            Builtin {
-                r#type: yash_env::builtin::Type::Mandatory,
-                execute: |_env, _args| {
-                    Box::pin(async {
-                        let mut result = yash_env::builtin::Result::default();
-                        result.retain_redirs();
-                        result
-                    })
-                },
-                is_declaration_utility: Some(false),
-            },
+            Builtin::new(yash_env::builtin::Type::Mandatory, |_env, _args| {
+                Box::pin(async {
+                    let mut result = yash_env::builtin::Result::default();
+                    result.retain_redirs();
+                    result
+                })
+            }),
         );
         let command: syntax::SimpleCommand = "exec >/tmp/file".parse().unwrap();
         command.execute(&mut env).now_or_never().unwrap();
@@ -283,19 +275,11 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert(
             "builtin",
-            Builtin {
-                r#type: yash_env::builtin::Type::Mandatory,
-                execute: builtin_main,
-                is_declaration_utility: Some(false),
-            },
+            Builtin::new(yash_env::builtin::Type::Mandatory, builtin_main),
         );
         env.builtins.insert(
             "special",
-            Builtin {
-                r#type: yash_env::builtin::Type::Special,
-                execute: special_main,
-                is_declaration_utility: Some(false),
-            },
+            Builtin::new(yash_env::builtin::Type::Special, special_main),
         );
         let command: syntax::SimpleCommand = "builtin".parse().unwrap();
         command.execute(&mut env).now_or_never().unwrap();

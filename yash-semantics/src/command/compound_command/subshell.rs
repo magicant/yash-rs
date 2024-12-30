@@ -123,11 +123,7 @@ mod tests {
         in_virtual_system(|mut env, _state| async move {
             env.builtins.insert(
                 "exit",
-                yash_env::builtin::Builtin {
-                    r#type: yash_env::builtin::Type::Special,
-                    execute: exit_builtin,
-                    is_declaration_utility: Some(false),
-                },
+                yash_env::builtin::Builtin::new(yash_env::builtin::Type::Special, exit_builtin),
             );
 
             let command: CompoundCommand = "(exit)".parse().unwrap();
@@ -236,11 +232,7 @@ mod tests {
             env.builtins.insert("echo", echo_builtin());
             env.builtins.insert(
                 "trap",
-                yash_env::builtin::Builtin {
-                    r#type: yash_env::builtin::Type::Special,
-                    execute: trap_builtin,
-                    is_declaration_utility: Some(false),
-                },
+                yash_env::builtin::Builtin::new(yash_env::builtin::Type::Special, trap_builtin),
             );
 
             let command: CompoundCommand = "(trap)".parse().unwrap();

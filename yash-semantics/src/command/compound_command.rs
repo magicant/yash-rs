@@ -187,14 +187,8 @@ mod tests {
         }
 
         let mut env = Env::new_virtual();
-        env.builtins.insert(
-            "foo",
-            Builtin {
-                r#type: Special,
-                execute: stub_builtin,
-                is_declaration_utility: Some(false),
-            },
-        );
+        env.builtins
+            .insert("foo", Builtin::new(Special, stub_builtin));
         let condition = "foo".parse().unwrap();
 
         let result = evaluate_condition(&mut env, &condition)

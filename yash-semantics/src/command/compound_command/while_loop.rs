@@ -200,11 +200,7 @@ mod tests {
         let (mut env, _state) = fixture();
         env.builtins.insert(
             "check",
-            Builtin {
-                r#type: yash_env::builtin::Type::Mandatory,
-                execute,
-                is_declaration_utility: Some(false),
-            },
+            Builtin::new(yash_env::builtin::Type::Mandatory, execute),
         );
         let command: CompoundCommand = "while check; do check; return; done".parse().unwrap();
 
@@ -452,11 +448,7 @@ mod tests {
         let (mut env, _state) = fixture();
         env.builtins.insert(
             "check",
-            Builtin {
-                r#type: yash_env::builtin::Type::Mandatory,
-                execute,
-                is_declaration_utility: Some(false),
-            },
+            Builtin::new(yash_env::builtin::Type::Mandatory, execute),
         );
         let command: CompoundCommand = "until ! check; do check; return; done".parse().unwrap();
 

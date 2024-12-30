@@ -191,11 +191,7 @@ mod tests {
     #[test]
     fn builtin_on() {
         let env = &mut Env::new_virtual();
-        let builtin = Builtin {
-            r#type: Special,
-            execute: |_, _| unreachable!(),
-            is_declaration_utility: Some(false),
-        };
+        let builtin = Builtin::new(Special, |_, _| unreachable!());
         env.builtins.insert(":", builtin);
         let params = &Search {
             categories: Category::Builtin.into(),
@@ -210,11 +206,7 @@ mod tests {
     #[test]
     fn builtin_off() {
         let env = &mut Env::new_virtual();
-        let builtin = Builtin {
-            r#type: Special,
-            execute: |_, _| unreachable!(),
-            is_declaration_utility: Some(false),
-        };
+        let builtin = Builtin::new(Special, |_, _| unreachable!());
         env.builtins.insert(":", builtin);
         let params = &Search {
             categories: EnumSet::empty(),
