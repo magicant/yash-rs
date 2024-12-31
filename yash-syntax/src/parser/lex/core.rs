@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Fundamental building blocks for the lexical analyzer.
+//! Fundamental building blocks for the lexical analyzer
 
 use super::keyword::Keyword;
 use super::op::Operator;
@@ -46,7 +46,7 @@ pub fn is_blank(c: char) -> bool {
     c != '\n' && c.is_whitespace()
 }
 
-/// Result of [`LexerCore::peek_char`].
+/// Result of [`LexerCore::peek_char`]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum PeekChar<'a> {
     Char(&'a SourceChar),
@@ -64,7 +64,7 @@ impl<'a> PeekChar<'a> {
     }
 }
 
-/// Token identifier, or classification of tokens.
+/// Token identifier, or classification of tokens
 ///
 /// This enum classifies a token as defined in POSIX XCU 2.10.1 Shell Grammar Lexical
 /// Conventions, but does not exactly reflect further distinction defined in
@@ -85,7 +85,7 @@ pub enum TokenId {
     Operator(Operator),
     /// `IO_NUMBER`
     IoNumber,
-    /// Imaginary token identifier for the end of input.
+    /// Imaginary token identifier for the end of input
     EndOfInput,
 }
 
@@ -108,18 +108,18 @@ impl TokenId {
     }
 }
 
-/// Result of lexical analysis produced by the [`Lexer`].
+/// Result of lexical analysis produced by the [`Lexer`]
 #[derive(Debug)]
 pub struct Token {
-    /// Content of the token.
+    /// Content of the token
     ///
     /// The word value contains at least one [unit](crate::syntax::WordUnit),
     /// regardless of whether the token is an operator. The only exception is
     /// when `id` is `EndOfInput`, in which case the word is empty.
     pub word: Word,
-    /// Token identifier.
+    /// Token identifier
     pub id: TokenId,
-    /// Position of the first character of the word.
+    /// Position of the first character of the word
     pub index: usize,
 }
 
@@ -129,7 +129,7 @@ impl fmt::Display for Token {
     }
 }
 
-/// State of the input function in a lexer.
+/// State of the input function in a lexer
 #[derive(Clone, Debug)]
 enum InputState {
     Alive,
@@ -151,8 +151,12 @@ fn ex<I: IntoIterator<Item = SourceChar>>(i: I) -> impl Iterator<Item = SourceCh
     })
 }
 
-/// Core part of the lexical analyzer.
+/// Core part of the lexical analyzer
 struct LexerCore<'a> {
+    // The `input` field could be a `&'a mut dyn InputObject + 'a`, but it is
+    // `Box<dyn InputObject + 'a>` to allow the lexer to take ownership of the
+    // input object. This is necessary for `Lexer::with_code` and similarly
+    // constructed lexers.
     input: Box<dyn InputObject + 'a>,
     state: InputState,
     raw_code: Rc<Code>,
@@ -430,7 +434,70 @@ impl fmt::Debug for LexerCore<'_> {
     }
 }
 
-/// Lexical analyzer.
+/// Configuration for the [lexer](Lexer)
+///
+/// `Config` is a builder for the lexer. A [new](Self::new) instance is created
+/// with default settings. You can then customize the settings by modifying the
+/// corresponding fields. Finally, you can pass an input object to the
+/// [`input`](Self::input) method to create a lexer.
+#[derive(Debug)]
+#[must_use = "you must call `input` to create a lexer"]
+#[non_exhaustive]
+pub struct Config {
+    /// Line number for the first line of the input
+    ///
+    /// The lexer counts the line number from this value to annotate the
+    /// location of the tokens. The line number is saved in the
+    /// `start_line_number` field of the [`Code`] instance that is contained in
+    /// the [`Location`] instance of the token.
+    ///
+    /// The default value is 1.
+    pub start_line_number: NonZeroU64,
+
+    /// Source of the input
+    ///
+    /// The source is used to annotate the location of the tokens. This value
+    /// is saved in the `source` field of the [`Code`] instance that is
+    /// contained in the [`Location`] instance of the token.
+    ///
+    /// The default value is `None`, in which case the source is set to
+    /// [`Source::Unknown`]. It is recommended to set this to a more informative
+    /// value, so that the locations in the parsed syntax tree can be traced
+    /// back to the source code. Especially, the correct source is necessary to
+    /// indicate the location of possible errors that occur during parsing and
+    /// execution.
+    pub source: Option<Rc<Source>>,
+}
+
+impl Config {
+    /// Creates a new configuration with default settings.
+    ///
+    /// You can also call [`Lexer::config`] to create a new configuration.
+    pub fn new() -> Self {
+        Config {
+            start_line_number: NonZeroU64::MIN,
+            source: None,
+        }
+    }
+
+    /// Creates a lexer with the given input object.
+    pub fn input<'a>(self, input: Box<dyn InputObject + 'a>) -> Lexer<'a> {
+        let start_line_number = self.start_line_number;
+        let source = self.source.unwrap_or_else(|| Rc::new(Source::Unknown));
+        Lexer {
+            core: LexerCore::new(input, start_line_number, source),
+            line_continuation_enabled: true,
+        }
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Lexical analyzer
 ///
 /// A lexer reads lines using an input function and parses the characters into tokens. It has an
 /// internal buffer containing the characters that have been read and the position (or the
@@ -439,8 +506,27 @@ impl fmt::Debug for LexerCore<'_> {
 /// `Lexer` has primitive functions such as [`peek_char`](Lexer::peek_char) that provide access
 /// to the character at the current position. Derived functions such as
 /// [`skip_blanks_and_comment`](Lexer::skip_blanks_and_comment) depend on those primitives to
-/// parse more complex structures in the source code.
+/// parse more complex structures in the source code. Usually, the lexer is used by a
+/// [parser](super::super::Parser) to read the source code and produce a syntax
+/// tree, so you don't need to call these functions directly.
+///
+/// To construct a lexer, you can use the [`Lexer::new`] function with an input object.
+/// You can also use the [`Lexer::config`] function to create a configuration that allows you to
+/// customize the settings before creating a lexer.
+///
+/// ```
+/// # use yash_syntax::input::Memory;
+/// # use yash_syntax::parser::{lex::Lexer, Parser};
+/// # use yash_syntax::source::Source;
+/// let mut config = Lexer::config();
+/// config.start_line_number = 10.try_into().unwrap();
+/// config.source = Some(Source::CommandString.into());
+/// let mut lexer = config.input(Box::new(Memory::new("echo hello\n")));
+/// let mut parser = Parser::new(&mut lexer);
+/// _ = parser.command_line();
+/// ```
 #[derive(Debug)]
+#[must_use]
 pub struct Lexer<'a> {
     // `Lexer` is a thin wrapper around `LexerCore`. `Lexer` delegates most
     // functions to `LexerCore`. `Lexer` adds automatic line-continuation
@@ -450,28 +536,59 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
+    /// Creates a new configuration with default settings.
+    ///
+    /// This is a synonym for [`Config::new`]. You can modify the settings and
+    /// then create a lexer with the [`input`](Config::input) method.
+    #[inline(always)]
+    pub fn config() -> Config {
+        Config::new()
+    }
+
     /// Creates a new lexer that reads using the given input function.
-    #[must_use]
-    pub fn new(
-        input: Box<dyn InputObject + 'a>,
-        start_line_number: NonZeroU64,
-        source: Rc<Source>,
-    ) -> Lexer<'a> {
-        Lexer {
-            core: LexerCore::new(input, start_line_number, source),
-            line_continuation_enabled: true,
-        }
+    ///
+    /// This is a convenience function that creates a lexer with the given input
+    /// object and the default configuration. To customize the configuration,
+    /// use the [`config`](Self::config) function.
+    ///
+    /// This function is best used for testing or for simple cases where you
+    /// don't need to customize the lexer. For practical use, it is recommended
+    /// to use the [`config`](Self::config) function to create a configuration
+    /// and provide it with supplementary information, especially
+    /// [`source`](Config::source), before creating a lexer.
+    pub fn new(input: Box<dyn InputObject + 'a>) -> Lexer<'a> {
+        Self::config().input(input)
     }
 
     /// Creates a new lexer with a fixed source code.
     ///
     /// This is a convenience function that creates a lexer that reads from a
-    /// string using a [`Memory`] input function. The line number starts from 1.
-    #[must_use]
+    /// string using [`Memory`] with the default configuration.
+    ///
+    /// This function is best used for testing or for simple cases where you
+    /// don't need to customize the lexer. For practical use, it is recommended
+    /// to use the [`config`](Self::config) function to create a configuration
+    /// and provide it with supplementary information, especially
+    /// [`source`](Config::source), before creating a lexer.
+    pub fn with_code(code: &'a str) -> Lexer<'a> {
+        Self::new(Box::new(Memory::new(code)))
+    }
+
+    /// Creates a new lexer with a fixed source code.
+    ///
+    /// This is a convenience function that creates a lexer that reads from a
+    /// string using [`Memory`] with the specified source starting from line
+    /// number 1.
+    ///
+    /// This function is soft-deprecated. Use [`with_code`](Self::with_code)
+    /// instead if the source is `Unknown`. Otherwise, use
+    /// [`config`](Self::config) to set the source and [`input`](Config::input)
+    /// to create a lexer, which is more descriptive.
     pub fn from_memory<S: Into<Rc<Source>>>(code: &'a str, source: S) -> Lexer<'a> {
         fn inner(code: &str, source: Rc<Source>) -> Lexer {
-            let line = NonZeroU64::new(1).unwrap();
-            Lexer::new(Box::new(Memory::new(code)), line, source)
+            let mut config = Lexer::config();
+            config.source = Some(source);
+            config.input(Box::new(Memory::new(code)))
         }
         inner(code, source.into())
     }
@@ -583,15 +700,14 @@ impl<'a> Lexer<'a> {
     ///
     /// ```
     /// # use yash_syntax::parser::lex::Lexer;
-    /// # use yash_syntax::source::Source;
-    /// futures_executor::block_on(async {
-    ///     let mut lexer = Lexer::from_memory("abc", Source::Unknown);
-    ///     assert_eq!(lexer.index(), 0);
-    ///     let _ = lexer.peek_char().await;
-    ///     assert_eq!(lexer.index(), 0);
-    ///     lexer.consume_char();
-    ///     assert_eq!(lexer.index(), 1);
-    /// })
+    /// # futures_executor::block_on(async {
+    /// let mut lexer = Lexer::with_code("abc");
+    /// assert_eq!(lexer.index(), 0);
+    /// let _ = lexer.peek_char().await;
+    /// assert_eq!(lexer.index(), 0);
+    /// lexer.consume_char();
+    /// assert_eq!(lexer.index(), 1);
+    /// # })
     /// ```
     #[must_use]
     pub fn index(&self) -> usize {
@@ -606,16 +722,15 @@ impl<'a> Lexer<'a> {
     ///
     /// ```
     /// # use yash_syntax::parser::lex::Lexer;
-    /// # use yash_syntax::source::Source;
-    /// futures_executor::block_on(async {
-    ///     let mut lexer = Lexer::from_memory("abc", Source::Unknown);
-    ///     let saved_index = lexer.index();
-    ///     assert_eq!(lexer.peek_char().await, Ok(Some('a')));
-    ///     lexer.consume_char();
-    ///     assert_eq!(lexer.peek_char().await, Ok(Some('b')));
-    ///     lexer.rewind(saved_index);
-    ///     assert_eq!(lexer.peek_char().await, Ok(Some('a')));
-    /// })
+    /// # futures_executor::block_on(async {
+    /// let mut lexer = Lexer::with_code("abc");
+    /// let saved_index = lexer.index();
+    /// assert_eq!(lexer.peek_char().await, Ok(Some('a')));
+    /// lexer.consume_char();
+    /// assert_eq!(lexer.peek_char().await, Ok(Some('b')));
+    /// lexer.rewind(saved_index);
+    /// assert_eq!(lexer.peek_char().await, Ok(Some('a')));
+    /// # })
     /// ```
     pub fn rewind(&mut self, index: usize) {
         self.core.rewind(index)
@@ -765,7 +880,7 @@ impl<'a> Lexer<'a> {
     }
 }
 
-/// Reference to [`Lexer`] with line continuation disabled.
+/// Reference to [`Lexer`] with line continuation disabled
 ///
 /// This struct implements the RAII pattern for temporarily disabling line
 /// continuation. When you disable the line continuation of a lexer, you get an
@@ -797,7 +912,7 @@ impl Drop for PlainLexer<'_, '_> {
     }
 }
 
-/// Context in which a [word](crate::syntax::Word) is parsed.
+/// Context in which a [word](crate::syntax::Word) is parsed
 ///
 /// The parse of the word of a [switch](crate::syntax::Switch) depends on
 /// whether the parameter expansion containing the switch is part of a text or a
@@ -814,7 +929,7 @@ pub enum WordContext {
 }
 
 /// Lexer with additional information for parsing [texts](crate::syntax::Text)
-/// and [words](crate::syntax::Word).
+/// and [words](crate::syntax::Word)
 #[derive(Debug)]
 pub struct WordLexer<'a, 'b> {
     pub lexer: &'a mut Lexer<'b>,
@@ -1401,27 +1516,27 @@ mod tests {
 
     #[test]
     fn lexer_with_empty_source() {
-        let mut lexer = Lexer::from_memory("", Source::Unknown);
+        let mut lexer = Lexer::with_code("");
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
     fn lexer_peek_char_with_line_continuation_enabled_stopping_on_non_backslash() {
-        let mut lexer = Lexer::from_memory("\\\n\n\\", Source::Unknown);
+        let mut lexer = Lexer::with_code("\\\n\n\\");
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('\n')));
         assert_eq!(lexer.index(), 2);
     }
 
     #[test]
     fn lexer_peek_char_with_line_continuation_enabled_stopping_on_non_newline() {
-        let mut lexer = Lexer::from_memory("\\\n\\\n\\\n\\\\", Source::Unknown);
+        let mut lexer = Lexer::with_code("\\\n\\\n\\\n\\\\");
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('\\')));
         assert_eq!(lexer.index(), 6);
     }
 
     #[test]
     fn lexer_peek_char_with_line_continuation_disabled() {
-        let mut lexer = Lexer::from_memory("\\\n\\\n\\\\", Source::Unknown);
+        let mut lexer = Lexer::with_code("\\\n\\\n\\\\");
         let mut lexer = lexer.disable_line_continuation();
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('\\')));
         assert_eq!(lexer.index(), 0);
@@ -1429,7 +1544,7 @@ mod tests {
 
     #[test]
     fn lexer_flush() {
-        let mut lexer = Lexer::from_memory(" \n\n\t\n", Source::Unknown);
+        let mut lexer = Lexer::with_code(" \n\n\t\n");
         let location_1 = lexer.location().now_or_never().unwrap().unwrap().clone();
         assert_eq!(*location_1.code.value.borrow(), " \n");
 
@@ -1456,7 +1571,7 @@ mod tests {
 
     #[test]
     fn lexer_consume_char_if() {
-        let mut lexer = Lexer::from_memory("word\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("word\n");
 
         let mut called = 0;
         let c = lexer
@@ -1558,7 +1673,7 @@ mod tests {
 
     #[test]
     fn lexer_location_range_with_empty_range() {
-        let mut lexer = Lexer::from_memory("", Source::Unknown);
+        let mut lexer = Lexer::with_code("");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         let location = lexer.location_range(0..0);
         assert_eq!(*location.code.value.borrow(), "");
@@ -1602,20 +1717,20 @@ mod tests {
     #[test]
     #[should_panic]
     fn lexer_location_range_with_unconsumed_code() {
-        let lexer = Lexer::from_memory("echo ok", Source::Unknown);
+        let lexer = Lexer::with_code("echo ok");
         let _ = lexer.location_range(0..0);
     }
 
     #[test]
     #[should_panic(expected = "The index 1 must not be larger than the current index 0")]
     fn lexer_location_range_with_range_out_of_bounds() {
-        let lexer = Lexer::from_memory("", Source::Unknown);
+        let lexer = Lexer::with_code("");
         let _ = lexer.location_range(1..2);
     }
 
     #[test]
     fn lexer_location_range_with_alias_substitution() {
-        let mut lexer = Lexer::from_memory(" a;", Source::Unknown);
+        let mut lexer = Lexer::with_code(" a;");
         let alias_def = Rc::new(Alias {
             name: "a".to_string(),
             replacement: "abc".to_string(),
@@ -1647,14 +1762,14 @@ mod tests {
 
     #[test]
     fn lexer_inner_program_success() {
-        let mut lexer = Lexer::from_memory("x y )", Source::Unknown);
+        let mut lexer = Lexer::with_code("x y )");
         let source = lexer.inner_program().now_or_never().unwrap().unwrap();
         assert_eq!(source, "x y ");
     }
 
     #[test]
     fn lexer_inner_program_failure() {
-        let mut lexer = Lexer::from_memory("<< )", Source::Unknown);
+        let mut lexer = Lexer::with_code("<< )");
         let e = lexer.inner_program().now_or_never().unwrap().unwrap_err();
         assert_eq!(
             e.cause,

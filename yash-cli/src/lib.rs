@@ -29,9 +29,7 @@ pub mod startup;
 use self::startup::args::Parse;
 use self::startup::init_file::run_rcfile;
 use self::startup::input::prepare_input;
-use self::startup::input::SourceInput;
 use std::cell::RefCell;
-use std::num::NonZeroU64;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::option::{Interactive, On};
 use yash_env::signal;
@@ -43,7 +41,6 @@ use yash_executor::Executor;
 use yash_semantics::trap::run_exit_trap;
 use yash_semantics::{interactive_read_eval_loop, read_eval_loop};
 use yash_semantics::{Divert, ExitStatus};
-use yash_syntax::parser::lex::Lexer;
 
 async fn print_version(env: &mut Env) -> ExitStatus {
     let version = env!("CARGO_PKG_VERSION");
@@ -79,8 +76,8 @@ async fn parse_and_print(mut env: Env) -> ExitStatus {
 
     // Prepare the input for the main read-eval loop
     let ref_env = &RefCell::new(&mut env);
-    let SourceInput { input, source } = match prepare_input(ref_env, &work.source) {
-        Ok(input) => input,
+    let lexer = match prepare_input(ref_env, &work.source) {
+        Ok(lexer) => lexer,
         Err(e) => {
             let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());
             let message = format!("{}: {}\n", arg0, e);
@@ -95,8 +92,6 @@ async fn parse_and_print(mut env: Env) -> ExitStatus {
             };
         }
     };
-    let line = NonZeroU64::new(1).unwrap();
-    let mut lexer = Lexer::new(input, line, source.into());
 
     // Run the read-eval loop
     let result = if is_interactive {

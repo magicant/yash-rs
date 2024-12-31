@@ -101,7 +101,7 @@ mod tests {
 
     #[test]
     fn parser_short_function_definition_not_one_word_name() {
-        let mut lexer = Lexer::from_memory("(", Source::Unknown);
+        let mut lexer = Lexer::with_code("(");
         let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
             assigns: vec![],
@@ -121,7 +121,7 @@ mod tests {
 
     #[test]
     fn parser_short_function_definition_eof() {
-        let mut lexer = Lexer::from_memory("", Source::Unknown);
+        let mut lexer = Lexer::with_code("");
         let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
             assigns: vec![],
@@ -138,7 +138,7 @@ mod tests {
 
     #[test]
     fn parser_short_function_definition_unmatched_parenthesis() {
-        let mut lexer = Lexer::from_memory("( ", Source::Unknown);
+        let mut lexer = Lexer::with_code("( ");
         let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
             assigns: vec![],
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn parser_short_function_definition_missing_function_body() {
-        let mut lexer = Lexer::from_memory("( ) ", Source::Unknown);
+        let mut lexer = Lexer::with_code("( ) ");
         let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
             assigns: vec![],
@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn parser_short_function_definition_invalid_function_body() {
-        let mut lexer = Lexer::from_memory("() foo ; ", Source::Unknown);
+        let mut lexer = Lexer::with_code("() foo ; ");
         let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
             assigns: vec![],
@@ -204,7 +204,7 @@ mod tests {
 
     #[test]
     fn parser_short_function_definition_close_parenthesis_alias() {
-        let mut lexer = Lexer::from_memory(" a b ", Source::Unknown);
+        let mut lexer = Lexer::with_code(" a b ");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
@@ -245,7 +245,7 @@ mod tests {
 
     #[test]
     fn parser_short_function_definition_body_alias_and_newline() {
-        let mut lexer = Lexer::from_memory(" a b ", Source::Unknown);
+        let mut lexer = Lexer::with_code(" a b ");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
@@ -286,7 +286,7 @@ mod tests {
 
     #[test]
     fn parser_short_function_definition_alias_inapplicable() {
-        let mut lexer = Lexer::from_memory("()b", Source::Unknown);
+        let mut lexer = Lexer::with_code("()b");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");

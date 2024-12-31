@@ -14,14 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Preparing input object
+//! Preparing input for the parser
 //!
-//! This module implements the [`prepare_input`] function that prepares the input
-//! object for the shell. The input object is constructed from the given source
-//! and decorated with the [`Echo`] and [`Prompter`] decorators as necessary.
+//! This module implements the [`prepare_input`] function that prepares the
+//! input for the shell syntax parser. The input is constructed from the given
+//! source and decorated with the [`Echo`] and [`Prompter`] decorators as
+//! necessary.
 //!
-//! The [`SourceInput`] and [`PrepareInputError`] types define the return value
-//! of the function.
+//! [`PrepareInputError`] defines the error that may occur when preparing the
+//! input.
 
 use super::args::Source;
 use std::cell::RefCell;
@@ -44,17 +45,10 @@ use yash_env::System;
 use yash_prompt::Prompter;
 use yash_syntax::input::InputObject;
 use yash_syntax::input::Memory;
+use yash_syntax::parser::lex::Lexer;
 use yash_syntax::source::Source as SyntaxSource;
 
-/// Result of [`prepare_input`].
-pub struct SourceInput<'a> {
-    /// Input to be passed to the lexer
-    pub input: Box<dyn InputObject + 'a>,
-    /// Description of the source
-    pub source: SyntaxSource,
-}
-
-/// Error returned by [`prepare_input`].
+/// Error returned by [`prepare_input`]
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[error("cannot open script file '{path}': {errno}")]
 pub struct PrepareInputError<'a> {
@@ -64,10 +58,10 @@ pub struct PrepareInputError<'a> {
     pub path: &'a str,
 }
 
-/// Prepares the input for the shell.
+/// Prepares the input for the shell syntax parser.
 ///
-/// This function constructs an input object from the given source with the
-/// following decorators:
+/// This function constructs a lexer from the given source with the
+/// following decorators applied to the input object:
 ///
 /// - If the source is read with a file descriptor, the [`Echo`] decorator is
 ///   applied to the input to implement the [`Verbose`] shell option.
@@ -89,7 +83,16 @@ pub struct PrepareInputError<'a> {
 pub fn prepare_input<'s: 'i + 'e, 'i, 'e>(
     env: &'i RefCell<&mut Env>,
     source: &'s Source,
-) -> Result<SourceInput<'i>, PrepareInputError<'e>> {
+) -> Result<Lexer<'i>, PrepareInputError<'e>> {
+    fn lexer_with_input_and_source<'a>(
+        input: Box<dyn InputObject + 'a>,
+        source: SyntaxSource,
+    ) -> Lexer<'a> {
+        let mut config = Lexer::config();
+        config.source = Some(source.into());
+        config.input(input)
+    }
+
     match source {
         Source::Stdin => {
             let mut system = env.borrow().system.clone();
@@ -103,7 +106,7 @@ pub fn prepare_input<'s: 'i + 'e, 'i, 'e>(
 
             let input = prepare_fd_input(Fd::STDIN, env);
             let source = SyntaxSource::Stdin;
-            Ok(SourceInput { input, source })
+            Ok(lexer_with_input_and_source(input, source))
         }
 
         Source::File { path } => {
@@ -126,7 +129,7 @@ pub fn prepare_input<'s: 'i + 'e, 'i, 'e>(
             let input = prepare_fd_input(fd, env);
             let path = path.to_owned();
             let source = SyntaxSource::CommandFile { path };
-            Ok(SourceInput { input, source })
+            Ok(lexer_with_input_and_source(input, source))
         }
 
         Source::String(command) => {
@@ -139,7 +142,7 @@ pub fn prepare_input<'s: 'i + 'e, 'i, 'e>(
                 Box::new(basic_input)
             };
             let source = SyntaxSource::CommandString;
-            Ok(SourceInput { input, source })
+            Ok(lexer_with_input_and_source(input, source))
         }
     }
 }

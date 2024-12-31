@@ -25,7 +25,6 @@ use super::Error;
 use super::ErrorCause;
 use super::Parser;
 use super::SyntaxError;
-use crate::source::Source;
 use crate::syntax::*;
 use std::future::Future;
 use std::str::FromStr;
@@ -50,7 +49,7 @@ async fn reject_redundant_token(parser: &mut Parser<'_, '_>) -> Result<(), Error
     }
 }
 
-/// Helper for implementing FromStr.
+/// Helper for implementing FromStr
 trait Shift {
     type Output;
     fn shift(self) -> Self::Output;
@@ -92,7 +91,7 @@ impl FromStr for TextUnit {
     type Err = Option<Error>;
 
     fn from_str(s: &str) -> Result<TextUnit, Option<Error>> {
-        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        let mut lexer = Lexer::with_code(s);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -105,7 +104,7 @@ impl FromStr for TextUnit {
 impl FromStr for Text {
     type Err = Error;
     fn from_str(s: &str) -> Result<Text, Error> {
-        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        let mut lexer = Lexer::with_code(s);
         unwrap_ready(lexer.text(|_| false, |_| true))
     }
 }
@@ -118,7 +117,7 @@ impl FromStr for EscapeUnit {
     type Err = Option<Error>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        let mut lexer = Lexer::with_code(s);
         unwrap_ready(lexer.escape_unit()).shift()
     }
 }
@@ -127,7 +126,7 @@ impl FromStr for EscapeUnit {
 impl FromStr for EscapedString {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        let mut lexer = Lexer::with_code(s);
         unwrap_ready(lexer.escaped_string(|_| false))
     }
 }
@@ -140,7 +139,7 @@ impl FromStr for WordUnit {
     type Err = Option<Error>;
 
     fn from_str(s: &str) -> Result<WordUnit, Option<Error>> {
-        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        let mut lexer = Lexer::with_code(s);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -158,7 +157,7 @@ impl FromStr for Word {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Word, Error> {
-        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        let mut lexer = Lexer::with_code(s);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -215,7 +214,7 @@ impl FromStr for Assign {
 impl FromStr for Operator {
     type Err = ParseOperatorError;
     fn from_str(s: &str) -> Result<Operator, ParseOperatorError> {
-        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        let mut lexer = Lexer::with_code(s);
         match unwrap_ready(lexer.operator()) {
             Ok(Some(Token {
                 id: TokenId::Operator(op),
@@ -247,7 +246,7 @@ impl FromStr for Redir {
     type Err = Option<Error>;
 
     fn from_str(s: &str) -> Result<Redir, Option<Error>> {
-        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        let mut lexer = Lexer::with_code(s);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(async {
             let redir = parser.redirection().await?;
@@ -276,7 +275,7 @@ impl FromStr for SimpleCommand {
     type Err = Option<Error>;
 
     fn from_str(s: &str) -> Result<SimpleCommand, Option<Error>> {
-        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        let mut lexer = Lexer::with_code(s);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(async {
             let command = parser.simple_command().await?.unwrap();
@@ -302,7 +301,7 @@ impl FromStr for CaseItem {
     type Err = Option<Error>;
 
     fn from_str(s: &str) -> Result<CaseItem, Option<Error>> {
-        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        let mut lexer = Lexer::with_code(s);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(async {
             let item = parser.case_item().await?.map(|(item, _)| item);
@@ -329,7 +328,7 @@ impl FromStr for CompoundCommand {
     type Err = Option<Error>;
 
     fn from_str(s: &str) -> Result<CompoundCommand, Option<Error>> {
-        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        let mut lexer = Lexer::with_code(s);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(async {
             let command = parser.compound_command().await?;
@@ -352,7 +351,7 @@ impl FromStr for FullCompoundCommand {
     type Err = Option<Error>;
 
     fn from_str(s: &str) -> Result<FullCompoundCommand, Option<Error>> {
-        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        let mut lexer = Lexer::with_code(s);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(async {
             let command = parser.full_compound_command().await?;
@@ -375,7 +374,7 @@ impl FromStr for Command {
     type Err = Option<Error>;
 
     fn from_str(s: &str) -> Result<Command, Option<Error>> {
-        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        let mut lexer = Lexer::with_code(s);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(async {
             let command = parser.command().await?.unwrap();
@@ -398,7 +397,7 @@ impl FromStr for Pipeline {
     type Err = Option<Error>;
 
     fn from_str(s: &str) -> Result<Pipeline, Option<Error>> {
-        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        let mut lexer = Lexer::with_code(s);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(async {
             let pipeline = parser.pipeline().await?.unwrap();
@@ -430,7 +429,7 @@ impl FromStr for AndOrList {
     type Err = Option<Error>;
 
     fn from_str(s: &str) -> Result<AndOrList, Option<Error>> {
-        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        let mut lexer = Lexer::with_code(s);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(async {
             let list = parser.and_or_list().await?.unwrap();
@@ -448,7 +447,7 @@ impl FromStr for AndOrList {
 impl FromStr for List {
     type Err = Error;
     fn from_str(s: &str) -> Result<List, Error> {
-        let mut lexer = Lexer::from_memory(s, Source::Unknown);
+        let mut lexer = Lexer::with_code(s);
         let mut parser = Parser::new(&mut lexer);
         let list = unwrap_ready(parser.maybe_compound_list())?;
         parser.ensure_no_unread_here_doc()?;

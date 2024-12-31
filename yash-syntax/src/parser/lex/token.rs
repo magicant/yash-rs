@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Part of the lexer that parses backquotes.
+//! Part of the lexer that parses backquotes
 
 use super::core::is_blank;
 use super::core::Lexer;
@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn lexer_token_empty() {
         // If there's no word unit that can be parsed, it is the end of input.
-        let mut lexer = Lexer::from_memory("", Source::Unknown);
+        let mut lexer = Lexer::with_code("");
 
         let t = lexer.token().now_or_never().unwrap().unwrap();
         assert_eq!(*t.word.location.code.value.borrow(), "");
@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn lexer_token_non_empty() {
-        let mut lexer = Lexer::from_memory("abc ", Source::Unknown);
+        let mut lexer = Lexer::with_code("abc ");
 
         let t = lexer.token().now_or_never().unwrap().unwrap();
         assert_eq!(t.word.units.len(), 3);
@@ -128,7 +128,7 @@ mod tests {
 
     #[test]
     fn lexer_token_tilde() {
-        let mut lexer = Lexer::from_memory("~a:~", Source::Unknown);
+        let mut lexer = Lexer::with_code("~a:~");
 
         let t = lexer.token().now_or_never().unwrap().unwrap();
         assert_eq!(t.word.units, [WordUnit::Tilde("a:~".to_string())]);
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn lexer_token_io_number_delimited_by_less() {
-        let mut lexer = Lexer::from_memory("12<", Source::Unknown);
+        let mut lexer = Lexer::with_code("12<");
 
         let t = lexer.token().now_or_never().unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
@@ -154,7 +154,7 @@ mod tests {
 
     #[test]
     fn lexer_token_io_number_delimited_by_greater() {
-        let mut lexer = Lexer::from_memory("0>>", Source::Unknown);
+        let mut lexer = Lexer::with_code("0>>");
 
         let t = lexer.token().now_or_never().unwrap().unwrap();
         assert_eq!(t.word.units.len(), 1);
@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn lexer_token_after_blank() {
-        let mut lexer = Lexer::from_memory(" a  ", Source::Unknown);
+        let mut lexer = Lexer::with_code(" a  ");
 
         lexer.skip_blanks().now_or_never().unwrap().unwrap();
         let t = lexer.token().now_or_never().unwrap().unwrap();

@@ -17,8 +17,12 @@ more flexible and readable configurations.
 - The `decl_util` module is added, which contains the `Glossary` trait and the
   `EmptyGlossary` and `PosixGlossary` structs.
 - Added the `Config` struct to the `parser` module. Currently, it allows
-  setting glossaries for aliases and declaration utilities.
+  setting glossaries for aliases and declaration utilities for the parser.
+- Added the `Config` struct to the `parser::lex` module. Currently, it allows
+  setting the starting line number and the source information for the lexer.
 - The `syntax::Word::parse_tilde_everywhere_after` method is added.
+- The `with_code` function is added to the `parser::lex::Lexer` struct.
+- The `From<&str>` trait is now implemented for `input::Memory`.
 
 ### Changed
 
@@ -30,6 +34,10 @@ more flexible and readable configurations.
 - When a simple command is parsed, the parser now checks if the command name is
   a declaration utility. If it is, following words in an assignment form are
   parsed like assignments.
+- The `parser::lex::Lexer` struct is now `#[must_use]`.
+- The `parser::lex::Lexer::new` method now only takes a `Box<dyn InputObject>`
+  argument. The `start_line_number: NonZeroU64` and `source: Rc<Source>`
+  arguments have been removed in favor of construction with a `Config` struct.
 
 ## [0.13.0] - 2024-12-14
 

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Source code that is passed to the parser.
+//! Source code that is passed to the parser
 //!
 //! This module contains items representing information about the source code
 //! from which ASTs originate. [`Source`] identifies the origin of source code
@@ -263,13 +263,13 @@ pub fn source_chars<'a>(
     })
 }
 
-/// Position of source code.
+/// Position of source code
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Location {
-    /// Code that contains the character.
+    /// Code that contains the character
     pub code: Rc<Code>,
 
-    /// Character position in the code, counted from 0.
+    /// Character position in the code, counted from 0
     ///
     /// Characters are counted in the number of Unicode scalar values, not
     /// bytes. That means the index should be between 0 and
@@ -300,12 +300,12 @@ impl Location {
     }
 }
 
-/// Character with source description.
+/// Character with source description
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SourceChar {
-    /// Character value.
+    /// Character value
     pub value: char,
-    /// Location of this character in source code.
+    /// Location of this character in source code
     pub location: Location,
 }
 

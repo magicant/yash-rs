@@ -107,7 +107,7 @@ mod tests {
 
     #[test]
     fn parser_do_clause_none() {
-        let mut lexer = Lexer::from_memory("done", Source::Unknown);
+        let mut lexer = Lexer::with_code("done");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.do_clause().now_or_never().unwrap().unwrap();
@@ -116,7 +116,7 @@ mod tests {
 
     #[test]
     fn parser_do_clause_short() {
-        let mut lexer = Lexer::from_memory("do :; done", Source::Unknown);
+        let mut lexer = Lexer::with_code("do :; done");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.do_clause().now_or_never().unwrap().unwrap().unwrap();
@@ -128,7 +128,7 @@ mod tests {
 
     #[test]
     fn parser_do_clause_long() {
-        let mut lexer = Lexer::from_memory("do foo; bar& done", Source::Unknown);
+        let mut lexer = Lexer::with_code("do foo; bar& done");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.do_clause().now_or_never().unwrap().unwrap().unwrap();
@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn parser_do_clause_unclosed() {
-        let mut lexer = Lexer::from_memory(" do not close ", Source::Unknown);
+        let mut lexer = Lexer::with_code(" do not close ");
         let mut parser = Parser::new(&mut lexer);
 
         let e = parser.do_clause().now_or_never().unwrap().unwrap_err();
@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn parser_do_clause_empty_posix() {
-        let mut lexer = Lexer::from_memory("do done", Source::Unknown);
+        let mut lexer = Lexer::with_code("do done");
         let mut parser = Parser::new(&mut lexer);
 
         let e = parser.do_clause().now_or_never().unwrap().unwrap_err();
@@ -172,7 +172,7 @@ mod tests {
 
     #[test]
     fn parser_do_clause_aliasing() {
-        let mut lexer = Lexer::from_memory(" do :; end ", Source::Unknown);
+        let mut lexer = Lexer::with_code(" do :; end ");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn parser_compound_command_none() {
-        let mut lexer = Lexer::from_memory("}", Source::Unknown);
+        let mut lexer = Lexer::with_code("}");
         let mut parser = Parser::new(&mut lexer);
 
         let option = parser.compound_command().now_or_never().unwrap().unwrap();
@@ -214,7 +214,7 @@ mod tests {
 
     #[test]
     fn parser_full_compound_command_without_redirections() {
-        let mut lexer = Lexer::from_memory("(:)", Source::Unknown);
+        let mut lexer = Lexer::with_code("(:)");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.full_compound_command().now_or_never().unwrap();
@@ -225,7 +225,7 @@ mod tests {
 
     #[test]
     fn parser_full_compound_command_with_redirections() {
-        let mut lexer = Lexer::from_memory("(command) <foo >bar ;", Source::Unknown);
+        let mut lexer = Lexer::with_code("(command) <foo >bar ;");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.full_compound_command().now_or_never().unwrap();
@@ -241,7 +241,7 @@ mod tests {
 
     #[test]
     fn parser_full_compound_command_none() {
-        let mut lexer = Lexer::from_memory("}", Source::Unknown);
+        let mut lexer = Lexer::with_code("}");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.full_compound_command().now_or_never().unwrap();
@@ -250,7 +250,7 @@ mod tests {
 
     #[test]
     fn parser_short_function_definition_ok() {
-        let mut lexer = Lexer::from_memory(" ( ) ( : ) > /dev/null ", Source::Unknown);
+        let mut lexer = Lexer::with_code(" ( ) ( : ) > /dev/null ");
         let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
             assigns: vec![],

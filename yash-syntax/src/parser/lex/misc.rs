@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Extension of the core for implementing the rest of the lexer.
+//! Extension of the core for implementing the rest of the lexer
 
 use super::core::is_blank;
 use super::core::Lexer;
@@ -67,12 +67,11 @@ impl Lexer<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::source::Source;
     use futures_util::FutureExt;
 
     #[test]
     fn lexer_skip_blanks() {
-        let mut lexer = Lexer::from_memory(" \t w", Source::Unknown);
+        let mut lexer = Lexer::with_code(" \t w");
 
         let c = async {
             lexer.skip_blanks().await?;
@@ -94,14 +93,14 @@ mod tests {
 
     #[test]
     fn lexer_skip_blanks_does_not_skip_newline() {
-        let mut lexer = Lexer::from_memory("\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("\n");
         lexer.skip_blanks().now_or_never().unwrap().unwrap();
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('\n')));
     }
 
     #[test]
     fn lexer_skip_blanks_skips_line_continuations() {
-        let mut lexer = Lexer::from_memory("\\\n  \\\n\\\n\\\n \\\nX", Source::Unknown);
+        let mut lexer = Lexer::with_code("\\\n  \\\n\\\n\\\n \\\nX");
         let c = async {
             lexer.skip_blanks().await?;
             lexer.peek_char().await
@@ -110,7 +109,7 @@ mod tests {
         .unwrap();
         assert_eq!(c, Ok(Some('X')));
 
-        let mut lexer = Lexer::from_memory("  \\\n\\\n  \\\n Y", Source::Unknown);
+        let mut lexer = Lexer::with_code("  \\\n\\\n  \\\n Y");
         let c = async {
             lexer.skip_blanks().await?;
             lexer.peek_char().await
@@ -122,14 +121,14 @@ mod tests {
 
     #[test]
     fn lexer_skip_comment_no_comment() {
-        let mut lexer = Lexer::from_memory("\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("\n");
         lexer.skip_comment().now_or_never().unwrap().unwrap();
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('\n')));
     }
 
     #[test]
     fn lexer_skip_comment_empty_comment() {
-        let mut lexer = Lexer::from_memory("#\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("#\n");
 
         let c = async {
             lexer.skip_comment().await?;
@@ -151,7 +150,7 @@ mod tests {
 
     #[test]
     fn lexer_skip_comment_non_empty_comment() {
-        let mut lexer = Lexer::from_memory("\\\n### foo bar\\\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("\\\n### foo bar\\\n");
 
         let c = async {
             lexer.skip_comment().await?;
@@ -175,7 +174,7 @@ mod tests {
 
     #[test]
     fn lexer_skip_comment_not_ending_with_newline() {
-        let mut lexer = Lexer::from_memory("#comment", Source::Unknown);
+        let mut lexer = Lexer::with_code("#comment");
 
         let c = async {
             lexer.skip_comment().await?;

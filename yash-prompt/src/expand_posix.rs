@@ -20,7 +20,6 @@ use futures_util::FutureExt as _;
 use yash_env::Env;
 use yash_semantics::expansion::expand_text;
 use yash_syntax::parser::lex::Lexer;
-use yash_syntax::source::Source;
 use yash_syntax::syntax::Text;
 use yash_syntax::syntax::TextUnit::{self, Literal};
 
@@ -42,7 +41,7 @@ use yash_syntax::syntax::TextUnit::{self, Literal};
 /// implementations support backslash escapes in the prompt string. This
 /// discrepancy may be reconsidered in the future.
 pub async fn expand_posix(env: &mut Env, prompt: &str, excl: bool) -> String {
-    let mut lexer = Lexer::from_memory(prompt, Source::Unknown);
+    let mut lexer = Lexer::with_code(prompt);
     let text_result = lexer.text(|_| false, |_| false).now_or_never().unwrap();
 
     let mut text = text_result.unwrap_or_else(|_| {

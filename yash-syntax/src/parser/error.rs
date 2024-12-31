@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Definition of errors that happen in the parser.
+//! Definition of errors that happen in the parser
 
 use crate::source::pretty::Annotation;
 use crate::source::pretty::AnnotationType;
@@ -25,7 +25,7 @@ use std::borrow::Cow;
 use std::rc::Rc;
 use thiserror::Error;
 
-/// Types of syntax errors.
+/// Types of syntax errors
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[error("{}", self.message())]
 #[non_exhaustive]
@@ -409,13 +409,13 @@ impl SyntaxError {
     }
 }
 
-/// Types of errors that may happen in parsing.
+/// Types of errors that may happen in parsing
 #[derive(Clone, Debug, Error)]
 #[error("{}", self.message())]
 pub enum ErrorCause {
-    /// Error in an underlying input function.
+    /// Error in an underlying input function
     Io(#[from] Rc<std::io::Error>),
-    /// Syntax error.
+    /// Syntax error
     Syntax(#[from] SyntaxError),
 }
 
@@ -467,7 +467,7 @@ impl From<std::io::Error> for ErrorCause {
     }
 }
 
-/// Explanation of a failure in parsing.
+/// Explanation of a failure in parsing
 #[derive(Clone, Debug, Error, PartialEq)]
 #[error("{cause}")]
 pub struct Error {

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Part of the lexer that parses command substitutions.
+//! Part of the lexer that parses command substitutions
 
 use super::core::Lexer;
 use crate::parser::core::Result;
@@ -65,7 +65,7 @@ mod tests {
 
     #[test]
     fn lexer_command_substitution_success() {
-        let mut lexer = Lexer::from_memory("$( foo bar )baz", Source::Unknown);
+        let mut lexer = Lexer::with_code("$( foo bar )baz");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
@@ -88,7 +88,7 @@ mod tests {
 
     #[test]
     fn lexer_command_substitution_none() {
-        let mut lexer = Lexer::from_memory("$ foo bar )baz", Source::Unknown);
+        let mut lexer = Lexer::with_code("$ foo bar )baz");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn lexer_command_substitution_unclosed() {
-        let mut lexer = Lexer::from_memory("$( foo bar baz", Source::Unknown);
+        let mut lexer = Lexer::with_code("$( foo bar baz");
         lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 

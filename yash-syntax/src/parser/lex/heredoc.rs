@@ -134,11 +134,11 @@ mod tests {
 
     #[test]
     fn lexer_line() {
-        let mut lexer = Lexer::from_memory("\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("\n");
         let line = lexer.line().now_or_never().unwrap().unwrap();
         assert_eq!(line, "");
 
-        let mut lexer = Lexer::from_memory("foo\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("foo\n");
         let line = lexer.line().now_or_never().unwrap().unwrap();
         assert_eq!(line, "foo");
         let next = lexer.peek_char().now_or_never().unwrap().unwrap().unwrap();
@@ -157,7 +157,7 @@ mod tests {
     fn lexer_here_doc_content_empty_content() {
         let heredoc = here_doc_operator("END", false);
 
-        let mut lexer = Lexer::from_memory("END\nX", Source::Unknown);
+        let mut lexer = Lexer::with_code("END\nX");
         lexer
             .here_doc_content(&heredoc)
             .now_or_never()
@@ -177,7 +177,7 @@ mod tests {
     fn lexer_here_doc_content_one_line_content() {
         let heredoc = here_doc_operator("FOO", false);
 
-        let mut lexer = Lexer::from_memory("content\nFOO\nX", Source::Unknown);
+        let mut lexer = Lexer::with_code("content\nFOO\nX");
         lexer
             .here_doc_content(&heredoc)
             .now_or_never()
@@ -197,7 +197,7 @@ mod tests {
     fn lexer_here_doc_content_long_content() {
         let heredoc = here_doc_operator("BAR", false);
 
-        let mut lexer = Lexer::from_memory("foo\n\tBAR\n\nbaz\nBAR\nX", Source::Unknown);
+        let mut lexer = Lexer::with_code("foo\n\tBAR\n\nbaz\nBAR\nX");
         lexer
             .here_doc_content(&heredoc)
             .now_or_never()
@@ -220,12 +220,11 @@ mod tests {
     fn lexer_here_doc_content_escapes_with_unquoted_delimiter() {
         let heredoc = here_doc_operator("END", false);
 
-        let mut lexer = Lexer::from_memory(
+        let mut lexer = Lexer::with_code(
             r#"\a\$\"\'\`\\\
 X
 END
 "#,
-            Source::Unknown,
         );
         lexer
             .here_doc_content(&heredoc)
@@ -254,12 +253,11 @@ END
     fn lexer_here_doc_content_escapes_with_quoted_delimiter() {
         let heredoc = here_doc_operator(r"\END", false);
 
-        let mut lexer = Lexer::from_memory(
+        let mut lexer = Lexer::with_code(
             r#"\a\$\"\'\`\\\
 X
 END
 "#,
-            Source::Unknown,
         );
         lexer
             .here_doc_content(&heredoc)
@@ -293,7 +291,7 @@ END
     fn lexer_here_doc_content_with_tabs_removed() {
         let heredoc = here_doc_operator("BAR", true);
 
-        let mut lexer = Lexer::from_memory("\t\t\tfoo\n\tBAR\n\nbaz\nBAR\nX", Source::Unknown);
+        let mut lexer = Lexer::with_code("\t\t\tfoo\n\tBAR\n\nbaz\nBAR\nX");
         lexer
             .here_doc_content(&heredoc)
             .now_or_never()
@@ -313,7 +311,7 @@ END
     fn lexer_here_doc_content_unclosed() {
         let heredoc = here_doc_operator("END", false);
 
-        let mut lexer = Lexer::from_memory("", Source::Unknown);
+        let mut lexer = Lexer::with_code("");
         let e = lexer
             .here_doc_content(&heredoc)
             .now_or_never()

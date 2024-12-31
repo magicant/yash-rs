@@ -65,9 +65,8 @@ use yash_syntax::syntax::List;
 /// # use yash_semantics::ExitStatus;
 /// # use yash_semantics::read_eval_loop;
 /// # use yash_syntax::parser::lex::Lexer;
-/// # use yash_syntax::source::Source;
 /// let mut env = Env::new_virtual();
-/// let mut lexer = Lexer::from_memory("case foo in (bar) ;; esac", Source::Unknown);
+/// let mut lexer = Lexer::with_code("case foo in (bar) ;; esac");
 /// let result = read_eval_loop(&RefCell::new(&mut env), &mut lexer).await;
 /// assert_eq!(result, Continue(()));
 /// assert_eq!(env.exit_status, ExitStatus::SUCCESS);
@@ -79,20 +78,17 @@ use yash_syntax::syntax::List;
 /// ```
 /// # futures_executor::block_on(async {
 /// # use std::cell::RefCell;
-/// # use std::num::NonZeroU64;
 /// # use std::ops::ControlFlow::Continue;
-/// # use std::rc::Rc;
 /// # use yash_env::Env;
 /// # use yash_env::input::Echo;
 /// # use yash_semantics::ExitStatus;
 /// # use yash_semantics::read_eval_loop;
 /// # use yash_syntax::input::Memory;
 /// # use yash_syntax::parser::lex::Lexer;
-/// # use yash_syntax::source::Source;
 /// let mut env = Env::new_virtual();
 /// let mut ref_env = RefCell::new(&mut env);
 /// let input = Box::new(Echo::new(Memory::new("case foo in (bar) ;; esac"), &ref_env));
-/// let mut lexer = Lexer::new(input, NonZeroU64::MIN, Rc::new(Source::CommandString));
+/// let mut lexer = Lexer::new(input);
 /// let result = read_eval_loop(&ref_env, &mut lexer).await;
 /// drop(lexer);
 /// assert_eq!(result, Continue(()));
@@ -206,7 +202,6 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use futures_util::FutureExt;
-    use std::num::NonZeroU64;
     use std::rc::Rc;
     use yash_env::input::Echo;
     use yash_env::input::Memory;
@@ -219,13 +214,12 @@ mod tests {
     use yash_env_test_helper::assert_stdout;
     use yash_syntax::input::Context;
     use yash_syntax::source::Location;
-    use yash_syntax::source::Source;
 
     #[test]
     fn exit_status_zero_with_no_commands() {
         let mut env = Env::new_virtual();
         env.exit_status = ExitStatus(5);
-        let mut lexer = Lexer::from_memory("", Source::Unknown);
+        let mut lexer = Lexer::with_code("");
         let ref_env = RefCell::new(&mut env);
 
         let result = read_eval_loop(&ref_env, &mut lexer).now_or_never().unwrap();
@@ -241,7 +235,7 @@ mod tests {
         env.exit_status = ExitStatus(42);
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
-        let mut lexer = Lexer::from_memory("echo $?; return -n 7", Source::Unknown);
+        let mut lexer = Lexer::with_code("echo $?; return -n 7");
         let ref_env = RefCell::new(&mut env);
 
         let result = read_eval_loop(&ref_env, &mut lexer).now_or_never().unwrap();
@@ -256,7 +250,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
-        let mut lexer = Lexer::from_memory("echo 1\necho 2\necho 3;", Source::Unknown);
+        let mut lexer = Lexer::with_code("echo 1\necho 2\necho 3;");
         let ref_env = RefCell::new(&mut env);
 
         let result = read_eval_loop(&ref_env, &mut lexer).now_or_never().unwrap();
@@ -277,7 +271,7 @@ mod tests {
             origin: Location::dummy(""),
         })));
         env.builtins.insert("echo", echo_builtin());
-        let mut lexer = Lexer::from_memory("echo", Source::Unknown);
+        let mut lexer = Lexer::with_code("echo");
         let ref_env = RefCell::new(&mut env);
 
         let result = read_eval_loop(&ref_env, &mut lexer).now_or_never().unwrap();
@@ -294,8 +288,7 @@ mod tests {
         env.options.set(Verbose, On);
         let ref_env = RefCell::new(&mut env);
         let input = Box::new(Echo::new(Memory::new("case _ in esac"), &ref_env));
-        let line = NonZeroU64::new(1).unwrap();
-        let mut lexer = Lexer::new(input, line, Rc::new(Source::CommandString));
+        let mut lexer = Lexer::new(input);
 
         let result = read_eval_loop(&ref_env, &mut lexer).now_or_never().unwrap();
         drop(lexer);
@@ -312,7 +305,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
-        let mut lexer = Lexer::from_memory("${X?}\necho $?\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("${X?}\necho $?\n");
         let ref_env = RefCell::new(&mut env);
 
         let result = interactive_read_eval_loop(&ref_env, &mut lexer)
@@ -331,7 +324,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
-        let mut lexer = Lexer::from_memory("return 123\necho $?\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("return 123\necho $?\n");
         let ref_env = RefCell::new(&mut env);
 
         let result = interactive_read_eval_loop(&ref_env, &mut lexer)
@@ -349,7 +342,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
-        let mut lexer = Lexer::from_memory("${X?}\necho $?\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("${X?}\necho $?\n");
         let ref_env = RefCell::new(&mut env);
 
         let result = read_eval_loop(&ref_env, &mut lexer).now_or_never().unwrap();
@@ -362,7 +355,7 @@ mod tests {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        let mut lexer = Lexer::from_memory(";;", Source::Unknown);
+        let mut lexer = Lexer::with_code(";;");
         let ref_env = RefCell::new(&mut env);
         let result = read_eval_loop(&ref_env, &mut lexer).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
@@ -375,7 +368,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
-        let mut lexer = Lexer::from_memory(";;\necho !", Source::Unknown);
+        let mut lexer = Lexer::with_code(";;\necho !");
         let ref_env = RefCell::new(&mut env);
 
         let result = read_eval_loop(&ref_env, &mut lexer).now_or_never().unwrap();
@@ -391,7 +384,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         // The ";;" causes a syntax error, the following "(" is ignored, and the
         // loop continues with the command "echo $?" on the next line.
-        let mut lexer = Lexer::from_memory(";; (\necho $?", Source::Unknown);
+        let mut lexer = Lexer::with_code(";; (\necho $?");
         let ref_env = RefCell::new(&mut env);
 
         let result = interactive_read_eval_loop(&ref_env, &mut lexer)
@@ -410,9 +403,7 @@ mod tests {
             }
         }
 
-        let input = Box::new(BrokenInput);
-        let line = NonZeroU64::new(1).unwrap();
-        let mut lexer = Lexer::new(input, line, Rc::new(Source::Unknown));
+        let mut lexer = Lexer::new(Box::new(BrokenInput));
         let mut env = Env::new_virtual();
         let ref_env = RefCell::new(&mut env);
 
@@ -443,7 +434,7 @@ mod tests {
             .get_mut(&system.process_id)
             .unwrap()
             .raise_signal(SIGUSR1);
-        let mut lexer = Lexer::from_memory("echo $?", Source::Unknown);
+        let mut lexer = Lexer::with_code("echo $?");
         let ref_env = RefCell::new(&mut env);
 
         let result = read_eval_loop(&ref_env, &mut lexer).now_or_never().unwrap();

@@ -200,7 +200,7 @@ mod tests {
 
     #[test]
     fn parser_case_item_esac() {
-        let mut lexer = Lexer::from_memory("\nESAC", Source::Unknown);
+        let mut lexer = Lexer::with_code("\nESAC");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
@@ -227,7 +227,7 @@ mod tests {
 
     #[test]
     fn parser_case_item_minimum() {
-        let mut lexer = Lexer::from_memory("foo)", Source::Unknown);
+        let mut lexer = Lexer::with_code("foo)");
         let mut parser = Parser::new(&mut lexer);
 
         let (item, continued) = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
@@ -243,7 +243,7 @@ mod tests {
 
     #[test]
     fn parser_case_item_with_open_paren() {
-        let mut lexer = Lexer::from_memory("(foo)", Source::Unknown);
+        let mut lexer = Lexer::with_code("(foo)");
         let mut parser = Parser::new(&mut lexer);
 
         let (item, continued) = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn parser_case_item_many_patterns() {
-        let mut lexer = Lexer::from_memory("1 | esac | $three)", Source::Unknown);
+        let mut lexer = Lexer::with_code("1 | esac | $three)");
         let mut parser = Parser::new(&mut lexer);
 
         let (item, continued) = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
@@ -277,7 +277,7 @@ mod tests {
 
     #[test]
     fn parser_case_item_non_empty_body() {
-        let mut lexer = Lexer::from_memory("foo)\necho ok\n:&\n", Source::Unknown);
+        let mut lexer = Lexer::with_code("foo)\necho ok\n:&\n");
         let mut parser = Parser::new(&mut lexer);
 
         let (item, continued) = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
@@ -295,7 +295,7 @@ mod tests {
 
     #[test]
     fn parser_case_item_with_double_semicolon() {
-        let mut lexer = Lexer::from_memory("foo);;", Source::Unknown);
+        let mut lexer = Lexer::with_code("foo);;");
         let mut parser = Parser::new(&mut lexer);
 
         let (item, continued) = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
@@ -311,7 +311,7 @@ mod tests {
 
     #[test]
     fn parser_case_item_with_non_empty_body_and_double_semicolon() {
-        let mut lexer = Lexer::from_memory("foo):;\n;;", Source::Unknown);
+        let mut lexer = Lexer::with_code("foo):;\n;;");
         let mut parser = Parser::new(&mut lexer);
 
         let (item, continued) = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
@@ -328,7 +328,7 @@ mod tests {
 
     #[test]
     fn parser_case_item_with_semicolon_and() {
-        let mut lexer = Lexer::from_memory("foo);&", Source::Unknown);
+        let mut lexer = Lexer::with_code("foo);&");
         let mut parser = Parser::new(&mut lexer);
 
         let (item, continued) = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
@@ -344,7 +344,7 @@ mod tests {
 
     #[test]
     fn parser_case_item_missing_pattern_without_open_paren() {
-        let mut lexer = Lexer::from_memory(")", Source::Unknown);
+        let mut lexer = Lexer::with_code(")");
         let mut parser = Parser::new(&mut lexer);
 
         let e = parser.case_item().now_or_never().unwrap().unwrap_err();
@@ -357,7 +357,7 @@ mod tests {
 
     #[test]
     fn parser_case_item_esac_after_paren() {
-        let mut lexer = Lexer::from_memory("(esac)", Source::Unknown);
+        let mut lexer = Lexer::with_code("(esac)");
         let mut parser = Parser::new(&mut lexer);
 
         let (item, continued) = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
@@ -370,7 +370,7 @@ mod tests {
 
     #[test]
     fn parser_case_item_first_pattern_not_word_after_open_paren() {
-        let mut lexer = Lexer::from_memory("(&", Source::Unknown);
+        let mut lexer = Lexer::with_code("(&");
         let mut parser = Parser::new(&mut lexer);
 
         let e = parser.case_item().now_or_never().unwrap().unwrap_err();
@@ -383,7 +383,7 @@ mod tests {
 
     #[test]
     fn parser_case_item_missing_pattern_after_bar() {
-        let mut lexer = Lexer::from_memory("(foo| |", Source::Unknown);
+        let mut lexer = Lexer::with_code("(foo| |");
         let mut parser = Parser::new(&mut lexer);
 
         let e = parser.case_item().now_or_never().unwrap().unwrap_err();
@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn parser_case_item_missing_close_paren() {
-        let mut lexer = Lexer::from_memory("(foo bar", Source::Unknown);
+        let mut lexer = Lexer::with_code("(foo bar");
         let mut parser = Parser::new(&mut lexer);
 
         let e = parser.case_item().now_or_never().unwrap().unwrap_err();
@@ -412,7 +412,7 @@ mod tests {
 
     #[test]
     fn parser_case_command_minimum() {
-        let mut lexer = Lexer::from_memory("case foo in esac", Source::Unknown);
+        let mut lexer = Lexer::with_code("case foo in esac");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -429,7 +429,7 @@ mod tests {
     #[test]
     fn parser_case_command_newline_before_in() {
         // Alias substitution results in "case x \n\n \nin esac"
-        let mut lexer = Lexer::from_memory("CASE_X IN_ESAC", Source::Unknown);
+        let mut lexer = Lexer::with_code("CASE_X IN_ESAC");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
@@ -464,7 +464,7 @@ mod tests {
     #[test]
     fn parser_case_command_alias_on_subject() {
         // Alias substitution results in " case   in in  a|b) esac"
-        let mut lexer = Lexer::from_memory("CASE in a|b) esac", Source::Unknown);
+        let mut lexer = Lexer::with_code("CASE in a|b) esac");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
@@ -500,7 +500,7 @@ mod tests {
     #[test]
     fn parser_case_command_alias_on_in() {
         // Alias substitution results in "case x  in esac"
-        let mut lexer = Lexer::from_memory("CASE_X in esac", Source::Unknown);
+        let mut lexer = Lexer::with_code("CASE_X in esac");
         #[allow(clippy::mutable_key_type)]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
@@ -534,7 +534,7 @@ mod tests {
 
     #[test]
     fn parser_case_command_one_item() {
-        let mut lexer = Lexer::from_memory("case foo in bar) esac", Source::Unknown);
+        let mut lexer = Lexer::with_code("case foo in bar) esac");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -551,10 +551,7 @@ mod tests {
 
     #[test]
     fn parser_case_command_many_items_without_final_double_semicolon() {
-        let mut lexer = Lexer::from_memory(
-            "case x in\n\na) ;; (b|c):&:; ;;\n d)echo\nesac",
-            Source::Unknown,
-        );
+        let mut lexer = Lexer::with_code("case x in\n\na) ;; (b|c):&:; ;;\n d)echo\nesac");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -573,7 +570,7 @@ mod tests {
 
     #[test]
     fn parser_case_command_many_items_with_final_double_semicolon() {
-        let mut lexer = Lexer::from_memory("case x in(1);; 2)echo\n\n;;\n\nesac", Source::Unknown);
+        let mut lexer = Lexer::with_code("case x in(1);; 2)echo\n\n;;\n\nesac");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -591,7 +588,7 @@ mod tests {
 
     #[test]
     fn parser_case_command_missing_subject() {
-        let mut lexer = Lexer::from_memory(" case  ", Source::Unknown);
+        let mut lexer = Lexer::with_code(" case  ");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -605,7 +602,7 @@ mod tests {
 
     #[test]
     fn parser_case_command_invalid_subject() {
-        let mut lexer = Lexer::from_memory(" case ; ", Source::Unknown);
+        let mut lexer = Lexer::with_code(" case ; ");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -619,7 +616,7 @@ mod tests {
 
     #[test]
     fn parser_case_command_missing_in() {
-        let mut lexer = Lexer::from_memory(" case x esac", Source::Unknown);
+        let mut lexer = Lexer::with_code(" case x esac");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -639,7 +636,7 @@ mod tests {
 
     #[test]
     fn parser_case_command_missing_esac() {
-        let mut lexer = Lexer::from_memory("case x in a) }", Source::Unknown);
+        let mut lexer = Lexer::with_code("case x in a) }");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();

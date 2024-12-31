@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Shell language syntax and parser.
+//! Shell language syntax and parser
 //!
 //! This crate defines data types for constructing abstract syntax trees (AST)
 //! of the shell language. See the [`syntax`] module for details.

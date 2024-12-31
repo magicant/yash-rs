@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Part of the lexer that parses operators.
+//! Part of the lexer that parses operators
 
 use super::core::Lexer;
 use super::core::Token;
@@ -28,7 +28,7 @@ use std::future::Future;
 use std::pin::Pin;
 use thiserror::Error;
 
-/// Operator token identifier.
+/// Operator token identifier
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Operator {
     /// Newline
@@ -157,15 +157,15 @@ impl fmt::Display for Operator {
 #[derive(Copy, Clone, Debug)]
 pub struct Trie(&'static [Edge]);
 
-/// Edge of a [`Trie`].
+/// Edge of a [`Trie`]
 #[derive(Copy, Clone, Debug)]
 pub struct Edge {
-    /// Character value of this edge.
+    /// Character value of this edge
     pub key: char,
     /// Final operator token that is delimited after taking this edge if there are no longer
-    /// matches.
+    /// matches
     pub value: Option<Operator>,
-    /// Sub-trie containing values for keys that have the common prefix.
+    /// Sub-trie containing values for keys that have the common prefix
     pub next: Trie,
 }
 
@@ -184,7 +184,7 @@ impl Trie {
     }
 }
 
-/// Trie containing all the operators.
+/// Trie containing all the operators
 pub const OPERATORS: Trie = Trie(&[
     Edge {
         key: '\n',
@@ -228,14 +228,14 @@ pub const OPERATORS: Trie = Trie(&[
     },
 ]);
 
-/// Trie of the operators that start with `&`.
+/// Trie of the operators that start with `&`
 const AND: Trie = Trie(&[Edge {
     key: '&',
     value: Some(Operator::AndAnd),
     next: NONE,
 }]);
 
-/// Trie of the operators that start with `;`.
+/// Trie of the operators that start with `;`
 const SEMICOLON: Trie = Trie(&[
     Edge {
         key: '&',
@@ -254,14 +254,14 @@ const SEMICOLON: Trie = Trie(&[
     },
 ]);
 
-/// Trie of the operators that start with `;;`.
+/// Trie of the operators that start with `;;`
 const SEMICOLON_SEMICOLON: Trie = Trie(&[Edge {
     key: '&',
     value: Some(Operator::SemicolonSemicolonAnd),
     next: NONE,
 }]);
 
-/// Trie of the operators that start with `<`.
+/// Trie of the operators that start with `<`
 const LESS: Trie = Trie(&[
     Edge {
         key: '&',
@@ -285,7 +285,7 @@ const LESS: Trie = Trie(&[
     },
 ]);
 
-/// Trie of the operators that start with `<<`.
+/// Trie of the operators that start with `<<`
 const LESS_LESS: Trie = Trie(&[
     Edge {
         key: '-',
@@ -299,7 +299,7 @@ const LESS_LESS: Trie = Trie(&[
     },
 ]);
 
-/// Trie of the operators that start with `>`.
+/// Trie of the operators that start with `>`
 const GREATER: Trie = Trie(&[
     Edge {
         key: '&',
@@ -323,21 +323,21 @@ const GREATER: Trie = Trie(&[
     },
 ]);
 
-/// Trie of the operators that start with `>>`.
+/// Trie of the operators that start with `>>`
 const GREATER_GREATER: Trie = Trie(&[Edge {
     key: '|',
     value: Some(Operator::GreaterGreaterBar),
     next: NONE,
 }]);
 
-/// Trie of the operators that start with `|`.
+/// Trie of the operators that start with `|`
 const BAR: Trie = Trie(&[Edge {
     key: '|',
     value: Some(Operator::BarBar),
     next: NONE,
 }]);
 
-/// Trie containing nothing.
+/// Trie containing nothing
 const NONE: Trie = Trie(&[]);
 
 /// Tests whether the given character is the first character of an operator.
@@ -447,8 +447,6 @@ mod tests {
     use crate::syntax::TextUnit;
     use crate::syntax::WordUnit;
     use futures_util::FutureExt;
-    use std::num::NonZeroU64;
-    use std::rc::Rc;
 
     fn ensure_sorted(trie: &Trie) {
         assert!(
@@ -468,7 +466,7 @@ mod tests {
 
     #[test]
     fn lexer_operator_longest_match() {
-        let mut lexer = Lexer::from_memory("<<-", Source::Unknown);
+        let mut lexer = Lexer::with_code("<<-");
 
         let t = lexer.operator().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(t.word.units.len(), 3);
@@ -486,7 +484,7 @@ mod tests {
 
     #[test]
     fn lexer_operator_delimited_by_another_operator() {
-        let mut lexer = Lexer::from_memory("<<>", Source::Unknown);
+        let mut lexer = Lexer::with_code("<<>");
 
         let t = lexer.operator().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
@@ -506,7 +504,7 @@ mod tests {
 
     #[test]
     fn lexer_operator_delimited_by_eof() {
-        let mut lexer = Lexer::from_memory("<<", Source::Unknown);
+        let mut lexer = Lexer::with_code("<<");
 
         let t = lexer.operator().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
@@ -523,7 +521,7 @@ mod tests {
 
     #[test]
     fn lexer_operator_containing_line_continuations() {
-        let mut lexer = Lexer::from_memory("\\\n\\\n<\\\n<\\\n>", Source::Unknown);
+        let mut lexer = Lexer::with_code("\\\n\\\n<\\\n<\\\n>");
 
         let t = lexer.operator().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
@@ -540,7 +538,7 @@ mod tests {
 
     #[test]
     fn lexer_operator_none() {
-        let mut lexer = Lexer::from_memory("\\\n ", Source::Unknown);
+        let mut lexer = Lexer::with_code("\\\n ");
 
         let r = lexer.operator().now_or_never().unwrap().unwrap();
         assert!(r.is_none(), "unexpected success: {r:?}");
@@ -559,12 +557,7 @@ mod tests {
             }
         }
 
-        let line_number = NonZeroU64::new(1).unwrap();
-        let mut lexer = Lexer::new(
-            Box::new(OneLineInput(Some("\n".to_owned()))),
-            line_number,
-            Rc::new(Source::Unknown),
-        );
+        let mut lexer = Lexer::new(Box::new(OneLineInput(Some("\n".to_owned()))));
 
         let t = lexer.operator().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(t.word.units, [WordUnit::Unquoted(TextUnit::Literal('\n'))]);

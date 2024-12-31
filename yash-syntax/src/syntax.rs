@@ -243,7 +243,7 @@ pub struct Trim {
     pub side: TrimSide,
     /// How long the pattern should match?
     pub length: TrimLength,
-    /// Pattern to be matched with the expanded value.
+    /// Pattern to be matched with the expanded value
     pub pattern: Word,
 }
 
@@ -341,7 +341,7 @@ pub use TextUnit::*;
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Text(pub Vec<TextUnit>);
 
-/// Element of an [`EscapedString`].
+/// Element of an [`EscapedString`]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EscapeUnit {
     /// Literal single character

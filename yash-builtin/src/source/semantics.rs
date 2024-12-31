@@ -21,7 +21,6 @@ use crate::common::report_failure;
 use std::cell::RefCell;
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::num::NonZeroU64;
 use std::ops::ControlFlow;
 use std::rc::Rc;
 use yash_env::input::Echo;
@@ -65,13 +64,13 @@ impl Command {
         // Parse and execute the command script
         let system = env.system.clone();
         let ref_env = RefCell::new(&mut *env);
-        let input = Box::new(Echo::new(FdReader::new(fd, system), &ref_env));
-        let start_line_number = NonZeroU64::new(1).unwrap();
-        let source = Rc::new(Source::DotScript {
+        let mut config = Lexer::config();
+        config.source = Some(Rc::new(Source::DotScript {
             name: self.file.value,
             origin: self.file.origin,
-        });
-        let mut lexer = Lexer::new(input, start_line_number, source);
+        }));
+        let input = Box::new(Echo::new(FdReader::new(fd, system), &ref_env));
+        let mut lexer = config.input(input);
         let divert = read_eval_loop(&ref_env, &mut { lexer }).await;
 
         _ = env.system.close(fd);

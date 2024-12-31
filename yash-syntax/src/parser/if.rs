@@ -146,7 +146,7 @@ mod tests {
 
     #[test]
     fn parser_if_command_minimum() {
-        let mut lexer = Lexer::from_memory("if a; then b; fi", Source::Unknown);
+        let mut lexer = Lexer::with_code("if a; then b; fi");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -164,10 +164,7 @@ mod tests {
 
     #[test]
     fn parser_if_command_one_elif() {
-        let mut lexer = Lexer::from_memory(
-            "if\ntrue\nthen\nfalse\n\nelif x; then y& fi",
-            Source::Unknown,
-        );
+        let mut lexer = Lexer::with_code("if\ntrue\nthen\nfalse\n\nelif x; then y& fi");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -186,9 +183,8 @@ mod tests {
 
     #[test]
     fn parser_if_command_many_elifs() {
-        let mut lexer = Lexer::from_memory(
+        let mut lexer = Lexer::with_code(
             "if a; then b; elif c; then d; elif e 1; e 2& then f 1; f 2& elif g; then h; fi",
-            Source::Unknown,
         );
         let mut parser = Parser::new(&mut lexer);
 
@@ -210,7 +206,7 @@ mod tests {
 
     #[test]
     fn parser_if_command_else() {
-        let mut lexer = Lexer::from_memory("if a; then b; else c; d; fi", Source::Unknown);
+        let mut lexer = Lexer::with_code("if a; then b; else c; d; fi");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -228,8 +224,7 @@ mod tests {
 
     #[test]
     fn parser_if_command_elif_and_else() {
-        let mut lexer =
-            Lexer::from_memory("if 1; then 2; elif 3; then 4; else 5; fi", Source::Unknown);
+        let mut lexer = Lexer::with_code("if 1; then 2; elif 3; then 4; else 5; fi");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -248,7 +243,7 @@ mod tests {
 
     #[test]
     fn parser_if_command_without_then_after_if() {
-        let mut lexer = Lexer::from_memory(" if :; fi", Source::Unknown);
+        let mut lexer = Lexer::with_code(" if :; fi");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -267,7 +262,7 @@ mod tests {
 
     #[test]
     fn parser_if_command_without_then_after_elif() {
-        let mut lexer = Lexer::from_memory("if a; then b; elif c; fi", Source::Unknown);
+        let mut lexer = Lexer::with_code("if a; then b; elif c; fi");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -287,7 +282,7 @@ mod tests {
 
     #[test]
     fn parser_if_command_without_fi() {
-        let mut lexer = Lexer::from_memory("  if :; then :; }", Source::Unknown);
+        let mut lexer = Lexer::with_code("  if :; then :; }");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -307,7 +302,7 @@ mod tests {
 
     #[test]
     fn parser_if_command_empty_condition() {
-        let mut lexer = Lexer::from_memory("   if then :; fi", Source::Unknown);
+        let mut lexer = Lexer::with_code("   if then :; fi");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -321,7 +316,7 @@ mod tests {
 
     #[test]
     fn parser_if_command_empty_body() {
-        let mut lexer = Lexer::from_memory("if :; then fi", Source::Unknown);
+        let mut lexer = Lexer::with_code("if :; then fi");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -335,7 +330,7 @@ mod tests {
 
     #[test]
     fn parser_if_command_empty_elif_condition() {
-        let mut lexer = Lexer::from_memory("if :; then :; elif then :; fi", Source::Unknown);
+        let mut lexer = Lexer::with_code("if :; then :; elif then :; fi");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -352,7 +347,7 @@ mod tests {
 
     #[test]
     fn parser_if_command_empty_elif_body() {
-        let mut lexer = Lexer::from_memory("if :; then :; elif :; then fi", Source::Unknown);
+        let mut lexer = Lexer::with_code("if :; then :; elif :; then fi");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
@@ -369,7 +364,7 @@ mod tests {
 
     #[test]
     fn parser_if_command_empty_else() {
-        let mut lexer = Lexer::from_memory("if :; then :; else fi", Source::Unknown);
+        let mut lexer = Lexer::with_code("if :; then :; else fi");
         let mut parser = Parser::new(&mut lexer);
 
         let result = parser.compound_command().now_or_never().unwrap();
