@@ -23,9 +23,9 @@ impl OfdAccess {
     #[must_use]
     pub(super) fn to_real_flags(self) -> Option<c_int> {
         match self {
-            Self::ReadOnly => Some(nix::libc::O_RDONLY),
-            Self::WriteOnly => Some(nix::libc::O_WRONLY),
-            Self::ReadWrite => Some(nix::libc::O_RDWR),
+            Self::ReadOnly => Some(libc::O_RDONLY),
+            Self::WriteOnly => Some(libc::O_WRONLY),
+            Self::ReadWrite => Some(libc::O_RDWR),
             // TODO Support O_EXEC, O_PATH and O_SEARCH
             Self::Exec | Self::Search => None,
         }
@@ -33,10 +33,10 @@ impl OfdAccess {
 
     #[must_use]
     pub(super) fn from_real_flags(flags: c_int) -> Self {
-        match flags & nix::libc::O_ACCMODE {
-            nix::libc::O_RDONLY => Self::ReadOnly,
-            nix::libc::O_WRONLY => Self::WriteOnly,
-            nix::libc::O_RDWR => Self::ReadWrite,
+        match flags & libc::O_ACCMODE {
+            libc::O_RDONLY => Self::ReadOnly,
+            libc::O_WRONLY => Self::WriteOnly,
+            libc::O_RDWR => Self::ReadWrite,
             _ => Self::Exec, // TODO Support O_PATH and O_SEARCH
         }
     }
@@ -46,22 +46,22 @@ impl OpenFlag {
     #[must_use]
     pub(super) fn to_real_flags(self) -> Option<c_int> {
         match self {
-            Self::Append => Some(nix::libc::O_APPEND),
-            Self::CloseOnExec => Some(nix::libc::O_CLOEXEC),
-            Self::Create => Some(nix::libc::O_CREAT),
-            Self::Directory => Some(nix::libc::O_DIRECTORY),
-            Self::Exclusive => Some(nix::libc::O_EXCL),
+            Self::Append => Some(libc::O_APPEND),
+            Self::CloseOnExec => Some(libc::O_CLOEXEC),
+            Self::Create => Some(libc::O_CREAT),
+            Self::Directory => Some(libc::O_DIRECTORY),
+            Self::Exclusive => Some(libc::O_EXCL),
             #[cfg(not(any(target_env = "newlib", target_os = "redox")))]
-            Self::NoCtty => Some(nix::libc::O_NOCTTY),
+            Self::NoCtty => Some(libc::O_NOCTTY),
             #[cfg(any(target_env = "newlib", target_os = "redox"))]
             Self::NoCtty => None,
-            Self::NoFollow => Some(nix::libc::O_NOFOLLOW),
-            Self::NonBlock => Some(nix::libc::O_NONBLOCK),
+            Self::NoFollow => Some(libc::O_NOFOLLOW),
+            Self::NonBlock => Some(libc::O_NONBLOCK),
             #[cfg(not(target_os = "redox"))]
-            Self::Sync => Some(nix::libc::O_SYNC),
+            Self::Sync => Some(libc::O_SYNC),
             #[cfg(target_os = "redox")]
             Self::Sync => None,
-            Self::Truncate => Some(nix::libc::O_TRUNC),
+            Self::Truncate => Some(libc::O_TRUNC),
         }
     }
 }

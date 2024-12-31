@@ -50,7 +50,7 @@ use std::ops::Deref;
 use thiserror::Error;
 
 #[cfg(unix)]
-type RawPidDef = nix::libc::pid_t;
+type RawPidDef = libc::pid_t;
 #[cfg(not(unix))]
 type RawPidDef = i32;
 
@@ -63,8 +63,6 @@ type RawPidDef = i32;
 ///
 /// Process IDs are usually wrapped in the [`Pid`] type for better type safety,
 /// so this type is not used directly in most cases.
-///
-/// [`libc`]: nix::libc
 pub type RawPid = RawPidDef;
 
 /// Process ID
@@ -82,7 +80,6 @@ pub type RawPid = RawPidDef;
 ///
 /// This type may also be used to represent process group IDs, session IDs, etc.
 ///
-/// [`libc`]: nix::libc
 /// [`kill`]: crate::system::System::kill
 /// [`wait`]: crate::system::System::wait
 /// [`setpgid`]: crate::system::System::setpgid
