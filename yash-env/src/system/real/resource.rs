@@ -27,15 +27,15 @@ impl Resource {
     pub(super) const fn as_raw_type(&self) -> Option<std::ffi::c_int> {
         match *self {
             #[cfg(not(any(target_env = "newlib", target_os = "redox")))]
-            Self::AS => Some(nix::libc::RLIMIT_AS as _),
-            Self::CORE => Some(nix::libc::RLIMIT_CORE as _),
-            Self::CPU => Some(nix::libc::RLIMIT_CPU as _),
-            Self::DATA => Some(nix::libc::RLIMIT_DATA as _),
-            Self::FSIZE => Some(nix::libc::RLIMIT_FSIZE as _),
+            Self::AS => Some(libc::RLIMIT_AS as _),
+            Self::CORE => Some(libc::RLIMIT_CORE as _),
+            Self::CPU => Some(libc::RLIMIT_CPU as _),
+            Self::DATA => Some(libc::RLIMIT_DATA as _),
+            Self::FSIZE => Some(libc::RLIMIT_FSIZE as _),
             #[cfg(target_os = "freebsd")]
-            Self::KQUEUES => Some(nix::libc::RLIMIT_KQUEUES as _),
+            Self::KQUEUES => Some(libc::RLIMIT_KQUEUES as _),
             #[cfg(any(target_os = "linux", target_os = "android", target_os = "emscripten"))]
-            Self::LOCKS => Some(nix::libc::RLIMIT_LOCKS as _),
+            Self::LOCKS => Some(libc::RLIMIT_LOCKS as _),
             #[cfg(any(
                 target_os = "macos",
                 target_os = "ios",
@@ -50,12 +50,12 @@ impl Resource {
                 target_os = "emscripten",
                 target_os = "nto"
             ))]
-            Self::MEMLOCK => Some(nix::libc::RLIMIT_MEMLOCK as _),
+            Self::MEMLOCK => Some(libc::RLIMIT_MEMLOCK as _),
             #[cfg(any(target_os = "linux", target_os = "android", target_os = "emscripten"))]
-            Self::MSGQUEUE => Some(nix::libc::RLIMIT_MSGQUEUE as _),
+            Self::MSGQUEUE => Some(libc::RLIMIT_MSGQUEUE as _),
             #[cfg(any(target_os = "linux", target_os = "android"))]
-            Self::NICE => Some(nix::libc::RLIMIT_NICE as _),
-            Self::NOFILE => Some(nix::libc::RLIMIT_NOFILE as _),
+            Self::NICE => Some(libc::RLIMIT_NICE as _),
+            Self::NOFILE => Some(libc::RLIMIT_NOFILE as _),
             #[cfg(any(
                 target_os = "aix",
                 target_os = "macos",
@@ -71,7 +71,7 @@ impl Resource {
                 target_os = "emscripten",
                 target_os = "nto"
             ))]
-            Self::NPROC => Some(nix::libc::RLIMIT_NPROC as _),
+            Self::NPROC => Some(libc::RLIMIT_NPROC as _),
             #[cfg(any(
                 target_os = "aix",
                 target_os = "macos",
@@ -87,18 +87,18 @@ impl Resource {
                 target_os = "emscripten",
                 target_os = "nto"
             ))]
-            Self::RSS => Some(nix::libc::RLIMIT_RSS as _),
+            Self::RSS => Some(libc::RLIMIT_RSS as _),
             #[cfg(any(target_os = "linux", target_os = "android", target_os = "emscripten"))]
-            Self::RTPRIO => Some(nix::libc::RLIMIT_RTPRIO as _),
+            Self::RTPRIO => Some(libc::RLIMIT_RTPRIO as _),
             #[cfg(target_os = "linux")]
-            Self::RTTIME => Some(nix::libc::RLIMIT_RTTIME as _),
+            Self::RTTIME => Some(libc::RLIMIT_RTTIME as _),
             #[cfg(any(target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd"))]
-            Self::SBSIZE => Some(nix::libc::RLIMIT_SBSIZE as _),
+            Self::SBSIZE => Some(libc::RLIMIT_SBSIZE as _),
             #[cfg(any(target_os = "linux", target_os = "android", target_os = "emscripten"))]
-            Self::SIGPENDING => Some(nix::libc::RLIMIT_SIGPENDING as _),
-            Self::STACK => Some(nix::libc::RLIMIT_STACK as _),
+            Self::SIGPENDING => Some(libc::RLIMIT_SIGPENDING as _),
+            Self::STACK => Some(libc::RLIMIT_STACK as _),
             #[cfg(target_os = "freebsd")]
-            Self::SWAP => Some(nix::libc::RLIMIT_SWAP as _),
+            Self::SWAP => Some(libc::RLIMIT_SWAP as _),
             _ => None,
         }
     }

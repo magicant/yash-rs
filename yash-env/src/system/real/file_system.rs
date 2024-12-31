@@ -22,14 +22,14 @@ use std::mem::MaybeUninit;
 impl FileType {
     #[must_use]
     pub(super) const fn from_raw(mode: RawMode) -> Self {
-        match mode & nix::libc::S_IFMT {
-            nix::libc::S_IFREG => Self::Regular,
-            nix::libc::S_IFDIR => Self::Directory,
-            nix::libc::S_IFLNK => Self::Symlink,
-            nix::libc::S_IFIFO => Self::Fifo,
-            nix::libc::S_IFBLK => Self::BlockDevice,
-            nix::libc::S_IFCHR => Self::CharacterDevice,
-            nix::libc::S_IFSOCK => Self::Socket,
+        match mode & libc::S_IFMT {
+            libc::S_IFREG => Self::Regular,
+            libc::S_IFDIR => Self::Directory,
+            libc::S_IFLNK => Self::Symlink,
+            libc::S_IFIFO => Self::Fifo,
+            libc::S_IFBLK => Self::BlockDevice,
+            libc::S_IFCHR => Self::CharacterDevice,
+            libc::S_IFSOCK => Self::Socket,
             _ => Self::Other,
         }
     }
@@ -42,7 +42,7 @@ impl Stat {
     /// passed as `MaybeUninit` because of possible padding or extension fields
     /// in the structure which may not be initialized by the `stat` system call.
     #[must_use]
-    pub(super) const fn from_raw(stat: &MaybeUninit<nix::libc::stat>) -> Self {
+    pub(super) const fn from_raw(stat: &MaybeUninit<libc::stat>) -> Self {
         let ptr = stat.as_ptr();
         let raw_mode = unsafe { (&raw const (*ptr).st_mode).read() };
         Self {
