@@ -576,6 +576,7 @@ dependencies = [
  "bitflags",
  "either",
  "enumset",
+ "errno",
  "futures-executor",
  "futures-util",
  "itertools",

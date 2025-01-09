@@ -394,13 +394,13 @@ impl System for RealSystem {
 
     fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
         let dir = unsafe { libc::fdopendir(fd.0) };
-        let dir = NonNull::new(dir).ok_or_else(NixErrno::last)?;
+        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
         Ok(Box::new(RealDir(dir)))
     }
 
     fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
         let dir = unsafe { libc::opendir(path.as_ptr()) };
-        let dir = NonNull::new(dir).ok_or_else(NixErrno::last)?;
+        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
         Ok(Box::new(RealDir(dir)))
     }
 

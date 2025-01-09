@@ -19,6 +19,7 @@ annotate-snippets = "0.11.4"
 bitflags = "2.6.0"
 either = "1.9.0"
 enumset = "1.1.2"
+errno = { version = "0.3.10", default-features = false }
 futures-util = "0.3.31"
 itertools = "0.13.0"
 slab = "0.4.9"

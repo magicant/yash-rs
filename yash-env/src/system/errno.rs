@@ -394,6 +394,22 @@ impl From<RawErrno> for Errno {
     }
 }
 
+/// Converts [`Errno`] to [`errno::Errno`].
+impl From<Errno> for errno::Errno {
+    #[inline]
+    fn from(errno: Errno) -> Self {
+        Self(errno.0)
+    }
+}
+
+/// Converts [`errno::Errno`] to [`Errno`].
+impl From<errno::Errno> for Errno {
+    #[inline]
+    fn from(errno: errno::Errno) -> Self {
+        Self(errno.into())
+    }
+}
+
 /// Converts [`Errno`] to [`nix::Error`].
 ///
 /// This conversion is only available on Unix-like systems.
