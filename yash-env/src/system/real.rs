@@ -37,6 +37,7 @@ use super::Disposition;
 use super::Env;
 use super::Errno;
 use super::FdFlag;
+use super::FileType;
 use super::Gid;
 use super::Mode;
 use super::OfdAccess;
@@ -47,6 +48,7 @@ use super::Stat;
 use super::System;
 use super::Times;
 use super::Uid;
+use super::AT_FDCWD;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessResult;
@@ -57,11 +59,7 @@ use crate::str::UnixStr;
 use crate::str::UnixString;
 use enumset::EnumSet;
 use libc::DIR;
-use libc::{S_IFDIR, S_IFMT, S_IFREG};
 use nix::errno::Errno as NixErrno;
-use nix::fcntl::AtFlags;
-use nix::sys::stat::stat;
-use nix::unistd::AccessFlags;
 use std::convert::Infallible;
 use std::convert::TryInto;
 use std::ffi::c_int;
@@ -130,24 +128,6 @@ impl Pid {
     }
 }
 
-// TODO Should use AT_EACCESS on all platforms
-#[cfg(not(target_os = "redox"))]
-fn is_executable(path: &CStr) -> bool {
-    nix::unistd::faccessat(None, path, AccessFlags::X_OK, AtFlags::AT_EACCESS).is_ok()
-}
-#[cfg(target_os = "redox")]
-fn is_executable(path: &CStr) -> bool {
-    nix::unistd::access(path, AccessFlags::X_OK).is_ok()
-}
-
-fn is_regular_file(path: &CStr) -> bool {
-    matches!(stat(path), Ok(stat) if stat.st_mode & S_IFMT == S_IFREG)
-}
-
-fn is_directory(path: &CStr) -> bool {
-    matches!(stat(path), Ok(stat) if stat.st_mode & S_IFMT == S_IFDIR)
-}
-
 /// Converts a `Duration` to a `timespec`.
 ///
 /// The return value is a `MaybeUninit` because the `timespec` struct may have
@@ -214,6 +194,22 @@ impl RealSystem {
     pub unsafe fn new() -> Self {
         RealSystem(())
     }
+
+    fn file_has_type(&self, path: &CStr, r#type: FileType) -> bool {
+        self.fstatat(AT_FDCWD, path, true)
+            .is_ok_and(|stat| stat.r#type == r#type)
+    }
+
+    // TODO Should use AT_EACCESS on all platforms
+    #[cfg(not(target_os = "redox"))]
+    fn has_execute_permission(&self, path: &CStr) -> bool {
+        (unsafe { libc::faccessat(libc::AT_FDCWD, path.as_ptr(), libc::X_OK, libc::AT_EACCESS) })
+            != -1
+    }
+    #[cfg(target_os = "redox")]
+    fn has_execute_permission(&self, path: &CStr) -> bool {
+        (unsafe { libc::access(path.as_ptr(), libc::X_OK) }) != -1
+    }
 }
 
 impl System for RealSystem {
@@ -237,11 +233,11 @@ impl System for RealSystem {
     }
 
     fn is_executable_file(&self, path: &CStr) -> bool {
-        is_regular_file(path) && is_executable(path)
+        self.file_has_type(path, FileType::Regular) && self.has_execute_permission(path)
     }
 
     fn is_directory(&self, path: &CStr) -> bool {
-        is_directory(path)
+        self.file_has_type(path, FileType::Directory)
     }
 
     fn pipe(&mut self) -> Result<(Fd, Fd)> {
