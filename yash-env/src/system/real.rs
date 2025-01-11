@@ -408,13 +408,13 @@ impl System for RealSystem {
             return Err(Errno::last());
         }
 
-        // SAFETY: The four fields of `tms` have been initialized by `times`.
+        // SAFETY: These four fields of `tms` have been initialized by `times`.
         // (But that does not mean *all* fields are initialized,
         // so we cannot use `assume_init` here.)
-        let utime = unsafe { (&raw const (*tms.as_ptr()).tms_utime).read() };
-        let stime = unsafe { (&raw const (*tms.as_ptr()).tms_stime).read() };
-        let cutime = unsafe { (&raw const (*tms.as_ptr()).tms_cutime).read() };
-        let cstime = unsafe { (&raw const (*tms.as_ptr()).tms_cstime).read() };
+        let utime = unsafe { (*tms.as_ptr()).tms_utime };
+        let stime = unsafe { (*tms.as_ptr()).tms_stime };
+        let cutime = unsafe { (*tms.as_ptr()).tms_cutime };
+        let cstime = unsafe { (*tms.as_ptr()).tms_cstime };
 
         Ok(Times {
             self_user: utime as f64 / ticks_per_second as f64,
@@ -778,7 +778,7 @@ impl System for RealSystem {
             };
         }
 
-        let dir = unsafe { CStr::from_ptr(*&raw const (*passwd).pw_dir) };
+        let dir = unsafe { CStr::from_ptr((*passwd).pw_dir) };
         Ok(Some(UnixString::from_vec(dir.to_bytes().to_vec()).into()))
     }
 
@@ -846,9 +846,13 @@ impl System for RealSystem {
 
         let mut limits = MaybeUninit::<libc::rlimit>::uninit();
         unsafe { libc::getrlimit(raw_resource as _, limits.as_mut_ptr()) }.errno_if_m1()?;
+
+        // SAFETY: These two fields of `limits` have been initialized by `getrlimit`.
+        // (But that does not mean *all* fields are initialized,
+        // so we cannot use `assume_init` here.)
         Ok(LimitPair {
-            soft: unsafe { (&raw const (*limits.as_ptr()).rlim_cur).read() },
-            hard: unsafe { (&raw const (*limits.as_ptr()).rlim_max).read() },
+            soft: unsafe { (*limits.as_ptr()).rlim_cur },
+            hard: unsafe { (*limits.as_ptr()).rlim_max },
         })
     }
 

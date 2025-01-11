@@ -436,8 +436,8 @@ impl Disposition {
         let mut sa = MaybeUninit::<libc::sigaction>::uninit();
         let sa_ptr = sa.as_mut_ptr();
         unsafe {
-            (&raw mut (*sa_ptr).sa_flags).write(0);
-            libc::sigemptyset(&raw mut ((*sa_ptr).sa_mask));
+            (*sa_ptr).sa_flags = 0;
+            libc::sigemptyset(&raw mut (*sa_ptr).sa_mask);
 
             #[cfg(not(target_os = "aix"))]
             #[allow(clippy::useless_transmute)] // See from_sigaction below
@@ -453,10 +453,10 @@ impl Disposition {
     /// Converts the `sigaction` to the signal disposition for the real system.
     pub(super) unsafe fn from_sigaction(sa: &MaybeUninit<libc::sigaction>) -> Self {
         #[cfg(not(target_os = "aix"))]
-        let handler = (&raw const (*sa.as_ptr()).sa_sigaction).read();
+        let handler = (*sa.as_ptr()).sa_sigaction;
 
         #[cfg(target_os = "aix")]
-        let handler = (&raw const (*sa.as_ptr()).sa_union.__su_sigaction).read();
+        let handler = (*sa.as_ptr()).sa_union.__su_sigaction;
 
         // It is platform-specific whether we really need to transmute the handler.
         #[allow(clippy::useless_transmute)]

@@ -44,16 +44,16 @@ impl Stat {
     #[must_use]
     pub(super) const fn from_raw(stat: &MaybeUninit<libc::stat>) -> Self {
         let ptr = stat.as_ptr();
-        let raw_mode = unsafe { (&raw const (*ptr).st_mode).read() };
+        let raw_mode = unsafe { (*ptr).st_mode };
         Self {
-            dev: unsafe { (&raw const (*ptr).st_dev).read() } as _,
-            ino: unsafe { (&raw const (*ptr).st_ino).read() } as _,
+            dev: unsafe { (*ptr).st_dev } as _,
+            ino: unsafe { (*ptr).st_ino } as _,
             mode: Mode::from_bits_truncate(raw_mode),
             r#type: FileType::from_raw(raw_mode),
-            nlink: unsafe { (&raw const (*ptr).st_nlink).read() } as _,
-            uid: Uid(unsafe { (&raw const (*ptr).st_uid).read() }),
-            gid: Gid(unsafe { (&raw const (*ptr).st_gid).read() }),
-            size: unsafe { (&raw const (*ptr).st_size).read() } as _,
+            nlink: unsafe { (*ptr).st_nlink } as _,
+            uid: Uid(unsafe { (*ptr).st_uid }),
+            gid: Gid(unsafe { (*ptr).st_gid }),
+            size: unsafe { (*ptr).st_size } as _,
         }
     }
 }
