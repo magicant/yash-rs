@@ -117,17 +117,6 @@ impl ErrnoIfM1 for isize {
     const MINUS_1: Self = -1;
 }
 
-impl Pid {
-    #[inline(always)]
-    const fn to_nix(self) -> nix::unistd::Pid {
-        nix::unistd::Pid::from_raw(self.0)
-    }
-    #[inline(always)]
-    const fn from_nix(pid: nix::unistd::Pid) -> Self {
-        Pid(pid.as_raw())
-    }
-}
-
 /// Converts a `Duration` to a `timespec`.
 ///
 /// The return value is a `MaybeUninit` because the `timespec` struct may have
@@ -687,31 +676,36 @@ impl System for RealSystem {
     }
 
     fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
-        use nix::sys::wait::{WaitPidFlag, WaitStatus::*};
-        let options = WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED | WaitPidFlag::WNOHANG;
-        let status = nix::sys::wait::waitpid(Some(target.to_nix()), options.into())?;
-        match status {
-            StillAlive => Ok(None),
-            Continued(pid) => Ok(Some((Pid::from_nix(pid), ProcessState::Running))),
-            Exited(pid, exit_status) => Ok(Some((
-                Pid::from_nix(pid),
-                ProcessState::exited(exit_status),
-            ))),
-            Signaled(pid, signal, core_dump) => {
-                // SAFETY: The signal number is always a valid signal number, which is non-zero.
-                let raw_number = unsafe { NonZeroI32::new_unchecked(signal as _) };
-                let signal = signal::Number::from_raw_unchecked(raw_number);
-                let process_result = ProcessResult::Signaled { signal, core_dump };
-                Ok(Some((Pid::from_nix(pid), process_result.into())))
+        let mut status = 0;
+        let options = libc::WUNTRACED | libc::WCONTINUED | libc::WNOHANG;
+        match unsafe { libc::waitpid(target.0, &mut status, options) } {
+            -1 => Err(Errno::last()),
+            0 => Ok(None),
+            pid => {
+                let state = if libc::WIFCONTINUED(status) {
+                    ProcessState::Running
+                } else if libc::WIFEXITED(status) {
+                    let exit_status = libc::WEXITSTATUS(status);
+                    ProcessState::exited(exit_status)
+                } else if libc::WIFSIGNALED(status) {
+                    let signal = libc::WTERMSIG(status);
+                    let core_dump = libc::WCOREDUMP(status);
+                    // SAFETY: The signal number is always a valid signal number, which is non-zero.
+                    let raw_number = unsafe { NonZeroI32::new_unchecked(signal as _) };
+                    let signal = signal::Number::from_raw_unchecked(raw_number);
+                    let process_result = ProcessResult::Signaled { signal, core_dump };
+                    process_result.into()
+                } else if libc::WIFSTOPPED(status) {
+                    let signal = libc::WSTOPSIG(status);
+                    // SAFETY: The signal number is always a valid signal number, which is non-zero.
+                    let raw_number = unsafe { NonZeroI32::new_unchecked(signal as _) };
+                    let signal = signal::Number::from_raw_unchecked(raw_number);
+                    ProcessState::stopped(signal)
+                } else {
+                    unreachable!()
+                };
+                Ok(Some((Pid(pid), state)))
             }
-            Stopped(pid, signal) => {
-                // SAFETY: The signal number is always a valid signal number, which is non-zero.
-                let raw_number = unsafe { NonZeroI32::new_unchecked(signal as _) };
-                let signal = signal::Number::from_raw_unchecked(raw_number);
-                Ok(Some((Pid::from_nix(pid), ProcessState::stopped(signal))))
-            }
-            #[allow(unreachable_patterns)]
-            _ => unreachable!(),
         }
     }
 
