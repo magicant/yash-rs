@@ -747,8 +747,8 @@ impl System for RealSystem {
     }
 
     fn chdir(&mut self, path: &CStr) -> Result<()> {
-        nix::unistd::chdir(path)?;
-        Ok(())
+        let result = unsafe { libc::chdir(path.as_ptr()) };
+        result.errno_if_m1().map(drop)
     }
 
     fn getuid(&self) -> Uid {
