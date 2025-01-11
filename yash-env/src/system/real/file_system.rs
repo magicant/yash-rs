@@ -38,11 +38,12 @@ impl FileType {
 impl Stat {
     /// Converts a raw `stat` structure to a `Stat` object.
     ///
-    /// This function requires the `stat` structure to be initialized, but it is
-    /// passed as `MaybeUninit` because of possible padding or extension fields
-    /// in the structure which may not be initialized by the `stat` system call.
+    /// This function assumes the `stat` structure to be initialized by the
+    /// `stat` system call, but it is passed as `MaybeUninit` because of
+    /// possible padding or extension fields in the structure which may not be
+    /// initialized by the system call.
     #[must_use]
-    pub(super) const fn from_raw(stat: &MaybeUninit<libc::stat>) -> Self {
+    pub(super) const unsafe fn from_raw(stat: &MaybeUninit<libc::stat>) -> Self {
         let ptr = stat.as_ptr();
         let raw_mode = unsafe { (*ptr).st_mode };
         Self {

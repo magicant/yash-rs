@@ -204,7 +204,8 @@ impl System for RealSystem {
     fn fstat(&self, fd: Fd) -> Result<Stat> {
         let mut stat = MaybeUninit::<libc::stat>::uninit();
         unsafe { libc::fstat(fd.0, stat.as_mut_ptr()) }.errno_if_m1()?;
-        Ok(Stat::from_raw(&stat))
+        let stat = unsafe { Stat::from_raw(&stat) };
+        Ok(stat)
     }
 
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
@@ -217,7 +218,8 @@ impl System for RealSystem {
         let mut stat = MaybeUninit::<libc::stat>::uninit();
         unsafe { libc::fstatat(dir_fd.0, path.as_ptr(), stat.as_mut_ptr(), flags) }
             .errno_if_m1()?;
-        Ok(Stat::from_raw(&stat))
+        let stat = unsafe { Stat::from_raw(&stat) };
+        Ok(stat)
     }
 
     fn is_executable_file(&self, path: &CStr) -> bool {
