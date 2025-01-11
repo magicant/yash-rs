@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `System::getpwnam_dir` now takes a `&CStr` parameter instead of a `&str`.
 - The `builtin::Builtin` struct is now `non_exhaustive`.
 - External dependency versions:
     - yash-syntax 0.13.0 → 0.14.0

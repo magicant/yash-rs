@@ -455,7 +455,7 @@ impl System for &SharedSystem {
     fn getegid(&self) -> Gid {
         self.0.borrow().getegid()
     }
-    fn getpwnam_dir(&self, name: &str) -> Result<Option<PathBuf>> {
+    fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
         self.0.borrow().getpwnam_dir(name)
     }
     fn confstr_path(&self) -> Result<UnixString> {
@@ -677,7 +677,7 @@ impl System for SharedSystem {
         (&self).getegid()
     }
     #[inline]
-    fn getpwnam_dir(&self, name: &str) -> Result<Option<PathBuf>> {
+    fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
         (&self).getpwnam_dir(name)
     }
     #[inline]

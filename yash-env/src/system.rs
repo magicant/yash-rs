@@ -434,7 +434,7 @@ pub trait System: Debug {
     /// Returns the home directory path of the given user.
     ///
     /// Returns `Ok(None)` if the user is not found.
-    fn getpwnam_dir(&self, name: &str) -> Result<Option<PathBuf>>;
+    fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>>;
 
     /// Returns the standard `$PATH` value where all standard utilities are
     /// expected to be found.

@@ -71,7 +71,6 @@ use std::io::SeekFrom;
 use std::mem::MaybeUninit;
 use std::num::NonZeroI32;
 use std::os::unix::ffi::OsStrExt as _;
-use std::os::unix::ffi::OsStringExt as _;
 use std::os::unix::io::IntoRawFd;
 use std::pin::Pin;
 use std::ptr::NonNull;
@@ -767,12 +766,20 @@ impl System for RealSystem {
         Gid(unsafe { libc::getegid() })
     }
 
-    fn getpwnam_dir(&self, name: &str) -> Result<Option<PathBuf>> {
-        let user = nix::unistd::User::from_name(name)?;
-        Ok(user.map(|user| {
-            let dir = user.dir.into_os_string().into_vec();
-            PathBuf::from(UnixString::from_vec(dir))
-        }))
+    fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
+        Errno::clear();
+        let passwd = unsafe { libc::getpwnam(name.as_ptr()) };
+        if passwd.is_null() {
+            let errno = Errno::last();
+            return if errno == Errno::NO_ERROR {
+                Ok(None)
+            } else {
+                Err(errno)
+            };
+        }
+
+        let dir = unsafe { CStr::from_ptr(*&raw const (*passwd).pw_dir) };
+        Ok(Some(UnixString::from_vec(dir.to_bytes().to_vec()).into()))
     }
 
     fn confstr_path(&self) -> Result<UnixString> {

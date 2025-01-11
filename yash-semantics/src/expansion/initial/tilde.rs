@@ -18,6 +18,7 @@
 
 use crate::expansion::attr::AttrChar;
 use crate::expansion::attr::Origin;
+use std::ffi::CString;
 use yash_env::variable::HOME;
 use yash_env::Env;
 use yash_env::System;
@@ -42,9 +43,11 @@ pub fn expand(name: &str, env: &Env) -> Vec<AttrChar> {
         let result = env.variables.get_scalar(HOME).unwrap_or("~");
         into_attr_chars(result.chars())
     } else {
-        if let Ok(Some(path)) = env.system.getpwnam_dir(name) {
-            if let Ok(path) = path.into_unix_string().into_string() {
-                return into_attr_chars(path.chars());
+        if let Ok(name) = CString::new(name) {
+            if let Ok(Some(path)) = env.system.getpwnam_dir(&name) {
+                if let Ok(path) = path.into_unix_string().into_string() {
+                    return into_attr_chars(path.chars());
+                }
             }
         }
         into_attr_chars(std::iter::once('~').chain(name.chars()))
