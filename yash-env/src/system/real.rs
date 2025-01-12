@@ -37,6 +37,7 @@ use super::Disposition;
 use super::Env;
 use super::Errno;
 use super::FdFlag;
+use super::FileType;
 use super::Gid;
 use super::Mode;
 use super::OfdAccess;
@@ -47,6 +48,7 @@ use super::Stat;
 use super::System;
 use super::Times;
 use super::Uid;
+use super::AT_FDCWD;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessResult;
@@ -56,12 +58,7 @@ use crate::path::PathBuf;
 use crate::str::UnixStr;
 use crate::str::UnixString;
 use enumset::EnumSet;
-use nix::errno::Errno as NixErrno;
-use nix::fcntl::AtFlags;
-use nix::libc::DIR;
-use nix::libc::{S_IFDIR, S_IFMT, S_IFREG};
-use nix::sys::stat::stat;
-use nix::unistd::AccessFlags;
+use libc::DIR;
 use std::convert::Infallible;
 use std::convert::TryInto;
 use std::ffi::c_int;
@@ -73,7 +70,6 @@ use std::io::SeekFrom;
 use std::mem::MaybeUninit;
 use std::num::NonZeroI32;
 use std::os::unix::ffi::OsStrExt as _;
-use std::os::unix::ffi::OsStringExt as _;
 use std::os::unix::io::IntoRawFd;
 use std::pin::Pin;
 use std::ptr::NonNull;
@@ -119,46 +115,14 @@ impl ErrnoIfM1 for isize {
     const MINUS_1: Self = -1;
 }
 
-impl Pid {
-    #[inline(always)]
-    const fn to_nix(self) -> nix::unistd::Pid {
-        nix::unistd::Pid::from_raw(self.0)
-    }
-    #[inline(always)]
-    const fn from_nix(pid: nix::unistd::Pid) -> Self {
-        Pid(pid.as_raw())
-    }
-}
-
-// TODO Should use AT_EACCESS on all platforms
-#[cfg(not(target_os = "redox"))]
-fn is_executable(path: &CStr) -> bool {
-    nix::unistd::faccessat(None, path, AccessFlags::X_OK, AtFlags::AT_EACCESS).is_ok()
-}
-#[cfg(target_os = "redox")]
-fn is_executable(path: &CStr) -> bool {
-    nix::unistd::access(path, AccessFlags::X_OK).is_ok()
-}
-
-fn is_regular_file(path: &CStr) -> bool {
-    matches!(stat(path), Ok(stat) if stat.st_mode & S_IFMT == S_IFREG)
-}
-
-fn is_directory(path: &CStr) -> bool {
-    matches!(stat(path), Ok(stat) if stat.st_mode & S_IFMT == S_IFDIR)
-}
-
 /// Converts a `Duration` to a `timespec`.
 ///
 /// The return value is a `MaybeUninit` because the `timespec` struct may have
 /// padding or extension fields that are not initialized by this function.
 #[must_use]
-fn to_timespec(duration: Duration) -> MaybeUninit<nix::libc::timespec> {
-    let seconds = duration
-        .as_secs()
-        .try_into()
-        .unwrap_or(nix::libc::time_t::MAX);
-    let mut timespec = MaybeUninit::<nix::libc::timespec>::uninit();
+fn to_timespec(duration: Duration) -> MaybeUninit<libc::timespec> {
+    let seconds = duration.as_secs().try_into().unwrap_or(libc::time_t::MAX);
+    let mut timespec = MaybeUninit::<libc::timespec>::uninit();
     unsafe {
         (&raw mut (*timespec.as_mut_ptr()).tv_sec).write(seconds);
         (&raw mut (*timespec.as_mut_ptr()).tv_nsec).write(duration.subsec_nanos() as _);
@@ -217,60 +181,76 @@ impl RealSystem {
     pub unsafe fn new() -> Self {
         RealSystem(())
     }
+
+    fn file_has_type(&self, path: &CStr, r#type: FileType) -> bool {
+        self.fstatat(AT_FDCWD, path, true)
+            .is_ok_and(|stat| stat.r#type == r#type)
+    }
+
+    // TODO Should use AT_EACCESS on all platforms
+    #[cfg(not(target_os = "redox"))]
+    fn has_execute_permission(&self, path: &CStr) -> bool {
+        (unsafe { libc::faccessat(libc::AT_FDCWD, path.as_ptr(), libc::X_OK, libc::AT_EACCESS) })
+            != -1
+    }
+    #[cfg(target_os = "redox")]
+    fn has_execute_permission(&self, path: &CStr) -> bool {
+        (unsafe { libc::access(path.as_ptr(), libc::X_OK) }) != -1
+    }
 }
 
 impl System for RealSystem {
     fn fstat(&self, fd: Fd) -> Result<Stat> {
-        let mut stat = MaybeUninit::<nix::libc::stat>::uninit();
-        unsafe { nix::libc::fstat(fd.0, stat.as_mut_ptr()) }.errno_if_m1()?;
-        Ok(Stat::from_raw(&stat))
+        let mut stat = MaybeUninit::<libc::stat>::uninit();
+        unsafe { libc::fstat(fd.0, stat.as_mut_ptr()) }.errno_if_m1()?;
+        let stat = unsafe { Stat::from_raw(&stat) };
+        Ok(stat)
     }
 
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
         let flags = if follow_symlinks {
             0
         } else {
-            nix::libc::AT_SYMLINK_NOFOLLOW
+            libc::AT_SYMLINK_NOFOLLOW
         };
 
-        let mut stat = MaybeUninit::<nix::libc::stat>::uninit();
-        unsafe { nix::libc::fstatat(dir_fd.0, path.as_ptr(), stat.as_mut_ptr(), flags) }
+        let mut stat = MaybeUninit::<libc::stat>::uninit();
+        unsafe { libc::fstatat(dir_fd.0, path.as_ptr(), stat.as_mut_ptr(), flags) }
             .errno_if_m1()?;
-        Ok(Stat::from_raw(&stat))
+        let stat = unsafe { Stat::from_raw(&stat) };
+        Ok(stat)
     }
 
     fn is_executable_file(&self, path: &CStr) -> bool {
-        is_regular_file(path) && is_executable(path)
+        self.file_has_type(path, FileType::Regular) && self.has_execute_permission(path)
     }
 
     fn is_directory(&self, path: &CStr) -> bool {
-        is_directory(path)
+        self.file_has_type(path, FileType::Directory)
     }
 
     fn pipe(&mut self) -> Result<(Fd, Fd)> {
         let mut fds = MaybeUninit::<[c_int; 2]>::uninit();
         // TODO Use as_mut_ptr rather than cast when array_ptr_get is stabilized
-        unsafe { nix::libc::pipe(fds.as_mut_ptr().cast()) }.errno_if_m1()?;
+        unsafe { libc::pipe(fds.as_mut_ptr().cast()) }.errno_if_m1()?;
         let fds = unsafe { fds.assume_init() };
         Ok((Fd(fds[0]), Fd(fds[1])))
     }
 
     fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
         let command = if flags.contains(FdFlag::CloseOnExec) {
-            nix::libc::F_DUPFD_CLOEXEC
+            libc::F_DUPFD_CLOEXEC
         } else {
-            nix::libc::F_DUPFD
+            libc::F_DUPFD
         };
-        unsafe { nix::libc::fcntl(from.0, command, to_min.0) }
+        unsafe { libc::fcntl(from.0, command, to_min.0) }
             .errno_if_m1()
             .map(Fd)
     }
 
     fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
         loop {
-            let result = unsafe { nix::libc::dup2(from.0, to.0) }
-                .errno_if_m1()
-                .map(Fd);
+            let result = unsafe { libc::dup2(from.0, to.0) }.errno_if_m1().map(Fd);
             if result != Err(Errno::EINTR) {
                 return result;
             }
@@ -294,7 +274,7 @@ impl System for RealSystem {
         #[cfg(target_os = "redox")]
         let mode_bits = mode.bits() as c_int;
 
-        unsafe { nix::libc::open(path.as_ptr(), raw_flags, mode_bits) }
+        unsafe { libc::open(path.as_ptr(), raw_flags, mode_bits) }
             .errno_if_m1()
             .map(Fd)
     }
@@ -313,7 +293,7 @@ impl System for RealSystem {
 
     fn close(&mut self, fd: Fd) -> Result<()> {
         loop {
-            let result = unsafe { nix::libc::close(fd.0) }.errno_if_m1().map(drop);
+            let result = unsafe { libc::close(fd.0) }.errno_if_m1().map(drop);
             match result {
                 Err(Errno::EBADF) => return Ok(()),
                 Err(Errno::EINTR) => continue,
@@ -323,28 +303,28 @@ impl System for RealSystem {
     }
 
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
-        let flags = unsafe { nix::libc::fcntl(fd.0, nix::libc::F_GETFL) }.errno_if_m1()?;
+        let flags = unsafe { libc::fcntl(fd.0, libc::F_GETFL) }.errno_if_m1()?;
         Ok(OfdAccess::from_real_flags(flags))
     }
 
     fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
-        let old_flags = unsafe { nix::libc::fcntl(fd.0, nix::libc::F_GETFL) }.errno_if_m1()?;
+        let old_flags = unsafe { libc::fcntl(fd.0, libc::F_GETFL) }.errno_if_m1()?;
         let new_flags = if nonblocking {
-            old_flags | nix::libc::O_NONBLOCK
+            old_flags | libc::O_NONBLOCK
         } else {
-            old_flags & !nix::libc::O_NONBLOCK
+            old_flags & !libc::O_NONBLOCK
         };
         if new_flags != old_flags {
-            unsafe { nix::libc::fcntl(fd.0, nix::libc::F_SETFL, new_flags) }.errno_if_m1()?;
+            unsafe { libc::fcntl(fd.0, libc::F_SETFL, new_flags) }.errno_if_m1()?;
         }
-        let was_nonblocking = old_flags & nix::libc::O_NONBLOCK != 0;
+        let was_nonblocking = old_flags & libc::O_NONBLOCK != 0;
         Ok(was_nonblocking)
     }
 
     fn fcntl_getfd(&self, fd: Fd) -> Result<EnumSet<FdFlag>> {
-        let bits = unsafe { nix::libc::fcntl(fd.0, nix::libc::F_GETFD) }.errno_if_m1()?;
+        let bits = unsafe { libc::fcntl(fd.0, libc::F_GETFD) }.errno_if_m1()?;
         let mut flags = EnumSet::empty();
-        if bits & nix::libc::FD_CLOEXEC != 0 {
+        if bits & libc::FD_CLOEXEC != 0 {
             flags.insert(FdFlag::CloseOnExec);
         }
         Ok(flags)
@@ -353,21 +333,21 @@ impl System for RealSystem {
     fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
         let mut bits = 0 as c_int;
         if flags.contains(FdFlag::CloseOnExec) {
-            bits |= nix::libc::FD_CLOEXEC;
+            bits |= libc::FD_CLOEXEC;
         }
-        unsafe { nix::libc::fcntl(fd.0, nix::libc::F_SETFD, bits) }
+        unsafe { libc::fcntl(fd.0, libc::F_SETFD, bits) }
             .errno_if_m1()
             .map(drop)
     }
 
     fn isatty(&self, fd: Fd) -> bool {
-        (unsafe { nix::libc::isatty(fd.0) } != 0)
+        (unsafe { libc::isatty(fd.0) } != 0)
     }
 
     fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
         loop {
-            let result = unsafe { nix::libc::read(fd.0, buffer.as_mut_ptr().cast(), buffer.len()) }
-                .errno_if_m1();
+            let result =
+                unsafe { libc::read(fd.0, buffer.as_mut_ptr().cast(), buffer.len()) }.errno_if_m1();
             if result != Err(Errno::EINTR) {
                 return Ok(result?.try_into().unwrap());
             }
@@ -376,8 +356,8 @@ impl System for RealSystem {
 
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {
         loop {
-            let result = unsafe { nix::libc::write(fd.0, buffer.as_ptr().cast(), buffer.len()) }
-                .errno_if_m1();
+            let result =
+                unsafe { libc::write(fd.0, buffer.as_ptr().cast(), buffer.len()) }.errno_if_m1();
             if result != Err(Errno::EINTR) {
                 return Ok(result?.try_into().unwrap());
             }
@@ -388,29 +368,29 @@ impl System for RealSystem {
         let (offset, whence) = match position {
             SeekFrom::Start(offset) => {
                 let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
-                (offset, nix::libc::SEEK_SET)
+                (offset, libc::SEEK_SET)
             }
-            SeekFrom::End(offset) => (offset, nix::libc::SEEK_END),
-            SeekFrom::Current(offset) => (offset, nix::libc::SEEK_CUR),
+            SeekFrom::End(offset) => (offset, libc::SEEK_END),
+            SeekFrom::Current(offset) => (offset, libc::SEEK_CUR),
         };
-        let new_offset = unsafe { nix::libc::lseek(fd.0, offset, whence) }.errno_if_m1()?;
+        let new_offset = unsafe { libc::lseek(fd.0, offset, whence) }.errno_if_m1()?;
         Ok(new_offset.try_into().unwrap())
     }
 
     fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
-        let dir = unsafe { nix::libc::fdopendir(fd.0) };
-        let dir = NonNull::new(dir).ok_or_else(NixErrno::last)?;
+        let dir = unsafe { libc::fdopendir(fd.0) };
+        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
         Ok(Box::new(RealDir(dir)))
     }
 
     fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
-        let dir = unsafe { nix::libc::opendir(path.as_ptr()) };
-        let dir = NonNull::new(dir).ok_or_else(NixErrno::last)?;
+        let dir = unsafe { libc::opendir(path.as_ptr()) };
+        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
         Ok(Box::new(RealDir(dir)))
     }
 
     fn umask(&mut self, new_mask: Mode) -> Mode {
-        Mode::from_bits_retain(unsafe { nix::libc::umask(new_mask.bits()) })
+        Mode::from_bits_retain(unsafe { libc::umask(new_mask.bits()) })
     }
 
     fn now(&self) -> Instant {
@@ -418,24 +398,24 @@ impl System for RealSystem {
     }
 
     fn times(&self) -> Result<Times> {
-        let mut tms = MaybeUninit::<nix::libc::tms>::uninit();
-        let raw_result = unsafe { nix::libc::times(tms.as_mut_ptr()) };
+        let mut tms = MaybeUninit::<libc::tms>::uninit();
+        let raw_result = unsafe { libc::times(tms.as_mut_ptr()) };
         if raw_result == (-1) as _ {
             return Err(Errno::last());
         }
 
-        let ticks_per_second = unsafe { nix::libc::sysconf(nix::libc::_SC_CLK_TCK) };
+        let ticks_per_second = unsafe { libc::sysconf(libc::_SC_CLK_TCK) };
         if ticks_per_second <= 0 {
             return Err(Errno::last());
         }
 
-        // SAFETY: The four fields of `tms` have been initialized by `times`.
+        // SAFETY: These four fields of `tms` have been initialized by `times`.
         // (But that does not mean *all* fields are initialized,
         // so we cannot use `assume_init` here.)
-        let utime = unsafe { (&raw const (*tms.as_ptr()).tms_utime).read() };
-        let stime = unsafe { (&raw const (*tms.as_ptr()).tms_stime).read() };
-        let cutime = unsafe { (&raw const (*tms.as_ptr()).tms_cutime).read() };
-        let cstime = unsafe { (&raw const (*tms.as_ptr()).tms_cstime).read() };
+        let utime = unsafe { (*tms.as_ptr()).tms_utime };
+        let stime = unsafe { (*tms.as_ptr()).tms_stime };
+        let cutime = unsafe { (*tms.as_ptr()).tms_cutime };
+        let cstime = unsafe { (*tms.as_ptr()).tms_cstime };
 
         Ok(Times {
             self_user: utime as f64 / ticks_per_second as f64,
@@ -463,19 +443,18 @@ impl System for RealSystem {
     ) -> Result<()> {
         unsafe {
             let (how, raw_mask) = match op {
-                None => (nix::libc::SIG_BLOCK, None),
+                None => (libc::SIG_BLOCK, None),
                 Some((op, mask)) => {
                     let how = match op {
-                        SigmaskOp::Add => nix::libc::SIG_BLOCK,
-                        SigmaskOp::Remove => nix::libc::SIG_UNBLOCK,
-                        SigmaskOp::Set => nix::libc::SIG_SETMASK,
+                        SigmaskOp::Add => libc::SIG_BLOCK,
+                        SigmaskOp::Remove => libc::SIG_UNBLOCK,
+                        SigmaskOp::Set => libc::SIG_SETMASK,
                     };
 
-                    let mut raw_mask = MaybeUninit::<nix::libc::sigset_t>::uninit();
-                    nix::libc::sigemptyset(raw_mask.as_mut_ptr()).errno_if_m1()?;
+                    let mut raw_mask = MaybeUninit::<libc::sigset_t>::uninit();
+                    libc::sigemptyset(raw_mask.as_mut_ptr()).errno_if_m1()?;
                     for &signal in mask {
-                        nix::libc::sigaddset(raw_mask.as_mut_ptr(), signal.as_raw())
-                            .errno_if_m1()?;
+                        libc::sigaddset(raw_mask.as_mut_ptr(), signal.as_raw()).errno_if_m1()?;
                     }
 
                     (how, Some(raw_mask))
@@ -484,9 +463,9 @@ impl System for RealSystem {
             let mut old_mask_pair = match old_mask {
                 None => None,
                 Some(old_mask) => {
-                    let mut raw_old_mask = MaybeUninit::<nix::libc::sigset_t>::uninit();
+                    let mut raw_old_mask = MaybeUninit::<libc::sigset_t>::uninit();
                     // POSIX requires *all* sigset_t objects to be initialized before use.
-                    nix::libc::sigemptyset(raw_old_mask.as_mut_ptr()).errno_if_m1()?;
+                    libc::sigemptyset(raw_old_mask.as_mut_ptr()).errno_if_m1()?;
                     Some((old_mask, raw_old_mask))
                 }
             };
@@ -499,7 +478,7 @@ impl System for RealSystem {
                 .map_or(std::ptr::null_mut(), |(_, raw_old_mask)| {
                     raw_old_mask.as_mut_ptr()
                 });
-            let result = nix::libc::sigprocmask(how, raw_set_ptr, raw_old_set_ptr);
+            let result = libc::sigprocmask(how, raw_set_ptr, raw_old_set_ptr);
             result.errno_if_m1().map(drop)?;
 
             if let Some((old_mask, raw_old_mask)) = old_mask_pair {
@@ -515,12 +494,12 @@ impl System for RealSystem {
         unsafe {
             let new_action = handling.to_sigaction();
 
-            let mut old_action = MaybeUninit::<nix::libc::sigaction>::uninit();
+            let mut old_action = MaybeUninit::<libc::sigaction>::uninit();
             let old_mask_ptr = &raw mut (*old_action.as_mut_ptr()).sa_mask;
             // POSIX requires *all* sigset_t objects to be initialized before use.
-            nix::libc::sigemptyset(old_mask_ptr).errno_if_m1()?;
+            libc::sigemptyset(old_mask_ptr).errno_if_m1()?;
 
-            nix::libc::sigaction(
+            libc::sigaction(
                 signal.as_raw(),
                 new_action.as_ptr(),
                 old_action.as_mut_ptr(),
@@ -561,7 +540,7 @@ impl System for RealSystem {
     ) -> Pin<Box<(dyn Future<Output = Result<()>>)>> {
         Box::pin(async move {
             let raw = signal.map_or(0, signal::Number::as_raw);
-            unsafe { nix::libc::kill(target.0, raw) }.errno_if_m1()?;
+            unsafe { libc::kill(target.0, raw) }.errno_if_m1()?;
             Ok(())
         })
     }
@@ -581,12 +560,12 @@ impl System for RealSystem {
             .transpose()?
             .unwrap_or(0);
 
-        fn to_raw_fd_set(fds: &[Fd]) -> MaybeUninit<nix::libc::fd_set> {
-            let mut raw_fds = MaybeUninit::<nix::libc::fd_set>::uninit();
+        fn to_raw_fd_set(fds: &[Fd]) -> MaybeUninit<libc::fd_set> {
+            let mut raw_fds = MaybeUninit::<libc::fd_set>::uninit();
             unsafe {
-                nix::libc::FD_ZERO(raw_fds.as_mut_ptr());
+                libc::FD_ZERO(raw_fds.as_mut_ptr());
                 for fd in fds {
-                    nix::libc::FD_SET(fd.0, raw_fds.as_mut_ptr());
+                    libc::FD_SET(fd.0, raw_fds.as_mut_ptr());
                 }
             }
             raw_fds
@@ -604,13 +583,13 @@ impl System for RealSystem {
             null()
         };
 
-        let mut raw_mask = MaybeUninit::<nix::libc::sigset_t>::uninit();
+        let mut raw_mask = MaybeUninit::<libc::sigset_t>::uninit();
         let raw_mask_ptr = match signal_mask {
             None => null(),
             Some(signal_mask) => {
-                unsafe { nix::libc::sigemptyset(raw_mask.as_mut_ptr()) }.errno_if_m1()?;
+                unsafe { libc::sigemptyset(raw_mask.as_mut_ptr()) }.errno_if_m1()?;
                 for &signal in signal_mask {
-                    unsafe { nix::libc::sigaddset(raw_mask.as_mut_ptr(), signal.as_raw()) }
+                    unsafe { libc::sigaddset(raw_mask.as_mut_ptr(), signal.as_raw()) }
                         .errno_if_m1()?;
                 }
                 raw_mask.as_ptr()
@@ -618,7 +597,7 @@ impl System for RealSystem {
         };
 
         let count = unsafe {
-            nix::libc::pselect(
+            libc::pselect(
                 nfds,
                 readers_ptr,
                 writers_ptr,
@@ -629,35 +608,35 @@ impl System for RealSystem {
         }
         .errno_if_m1()?;
 
-        readers.retain(|fd| unsafe { nix::libc::FD_ISSET(fd.0, readers_ptr) });
-        writers.retain(|fd| unsafe { nix::libc::FD_ISSET(fd.0, writers_ptr) });
+        readers.retain(|fd| unsafe { libc::FD_ISSET(fd.0, readers_ptr) });
+        writers.retain(|fd| unsafe { libc::FD_ISSET(fd.0, writers_ptr) });
 
         Ok(count)
     }
 
     fn getpid(&self) -> Pid {
-        Pid(unsafe { nix::libc::getpid() })
+        Pid(unsafe { libc::getpid() })
     }
 
     fn getppid(&self) -> Pid {
-        Pid(unsafe { nix::libc::getppid() })
+        Pid(unsafe { libc::getppid() })
     }
 
     fn getpgrp(&self) -> Pid {
-        Pid(unsafe { nix::libc::getpgrp() })
+        Pid(unsafe { libc::getpgrp() })
     }
 
     fn setpgid(&mut self, pid: Pid, pgid: Pid) -> Result<()> {
-        let result = unsafe { nix::libc::setpgid(pid.0, pgid.0) };
+        let result = unsafe { libc::setpgid(pid.0, pgid.0) };
         result.errno_if_m1().map(drop)
     }
 
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
-        unsafe { nix::libc::tcgetpgrp(fd.0) }.errno_if_m1().map(Pid)
+        unsafe { libc::tcgetpgrp(fd.0) }.errno_if_m1().map(Pid)
     }
 
     fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> Result<()> {
-        let result = unsafe { nix::libc::tcsetpgrp(fd.0, pgid.0) };
+        let result = unsafe { libc::tcsetpgrp(fd.0, pgid.0) };
         result.errno_if_m1().map(drop)
     }
 
@@ -669,7 +648,7 @@ impl System for RealSystem {
     /// process ID. In the child, the starter runs the task and exits the
     /// process.
     fn new_child_process(&mut self) -> Result<ChildProcessStarter> {
-        let raw_pid = unsafe { nix::libc::fork() }.errno_if_m1()?;
+        let raw_pid = unsafe { libc::fork() }.errno_if_m1()?;
         if raw_pid != 0 {
             // Parent process
             return Ok(Box::new(move |_env, _task| Pid(raw_pid)));
@@ -697,77 +676,129 @@ impl System for RealSystem {
     }
 
     fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
-        use nix::sys::wait::{WaitPidFlag, WaitStatus::*};
-        let options = WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED | WaitPidFlag::WNOHANG;
-        let status = nix::sys::wait::waitpid(Some(target.to_nix()), options.into())?;
-        match status {
-            StillAlive => Ok(None),
-            Continued(pid) => Ok(Some((Pid::from_nix(pid), ProcessState::Running))),
-            Exited(pid, exit_status) => Ok(Some((
-                Pid::from_nix(pid),
-                ProcessState::exited(exit_status),
-            ))),
-            Signaled(pid, signal, core_dump) => {
-                // SAFETY: The signal number is always a valid signal number, which is non-zero.
-                let raw_number = unsafe { NonZeroI32::new_unchecked(signal as _) };
-                let signal = signal::Number::from_raw_unchecked(raw_number);
-                let process_result = ProcessResult::Signaled { signal, core_dump };
-                Ok(Some((Pid::from_nix(pid), process_result.into())))
+        let mut status = 0;
+        let options = libc::WUNTRACED | libc::WCONTINUED | libc::WNOHANG;
+        match unsafe { libc::waitpid(target.0, &mut status, options) } {
+            -1 => Err(Errno::last()),
+            0 => Ok(None),
+            pid => {
+                let state = if libc::WIFCONTINUED(status) {
+                    ProcessState::Running
+                } else if libc::WIFEXITED(status) {
+                    let exit_status = libc::WEXITSTATUS(status);
+                    ProcessState::exited(exit_status)
+                } else if libc::WIFSIGNALED(status) {
+                    let signal = libc::WTERMSIG(status);
+                    let core_dump = libc::WCOREDUMP(status);
+                    // SAFETY: The signal number is always a valid signal number, which is non-zero.
+                    let raw_number = unsafe { NonZeroI32::new_unchecked(signal as _) };
+                    let signal = signal::Number::from_raw_unchecked(raw_number);
+                    let process_result = ProcessResult::Signaled { signal, core_dump };
+                    process_result.into()
+                } else if libc::WIFSTOPPED(status) {
+                    let signal = libc::WSTOPSIG(status);
+                    // SAFETY: The signal number is always a valid signal number, which is non-zero.
+                    let raw_number = unsafe { NonZeroI32::new_unchecked(signal as _) };
+                    let signal = signal::Number::from_raw_unchecked(raw_number);
+                    ProcessState::stopped(signal)
+                } else {
+                    unreachable!()
+                };
+                Ok(Some((Pid(pid), state)))
             }
-            Stopped(pid, signal) => {
-                // SAFETY: The signal number is always a valid signal number, which is non-zero.
-                let raw_number = unsafe { NonZeroI32::new_unchecked(signal as _) };
-                let signal = signal::Number::from_raw_unchecked(raw_number);
-                Ok(Some((Pid::from_nix(pid), ProcessState::stopped(signal))))
-            }
-            #[allow(unreachable_patterns)]
-            _ => unreachable!(),
         }
     }
 
     fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {
+        fn to_pointer_array<S: AsRef<CStr>>(strs: &[S]) -> Vec<*const libc::c_char> {
+            strs.iter()
+                .map(|s| s.as_ref().as_ptr())
+                .chain(std::iter::once(std::ptr::null()))
+                .collect()
+        }
+        // TODO Uncomment when upgrading to libc 1.0
+        // // This function makes mutable char pointers from immutable string
+        // // slices since `execve` requires mutable pointers.
+        // fn to_pointer_array<S: AsRef<CStr>>(strs: &[S]) -> Vec<*mut libc::c_char> {
+        //     strs.iter()
+        //         .map(|s| s.as_ref().as_ptr().cast_mut())
+        //         .chain(std::iter::once(std::ptr::null_mut()))
+        //         .collect()
+        // }
+
+        let args = to_pointer_array(args);
+        let envs = to_pointer_array(envs);
         loop {
-            // TODO Use Result::into_err
-            let result = nix::unistd::execve(path, args, envs);
-            if result != Err(NixErrno::EINTR) {
-                return Ok(result?);
+            let _ = unsafe { libc::execve(path.as_ptr(), args.as_ptr(), envs.as_ptr()) };
+            let errno = Errno::last();
+            if errno != Errno::EINTR {
+                return Err(errno);
             }
         }
     }
 
     fn getcwd(&self) -> Result<PathBuf> {
-        let path = nix::unistd::getcwd()?;
-        let raw = path.into_os_string().into_vec();
-        Ok(PathBuf::from(UnixString::from_vec(raw)))
+        // Some getcwd implementations allocate a buffer for the path if the
+        // first argument is null, but we cannot use that feature because Vec's
+        // allocator may not be compatible with the system's allocator.
+
+        // Since there is no way to know the required buffer size, we try
+        // several buffer sizes.
+        let mut buffer = Vec::<u8>::new();
+        for capacity in [1 << 10, 1 << 12, 1 << 14, 1 << 16] {
+            buffer.reserve_exact(capacity);
+
+            let result = unsafe { libc::getcwd(buffer.as_mut_ptr().cast(), capacity) };
+            if !result.is_null() {
+                // len does not include the null terminator
+                let len = unsafe { CStr::from_ptr(buffer.as_ptr().cast()) }.count_bytes();
+                unsafe { buffer.set_len(len) }
+                buffer.shrink_to_fit();
+                return Ok(PathBuf::from(UnixString::from_vec(buffer)));
+            }
+            let errno = Errno::last();
+            if errno != Errno::ERANGE {
+                return Err(errno);
+            }
+        }
+        Err(Errno::ERANGE)
     }
 
     fn chdir(&mut self, path: &CStr) -> Result<()> {
-        nix::unistd::chdir(path)?;
-        Ok(())
+        let result = unsafe { libc::chdir(path.as_ptr()) };
+        result.errno_if_m1().map(drop)
     }
 
     fn getuid(&self) -> Uid {
-        Uid(unsafe { nix::libc::getuid() })
+        Uid(unsafe { libc::getuid() })
     }
 
     fn geteuid(&self) -> Uid {
-        Uid(unsafe { nix::libc::geteuid() })
+        Uid(unsafe { libc::geteuid() })
     }
 
     fn getgid(&self) -> Gid {
-        Gid(unsafe { nix::libc::getgid() })
+        Gid(unsafe { libc::getgid() })
     }
 
     fn getegid(&self) -> Gid {
-        Gid(unsafe { nix::libc::getegid() })
+        Gid(unsafe { libc::getegid() })
     }
 
-    fn getpwnam_dir(&self, name: &str) -> Result<Option<PathBuf>> {
-        let user = nix::unistd::User::from_name(name)?;
-        Ok(user.map(|user| {
-            let dir = user.dir.into_os_string().into_vec();
-            PathBuf::from(UnixString::from_vec(dir))
-        }))
+    fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
+        Errno::clear();
+        let passwd = unsafe { libc::getpwnam(name.as_ptr()) };
+        if passwd.is_null() {
+            let errno = Errno::last();
+            return if errno == Errno::NO_ERROR {
+                Ok(None)
+            } else {
+                Err(errno)
+            };
+        }
+
+        let dir = unsafe { CStr::from_ptr((*passwd).pw_dir) };
+        Ok(Some(UnixString::from_vec(dir.to_bytes().to_vec()).into()))
     }
 
     fn confstr_path(&self) -> Result<UnixString> {
@@ -779,13 +810,12 @@ impl System for RealSystem {
             target_os = "watchos"
         ))]
         unsafe {
-            let size = nix::libc::confstr(nix::libc::_CS_PATH, std::ptr::null_mut(), 0);
+            let size = libc::confstr(libc::_CS_PATH, std::ptr::null_mut(), 0);
             if size == 0 {
                 return Err(Errno::last());
             }
             let mut buffer = Vec::<u8>::with_capacity(size);
-            let final_size =
-                nix::libc::confstr(nix::libc::_CS_PATH, buffer.as_mut_ptr() as *mut _, size);
+            let final_size = libc::confstr(libc::_CS_PATH, buffer.as_mut_ptr() as *mut _, size);
             if final_size == 0 {
                 return Err(Errno::last());
             }
@@ -833,24 +863,28 @@ impl System for RealSystem {
     fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
         let raw_resource = resource.as_raw_type().ok_or(Errno::EINVAL)?;
 
-        let mut limits = MaybeUninit::<nix::libc::rlimit>::uninit();
-        unsafe { nix::libc::getrlimit(raw_resource as _, limits.as_mut_ptr()) }.errno_if_m1()?;
+        let mut limits = MaybeUninit::<libc::rlimit>::uninit();
+        unsafe { libc::getrlimit(raw_resource as _, limits.as_mut_ptr()) }.errno_if_m1()?;
+
+        // SAFETY: These two fields of `limits` have been initialized by `getrlimit`.
+        // (But that does not mean *all* fields are initialized,
+        // so we cannot use `assume_init` here.)
         Ok(LimitPair {
-            soft: unsafe { (&raw const (*limits.as_ptr()).rlim_cur).read() },
-            hard: unsafe { (&raw const (*limits.as_ptr()).rlim_max).read() },
+            soft: unsafe { (*limits.as_ptr()).rlim_cur },
+            hard: unsafe { (*limits.as_ptr()).rlim_max },
         })
     }
 
     fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()> {
         let raw_resource = resource.as_raw_type().ok_or(Errno::EINVAL)?;
 
-        let mut rlimit = MaybeUninit::<nix::libc::rlimit>::uninit();
+        let mut rlimit = MaybeUninit::<libc::rlimit>::uninit();
         unsafe {
             (&raw mut (*rlimit.as_mut_ptr()).rlim_cur).write(limits.soft);
             (&raw mut (*rlimit.as_mut_ptr()).rlim_max).write(limits.hard);
         }
 
-        unsafe { nix::libc::setrlimit(raw_resource as _, rlimit.as_ptr()) }.errno_if_m1()?;
+        unsafe { libc::setrlimit(raw_resource as _, rlimit.as_ptr()) }.errno_if_m1()?;
         Ok(())
     }
 }
@@ -862,7 +896,7 @@ struct RealDir(NonNull<DIR>);
 impl Drop for RealDir {
     fn drop(&mut self) {
         unsafe {
-            nix::libc::closedir(self.0.as_ptr());
+            libc::closedir(self.0.as_ptr());
         }
     }
 }
@@ -870,7 +904,7 @@ impl Drop for RealDir {
 impl Dir for RealDir {
     fn next(&mut self) -> Result<Option<DirEntry>> {
         Errno::clear();
-        let entry = unsafe { nix::libc::readdir(self.0.as_ptr()) };
+        let entry = unsafe { libc::readdir(self.0.as_ptr()) };
         let errno = Errno::last();
         if entry.is_null() {
             if errno == Errno::NO_ERROR {
@@ -910,17 +944,16 @@ mod tests {
             let result = system.caught_signals();
             assert_eq!(result, []);
 
-            catch_signal(nix::libc::SIGINT);
-            catch_signal(nix::libc::SIGTERM);
-            catch_signal(nix::libc::SIGTERM);
-            catch_signal(nix::libc::SIGCHLD);
+            catch_signal(libc::SIGINT);
+            catch_signal(libc::SIGTERM);
+            catch_signal(libc::SIGTERM);
+            catch_signal(libc::SIGCHLD);
 
-            let sigint =
-                signal::Number::from_raw_unchecked(NonZeroI32::new(nix::libc::SIGINT).unwrap());
+            let sigint = signal::Number::from_raw_unchecked(NonZeroI32::new(libc::SIGINT).unwrap());
             let sigterm =
-                signal::Number::from_raw_unchecked(NonZeroI32::new(nix::libc::SIGTERM).unwrap());
+                signal::Number::from_raw_unchecked(NonZeroI32::new(libc::SIGTERM).unwrap());
             let sigchld =
-                signal::Number::from_raw_unchecked(NonZeroI32::new(nix::libc::SIGCHLD).unwrap());
+                signal::Number::from_raw_unchecked(NonZeroI32::new(libc::SIGCHLD).unwrap());
 
             let result = system.caught_signals();
             assert_eq!(result, [sigint, sigterm, sigchld]);

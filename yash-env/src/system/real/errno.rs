@@ -29,21 +29,21 @@ impl Errno {
     #[inline]
     #[must_use]
     pub(super) fn last() -> Self {
-        Self(nix::Error::last() as _)
+        errno::errno().into()
     }
 
-    // TODO Need nix 0.28.0
-    // /// Sets the current `errno` value.
-    // ///
-    // /// This function sets the current `errno` value to the specified value.
-    // /// The next call to [`last`](Self::last) will return the specified value
-    // /// unless another system call changes the `errno` value. This function is
-    // /// useful when you want to simulate an error condition in a system call.
-    // ///
-    // /// Use [`clear`](Self::clear) to reset the `errno` value.
-    // pub(super) fn set_last(errno: Self) {
-    //     nix::Error::set_raw(errno.0)
-    // }
+    /// Sets the current `errno` value.
+    ///
+    /// This function sets the current `errno` value to the specified value.
+    /// The next call to [`last`](Self::last) will return the specified value
+    /// unless another system call changes the `errno` value. This function is
+    /// useful when you want to simulate an error condition in a system call.
+    ///
+    /// Use [`clear`](Self::clear) to reset the `errno` value.
+    #[inline]
+    pub(super) fn set_last(errno: Self) {
+        errno::set_errno(errno.into())
+    }
 
     /// Clears the current `errno` value.
     ///
@@ -53,12 +53,11 @@ impl Errno {
     /// and check the `errno` value after calling the function to see if an
     /// error occurred. This function resets the current `errno` value to
     /// [`NO_ERROR`](Self::NO_ERROR).
-    // ///
-    // /// Use [`set_last`](Self::set_last) to set the `errno` value to an
-    // /// arbitrary value.
+    ///
+    /// Use [`set_last`](Self::set_last) to set the `errno` value to an
+    /// arbitrary value.
     #[inline]
     pub(super) fn clear() {
-        // Self::set_last(Self::NO_ERROR)
-        nix::Error::clear()
+        Self::set_last(Self::NO_ERROR)
     }
 }

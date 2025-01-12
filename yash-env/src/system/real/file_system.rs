@@ -22,14 +22,14 @@ use std::mem::MaybeUninit;
 impl FileType {
     #[must_use]
     pub(super) const fn from_raw(mode: RawMode) -> Self {
-        match mode & nix::libc::S_IFMT {
-            nix::libc::S_IFREG => Self::Regular,
-            nix::libc::S_IFDIR => Self::Directory,
-            nix::libc::S_IFLNK => Self::Symlink,
-            nix::libc::S_IFIFO => Self::Fifo,
-            nix::libc::S_IFBLK => Self::BlockDevice,
-            nix::libc::S_IFCHR => Self::CharacterDevice,
-            nix::libc::S_IFSOCK => Self::Socket,
+        match mode & libc::S_IFMT {
+            libc::S_IFREG => Self::Regular,
+            libc::S_IFDIR => Self::Directory,
+            libc::S_IFLNK => Self::Symlink,
+            libc::S_IFIFO => Self::Fifo,
+            libc::S_IFBLK => Self::BlockDevice,
+            libc::S_IFCHR => Self::CharacterDevice,
+            libc::S_IFSOCK => Self::Socket,
             _ => Self::Other,
         }
     }
@@ -38,22 +38,23 @@ impl FileType {
 impl Stat {
     /// Converts a raw `stat` structure to a `Stat` object.
     ///
-    /// This function requires the `stat` structure to be initialized, but it is
-    /// passed as `MaybeUninit` because of possible padding or extension fields
-    /// in the structure which may not be initialized by the `stat` system call.
+    /// This function assumes the `stat` structure to be initialized by the
+    /// `stat` system call, but it is passed as `MaybeUninit` because of
+    /// possible padding or extension fields in the structure which may not be
+    /// initialized by the system call.
     #[must_use]
-    pub(super) const fn from_raw(stat: &MaybeUninit<nix::libc::stat>) -> Self {
+    pub(super) const unsafe fn from_raw(stat: &MaybeUninit<libc::stat>) -> Self {
         let ptr = stat.as_ptr();
-        let raw_mode = unsafe { (&raw const (*ptr).st_mode).read() };
+        let raw_mode = unsafe { (*ptr).st_mode };
         Self {
-            dev: unsafe { (&raw const (*ptr).st_dev).read() } as _,
-            ino: unsafe { (&raw const (*ptr).st_ino).read() } as _,
+            dev: unsafe { (*ptr).st_dev } as _,
+            ino: unsafe { (*ptr).st_ino } as _,
             mode: Mode::from_bits_truncate(raw_mode),
             r#type: FileType::from_raw(raw_mode),
-            nlink: unsafe { (&raw const (*ptr).st_nlink).read() } as _,
-            uid: Uid(unsafe { (&raw const (*ptr).st_uid).read() }),
-            gid: Gid(unsafe { (&raw const (*ptr).st_gid).read() }),
-            size: unsafe { (&raw const (*ptr).st_size).read() } as _,
+            nlink: unsafe { (*ptr).st_nlink } as _,
+            uid: Uid(unsafe { (*ptr).st_uid }),
+            gid: Gid(unsafe { (*ptr).st_gid }),
+            size: unsafe { (*ptr).st_size } as _,
         }
     }
 }

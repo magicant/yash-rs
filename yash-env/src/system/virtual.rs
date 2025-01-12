@@ -982,8 +982,12 @@ impl System for VirtualSystem {
         self.current_process().egid()
     }
 
-    fn getpwnam_dir(&self, name: &str) -> Result<Option<PathBuf>> {
+    fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
         let state = self.state.borrow();
+        let name = match name.to_str() {
+            Ok(name) => name,
+            Err(_utf8_error) => return Ok(None),
+        };
         Ok(state.home_dirs.get(name).cloned())
     }
 

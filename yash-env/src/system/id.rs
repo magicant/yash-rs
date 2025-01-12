@@ -17,7 +17,7 @@
 //! Definitions of ID types
 
 #[cfg(unix)]
-type RawUidDef = nix::libc::uid_t;
+type RawUidDef = libc::uid_t;
 #[cfg(not(unix))]
 type RawUidDef = u32;
 
@@ -30,8 +30,6 @@ type RawUidDef = u32;
 ///
 /// User IDs are usually wrapped in the [`Uid`] type for better type safety, so
 /// this type is not used directly in most cases.
-///
-/// [`libc`]: nix::libc
 pub type RawUid = RawUidDef;
 
 /// User ID
@@ -39,14 +37,12 @@ pub type RawUid = RawUidDef;
 /// This type implements the new type pattern for the raw user ID type
 /// [`RawUid`]. The advantage of using this type is that it is more type-safe
 /// than using the raw integer value directly.
-///
-/// [`libc`]: nix::libc
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(transparent)]
 pub struct Uid(pub RawUid);
 
 #[cfg(unix)]
-type RawGidDef = nix::libc::gid_t;
+type RawGidDef = libc::gid_t;
 #[cfg(not(unix))]
 type RawGidDef = u32;
 
@@ -59,8 +55,6 @@ type RawGidDef = u32;
 ///
 /// Group IDs are usually wrapped in the [`Gid`] type for better type safety, so
 /// this type is not used directly in most cases.
-///
-/// [`libc`]: nix::libc
 pub type RawGid = RawGidDef;
 
 /// Group ID

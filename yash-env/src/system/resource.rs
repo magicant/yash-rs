@@ -23,7 +23,7 @@
 //! [`setrlimit`]: super::System::setrlimit
 
 #[cfg(unix)]
-type RawLimit = nix::libc::rlim_t;
+type RawLimit = libc::rlim_t;
 #[cfg(not(unix))]
 type RawLimit = u64;
 
@@ -33,7 +33,7 @@ type RawLimit = u64;
 pub type Limit = RawLimit;
 
 #[cfg(unix)]
-const RLIM_INFINITY: Limit = nix::libc::RLIM_INFINITY;
+const RLIM_INFINITY: Limit = libc::RLIM_INFINITY;
 #[cfg(not(unix))]
 const RLIM_INFINITY: Limit = Limit::MAX;
 

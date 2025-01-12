@@ -23,7 +23,7 @@ use std::fmt::Debug;
 use yash_syntax::syntax::Fd;
 
 #[cfg(unix)]
-const RAW_AT_FDCWD: i32 = nix::libc::AT_FDCWD;
+const RAW_AT_FDCWD: i32 = libc::AT_FDCWD;
 #[cfg(not(unix))]
 const RAW_AT_FDCWD: i32 = -100;
 
@@ -54,7 +54,7 @@ pub trait Dir: Debug {
 }
 
 #[cfg(unix)]
-type RawModeDef = nix::libc::mode_t;
+type RawModeDef = libc::mode_t;
 #[cfg(not(unix))]
 type RawModeDef = u32;
 
@@ -67,8 +67,6 @@ type RawModeDef = u32;
 ///
 /// File permission bits are usually wrapped in the [`Mode`] type for better type
 /// safety, so this type is not used directly in most cases.
-///
-/// [`libc`]: nix::libc
 pub type RawMode = RawModeDef;
 
 /// File permission bits
