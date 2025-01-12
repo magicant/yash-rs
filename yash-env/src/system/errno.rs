@@ -410,28 +410,6 @@ impl From<errno::Errno> for Errno {
     }
 }
 
-/// Converts [`Errno`] to [`nix::Error`].
-///
-/// This conversion is only available on Unix-like systems.
-#[cfg(unix)]
-impl From<Errno> for nix::Error {
-    #[inline]
-    fn from(errno: Errno) -> Self {
-        Self::from_raw(errno.0)
-    }
-}
-
-/// Converts [`nix::Error`] to [`Errno`].
-///
-/// This conversion is only available on Unix-like systems.
-#[cfg(unix)]
-impl From<nix::Error> for Errno {
-    #[inline]
-    fn from(error: nix::Error) -> Self {
-        Self(error as RawErrno)
-    }
-}
-
 impl From<Errno> for std::io::Error {
     #[inline]
     fn from(errno: Errno) -> Self {

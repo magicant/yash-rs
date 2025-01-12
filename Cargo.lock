@@ -581,7 +581,6 @@ dependencies = [
  "futures-util",
  "itertools",
  "libc",
- "nix",
  "slab",
  "strum",
  "tempfile",

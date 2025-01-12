@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - External dependency versions:
     - yash-syntax 0.13.0 → 0.14.0
 
+### Removed
+
+- The implementation of `From` for converting `errno::Errno` to and from
+  `nix::errno::Errno`.
+- Internal dependencies:
+    - nix 0.29.0
+
 ## [0.5.0] - 2024-12-14
 
 ### Changed
