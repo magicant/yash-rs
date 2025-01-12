@@ -436,7 +436,7 @@ impl Disposition {
         let mut sa = MaybeUninit::<libc::sigaction>::uninit();
         let sa_ptr = sa.as_mut_ptr();
         unsafe {
-            (*sa_ptr).sa_flags = 0;
+            (&raw mut (*sa_ptr).sa_flags).write(0);
             libc::sigemptyset(&raw mut (*sa_ptr).sa_mask);
 
             #[cfg(not(target_os = "aix"))]
