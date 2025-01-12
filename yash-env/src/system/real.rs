@@ -59,7 +59,6 @@ use crate::str::UnixStr;
 use crate::str::UnixString;
 use enumset::EnumSet;
 use libc::DIR;
-use nix::errno::Errno as NixErrno;
 use std::convert::Infallible;
 use std::convert::TryInto;
 use std::ffi::c_int;
@@ -711,11 +710,29 @@ impl System for RealSystem {
     }
 
     fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {
+        fn to_pointer_array<S: AsRef<CStr>>(strs: &[S]) -> Vec<*const libc::c_char> {
+            strs.iter()
+                .map(|s| s.as_ref().as_ptr())
+                .chain(std::iter::once(std::ptr::null()))
+                .collect()
+        }
+        // TODO Uncomment when upgrading to libc 1.0
+        // // This function makes mutable char pointers from immutable string
+        // // slices since `execve` requires mutable pointers.
+        // fn to_pointer_array<S: AsRef<CStr>>(strs: &[S]) -> Vec<*mut libc::c_char> {
+        //     strs.iter()
+        //         .map(|s| s.as_ref().as_ptr().cast_mut())
+        //         .chain(std::iter::once(std::ptr::null_mut()))
+        //         .collect()
+        // }
+
+        let args = to_pointer_array(args);
+        let envs = to_pointer_array(envs);
         loop {
-            // TODO Use Result::into_err
-            let result = nix::unistd::execve(path, args, envs);
-            if result != Err(NixErrno::EINTR) {
-                return Ok(result?);
+            let _ = unsafe { libc::execve(path.as_ptr(), args.as_ptr(), envs.as_ptr()) };
+            let errno = Errno::last();
+            if errno != Errno::EINTR {
+                return Err(errno);
             }
         }
     }
