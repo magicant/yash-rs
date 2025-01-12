@@ -68,7 +68,7 @@ use std::ffi::OsStr;
 use std::future::Future;
 use std::io::SeekFrom;
 use std::mem::MaybeUninit;
-use std::num::NonZeroI32;
+use std::num::NonZero;
 use std::os::unix::ffi::OsStrExt as _;
 use std::os::unix::io::IntoRawFd;
 use std::pin::Pin;
@@ -426,7 +426,7 @@ impl System for RealSystem {
     }
 
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
-        let non_zero = NonZeroI32::new(number)?;
+        let non_zero = NonZero::new(number)?;
         let name = signal::Name::try_from_raw_real(number)?;
         Some((name, signal::Number::from_raw_unchecked(non_zero)))
     }
@@ -691,14 +691,14 @@ impl System for RealSystem {
                     let signal = libc::WTERMSIG(status);
                     let core_dump = libc::WCOREDUMP(status);
                     // SAFETY: The signal number is always a valid signal number, which is non-zero.
-                    let raw_number = unsafe { NonZeroI32::new_unchecked(signal as _) };
+                    let raw_number = unsafe { NonZero::new_unchecked(signal) };
                     let signal = signal::Number::from_raw_unchecked(raw_number);
                     let process_result = ProcessResult::Signaled { signal, core_dump };
                     process_result.into()
                 } else if libc::WIFSTOPPED(status) {
                     let signal = libc::WSTOPSIG(status);
                     // SAFETY: The signal number is always a valid signal number, which is non-zero.
-                    let raw_number = unsafe { NonZeroI32::new_unchecked(signal as _) };
+                    let raw_number = unsafe { NonZero::new_unchecked(signal) };
                     let signal = signal::Number::from_raw_unchecked(raw_number);
                     ProcessState::stopped(signal)
                 } else {
@@ -949,11 +949,9 @@ mod tests {
             catch_signal(libc::SIGTERM);
             catch_signal(libc::SIGCHLD);
 
-            let sigint = signal::Number::from_raw_unchecked(NonZeroI32::new(libc::SIGINT).unwrap());
-            let sigterm =
-                signal::Number::from_raw_unchecked(NonZeroI32::new(libc::SIGTERM).unwrap());
-            let sigchld =
-                signal::Number::from_raw_unchecked(NonZeroI32::new(libc::SIGCHLD).unwrap());
+            let sigint = signal::Number::from_raw_unchecked(NonZero::new(libc::SIGINT).unwrap());
+            let sigterm = signal::Number::from_raw_unchecked(NonZero::new(libc::SIGTERM).unwrap());
+            let sigchld = signal::Number::from_raw_unchecked(NonZero::new(libc::SIGCHLD).unwrap());
 
             let result = system.caught_signals();
             assert_eq!(result, [sigint, sigterm, sigchld]);

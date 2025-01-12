@@ -20,7 +20,7 @@ use super::Disposition;
 pub use crate::signal::*;
 use std::ffi::c_int;
 use std::mem::MaybeUninit;
-use std::num::NonZeroI32;
+use std::num::NonZero;
 use std::ops::RangeInclusive;
 
 /// Returns the range of real-time signals supported by the real system.
@@ -52,7 +52,7 @@ impl Name {
     pub(super) fn to_raw_real(self) -> Option<Number> {
         #[inline]
         fn wrap(number: RawNumber) -> Option<Number> {
-            NonZeroI32::new(number).map(Number::from_raw_unchecked)
+            NonZero::new(number).map(Number::from_raw_unchecked)
         }
 
         match self {
@@ -405,7 +405,7 @@ fn all_signals() -> impl Iterator<Item = Number> {
         .filter_map(Name::to_raw_real);
 
     let real_time = rt_range()
-        .filter_map(NonZeroI32::new)
+        .filter_map(NonZero::new)
         .map(Number::from_raw_unchecked);
 
     non_real_time.chain(real_time)

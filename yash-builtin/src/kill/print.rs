@@ -25,7 +25,7 @@ use super::Signal;
 use crate::common::{report_failure, to_single_message};
 use std::borrow::Cow;
 use std::fmt::Write;
-use std::num::NonZeroI32;
+use std::num::NonZero;
 use thiserror::Error;
 use yash_env::semantics::Field;
 use yash_env::signal::{Name, Number};
@@ -53,7 +53,7 @@ fn all_signals<S: System>(system: &S) -> impl Iterator<Item = (Name, Number)> + 
         }
     };
     let real_time = range.into_iter().map(|n| {
-        let number = Number::from_raw_unchecked(NonZeroI32::new(n).unwrap());
+        let number = Number::from_raw_unchecked(NonZero::new(n).unwrap());
         let name = system.signal_name_from_number(number);
         (name, number)
     });

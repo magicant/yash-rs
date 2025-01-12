@@ -119,7 +119,7 @@ impl Signal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::num::NonZeroI32;
+    use std::num::NonZero;
     use yash_env::signal::UnknownNameError;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::system::r#virtual::{SIGHUP, SIGINT, SIGRTMAX, SIGRTMIN};
@@ -163,12 +163,12 @@ mod tests {
         assert_eq!(Signal::Name(Name::Hup).to_number(&system), Ok(Some(SIGHUP)));
         assert_eq!(Signal::Name(Name::Int).to_number(&system), Ok(Some(SIGINT)));
 
-        let next = Number::from_raw_unchecked(NonZeroI32::new(SIGRTMIN.as_raw() + 1).unwrap());
+        let next = Number::from_raw_unchecked(NonZero::new(SIGRTMIN.as_raw() + 1).unwrap());
         assert_eq!(
             Signal::Name(Name::Rtmin(1)).to_number(&system),
             Ok(Some(next))
         );
-        let prev = Number::from_raw_unchecked(NonZeroI32::new(SIGRTMAX.as_raw() - 1).unwrap());
+        let prev = Number::from_raw_unchecked(NonZero::new(SIGRTMAX.as_raw() - 1).unwrap());
         assert_eq!(
             Signal::Name(Name::Rtmax(-1)).to_number(&system),
             Ok(Some(prev))
@@ -206,12 +206,12 @@ mod tests {
             Ok(Some(SIGINT))
         );
 
-        let next = Number::from_raw_unchecked(NonZeroI32::new(SIGRTMIN.as_raw() + 1).unwrap());
+        let next = Number::from_raw_unchecked(NonZero::new(SIGRTMIN.as_raw() + 1).unwrap());
         assert_eq!(
             Signal::Number(next.as_raw()).to_number(&system),
             Ok(Some(next))
         );
-        let prev = Number::from_raw_unchecked(NonZeroI32::new(SIGRTMAX.as_raw() - 1).unwrap());
+        let prev = Number::from_raw_unchecked(NonZero::new(SIGRTMAX.as_raw() - 1).unwrap());
         assert_eq!(
             Signal::Number(prev.as_raw()).to_number(&system),
             Ok(Some(prev))

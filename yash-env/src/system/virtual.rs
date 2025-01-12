@@ -96,7 +96,7 @@ use std::fmt::Debug;
 use std::future::poll_fn;
 use std::future::Future;
 use std::io::SeekFrom;
-use std::num::NonZeroI32;
+use std::num::NonZero;
 use std::ops::DerefMut as _;
 use std::pin::Pin;
 use std::rc::Rc;
@@ -595,7 +595,7 @@ impl System for VirtualSystem {
     }
 
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
-        let non_zero = NonZeroI32::new(number)?;
+        let non_zero = NonZero::new(number)?;
         let name = signal::Name::try_from_raw_virtual(number)?;
         Some((name, signal::Number::from_raw_unchecked(non_zero)))
     }

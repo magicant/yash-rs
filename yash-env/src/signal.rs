@@ -46,7 +46,7 @@ use crate::system::System;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::ffi::c_int;
-use std::num::NonZeroI32;
+use std::num::NonZero;
 use std::str::FromStr;
 use strum::{EnumIter, IntoEnumIterator};
 use thiserror::Error;
@@ -55,11 +55,6 @@ use thiserror::Error;
 ///
 /// This is a type alias for the raw signal number used by the underlying
 /// system. POSIX requires valid signal numbers to be positive `c_int` values.
-///
-/// The current implementation of conversion between `RawNumber` and `Number`
-/// assumes that `c_int` is a 32-bit signed integer type. This is a reasonable
-/// assumption, as POSIX requires `c_int` to be at least 32 bits wide, but it
-/// may break on systems where `c_int` is wider than 32 bits.
 pub type RawNumber = c_int;
 
 /// Signal name
@@ -413,7 +408,7 @@ fn test_name_from_str() {
 /// [`VirtualSystem`]: crate::system::virtual::VirtualSystem
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 #[repr(transparent)]
-pub struct Number(NonZeroI32);
+pub struct Number(NonZero<RawNumber>);
 
 impl Number {
     /// Returns the raw signal number.
@@ -423,10 +418,10 @@ impl Number {
         self.0.get()
     }
 
-    /// Returns the raw signal number as a `NonZeroI32`.
+    /// Returns the raw signal number as a `NonZero<RawNumber>`.
     #[inline(always)]
     #[must_use]
-    pub const fn as_raw_non_zero(self) -> NonZeroI32 {
+    pub const fn as_raw_non_zero(self) -> NonZero<RawNumber> {
         self.0
     }
 
@@ -444,7 +439,7 @@ impl Number {
     /// methods instead.
     #[inline(always)]
     #[must_use]
-    pub const fn from_raw_unchecked(raw: NonZeroI32) -> Self {
+    pub const fn from_raw_unchecked(raw: NonZero<RawNumber>) -> Self {
         Self(raw)
     }
 }
