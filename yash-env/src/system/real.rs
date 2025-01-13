@@ -804,6 +804,7 @@ impl System for RealSystem {
     fn confstr_path(&self) -> Result<UnixString> {
         // TODO Support other platforms
         #[cfg(any(
+            target_os = "linux",
             target_os = "macos",
             target_os = "ios",
             target_os = "tvos",
