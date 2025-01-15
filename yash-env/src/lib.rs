@@ -31,6 +31,7 @@
 //! the underlying system. [`VirtualSystem`] is a dummy for simulating the
 //! system's behavior without affecting the actual system.
 
+use self::any::DataSet;
 use self::builtin::getopts::GetoptsState;
 use self::builtin::Builtin;
 use self::function::FunctionSet;
@@ -134,6 +135,9 @@ pub struct Env {
     /// Variables and positional parameters defined in the environment
     pub variables: VariableSet,
 
+    /// Abstract container that can store any type-erased data
+    pub any: DataSet,
+
     /// Interface to the system-managed parts of the environment
     pub system: SharedSystem,
 }
@@ -161,6 +165,7 @@ impl Env {
             traps: Default::default(),
             tty: Default::default(),
             variables: Default::default(),
+            any: Default::default(),
             system: SharedSystem::new(system),
         }
     }
@@ -193,6 +198,7 @@ impl Env {
             traps: self.traps.clone(),
             tty: self.tty,
             variables: self.variables.clone(),
+            any: self.any.clone(),
             system: SharedSystem::new(system),
         }
     }
