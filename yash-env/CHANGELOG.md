@@ -32,7 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - The implementation of `From` for converting `errno::Errno` to and from
-  `nix::errno::Errno`.
+  `nix::errno::Errno`
+- The `getopts_state` field from the `Env` struct
 - Internal dependencies:
     - nix 0.29.0
 

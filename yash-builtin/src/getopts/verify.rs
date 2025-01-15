@@ -22,8 +22,6 @@
 //! arguments and `$OPTIND` value in subsequent calls.
 
 use thiserror::Error;
-use yash_env::builtin::getopts::GetoptsState;
-use yash_env::builtin::getopts::Origin;
 
 /// Type of error returned by [`GetoptsStateRef::verify`]
 #[derive(Clone, Copy, Debug, Eq, Error, Hash, PartialEq)]
@@ -34,6 +32,33 @@ pub enum Error {
     /// The `$OPTIND` variable is altered externally.
     #[error("$OPTIND has been modified externally")]
     DifferentOptind,
+}
+
+/// Origin of the arguments parsed by the getopts built-in
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum Origin {
+    /// The arguments are passed directly to the built-in.
+    DirectArgs,
+    /// No arguments are passed to the built-in, so the built-in parses the
+    /// positional parameters.
+    PositionalParams,
+}
+
+/// State shared between getopts built-in invocations
+///
+/// The getopts built-in is designed to be called multiple times with the same
+/// arguments, assuming that the `$OPTIND` variable isn't altered externally.
+/// The built-in stores the arguments and the `$OPTIND` value in this data, and
+/// verifies if it receives the same arguments and `$OPTIND` value in subsequent
+/// calls.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct GetoptsState {
+    /// Expected arguments to parse
+    pub args: Vec<String>,
+    /// Expected origin of the arguments
+    pub origin: Origin,
+    /// Expected value of `$OPTIND`
+    pub optind: String,
 }
 
 /// Borrowed version of [`GetoptsState`]
