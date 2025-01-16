@@ -180,9 +180,9 @@
 //!
 //! # Implementation notes
 //!
-//! This implementation uses the `getopts_state` field in the [`Env`] to check
-//! if the built-in is invoked with the same arguments and `$OPTIND` as the
-//! previous invocation.
+//! This implementation uses the `any` field in the [`Env`] to check if the
+//! built-in is invoked with the same arguments and `$OPTIND` as the previous
+//! invocation.
 
 use crate::common::report_error;
 use crate::common::report_simple_error;
@@ -190,7 +190,6 @@ use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
 use either::Either::{Left, Right};
 use std::num::NonZeroUsize;
-use yash_env::builtin::getopts::Origin;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::variable::OPTIND;
@@ -239,11 +238,11 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     // Get the arguments to parse
     let (args, arg_origin) = if operands.len() > 2 {
         let iter = operands[2..].iter().map(|f| f.value.as_str());
-        (Left(iter), Origin::DirectArgs)
+        (Left(iter), verify::Origin::DirectArgs)
     } else {
         let params = &env.variables.positional_params().values;
         let iter = params.iter().map(|v| v.as_str());
-        (Right(iter), Origin::PositionalParams)
+        (Right(iter), verify::Origin::PositionalParams)
     };
 
     // Get the `$OPTIND` value
@@ -256,10 +255,10 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
         origin: arg_origin,
         optind,
     };
-    if let Some(previous) = &env.getopts_state {
-        match current.verify(previous) {
+    if let Some(state) = env.any.get_mut::<verify::GetoptsState>() {
+        match current.verify(&*state) {
             Ok(None) => {}
-            Ok(Some(current)) => env.getopts_state = Some(current.into_state()),
+            Ok(Some(current)) => *state = current.into_state(),
             Err(e) => return report_simple_error(env, &e.to_string()).await,
         }
     } else {
@@ -267,7 +266,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
             let message = format!("unexpected $OPTIND value `{optind}`");
             return report_simple_error(env, &message).await;
         }
-        env.getopts_state = Some(current.into_state());
+        env.any.insert(Box::new(current.into_state()));
     }
 
     // Parse the next option

@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - The `Env` struct now implements `yash_syntax::decl_util::Glossary`.
+- The `Env` struct now contains the `any` field of type `DataSet`.
+    - The `DataSet` struct is defined in the newly added `any` module.
+      It can be used to store arbitrary data.
 - The `builtin::Builtin` struct now has the `is_declaration_utility` field.
 - The `builtin::Builtin` struct now can be constructed with the associated
   function `new`.
@@ -29,7 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - The implementation of `From` for converting `errno::Errno` to and from
-  `nix::errno::Errno`.
+  `nix::errno::Errno`
+- The `getopts_state` field from the `Env` struct
+- The `builtin::getopts` module and its contents
+  (the `GetoptsState` struct and the `Origin` enum)
 - Internal dependencies:
     - nix 0.29.0
 

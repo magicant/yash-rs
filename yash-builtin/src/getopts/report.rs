@@ -18,6 +18,7 @@
 
 use super::indexes_to_optind;
 use super::model;
+use super::verify::GetoptsState;
 use thiserror::Error;
 use yash_env::semantics::Field;
 use yash_env::variable::AssignError;
@@ -205,7 +206,7 @@ impl model::Result {
             .assign(optind.clone(), location)
             .map_err(|e| Error::with_name_and_assign_error(OPTIND.to_string(), e))?;
 
-        if let Some(state) = &mut env.getopts_state {
+        if let Some(state) = env.any.get_mut::<GetoptsState>() {
             state.optind = optind;
         }
 
@@ -215,11 +216,10 @@ impl model::Result {
 
 #[cfg(test)]
 mod tests {
+    use super::super::verify::Origin;
     use super::*;
     use assert_matches::assert_matches;
     use std::num::NonZeroUsize;
-    use yash_env::builtin::getopts::GetoptsState;
-    use yash_env::builtin::getopts::Origin;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::variable::Value;
@@ -355,11 +355,11 @@ mod tests {
     #[test]
     fn report_updates_optind_of_getopts_state() {
         let mut env = env_with_dummy_arg0_and_optarg();
-        env.getopts_state = Some(GetoptsState {
+        env.any.insert(Box::new(GetoptsState {
             args: vec!["-a".to_string(), "-b".to_string()],
             origin: Origin::DirectArgs,
             optind: "1".to_string(),
-        });
+        }));
         let result = model::Result {
             option: Some(model::OptionOccurrence {
                 option: 'a',
@@ -372,7 +372,7 @@ mod tests {
 
         _ = result.report(&mut env, false, Field::dummy("opt_var"));
 
-        assert_eq!(env.getopts_state.unwrap().optind, "2");
+        assert_eq!(env.any.get::<GetoptsState>().unwrap().optind, "2");
     }
 
     #[test]

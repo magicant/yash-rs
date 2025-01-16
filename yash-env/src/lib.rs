@@ -31,7 +31,7 @@
 //! the underlying system. [`VirtualSystem`] is a dummy for simulating the
 //! system's behavior without affecting the actual system.
 
-use self::builtin::getopts::GetoptsState;
+use self::any::DataSet;
 use self::builtin::Builtin;
 use self::function::FunctionSet;
 use self::io::Fd;
@@ -102,9 +102,6 @@ pub struct Env {
     /// Functions defined in the environment
     pub functions: FunctionSet,
 
-    /// State of the previous invocation of the `getopts` built-in
-    pub getopts_state: Option<GetoptsState>,
-
     /// Jobs managed in the environment
     pub jobs: JobList,
 
@@ -134,6 +131,9 @@ pub struct Env {
     /// Variables and positional parameters defined in the environment
     pub variables: VariableSet,
 
+    /// Abstract container that can store any type-erased data
+    pub any: DataSet,
+
     /// Interface to the system-managed parts of the environment
     pub system: SharedSystem,
 }
@@ -152,7 +152,6 @@ impl Env {
             builtins: Default::default(),
             exit_status: Default::default(),
             functions: Default::default(),
-            getopts_state: Default::default(),
             jobs: Default::default(),
             main_pgid: system.getpgrp(),
             main_pid: system.getpid(),
@@ -161,6 +160,7 @@ impl Env {
             traps: Default::default(),
             tty: Default::default(),
             variables: Default::default(),
+            any: Default::default(),
             system: SharedSystem::new(system),
         }
     }
@@ -184,7 +184,6 @@ impl Env {
             builtins: self.builtins.clone(),
             exit_status: self.exit_status,
             functions: self.functions.clone(),
-            getopts_state: self.getopts_state.clone(),
             jobs: self.jobs.clone(),
             main_pgid: self.main_pgid,
             main_pid: self.main_pid,
@@ -193,6 +192,7 @@ impl Env {
             traps: self.traps.clone(),
             tty: self.tty,
             variables: self.variables.clone(),
+            any: self.any.clone(),
             system: SharedSystem::new(system),
         }
     }
@@ -464,6 +464,7 @@ impl Env {
 }
 
 mod alias;
+pub mod any;
 pub mod builtin;
 mod decl_util;
 pub mod function;
