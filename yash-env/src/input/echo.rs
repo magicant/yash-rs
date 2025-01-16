@@ -49,7 +49,7 @@ impl<'a, 'b, T> Echo<'a, 'b, T> {
     }
 }
 
-impl<'a, 'b, T> Input for Echo<'a, 'b, T>
+impl<T> Input for Echo<'_, '_, T>
 where
     T: Input,
 {

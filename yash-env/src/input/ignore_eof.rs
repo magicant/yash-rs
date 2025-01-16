@@ -78,7 +78,7 @@ impl<'a, 'b, T> IgnoreEof<'a, 'b, T> {
     }
 }
 
-impl<'a, 'b, T> Input for IgnoreEof<'a, 'b, T>
+impl<T> Input for IgnoreEof<'_, '_, T>
 where
     T: Input,
 {

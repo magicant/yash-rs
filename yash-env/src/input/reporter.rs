@@ -45,7 +45,7 @@ impl<'a, 'b, T> Reporter<'a, 'b, T> {
     }
 }
 
-impl<'a, 'b, T> Input for Reporter<'a, 'b, T>
+impl<T> Input for Reporter<'_, '_, T>
 where
     T: Input,
 {

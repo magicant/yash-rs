@@ -377,7 +377,7 @@ impl<'a, 'b> Parser<'a, 'b> {
     pub async fn has_blank(&mut self) -> Result<bool> {
         assert!(self.token.is_none(), "There should be no pending token");
         let c = self.lexer.peek_char().await?;
-        Ok(c.map_or(false, is_blank))
+        Ok(c.is_some_and(is_blank))
     }
 
     /// Remembers the given partial here-document for later parsing of its content.

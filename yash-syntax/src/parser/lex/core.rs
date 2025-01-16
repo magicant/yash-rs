@@ -397,7 +397,7 @@ impl<'a> LexerCore<'a> {
     /// If `index` is larger than the currently read index.
     fn is_after_blank_ending_alias(&self, index: usize) -> bool {
         fn ends_with_blank(s: &str) -> bool {
-            s.chars().next_back().map_or(false, is_blank)
+            s.chars().next_back().is_some_and(is_blank)
         }
         fn is_same_alias(alias: &Alias, sc: Option<&SourceCharEx>) -> bool {
             sc.is_some_and(|sc| sc.value.location.code.source.is_alias_for(&alias.name))

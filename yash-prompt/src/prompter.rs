@@ -45,7 +45,7 @@ impl<'a, 'b, T> Prompter<'a, 'b, T> {
     }
 }
 
-impl<'a, 'b, T> Input for Prompter<'a, 'b, T>
+impl<T> Input for Prompter<'_, '_, T>
 where
     T: Input,
 {
