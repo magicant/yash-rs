@@ -70,9 +70,8 @@ where
 {
     async fn inner(env: &mut Env, message: Message<'_>) {
         env.system
-            .write_all(Fd::STDERR, message_to_string(env, &message).as_bytes())
+            .print_error(&message_to_string(env, &message))
             .await
-            .ok();
     }
     inner(env, error.into()).await;
 }

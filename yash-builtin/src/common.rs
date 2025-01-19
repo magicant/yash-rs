@@ -93,7 +93,7 @@ async fn report(
     exit_status: ExitStatus,
 ) -> yash_env::builtin::Result {
     let (message, divert) = arrange_message_and_divert(env, message);
-    _ = env.system.write_all(Fd::STDERR, message.as_bytes()).await;
+    env.system.print_error(&message).await;
     yash_env::builtin::Result::with_exit_status_and_divert(exit_status, divert)
 }
 
