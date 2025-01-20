@@ -21,7 +21,7 @@
 //! # Synopsis
 //!
 //! ```sh
-//! cd [-L|-P] [directory]
+//! cd [-L|-P [-e]] [directory]
 //! ```
 //!
 //! # Description
@@ -76,6 +76,12 @@
 //! These two options are mutually exclusive. The last specified one applies if
 //! given both. The default is `-L`.
 //!
+//! When the `-P` option is effective, the built-in may fail to determine the
+//! new working directory pathname to assign to `$PWD`. By default, the exit
+//! status does not indicate the failure. If the **`-e`** (**`--ensure-pwd`**)
+//! option is given together with the `-P` option, the built-in returns exit
+//! status 1 in this case.
+//!
 //! TODO: The **`--default-directory=directory`** option is not implemented.
 //!
 //! TODO: The **`--print={always,auto,never}`** option is not implemented.
@@ -88,12 +94,24 @@
 //!
 //! # Errors
 //!
-//! This built-in may fail with a non-zero exit status when:
+//! This built-in fails if the working directory cannot be changed, for example,
+//! in the following cases:
 //!
 //! - The operand does not resolve to an existing accessible directory.
 //! - The operand is omitted and `$HOME` is not set or empty.
 //! - The operand is a single hyphen (`-`) and `$OLDPWD` is not set or empty.
 //! - The resolved pathname of the new working directory is too long.
+//!
+//! If the `-P` option is effective, the built-in may fail to determine the
+//! new working directory pathname to assign to `$PWD`, for example, in the
+//! following cases:
+//!
+//! - The new pathname is too long.
+//! - Some ancestor directories of the new working directory are not accessible.
+//! - The new working directory does not belong to the filesystem tree.
+//!
+//! In these cases, the working directory remains changed and the exit status
+//! depends on the `-e` option.
 //!
 //! The built-in may also fail in the following cases, but the working directory
 //! will remain changed and the exit status will be zero:
@@ -103,7 +121,19 @@
 //!
 //! # Exit Status
 //!
-//! Zero if the working directory was successfully changed; non-zero otherwise.
+//! - If the working directory is successfully changed:
+//!   - If the `-L` option is effective, the exit status is zero.
+//!   - If the `-L` option is effective:
+//!     - If the new working directory pathname is successfully determined, the
+//!       exit status is zero.
+//!     - If the new working directory pathname cannot be determined:
+//!       - If the `-e` option is effective, the exit status is one.
+//!       - Otherwise, the exit status is zero.
+//! - If the working directory cannot be changed because of an error in the
+//!   underlying `chdir` system call, the exit status is two.
+//! - If the operand cannot be processed because of an unset or empty `$HOME` or
+//!   `$OLDPWD`, the exit status is three.
+//! - If the command arguments are invalid, the exit status is four.
 //!
 //! # Security considerations
 //!
@@ -114,11 +144,11 @@
 //! the working directory to an unexpected one. To ensure that the cd built-in
 //! behaves as intended, shell script writers should unset the variable at the
 //! beginning of the script. Users can configure `$CDPATH` in their shell
-//! sessions, but must avoid exporting the variable to the environment.
+//! sessions, but should avoid exporting the variable to the environment.
 //!
 //! # Portability
 //!
-//! The `-L` and `-P` options are defined in POSIX. The other options are
+//! The `-L`, `-P`, and `-e` options are defined in POSIX. The other options are
 //! non-standard.
 //!
 //! The shell sets `$PWD` on the startup and modifies it in the cd built-in.
