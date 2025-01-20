@@ -4,6 +4,10 @@ cd -P .
 export ORIGPWD="$PWD"
 mkdir dir -
 
+test_O -d -e 2 'directory not changeable'
+cd _no_such_directory_
+__IN__
+
 test_O -d -e 3 'unset HOME'
 unset HOME
 cd

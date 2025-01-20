@@ -13,9 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - These functions are generalizations of the existing `report_failure`,
       `report_error`, `report_simple_failure`, and `report_simple_error`
       functions that allow returning a custom exit status.
+- `cd::EXIT_STATUS_SUCCESS`, `cd::EXIT_STATUS_STALE_PWD`,
+  `cd::EXIT_STATUS_CHDIR_ERROR`, `cd::EXIT_STATUS_UNSET_VARIABLE`, and
+  `cd::EXIT_STATUS_SYNTAX_ERROR`
+    - These constants represent exit statuses that can be returned by the `cd`
+      built-in.
 
 ### Changed
 
+- The `cd::chdir::report_failure` function now returns a result with
+  `EXIT_STATUS_CHDIR_ERROR`.
 - External dependency versions:
     - yash-env 0.5.0 → 0.6.0
     - yash-semantics 0.5.0 → 0.6.0 (optional)
