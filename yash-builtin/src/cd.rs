@@ -178,9 +178,25 @@ use crate::common::report_error;
 use crate::common::report_failure;
 use crate::Result;
 use yash_env::path::Path;
+use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::variable::PWD;
 use yash_env::Env;
+
+/// Exit status when the built-in succeeds
+pub const EXIT_STATUS_SUCCESS: ExitStatus = ExitStatus(0);
+
+/// Exit status when the new `$PWD` value cannot be determined
+pub const EXIT_STATUS_STALE_PWD: ExitStatus = ExitStatus(1);
+
+/// Exit status for an error in the underlying `chdir` system call
+pub const EXIT_STATUS_CHDIR_ERROR: ExitStatus = ExitStatus(2);
+
+/// Exit status for an unset or empty `$HOME` or `$OLDPWD`
+pub const EXIT_STATUS_UNSET_VARIABLE: ExitStatus = ExitStatus(3);
+
+/// Exit status for invalid command arguments
+pub const EXIT_STATUS_SYNTAX_ERROR: ExitStatus = ExitStatus(4);
 
 /// Treatments of symbolic links in the pathname
 #[derive(Debug, Clone, Copy, Default, Eq, Hash, PartialEq)]
@@ -247,5 +263,5 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     assign::set_oldpwd(env, pwd).await;
     assign::set_pwd(env, new_pwd).await;
 
-    Result::default()
+    Result::from(EXIT_STATUS_SUCCESS)
 }
