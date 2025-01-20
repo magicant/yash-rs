@@ -175,7 +175,6 @@
 //! only if the final operand starts with `$PWD`.
 
 use crate::common::report;
-use crate::common::report_failure;
 use crate::Result;
 use yash_env::path::Path;
 use yash_env::semantics::ExitStatus;
@@ -247,7 +246,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
 
     let (path, origin) = match target::target(env, &command, &pwd) {
         Ok(target) => target,
-        Err(e) => return report_failure(env, &e).await,
+        Err(e) => return report(env, &e, EXIT_STATUS_UNSET_VARIABLE).await,
     };
 
     let short_path = shorten::shorten(&path, Path::new(&pwd), command.mode);

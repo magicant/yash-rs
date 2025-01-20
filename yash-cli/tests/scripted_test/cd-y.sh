@@ -4,12 +4,12 @@ cd -P .
 export ORIGPWD="$PWD"
 mkdir dir -
 
-test_O -d -e 1 'unset HOME'
+test_O -d -e 3 'unset HOME'
 unset HOME
 cd
 __IN__
 
-test_O -d -e 1 'empty HOME'
+test_O -d -e 3 'empty HOME'
 HOME=
 cd
 __IN__
@@ -28,7 +28,7 @@ OLDPWD=
 $ORIGPWD/dir
 __OUT__
 
-test_O -d -e 1 'unset OLDPWD'
+test_O -d -e 3 'unset OLDPWD'
 unset OLDPWD
 cd -
 __IN__
