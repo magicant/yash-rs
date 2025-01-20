@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.6.0] - Unreleased
 
+### Added
+
+- `common::report`, `common::report_simple`
+    - These functions are generalizations of the existing `report_failure`,
+      `report_error`, `report_simple_failure`, and `report_simple_error`
+      functions that allow returning a custom exit status.
+
 ### Changed
 
 - External dependency versions:
