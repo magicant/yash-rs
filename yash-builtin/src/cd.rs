@@ -174,7 +174,7 @@
 //! the above conditions are not met. The current implementation does it if and
 //! only if the final operand starts with `$PWD`.
 
-use crate::common::report_error;
+use crate::common::report;
 use crate::common::report_failure;
 use crate::Result;
 use yash_env::path::Path;
@@ -240,7 +240,7 @@ fn get_pwd(env: &Env) -> String {
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     let command = match syntax::parse(env, args) {
         Ok(command) => command,
-        Err(e) => return report_error(env, &e).await,
+        Err(e) => return report(env, &e, EXIT_STATUS_SYNTAX_ERROR).await,
     };
 
     let pwd = get_pwd(env);

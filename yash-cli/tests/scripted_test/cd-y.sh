@@ -150,11 +150,11 @@ __IN__
 $ORIGPWD/-
 __OUT__
 
-test_O -d -e 2 'too many operands'
+test_O -d -e 4 'too many operands'
 cd . .
 __IN__
 
-test_O -d -e 2 'invalid option'
+test_O -d -e 4 'invalid option'
 cd --no-such-option
 __IN__
 
