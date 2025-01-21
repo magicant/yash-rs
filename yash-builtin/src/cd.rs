@@ -214,7 +214,15 @@ pub enum Mode {
 #[non_exhaustive]
 pub struct Command {
     /// Treatments of symbolic links in the pathname
+    ///
+    /// The `-L` and `-P` options are translated to this field.
     pub mode: Mode,
+
+    /// Whether to ensure the new `$PWD` value
+    ///
+    /// The `-e` option is translated to this field.
+    /// This option must be used together with the `-P` option.
+    pub ensure_pwd: bool,
 
     /// The operand that specifies the directory to change to
     pub operand: Option<Field>,

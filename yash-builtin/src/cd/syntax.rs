@@ -19,7 +19,6 @@
 use super::Command;
 use super::Mode;
 use crate::common::syntax::parse_arguments;
-use crate::common::syntax::OptionOccurrence;
 use crate::common::syntax::OptionSpec;
 use std::borrow::Cow;
 use std::collections::VecDeque;
@@ -29,6 +28,7 @@ use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
+use yash_syntax::source::Location;
 
 /// Error in parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -38,9 +38,17 @@ pub enum Error {
     #[error(transparent)]
     CommonError(#[from] crate::common::syntax::ParseError<'static>),
 
+    /// The `-e` option is used without the `-P` option.
+    ///
+    /// The `Location` indicates the argument containing the `-e` option.
+    #[error("-e option must be used with -P (and not -L)")]
+    EnsurePwdNotPhysical(Location),
+
     // /// The operand is an empty string.
     // TODO: EmptyOperand(Field),
     /// More than one operand is given.
+    ///
+    /// The `Vec` contains the extra operands.
     #[error("unexpected operand")]
     UnexpectedOperands(Vec<Field>),
 }
@@ -54,6 +62,9 @@ impl MessageBase for Error {
         use Error::*;
         match self {
             CommonError(e) => e.main_annotation(),
+            EnsurePwdNotPhysical(location) => {
+                Annotation::new(AnnotationType::Error, "-e option".into(), location)
+            }
             UnexpectedOperands(operands) => Annotation::new(
                 AnnotationType::Error,
                 format!("{}: unexpected operand", operands[0].value).into(),
@@ -67,28 +78,41 @@ impl MessageBase for Error {
 pub type Result = std::result::Result<Command, Error>;
 
 const OPTION_SPECS: &[OptionSpec] = &[
+    OptionSpec::new().short('e').long("ensure-pwd"),
     OptionSpec::new().short('L').long("logical"),
     OptionSpec::new().short('P').long("physical"),
 ];
-
-fn mode_for_option(option: &OptionOccurrence) -> Mode {
-    match option.spec.get_short() {
-        Some('L') => Mode::Logical,
-        Some('P') => Mode::Physical,
-        _ => unreachable!(),
-    }
-}
 
 /// Parses command line arguments for the cd built-in.
 pub fn parse(env: &Env, args: Vec<Field>) -> Result {
     let parser_mode = crate::common::syntax::Mode::with_env(env);
     let (options, operands) = parse_arguments(OPTION_SPECS, parser_mode, args)?;
 
-    let mode = options.last().map(mode_for_option).unwrap_or_default();
+    let mut ensure_pwd_option_location = None;
+    let mut mode = Mode::default();
+    for option in options {
+        match option.spec.get_short() {
+            Some('e') => ensure_pwd_option_location = Some(option.location),
+            Some('L') => mode = Mode::Logical,
+            Some('P') => mode = Mode::Physical,
+            _ => unreachable!(),
+        }
+    }
+
+    let ensure_pwd = match (ensure_pwd_option_location, mode) {
+        (Some(_), Mode::Physical) => true,
+        (Some(location), _) => return Err(Error::EnsurePwdNotPhysical(location)),
+        (None, _) => false,
+    };
+
     let mut operands = VecDeque::from(operands);
     let operand = operands.pop_front();
     if operands.is_empty() {
-        Ok(Command { mode, operand })
+        Ok(Command {
+            mode,
+            ensure_pwd,
+            operand,
+        })
     } else {
         Err(Error::UnexpectedOperands(operands.into()))
     }
@@ -106,6 +130,7 @@ mod tests {
             result,
             Ok(Command {
                 mode: Mode::Logical,
+                ensure_pwd: false,
                 operand: None,
             })
         );
@@ -119,6 +144,7 @@ mod tests {
             result,
             Ok(Command {
                 mode: Mode::Logical,
+                ensure_pwd: false,
                 operand: None,
             })
         );
@@ -132,6 +158,7 @@ mod tests {
             result,
             Ok(Command {
                 mode: Mode::Physical,
+                ensure_pwd: false,
                 operand: None,
             })
         );
@@ -155,6 +182,20 @@ mod tests {
     }
 
     #[test]
+    fn ensure_pwd_option_with_physical_option() {
+        let env = Env::new_virtual();
+
+        let result = parse(&env, Field::dummies(["-e", "-P"]));
+        assert!(result.unwrap().ensure_pwd);
+
+        let result = parse(&env, Field::dummies(["-P", "-e"]));
+        assert!(result.unwrap().ensure_pwd);
+
+        let result = parse(&env, Field::dummies(["-eLP"]));
+        assert!(result.unwrap().ensure_pwd);
+    }
+
+    #[test]
     fn with_operand() {
         let env = Env::new_virtual();
         let operand = Field::dummy("foo/bar");
@@ -163,6 +204,7 @@ mod tests {
             result,
             Ok(Command {
                 mode: Mode::default(),
+                ensure_pwd: false,
                 operand: Some(operand),
             })
         );
@@ -178,9 +220,22 @@ mod tests {
             result,
             Ok(Command {
                 mode: Mode::Logical,
+                ensure_pwd: false,
                 operand: Some(operand),
             })
         );
+    }
+
+    #[test]
+    fn ensure_pwd_option_with_logical_option() {
+        let env = Env::new_virtual();
+        let e = Field::dummy("-e");
+
+        let result = parse(&env, vec![Field::dummy("-L"), e.clone()]);
+        assert_eq!(result, Err(Error::EnsurePwdNotPhysical(e.origin.clone())));
+
+        let result = parse(&env, vec![e.clone()]);
+        assert_eq!(result, Err(Error::EnsurePwdNotPhysical(e.origin)));
     }
 
     #[test]

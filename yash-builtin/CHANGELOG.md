@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+The `cd` built-in now supports the `-e` (`--ensure-pwd`) option, which ensures
+that the `$PWD` variable is set to the actual current working directory after
+changing the working directory. The following items have been added to implement
+this feature:
+
 - `common::report`, `common::report_simple`
     - These functions are generalizations of the existing `report_failure`,
       `report_error`, `report_simple_failure`, and `report_simple_error`
@@ -18,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `cd::EXIT_STATUS_SYNTAX_ERROR`
     - These constants represent exit statuses that can be returned by the `cd`
       built-in.
+- `cd::Command::ensure_pwd`
+    - This field represents the new `-e` option of the `cd` built-in.
+- `cd::syntax::Error::EnsurePwdNotPhysical`
+    - This error variant represents a syntax error that occurs when the `-e`
+      option is specified without the `-P` option.
 
 ### Changed
 
