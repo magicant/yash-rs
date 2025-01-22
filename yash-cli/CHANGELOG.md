@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - The shell now supports declaration utilities as defined in POSIX.
+- The `cd` built-in now supports the `-e` option as defined in POSIX.
+- The `-p` option for the `command` built-in now works on Linux.
 
 ## [0.2.0] - 2024-12-14
 
