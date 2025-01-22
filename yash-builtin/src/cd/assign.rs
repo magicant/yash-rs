@@ -20,6 +20,7 @@ use super::Mode;
 use crate::common::arrange_message_and_divert;
 use yash_env::path::Path;
 use yash_env::path::PathBuf;
+use yash_env::system::Errno;
 use yash_env::variable::AssignError;
 use yash_env::variable::Scope::Global;
 use yash_env::variable::Value::Scalar;
@@ -88,11 +89,12 @@ async fn handle_assign_error(env: &mut Env, name: &str, error: AssignError) {
 ///
 /// If `mode` is `Logical`, this function returns `path` without any
 /// modification. If `mode` is `Physical`, this function uses [`System::getcwd`]
-/// to obtain the working directory path.
-pub fn new_pwd(env: &Env, mode: Mode, path: &Path) -> PathBuf {
+/// to obtain the working directory path. If `System::getcwd` fails, the error
+/// code is returned.
+pub fn new_pwd(env: &Env, mode: Mode, path: &Path) -> Result<PathBuf, Errno> {
     match mode {
-        Mode::Logical => path.to_owned(),
-        Mode::Physical => env.system.getcwd().unwrap_or_else(|_| PathBuf::new()),
+        Mode::Logical => Ok(path.to_owned()),
+        Mode::Physical => env.system.getcwd(),
     }
 }
 
@@ -273,7 +275,7 @@ mod tests {
             .chdir(PathBuf::from("/some/path"));
         let env = Env::with_system(system);
 
-        let result = new_pwd(&env, Mode::Physical, Path::new(".."));
+        let result = new_pwd(&env, Mode::Physical, Path::new("..")).unwrap();
         assert_eq!(result, Path::new("/some/path"));
     }
 
@@ -285,7 +287,7 @@ mod tests {
             .chdir(PathBuf::from("/some/path"));
         let env = Env::with_system(system);
 
-        let result = new_pwd(&env, Mode::Logical, Path::new("/foo/bar"));
+        let result = new_pwd(&env, Mode::Logical, Path::new("/foo/bar")).unwrap();
         assert_eq!(result, Path::new("/foo/bar"));
     }
 }

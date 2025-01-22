@@ -110,8 +110,8 @@
 //! - Some ancestor directories of the new working directory are not accessible.
 //! - The new working directory does not belong to the filesystem tree.
 //!
-//! In these cases, the working directory remains changed and the exit status
-//! depends on the `-e` option.
+//! In these cases, the working directory remains changed, the `$PWD` variable
+//! is left empty, and the exit status depends on the `-e` option.
 //!
 //! The built-in may also fail in the following cases, but the working directory
 //! will remain changed and the exit status will be zero:
@@ -159,6 +159,9 @@
 //! existing implementations when the built-in fails because of a write error or
 //! a read-only variable error.
 //!
+//! Other implementations may return different non-zero exit statuses in cases
+//! where this implementation would return exit statuses between 2 and 4.
+//!
 //! POSIX requires the shell to convert the pathname passed to the underlying
 //! `chdir` system call to a shorter relative pathname when the `-L` option is
 //! in effect. This conversion is mandatory if:
@@ -177,10 +180,15 @@
 use crate::common::report;
 use crate::Result;
 use yash_env::path::Path;
+use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
+use yash_env::system::Errno;
 use yash_env::variable::PWD;
 use yash_env::Env;
+use yash_syntax::source::pretty::AnnotationType;
+use yash_syntax::source::pretty::Footer;
+use yash_syntax::source::pretty::Message;
 
 /// Exit status when the built-in succeeds
 pub const EXIT_STATUS_SUCCESS: ExitStatus = ExitStatus(0);
@@ -241,6 +249,28 @@ fn get_pwd(env: &Env) -> String {
     env.variables.get_scalar(PWD).unwrap_or_default().to_owned()
 }
 
+/// Reports that the new `$PWD` value cannot be determined, and returns the
+/// corresponding exit status.
+async fn report_pwd_error(env: &mut Env, errno: Errno, ensure_pwd: bool) -> Result {
+    let (r#type, exit_status) = if ensure_pwd {
+        (AnnotationType::Error, EXIT_STATUS_STALE_PWD)
+    } else {
+        (AnnotationType::Warning, EXIT_STATUS_SUCCESS)
+    };
+
+    let message = Message {
+        r#type,
+        title: "cannot compute new $PWD".into(),
+        annotations: vec![],
+        footers: vec![Footer {
+            r#type: AnnotationType::Info,
+            label: format!("error from underlying system call: {errno}").into(),
+        }],
+    };
+
+    report(env, message, exit_status).await
+}
+
 /// Entry point for executing the `cd` built-in
 ///
 /// This function uses functions in the submodules to execute the built-in.
@@ -264,11 +294,59 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
         Err(e) => return chdir::report_failure(env, command.operand.as_ref(), &path, &e).await,
     }
 
-    let new_pwd = assign::new_pwd(env, command.mode, &path);
+    let (new_pwd, result) = match assign::new_pwd(env, command.mode, &path) {
+        Ok(new_pwd) => (new_pwd, Result::from(EXIT_STATUS_SUCCESS)),
+        Err(errno) => (
+            PathBuf::default(),
+            report_pwd_error(env, errno, command.ensure_pwd).await,
+        ),
+    };
+
     print::print_path(env, &new_pwd, &origin).await;
 
     assign::set_oldpwd(env, pwd).await;
     assign::set_pwd(env, new_pwd).await;
 
-    Result::from(EXIT_STATUS_SUCCESS)
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures_util::FutureExt as _;
+    use std::rc::Rc;
+    use yash_env::VirtualSystem;
+    use yash_env_test_helper::assert_stderr;
+
+    #[test]
+    fn report_pwd_error_with_ensure_pwd() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+
+        let result = report_pwd_error(&mut env, Errno::ENAMETOOLONG, true)
+            .now_or_never()
+            .unwrap();
+
+        // Something should be printed
+        assert_stderr(&state, |stderr| assert!(!stderr.is_empty()));
+
+        assert_eq!(result, Result::from(ExitStatus(1)));
+    }
+
+    #[test]
+    fn report_pwd_error_without_ensure_pwd() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+
+        let result = report_pwd_error(&mut env, Errno::ENAMETOOLONG, false)
+            .now_or_never()
+            .unwrap();
+
+        // Something should be printed
+        assert_stderr(&state, |stderr| assert!(!stderr.is_empty()));
+
+        assert_eq!(result, Result::from(ExitStatus(0)));
+    }
 }

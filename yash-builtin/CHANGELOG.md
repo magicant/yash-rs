@@ -33,6 +33,8 @@ this feature:
 
 - The `cd::chdir::report_failure` function now returns a result with
   `EXIT_STATUS_CHDIR_ERROR`.
+- The `cd::assign::new_pwd` function now returns `Result<PathBuf, Errno>` instead
+  of `PathBuf`. Previously, it returned an empty `PathBuf` on failure.
 - External dependency versions:
     - yash-env 0.5.0 → 0.6.0
     - yash-semantics 0.5.0 → 0.6.0 (optional)

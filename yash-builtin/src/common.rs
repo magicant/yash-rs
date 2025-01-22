@@ -67,7 +67,7 @@ pub fn arrange_message_and_divert<'e: 'm, 'm>(
         // Add an annotation indicating the built-in name
         message.annotations.push(Annotation::new(
             AnnotationType::Info,
-            format!("error occurred in the {} built-in", builtin.name.value).into(),
+            format!("executing the {} built-in", builtin.name.value).into(),
             &builtin.name.origin,
         ));
         let source = &builtin.name.origin.code.source;
