@@ -34,6 +34,8 @@ The `cd` built-in now errors out when a given operand is an empty string.
 - `cd::syntax::Error::EmptyOperand`
     - This error variant represents a syntax error that occurs when an operand
       is an empty string.
+- `cd::target::TargetError::exit_status`
+    - This method returns the exit status corresponding to the error.
 
 ### Changed
 

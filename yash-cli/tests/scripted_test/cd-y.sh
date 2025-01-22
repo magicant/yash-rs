@@ -8,12 +8,20 @@ test_O -d -e 2 'directory not changeable'
 cd _no_such_directory_
 __IN__
 
-test_O -d -e 3 'unset HOME'
+test_x -e 3 'exit status of non-existing file in operand component (-L)'
+cd -L ./_no_such_file_/../dev
+__IN__
+
+test_x -e 2 'exit status of non-existing file in operand component (-P)'
+cd -P ./_no_such_file_/../dev
+__IN__
+
+test_O -d -e 4 'unset HOME'
 unset HOME
 cd
 __IN__
 
-test_O -d -e 3 'empty HOME'
+test_O -d -e 4 'empty HOME'
 HOME=
 cd
 __IN__
@@ -32,7 +40,7 @@ OLDPWD=
 $ORIGPWD/dir
 __OUT__
 
-test_O -d -e 3 'unset OLDPWD'
+test_O -d -e 4 'unset OLDPWD'
 unset OLDPWD
 cd -
 __IN__
@@ -154,11 +162,11 @@ __IN__
 $ORIGPWD/-
 __OUT__
 
-test_O -d -e 4 'too many operands'
+test_O -d -e 5 'too many operands'
 cd . .
 __IN__
 
-test_O -d -e 4 'invalid option'
+test_O -d -e 5 'invalid option'
 cd --no-such-option
 __IN__
 

@@ -133,9 +133,12 @@
 //!       - Otherwise, the exit status is zero.
 //! - If the working directory cannot be changed because of an error in the
 //!   underlying `chdir` system call, the exit status is two.
+//! - If the `-L` option is effective and canonicalization fails because of a
+//!   `..` component referring to a non-existent directory, the exit status is
+//!   three.
 //! - If the operand cannot be processed because of an unset or empty `$HOME` or
-//!   `$OLDPWD`, the exit status is three.
-//! - If the command arguments are invalid, the exit status is four.
+//!   `$OLDPWD`, the exit status is four.
+//! - If the command arguments are invalid, the exit status is five.
 //!
 //! # Security considerations
 //!
@@ -201,11 +204,15 @@ pub const EXIT_STATUS_STALE_PWD: ExitStatus = ExitStatus(1);
 /// Exit status for an error in the underlying `chdir` system call
 pub const EXIT_STATUS_CHDIR_ERROR: ExitStatus = ExitStatus(2);
 
+/// Exit status for when canonicalization fails because of a `..` component
+/// referring to a non-existent directory
+pub const EXIT_STATUS_CANNOT_CANONICALIZE: ExitStatus = ExitStatus(3);
+
 /// Exit status for an unset or empty `$HOME` or `$OLDPWD`
-pub const EXIT_STATUS_UNSET_VARIABLE: ExitStatus = ExitStatus(3);
+pub const EXIT_STATUS_UNSET_VARIABLE: ExitStatus = ExitStatus(4);
 
 /// Exit status for invalid command arguments
-pub const EXIT_STATUS_SYNTAX_ERROR: ExitStatus = ExitStatus(4);
+pub const EXIT_STATUS_SYNTAX_ERROR: ExitStatus = ExitStatus(5);
 
 /// Treatments of symbolic links in the pathname
 #[derive(Debug, Clone, Copy, Default, Eq, Hash, PartialEq)]
@@ -286,7 +293,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
 
     let (path, origin) = match target::target(env, &command, &pwd) {
         Ok(target) => target,
-        Err(e) => return report(env, &e, EXIT_STATUS_UNSET_VARIABLE).await,
+        Err(e) => return report(env, &e, e.exit_status()).await,
     };
 
     let short_path = shorten::shorten(&path, Path::new(&pwd), command.mode);

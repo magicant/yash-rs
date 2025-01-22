@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The `cd` built-in now errors out when a given operand is an empty string.
+- The `cd` built-in now returns different exit statuses for different errors.
 
 ## [0.2.0] - 2024-12-14
 

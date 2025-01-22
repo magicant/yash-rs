@@ -22,6 +22,7 @@ use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::path::Path;
 use yash_env::path::PathBuf;
+use yash_env::semantics::ExitStatus;
 use yash_env::variable::HOME;
 use yash_env::variable::OLDPWD;
 use yash_env::Env;
@@ -76,6 +77,19 @@ pub enum TargetError {
         /// Location in the source code where the target directory is specified
         location: Location,
     },
+}
+
+impl TargetError {
+    /// Returns the exit status that corresponds to this error.
+    #[must_use]
+    pub fn exit_status(&self) -> ExitStatus {
+        match self {
+            TargetError::UnsetHome { .. } | TargetError::UnsetOldpwd { .. } => {
+                super::EXIT_STATUS_UNSET_VARIABLE
+            }
+            TargetError::NonExistingDirectory { .. } => super::EXIT_STATUS_CANNOT_CANONICALIZE,
+        }
+    }
 }
 
 impl MessageBase for TargetError {
