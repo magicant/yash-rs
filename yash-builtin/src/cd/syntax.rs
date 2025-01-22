@@ -44,8 +44,10 @@ pub enum Error {
     #[error("-e option must be used with -P (and not -L)")]
     EnsurePwdNotPhysical(Location),
 
-    // /// The operand is an empty string.
-    // TODO: EmptyOperand(Field),
+    /// The operand is an empty string.
+    #[error("empty operand")]
+    EmptyOperand(Field),
+
     /// More than one operand is given.
     ///
     /// The `Vec` contains the extra operands.
@@ -65,6 +67,11 @@ impl MessageBase for Error {
             EnsurePwdNotPhysical(location) => {
                 Annotation::new(AnnotationType::Error, "-e option".into(), location)
             }
+            EmptyOperand(operand) => Annotation::new(
+                AnnotationType::Error,
+                "empty operand".into(),
+                &operand.origin,
+            ),
             UnexpectedOperands(operands) => Annotation::new(
                 AnnotationType::Error,
                 format!("{}: unexpected operand", operands[0].value).into(),
@@ -107,15 +114,19 @@ pub fn parse(env: &Env, args: Vec<Field>) -> Result {
 
     let mut operands = VecDeque::from(operands);
     let operand = operands.pop_front();
-    if operands.is_empty() {
-        Ok(Command {
-            mode,
-            ensure_pwd,
-            operand,
-        })
-    } else {
-        Err(Error::UnexpectedOperands(operands.into()))
+    if !operands.is_empty() {
+        return Err(Error::UnexpectedOperands(operands.into()));
     }
+
+    let operand = match operand {
+        Some(operand) if operand.value.is_empty() => return Err(Error::EmptyOperand(operand)),
+        operand => operand,
+    };
+    Ok(Command {
+        mode,
+        ensure_pwd,
+        operand,
+    })
 }
 
 #[cfg(test)]
@@ -236,6 +247,14 @@ mod tests {
 
         let result = parse(&env, vec![e.clone()]);
         assert_eq!(result, Err(Error::EnsurePwdNotPhysical(e.origin)));
+    }
+
+    #[test]
+    fn empty_operand() {
+        let env = Env::new_virtual();
+        let operand = Field::dummy("");
+        let result = parse(&env, vec![operand.clone()]);
+        assert_eq!(result, Err(Error::EmptyOperand(operand)));
     }
 
     #[test]

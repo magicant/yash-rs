@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `cd` built-in now supports the `-e` option as defined in POSIX.
 - The `-p` option for the `command` built-in now works on Linux.
 
+### Changed
+
+- The `cd` built-in now errors out when a given operand is an empty string.
+
 ## [0.2.0] - 2024-12-14
 
 ### Added

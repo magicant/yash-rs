@@ -102,6 +102,8 @@
 //! - The operand is a single hyphen (`-`) and `$OLDPWD` is not set or empty.
 //! - The resolved pathname of the new working directory is too long.
 //!
+//! It is also an error if a given operand is an empty string.
+//!
 //! If the `-P` option is effective, the built-in may fail to determine the
 //! new working directory pathname to assign to `$PWD`, for example, in the
 //! following cases:

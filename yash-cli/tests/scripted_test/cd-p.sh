@@ -419,3 +419,11 @@ printf 'OLDPWD=%s\n' "$OLDPWD"
 __IN__
 OLDPWD=$ORIGPWD
 __OUT__
+
+test_O -d -e n 'empty operand (-L)'
+cd -L ''
+__IN__
+
+test_O -d -e n 'empty operand (-P)'
+cd -P ''
+__IN__
