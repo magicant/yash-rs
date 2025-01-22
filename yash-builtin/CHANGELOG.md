@@ -7,8 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.6.0] - Unreleased
 
+### Added
+
+The `cd` built-in now supports the `-e` (`--ensure-pwd`) option, which ensures
+that the `$PWD` variable is set to the actual current working directory after
+changing the working directory. The following items have been added to implement
+this feature:
+
+- `common::report`, `common::report_simple`
+    - These functions are generalizations of the existing `report_failure`,
+      `report_error`, `report_simple_failure`, and `report_simple_error`
+      functions that allow returning a custom exit status.
+- `cd::EXIT_STATUS_SUCCESS`, `cd::EXIT_STATUS_STALE_PWD`,
+  `cd::EXIT_STATUS_CHDIR_ERROR`, `cd::EXIT_STATUS_UNSET_VARIABLE`, and
+  `cd::EXIT_STATUS_SYNTAX_ERROR`
+    - These constants represent exit statuses that can be returned by the `cd`
+      built-in.
+- `cd::Command::ensure_pwd`
+    - This field represents the new `-e` option of the `cd` built-in.
+- `cd::syntax::Error::EnsurePwdNotPhysical`
+    - This error variant represents a syntax error that occurs when the `-e`
+      option is specified without the `-P` option.
+
 ### Changed
 
+- The `cd::chdir::report_failure` function now returns a result with
+  `EXIT_STATUS_CHDIR_ERROR`.
+- The `cd::assign::new_pwd` function now returns `Result<PathBuf, Errno>` instead
+  of `PathBuf`. Previously, it returned an empty `PathBuf` on failure.
 - External dependency versions:
     - yash-env 0.5.0 → 0.6.0
     - yash-semantics 0.5.0 → 0.6.0 (optional)

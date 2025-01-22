@@ -22,7 +22,6 @@ use std::ffi::CString;
 use std::ffi::NulError;
 use thiserror::Error;
 use yash_env::path::Path;
-use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 #[cfg(doc)]
 use yash_env::stack::Stack;
@@ -101,5 +100,5 @@ pub async fn report_failure(
 ) -> crate::Result {
     let (message, divert) = failure_message(env, operand, path, error);
     env.system.print_error(&message).await;
-    crate::Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
+    crate::Result::with_exit_status_and_divert(super::EXIT_STATUS_CHDIR_ERROR, divert)
 }

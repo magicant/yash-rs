@@ -254,6 +254,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let command = Command {
             mode: Mode::default(),
+            ensure_pwd: false,
             operand: None,
         };
         env.get_or_create_variable(HOME, Scope::Global)
@@ -269,6 +270,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let command = Command {
             mode: Mode::default(),
+            ensure_pwd: false,
             operand: None,
         };
         let arg0 = Field::dummy("cd");
@@ -287,6 +289,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let command = Command {
             mode: Mode::default(),
+            ensure_pwd: false,
             operand: None,
         };
         let arg0 = Field::dummy("cd");
@@ -308,6 +311,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let command = Command {
             mode: Mode::default(),
+            ensure_pwd: false,
             operand: Some(Field::dummy("-")),
         };
         env.get_or_create_variable(OLDPWD, Scope::Global)
@@ -325,6 +329,7 @@ mod tests {
         let location = operand.origin.clone();
         let command = Command {
             mode: Mode::default(),
+            ensure_pwd: false,
             operand: Some(operand),
         };
 
@@ -339,6 +344,7 @@ mod tests {
         let location = operand.origin.clone();
         let command = Command {
             mode: Mode::default(),
+            ensure_pwd: false,
             operand: Some(operand),
         };
         env.get_or_create_variable(OLDPWD, Scope::Global)
@@ -357,6 +363,7 @@ mod tests {
             &env,
             &Command {
                 mode: Mode::Physical,
+                ensure_pwd: false,
                 operand: Some(Field::dummy("foo")),
             },
             "/ignored",
@@ -368,6 +375,7 @@ mod tests {
             &env,
             &Command {
                 mode: Mode::Physical,
+                ensure_pwd: false,
                 operand: Some(Field::dummy("foo/bar")),
             },
             "/ignored",
@@ -384,6 +392,7 @@ mod tests {
             &env,
             &Command {
                 mode: Mode::Logical,
+                ensure_pwd: false,
                 operand: Some(Field::dummy("/foo")),
             },
             "/ignored",
@@ -395,6 +404,7 @@ mod tests {
             &env,
             &Command {
                 mode: Mode::Logical,
+                ensure_pwd: false,
                 operand: Some(Field::dummy("/foo/bar")),
             },
             "/ignored",
@@ -409,6 +419,7 @@ mod tests {
         let env = Env::new_virtual();
         let command = Command {
             mode: Mode::Logical,
+            ensure_pwd: false,
             operand: Some(Field::dummy("foo/bar")),
         };
 

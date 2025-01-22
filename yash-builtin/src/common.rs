@@ -67,7 +67,7 @@ pub fn arrange_message_and_divert<'e: 'm, 'm>(
         // Add an annotation indicating the built-in name
         message.annotations.push(Annotation::new(
             AnnotationType::Info,
-            format!("error occurred in the {} built-in", builtin.name.value).into(),
+            format!("executing the {} built-in", builtin.name.value).into(),
             &builtin.name.origin,
         ));
         let source = &builtin.name.origin.code.source;
@@ -87,24 +87,26 @@ pub fn arrange_message_and_divert<'e: 'm, 'm>(
     (message, divert)
 }
 
-async fn report(
-    env: &mut Env,
-    message: Message<'_>,
-    exit_status: ExitStatus,
-) -> yash_env::builtin::Result {
-    let (message, divert) = arrange_message_and_divert(env, message);
-    env.system.print_error(&message).await;
-    yash_env::builtin::Result::with_exit_status_and_divert(exit_status, divert)
-}
-
-/// Prints a failure message.
+/// Reports a message with the given exit status.
 ///
-/// This function is only usable when the `message` argument does not contain
-/// any references borrowed from the environment. Otherwise, inline the body of
-/// this function into the caller:
+/// This is a convenience function for reporting a message with a specific exit
+/// status. The message is converted to a string and [`Divert`] using
+/// [`arrange_message_and_divert`], and then printed to the standard error.
+/// The returned result contains the given exit status and the divert value.
+///
+/// When the exit status is [`ExitStatus::FAILURE`] or [`ExitStatus::ERROR`],
+/// you can use [`report_failure`] or [`report_error`] instead of this function,
+/// respectively.
+///
+/// This function requires a mutable borrow of the environment to print the
+/// message, so it is only usable when the `message` argument does not contain
+/// any borrows from the environment. Otherwise, directly call
+/// [`arrange_message_and_divert`], which only requires an immutable borrow of
+/// the environment, to construct the message and divert value, and then print
+/// the message yourself.
 ///
 /// ```
-/// # use futures_util::future::FutureExt;
+/// # use futures_util::future::FutureExt as _;
 /// # use yash_builtin::common::arrange_message_and_divert;
 /// # use yash_env::builtin::Result;
 /// # use yash_env::semantics::ExitStatus;
@@ -119,70 +121,83 @@ async fn report(
 /// # }.now_or_never().unwrap();
 /// ```
 #[inline]
+pub async fn report<'a, M>(
+    env: &mut Env,
+    message: M,
+    exit_status: ExitStatus,
+) -> yash_env::builtin::Result
+where
+    M: Into<Message<'a>> + 'a,
+{
+    async fn inner(
+        env: &mut Env,
+        message: Message<'_>,
+        exit_status: ExitStatus,
+    ) -> yash_env::builtin::Result {
+        let (message, divert) = arrange_message_and_divert(env, message);
+        env.system.print_error(&message).await;
+        yash_env::builtin::Result::with_exit_status_and_divert(exit_status, divert)
+    }
+    inner(env, message.into(), exit_status).await
+}
+
+/// Prints a failure message.
+///
+/// This is a simple shortcut for calling [`report`] with [`ExitStatus::FAILURE`].
+#[inline]
 pub async fn report_failure<'a, M>(env: &mut Env, message: M) -> yash_env::builtin::Result
 where
     M: Into<Message<'a>> + 'a,
 {
-    report(env, message.into(), ExitStatus::FAILURE).await
-}
-
-/// Prints a simple failure message.
-///
-/// This function constructs a [`Message`] with the given title and prints it
-/// using [`report_failure`]. The message has no annotations except for the
-/// built-in name which is added by [`arrange_message_and_divert`].
-pub async fn report_simple_failure(env: &mut Env, title: &str) -> yash_env::builtin::Result {
-    let message = Message {
-        r#type: AnnotationType::Error,
-        title: title.into(),
-        annotations: vec![],
-        footers: vec![],
-    };
-    report_failure(env, message).await
+    report(env, message, ExitStatus::FAILURE).await
 }
 
 /// Prints an error message.
 ///
-/// This function is only usable when the `message` argument does not contain
-/// any references borrowed from the environment. Otherwise, inline the body of
-/// this function into the caller:
-///
-/// ```
-/// # use futures_util::future::FutureExt;
-/// # use yash_builtin::common::arrange_message_and_divert;
-/// # use yash_env::builtin::Result;
-/// # use yash_env::semantics::ExitStatus;
-/// # use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
-/// # use yash_syntax::syntax::Fd;
-/// # async {
-/// # let mut env = yash_env::Env::new_virtual();
-/// # let message = Message { r#type: AnnotationType::Error, title: "".into(), annotations: vec![], footers: vec![] };
-/// let (message, divert) = arrange_message_and_divert(&env, message);
-/// env.system.print_error(&message).await;
-/// Result::with_exit_status_and_divert(ExitStatus::ERROR, divert)
-/// # }.now_or_never().unwrap();
-/// ```
+/// This is a simple shortcut for calling [`report`] with [`ExitStatus::ERROR`].
 #[inline]
 pub async fn report_error<'a, M>(env: &mut Env, message: M) -> yash_env::builtin::Result
 where
     M: Into<Message<'a>> + 'a,
 {
-    report(env, message.into(), ExitStatus::ERROR).await
+    report(env, message, ExitStatus::ERROR).await
 }
 
-/// Prints a simple error message.
+/// Reports a simple message with the given exit status.
 ///
 /// This function constructs a [`Message`] with the given title and prints it
-/// using [`report_error`]. The message has no annotations except for the
-/// built-in name which is added by [`arrange_message_and_divert`].
-pub async fn report_simple_error(env: &mut Env, title: &str) -> yash_env::builtin::Result {
+/// using [`report`]. The message has no annotations except for the built-in
+/// name which is added by [`arrange_message_and_divert`].
+///
+/// When the exit status is [`ExitStatus::FAILURE`] or [`ExitStatus::ERROR`],
+/// you can use [`report_simple_failure`] or [`report_simple_error`] instead of
+/// this function, respectively.
+pub async fn report_simple(
+    env: &mut Env,
+    title: &str,
+    exit_status: ExitStatus,
+) -> yash_env::builtin::Result {
     let message = Message {
         r#type: AnnotationType::Error,
         title: title.into(),
         annotations: vec![],
         footers: vec![],
     };
-    report_error(env, message).await
+    report(env, message, exit_status).await
+}
+
+/// Prints a simple failure message.
+///
+/// This is a simple shortcut for calling [`report_simple`] with [`ExitStatus::FAILURE`].
+pub async fn report_simple_failure(env: &mut Env, title: &str) -> yash_env::builtin::Result {
+    report_simple(env, title, ExitStatus::FAILURE).await
+}
+
+/// Prints a simple error message.
+///
+/// This is a simple shortcut for calling [`report_simple`] with [`ExitStatus::ERROR`].
+pub async fn report_simple_error(env: &mut Env, title: &str) -> yash_env::builtin::Result {
+    report_simple(env, title, ExitStatus::ERROR).await
 }
 
 /// Prints a simple error message for a command syntax error.

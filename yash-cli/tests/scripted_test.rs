@@ -161,6 +161,11 @@ fn cd_builtin() {
 }
 
 #[test]
+fn cd_builtin_ex() {
+    run("cd-y.sh");
+}
+
+#[test]
 fn command_builtin() {
     run("command-p.sh")
 }
