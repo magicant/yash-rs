@@ -125,7 +125,7 @@
 //!
 //! - If the working directory is successfully changed:
 //!   - If the `-L` option is effective, the exit status is zero.
-//!   - If the `-L` option is effective:
+//!   - If the `-P` option is effective:
 //!     - If the new working directory pathname is successfully determined, the
 //!       exit status is zero.
 //!     - If the new working directory pathname cannot be determined:
