@@ -23,7 +23,7 @@
 //! Syntax Guidelines] and support non-standard syntax extensions such as long
 //! options and options after operands.
 //!
-//! [POSIX Utility Syntax Guidelines]: https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap12.html#tag_12_02
+//! [POSIX Utility Syntax Guidelines]: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02
 //!
 //! # Usage
 //!

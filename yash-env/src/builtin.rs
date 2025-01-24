@@ -37,7 +37,7 @@ pub enum Type {
     /// Special built-in
     ///
     /// Special built-in utilities are built-ins that are defined in [POSIX XCU
-    /// section 2.14](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_14).
+    /// section 2.15](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_15).
     ///
     /// They are treated differently from other built-ins.
     /// Especially, special built-ins are found in the first stage of command
@@ -48,9 +48,9 @@ pub enum Type {
 
     /// Standard utility that can be used without `$PATH` search
     ///
-    /// Mandatory built-ins are built-ins that are listed in step 1d of [Command
-    /// Search and Execution](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_09_01_01)
-    /// in POSIX XCU section 2.9.1.
+    /// Mandatory built-ins are utilities that are listed in [POSIX XCU section
+    /// 1.7](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap01.html#tag_18_07).
+    /// In POSIX, they are called "intrinsic utilities".
     ///
     /// Like special built-ins, mandatory built-ins are not subject to `$PATH`
     /// in command search; They are always found regardless of whether there is
@@ -58,14 +58,14 @@ pub enum Type {
     /// built-ins can still be overridden by functions.
     ///
     /// We call them "mandatory" because POSIX effectively requires them to be
-    /// implemented by the shell.
+    /// built into the shell.
     Mandatory,
 
     /// Non-portable built-in that can be used without `$PATH` search
     ///
     /// Elective built-ins are built-ins that are listed in step 1b of [Command
-    /// Search and Execution](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_09_01_01)
-    /// in POSIX XCU section 2.9.1.
+    /// Search and Execution](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_09_01_04)
+    /// in POSIX XCU section 2.9.1.4.
     /// They are very similar to mandatory built-ins, but their behavior is not
     /// specified by POSIX, so they are not portable. They cannot be used when
     /// the (TODO TBD) option is set. <!-- An option that disables non-portable
@@ -77,21 +77,21 @@ pub enum Type {
     /// implement them.
     Elective,
 
-    /// Non-portable extension
+    /// Non-conforming extension
     ///
     /// Extension built-ins are non-conformant extensions to the POSIX shell.
     /// Like elective built-ins, they can be executed without `$PATH` search
     /// finding a corresponding external utility. However, since this behavior
     /// does not conform to [Command
-    /// Search and Execution](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_09_01_01)
-    /// in POSIX XCU section 2.9.1, they cannot be used when the (TODO TBD)
+    /// Search and Execution](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_09_01_04)
+    /// in POSIX XCU section 2.9.1.4, they cannot be used when the (TODO TBD)
     /// option is set. <!-- An option that disables non-conforming behavior
     /// would make extension built-ins regarded as non-existing utilities. An
     /// option that disables non-portable behavior would make extension
     /// built-ins unusable even if found. -->
     Extension,
 
-    /// Built-in that works as a standalone utility
+    /// Built-in that works like a standalone utility
     ///
     /// A substitutive built-in is a built-in that is executed instead of an
     /// external utility to minimize invocation overhead. Since a substitutive
