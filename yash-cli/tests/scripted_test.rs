@@ -266,6 +266,11 @@ fn getopts_builtin() {
 }
 
 #[test]
+fn getopts_builtin_ex() {
+    run("getopts-y.sh");
+}
+
+#[test]
 fn grouping() {
     run("grouping-p.sh")
 }

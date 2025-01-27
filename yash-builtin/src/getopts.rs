@@ -112,9 +112,9 @@
 //!
 //! The built-in returns an exit status of zero if it parses an option,
 //! regardless of whether the option is valid or not. When there are no more
-//! options to parse, the built-in returns a non-zero exit status.
+//! options to parse, the exit status is one.
 //!
-//! The exit status is non-zero on error.
+//! The exit status is two on error.
 //!
 //! # Examples
 //!
@@ -177,6 +177,8 @@
 //!
 //! The behavior is unspecified if you modify the `$OPTIND` variable between
 //! invocations of the built-in or to a value other than `1`.
+//!
+//! In other implementations, the exit status may be greater than two on error.
 //!
 //! # Implementation notes
 //!
