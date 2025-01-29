@@ -388,6 +388,9 @@ impl System for &SharedSystem {
     ) -> Result<()> {
         (**self.0.borrow_mut()).sigmask(op, old_mask)
     }
+    fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
+        self.0.borrow().get_sigaction(signal)
+    }
     fn sigaction(&mut self, signal: signal::Number, action: Disposition) -> Result<Disposition> {
         self.0.borrow_mut().sigaction(signal, action)
     }
@@ -589,6 +592,10 @@ impl System for SharedSystem {
         old_mask: Option<&mut Vec<signal::Number>>,
     ) -> Result<()> {
         (&mut &*self).sigmask(op, old_mask)
+    }
+    #[inline]
+    fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
+        (&self).get_sigaction(signal)
     }
     #[inline]
     fn sigaction(&mut self, signal: signal::Number, action: Disposition) -> Result<Disposition> {

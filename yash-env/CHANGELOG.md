@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `Env` struct now contains the `any` field of type `DataSet`.
     - The `DataSet` struct is defined in the newly added `any` module.
       It can be used to store arbitrary data.
+- The `System` trait now has the `get_sigaction` method.
+    - This method returns the current signal handling configuration for a signal.
+      This method does not modify anything, so it can be used with an immutable
+      reference to the system.
 - The `builtin::Builtin` struct now has the `is_declaration_utility` field.
 - The `builtin::Builtin` struct now can be constructed with the associated
   function `new`.

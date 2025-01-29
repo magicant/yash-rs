@@ -257,6 +257,14 @@ pub trait System: Debug {
         old_mask: Option<&mut Vec<signal::Number>>,
     ) -> Result<()>;
 
+    /// Gets the disposition for a signal.
+    ///
+    /// This is an abstract wrapper around the `sigaction` system call. This
+    /// function returns the current disposition if successful.
+    ///
+    /// To change the disposition, use [`sigaction`](Self::sigaction).
+    fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition>;
+
     /// Gets and sets the disposition for a signal.
     ///
     /// This is a low-level function used internally by
@@ -271,6 +279,9 @@ pub trait System: Debug {
     /// When you set the disposition to `Disposition::Catch`, signals sent to
     /// this process are accumulated in the `System` instance and made available
     /// from [`caught_signals`](Self::caught_signals).
+    ///
+    /// To get the current disposition without changing it, use
+    /// [`get_sigaction`](Self::get_sigaction).
     fn sigaction(&mut self, signal: signal::Number, action: Disposition) -> Result<Disposition>;
 
     /// Returns signals this process has caught, if any.
