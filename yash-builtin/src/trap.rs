@@ -21,36 +21,49 @@
 //! # Synopsis
 //!
 //! ```sh
-//! trap
+//! trap [action] condition…
 //! ```
 //!
 //! ```sh
-//! trap [action] condition…
+//! trap [-p [condition…]]
 //! ```
 //!
 //! # Description
 //!
+//! The `trap` built-in can be used to either set or print traps.
+//! To set traps, pass an *action* and one or more *condition*s as operands.
+//! To print the currently configured traps, invoke the built-in with no
+//! operands or with the `-p` option.
+//!
+//! ## Setting traps
+//!
+//! When setting traps, the built-in sets the *action* for each *condition* in
+//! the current shell environment. To set different actions for multiple
+//! conditions, use multiple invocations of the built-in.
+//!
+//! ## Printing traps
+//!
 //! When the built-in is invoked with no operands, it prints the currently
 //! configured traps in the format `trap -- action condition` where *action* and
 //! *condition* are properly quoted so that the output can be read by the shell
-//! to restore the traps.
+//! to restore the traps. By default, the built-in prints traps that have
+//! non-default actions. To print all traps, use the `-p` option with no
+//! operands.
+//!
+//! When the `-p` option is used with one or more *condition*s, the built-in
+//! prints the traps for the specified *condition*s.
 //!
 //! When a [subshell](yash_env::subshell) is entered, traps other than
 //! `Action::Ignore` are reset to the default action. This behavior would make
 //! it impossible to save the current traps by using a command substitution as
-//! in `traps=$(trap)`. To avoid this, when the built-in is invoked in a
+//! in `traps=$(trap)`. To make this work, when the built-in is invoked in a
 //! subshell and no traps have been modified in the subshell, it prints the
 //! traps that were configured in the parent shell.
 //!
-//! When operands are given, the built-in sets the trap specified by *action*
-//! and *condition*. When there are more than one *condition*, the built-in sets
-//! the same *action* for all of them.
-//!
 //! # Options
 //!
-//! None.
-//!
-//! (TODO: `-p` option)
+//! The **`-p`** (**`--print`**) option prints the traps configured in the shell
+//! environment.
 //!
 //! # Operands
 //!
@@ -111,6 +124,9 @@
 //! configured in the parent shell. The check may be done by a simple literal
 //! comparison, so you should not expect the shell to recognize complex
 //! expressions such as `cmd=trap; traps=$($cmd)`.
+//!
+//! In other shells, the `EXIT` condition may be triggered when the shell is
+//! terminated by a signal.
 //!
 //! # Implementation notes
 //!
