@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `builtin::Builtin` struct now has the `is_declaration_utility` field.
 - The `builtin::Builtin` struct now can be constructed with the associated
   function `new`.
+- The `trap::SignalSystem` trait now has the `get_disposition` method.
 - The `system::errno::Errno` struct now can be converted to and from the `Errno`
   type from the `errno` crate.
 - Internal dependencies:

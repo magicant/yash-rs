@@ -716,6 +716,10 @@ impl SignalSystem for &SharedSystem {
         System::signal_number_from_name(*self, name)
     }
 
+    fn get_disposition(&self, signal: signal::Number) -> Result<Disposition> {
+        self.0.borrow().get_disposition(signal)
+    }
+
     fn set_disposition(
         &mut self,
         signal: signal::Number,
@@ -734,6 +738,11 @@ impl SignalSystem for SharedSystem {
     #[inline]
     fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
         System::signal_number_from_name(self, name)
+    }
+
+    #[inline]
+    fn get_disposition(&self, signal: signal::Number) -> Result<Disposition> {
+        self.0.borrow().get_disposition(signal)
     }
 
     #[inline]

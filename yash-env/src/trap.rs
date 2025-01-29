@@ -74,6 +74,13 @@ pub trait SignalSystem {
     #[must_use]
     fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number>;
 
+    /// Returns the current disposition for a signal.
+    ///
+    /// This function returns the current disposition for the specified signal like
+    /// [`set_disposition`](Self::set_disposition) does, but does not change the
+    /// disposition.
+    fn get_disposition(&self, signal: signal::Number) -> Result<Disposition, Errno>;
+
     /// Sets how a signal is handled.
     ///
     /// This function updates the signal blocking mask and the disposition for
@@ -451,15 +458,16 @@ mod tests {
             VirtualSystem::new().signal_number_from_name(name)
         }
 
+        fn get_disposition(&self, signal: signal::Number) -> Result<Disposition, Errno> {
+            Ok(self.0.get(&signal).copied().unwrap_or_default())
+        }
+
         fn set_disposition(
             &mut self,
             signal: signal::Number,
             disposition: Disposition,
         ) -> Result<Disposition, Errno> {
-            Ok(self
-                .0
-                .insert(signal, disposition)
-                .unwrap_or(Disposition::Default))
+            Ok(self.0.insert(signal, disposition).unwrap_or_default())
         }
     }
 

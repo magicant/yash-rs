@@ -107,6 +107,14 @@ impl SelectSystem {
         Ok(())
     }
 
+    /// Implements signal disposition query.
+    ///
+    /// See [`SharedSystem::get_disposition`].
+    #[inline]
+    pub fn get_disposition(&self, signal: signal::Number) -> Result<Disposition> {
+        self.system.get_sigaction(signal)
+    }
+
     /// Implements signal disposition update.
     ///
     /// See [`SharedSystem::set_disposition`].

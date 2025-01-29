@@ -259,6 +259,12 @@ pub trait System: Debug {
 
     /// Gets the disposition for a signal.
     ///
+    /// This is a low-level function used internally by
+    /// [`SharedSystem::get_disposition`]. You should not call this function
+    /// directly, or you will leave the `SharedSystem` instance in an
+    /// inconsistent state. The description below applies if you want to do
+    /// everything yourself without depending on `SharedSystem`.
+    ///
     /// This is an abstract wrapper around the `sigaction` system call. This
     /// function returns the current disposition if successful.
     ///
@@ -269,9 +275,9 @@ pub trait System: Debug {
     ///
     /// This is a low-level function used internally by
     /// [`SharedSystem::set_disposition`]. You should not call this function
-    /// directly, or you will disrupt the behavior of `SharedSystem`. The
-    /// description below applies if you want to do everything yourself without
-    /// depending on `SharedSystem`.
+    /// directly, or you will leave the `SharedSystem` instance in an
+    /// inconsistent state. The description below applies if you want to do
+    /// everything yourself without depending on `SharedSystem`.
     ///
     /// This is an abstract wrapper around the `sigaction` system call. This
     /// function returns the previous disposition if successful.
