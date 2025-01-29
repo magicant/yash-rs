@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Items that manage the state of a single signal.
+//! Items that manage the state of a single signal
 
 #[cfg(doc)]
 use super::TrapSet;
@@ -52,7 +52,7 @@ impl From<&Action> for Disposition {
     }
 }
 
-/// Error that may happen in [`TrapSet::set_action`].
+/// Error that may happen in [`TrapSet::set_action`]
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum SetActionError {
     /// Attempt to set a trap that has been ignored since the shell startup.
@@ -72,31 +72,31 @@ pub enum SetActionError {
     SystemError(#[from] Errno),
 }
 
-/// State of the trap action for a condition.
+/// State of the trap action for a condition
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrapState {
-    /// Action taken when the condition is met.
+    /// Action taken when the condition is met
     pub action: Action,
     /// Location of the simple command that invoked the trap built-in that set
-    /// the current action.
+    /// the current action
     pub origin: Location,
     /// True iff a signal specified by the condition has been caught and the
     /// action command has not yet executed.
     pub pending: bool,
 }
 
-/// User-visible trap setting.
+/// User-visible trap setting
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Setting {
     /// The user has not yet set a trap for the signal specified by the
     /// condition, and the signal disposition the shell has inherited from the
-    /// pre-exec process is `SIG_DFL`.
+    /// pre-exec process is [`Disposition::Default`].
     InitiallyDefaulted,
     /// The user has not yet set a trap for the signal specified by the
     /// condition, and the signal disposition the shell has inherited from the
-    /// pre-exec process is `SIG_IGN`.
+    /// pre-exec process is [`Disposition::Ignore`].
     InitiallyIgnored,
-    /// User-defined trap.
+    /// User-defined trap
     UserSpecified(TrapState),
 }
 
