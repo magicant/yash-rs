@@ -45,6 +45,7 @@ pub async fn run_trap_if_caught(env: &mut Env, signal: signal::Number) -> Option
     };
     let code = Rc::clone(command);
     let origin = trap_state.origin.clone();
+    let origin = origin.expect("user-defined trap must have origin");
     Some(run_trap(env, signal.into(), code, origin).await)
 }
 
@@ -87,6 +88,7 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
         };
         let code = Rc::clone(command);
         let origin = state.origin.clone();
+        let origin = origin.expect("user-defined trap must have origin");
         run_trap(env, signal.into(), code, origin).await?;
     }
 

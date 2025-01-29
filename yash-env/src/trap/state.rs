@@ -77,14 +77,20 @@ pub enum SetActionError {
 pub struct TrapState {
     /// Action taken when the condition is met
     pub action: Action,
+
     /// Location of the simple command that invoked the trap built-in that set
     /// the current action
-    pub origin: Location,
+    ///
+    /// If this value is `None`, the action was inherited from the previous
+    /// process that `exec`ed the shell.
+    pub origin: Option<Location>,
+
     /// True iff a signal specified by the condition has been caught and the
     /// action command has not yet executed.
     pub pending: bool,
 }
 
+// TODO Remove this
 /// User-visible trap setting
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Setting {
@@ -201,7 +207,7 @@ impl GrandState {
         let cond = *entry.key();
         let setting = Setting::UserSpecified(TrapState {
             action,
-            origin,
+            origin: Some(origin),
             pending: false,
         });
         let disposition = (&setting).into();
@@ -418,7 +424,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: Action::Ignore,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 }),
                 None
@@ -442,7 +448,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: Action::Ignore,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 }),
                 None
@@ -467,7 +473,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 }),
                 None
@@ -494,7 +500,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: Action::Default,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 }),
                 None
@@ -538,7 +544,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: Action::Ignore,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 }),
                 None
@@ -596,7 +602,7 @@ mod tests {
         );
         assert_matches!(map[&SIGCHLD.into()].get_state(), (Some(state), None) => {
             assert_eq!(state.action, Action::Ignore);
-            assert_eq!(state.origin, origin);
+            assert_eq!(state.origin, Some(origin));
         });
         assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
     }
@@ -619,7 +625,7 @@ mod tests {
         );
         assert_matches!(map[&SIGCHLD.into()].get_state(), (Some(state), None) => {
             assert_eq!(state.action, action);
-            assert_eq!(state.origin, origin);
+            assert_eq!(state.origin, Some(origin));
         });
         assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
     }
@@ -646,7 +652,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 }),
                 None
@@ -736,7 +742,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: Action::Ignore,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 }),
                 None
@@ -768,7 +774,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: Action::Ignore,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 }),
                 None
@@ -800,7 +806,7 @@ mod tests {
                 None,
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 }),
             )
@@ -833,7 +839,7 @@ mod tests {
                 None,
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 }),
             )
@@ -866,7 +872,7 @@ mod tests {
                 None,
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 }),
             )
@@ -897,7 +903,7 @@ mod tests {
                 None,
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 }),
             )
@@ -982,7 +988,7 @@ mod tests {
         state.mark_as_caught();
         let expected_trap = TrapState {
             action,
-            origin,
+            origin: Some(origin),
             pending: true,
         };
         assert_eq!(state.get_state(), (Some(&expected_trap), None));

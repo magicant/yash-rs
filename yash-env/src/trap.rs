@@ -507,7 +507,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: Action::Ignore,
-                    origin: origin_1,
+                    origin: Some(origin_1),
                     pending: false
                 }),
                 None
@@ -518,7 +518,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: command,
-                    origin: origin_2,
+                    origin: Some(origin_2),
                     pending: false
                 }),
                 None
@@ -580,12 +580,12 @@ mod tests {
         let first = i.next().unwrap();
         assert_eq!(first.0, &Condition::Signal(SIGUSR1));
         assert_eq!(first.1.unwrap().action, Action::Ignore);
-        assert_eq!(first.1.unwrap().origin, origin_1);
+        assert_eq!(first.1.unwrap().origin, Some(origin_1));
         assert_eq!(first.2, None);
         let second = i.next().unwrap();
         assert_eq!(second.0, &Condition::Signal(SIGUSR2));
         assert_eq!(second.1.unwrap().action, command);
-        assert_eq!(second.1.unwrap().origin, origin_2);
+        assert_eq!(second.1.unwrap().origin, Some(origin_2));
         assert_eq!(first.2, None);
         assert_eq!(i.next(), None);
     }
@@ -621,13 +621,13 @@ mod tests {
         let first = i.next().unwrap();
         assert_eq!(first.0, &Condition::Signal(SIGUSR1));
         assert_eq!(first.1.unwrap().action, Action::Ignore);
-        assert_eq!(first.1.unwrap().origin, origin_1);
+        assert_eq!(first.1.unwrap().origin, Some(origin_1));
         assert_eq!(first.2, None);
         let second = i.next().unwrap();
         assert_eq!(second.0, &Condition::Signal(SIGUSR2));
         assert_eq!(second.1, None);
         assert_eq!(second.2.unwrap().action, command);
-        assert_eq!(second.2.unwrap().origin, origin_2);
+        assert_eq!(second.2.unwrap().origin, Some(origin_2));
         assert_eq!(i.next(), None);
     }
 
@@ -657,7 +657,7 @@ mod tests {
         let first = i.next().unwrap();
         assert_eq!(first.0, &Condition::Signal(SIGUSR2));
         assert_eq!(first.1.unwrap().action, command);
-        assert_eq!(first.1.unwrap().origin, origin_2);
+        assert_eq!(first.1.unwrap().origin, Some(origin_2));
         assert_eq!(first.2, None);
         assert_eq!(i.next(), None);
     }
@@ -679,7 +679,7 @@ mod tests {
                 None,
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 })
             )
@@ -702,7 +702,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: Action::Ignore,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 }),
                 None
@@ -731,7 +731,7 @@ mod tests {
                 None,
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 })
             )
@@ -759,7 +759,7 @@ mod tests {
                 None,
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 })
             )
@@ -787,7 +787,7 @@ mod tests {
                 None,
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 })
             )
@@ -815,7 +815,7 @@ mod tests {
                 None,
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 })
             )
@@ -843,7 +843,7 @@ mod tests {
                 None,
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 })
             )
@@ -871,7 +871,7 @@ mod tests {
                 None,
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 })
             )
@@ -899,7 +899,7 @@ mod tests {
                 None,
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Some(origin),
                     pending: false
                 })
             )
@@ -940,7 +940,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: command,
-                    origin: origin_3,
+                    origin: Some(origin_3),
                     pending: false
                 }),
                 None
@@ -1426,7 +1426,7 @@ mod tests {
                 (
                     Some(&TrapState {
                         action: Action::Ignore,
-                        origin,
+                        origin: Some(origin),
                         pending: false
                     }),
                     None
@@ -1444,7 +1444,7 @@ mod tests {
                 (
                     Some(&TrapState {
                         action: Action::Ignore,
-                        origin,
+                        origin: Some(origin),
                         pending: false
                     }),
                     None
@@ -1480,7 +1480,7 @@ mod tests {
                 (
                     Some(&TrapState {
                         action: Action::Ignore,
-                        origin: origin.clone(),
+                        origin: Some(origin.clone()),
                         pending: false
                     }),
                     None

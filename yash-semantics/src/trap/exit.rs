@@ -41,6 +41,7 @@ pub async fn run_exit_trap(env: &mut Env) {
 
     let command = Rc::clone(command);
     let origin = state.origin.clone();
+    let origin = origin.expect("user-defined trap must have origin");
     let result = run_trap(env, Condition::Exit, command, origin).await;
     env.apply_result(result);
 }
