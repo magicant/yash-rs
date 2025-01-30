@@ -106,49 +106,6 @@ impl TrapState {
     }
 }
 
-// TODO Remove this
-/// User-visible trap setting
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Setting {
-    /// The user has not yet set a trap for the signal specified by the
-    /// condition, and the signal disposition the shell has inherited from the
-    /// pre-exec process is [`Disposition::Default`].
-    InitiallyDefaulted,
-    /// The user has not yet set a trap for the signal specified by the
-    /// condition, and the signal disposition the shell has inherited from the
-    /// pre-exec process is [`Disposition::Ignore`].
-    InitiallyIgnored,
-    /// User-defined trap
-    UserSpecified(TrapState),
-}
-
-impl Setting {
-    pub fn as_trap(&self) -> Option<&TrapState> {
-        if let Setting::UserSpecified(trap) = self {
-            Some(trap)
-        } else {
-            None
-        }
-    }
-
-    pub fn from_initial_disposition(disposition: Disposition) -> Self {
-        match disposition {
-            Disposition::Default | Disposition::Catch => Self::InitiallyDefaulted,
-            Disposition::Ignore => Self::InitiallyIgnored,
-        }
-    }
-}
-
-impl From<&Setting> for Disposition {
-    fn from(state: &Setting) -> Self {
-        match state {
-            Setting::InitiallyDefaulted => Disposition::Default,
-            Setting::InitiallyIgnored => Disposition::Ignore,
-            Setting::UserSpecified(trap) => (&trap.action).into(),
-        }
-    }
-}
-
 /// Option for [`GrandState::enter_subshell`]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EnterSubshellOption {
