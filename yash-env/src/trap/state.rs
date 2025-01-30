@@ -81,13 +81,29 @@ pub struct TrapState {
     /// Location of the simple command that invoked the trap built-in that set
     /// the current action
     ///
-    /// If this value is `None`, the action was inherited from the previous
-    /// process that `exec`ed the shell.
+    /// If this value is `None`, the action was either inherited from the
+    /// previous process that `exec`ed the shell or reset by the shell when
+    /// entering a subshell.
     pub origin: Option<Location>,
 
     /// True iff a signal specified by the condition has been caught and the
     /// action command has not yet executed.
     pub pending: bool,
+}
+
+impl TrapState {
+    fn from_initial_disposition(disposition: Disposition) -> Self {
+        let action = match disposition {
+            Disposition::Default => Action::Default,
+            Disposition::Ignore => Action::Ignore,
+            Disposition::Catch => panic!("initial disposition cannot be `Catch`"),
+        };
+        TrapState {
+            action,
+            origin: None,
+            pending: false,
+        }
+    }
 }
 
 // TODO Remove this
@@ -113,16 +129,6 @@ impl Setting {
         } else {
             None
         }
-    }
-
-    fn is_user_defined_command(&self) -> bool {
-        matches!(
-            self,
-            Setting::UserSpecified(TrapState {
-                action: Action::Command(_),
-                ..
-            })
-        )
     }
 
     pub fn from_initial_disposition(disposition: Disposition) -> Self {
@@ -158,11 +164,11 @@ pub enum EnterSubshellOption {
 /// Whole configuration and state for a trap condition
 #[derive(Clone, Debug)]
 pub struct GrandState {
-    /// Setting that is effective in the current environment
-    current_setting: Setting,
+    /// Current trap state
+    current_state: TrapState,
 
-    /// Setting that was effective in the parent environment
-    parent_setting: Option<Setting>,
+    /// Trap state that was effective in the parent environment
+    parent_state: Option<TrapState>,
 
     /// Current internal disposition
     ///
@@ -186,14 +192,20 @@ impl GrandState {
     /// inherited on startup.
     #[must_use]
     pub fn get_state(&self) -> (Option<&TrapState>, Option<&TrapState>) {
-        let current = self.current_setting.as_trap();
-        let parent = self.parent_setting.as_ref().and_then(Setting::as_trap);
+        // let current = Some(&self.current_state);
+        // let parent = self.parent_state.as_ref();
+        let current = Some(&self.current_state).filter(|state| state.origin.is_some());
+        let parent = self
+            .parent_state
+            .as_ref()
+            .filter(|state| state.origin.is_some());
         (current, parent)
     }
 
+    // TODO Rename to clear_parent_state
     /// Clears the parent trap state.
     pub fn clear_parent_setting(&mut self) {
-        self.parent_setting = None;
+        self.parent_state = None;
     }
 
     /// Updates the entry with the new action.
@@ -205,12 +217,12 @@ impl GrandState {
         override_ignore: bool,
     ) -> Result<(), SetActionError> {
         let cond = *entry.key();
-        let setting = Setting::UserSpecified(TrapState {
+        let disposition = (&action).into();
+        let new_state = TrapState {
             action,
             origin: Some(origin),
             pending: false,
-        });
-        let disposition = (&setting).into();
+        };
 
         match entry {
             Entry::Vacant(vacant) => {
@@ -220,8 +232,10 @@ impl GrandState {
                             system.set_disposition(signal, Disposition::Ignore)?;
                         if initial_disposition == Disposition::Ignore {
                             vacant.insert(GrandState {
-                                current_setting: Setting::InitiallyIgnored,
-                                parent_setting: None,
+                                current_state: TrapState::from_initial_disposition(
+                                    initial_disposition,
+                                ),
+                                parent_state: None,
                                 internal_disposition: Disposition::Default,
                             });
                             return Err(SetActionError::InitiallyIgnored);
@@ -234,28 +248,31 @@ impl GrandState {
                 }
 
                 vacant.insert(GrandState {
-                    current_setting: setting,
-                    parent_setting: None,
+                    current_state: new_state,
+                    parent_state: None,
                     internal_disposition: Disposition::Default,
                 });
             }
 
             Entry::Occupied(mut occupied) => {
                 let state = occupied.get_mut();
-                if !override_ignore && state.current_setting == Setting::InitiallyIgnored {
+                if !override_ignore
+                    && state.current_state.action == Action::Ignore
+                    && state.current_state.origin.is_none()
+                {
                     return Err(SetActionError::InitiallyIgnored);
                 }
 
                 if let Condition::Signal(signal) = cond {
                     let internal = state.internal_disposition;
-                    let old_disposition = internal.max((&state.current_setting).into());
+                    let old_disposition = internal.max((&state.current_state.action).into());
                     let new_disposition = internal.max(disposition);
                     if old_disposition != new_disposition {
                         system.set_disposition(signal, new_disposition)?;
                     }
                 }
 
-                state.current_setting = setting;
+                state.current_state = new_state;
             }
         }
 
@@ -288,15 +305,15 @@ impl GrandState {
             Entry::Vacant(vacant) => {
                 let initial_disposition = system.set_disposition(signal, disposition)?;
                 vacant.insert(GrandState {
-                    current_setting: Setting::from_initial_disposition(initial_disposition),
-                    parent_setting: None,
+                    current_state: TrapState::from_initial_disposition(initial_disposition),
+                    parent_state: None,
                     internal_disposition: disposition,
                 });
             }
 
             Entry::Occupied(mut occupied) => {
                 let state = occupied.get_mut();
-                let setting = (&state.current_setting).into();
+                let setting = (&state.current_state.action).into();
                 let old_disposition = state.internal_disposition.max(setting);
                 let new_disposition = disposition.max(setting);
                 if old_disposition != new_disposition {
@@ -322,17 +339,21 @@ impl GrandState {
         cond: Condition,
         option: EnterSubshellOption,
     ) -> Result<(), Errno> {
-        let old_setting = (&self.current_setting).into();
+        let old_setting = (&self.current_state.action).into();
         let old_disposition = self.internal_disposition.max(old_setting);
 
-        if self.current_setting.is_user_defined_command() {
-            self.parent_setting = Some(std::mem::replace(
-                &mut self.current_setting,
-                Setting::InitiallyDefaulted,
+        if matches!(self.current_state.action, Action::Command(_)) {
+            self.parent_state = Some(std::mem::replace(
+                &mut self.current_state,
+                TrapState {
+                    action: Action::Default,
+                    origin: None,
+                    pending: false,
+                },
             ));
         }
 
-        let new_setting = (&self.current_setting).into();
+        let new_setting = (&self.current_state.action).into();
         let new_disposition = match option {
             EnterSubshellOption::KeepInternalDisposition => {
                 self.internal_disposition.max(new_setting)
@@ -373,8 +394,9 @@ impl GrandState {
         };
         let initial_disposition = system.set_disposition(signal, Disposition::Ignore)?;
         vacant.insert(GrandState {
-            current_setting: Setting::from_initial_disposition(initial_disposition),
-            parent_setting: None,
+            // TODO current_state should reflect the current signal disposition
+            current_state: TrapState::from_initial_disposition(initial_disposition),
+            parent_state: None,
             internal_disposition: Disposition::Default,
         });
         Ok(())
@@ -384,19 +406,16 @@ impl GrandState {
     ///
     /// This function does nothing unless a user-specified trap action is set.
     pub fn mark_as_caught(&mut self) {
-        if let Setting::UserSpecified(state) = &mut self.current_setting {
-            state.pending = true;
-        }
+        self.current_state.pending = true;
     }
 
     /// Clears the mark of this signal being caught and returns the trap state.
     pub fn handle_if_caught(&mut self) -> Option<&TrapState> {
-        match &mut self.current_setting {
-            Setting::UserSpecified(trap) if trap.pending => {
-                trap.pending = false;
-                Some(trap)
-            }
-            _ => None,
+        if self.current_state.pending {
+            self.current_state.pending = false;
+            Some(&self.current_state)
+        } else {
+            None
         }
     }
 }
