@@ -190,15 +190,15 @@ impl TrapSet {
             }
         }
 
-        self.clear_parent_settings();
+        self.clear_parent_states();
 
         let entry = self.traps.entry(cond);
         GrandState::set_action(system, entry, action, origin, override_ignore)
     }
 
-    fn clear_parent_settings(&mut self) {
+    fn clear_parent_states(&mut self) {
         for state in self.traps.values_mut() {
-            state.clear_parent_setting();
+            state.clear_parent_state();
         }
     }
 
@@ -254,7 +254,7 @@ impl TrapSet {
         ignore_sigint_sigquit: bool,
         keep_internal_dispositions_for_stoppers: bool,
     ) {
-        self.clear_parent_settings();
+        self.clear_parent_states();
 
         for (&cond, state) in &mut self.traps {
             let option = match cond {

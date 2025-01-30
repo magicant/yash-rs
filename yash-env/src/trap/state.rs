@@ -159,9 +159,8 @@ impl GrandState {
         (current, parent)
     }
 
-    // TODO Rename to clear_parent_state
     /// Clears the parent trap state.
-    pub fn clear_parent_setting(&mut self) {
+    pub fn clear_parent_state(&mut self) {
         self.parent_state = None;
     }
 
@@ -946,7 +945,7 @@ mod tests {
             )
             .unwrap();
 
-        state.clear_parent_setting();
+        state.clear_parent_state();
         assert_eq!(state.get_state(), (None, None));
     }
 
