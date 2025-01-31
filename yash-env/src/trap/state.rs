@@ -325,6 +325,9 @@ impl GrandState {
                 },
             ));
         }
+        if option == EnterSubshellOption::Ignore {
+            self.current_state.action = Action::Ignore;
+        }
 
         let new_setting = (&self.current_state.action).into();
         let new_disposition = match option {
@@ -905,7 +908,7 @@ mod tests {
             map[&cond].get_state(),
             (
                 Some(&TrapState {
-                    action: Action::Default, // TODO Should be Action::Ignore,
+                    action: Action::Ignore,
                     origin: Origin::Subshell,
                     pending: false
                 }),
