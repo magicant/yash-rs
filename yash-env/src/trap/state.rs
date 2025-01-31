@@ -72,19 +72,36 @@ pub enum SetActionError {
     SystemError(#[from] Errno),
 }
 
+/// Origin of the current trap action
+///
+/// The `Origin` enum indicates how the current trap action was set.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub enum Origin {
+    /// The current trap action was inherited from the previous process that
+    /// `exec`ed the shell.
+    ///
+    /// This is the default value.
+    #[default]
+    Inherited,
+
+    /// The current trap action was set by the shell when entering a subshell.
+    Subshell,
+
+    /// The current trap action was set by the user.
+    ///
+    /// The location indicates the simple command that invoked the trap built-in
+    /// that set the current action.
+    User(Location),
+}
+
 /// State of the trap action for a condition
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct TrapState {
     /// Action taken when the condition is met
     pub action: Action,
 
-    /// Location of the simple command that invoked the trap built-in that set
-    /// the current action
-    ///
-    /// If this value is `None`, the action was either inherited from the
-    /// previous process that `exec`ed the shell or reset by the shell when
-    /// entering a subshell.
-    pub origin: Option<Location>,
+    /// Origin of the current action
+    pub origin: Origin,
 
     /// True iff a signal specified by the condition has been caught and the
     /// action command has not yet executed.
@@ -100,7 +117,7 @@ impl TrapState {
         };
         TrapState {
             action,
-            origin: None,
+            origin: Origin::Inherited,
             pending: false,
         }
     }
@@ -151,11 +168,11 @@ impl GrandState {
     pub fn get_state(&self) -> (Option<&TrapState>, Option<&TrapState>) {
         // let current = Some(&self.current_state);
         // let parent = self.parent_state.as_ref();
-        let current = Some(&self.current_state).filter(|state| state.origin.is_some());
+        let current = Some(&self.current_state).filter(|state| state.origin != Origin::Inherited);
         let parent = self
             .parent_state
             .as_ref()
-            .filter(|state| state.origin.is_some());
+            .filter(|state| state.origin != Origin::Inherited);
         (current, parent)
     }
 
@@ -176,7 +193,7 @@ impl GrandState {
         let disposition = (&action).into();
         let new_state = TrapState {
             action,
-            origin: Some(origin),
+            origin: Origin::User(origin),
             pending: false,
         };
 
@@ -214,7 +231,7 @@ impl GrandState {
                 let state = occupied.get_mut();
                 if !override_ignore
                     && state.current_state.action == Action::Ignore
-                    && state.current_state.origin.is_none()
+                    && state.current_state.origin == Origin::Inherited
                 {
                     return Err(SetActionError::InitiallyIgnored);
                 }
@@ -303,7 +320,7 @@ impl GrandState {
                 &mut self.current_state,
                 TrapState {
                     action: Action::Default,
-                    origin: None,
+                    origin: Origin::Inherited, // TODO Should be Origin::Subshell
                     pending: false,
                 },
             ));
@@ -399,7 +416,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: Action::Ignore,
-                    origin: Some(origin),
+                    origin: Origin::User(origin),
                     pending: false
                 }),
                 None
@@ -423,7 +440,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: Action::Ignore,
-                    origin: Some(origin),
+                    origin: Origin::User(origin),
                     pending: false
                 }),
                 None
@@ -448,7 +465,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action,
-                    origin: Some(origin),
+                    origin: Origin::User(origin),
                     pending: false
                 }),
                 None
@@ -475,7 +492,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: Action::Default,
-                    origin: Some(origin),
+                    origin: Origin::User(origin),
                     pending: false
                 }),
                 None
@@ -519,7 +536,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: Action::Ignore,
-                    origin: Some(origin),
+                    origin: Origin::User(origin),
                     pending: false
                 }),
                 None
@@ -577,7 +594,7 @@ mod tests {
         );
         assert_matches!(map[&SIGCHLD.into()].get_state(), (Some(state), None) => {
             assert_eq!(state.action, Action::Ignore);
-            assert_eq!(state.origin, Some(origin));
+            assert_eq!(state.origin, Origin::User(origin));
         });
         assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
     }
@@ -600,7 +617,7 @@ mod tests {
         );
         assert_matches!(map[&SIGCHLD.into()].get_state(), (Some(state), None) => {
             assert_eq!(state.action, action);
-            assert_eq!(state.origin, Some(origin));
+            assert_eq!(state.origin, Origin::User(origin));
         });
         assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
     }
@@ -627,7 +644,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action,
-                    origin: Some(origin),
+                    origin: Origin::User(origin),
                     pending: false
                 }),
                 None
@@ -717,7 +734,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: Action::Ignore,
-                    origin: Some(origin),
+                    origin: Origin::User(origin),
                     pending: false
                 }),
                 None
@@ -749,7 +766,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: Action::Ignore,
-                    origin: Some(origin),
+                    origin: Origin::User(origin),
                     pending: false
                 }),
                 None
@@ -781,7 +798,7 @@ mod tests {
                 None,
                 Some(&TrapState {
                     action,
-                    origin: Some(origin),
+                    origin: Origin::User(origin),
                     pending: false
                 }),
             )
@@ -814,7 +831,7 @@ mod tests {
                 None,
                 Some(&TrapState {
                     action,
-                    origin: Some(origin),
+                    origin: Origin::User(origin),
                     pending: false
                 }),
             )
@@ -847,7 +864,7 @@ mod tests {
                 None,
                 Some(&TrapState {
                     action,
-                    origin: Some(origin),
+                    origin: Origin::User(origin),
                     pending: false
                 }),
             )
@@ -878,7 +895,7 @@ mod tests {
                 None,
                 Some(&TrapState {
                     action,
-                    origin: Some(origin),
+                    origin: Origin::User(origin),
                     pending: false
                 }),
             )
@@ -963,7 +980,7 @@ mod tests {
         state.mark_as_caught();
         let expected_trap = TrapState {
             action,
-            origin: Some(origin),
+            origin: Origin::User(origin),
             pending: true,
         };
         assert_eq!(state.get_state(), (Some(&expected_trap), None));

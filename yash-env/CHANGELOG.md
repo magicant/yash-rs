@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `builtin::Builtin` struct now can be constructed with the associated
   function `new`.
 - The `trap::SignalSystem` trait now has the `get_disposition` method.
+- The `Origin` enum has been added to the `trap` module.
+    - This enum represents the origin of a configured trap.
+- The `trap::TrapSet` struct now implements `Default`.
 - The `system::errno::Errno` struct now can be converted to and from the `Errno`
   type from the `errno` crate.
 - Internal dependencies:
@@ -31,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `System::getpwnam_dir` now takes a `&CStr` parameter instead of a `&str`.
 - The `builtin::Builtin` struct is now `non_exhaustive`.
+- The `origin` field of the `trap::TrapState` struct is now `trap::Origin`.
 - External dependency versions:
     - yash-syntax 0.13.0 → 0.14.0
 
