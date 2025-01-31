@@ -625,7 +625,8 @@ mod tests {
         assert_eq!(first.2, None);
         let second = i.next().unwrap();
         assert_eq!(second.0, &Condition::Signal(SIGUSR2));
-        assert_eq!(second.1, None);
+        assert_eq!(second.1.unwrap().action, Action::Default);
+        assert_eq!(second.1.unwrap().origin, Origin::Subshell);
         assert_eq!(second.2.unwrap().action, command);
         assert_eq!(second.2.unwrap().origin, Origin::User(origin_2));
         assert_eq!(i.next(), None);
@@ -655,10 +656,15 @@ mod tests {
 
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
-        assert_eq!(first.0, &Condition::Signal(SIGUSR2));
-        assert_eq!(first.1.unwrap().action, command);
-        assert_eq!(first.1.unwrap().origin, Origin::User(origin_2));
+        assert_eq!(first.0, &Condition::Signal(SIGUSR1));
+        assert_eq!(first.1.unwrap().action, Action::Default);
+        assert_eq!(first.1.unwrap().origin, Origin::Subshell);
         assert_eq!(first.2, None);
+        let second = i.next().unwrap();
+        assert_eq!(second.0, &Condition::Signal(SIGUSR2));
+        assert_eq!(second.1.unwrap().action, command);
+        assert_eq!(second.1.unwrap().origin, Origin::User(origin_2));
+        assert_eq!(second.2, None);
         assert_eq!(i.next(), None);
     }
 
@@ -676,7 +682,11 @@ mod tests {
         assert_eq!(
             trap_set.get_state(SIGCHLD),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
                     origin: Origin::User(origin),
@@ -728,7 +738,11 @@ mod tests {
         assert_eq!(
             trap_set.get_state(SIGCHLD),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
                     origin: Origin::User(origin),
@@ -756,7 +770,11 @@ mod tests {
         assert_eq!(
             trap_set.get_state(SIGINT),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
                     origin: Origin::User(origin),
@@ -784,7 +802,11 @@ mod tests {
         assert_eq!(
             trap_set.get_state(SIGTERM),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
                     origin: Origin::User(origin),
@@ -812,7 +834,11 @@ mod tests {
         assert_eq!(
             trap_set.get_state(SIGQUIT),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
                     origin: Origin::User(origin),
@@ -840,7 +866,11 @@ mod tests {
         assert_eq!(
             trap_set.get_state(SIGTSTP),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
                     origin: Origin::User(origin),
@@ -868,7 +898,11 @@ mod tests {
         assert_eq!(
             trap_set.get_state(SIGTTIN),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
                     origin: Origin::User(origin),
@@ -896,7 +930,11 @@ mod tests {
         assert_eq!(
             trap_set.get_state(SIGTTOU),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
                     origin: Origin::User(origin),
@@ -946,7 +984,17 @@ mod tests {
                 None
             )
         );
-        assert_eq!(trap_set.get_state(SIGUSR2), (None, None));
+        assert_eq!(
+            trap_set.get_state(SIGUSR2),
+            (
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
+                None
+            )
+        );
         assert_eq!(system.0[&SIGUSR1], Disposition::Catch);
         assert_eq!(system.0[&SIGUSR2], Disposition::Default);
     }
@@ -968,8 +1016,28 @@ mod tests {
         trap_set.enter_subshell(&mut system, false, false);
         trap_set.enter_subshell(&mut system, false, false);
 
-        assert_eq!(trap_set.get_state(SIGUSR1), (None, None));
-        assert_eq!(trap_set.get_state(SIGUSR2), (None, None));
+        assert_eq!(
+            trap_set.get_state(SIGUSR1),
+            (
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
+                None
+            )
+        );
+        assert_eq!(
+            trap_set.get_state(SIGUSR2),
+            (
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
+                None
+            )
+        );
         assert_eq!(system.0[&SIGUSR1], Disposition::Default);
         assert_eq!(system.0[&SIGUSR2], Disposition::Default);
     }

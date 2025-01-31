@@ -407,12 +407,10 @@ mod tests {
                 .unwrap();
             let subshell = Subshell::new(|env, _job_control| {
                 Box::pin(async {
-                    let trap_state = assert_matches!(
-                        env.traps.get_state(SIGCHLD),
-                        (None, Some(trap_state)) => trap_state
-                    );
+                    let (current, parent) = env.traps.get_state(SIGCHLD);
+                    assert_eq!(current.unwrap().action, Action::Default);
                     assert_matches!(
-                        &trap_state.action,
+                        &parent.unwrap().action,
                         Action::Command(body) => assert_eq!(&**body, "echo foo")
                     );
                 })

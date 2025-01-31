@@ -320,7 +320,7 @@ impl GrandState {
                 &mut self.current_state,
                 TrapState {
                     action: Action::Default,
-                    origin: Origin::Inherited, // TODO Should be Origin::Subshell
+                    origin: Origin::Subshell,
                     pending: false,
                 },
             ));
@@ -795,7 +795,11 @@ mod tests {
         assert_eq!(
             map[&cond].get_state(),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
                     origin: Origin::User(origin),
@@ -828,7 +832,11 @@ mod tests {
         assert_eq!(
             map[&cond].get_state(),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
                     origin: Origin::User(origin),
@@ -861,7 +869,11 @@ mod tests {
         assert_eq!(
             map[&cond].get_state(),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
                     origin: Origin::User(origin),
@@ -892,7 +904,11 @@ mod tests {
         assert_eq!(
             map[&cond].get_state(),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default, // TODO Should be Action::Ignore,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
                     origin: Origin::User(origin),
@@ -963,7 +979,17 @@ mod tests {
             .unwrap();
 
         state.clear_parent_state();
-        assert_eq!(state.get_state(), (None, None));
+        assert_eq!(
+            state.get_state(),
+            (
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
+                None
+            )
+        );
     }
 
     #[test]

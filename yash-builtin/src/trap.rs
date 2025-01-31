@@ -187,8 +187,8 @@ pub fn display_traps<S: SignalSystem>(traps: &TrapSet, system: &S) -> String {
     let mut output = String::new();
     for (cond, current, parent) in traps {
         let trap = match (current, parent) {
-            (Some(trap), _) => trap,
-            (None, Some(trap)) => trap,
+            (_, Some(trap)) => trap,
+            (Some(trap), None) => trap,
             (None, None) => continue,
         };
         let command = match &trap.action {
