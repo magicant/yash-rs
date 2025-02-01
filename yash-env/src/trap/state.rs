@@ -353,8 +353,11 @@ impl GrandState {
 
     /// Sets the disposition to `Ignore` for the given signal condition.
     ///
-    /// This function creates a new entry having `Setting::InitiallyDefaulted`
-    /// or `Setting::InitiallyIgnored` based on the current setting.
+    /// This function creates a new `GrandState` entry with the current state
+    /// having `Action::Ignore`. If the signal disposition is default, the shell
+    /// sets the signal disposition to `Ignore` and the origin to `Subshell`. If
+    /// the signal disposition is already `Ignore`, the origin is set to
+    /// `Inherited` to disallow changing the action in a non-interactive shell.
     ///
     /// You should call this function in place of [`Self::enter_subshell`] if
     /// there is no entry for the condition yet.
@@ -369,9 +372,17 @@ impl GrandState {
             Condition::Exit => panic!("exit condition cannot be ignored"),
         };
         let initial_disposition = system.set_disposition(signal, Disposition::Ignore)?;
+        let origin = match initial_disposition {
+            Disposition::Default => Origin::Subshell,
+            Disposition::Ignore => Origin::Inherited,
+            Disposition::Catch => panic!("initial disposition cannot be `Catch`"),
+        };
         vacant.insert(GrandState {
-            // TODO current_state should reflect the current signal disposition
-            current_state: TrapState::from_initial_disposition(initial_disposition),
+            current_state: TrapState {
+                action: Action::Ignore,
+                origin,
+                pending: false,
+            },
             parent_state: None,
             internal_disposition: Disposition::Default,
         });
@@ -932,7 +943,17 @@ mod tests {
 
         let result = GrandState::ignore(&mut system, vacant);
         assert_eq!(result, Ok(()));
-        assert_eq!(map[&cond].get_state(), (None, None));
+        assert_eq!(
+            map[&cond].get_state(),
+            (
+                Some(&TrapState {
+                    action: Action::Ignore,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
+                None
+            )
+        );
         assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
 
         let entry = map.entry(cond);
