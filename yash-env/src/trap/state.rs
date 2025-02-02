@@ -161,18 +161,10 @@ impl GrandState {
     /// This function returns a pair of optional trap states. The first is the
     /// currently configured trap action, and the second is the action set
     /// before [`enter_subshell`](Self::enter_subshell) was called.
-    ///
-    /// This function does not reflect the initial signal actions the shell
-    /// inherited on startup.
     #[must_use]
     pub fn get_state(&self) -> (Option<&TrapState>, Option<&TrapState>) {
-        // let current = Some(&self.current_state);
-        // let parent = self.parent_state.as_ref();
-        let current = Some(&self.current_state).filter(|state| state.origin != Origin::Inherited);
-        let parent = self
-            .parent_state
-            .as_ref()
-            .filter(|state| state.origin != Origin::Inherited);
+        let current = Some(&self.current_state);
+        let parent = self.parent_state.as_ref();
         (current, parent)
     }
 
@@ -531,7 +523,17 @@ mod tests {
         let result = GrandState::set_action(&mut system, entry, Action::Ignore, origin, false);
         assert_eq!(result, Err(SetActionError::InitiallyIgnored));
 
-        assert_eq!(map[&SIGCHLD.into()].get_state(), (None, None));
+        assert_eq!(
+            map[&SIGCHLD.into()].get_state(),
+            (
+                Some(&TrapState {
+                    action: Action::Ignore,
+                    origin: Origin::Inherited,
+                    pending: false
+                }),
+                None
+            )
+        );
         assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
     }
 
@@ -571,7 +573,17 @@ mod tests {
             map[&SIGCHLD.into()].internal_disposition(),
             Disposition::Ignore
         );
-        assert_eq!(map[&SIGCHLD.into()].get_state(), (None, None));
+        assert_eq!(
+            map[&SIGCHLD.into()].get_state(),
+            (
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Inherited,
+                    pending: false
+                }),
+                None
+            )
+        );
         assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
     }
 
@@ -587,7 +599,17 @@ mod tests {
             map[&SIGCHLD.into()].internal_disposition(),
             Disposition::Catch
         );
-        assert_eq!(map[&SIGCHLD.into()].get_state(), (None, None));
+        assert_eq!(
+            map[&SIGCHLD.into()].get_state(),
+            (
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Inherited,
+                    pending: false
+                }),
+                None
+            )
+        );
         assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
     }
 
@@ -682,7 +704,17 @@ mod tests {
         let result = GrandState::set_action(&mut system, entry, action, origin, false);
         assert_eq!(result, Err(SetActionError::InitiallyIgnored));
         assert_eq!(map[&cond].internal_disposition(), Disposition::Ignore);
-        assert_eq!(map[&cond].get_state(), (None, None));
+        assert_eq!(
+            map[&cond].get_state(),
+            (
+                Some(&TrapState {
+                    action: Action::Ignore,
+                    origin: Origin::Inherited,
+                    pending: false
+                }),
+                None
+            )
+        );
         assert_eq!(system.0[&SIGTTOU], Disposition::Ignore);
     }
 
@@ -701,7 +733,17 @@ mod tests {
         );
         assert_eq!(result, Ok(()));
         assert_eq!(map[&cond].internal_disposition(), Disposition::Catch);
-        assert_eq!(map[&cond].get_state(), (None, None));
+        assert_eq!(
+            map[&cond].get_state(),
+            (
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Inherited,
+                    pending: false
+                }),
+                None
+            )
+        );
         assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
     }
 
@@ -719,11 +761,18 @@ mod tests {
             EnterSubshellOption::ClearInternalDisposition,
         );
         assert_eq!(result, Ok(()));
+        assert_eq!(map[&cond].internal_disposition(), Disposition::Default);
         assert_eq!(
-            map[&SIGCHLD.into()].internal_disposition(),
-            Disposition::Default
+            map[&cond].get_state(),
+            (
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Inherited,
+                    pending: false
+                }),
+                None
+            )
         );
-        assert_eq!(map[&cond].get_state(), (None, None));
         assert_eq!(system.0[&SIGCHLD], Disposition::Default);
     }
 
@@ -974,7 +1023,17 @@ mod tests {
 
         let result = GrandState::ignore(&mut system, vacant);
         assert_eq!(result, Ok(()));
-        assert_eq!(map[&cond].get_state(), (None, None));
+        assert_eq!(
+            map[&cond].get_state(),
+            (
+                Some(&TrapState {
+                    action: Action::Ignore,
+                    origin: Origin::Inherited,
+                    pending: false
+                }),
+                None
+            )
+        );
         assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
 
         let entry = map.entry(cond);

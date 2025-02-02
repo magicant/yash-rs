@@ -123,14 +123,17 @@ pub struct TrapSet {
 }
 
 impl TrapSet {
-    /// Returns the current state for a condition.
+    /// Returns the current and parent states for a condition.
     ///
     /// This function returns a pair of optional trap states. The first is the
     /// currently configured trap action, and the second is the action set
     /// before [`enter_subshell`](Self::enter_subshell) was called.
     ///
-    /// This function does not reflect the initial signal actions the shell
-    /// inherited on startup.
+    /// The current state (the first return value) is `None` if no trap action
+    /// has been set for the condition and the signal disposition is not yet
+    /// known. The parent state (the second return value) is `None` if the
+    /// shell environment has not entered a subshell or a trap action has been
+    /// modified after entering a subshell.
     pub fn get_state<C: Into<Condition>>(
         &self,
         cond: C,

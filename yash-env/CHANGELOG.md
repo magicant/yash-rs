@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `System::getpwnam_dir` now takes a `&CStr` parameter instead of a `&str`.
 - The `builtin::Builtin` struct is now `non_exhaustive`.
 - The `origin` field of the `trap::TrapState` struct is now `trap::Origin`.
+- The `TrapSet::get_state` method now returns a `TrapState` reference even if
+  the current action was not set by the user.
 - External dependency versions:
     - yash-syntax 0.13.0 → 0.14.0
 
