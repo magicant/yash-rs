@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `Origin` enum has been added to the `trap` module.
     - This enum represents the origin of a configured trap.
 - The `trap::TrapSet` struct now implements `Default`.
+- The `trap::TrapSet` struct now has the `peek_state` method.
+    - This method can be used to get the current state of a trap by accessing
+      the underlying system if necessary. It reports the trap state that should
+      be used in the output of the `trap` built-in.
 - The `system::errno::Errno` struct now can be converted to and from the `Errno`
   type from the `errno` crate.
 - Internal dependencies:

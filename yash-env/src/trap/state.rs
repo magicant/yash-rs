@@ -180,6 +180,32 @@ impl GrandState {
         self.parent_state = None;
     }
 
+    /// Inserts a new entry if the entry is vacant.
+    ///
+    /// If the condition is a signal, the new entry is initialized with the
+    /// current signal disposition obtained from the system.
+    pub fn insert_from_system_if_vacant<'a, S: SignalSystem>(
+        system: &S,
+        entry: Entry<'a, Condition, GrandState>,
+    ) -> Result<&'a GrandState, Errno> {
+        match entry {
+            Entry::Vacant(vacant) => {
+                let disposition = match *vacant.key() {
+                    Condition::Signal(signal) => system.get_disposition(signal)?,
+                    Condition::Exit => Disposition::Default,
+                };
+                let state = GrandState {
+                    current_state: TrapState::from_initial_disposition(disposition),
+                    parent_state: None,
+                    internal_disposition: Disposition::Default,
+                };
+                Ok(vacant.insert(state))
+            }
+
+            Entry::Occupied(occupied) => Ok(occupied.into_mut()),
+        }
+    }
+
     /// Updates the entry with the new action.
     pub fn set_action<S: SignalSystem>(
         system: &mut S,
@@ -413,6 +439,109 @@ mod tests {
     use crate::system::r#virtual::{SIGCHLD, SIGQUIT, SIGTSTP, SIGTTOU, SIGUSR1};
     use assert_matches::assert_matches;
     use std::collections::BTreeMap;
+
+    struct UnusedSystem;
+
+    impl SignalSystem for UnusedSystem {
+        fn signal_name_from_number(&self, number: crate::signal::Number) -> crate::signal::Name {
+            unreachable!("signal_name_from_number({number})")
+        }
+        fn signal_number_from_name(
+            &self,
+            name: crate::signal::Name,
+        ) -> Option<crate::signal::Number> {
+            unreachable!("signal_number_from_name({name})")
+        }
+        fn get_disposition(&self, signal: crate::signal::Number) -> Result<Disposition, Errno> {
+            unreachable!("get_disposition({signal})")
+        }
+        fn set_disposition(
+            &mut self,
+            signal: crate::signal::Number,
+            disposition: Disposition,
+        ) -> Result<Disposition, Errno> {
+            unreachable!("set_disposition({signal}, {disposition:?})")
+        }
+    }
+
+    #[test]
+    fn insertion_with_default_inherited_disposition() {
+        let system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let entry = map.entry(SIGCHLD.into());
+        let state = GrandState::insert_from_system_if_vacant(&system, entry).unwrap();
+        assert_eq!(
+            state.current_state(),
+            &TrapState {
+                action: Action::Default,
+                origin: Origin::Inherited,
+                pending: false,
+            }
+        );
+        assert_eq!(state.parent_state(), None);
+        assert_eq!(state.internal_disposition(), Disposition::Default);
+    }
+
+    #[test]
+    fn insertion_with_inherited_disposition_of_ignore() {
+        let mut system = DummySystem::default();
+        system.0.insert(SIGCHLD, Disposition::Ignore);
+        let mut map = BTreeMap::new();
+        let entry = map.entry(SIGCHLD.into());
+        let state = GrandState::insert_from_system_if_vacant(&system, entry).unwrap();
+        assert_eq!(
+            state.current_state(),
+            &TrapState {
+                action: Action::Ignore,
+                origin: Origin::Inherited,
+                pending: false,
+            }
+        );
+        assert_eq!(state.parent_state(), None);
+        assert_eq!(state.internal_disposition(), Disposition::Default);
+    }
+
+    #[test]
+    fn insertion_with_occupied_entry() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let entry = map.entry(SIGCHLD.into());
+        let origin = Location::dummy("origin");
+        let action = Action::Command("echo".into());
+        let _ = GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false);
+
+        // If the entry is occupied, the function should return the existing
+        // state without accessing the system.
+        let entry = map.entry(SIGCHLD.into());
+        let state = GrandState::insert_from_system_if_vacant(&UnusedSystem, entry).unwrap();
+        assert_eq!(
+            state.current_state(),
+            &TrapState {
+                action,
+                origin: Origin::User(origin),
+                pending: false,
+            }
+        );
+        assert_eq!(state.parent_state(), None);
+        assert_eq!(state.internal_disposition(), Disposition::Default);
+    }
+
+    #[test]
+    fn insertion_with_non_signal_condition() {
+        let mut map = BTreeMap::new();
+        let entry = map.entry(Condition::Exit);
+        let state = GrandState::insert_from_system_if_vacant(&UnusedSystem, entry).unwrap();
+        assert_eq!(
+            state.current_state(),
+            &TrapState {
+                action: Action::Default,
+                origin: Origin::Inherited,
+                pending: false,
+            }
+        );
+        assert_eq!(state.parent_state(), None);
+        assert_eq!(state.internal_disposition(), Disposition::Default);
+    }
 
     #[test]
     fn setting_trap_to_ignore_without_override_ignore() {

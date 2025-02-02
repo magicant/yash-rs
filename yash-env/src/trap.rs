@@ -129,11 +129,15 @@ impl TrapSet {
     /// currently configured trap action, and the second is the action set
     /// before [`enter_subshell`](Self::enter_subshell) was called.
     ///
-    /// The current state (the first return value) is `None` if no trap action
-    /// has been set for the condition and the signal disposition is not yet
-    /// known. The parent state (the second return value) is `None` if the
-    /// shell environment has not entered a subshell or a trap action has been
-    /// modified after entering a subshell.
+    /// The current state (the first return value) is `None` if the state is
+    /// unknown (because no trap action or internal disposition has been set for
+    /// the signal specified by the condition). To get the current signal
+    /// disposition in this case, use [`peek_state`](Self::peek_state).
+    ///
+    /// The parent state (the second return value) is `None` if the
+    /// shell environment has not [entered a subshell](Self::enter_subshell) or
+    /// a [trap action has been modified](Self::set_action) after entering the
+    /// subshell.
     pub fn get_state<C: Into<Condition>>(
         &self,
         cond: C,
@@ -146,6 +150,41 @@ impl TrapSet {
             None => (None, None),
             Some(state) => (Some(state.current_state()), state.parent_state()),
         }
+    }
+
+    /// Returns the current state for a condition.
+    ///
+    /// This function returns the trap action for the specified condition that
+    /// is to be included in the output of the `trap` built-in.
+    ///
+    /// If the current state is not yet known (because no trap action or
+    /// internal disposition has been set for the signal specified by the
+    /// condition), it calls [`SignalSystem::get_disposition`] to get the
+    /// current signal disposition and saves it as the current state.
+    ///
+    /// If the shell environment has [entered a subshell](Self::enter_subshell)
+    /// and no [trap action has been modified](Self::set_action) after entering
+    /// the subshell, the state that was active before entering the subshell is
+    /// returned.
+    ///
+    /// See also [`get_state`](Self::get_state), which returns `None` if the
+    /// current state is not yet known.
+    pub fn peek_state<S: SignalSystem, C: Into<Condition>>(
+        &mut self,
+        system: &S,
+        cond: C,
+    ) -> Result<&TrapState, Errno> {
+        self.peek_state_impl(system, cond.into())
+    }
+
+    fn peek_state_impl<S: SignalSystem>(
+        &mut self,
+        system: &S,
+        cond: Condition,
+    ) -> Result<&TrapState, Errno> {
+        let entry = self.traps.entry(cond);
+        let state = GrandState::insert_from_system_if_vacant(system, entry)?;
+        Ok(state.parent_state().unwrap_or(state.current_state()))
     }
 
     /// Sets a trap action for a condition.
@@ -210,6 +249,12 @@ impl TrapSet {
     /// The iterator yields tuples of the signal, the currently configured trap
     /// action, and the action set before
     /// [`enter_subshell`](Self::enter_subshell) was called.
+    ///
+    /// The iterator only emits conditions for which a trap action has been
+    /// [set](Self::set_action) or [peeked](Self::peek_state). In other words,
+    /// it does not include conditions for which the current state is not yet
+    /// known. To get the state for all conditions, use
+    /// [`peek_state`](Self::peek_state) for each condition.
     #[inline]
     pub fn iter(&self) -> Iter<'_> {
         let inner = self.traps.iter();
@@ -555,6 +600,59 @@ mod tests {
         assert_eq!(result, Err(SetActionError::SIGSTOP));
         assert_eq!(trap_set.get_state(SIGSTOP), (None, None));
         assert_eq!(system.0.get(&SIGSTOP), None);
+    }
+
+    #[test]
+    fn peeking_state_with_default_inherited_disposition() {
+        let system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let result = trap_set.peek_state(&system, SIGCHLD);
+        assert_eq!(
+            result,
+            Ok(&TrapState {
+                action: Action::Default,
+                origin: Origin::Inherited,
+                pending: false
+            })
+        );
+    }
+
+    #[test]
+    fn peeking_state_with_inherited_disposition_of_ignore() {
+        let mut system = DummySystem::default();
+        system.0.insert(SIGCHLD, Disposition::Ignore);
+        let mut trap_set = TrapSet::default();
+        let result = trap_set.peek_state(&system, SIGCHLD);
+        assert_eq!(
+            result,
+            Ok(&TrapState {
+                action: Action::Ignore,
+                origin: Origin::Inherited,
+                pending: false
+            })
+        );
+    }
+
+    #[test]
+    fn peeking_state_with_parent_state() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let origin = Location::dummy("foo");
+        let command = Action::Command("echo".into());
+        trap_set
+            .set_action(&mut system, SIGUSR1, command.clone(), origin.clone(), false)
+            .unwrap();
+        trap_set.enter_subshell(&mut system, false, false);
+
+        let result = trap_set.peek_state(&system, SIGUSR1);
+        assert_eq!(
+            result,
+            Ok(&TrapState {
+                action: command,
+                origin: Origin::User(origin),
+                pending: false
+            })
+        );
     }
 
     #[test]
