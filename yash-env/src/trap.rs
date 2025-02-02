@@ -101,16 +101,16 @@ pub struct Iter<'a> {
 }
 
 impl<'a> Iterator for Iter<'a> {
-    type Item = (&'a Condition, Option<&'a TrapState>, Option<&'a TrapState>);
+    /// Type of items yielded by this iterator
+    ///
+    /// Each item is a tuple of a condition, the currently configured trap state,
+    /// and the parent state that was active before entering a subshell.
+    type Item = (&'a Condition, &'a TrapState, Option<&'a TrapState>);
 
-    fn next(&mut self) -> Option<(&'a Condition, Option<&'a TrapState>, Option<&'a TrapState>)> {
-        loop {
-            let (cond, state) = self.inner.next()?;
-            let (current, parent) = state.get_state();
-            if current.is_some() || parent.is_some() {
-                return Some((cond, current, parent));
-            }
-        }
+    fn next(&mut self) -> Option<(&'a Condition, &'a TrapState, Option<&'a TrapState>)> {
+        self.inner
+            .next()
+            .map(|(cond, state)| (cond, state.current_state(), state.parent_state()))
     }
 }
 
@@ -144,7 +144,7 @@ impl TrapSet {
     fn get_state_impl(&self, cond: Condition) -> (Option<&TrapState>, Option<&TrapState>) {
         match self.traps.get(&cond) {
             None => (None, None),
-            Some(state) => state.get_state(),
+            Some(state) => (Some(state.current_state()), state.parent_state()),
         }
     }
 
@@ -426,7 +426,11 @@ impl TrapSet {
 }
 
 impl<'a> IntoIterator for &'a TrapSet {
-    type Item = (&'a Condition, Option<&'a TrapState>, Option<&'a TrapState>);
+    /// Type of items yielded by this iterator
+    ///
+    /// Each item is a tuple of a condition, the currently configured trap state,
+    /// and the parent state that was active before entering a subshell.
+    type Item = (&'a Condition, &'a TrapState, Option<&'a TrapState>);
     type IntoIter = Iter<'a>;
 
     #[inline(always)]
@@ -582,13 +586,13 @@ mod tests {
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
         assert_eq!(first.0, &Condition::Signal(SIGUSR1));
-        assert_eq!(first.1.unwrap().action, Action::Ignore);
-        assert_eq!(first.1.unwrap().origin, Origin::User(origin_1));
+        assert_eq!(first.1.action, Action::Ignore);
+        assert_eq!(first.1.origin, Origin::User(origin_1));
         assert_eq!(first.2, None);
         let second = i.next().unwrap();
         assert_eq!(second.0, &Condition::Signal(SIGUSR2));
-        assert_eq!(second.1.unwrap().action, command);
-        assert_eq!(second.1.unwrap().origin, Origin::User(origin_2));
+        assert_eq!(second.1.action, command);
+        assert_eq!(second.1.origin, Origin::User(origin_2));
         assert_eq!(first.2, None);
         assert_eq!(i.next(), None);
     }
@@ -623,13 +627,13 @@ mod tests {
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
         assert_eq!(first.0, &Condition::Signal(SIGUSR1));
-        assert_eq!(first.1.unwrap().action, Action::Ignore);
-        assert_eq!(first.1.unwrap().origin, Origin::User(origin_1));
+        assert_eq!(first.1.action, Action::Ignore);
+        assert_eq!(first.1.origin, Origin::User(origin_1));
         assert_eq!(first.2, None);
         let second = i.next().unwrap();
         assert_eq!(second.0, &Condition::Signal(SIGUSR2));
-        assert_eq!(second.1.unwrap().action, Action::Default);
-        assert_eq!(second.1.unwrap().origin, Origin::Subshell);
+        assert_eq!(second.1.action, Action::Default);
+        assert_eq!(second.1.origin, Origin::Subshell);
         assert_eq!(second.2.unwrap().action, command);
         assert_eq!(second.2.unwrap().origin, Origin::User(origin_2));
         assert_eq!(i.next(), None);
@@ -660,13 +664,13 @@ mod tests {
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
         assert_eq!(first.0, &Condition::Signal(SIGUSR1));
-        assert_eq!(first.1.unwrap().action, Action::Default);
-        assert_eq!(first.1.unwrap().origin, Origin::Subshell);
+        assert_eq!(first.1.action, Action::Default);
+        assert_eq!(first.1.origin, Origin::Subshell);
         assert_eq!(first.2, None);
         let second = i.next().unwrap();
         assert_eq!(second.0, &Condition::Signal(SIGUSR2));
-        assert_eq!(second.1.unwrap().action, command);
-        assert_eq!(second.1.unwrap().origin, Origin::User(origin_2));
+        assert_eq!(second.1.action, command);
+        assert_eq!(second.1.origin, Origin::User(origin_2));
         assert_eq!(second.2, None);
         assert_eq!(i.next(), None);
     }

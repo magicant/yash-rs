@@ -156,16 +156,23 @@ pub struct GrandState {
 }
 
 impl GrandState {
-    /// Returns the current and parent trap states.
-    ///
-    /// This function returns a pair of optional trap states. The first is the
-    /// currently configured trap action, and the second is the action set
-    /// before [`enter_subshell`](Self::enter_subshell) was called.
+    /// Returns the current trap state.
+    #[inline]
     #[must_use]
-    pub fn get_state(&self) -> (Option<&TrapState>, Option<&TrapState>) {
-        let current = Some(&self.current_state);
-        let parent = self.parent_state.as_ref();
-        (current, parent)
+    pub fn current_state(&self) -> &TrapState {
+        &self.current_state
+    }
+
+    /// Returns the parent trap state.
+    ///
+    /// This is the trap state that was effective in the parent environment
+    /// before the current environment was created as a subshell of the parent.
+    /// Returns `None` if the current environment is not a subshell or the parent
+    /// state was [cleared](Self::clear_parent_state).
+    #[inline]
+    #[must_use]
+    pub fn parent_state(&self) -> Option<&TrapState> {
+        self.parent_state.as_ref()
     }
 
     /// Clears the parent trap state.
@@ -418,16 +425,14 @@ mod tests {
             GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), false);
         assert_eq!(result, Ok(()));
         assert_eq!(
-            map[&SIGCHLD.into()].get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Ignore,
-                    origin: Origin::User(origin),
-                    pending: false
-                }),
-                None
-            )
+            map[&SIGCHLD.into()].current_state(),
+            &TrapState {
+                action: Action::Ignore,
+                origin: Origin::User(origin),
+                pending: false
+            }
         );
+        assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
         assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
     }
 
@@ -442,16 +447,14 @@ mod tests {
             GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), true);
         assert_eq!(result, Ok(()));
         assert_eq!(
-            map[&SIGCHLD.into()].get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Ignore,
-                    origin: Origin::User(origin),
-                    pending: false
-                }),
-                None
-            )
+            map[&SIGCHLD.into()].current_state(),
+            &TrapState {
+                action: Action::Ignore,
+                origin: Origin::User(origin),
+                pending: false
+            }
         );
+        assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
         assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
     }
 
@@ -467,16 +470,14 @@ mod tests {
             GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false);
         assert_eq!(result, Ok(()));
         assert_eq!(
-            map[&SIGCHLD.into()].get_state(),
-            (
-                Some(&TrapState {
-                    action,
-                    origin: Origin::User(origin),
-                    pending: false
-                }),
-                None
-            )
+            map[&SIGCHLD.into()].current_state(),
+            &TrapState {
+                action,
+                origin: Origin::User(origin),
+                pending: false
+            }
         );
+        assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
         assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
     }
 
@@ -494,16 +495,14 @@ mod tests {
             GrandState::set_action(&mut system, entry, Action::Default, origin.clone(), false);
         assert_eq!(result, Ok(()));
         assert_eq!(
-            map[&SIGCHLD.into()].get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Default,
-                    origin: Origin::User(origin),
-                    pending: false
-                }),
-                None
-            )
+            map[&SIGCHLD.into()].current_state(),
+            &TrapState {
+                action: Action::Default,
+                origin: Origin::User(origin),
+                pending: false
+            }
         );
+        assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
         assert_eq!(system.0[&SIGCHLD], Disposition::Default);
     }
 
@@ -524,16 +523,14 @@ mod tests {
         assert_eq!(result, Err(SetActionError::InitiallyIgnored));
 
         assert_eq!(
-            map[&SIGCHLD.into()].get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Ignore,
-                    origin: Origin::Inherited,
-                    pending: false
-                }),
-                None
-            )
+            map[&SIGCHLD.into()].current_state(),
+            &TrapState {
+                action: Action::Ignore,
+                origin: Origin::Inherited,
+                pending: false
+            }
         );
+        assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
         assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
     }
 
@@ -548,16 +545,14 @@ mod tests {
             GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), true);
         assert_eq!(result, Ok(()));
         assert_eq!(
-            map[&SIGCHLD.into()].get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Ignore,
-                    origin: Origin::User(origin),
-                    pending: false
-                }),
-                None
-            )
+            map[&SIGCHLD.into()].current_state(),
+            &TrapState {
+                action: Action::Ignore,
+                origin: Origin::User(origin),
+                pending: false
+            }
         );
+        assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
         assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
     }
 
@@ -574,16 +569,14 @@ mod tests {
             Disposition::Ignore
         );
         assert_eq!(
-            map[&SIGCHLD.into()].get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Default,
-                    origin: Origin::Inherited,
-                    pending: false
-                }),
-                None
-            )
+            map[&SIGCHLD.into()].current_state(),
+            &TrapState {
+                action: Action::Default,
+                origin: Origin::Inherited,
+                pending: false
+            }
         );
+        assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
         assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
     }
 
@@ -600,16 +593,14 @@ mod tests {
             Disposition::Catch
         );
         assert_eq!(
-            map[&SIGCHLD.into()].get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Default,
-                    origin: Origin::Inherited,
-                    pending: false
-                }),
-                None
-            )
+            map[&SIGCHLD.into()].current_state(),
+            &TrapState {
+                action: Action::Default,
+                origin: Origin::Inherited,
+                pending: false
+            }
         );
+        assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
         assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
     }
 
@@ -628,10 +619,15 @@ mod tests {
             map[&SIGCHLD.into()].internal_disposition(),
             Disposition::Catch
         );
-        assert_matches!(map[&SIGCHLD.into()].get_state(), (Some(state), None) => {
-            assert_eq!(state.action, Action::Ignore);
-            assert_eq!(state.origin, Origin::User(origin));
-        });
+        assert_eq!(
+            map[&SIGCHLD.into()].current_state(),
+            &TrapState {
+                action: Action::Ignore,
+                origin: Origin::User(origin),
+                pending: false
+            }
+        );
+        assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
         assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
     }
 
@@ -651,10 +647,15 @@ mod tests {
             map[&SIGCHLD.into()].internal_disposition(),
             Disposition::Ignore
         );
-        assert_matches!(map[&SIGCHLD.into()].get_state(), (Some(state), None) => {
-            assert_eq!(state.action, action);
-            assert_eq!(state.origin, Origin::User(origin));
-        });
+        assert_eq!(
+            map[&SIGCHLD.into()].current_state(),
+            &TrapState {
+                action,
+                origin: Origin::User(origin),
+                pending: false
+            }
+        );
+        assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
         assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
     }
 
@@ -676,16 +677,14 @@ mod tests {
             Disposition::Ignore
         );
         assert_eq!(
-            map[&SIGTTOU.into()].get_state(),
-            (
-                Some(&TrapState {
-                    action,
-                    origin: Origin::User(origin),
-                    pending: false
-                }),
-                None
-            )
+            map[&SIGTTOU.into()].current_state(),
+            &TrapState {
+                action,
+                origin: Origin::User(origin),
+                pending: false
+            }
         );
+        assert_eq!(map[&SIGTTOU.into()].parent_state(), None);
         assert_eq!(system.0[&SIGTTOU], Disposition::Catch);
     }
 
@@ -705,16 +704,14 @@ mod tests {
         assert_eq!(result, Err(SetActionError::InitiallyIgnored));
         assert_eq!(map[&cond].internal_disposition(), Disposition::Ignore);
         assert_eq!(
-            map[&cond].get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Ignore,
-                    origin: Origin::Inherited,
-                    pending: false
-                }),
-                None
-            )
+            map[&cond].current_state(),
+            &TrapState {
+                action: Action::Ignore,
+                origin: Origin::Inherited,
+                pending: false
+            }
         );
+        assert_eq!(map[&cond].parent_state(), None);
         assert_eq!(system.0[&SIGTTOU], Disposition::Ignore);
     }
 
@@ -734,16 +731,14 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(map[&cond].internal_disposition(), Disposition::Catch);
         assert_eq!(
-            map[&cond].get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Default,
-                    origin: Origin::Inherited,
-                    pending: false
-                }),
-                None
-            )
+            map[&cond].current_state(),
+            &TrapState {
+                action: Action::Default,
+                origin: Origin::Inherited,
+                pending: false
+            }
         );
+        assert_eq!(map[&cond].parent_state(), None);
         assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
     }
 
@@ -763,16 +758,14 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(map[&cond].internal_disposition(), Disposition::Default);
         assert_eq!(
-            map[&cond].get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Default,
-                    origin: Origin::Inherited,
-                    pending: false
-                }),
-                None
-            )
+            map[&cond].current_state(),
+            &TrapState {
+                action: Action::Default,
+                origin: Origin::Inherited,
+                pending: false
+            }
         );
+        assert_eq!(map[&cond].parent_state(), None);
         assert_eq!(system.0[&SIGCHLD], Disposition::Default);
     }
 
@@ -793,16 +786,14 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(map[&cond].internal_disposition(), Disposition::Default);
         assert_eq!(
-            map[&cond].get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Ignore,
-                    origin: Origin::User(origin),
-                    pending: false
-                }),
-                None
-            )
+            map[&cond].current_state(),
+            &TrapState {
+                action: Action::Ignore,
+                origin: Origin::User(origin),
+                pending: false
+            }
         );
+        assert_eq!(map[&cond].parent_state(), None);
         assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
     }
 
@@ -825,16 +816,14 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(map[&cond].internal_disposition(), Disposition::Default);
         assert_eq!(
-            map[&cond].get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Ignore,
-                    origin: Origin::User(origin),
-                    pending: false
-                }),
-                None
-            )
+            map[&cond].current_state(),
+            &TrapState {
+                action: Action::Ignore,
+                origin: Origin::User(origin),
+                pending: false
+            }
         );
+        assert_eq!(map[&cond].parent_state(), None);
         assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
     }
 
@@ -856,19 +845,20 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(map[&cond].internal_disposition(), Disposition::Default);
         assert_eq!(
-            map[&cond].get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Default,
-                    origin: Origin::Subshell,
-                    pending: false
-                }),
-                Some(&TrapState {
-                    action,
-                    origin: Origin::User(origin),
-                    pending: false
-                }),
-            )
+            map[&cond].current_state(),
+            &TrapState {
+                action: Action::Default,
+                origin: Origin::Subshell,
+                pending: false
+            }
+        );
+        assert_eq!(
+            map[&cond].parent_state(),
+            Some(&TrapState {
+                action,
+                origin: Origin::User(origin),
+                pending: false
+            })
         );
         assert_eq!(system.0[&SIGCHLD], Disposition::Default);
     }
@@ -893,19 +883,20 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(map[&cond].internal_disposition(), Disposition::Ignore);
         assert_eq!(
-            map[&cond].get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Default,
-                    origin: Origin::Subshell,
-                    pending: false
-                }),
-                Some(&TrapState {
-                    action,
-                    origin: Origin::User(origin),
-                    pending: false
-                }),
-            )
+            map[&cond].current_state(),
+            &TrapState {
+                action: Action::Default,
+                origin: Origin::Subshell,
+                pending: false
+            }
+        );
+        assert_eq!(
+            map[&cond].parent_state(),
+            Some(&TrapState {
+                action,
+                origin: Origin::User(origin),
+                pending: false
+            })
         );
         assert_eq!(system.0[&SIGTSTP], Disposition::Ignore);
     }
@@ -930,19 +921,20 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(map[&cond].internal_disposition(), Disposition::Default);
         assert_eq!(
-            map[&cond].get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Default,
-                    origin: Origin::Subshell,
-                    pending: false
-                }),
-                Some(&TrapState {
-                    action,
-                    origin: Origin::User(origin),
-                    pending: false
-                }),
-            )
+            map[&cond].current_state(),
+            &TrapState {
+                action: Action::Default,
+                origin: Origin::Subshell,
+                pending: false
+            }
+        );
+        assert_eq!(
+            map[&cond].parent_state(),
+            Some(&TrapState {
+                action,
+                origin: Origin::User(origin),
+                pending: false
+            })
         );
         assert_eq!(system.0[&SIGTSTP], Disposition::Default);
     }
@@ -965,19 +957,20 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(map[&cond].internal_disposition(), Disposition::Default);
         assert_eq!(
-            map[&cond].get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Ignore,
-                    origin: Origin::Subshell,
-                    pending: false
-                }),
-                Some(&TrapState {
-                    action,
-                    origin: Origin::User(origin),
-                    pending: false
-                }),
-            )
+            map[&cond].current_state(),
+            &TrapState {
+                action: Action::Ignore,
+                origin: Origin::Subshell,
+                pending: false
+            }
+        );
+        assert_eq!(
+            map[&cond].parent_state(),
+            Some(&TrapState {
+                action,
+                origin: Origin::User(origin),
+                pending: false
+            })
         );
         assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
     }
@@ -993,16 +986,14 @@ mod tests {
         let result = GrandState::ignore(&mut system, vacant);
         assert_eq!(result, Ok(()));
         assert_eq!(
-            map[&cond].get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Ignore,
-                    origin: Origin::Subshell,
-                    pending: false
-                }),
-                None
-            )
+            map[&cond].current_state(),
+            &TrapState {
+                action: Action::Ignore,
+                origin: Origin::Subshell,
+                pending: false
+            }
         );
+        assert_eq!(map[&cond].parent_state(), None);
         assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
 
         let entry = map.entry(cond);
@@ -1024,16 +1015,14 @@ mod tests {
         let result = GrandState::ignore(&mut system, vacant);
         assert_eq!(result, Ok(()));
         assert_eq!(
-            map[&cond].get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Ignore,
-                    origin: Origin::Inherited,
-                    pending: false
-                }),
-                None
-            )
+            map[&cond].current_state(),
+            &TrapState {
+                action: Action::Ignore,
+                origin: Origin::Inherited,
+                pending: false
+            }
         );
+        assert_eq!(map[&cond].parent_state(), None);
         assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
 
         let entry = map.entry(cond);
@@ -1063,16 +1052,14 @@ mod tests {
 
         state.clear_parent_state();
         assert_eq!(
-            state.get_state(),
-            (
-                Some(&TrapState {
-                    action: Action::Default,
-                    origin: Origin::Subshell,
-                    pending: false
-                }),
-                None
-            )
+            state.current_state(),
+            &TrapState {
+                action: Action::Default,
+                origin: Origin::Subshell,
+                pending: false
+            }
         );
+        assert_eq!(state.parent_state(), None);
     }
 
     #[test]
@@ -1092,7 +1079,8 @@ mod tests {
             origin: Origin::User(origin),
             pending: true,
         };
-        assert_eq!(state.get_state(), (Some(&expected_trap), None));
+        assert_eq!(state.current_state(), &expected_trap);
+        assert_eq!(state.parent_state(), None);
 
         let trap = state.handle_if_caught();
         let expected_trap = TrapState {

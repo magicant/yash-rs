@@ -186,11 +186,7 @@ pub mod syntax;
 pub fn display_traps<S: SignalSystem>(traps: &TrapSet, system: &S) -> String {
     let mut output = String::new();
     for (cond, current, parent) in traps {
-        let trap = match (current, parent) {
-            (_, Some(trap)) => trap,
-            (Some(trap), None) => trap,
-            (None, None) => continue,
-        };
+        let trap = parent.unwrap_or(current);
         let command = match &trap.action {
             Action::Default => continue,
             Action::Ignore => "",

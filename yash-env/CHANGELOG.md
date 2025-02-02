@@ -37,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `origin` field of the `trap::TrapState` struct is now `trap::Origin`.
 - The `TrapSet::get_state` method now returns a `TrapState` reference even if
   the current action was not set by the user.
+- The `trap::Iter` iterator now yields
+  `(&'a Condition, &'a TrapState, Option<&'a TrapState>)` instead of
+  `(&'a Condition, Option<&'a TrapState>, Option<&'a TrapState>)`.
+  It now yields the current state even if the current action was not set by the
+  user.
 - External dependency versions:
     - yash-syntax 0.13.0 → 0.14.0
 
