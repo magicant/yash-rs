@@ -113,7 +113,11 @@ impl TrapState {
         let action = match disposition {
             Disposition::Default => Action::Default,
             Disposition::Ignore => Action::Ignore,
-            Disposition::Catch => panic!("initial disposition cannot be `Catch`"),
+            // The Rust runtime installs a handler for SIGSEGV and SIGBUS before
+            // the shell is initialized. We should treat these signals as if
+            // they have the default disposition.
+            // Disposition::Catch => panic!("initial disposition cannot be `Catch`"),
+            Disposition::Catch => Action::Default,
         };
         TrapState {
             action,
@@ -400,7 +404,12 @@ impl GrandState {
         let origin = match initial_disposition {
             Disposition::Default => Origin::Subshell,
             Disposition::Ignore => Origin::Inherited,
-            Disposition::Catch => panic!("initial disposition cannot be `Catch`"),
+            // The Rust runtime installs a handler for SIGSEGV and SIGBUS before
+            // the shell is initialized. We should treat these signals as if
+            // they have the default disposition (though the ignore function is
+            // normally not called for these signals).
+            // Disposition::Catch => panic!("initial disposition cannot be `Catch`"),
+            Disposition::Catch => Origin::Subshell,
         };
         vacant.insert(GrandState {
             current_state: TrapState {
