@@ -23,7 +23,7 @@ jobs:
     - name: Run basic tests
       run: ./check.sh -v
     - name: Run scripted tests as root
-      run: sudo cargo test --package yash-cli --test scripted_test
+      run: sudo `which cargo` test --package yash-cli --test scripted_test
   clippy:
     runs-on: ubuntu-latest
     steps:
