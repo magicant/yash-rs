@@ -632,6 +632,11 @@ impl System for VirtualSystem {
         Ok(())
     }
 
+    fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
+        let process = self.current_process();
+        Ok(process.disposition(signal))
+    }
+
     fn sigaction(
         &mut self,
         signal: signal::Number,

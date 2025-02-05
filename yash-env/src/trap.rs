@@ -37,7 +37,7 @@ mod cond;
 mod state;
 
 pub use self::cond::Condition;
-pub use self::state::{Action, SetActionError, TrapState};
+pub use self::state::{Action, Origin, SetActionError, TrapState};
 use self::state::{EnterSubshellOption, GrandState};
 use crate::signal;
 use crate::system::{Disposition, Errno};
@@ -74,6 +74,13 @@ pub trait SignalSystem {
     #[must_use]
     fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number>;
 
+    /// Returns the current disposition for a signal.
+    ///
+    /// This function returns the current disposition for the specified signal like
+    /// [`set_disposition`](Self::set_disposition) does, but does not change the
+    /// disposition.
+    fn get_disposition(&self, signal: signal::Number) -> Result<Disposition, Errno>;
+
     /// Sets how a signal is handled.
     ///
     /// This function updates the signal blocking mask and the disposition for
@@ -94,16 +101,16 @@ pub struct Iter<'a> {
 }
 
 impl<'a> Iterator for Iter<'a> {
-    type Item = (&'a Condition, Option<&'a TrapState>, Option<&'a TrapState>);
+    /// Type of items yielded by this iterator
+    ///
+    /// Each item is a tuple of a condition, the currently configured trap state,
+    /// and the parent state that was active before entering a subshell.
+    type Item = (&'a Condition, &'a TrapState, Option<&'a TrapState>);
 
-    fn next(&mut self) -> Option<(&'a Condition, Option<&'a TrapState>, Option<&'a TrapState>)> {
-        loop {
-            let (cond, state) = self.inner.next()?;
-            let (current, parent) = state.get_state();
-            if current.is_some() || parent.is_some() {
-                return Some((cond, current, parent));
-            }
-        }
+    fn next(&mut self) -> Option<(&'a Condition, &'a TrapState, Option<&'a TrapState>)> {
+        self.inner
+            .next()
+            .map(|(cond, state)| (cond, state.current_state(), state.parent_state()))
     }
 }
 
@@ -116,14 +123,21 @@ pub struct TrapSet {
 }
 
 impl TrapSet {
-    /// Returns the current state for a condition.
+    /// Returns the current and parent states for a condition.
     ///
     /// This function returns a pair of optional trap states. The first is the
     /// currently configured trap action, and the second is the action set
     /// before [`enter_subshell`](Self::enter_subshell) was called.
     ///
-    /// This function does not reflect the initial signal actions the shell
-    /// inherited on startup.
+    /// The current state (the first return value) is `None` if the state is
+    /// unknown (because no trap action or internal disposition has been set for
+    /// the signal specified by the condition). To get the current signal
+    /// disposition in this case, use [`peek_state`](Self::peek_state).
+    ///
+    /// The parent state (the second return value) is `None` if the
+    /// shell environment has not [entered a subshell](Self::enter_subshell) or
+    /// a [trap action has been modified](Self::set_action) after entering the
+    /// subshell.
     pub fn get_state<C: Into<Condition>>(
         &self,
         cond: C,
@@ -134,8 +148,43 @@ impl TrapSet {
     fn get_state_impl(&self, cond: Condition) -> (Option<&TrapState>, Option<&TrapState>) {
         match self.traps.get(&cond) {
             None => (None, None),
-            Some(state) => state.get_state(),
+            Some(state) => (Some(state.current_state()), state.parent_state()),
         }
+    }
+
+    /// Returns the current state for a condition.
+    ///
+    /// This function returns the trap action for the specified condition that
+    /// is to be included in the output of the `trap` built-in.
+    ///
+    /// If the current state is not yet known (because no trap action or
+    /// internal disposition has been set for the signal specified by the
+    /// condition), it calls [`SignalSystem::get_disposition`] to get the
+    /// current signal disposition and saves it as the current state.
+    ///
+    /// If the shell environment has [entered a subshell](Self::enter_subshell)
+    /// and no [trap action has been modified](Self::set_action) after entering
+    /// the subshell, the state that was active before entering the subshell is
+    /// returned.
+    ///
+    /// See also [`get_state`](Self::get_state), which returns `None` if the
+    /// current state is not yet known.
+    pub fn peek_state<S: SignalSystem, C: Into<Condition>>(
+        &mut self,
+        system: &S,
+        cond: C,
+    ) -> Result<&TrapState, Errno> {
+        self.peek_state_impl(system, cond.into())
+    }
+
+    fn peek_state_impl<S: SignalSystem>(
+        &mut self,
+        system: &S,
+        cond: Condition,
+    ) -> Result<&TrapState, Errno> {
+        let entry = self.traps.entry(cond);
+        let state = GrandState::insert_from_system_if_vacant(system, entry)?;
+        Ok(state.parent_state().unwrap_or(state.current_state()))
     }
 
     /// Sets a trap action for a condition.
@@ -183,15 +232,15 @@ impl TrapSet {
             }
         }
 
-        self.clear_parent_settings();
+        self.clear_parent_states();
 
         let entry = self.traps.entry(cond);
         GrandState::set_action(system, entry, action, origin, override_ignore)
     }
 
-    fn clear_parent_settings(&mut self) {
+    fn clear_parent_states(&mut self) {
         for state in self.traps.values_mut() {
-            state.clear_parent_setting();
+            state.clear_parent_state();
         }
     }
 
@@ -200,6 +249,12 @@ impl TrapSet {
     /// The iterator yields tuples of the signal, the currently configured trap
     /// action, and the action set before
     /// [`enter_subshell`](Self::enter_subshell) was called.
+    ///
+    /// The iterator only emits conditions for which a trap action has been
+    /// [set](Self::set_action) or [peeked](Self::peek_state). In other words,
+    /// it does not include conditions for which the current state is not yet
+    /// known. To get the state for all conditions, use
+    /// [`peek_state`](Self::peek_state) for each condition.
     #[inline]
     pub fn iter(&self) -> Iter<'_> {
         let inner = self.traps.iter();
@@ -247,7 +302,7 @@ impl TrapSet {
         ignore_sigint_sigquit: bool,
         keep_internal_dispositions_for_stoppers: bool,
     ) {
-        self.clear_parent_settings();
+        self.clear_parent_states();
 
         for (&cond, state) in &mut self.traps {
             let option = match cond {
@@ -416,7 +471,11 @@ impl TrapSet {
 }
 
 impl<'a> IntoIterator for &'a TrapSet {
-    type Item = (&'a Condition, Option<&'a TrapState>, Option<&'a TrapState>);
+    /// Type of items yielded by this iterator
+    ///
+    /// Each item is a tuple of a condition, the currently configured trap state,
+    /// and the parent state that was active before entering a subshell.
+    type Item = (&'a Condition, &'a TrapState, Option<&'a TrapState>);
     type IntoIter = Iter<'a>;
 
     #[inline(always)]
@@ -451,15 +510,16 @@ mod tests {
             VirtualSystem::new().signal_number_from_name(name)
         }
 
+        fn get_disposition(&self, signal: signal::Number) -> Result<Disposition, Errno> {
+            Ok(self.0.get(&signal).copied().unwrap_or_default())
+        }
+
         fn set_disposition(
             &mut self,
             signal: signal::Number,
             disposition: Disposition,
         ) -> Result<Disposition, Errno> {
-            Ok(self
-                .0
-                .insert(signal, disposition)
-                .unwrap_or(Disposition::Default))
+            Ok(self.0.insert(signal, disposition).unwrap_or_default())
         }
     }
 
@@ -499,7 +559,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: Action::Ignore,
-                    origin: origin_1,
+                    origin: Origin::User(origin_1),
                     pending: false
                 }),
                 None
@@ -510,7 +570,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: command,
-                    origin: origin_2,
+                    origin: Origin::User(origin_2),
                     pending: false
                 }),
                 None
@@ -543,6 +603,59 @@ mod tests {
     }
 
     #[test]
+    fn peeking_state_with_default_inherited_disposition() {
+        let system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let result = trap_set.peek_state(&system, SIGCHLD);
+        assert_eq!(
+            result,
+            Ok(&TrapState {
+                action: Action::Default,
+                origin: Origin::Inherited,
+                pending: false
+            })
+        );
+    }
+
+    #[test]
+    fn peeking_state_with_inherited_disposition_of_ignore() {
+        let mut system = DummySystem::default();
+        system.0.insert(SIGCHLD, Disposition::Ignore);
+        let mut trap_set = TrapSet::default();
+        let result = trap_set.peek_state(&system, SIGCHLD);
+        assert_eq!(
+            result,
+            Ok(&TrapState {
+                action: Action::Ignore,
+                origin: Origin::Inherited,
+                pending: false
+            })
+        );
+    }
+
+    #[test]
+    fn peeking_state_with_parent_state() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let origin = Location::dummy("foo");
+        let command = Action::Command("echo".into());
+        trap_set
+            .set_action(&mut system, SIGUSR1, command.clone(), origin.clone(), false)
+            .unwrap();
+        trap_set.enter_subshell(&mut system, false, false);
+
+        let result = trap_set.peek_state(&system, SIGUSR1);
+        assert_eq!(
+            result,
+            Ok(&TrapState {
+                action: command,
+                origin: Origin::User(origin),
+                pending: false
+            })
+        );
+    }
+
+    #[test]
     fn basic_iteration() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
@@ -571,13 +684,13 @@ mod tests {
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
         assert_eq!(first.0, &Condition::Signal(SIGUSR1));
-        assert_eq!(first.1.unwrap().action, Action::Ignore);
-        assert_eq!(first.1.unwrap().origin, origin_1);
+        assert_eq!(first.1.action, Action::Ignore);
+        assert_eq!(first.1.origin, Origin::User(origin_1));
         assert_eq!(first.2, None);
         let second = i.next().unwrap();
         assert_eq!(second.0, &Condition::Signal(SIGUSR2));
-        assert_eq!(second.1.unwrap().action, command);
-        assert_eq!(second.1.unwrap().origin, origin_2);
+        assert_eq!(second.1.action, command);
+        assert_eq!(second.1.origin, Origin::User(origin_2));
         assert_eq!(first.2, None);
         assert_eq!(i.next(), None);
     }
@@ -612,14 +725,15 @@ mod tests {
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
         assert_eq!(first.0, &Condition::Signal(SIGUSR1));
-        assert_eq!(first.1.unwrap().action, Action::Ignore);
-        assert_eq!(first.1.unwrap().origin, origin_1);
+        assert_eq!(first.1.action, Action::Ignore);
+        assert_eq!(first.1.origin, Origin::User(origin_1));
         assert_eq!(first.2, None);
         let second = i.next().unwrap();
         assert_eq!(second.0, &Condition::Signal(SIGUSR2));
-        assert_eq!(second.1, None);
+        assert_eq!(second.1.action, Action::Default);
+        assert_eq!(second.1.origin, Origin::Subshell);
         assert_eq!(second.2.unwrap().action, command);
-        assert_eq!(second.2.unwrap().origin, origin_2);
+        assert_eq!(second.2.unwrap().origin, Origin::User(origin_2));
         assert_eq!(i.next(), None);
     }
 
@@ -647,10 +761,15 @@ mod tests {
 
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
-        assert_eq!(first.0, &Condition::Signal(SIGUSR2));
-        assert_eq!(first.1.unwrap().action, command);
-        assert_eq!(first.1.unwrap().origin, origin_2);
+        assert_eq!(first.0, &Condition::Signal(SIGUSR1));
+        assert_eq!(first.1.action, Action::Default);
+        assert_eq!(first.1.origin, Origin::Subshell);
         assert_eq!(first.2, None);
+        let second = i.next().unwrap();
+        assert_eq!(second.0, &Condition::Signal(SIGUSR2));
+        assert_eq!(second.1.action, command);
+        assert_eq!(second.1.origin, Origin::User(origin_2));
+        assert_eq!(second.2, None);
         assert_eq!(i.next(), None);
     }
 
@@ -668,10 +787,14 @@ mod tests {
         assert_eq!(
             trap_set.get_state(SIGCHLD),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Origin::User(origin),
                     pending: false
                 })
             )
@@ -694,7 +817,7 @@ mod tests {
             (
                 Some(&TrapState {
                     action: Action::Ignore,
-                    origin,
+                    origin: Origin::User(origin),
                     pending: false
                 }),
                 None
@@ -720,10 +843,14 @@ mod tests {
         assert_eq!(
             trap_set.get_state(SIGCHLD),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Origin::User(origin),
                     pending: false
                 })
             )
@@ -748,10 +875,14 @@ mod tests {
         assert_eq!(
             trap_set.get_state(SIGINT),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Origin::User(origin),
                     pending: false
                 })
             )
@@ -776,10 +907,14 @@ mod tests {
         assert_eq!(
             trap_set.get_state(SIGTERM),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Origin::User(origin),
                     pending: false
                 })
             )
@@ -804,10 +939,14 @@ mod tests {
         assert_eq!(
             trap_set.get_state(SIGQUIT),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Origin::User(origin),
                     pending: false
                 })
             )
@@ -832,10 +971,14 @@ mod tests {
         assert_eq!(
             trap_set.get_state(SIGTSTP),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Origin::User(origin),
                     pending: false
                 })
             )
@@ -860,10 +1003,14 @@ mod tests {
         assert_eq!(
             trap_set.get_state(SIGTTIN),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Origin::User(origin),
                     pending: false
                 })
             )
@@ -888,10 +1035,14 @@ mod tests {
         assert_eq!(
             trap_set.get_state(SIGTTOU),
             (
-                None,
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
                 Some(&TrapState {
                     action,
-                    origin,
+                    origin: Origin::User(origin),
                     pending: false
                 })
             )
@@ -932,13 +1083,23 @@ mod tests {
             (
                 Some(&TrapState {
                     action: command,
-                    origin: origin_3,
+                    origin: Origin::User(origin_3),
                     pending: false
                 }),
                 None
             )
         );
-        assert_eq!(trap_set.get_state(SIGUSR2), (None, None));
+        assert_eq!(
+            trap_set.get_state(SIGUSR2),
+            (
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
+                None
+            )
+        );
         assert_eq!(system.0[&SIGUSR1], Disposition::Catch);
         assert_eq!(system.0[&SIGUSR2], Disposition::Default);
     }
@@ -960,8 +1121,28 @@ mod tests {
         trap_set.enter_subshell(&mut system, false, false);
         trap_set.enter_subshell(&mut system, false, false);
 
-        assert_eq!(trap_set.get_state(SIGUSR1), (None, None));
-        assert_eq!(trap_set.get_state(SIGUSR2), (None, None));
+        assert_eq!(
+            trap_set.get_state(SIGUSR1),
+            (
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
+                None
+            )
+        );
+        assert_eq!(
+            trap_set.get_state(SIGUSR2),
+            (
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin: Origin::Subshell,
+                    pending: false
+                }),
+                None
+            )
+        );
         assert_eq!(system.0[&SIGUSR1], Disposition::Default);
         assert_eq!(system.0[&SIGUSR2], Disposition::Default);
     }
@@ -1418,7 +1599,7 @@ mod tests {
                 (
                     Some(&TrapState {
                         action: Action::Ignore,
-                        origin,
+                        origin: Origin::User(origin),
                         pending: false
                     }),
                     None
@@ -1436,7 +1617,7 @@ mod tests {
                 (
                     Some(&TrapState {
                         action: Action::Ignore,
-                        origin,
+                        origin: Origin::User(origin),
                         pending: false
                     }),
                     None
@@ -1472,7 +1653,7 @@ mod tests {
                 (
                     Some(&TrapState {
                         action: Action::Ignore,
-                        origin: origin.clone(),
+                        origin: Origin::User(origin.clone()),
                         pending: false
                     }),
                     None

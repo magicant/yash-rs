@@ -21,6 +21,7 @@ use super::state::Action;
 use super::SignalSystem;
 use crate::signal;
 use std::borrow::Cow;
+use std::num::NonZero;
 
 /// Condition under which an [`Action`] is executed
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -74,5 +75,40 @@ impl Condition {
             Self::Exit => Cow::Borrowed("EXIT"),
             Self::Signal(number) => system.signal_name_from_number(*number).as_string(),
         }
+    }
+
+    /// Returns an iterator over all possible conditions.
+    ///
+    /// The iterator yields all the conditions supported by the given signal
+    /// system in the following order:
+    ///
+    /// 1. [`Condition::Exit`]
+    /// 2. Non-real-time signals
+    /// 3. Real-time signals
+    // TODO Most part of this function is duplicated from yash_builtin::kill::print::all_signals.
+    // Consider refactoring to share the code. Note that all_signals requires a System
+    // while this function requires a SignalSystem.
+    pub fn iter<S: SignalSystem>(system: &S) -> impl Iterator<Item = Condition> + '_ {
+        let exit = std::iter::once(Condition::Exit);
+
+        let non_real_time = signal::Name::iter()
+            .filter(|name| !matches!(name, signal::Name::Rtmin(_) | signal::Name::Rtmax(_)))
+            .filter_map(|name| Some(Condition::Signal(system.signal_number_from_name(name)?)));
+
+        let rtmin = system.signal_number_from_name(signal::Name::Rtmin(0));
+        let rtmax = system.signal_number_from_name(signal::Name::Rtmax(0));
+        let range = if let (Some(rtmin), Some(rtmax)) = (rtmin, rtmax) {
+            rtmin.as_raw()..=rtmax.as_raw()
+        } else {
+            #[allow(clippy::reversed_empty_ranges)]
+            {
+                0..=-1
+            }
+        };
+        let real_time = range.into_iter().map(|n| {
+            Condition::Signal(signal::Number::from_raw_unchecked(NonZero::new(n).unwrap()))
+        });
+
+        exit.chain(non_real_time).chain(real_time)
     }
 }

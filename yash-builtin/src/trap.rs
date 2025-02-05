@@ -21,36 +21,49 @@
 //! # Synopsis
 //!
 //! ```sh
-//! trap
+//! trap [action] condition…
 //! ```
 //!
 //! ```sh
-//! trap [action] condition…
+//! trap [-p [condition…]]
 //! ```
 //!
 //! # Description
 //!
+//! The `trap` built-in can be used to either set or print traps.
+//! To set traps, pass an *action* and one or more *condition*s as operands.
+//! To print the currently configured traps, invoke the built-in with no
+//! operands or with the `-p` option.
+//!
+//! ## Setting traps
+//!
+//! When setting traps, the built-in sets the *action* for each *condition* in
+//! the current shell environment. To set different actions for multiple
+//! conditions, use multiple invocations of the built-in.
+//!
+//! ## Printing traps
+//!
 //! When the built-in is invoked with no operands, it prints the currently
 //! configured traps in the format `trap -- action condition` where *action* and
 //! *condition* are properly quoted so that the output can be read by the shell
-//! to restore the traps.
+//! to restore the traps. By default, the built-in prints traps that have
+//! non-default actions. To print all traps, use the `-p` option with no
+//! operands.
+//!
+//! When the `-p` option is used with one or more *condition*s, the built-in
+//! prints the traps for the specified *condition*s.
 //!
 //! When a [subshell](yash_env::subshell) is entered, traps other than
 //! `Action::Ignore` are reset to the default action. This behavior would make
 //! it impossible to save the current traps by using a command substitution as
-//! in `traps=$(trap)`. To avoid this, when the built-in is invoked in a
+//! in `traps=$(trap)`. To make this work, when the built-in is invoked in a
 //! subshell and no traps have been modified in the subshell, it prints the
 //! traps that were configured in the parent shell.
 //!
-//! When operands are given, the built-in sets the trap specified by *action*
-//! and *condition*. When there are more than one *condition*, the built-in sets
-//! the same *action* for all of them.
-//!
 //! # Options
 //!
-//! None.
-//!
-//! (TODO: `-p` option)
+//! The **`-p`** (**`--print`**) option prints the traps configured in the shell
+//! environment.
 //!
 //! # Operands
 //!
@@ -112,6 +125,9 @@
 //! comparison, so you should not expect the shell to recognize complex
 //! expressions such as `cmd=trap; traps=$($cmd)`.
 //!
+//! In other shells, the `EXIT` condition may be triggered when the shell is
+//! terminated by a signal.
+//!
 //! # Implementation notes
 //!
 //! The [`TrapSet`] remembers the traps that were configured in the parent shell
@@ -136,6 +152,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::SharedSystem;
 use yash_env::trap::Action;
+use yash_env::trap::Condition;
 use yash_env::trap::SetActionError;
 use yash_env::trap::SignalSystem;
 use yash_env::trap::TrapSet;
@@ -167,13 +184,11 @@ pub mod syntax;
 /// The returned string is the whole output of the `trap` built-in
 /// without operands, including the trailing newline.
 #[must_use]
-pub fn display_traps<S: SignalSystem>(traps: &TrapSet, system: &S) -> String {
+pub fn display_traps<S: SignalSystem>(traps: &mut TrapSet, system: &S) -> String {
     let mut output = String::new();
-    for (cond, current, parent) in traps {
-        let trap = match (current, parent) {
-            (Some(trap), _) => trap,
-            (None, Some(trap)) => trap,
-            (None, None) => continue,
+    for cond in Condition::iter(system) {
+        let Ok(trap) = traps.peek_state(system, cond) else {
+            continue;
         };
         let command = match &trap.action {
             Action::Default => continue,
@@ -265,7 +280,7 @@ impl Command {
     /// output. On failure, returns a non-empty list of errors.
     pub fn execute(self, env: &mut Env) -> Result<String, Vec<Error>> {
         match self {
-            Self::PrintAll => Ok(display_traps(&env.traps, &env.system)),
+            Self::PrintAll => Ok(display_traps(&mut env.traps, &env.system)),
 
             Self::SetAction { action, conditions } => {
                 let override_ignore = env.options.get(Interactive) == On;
@@ -427,6 +442,21 @@ mod tests {
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
             assert_eq!(stdout, "trap -- echo EXIT\ntrap -- 'echo t' TERM\n")
+        });
+    }
+
+    #[test]
+    fn printing_initially_ignored_trap() {
+        let mut system = VirtualSystem::new();
+        system
+            .current_process_mut()
+            .set_disposition(SIGINT, Disposition::Ignore);
+        let mut env = Env::with_system(Box::new(system.clone()));
+
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
+        assert_stdout(&system.state, |stdout| {
+            assert_eq!(stdout, "trap -- '' INT\n")
         });
     }
 

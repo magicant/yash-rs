@@ -37,6 +37,9 @@ use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 /// Returns an iterator over all supported signals.
 ///
 /// The iterator yields non-real-time signals first, followed by real-time signals.
+// TODO Most part of this function is duplicated in yash_env::trap::Condition::iter.
+// Consider refactoring to avoid duplication. Note that the two functions require
+// different trait bounds.
 fn all_signals<S: System>(system: &S) -> impl Iterator<Item = (Name, Number)> + '_ {
     let non_real_time = Name::iter()
         .filter(|name| !matches!(name, Name::Rtmin(_) | Name::Rtmax(_)))

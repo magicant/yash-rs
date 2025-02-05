@@ -160,6 +160,28 @@ extern "C" fn catch_signal(signal: c_int) {
     }
 }
 
+fn sigaction_impl(signal: signal::Number, disposition: Option<Disposition>) -> Result<Disposition> {
+    let new_action = disposition.map(Disposition::to_sigaction);
+    let new_action_ptr = new_action
+        .as_ref()
+        .map_or(std::ptr::null(), |action| action.as_ptr());
+
+    let mut old_action = MaybeUninit::<libc::sigaction>::uninit();
+    // SAFETY: We're just creating a new raw pointer to the struct field.
+    // Nothing is dereferenced.
+    let old_mask_ptr = unsafe { &raw mut (*old_action.as_mut_ptr()).sa_mask };
+    // POSIX requires *all* sigset_t objects to be initialized before use,
+    // even if they are output parameters.
+    unsafe { libc::sigemptyset(old_mask_ptr) }.errno_if_m1()?;
+
+    unsafe { libc::sigaction(signal.as_raw(), new_action_ptr, old_action.as_mut_ptr()) }
+        .errno_if_m1()?;
+
+    // SAFETY: the `old_action` has been initialized by `sigaction`.
+    let old_disposition = unsafe { Disposition::from_sigaction(&old_action) };
+    Ok(old_disposition)
+}
+
 /// Implementation of `System` that actually interacts with the system.
 ///
 /// `RealSystem` is an empty `struct` because the underlying operating system
@@ -490,25 +512,12 @@ impl System for RealSystem {
         }
     }
 
+    fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
+        sigaction_impl(signal, None)
+    }
+
     fn sigaction(&mut self, signal: signal::Number, handling: Disposition) -> Result<Disposition> {
-        unsafe {
-            let new_action = handling.to_sigaction();
-
-            let mut old_action = MaybeUninit::<libc::sigaction>::uninit();
-            let old_mask_ptr = &raw mut (*old_action.as_mut_ptr()).sa_mask;
-            // POSIX requires *all* sigset_t objects to be initialized before use.
-            libc::sigemptyset(old_mask_ptr).errno_if_m1()?;
-
-            libc::sigaction(
-                signal.as_raw(),
-                new_action.as_ptr(),
-                old_action.as_mut_ptr(),
-            )
-            .errno_if_m1()?;
-
-            let old_handling = Disposition::from_sigaction(&old_action);
-            Ok(old_handling)
-        }
+        sigaction_impl(signal, Some(handling))
     }
 
     fn caught_signals(&mut self) -> Vec<signal::Number> {

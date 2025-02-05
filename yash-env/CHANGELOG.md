@@ -13,9 +13,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `Env` struct now contains the `any` field of type `DataSet`.
     - The `DataSet` struct is defined in the newly added `any` module.
       It can be used to store arbitrary data.
+- The `System` trait now has the `get_sigaction` method.
+    - This method returns the current signal handling configuration for a signal.
+      This method does not modify anything, so it can be used with an immutable
+      reference to the system.
 - The `builtin::Builtin` struct now has the `is_declaration_utility` field.
 - The `builtin::Builtin` struct now can be constructed with the associated
   function `new`.
+- The `trap::Condition` enum now has the `iter` associated function.
+    - Given a `SignalSystem` implementation, this function returns an iterator
+      that yields all the conditions available in the system.
+- The `trap::SignalSystem` trait now has the `get_disposition` method.
+- The `Origin` enum has been added to the `trap` module.
+    - This enum represents the origin of a configured trap.
+- The `trap::TrapSet` struct now implements `Default`.
+- The `trap::TrapSet` struct now has the `peek_state` method.
+    - This method can be used to get the current state of a trap by accessing
+      the underlying system if necessary. It reports the trap state that should
+      be used in the output of the `trap` built-in.
 - The `system::errno::Errno` struct now can be converted to and from the `Errno`
   type from the `errno` crate.
 - Internal dependencies:
@@ -26,6 +41,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `System::getpwnam_dir` now takes a `&CStr` parameter instead of a `&str`.
 - The `builtin::Builtin` struct is now `non_exhaustive`.
+- The `origin` field of the `trap::TrapState` struct is now `trap::Origin`.
+- The `TrapSet::get_state` method now returns a `TrapState` reference even if
+  the current action was not set by the user.
+- The `trap::Iter` iterator now yields
+  `(&'a Condition, &'a TrapState, Option<&'a TrapState>)` instead of
+  `(&'a Condition, Option<&'a TrapState>, Option<&'a TrapState>)`.
+  It now yields the current state even if the current action was not set by the
+  user.
 - External dependency versions:
     - yash-syntax 0.13.0 → 0.14.0
 

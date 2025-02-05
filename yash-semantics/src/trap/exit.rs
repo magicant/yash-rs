@@ -20,6 +20,7 @@ use super::run_trap;
 use std::rc::Rc;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
+use yash_env::trap::Origin;
 use yash_env::Env;
 
 /// Executes the EXIT trap.
@@ -40,7 +41,10 @@ pub async fn run_exit_trap(env: &mut Env) {
     };
 
     let command = Rc::clone(command);
-    let origin = state.origin.clone();
+    let origin = match &state.origin {
+        Origin::Inherited | Origin::Subshell => panic!("user-defined trap must have origin"),
+        Origin::User(location) => location.clone(),
+    };
     let result = run_trap(env, Condition::Exit, command, origin).await;
     env.apply_result(result);
 }

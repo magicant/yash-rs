@@ -24,6 +24,7 @@ use yash_env::signal;
 use yash_env::stack::Frame;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
+use yash_env::trap::Origin;
 #[cfg(doc)]
 use yash_env::trap::TrapSet;
 use yash_env::Env;
@@ -44,7 +45,10 @@ pub async fn run_trap_if_caught(env: &mut Env, signal: signal::Number) -> Option
         return None;
     };
     let code = Rc::clone(command);
-    let origin = trap_state.origin.clone();
+    let origin = match &trap_state.origin {
+        Origin::Inherited | Origin::Subshell => panic!("user-defined trap must have origin"),
+        Origin::User(location) => location.clone(),
+    };
     Some(run_trap(env, signal.into(), code, origin).await)
 }
 
@@ -86,7 +90,10 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
             continue;
         };
         let code = Rc::clone(command);
-        let origin = state.origin.clone();
+        let origin = match &state.origin {
+            Origin::Inherited | Origin::Subshell => panic!("user-defined trap must have origin"),
+            Origin::User(location) => location.clone(),
+        };
         run_trap(env, signal.into(), code, origin).await?;
     }
 

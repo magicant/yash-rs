@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `cd` built-in now errors out when a given operand is an empty string.
 - The `cd` built-in now returns different exit statuses for different errors.
+- The output of the `trap` built-in now includes not only user-defined traps but
+  also signal dispositions that are not explicitly set by the user.
 
 ## [0.2.0] - 2024-12-14
 

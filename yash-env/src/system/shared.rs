@@ -388,6 +388,9 @@ impl System for &SharedSystem {
     ) -> Result<()> {
         (**self.0.borrow_mut()).sigmask(op, old_mask)
     }
+    fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
+        self.0.borrow().get_sigaction(signal)
+    }
     fn sigaction(&mut self, signal: signal::Number, action: Disposition) -> Result<Disposition> {
         self.0.borrow_mut().sigaction(signal, action)
     }
@@ -591,6 +594,10 @@ impl System for SharedSystem {
         (&mut &*self).sigmask(op, old_mask)
     }
     #[inline]
+    fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
+        (&self).get_sigaction(signal)
+    }
+    #[inline]
     fn sigaction(&mut self, signal: signal::Number, action: Disposition) -> Result<Disposition> {
         (&mut &*self).sigaction(signal, action)
     }
@@ -709,6 +716,10 @@ impl SignalSystem for &SharedSystem {
         System::signal_number_from_name(*self, name)
     }
 
+    fn get_disposition(&self, signal: signal::Number) -> Result<Disposition> {
+        self.0.borrow().get_disposition(signal)
+    }
+
     fn set_disposition(
         &mut self,
         signal: signal::Number,
@@ -727,6 +738,11 @@ impl SignalSystem for SharedSystem {
     #[inline]
     fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
         System::signal_number_from_name(self, name)
+    }
+
+    #[inline]
+    fn get_disposition(&self, signal: signal::Number) -> Result<Disposition> {
+        self.0.borrow().get_disposition(signal)
     }
 
     #[inline]
