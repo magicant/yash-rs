@@ -43,6 +43,8 @@ The `cd` built-in now errors out when a given operand is an empty string.
   `EXIT_STATUS_CHDIR_ERROR`.
 - The `cd::assign::new_pwd` function now returns `Result<PathBuf, Errno>` instead
   of `PathBuf`. Previously, it returned an empty `PathBuf` on failure.
+- The output of the `trap` built-in now includes not only user-defined traps but
+  also signal dispositions that are not explicitly set by the user.
 - External dependency versions:
     - yash-env 0.5.0 → 0.6.0
     - yash-semantics 0.5.0 → 0.6.0 (optional)

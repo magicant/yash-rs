@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `builtin::Builtin` struct now has the `is_declaration_utility` field.
 - The `builtin::Builtin` struct now can be constructed with the associated
   function `new`.
+- The `trap::Condition` enum now has the `iter` associated function.
+    - Given a `SignalSystem` implementation, this function returns an iterator
+      that yields all the conditions available in the system.
 - The `trap::SignalSystem` trait now has the `get_disposition` method.
 - The `Origin` enum has been added to the `trap` module.
     - This enum represents the origin of a configured trap.

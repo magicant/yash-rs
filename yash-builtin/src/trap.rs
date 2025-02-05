@@ -152,6 +152,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::SharedSystem;
 use yash_env::trap::Action;
+use yash_env::trap::Condition;
 use yash_env::trap::SetActionError;
 use yash_env::trap::SignalSystem;
 use yash_env::trap::TrapSet;
@@ -183,10 +184,12 @@ pub mod syntax;
 /// The returned string is the whole output of the `trap` built-in
 /// without operands, including the trailing newline.
 #[must_use]
-pub fn display_traps<S: SignalSystem>(traps: &TrapSet, system: &S) -> String {
+pub fn display_traps<S: SignalSystem>(traps: &mut TrapSet, system: &S) -> String {
     let mut output = String::new();
-    for (cond, current, parent) in traps {
-        let trap = parent.unwrap_or(current);
+    for cond in Condition::iter(system) {
+        let Ok(trap) = traps.peek_state(system, cond) else {
+            continue;
+        };
         let command = match &trap.action {
             Action::Default => continue,
             Action::Ignore => "",
@@ -277,7 +280,7 @@ impl Command {
     /// output. On failure, returns a non-empty list of errors.
     pub fn execute(self, env: &mut Env) -> Result<String, Vec<Error>> {
         match self {
-            Self::PrintAll => Ok(display_traps(&env.traps, &env.system)),
+            Self::PrintAll => Ok(display_traps(&mut env.traps, &env.system)),
 
             Self::SetAction { action, conditions } => {
                 let override_ignore = env.options.get(Interactive) == On;
@@ -439,6 +442,21 @@ mod tests {
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
             assert_eq!(stdout, "trap -- echo EXIT\ntrap -- 'echo t' TERM\n")
+        });
+    }
+
+    #[test]
+    fn printing_initially_ignored_trap() {
+        let mut system = VirtualSystem::new();
+        system
+            .current_process_mut()
+            .set_disposition(SIGINT, Disposition::Ignore);
+        let mut env = Env::with_system(Box::new(system.clone()));
+
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
+        assert_stdout(&system.state, |stdout| {
+            assert_eq!(stdout, "trap -- '' INT\n")
         });
     }
 
