@@ -251,6 +251,24 @@ __IN__
 abc
 __OUT__
 
+test_oE -e 0 'without -p, only non-default traps are printed' -e
+trap - USR1
+trap >printed_trap_1 # should not print USR1
+trap 'echo trapped' USR1
+. ./printed_trap_1
+kill -s USR1 $$
+__IN__
+trapped
+__OUT__
+
+test_OE -e USR1 'with -p, all traps are printed' -e
+trap - USR1
+trap -p >printed_trap_2 # should print USR1
+trap 'echo trapped' USR1
+. ./printed_trap_2
+kill -s USR1 $$
+__IN__
+
 echo 'echo "$@"' > ./-
 chmod a+x ./-
 

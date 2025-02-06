@@ -150,6 +150,7 @@ use yash_env::option::Option::Interactive;
 use yash_env::option::State::On;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
+use yash_env::signal::Name::{Kill, Stop};
 use yash_env::system::SharedSystem;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
@@ -168,11 +169,16 @@ use yash_syntax::source::pretty::MessageBase;
 #[non_exhaustive]
 pub enum Command {
     /// Print all traps
-    PrintAll,
+    PrintAll {
+        /// If true, print all traps including ones with the default action
+        include_default: bool,
+    },
 
     /// Set an action for one or more conditions
     SetAction {
+        /// The action to set
         action: Action,
+        /// The conditions for which the action should be set
         conditions: Vec<(CondSpec, Field)>,
     },
 }
@@ -182,15 +188,41 @@ pub mod syntax;
 /// Returns a string that represents the currently configured traps.
 ///
 /// The returned string is the whole output of the `trap` built-in
-/// without operands, including the trailing newline.
+/// used without options or operands, including the trailing newline.
+///
+/// This function is equivalent to [`display_all_traps`] with `include_default`
+/// set to `false`.
 #[must_use]
 pub fn display_traps<S: SignalSystem>(traps: &mut TrapSet, system: &S) -> String {
+    display_all_traps(traps, system, false)
+}
+
+/// Returns a string that represents the currently configured traps.
+///
+/// The returned string is the whole output of the `trap` built-in
+/// used without operands, including the trailing newline.
+///
+/// If `include_default` is `true`, the output includes traps with the default
+/// action. Otherwise, the output includes only traps with non-default actions.
+#[must_use]
+pub fn display_all_traps<S: SignalSystem>(
+    traps: &mut TrapSet,
+    system: &S,
+    include_default: bool,
+) -> String {
     let mut output = String::new();
     for cond in Condition::iter(system) {
+        if let Condition::Signal(number) = cond {
+            let name = system.signal_name_from_number(number);
+            if name == Kill || name == Stop {
+                continue;
+            }
+        }
         let Ok(trap) = traps.peek_state(system, cond) else {
             continue;
         };
         let command = match &trap.action {
+            Action::Default if include_default => "-",
             Action::Default => continue,
             Action::Ignore => "",
             Action::Command(command) => command,
@@ -280,7 +312,11 @@ impl Command {
     /// output. On failure, returns a non-empty list of errors.
     pub fn execute(self, env: &mut Env) -> Result<String, Vec<Error>> {
         match self {
-            Self::PrintAll => Ok(display_traps(&mut env.traps, &env.system)),
+            Self::PrintAll { include_default } => Ok(display_all_traps(
+                &mut env.traps,
+                &env.system,
+                include_default,
+            )),
 
             Self::SetAction { action, conditions } => {
                 let override_ignore = env.options.get(Interactive) == On;
@@ -312,7 +348,8 @@ impl Command {
 
 /// Entry point for executing the `trap` built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
-    let (options, operands) = match parse_arguments(&[], Mode::with_env(env), args) {
+    let (options, operands) = match parse_arguments(syntax::OPTION_SPECS, Mode::with_env(env), args)
+    {
         Ok(result) => result,
         Err(error) => return report_error(env, &error).await,
     };
