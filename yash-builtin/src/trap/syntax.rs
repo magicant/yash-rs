@@ -103,7 +103,7 @@ pub fn interpret(
 
     // Parse the first operand as an action
     let action_field = operands
-        .next_if(|field| !is_non_negative_integer(&field.value))
+        .next_if(|field| !print && !is_non_negative_integer(&field.value))
         .map(|field| {
             let action = match field.value.as_str() {
                 "-" => Action::Default,
@@ -126,10 +126,13 @@ pub fn interpret(
     if !errors.is_empty() {
         Err(errors)
     } else if print {
-        // TODO If there is any condition, we should only print the specified conditions
-        Ok(Command::PrintAll {
-            include_default: true,
-        })
+        if conditions.is_empty() {
+            Ok(Command::PrintAll {
+                include_default: true,
+            })
+        } else {
+            Ok(Command::Print { conditions })
+        }
     } else {
         match (conditions.is_empty(), action_field) {
             (true, None) => Ok(Command::PrintAll {
@@ -180,6 +183,42 @@ mod tests {
                 include_default: true
             })
         );
+    }
+
+    #[test]
+    fn print_one_condition() {
+        let print = OptionOccurrence {
+            spec: &OptionSpec::new().short('p').long("print"),
+            location: Location::dummy("-p"),
+            argument: None,
+        };
+        let result = interpret(vec![print], Field::dummies(["INT"]));
+        assert_eq!(
+            result,
+            Ok(Command::Print {
+                conditions: vec![(CondSpec::SignalName(Name::Int), Field::dummy("INT"))]
+            })
+        )
+    }
+
+    #[test]
+    fn print_multiple_conditions() {
+        let print = OptionOccurrence {
+            spec: &OptionSpec::new().short('p').long("print"),
+            location: Location::dummy("-p"),
+            argument: None,
+        };
+        let result = interpret(vec![print], Field::dummies(["HUP", "EXIT", "QUIT"]));
+        assert_eq!(
+            result,
+            Ok(Command::Print {
+                conditions: vec![
+                    (CondSpec::SignalName(Name::Hup), Field::dummy("HUP")),
+                    (CondSpec::Exit, Field::dummy("EXIT")),
+                    (CondSpec::SignalName(Name::Quit), Field::dummy("QUIT")),
+                ]
+            })
+        )
     }
 
     #[test]

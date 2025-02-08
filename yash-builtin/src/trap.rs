@@ -158,6 +158,7 @@ use yash_env::trap::SetActionError;
 use yash_env::trap::SignalSystem;
 use yash_env::trap::TrapSet;
 use yash_env::Env;
+use yash_env::System;
 use yash_quote::quoted;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -174,6 +175,12 @@ pub enum Command {
         include_default: bool,
     },
 
+    /// Print traps for one or more conditions
+    Print {
+        /// The conditions for which to print traps
+        conditions: Vec<(CondSpec, Field)>,
+    },
+
     /// Set an action for one or more conditions
     SetAction {
         /// The action to set
@@ -184,6 +191,31 @@ pub enum Command {
 }
 
 pub mod syntax;
+
+/// Displays the current trap for a condition.
+///
+/// If the trap is not set and `include_default` is `false`, this function
+/// does nothing. Otherwise, it prints the trap in the format `trap -- command
+/// condition`. The result is written to `output`.
+fn display_trap<S: SignalSystem, W: Write>(
+    traps: &mut TrapSet,
+    system: &S,
+    cond: Condition,
+    include_default: bool,
+    output: &mut W,
+) -> Result<(), std::fmt::Error> {
+    let Ok(trap) = traps.peek_state(system, cond) else {
+        return Ok(());
+    };
+    let command = match &trap.action {
+        Action::Default if include_default => "-",
+        Action::Default => return Ok(()),
+        Action::Ignore => "",
+        Action::Command(command) => command,
+    };
+    let cond = cond.to_string(system);
+    writeln!(output, "trap -- {} {}", quoted(command), cond)
+}
 
 /// Returns a string that represents the currently configured traps.
 ///
@@ -218,17 +250,7 @@ pub fn display_all_traps<S: SignalSystem>(
                 continue;
             }
         }
-        let Ok(trap) = traps.peek_state(system, cond) else {
-            continue;
-        };
-        let command = match &trap.action {
-            Action::Default if include_default => "-",
-            Action::Default => continue,
-            Action::Ignore => "",
-            Action::Command(command) => command,
-        };
-        let cond = cond.to_string(system);
-        writeln!(output, "trap -- {} {}", quoted(command), cond).ok();
+        display_trap(traps, system, cond, include_default, &mut output).unwrap()
     }
     output
 }
@@ -250,7 +272,7 @@ pub enum ErrorCause {
 pub struct Error {
     /// The cause of the error
     pub cause: ErrorCause,
-    /// The condition for which the trap action could not be set
+    /// The condition on which the error occurred
     pub cond: CondSpec,
     /// The field that specifies the condition
     pub field: Field,
@@ -264,7 +286,10 @@ impl std::fmt::Display for Error {
 
 impl MessageBase for Error {
     fn message_title(&self) -> Cow<str> {
-        "cannot update trap".into()
+        match &self.cause {
+            ErrorCause::UnsupportedSignal => "invalid trap condition".into(),
+            ErrorCause::SetAction(_) => "cannot update trap".into(),
+        }
     }
 
     fn main_annotation(&self) -> Annotation<'_> {
@@ -274,6 +299,14 @@ impl MessageBase for Error {
             &self.field.origin,
         )
     }
+}
+
+/// Resolves a condition specification to a condition.
+fn resolve<S: System>(cond: CondSpec, field: Field, system: &S) -> Result<Condition, Error> {
+    cond.resolve(system).ok_or_else(|| {
+        let cause = ErrorCause::UnsupportedSignal;
+        Error { cause, cond, field }
+    })
 }
 
 /// Updates an action for a condition in the trap set.
@@ -317,6 +350,28 @@ impl Command {
                 &env.system,
                 include_default,
             )),
+
+            Self::Print { conditions } => {
+                let mut output = String::new();
+
+                let errors = conditions
+                    .into_iter()
+                    .filter_map(|(cond, field)| {
+                        resolve(cond, field, &env.system)
+                            .map(|cond| {
+                                display_trap(&mut env.traps, &env.system, cond, true, &mut output)
+                                    .unwrap()
+                            })
+                            .err()
+                    })
+                    .collect::<Vec<Error>>();
+
+                if errors.is_empty() {
+                    Ok(output)
+                } else {
+                    Err(errors)
+                }
+            }
 
             Self::SetAction { action, conditions } => {
                 let override_ignore = env.options.get(Interactive) == On;
@@ -494,6 +549,25 @@ mod tests {
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&system.state, |stdout| {
             assert_eq!(stdout, "trap -- '' INT\n")
+        });
+    }
+
+    #[test]
+    fn printing_specified_traps() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        let args = Field::dummies(["echo", "EXIT"]);
+        let _ = main(&mut env, args).now_or_never().unwrap();
+        let args = Field::dummies(["echo t", "TERM"]);
+        let _ = main(&mut env, args).now_or_never().unwrap();
+
+        let result = main(&mut env, Field::dummies(["-p", "TERM", "INT"]))
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
+        assert_stdout(&state, |stdout| {
+            assert_eq!(stdout, "trap -- 'echo t' TERM\ntrap -- - INT\n")
         });
     }
 

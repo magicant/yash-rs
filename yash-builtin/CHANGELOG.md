@@ -41,7 +41,11 @@ dispositions that are not explicitly set by the user. It also supports the `-p`
 - `cd::target::TargetError::exit_status`
     - This method returns the exit status corresponding to the error.
 - `trap::Command::PrintAll::include_default`
-    - This field represents the new `-p` option of the `trap` built-in.
+    - This field represents the new `-p` option of the `trap` built-in used
+      without operands.
+- `trap::Command::Print`
+    - This variant represents the new `-p` option of the `trap` built-in used
+      with operands.
 - `trap::syntax::OPTION_SPECS`
     - This array slice represents the option specifications of the `trap`
       built-in.

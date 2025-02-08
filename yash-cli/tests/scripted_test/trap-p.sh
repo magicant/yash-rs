@@ -269,6 +269,20 @@ trap 'echo trapped' USR1
 kill -s USR1 $$
 __IN__
 
+test_oE -e QUIT 'with -p and operands, only specified traps are printed' -e
+trap '' INT TERM
+trap -p TERM QUIT >printed_trap_3 # should not print INT
+trap 'echo INT' INT
+trap 'echo TERM' TERM
+trap '' QUIT
+. ./printed_trap_3 # TERM is ignored again, QUIT is now default
+kill -s INT $$ # should print INT
+kill -s TERM $$ # should be ignored
+kill -s QUIT $$
+__IN__
+INT
+__OUT__
+
 echo 'echo "$@"' > ./-
 chmod a+x ./-
 
