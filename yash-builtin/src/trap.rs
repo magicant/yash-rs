@@ -304,7 +304,7 @@ impl MessageBase for Error {
 
 /// Resolves a condition specification to a condition.
 fn resolve<S: System>(cond: CondSpec, field: Field, system: &S) -> Result<Condition, Error> {
-    cond.resolve(system).ok_or_else(|| {
+    cond.to_condition(system).ok_or_else(|| {
         let cause = ErrorCause::UnsupportedSignal;
         Error { cause, cond, field }
     })
@@ -321,7 +321,7 @@ fn set_action(
     action: Action,
     override_ignore: bool,
 ) -> Result<(), Error> {
-    let Some(cond2) = cond.resolve(system) else {
+    let Some(cond2) = cond.to_condition(system) else {
         let cause = ErrorCause::UnsupportedSignal;
         return Err(Error { cause, cond, field });
     };
