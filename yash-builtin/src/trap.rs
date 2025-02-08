@@ -143,6 +143,7 @@ use crate::common::report_failure;
 use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
 use crate::common::to_single_message;
+use itertools::Itertools as _;
 use std::borrow::Cow;
 use std::fmt::Write;
 use thiserror::Error;
@@ -354,17 +355,14 @@ impl Command {
             Self::Print { conditions } => {
                 let mut output = String::new();
 
-                let errors = conditions
+                let ((), errors): ((), Vec<Error>) = conditions
                     .into_iter()
-                    .filter_map(|(cond, field)| {
-                        resolve(cond, field, &env.system)
-                            .map(|cond| {
-                                display_trap(&mut env.traps, &env.system, cond, true, &mut output)
-                                    .unwrap()
-                            })
-                            .err()
+                    .map(|(cond, field)| {
+                        let cond = resolve(cond, field, &env.system)?;
+                        display_trap(&mut env.traps, &env.system, cond, true, &mut output).unwrap();
+                        Ok(())
                     })
-                    .collect::<Vec<Error>>();
+                    .partition_result();
 
                 if errors.is_empty() {
                     Ok(output)
@@ -376,9 +374,9 @@ impl Command {
             Self::SetAction { action, conditions } => {
                 let override_ignore = env.options.get(Interactive) == On;
 
-                let errors = conditions
+                let ((), errors): ((), Vec<Error>) = conditions
                     .into_iter()
-                    .filter_map(|(cond, field)| {
+                    .map(|(cond, field)| {
                         set_action(
                             &mut env.traps,
                             &mut env.system,
@@ -387,9 +385,8 @@ impl Command {
                             action.clone(),
                             override_ignore,
                         )
-                        .err()
                     })
-                    .collect::<Vec<Error>>();
+                    .partition_result();
 
                 if errors.is_empty() {
                     Ok(String::new())
