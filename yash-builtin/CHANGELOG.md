@@ -15,6 +15,10 @@ changing the working directory.
 
 The `cd` built-in now errors out when a given operand is an empty string.
 
+The `trap` built-in now implements the POSIX.1-2024 behavior of showing signal
+dispositions that are not explicitly set by the user. It also supports the `-p`
+(`--print`) option.
+
 ### Added
 
 - `common::report`, `common::report_simple`
@@ -36,6 +40,18 @@ The `cd` built-in now errors out when a given operand is an empty string.
       is an empty string.
 - `cd::target::TargetError::exit_status`
     - This method returns the exit status corresponding to the error.
+- `trap::Command::PrintAll::include_default`
+    - This field represents the new `-p` option of the `trap` built-in used
+      without operands.
+- `trap::Command::Print`
+    - This variant represents the new `-p` option of the `trap` built-in used
+      with operands.
+- `trap::syntax::OPTION_SPECS`
+    - This array slice represents the option specifications of the `trap`
+      built-in.
+- `trap::display_all_traps`
+    - This function is an extended version of `trap::display_traps` that shows
+      traps including ones that have the default action.
 
 ### Changed
 
@@ -43,6 +59,7 @@ The `cd` built-in now errors out when a given operand is an empty string.
   `EXIT_STATUS_CHDIR_ERROR`.
 - The `cd::assign::new_pwd` function now returns `Result<PathBuf, Errno>` instead
   of `PathBuf`. Previously, it returned an empty `PathBuf` on failure.
+- The `trap::syntax::interpret` function now supports the `-p` option.
 - The output of the `trap` built-in now includes not only user-defined traps but
   also signal dispositions that are not explicitly set by the user.
 - External dependency versions:

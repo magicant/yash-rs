@@ -17,13 +17,16 @@
 //! Command line argument parser for the trap built-in
 
 use super::Command;
-use crate::common::syntax::OptionOccurrence;
+use crate::common::syntax::{OptionOccurrence, OptionSpec};
 use itertools::Itertools;
 use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::semantics::Field;
 use yash_env::trap::Action;
 use yash_syntax::source::pretty::{Annotation, AnnotationType, Footer, MessageBase};
+
+/// Command line options for the trap built-in
+pub const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('p').long("print")];
 
 /// Error that may occur while [interpreting](interpret) command line arguments.
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
@@ -82,15 +85,25 @@ impl MessageBase for Error {
 /// should be passed to this function.
 ///
 /// On failure, returns a non-empty list of errors.
+///
+/// If a given option occurrence is not recognized, it is ignored.
 pub fn interpret(
-    _options: Vec<OptionOccurrence>,
+    options: Vec<OptionOccurrence>,
     operands: Vec<Field>,
 ) -> Result<Command, Vec<Error>> {
+    let mut print = false;
     let mut operands = operands.into_iter().peekable();
+
+    // Parse options
+    for option in options {
+        if option.spec.get_short() == Some('p') {
+            print = true;
+        }
+    }
 
     // Parse the first operand as an action
     let action_field = operands
-        .next_if(|field| !is_non_negative_integer(&field.value))
+        .next_if(|field| !print && !is_non_negative_integer(&field.value))
         .map(|field| {
             let action = match field.value.as_str() {
                 "-" => Action::Default,
@@ -112,9 +125,19 @@ pub fn interpret(
 
     if !errors.is_empty() {
         Err(errors)
+    } else if print {
+        if conditions.is_empty() {
+            Ok(Command::PrintAll {
+                include_default: true,
+            })
+        } else {
+            Ok(Command::Print { conditions })
+        }
     } else {
         match (conditions.is_empty(), action_field) {
-            (true, None) => Ok(Command::PrintAll),
+            (true, None) => Ok(Command::PrintAll {
+                include_default: false,
+            }),
             (true, Some((_, action))) => Err(vec![Error::MissingCondition { action }]),
             (false, action) => {
                 let action = action.map(|(action, _)| action).unwrap_or_default();
@@ -133,11 +156,69 @@ mod tests {
     use super::super::CondSpec;
     use super::*;
     use yash_env::signal::Name;
+    use yash_syntax::source::Location;
 
     #[test]
-    fn print_all_for_no_operands() {
+    fn print_all_not_including_default() {
         let result = interpret(vec![], vec![]);
-        assert_eq!(result, Ok(Command::PrintAll));
+        assert_eq!(
+            result,
+            Ok(Command::PrintAll {
+                include_default: false
+            })
+        );
+    }
+
+    #[test]
+    fn print_all_including_default() {
+        let print = OptionOccurrence {
+            spec: &OptionSpec::new().short('p').long("print"),
+            location: Location::dummy("-p"),
+            argument: None,
+        };
+        let result = interpret(vec![print], vec![]);
+        assert_eq!(
+            result,
+            Ok(Command::PrintAll {
+                include_default: true
+            })
+        );
+    }
+
+    #[test]
+    fn print_one_condition() {
+        let print = OptionOccurrence {
+            spec: &OptionSpec::new().short('p').long("print"),
+            location: Location::dummy("-p"),
+            argument: None,
+        };
+        let result = interpret(vec![print], Field::dummies(["INT"]));
+        assert_eq!(
+            result,
+            Ok(Command::Print {
+                conditions: vec![(CondSpec::SignalName(Name::Int), Field::dummy("INT"))]
+            })
+        )
+    }
+
+    #[test]
+    fn print_multiple_conditions() {
+        let print = OptionOccurrence {
+            spec: &OptionSpec::new().short('p').long("print"),
+            location: Location::dummy("-p"),
+            argument: None,
+        };
+        let result = interpret(vec![print], Field::dummies(["HUP", "EXIT", "QUIT"]));
+        assert_eq!(
+            result,
+            Ok(Command::Print {
+                conditions: vec![
+                    (CondSpec::SignalName(Name::Hup), Field::dummy("HUP")),
+                    (CondSpec::Exit, Field::dummy("EXIT")),
+                    (CondSpec::SignalName(Name::Quit), Field::dummy("QUIT")),
+                ]
+            })
+        )
     }
 
     #[test]
