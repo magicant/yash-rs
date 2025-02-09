@@ -16,9 +16,9 @@ publish = false
 
 [dependencies]
 futures-util = "0.3.31"
-yash-env = { path = "../yash-env", version = "0.6.0" }
-yash-semantics = { path = "../yash-semantics", version = "0.6.0" }
-yash-syntax = { path = "../yash-syntax", version = "0.14.0" }
+yash-env = { workspace = true }
+yash-semantics = { workspace = true }
+yash-syntax = { workspace = true }
 
 [dev-dependencies]
-yash-env-test-helper = { path = "../yash-env-test-helper", version = "0.4.0" }
+yash-env-test-helper = { workspace = true }

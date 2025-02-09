@@ -18,4 +18,4 @@ publish = false
 assert_matches = "1.5.0"
 futures-executor = "0.3.31"
 futures-util = { version = "0.3.31", features = ["channel"] }
-yash-env = { path = "../yash-env", version = "0.6.0" }
+yash-env = { workspace = true }

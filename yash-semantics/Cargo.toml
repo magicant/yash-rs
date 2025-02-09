@@ -19,13 +19,13 @@ assert_matches = "1.5.0"
 enumset = "1.1.2"
 itertools = "0.13.0"
 thiserror = "2.0.4"
-yash-arith = { path = "../yash-arith", version = "0.2.1" }
-yash-env = { path = "../yash-env", version = "0.6.0" }
-yash-fnmatch = { path = "../yash-fnmatch", version = "1.1.1" }
-yash-quote = { path = "../yash-quote", version = "1.1.1" }
-yash-syntax = { path = "../yash-syntax", version = "0.14.0" }
+yash-arith = { workspace = true }
+yash-env = { workspace = true }
+yash-fnmatch = { workspace = true }
+yash-quote = { workspace = true }
+yash-syntax = { workspace = true }
 
 [dev-dependencies]
 futures-executor = "0.3.31"
 futures-util = { version = "0.3.31", features = ["channel"] }
-yash-env-test-helper = { path = "../yash-env-test-helper", version = "0.4.0" }
+yash-env-test-helper = { workspace = true }
