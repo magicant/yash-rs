@@ -3,6 +3,26 @@ members = ["yash-*"]
 resolver = "2"
 
 [workspace.dependencies]
+annotate-snippets = "0.11.4"
+assert_matches = "1.5.0"
+bitflags = "2.6.0"
+either = "1.9.0"
+enumset = "1.1.2"
+errno = { version = "0.3.10", default-features = false }
+futures-executor = "0.3.31"
+futures-util = "0.3.31"
+fuzed-iterator = "1.0.0"
+itertools = "0.13.0"
+libc = { version = "0.2.169", default-features = false }
+nix = "0.29.0"
+regex = "1.9.4"
+regex-syntax = "0.8.2"
+slab = "0.4.9"
+strum = "0.26.2"
+tempfile = "3.8.0"
+thiserror = "2.0.4"
+unix_path = "1.0.1"
+unix_str = "1.0.0"
 yash-arith = { path = "yash-arith", version = "0.2.1" }
 yash-builtin = { path = "yash-builtin", version = "0.6.0" }
 yash-env = { path = "yash-env", version = "0.6.0" }

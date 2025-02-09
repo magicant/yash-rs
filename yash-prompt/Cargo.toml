@@ -15,7 +15,7 @@ categories = ["command-line-utilities"]
 publish = false
 
 [dependencies]
-futures-util = "0.3.31"
+futures-util = { workspace = true }
 yash-env = { workspace = true }
 yash-semantics = { workspace = true }
 yash-syntax = { workspace = true }

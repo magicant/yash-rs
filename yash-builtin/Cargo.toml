@@ -21,10 +21,10 @@ yash-prompt = ["dep:yash-prompt", "yash-semantics"]
 yash-semantics = ["dep:yash-semantics", "dep:enumset"]
 
 [dependencies]
-either = "1.9.0"
-enumset = { version = "1.1.2", optional = true }
-itertools = "0.13.0"
-thiserror = "2.0.4"
+either = { workspace = true }
+enumset = { workspace = true, optional = true }
+itertools = { workspace = true }
+thiserror = { workspace = true }
 yash-env = { workspace = true }
 yash-prompt = { workspace = true, optional = true }
 yash-quote = { workspace = true }
@@ -32,8 +32,8 @@ yash-semantics = { workspace = true, optional = true }
 yash-syntax = { workspace = true }
 
 [dev-dependencies]
-assert_matches = "1.5.0"
-futures-executor = "0.3.31"
-futures-util = { version = "0.3.31", features = ["channel"] }
+assert_matches = { workspace = true }
+futures-executor = { workspace = true }
+futures-util = { workspace = true, features = ["channel"] }
 yash-env-test-helper = { workspace = true }
 yash-semantics = { workspace = true }

@@ -15,12 +15,12 @@ categories = ["command-line-utilities", "parser-implementations"]
 publish = false
 
 [dependencies]
-annotate-snippets = { version = "0.11.4", optional = true }
-futures-util = "0.3.31"
-itertools = "0.13.0"
-thiserror = "2.0.4"
+annotate-snippets = { workspace = true, optional = true }
+futures-util = { workspace = true }
+itertools = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-annotate-snippets = "0.11.4"
-assert_matches = "1.5.0"
-futures-executor = "0.3.31"
+annotate-snippets = { workspace = true }
+assert_matches = { workspace = true }
+futures-executor = { workspace = true }

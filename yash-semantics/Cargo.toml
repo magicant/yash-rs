@@ -15,10 +15,10 @@ categories = ["command-line-utilities"]
 publish = false
 
 [dependencies]
-assert_matches = "1.5.0"
-enumset = "1.1.2"
-itertools = "0.13.0"
-thiserror = "2.0.4"
+assert_matches = { workspace = true }
+enumset = { workspace = true }
+itertools = { workspace = true }
+thiserror = { workspace = true }
 yash-arith = { workspace = true }
 yash-env = { workspace = true }
 yash-fnmatch = { workspace = true }
@@ -26,6 +26,6 @@ yash-quote = { workspace = true }
 yash-syntax = { workspace = true }
 
 [dev-dependencies]
-futures-executor = "0.3.31"
-futures-util = { version = "0.3.31", features = ["channel"] }
+futures-executor = { workspace = true }
+futures-util = { workspace = true, features = ["channel"] }
 yash-env-test-helper = { workspace = true }

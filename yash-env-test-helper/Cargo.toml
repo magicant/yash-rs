@@ -15,7 +15,7 @@ categories = ["command-line-utilities"]
 publish = false
 
 [dependencies]
-assert_matches = "1.5.0"
-futures-executor = "0.3.31"
-futures-util = { version = "0.3.31", features = ["channel"] }
+assert_matches = { workspace = true }
+futures-executor = { workspace = true }
+futures-util = { workspace = true, features = ["channel"] }
 yash-env = { workspace = true }
