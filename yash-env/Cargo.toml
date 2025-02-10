@@ -15,29 +15,27 @@ categories = ["command-line-utilities"]
 publish = false
 
 [dependencies]
-annotate-snippets = "0.11.4"
-bitflags = "2.6.0"
-either = "1.9.0"
-enumset = "1.1.2"
-errno = { version = "0.3.10", default-features = false }
-futures-util = "0.3.31"
-itertools = "0.13.0"
-slab = "0.4.9"
-strum = { version = "0.26.2", features = ["derive"] }
-tempfile = "3.8.0"
-thiserror = "2.0.4"
-unix_path = "1.0.1"
-unix_str = "1.0.0"
-yash-quote = { path = "../yash-quote", version = "1.1.1" }
-yash-syntax = { path = "../yash-syntax", version = "0.14.0", features = [
-    "annotate-snippets",
-] }
+annotate-snippets = { workspace = true }
+bitflags = { workspace = true }
+either = { workspace = true }
+enumset = { workspace = true }
+errno = { workspace = true, default-features = false }
+futures-util = { workspace = true }
+itertools = { workspace = true }
+slab = { workspace = true }
+strum = { workspace = true, features = ["derive"] }
+tempfile = { workspace = true }
+thiserror = { workspace = true }
+unix_path = { workspace = true }
+unix_str = { workspace = true }
+yash-quote = { workspace = true }
+yash-syntax = { workspace = true, features = ["annotate-snippets"] }
 
 [target.'cfg(unix)'.dependencies]
-libc = { version = "0.2.169", default-features = false }
-yash-executor = { path = "../yash-executor", version = "1.0.0" }
+libc = { workspace = true, default-features = false }
+yash-executor = { workspace = true }
 
 [dev-dependencies]
-assert_matches = "1.5.0"
-futures-executor = "0.3.31"
-futures-util = { version = "0.3.31", features = ["channel"] }
+assert_matches = { workspace = true }
+futures-executor = { workspace = true }
+futures-util = { workspace = true, features = ["channel"] }

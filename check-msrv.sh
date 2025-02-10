@@ -8,14 +8,6 @@ set -x
 git diff --exit-code -- Cargo.lock Cargo.toml
 trap 'git checkout -- Cargo.lock Cargo.toml' EXIT
 
-update_workspace_member() {
-    cat >| Cargo.toml <<EOF
-[workspace]
-members = ["$1"]
-resolver = "2"
-EOF
-}
-
 # $1 = package name
 # $2, $3, ... = additional options to `cargo test`
 check() {
@@ -25,7 +17,8 @@ check() {
         set ''
     fi
 
-    update_workspace_member "$package"
+    sed -e '/^members = / s;".*";"'"$package"'";' Cargo.toml >| Cargo.toml.tmp
+    mv Cargo.toml.tmp Cargo.toml
     cargo +nightly update -Z direct-minimal-versions
     msrv=$(cargo metadata --format-version=1 |
         jq -r ".packages[] | select(.name == \"$package\") | .rust_version")

@@ -14,9 +14,9 @@ keywords = ["posix", "shell", "glob"]
 categories = ["command-line-utilities"]
 
 [dependencies]
-regex = "1.9.4"
-regex-syntax = "0.8.2"
-thiserror = "2.0.4"
+regex = { workspace = true }
+regex-syntax = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-assert_matches = "1.5.0"
+assert_matches = { workspace = true }

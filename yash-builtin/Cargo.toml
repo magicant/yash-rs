@@ -21,19 +21,19 @@ yash-prompt = ["dep:yash-prompt", "yash-semantics"]
 yash-semantics = ["dep:yash-semantics", "dep:enumset"]
 
 [dependencies]
-either = "1.9.0"
-enumset = { version = "1.1.2", optional = true }
-itertools = "0.13.0"
-thiserror = "2.0.4"
-yash-env = { path = "../yash-env", version = "0.6.0" }
-yash-prompt = { path = "../yash-prompt", version = "0.4.0", optional = true }
-yash-quote = { path = "../yash-quote", version = "1.1.1" }
-yash-semantics = { path = "../yash-semantics", version = "0.6.0", optional = true }
-yash-syntax = { path = "../yash-syntax", version = "0.14.0" }
+either = { workspace = true }
+enumset = { workspace = true, optional = true }
+itertools = { workspace = true }
+thiserror = { workspace = true }
+yash-env = { workspace = true }
+yash-prompt = { workspace = true, optional = true }
+yash-quote = { workspace = true }
+yash-semantics = { workspace = true, optional = true }
+yash-syntax = { workspace = true }
 
 [dev-dependencies]
-assert_matches = "1.5.0"
-futures-executor = "0.3.31"
-futures-util = { version = "0.3.31", features = ["channel"] }
-yash-env-test-helper = { path = "../yash-env-test-helper", version = "0.4.0" }
-yash-semantics = { path = "../yash-semantics", version = "0.6.0" }
+assert_matches = { workspace = true }
+futures-executor = { workspace = true }
+futures-util = { workspace = true, features = ["channel"] }
+yash-env-test-helper = { workspace = true }
+yash-semantics = { workspace = true }

@@ -19,17 +19,17 @@ name = "yash3"
 path = "src/main.rs"
 
 [dependencies]
-thiserror = "2.0.4"
-yash-builtin = { path = "../yash-builtin", version = "0.6.0" }
-yash-env = { path = "../yash-env", version = "0.6.0" }
-yash-executor = { path = "../yash-executor", version = "1.0.0" }
-yash-prompt = { path = "../yash-prompt", version = "0.4.0" }
-yash-semantics = { path = "../yash-semantics", version = "0.6.0" }
-yash-syntax = { path = "../yash-syntax", version = "0.14.0" }
+thiserror = { workspace = true }
+yash-builtin = { workspace = true }
+yash-env = { workspace = true }
+yash-executor = { workspace = true }
+yash-prompt = { workspace = true }
+yash-semantics = { workspace = true }
+yash-syntax = { workspace = true }
 
 [dev-dependencies]
-assert_matches = "1.5.0"
-futures-util = { version = "0.3.31", features = ["channel"] }
-fuzed-iterator = "1.0.0"
-nix = { version = "0.29.0", features = ["fs", "process", "term"] }
-tempfile = "3.8.0"
+assert_matches = { workspace = true }
+futures-util = { workspace = true, features = ["channel"] }
+fuzed-iterator = { workspace = true }
+nix = { workspace = true, features = ["fs", "process", "term"] }
+tempfile = { workspace = true }
