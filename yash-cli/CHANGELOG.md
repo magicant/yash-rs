@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `cd` built-in now returns different exit statuses for different errors.
 - The output of the `trap` built-in now includes not only user-defined traps but
   also signal dispositions that are not explicitly set by the user.
+- The `wait` built-in no longer treats suspended jobs as terminated jobs. When
+  waiting for a suspended job, the built-in now waits indefinitely until the job
+  is resumed and finished.
 
 ## [0.2.0] - 2024-12-14
 

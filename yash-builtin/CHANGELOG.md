@@ -19,6 +19,8 @@ The `trap` built-in now implements the POSIX.1-2024 behavior of showing signal
 dispositions that are not explicitly set by the user. It also supports the `-p`
 (`--print`) option.
 
+The `wait` built-in no longer treats suspended jobs as terminated jobs.
+
 ### Added
 
 - `common::report`, `common::report_simple`
@@ -62,6 +64,9 @@ dispositions that are not explicitly set by the user. It also supports the `-p`
 - The `trap::syntax::interpret` function now supports the `-p` option.
 - The output of the `trap` built-in now includes not only user-defined traps but
   also signal dispositions that are not explicitly set by the user.
+- The `wait` built-in no longer treats suspended jobs as terminated jobs. When
+  waiting for a suspended job, the built-in now waits indefinitely until the job
+  is resumed and finished.
 - External dependency versions:
     - yash-env 0.5.0 → 0.6.0
     - yash-semantics 0.5.0 → 0.6.0 (optional)
