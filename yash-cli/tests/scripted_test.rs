@@ -428,6 +428,11 @@ fn trap_builtin() {
 }
 
 #[test]
+fn trap_ex() {
+    run("trap-y.sh");
+}
+
+#[test]
 fn trap_ex_2() {
     run_with_pty("trap2-y.sh")
 }
