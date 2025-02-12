@@ -31,10 +31,11 @@
 //! jobs. If the jobs are already finished, the built-in returns without
 //! waiting.
 //!
-//! If a job is job-controlled (that is, running in its own process group), it
-//! is considered finished not only when it has exited but also when it has been
-//! suspended. (TODO: This behavior is contrary to POSIX 2024 and will be fixed
-//! in the future.)
+//! If you try to wait for a suspended job, the built-in will wait indefinitely
+//! until the job is resumed and finished. Currently, there is no way to
+//! cancel the wait.
+//! (TODO: Add a way to cancel the wait)
+//! (TODO: Add a way to treat a suspended job as if it were finished)
 //!
 //! # Options
 //!
@@ -94,7 +95,7 @@ use crate::common::report_simple_failure;
 use crate::common::to_single_message;
 use itertools::Itertools as _;
 use yash_env::job::Pid;
-use yash_env::option::Option::Monitor;
+use yash_env::option::State::Off;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::Env;
@@ -133,7 +134,9 @@ impl Command {
     where
         I: IntoIterator<Item = Option<usize>>,
     {
-        let job_control = env.options.get(Monitor);
+        // Currently, we ignore the job control option as required by POSIX.
+        // TODO: Add some way to specify this option
+        let job_control = Off; // env.options.get(Monitor);
 
         // Await jobs specified by the indexes
         let mut exit_status = None;
