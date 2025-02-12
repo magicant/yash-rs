@@ -186,3 +186,47 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
         Err(error) => report_error(env, &error).await,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures_util::poll;
+    use std::pin::pin;
+    use std::task::Poll;
+    use yash_env::job::{Job, ProcessResult};
+    use yash_env::option::{Monitor, On};
+    use yash_env::subshell::{JobControl, Subshell};
+    use yash_env::system::r#virtual::SIGSTOP;
+    use yash_env::System as _;
+    use yash_env_test_helper::{in_virtual_system, stub_tty};
+
+    async fn suspend(env: &mut Env) {
+        let target = env.system.getpid();
+        env.system.kill(target, Some(SIGSTOP)).await.unwrap();
+    }
+
+    async fn start_self_suspending_job(env: &mut Env) {
+        let subshell =
+            Subshell::new(|env, _| Box::pin(suspend(env))).job_control(JobControl::Foreground);
+        let (pid, subshell_result) = subshell.start_and_wait(env).await.unwrap();
+        assert_eq!(subshell_result, ProcessResult::Stopped(SIGSTOP));
+        let mut job = Job::new(pid);
+        job.job_controlled = true;
+        job.state = subshell_result.into();
+        env.jobs.add(job);
+    }
+
+    #[test]
+    fn suspended_job() {
+        // Suspended jobs are not treated as finished, so the built-in waits indefinitely.
+        in_virtual_system(|mut env, state| async move {
+            stub_tty(&state);
+            env.options.set(Monitor, On);
+            start_self_suspending_job(&mut env).await;
+
+            let main = pin!(async move { main(&mut env, vec![]).await });
+            let poll = poll!(main);
+            assert_eq!(poll, Poll::Pending);
+        })
+    }
+}
