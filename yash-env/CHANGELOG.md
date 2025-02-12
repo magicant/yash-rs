@@ -51,6 +51,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   user.
 - External dependency versions:
     - yash-syntax 0.13.0 → 0.14.0
+- Internal dependency versions:
+    - itertools 0.13.0 → 0.14.0
+    - strum 0.26.2 → 0.27.0
 
 ### Removed
 

@@ -38,6 +38,8 @@ more flexible and readable configurations.
 - The `parser::lex::Lexer::new` method now only takes a `Box<dyn InputObject>`
   argument. The `start_line_number: NonZeroU64` and `source: Rc<Source>`
   arguments have been removed in favor of construction with a `Config` struct.
+- Internal dependency versions:
+    - itertools 0.13.0 → 0.14.0
 
 ## [0.13.0] - 2024-12-14
 

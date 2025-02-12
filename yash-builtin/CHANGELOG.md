@@ -72,6 +72,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
     - yash-semantics 0.5.0 → 0.6.0 (optional)
     - yash-syntax 0.13.0 → 0.14.0
 - Internal dependency versions:
+    - itertools 0.13.0 → 0.14.0
     - yash-prompt 0.3.0 → 0.4.0 (optional)
 
 ## [0.5.0] - 2024-12-14
