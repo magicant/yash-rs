@@ -64,7 +64,7 @@ pub fn new_mask(current: u16, command: &Command) -> u16 {
 
 fn copy(mask: u16) -> u16 {
     let mask = mask & 0o7;
-    mask << 6 | mask << 3 | mask
+    (mask << 6) | (mask << 3) | mask
 }
 
 #[cfg(test)]

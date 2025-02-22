@@ -1060,7 +1060,7 @@ fn send_signal_to_processes(
 
     if let Some(signal) = signal {
         for (&_pid, process) in &mut state.processes {
-            if target_pgid.map_or(true, |target_pgid| process.pgid == target_pgid) {
+            if target_pgid.is_none_or(|target_pgid| process.pgid == target_pgid) {
                 let result = process.raise_signal(signal);
                 results.push((result, process.ppid));
             }
