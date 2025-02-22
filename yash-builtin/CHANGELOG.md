@@ -68,6 +68,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
   waiting for a suspended job, the built-in now waits indefinitely until the job
   is resumed and finished.
 - External dependency versions:
+    - Rust 1.82.0 → 1.85.0
     - yash-env 0.5.0 → 0.6.0
     - yash-semantics 0.5.0 → 0.6.0 (optional)
     - yash-syntax 0.13.0 → 0.14.0

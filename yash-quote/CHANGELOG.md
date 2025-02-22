@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - External dependency versions
-    - Rust 1.56.0 → 1.65.0
+    - Rust 1.56.0 → 1.85.0
 
 ## [1.1.1] - 2023-11-12
 
@@ -46,6 +46,7 @@ No changes. Just bumping the version number to make the public API stable.
 
 - The `quote` function
 
+[1.1.2]: https://github.com/magicant/yash-rs/releases/tag/yash-quote-1.1.2
 [1.1.1]: https://github.com/magicant/yash-rs/releases/tag/yash-quote-1.1.1
 [1.1.0]: https://github.com/magicant/yash-rs/releases/tag/yash-quote-1.1.0
 [1.0.1]: https://github.com/magicant/yash-rs/releases/tag/yash-quote-1.0.1

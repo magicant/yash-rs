@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`impl command::Command for yash_syntax::syntax::SimpleCommand`)
   now honors the `ExpansionMode` specified for the words in the command.
 - External dependency versions:
+    - Rust 1.82.0 → 1.85.0
     - yash-env 0.5.0 → 0.6.0
     - yash-syntax 0.13.0 → 0.14.0
 - Internal dependency versions:

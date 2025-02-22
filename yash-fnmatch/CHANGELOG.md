@@ -5,6 +5,13 @@ All notable changes to `yash-fnmatch` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3] - Unreleased
+
+### Changed
+
+- External dependency versions
+    - Rust 1.65.0 → 1.85.0
+
 ## [1.1.2] - 2024-12-14
 
 ### Changed
@@ -49,6 +56,7 @@ The first release.
     - `ast`
         - `Ast`, `Atom`, `Bracket`, `BracketItem`, `BracketAtom`
 
+[1.1.3]: https://github.com/magicant/yash-rs/releases/tag/yash-fnmatch-1.1.3
 [1.1.2]: https://github.com/magicant/yash-rs/releases/tag/yash-fnmatch-1.1.2
 [1.1.1]: https://github.com/magicant/yash-rs/releases/tag/yash-fnmatch-1.1.1
 [1.1.0]: https://github.com/magicant/yash-rs/releases/tag/yash-fnmatch-1.1.0

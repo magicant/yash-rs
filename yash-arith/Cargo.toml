@@ -2,8 +2,8 @@
 name = "yash-arith"
 version = "0.2.2"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
-edition = "2021"
-rust-version = "1.65.0"
+edition = "2024"
+rust-version = "1.85.0"
 description = "POSIX shell arithmetic expansion"
 # documentation = "https://yash.osdn.jp/doc/"
 readme = "README.md"
