@@ -224,7 +224,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
                 Err(error) => errors.push(OperandError(operand, error)),
             }
         }
-        match to_single_message(&{ errors }) {
+        match to_single_message(&errors) {
             None => crate::Result::default(),
             Some(message) => report_failure(env, message).await,
         }

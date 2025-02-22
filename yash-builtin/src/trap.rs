@@ -428,7 +428,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
             // required by POSIX.
             errors.retain(|error| error.cause != SetActionError::InitiallyIgnored.into());
 
-            match to_single_message(&{ errors }) {
+            match to_single_message(&errors) {
                 None => crate::Result::default(),
                 Some(message) => report_failure(env, message).await,
             }

@@ -323,7 +323,7 @@ impl System for VirtualSystem {
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
         let path = Path::new(UnixStr::from_bytes(path.to_bytes()));
         let inode = self.resolve_existing_file(dir_fd, path, follow_symlinks)?;
-        Ok({ inode }.borrow().stat())
+        Ok(inode.borrow().stat())
     }
 
     /// Tests whether the specified file is executable or not.
