@@ -256,15 +256,15 @@ impl Lexer<'_> {
         let content = self.escaped_string(is_single_quote).await?;
 
         // Consume the closing single quote
-        if let Some(quote) = self.peek_char().await? {
+        match self.peek_char().await? { Some(quote) => {
             debug_assert_eq!(quote, '\'');
             self.consume_char();
             Ok(Some(content))
-        } else {
+        } _ => {
             let cause = SyntaxError::UnclosedDollarSingleQuote { opening_location }.into();
             let location = self.location().await?.clone();
             Err(Error { cause, location })
-        }
+        }}
     }
 }
 

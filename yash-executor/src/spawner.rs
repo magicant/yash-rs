@@ -61,12 +61,12 @@ impl<'a> Spawner<'a> {
         &self,
         future: Pin<Box<dyn Future<Output = ()> + 'a>>,
     ) -> Result<(), SpawnError<Pin<Box<dyn Future<Output = ()> + 'a>>>> {
-        if let Some(state) = self.state.upgrade() {
+        match self.state.upgrade() { Some(state) => {
             ExecutorState::enqueue(&state, future);
             Ok(())
-        } else {
+        } _ => {
             Err(SpawnError(future))
-        }
+        }}
     }
 
     /// Adds the given future to the executor's task queue so that it will be
@@ -93,10 +93,10 @@ impl<'a> Spawner<'a> {
         F: IntoFuture<Output = T> + 'a,
         T: 'a,
     {
-        if let Some(state) = self.state.upgrade() {
+        match self.state.upgrade() { Some(state) => {
             Ok(ExecutorState::enqueue_forwarding(&state, future))
-        } else {
+        } _ => {
             Err(SpawnError(future))
-        }
+        }}
     }
 }

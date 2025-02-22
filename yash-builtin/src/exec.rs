@@ -117,12 +117,12 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             search_path(env, name.value.as_str())
         };
 
-        if let Some(path) = path {
+        match path { Some(path) => {
             let location = name.origin.clone();
             let args = to_c_strings(args);
             replace_current_process(env, path, args, location).await;
             result.set_exit_status(env.exit_status);
-        } else {
+        } _ => {
             print_error(
                 env,
                 format!("cannot execute external utility {:?}", name.value).into(),
@@ -131,7 +131,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             )
             .await;
             result.set_exit_status(ExitStatus::NOT_FOUND);
-        }
+        }}
     }
 
     result

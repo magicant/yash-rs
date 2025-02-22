@@ -133,15 +133,15 @@ impl WordLexer<'_, '_> {
         let start_index = self.index();
         let colon = self.skip_if(|c| c == ':').await?;
 
-        if let Some(symbol) = self.peek_char().await? {
+        match self.peek_char().await? { Some(symbol) => {
             match symbol {
                 '+' | '-' | '=' | '?' => self.switch(colon, symbol).await,
                 '#' | '%' => self.trim(start_index, colon, symbol).await,
                 _ => self.suffix_modifier_not_found(start_index, colon),
             }
-        } else {
+        } _ => {
             self.suffix_modifier_not_found(start_index, colon)
-        }
+        }}
     }
 }
 

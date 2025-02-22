@@ -111,7 +111,7 @@ impl XTrace {
     /// When writing to the buffer, the content should end with a space.
     #[inline]
     #[must_use]
-    pub fn words(&mut self) -> &mut impl Write {
+    pub fn words(&mut self) -> &mut (impl Write + use<>) {
         &mut self.words
     }
 
@@ -121,7 +121,7 @@ impl XTrace {
     /// When writing to the buffer, the content should end with a space.
     #[inline]
     #[must_use]
-    pub fn assigns(&mut self) -> &mut impl Write {
+    pub fn assigns(&mut self) -> &mut (impl Write + use<>) {
         &mut self.assigns
     }
 
@@ -134,7 +134,7 @@ impl XTrace {
     /// See also [`here_doc_contents`](Self::here_doc_contents).
     #[inline]
     #[must_use]
-    pub fn redirs(&mut self) -> &mut impl Write {
+    pub fn redirs(&mut self) -> &mut (impl Write + use<>) {
         &mut self.redirs
     }
 
@@ -144,7 +144,7 @@ impl XTrace {
     /// [redirections buffer](Self::redirs()).
     #[inline]
     #[must_use]
-    pub fn here_doc_contents(&mut self) -> &mut impl Write {
+    pub fn here_doc_contents(&mut self) -> &mut (impl Write + use<>) {
         &mut self.here_doc_contents
     }
 

@@ -34,11 +34,11 @@ impl WordLexer<'_, '_> {
             };
             let is_escapable =
                 |c| matches!(c, '$' | '`' | '\\') || c == '"' && double_quote_escapable;
-            if let Some(c) = self.consume_char_if(is_escapable).await? {
+            match self.consume_char_if(is_escapable).await? { Some(c) => {
                 return Ok(Some(BackquoteUnit::Backslashed(c.value)));
-            } else {
+            } _ => {
                 return Ok(Some(BackquoteUnit::Literal('\\')));
-            }
+            }}
         }
 
         if let Some(c) = self.consume_char_if(|c| c != '`').await? {

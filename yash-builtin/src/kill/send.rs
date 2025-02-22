@@ -163,11 +163,11 @@ pub async fn execute(
         }
     }
 
-    if let Some(message) = to_single_message(&{ errors }) {
+    match to_single_message(&{ errors }) { Some(message) => {
         report_failure(env, message).await
-    } else {
+    } _ => {
         crate::Result::default()
-    }
+    }}
 }
 
 #[cfg(test)]

@@ -262,15 +262,15 @@ impl VirtualSystem {
             }
 
             let inode_ref = inode.borrow();
-            if let FileBody::Symlink { target } = &inode_ref.body {
+            match &inode_ref.body { FileBody::Symlink { target } => {
                 let mut new_path = resolved_path.into_owned();
                 new_path.pop();
                 new_path.push(target);
                 path = Cow::Owned(new_path);
-            } else {
+            } _ => {
                 drop(inode_ref);
                 return Ok(inode);
-            }
+            }}
         }
 
         Err(Errno::ELOOP)
@@ -908,7 +908,7 @@ impl System for VirtualSystem {
     fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         let parent_pid = self.process_id;
         let mut state = self.state.borrow_mut();
-        if let Some((pid, process)) = state.child_to_wait_for(parent_pid, target) {
+        match state.child_to_wait_for(parent_pid, target) { Some((pid, process)) => {
             if process.state_has_changed() {
                 Ok(Some((pid, process.take_state())))
             } else if process.state().is_alive() {
@@ -916,9 +916,9 @@ impl System for VirtualSystem {
             } else {
                 Err(Errno::ECHILD)
             }
-        } else {
+        } _ => {
             Err(Errno::ECHILD)
-        }
+        }}
     }
 
     /// Stub for the `execve` system call.

@@ -111,12 +111,12 @@ impl Bracket {
                     bracket.complement = true
                 }
                 PatternChar::Normal('[') => {
-                    if let Some((atom, j)) = BracketAtom::parse_inner(i.clone()) {
+                    match BracketAtom::parse_inner(i.clone()) { Some((atom, j)) => {
                         bracket.items.push(atom.into());
                         i = j;
-                    } else {
+                    } _ => {
                         bracket.items.push(Atom(Char('[')));
-                    }
+                    }}
                 }
                 c => bracket.items.push(Atom(Char(c.char_value()))),
             }
@@ -136,12 +136,12 @@ impl Atom {
                 PatternChar::Normal('?') => Atom::AnyChar,
                 PatternChar::Normal('*') => Atom::AnyString,
                 PatternChar::Normal('[') => {
-                    if let Some((bracket, j)) = Bracket::parse(i.clone()) {
+                    match Bracket::parse(i.clone()) { Some((bracket, j)) => {
                         i = j;
                         Atom::Bracket(bracket)
-                    } else {
+                    } _ => {
                         Atom::Char('[')
-                    }
+                    }}
                 }
                 c => Atom::Char(c.char_value()),
             };

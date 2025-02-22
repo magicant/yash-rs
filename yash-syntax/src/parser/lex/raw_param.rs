@@ -62,25 +62,25 @@ impl Lexer<'_> {
     /// used to construct the result, but this function does not check if it
     /// actually points to the `$`.
     pub async fn raw_param(&mut self, start_index: usize) -> Result<Option<TextUnit>> {
-        let param = if let Some(c) = self.consume_char_if(is_special_parameter_char).await? {
+        let param = match self.consume_char_if(is_special_parameter_char).await? { Some(c) => {
             Param {
                 id: c.value.to_string(),
                 r#type: SpecialParam::from_char(c.value).unwrap().into(),
             }
-        } else if let Some(c) = self.consume_char_if(|c| c.is_ascii_digit()).await? {
+        } _ => { match self.consume_char_if(|c| c.is_ascii_digit()).await? { Some(c) => {
             Param {
                 id: c.value.to_string(),
                 r#type: ParamType::Positional(c.value.to_digit(10).unwrap() as usize),
             }
-        } else if let Some(c) = self.consume_char_if(is_portable_name_char).await? {
+        } _ => { match self.consume_char_if(is_portable_name_char).await? { Some(c) => {
             let mut name = c.value.to_string();
             while let Some(c) = self.consume_char_if(is_portable_name_char).await? {
                 name.push(c.value);
             }
             Param::variable(name)
-        } else {
+        } _ => {
             return Ok(None);
-        };
+        }}}}}};
 
         let location = self.location_range(start_index..self.index());
 

@@ -451,7 +451,7 @@ impl Disposition {
     }
 
     /// Converts the `sigaction` to the signal disposition for the real system.
-    pub(super) unsafe fn from_sigaction(sa: &MaybeUninit<libc::sigaction>) -> Self {
+    pub(super) unsafe fn from_sigaction(sa: &MaybeUninit<libc::sigaction>) -> Self { unsafe {
         #[cfg(not(target_os = "aix"))]
         let handler = (*sa.as_ptr()).sa_sigaction;
 
@@ -465,5 +465,5 @@ impl Disposition {
             libc::SIG_IGN => Self::Ignore,
             _ => Self::Catch,
         }
-    }
+    }}
 }
