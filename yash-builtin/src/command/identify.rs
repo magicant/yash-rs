@@ -292,15 +292,15 @@ impl Identify {
 
         let output_result = output(env, &result).await;
 
-        let error_result = match to_single_message(&errors) { Some(message) => {
+        let error_result = if let Some(message) = to_single_message(&errors) {
             if self.verbose {
                 report_failure(env, message).await
             } else {
                 crate::Result::from(ExitStatus::FAILURE)
             }
-        } _ => {
+        } else {
             crate::Result::default()
-        }};
+        };
 
         output_result.max(error_result)
     }

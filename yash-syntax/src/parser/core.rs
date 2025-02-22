@@ -250,11 +250,11 @@ impl<'a, 'b> Parser<'a, 'b> {
     async fn require_token(&mut self) {
         #[allow(clippy::question_mark)] // TODO https://github.com/rust-lang/rust-clippy/issues/9518
         if self.token.is_none() {
-            self.token = Some(match self.lexer.skip_blanks_and_comment().await { Err(e) => {
+            self.token = Some(if let Err(e) = self.lexer.skip_blanks_and_comment().await {
                 Err(e)
-            } _ => {
+            } else {
                 self.lexer.token().await
-            }});
+            });
         }
     }
 

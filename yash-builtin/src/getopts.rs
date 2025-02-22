@@ -257,19 +257,19 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
         origin: arg_origin,
         optind,
     };
-    match env.any.get_mut::<verify::GetoptsState>() { Some(state) => {
+    if let Some(state) = env.any.get_mut::<verify::GetoptsState>() {
         match current.verify(&*state) {
             Ok(None) => {}
             Ok(Some(current)) => *state = current.into_state(),
             Err(e) => return report_simple_error(env, &e.to_string()).await,
         }
-    } _ => {
+    } else {
         if optind != "1" {
             let message = format!("unexpected $OPTIND value `{optind}`");
             return report_simple_error(env, &message).await;
         }
         env.any.insert(Box::new(current.into_state()));
-    }}
+    }
 
     // Parse the next option
     let result = model::next(args, spec, arg_index, char_index);

@@ -184,11 +184,11 @@ impl SearchEnv<'_> {
             Some(Err(pattern)) => {
                 let dir_path = if self.prefix.is_empty() {
                     c".".to_owned()
-                } else { match CString::new(self.prefix.as_str()) { Ok(dir_path) => {
+                } else if let Ok(dir_path) = CString::new(self.prefix.as_str()) {
                     dir_path
-                } _ => {
+                } else {
                     return;
-                }}};
+                };
 
                 if let Ok(mut dir) = self.env.system.opendir(&dir_path) {
                     while let Ok(Some(entry)) = dir.next() {

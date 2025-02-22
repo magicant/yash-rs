@@ -65,11 +65,11 @@ impl WordLexer<'_, '_> {
         is_escapable: &mut dyn FnMut(char) -> bool,
     ) -> Result<Option<TextUnit>> {
         if self.skip_if(|c| c == '\\').await? {
-            match self.consume_raw_char_if_dyn(is_escapable).await? { Some(c) => {
+            if let Some(c) = self.consume_raw_char_if_dyn(is_escapable).await? {
                 return Ok(Some(Backslashed(c)));
-            } _ => {
+            } else {
                 return Ok(Some(Literal('\\')));
-            }}
+            }
         }
 
         if let Some(u) = self.dollar_unit().await? {
@@ -194,10 +194,10 @@ impl Lexer<'_> {
 
             units.extend(next_units);
 
-            match self.consume_char_if(|c| c == '(').await? { Some(sc) => {
+            if let Some(sc) = self.consume_char_if(|c| c == '(').await? {
                 units.push(Literal('('));
                 open_paren_locations.push(sc.location.clone());
-            } _ => if let Some(opening_location) = open_paren_locations.pop() {
+            } else if let Some(opening_location) = open_paren_locations.pop() {
                 if self.skip_if(|c| c == ')').await? {
                     units.push(Literal(')'));
                 } else {
@@ -207,7 +207,7 @@ impl Lexer<'_> {
                 }
             } else {
                 break;
-            }}
+            }
         }
         Ok(Text(units))
     }

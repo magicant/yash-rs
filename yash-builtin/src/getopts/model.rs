@@ -183,11 +183,11 @@ where
             let remainder = chars.collect::<String>();
             if !remainder.is_empty() {
                 (Some(remainder), 1, None)
-            } else { match args.next() { Some(arg) => {
+            } else if let Some(arg) = args.next() {
                 (Some(arg.as_ref().to_owned()), 2, None)
-            } _ => {
+            } else {
                 (None, 1, Some(Error::MissingArgument))
-            }}}
+            }
         }
     };
 

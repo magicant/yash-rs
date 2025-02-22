@@ -174,11 +174,11 @@ impl SearchEnv for Env {
 /// actually exists.
 pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
     if name.contains('/') {
-        return match CString::new(name) { Ok(path) => {
+        return if let Ok(path) = CString::new(name) {
             Some(Target::External { path })
-        } _ => {
+        } else {
             None
-        }};
+        };
     }
 
     let builtin = env.builtin(name);
