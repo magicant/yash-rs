@@ -65,7 +65,6 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
 use std::ffi::c_int;
-use std::future::Future;
 use std::io::SeekFrom;
 use std::mem::MaybeUninit;
 use std::num::NonZero;

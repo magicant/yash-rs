@@ -332,7 +332,6 @@ mod tests {
     use crate::tests::suspend_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
-    use std::future::Future;
     use std::pin::Pin;
     use std::rc::Rc;
     use yash_env::VirtualSystem;

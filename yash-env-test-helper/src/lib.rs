@@ -22,7 +22,6 @@ use futures_executor::LocalSpawner;
 use futures_util::FutureExt as _;
 use futures_util::task::LocalSpawnExt as _;
 use std::cell::RefCell;
-use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::str::from_utf8;

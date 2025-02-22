@@ -77,7 +77,6 @@ mod tests {
     use crate::tests::return_builtin;
     use crate::tests::suspend_builtin;
     use futures_util::FutureExt;
-    use std::future::Future;
     use std::ops::ControlFlow::Continue;
     use std::pin::Pin;
     use std::rc::Rc;

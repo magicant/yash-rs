@@ -32,7 +32,6 @@ use crate::source::source_chars;
 use crate::syntax::Word;
 use std::cell::RefCell;
 use std::fmt;
-use std::future::Future;
 use std::num::NonZeroU64;
 use std::ops::Deref;
 use std::ops::DerefMut;

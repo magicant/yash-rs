@@ -16,7 +16,6 @@
 
 //! Methods about passing [source](crate::source) code to the [parser](crate::parser)
 
-use std::future::Future;
 use std::ops::DerefMut;
 use std::pin::Pin;
 

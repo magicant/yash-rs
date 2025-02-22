@@ -4,7 +4,6 @@
 use futures_task::noop_waker_ref;
 use pin_utils::pin_mut;
 use std::cell::Cell;
-use std::future::Future as _;
 use std::task::Context;
 use yash_executor::forwarder::TryReceiveError;
 use yash_executor::{Executor, Spawner};

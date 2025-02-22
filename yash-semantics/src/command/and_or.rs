@@ -88,7 +88,6 @@ mod tests {
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
-    use std::future::Future;
     use std::ops::ControlFlow::Break;
     use std::pin::Pin;
     use std::rc::Rc;

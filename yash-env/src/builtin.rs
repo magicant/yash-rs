@@ -28,7 +28,6 @@ use crate::semantics::Divert;
 use crate::semantics::ExitStatus;
 use crate::semantics::Field;
 use std::fmt::Debug;
-use std::future::Future;
 use std::pin::Pin;
 
 /// Types of built-in utilities

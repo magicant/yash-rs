@@ -122,7 +122,6 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use futures_util::FutureExt;
-    use std::future::Future;
     use std::pin::Pin;
     use std::rc::Rc;
     use yash_env::VirtualSystem;

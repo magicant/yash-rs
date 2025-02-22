@@ -73,7 +73,6 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::c_int;
 use std::fmt::Debug;
-use std::future::Future;
 use std::io::SeekFrom;
 use std::pin::Pin;
 use std::time::Duration;

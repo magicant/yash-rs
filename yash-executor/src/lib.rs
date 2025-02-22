@@ -56,7 +56,6 @@ use alloc::collections::VecDeque;
 use alloc::rc::{Rc, Weak};
 use core::cell::RefCell;
 use core::fmt::Debug;
-use core::future::Future;
 use core::pin::Pin;
 
 /// Interface for running concurrent tasks

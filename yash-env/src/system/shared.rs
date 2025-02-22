@@ -52,7 +52,6 @@ use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::c_int;
-use std::future::Future;
 use std::future::poll_fn;
 use std::io::SeekFrom;
 use std::pin::Pin;

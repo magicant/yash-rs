@@ -57,7 +57,6 @@ mod tests {
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
-    use std::future::Future;
     use std::pin::Pin;
     use yash_env::builtin::Builtin;
     use yash_env::semantics::ExitStatus;

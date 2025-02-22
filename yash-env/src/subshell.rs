@@ -37,7 +37,6 @@ use crate::system::Errno;
 use crate::system::SigmaskOp;
 use crate::system::System;
 use crate::system::SystemEx;
-use std::future::Future;
 use std::pin::Pin;
 
 /// Job state of a newly created subshell

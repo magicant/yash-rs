@@ -26,7 +26,6 @@ use super::lex::TokenId;
 use super::lex::WordContext;
 use super::lex::WordLexer;
 use crate::syntax::*;
-use std::future::Future;
 use std::str::FromStr;
 
 /// Polls the given future, assuming it returns `Ready`.

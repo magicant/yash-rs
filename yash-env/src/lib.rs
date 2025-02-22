@@ -60,7 +60,6 @@ use self::variable::VariableSet;
 use futures_util::task::noop_waker_ref;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::future::Future;
 use std::ops::ControlFlow::{self, Break, Continue};
 use std::rc::Rc;
 use std::task::Context;
