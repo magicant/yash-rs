@@ -16,12 +16,12 @@
 
 //! Part of the lexer that parses backquotes
 
-use super::core::is_blank;
 use super::core::Lexer;
 use super::core::Token;
 use super::core::TokenId;
 use super::core::WordContext;
 use super::core::WordLexer;
+use super::core::is_blank;
 use super::op::is_operator_char;
 use crate::parser::core::Result;
 use crate::syntax::MaybeLiteral;

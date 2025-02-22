@@ -125,20 +125,20 @@
 use crate::common::output;
 use crate::common::report_error;
 use std::fmt::Write;
+use yash_env::Env;
 use yash_env::builtin::Result;
+use yash_env::option::State;
 #[cfg(doc)]
 use yash_env::option::canonicalize;
 #[cfg(doc)]
 use yash_env::option::parse_long;
 #[cfg(doc)]
 use yash_env::option::parse_short;
-use yash_env::option::State;
 use yash_env::option::{Interactive, Monitor};
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::stack::Frame::Subshell;
 use yash_env::variable::Scope::Global;
-use yash_env::Env;
 
 /// Interpretation of command-line arguments that determine the behavior of the
 /// set built-in
@@ -260,16 +260,16 @@ mod tests {
     use futures_util::FutureExt;
     use std::ops::ControlFlow::Continue;
     use std::rc::Rc;
+    use yash_env::VirtualSystem;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
     use yash_env::option::Option::*;
     use yash_env::option::OptionSet;
     use yash_env::option::State::*;
-    use yash_env::system::r#virtual::SIGTSTP;
     use yash_env::system::Disposition;
+    use yash_env::system::r#virtual::SIGTSTP;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
     use yash_semantics::command::Command as _;

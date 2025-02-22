@@ -16,11 +16,11 @@
 
 //! Parameter expansion
 
-use super::super::phrase::Phrase;
 use super::super::AttrChar;
 use super::super::Error;
 use super::super::ErrorCause;
 use super::super::Origin;
+use super::super::phrase::Phrase;
 use super::Env;
 use super::Expand;
 use yash_env::option::Option::Unset;
@@ -153,7 +153,7 @@ fn to_field(value: &str) -> Vec<AttrChar> {
 pub mod tests {
     use super::*;
     use futures_util::FutureExt;
-    use yash_env::variable::{Scope, IFS};
+    use yash_env::variable::{IFS, Scope};
     use yash_syntax::syntax::{Switch, SwitchCondition, SwitchType};
 
     pub fn env_with_positional_params_and_ifs() -> yash_env::Env {

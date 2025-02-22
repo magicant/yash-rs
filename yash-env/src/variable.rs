@@ -94,13 +94,13 @@
 //! assert_eq!(set.get("foo").unwrap().value, Some("hello".into()));
 //! ```
 
-use crate::semantics::Field;
 #[cfg(doc)]
 use crate::Env;
+use crate::semantics::Field;
 use itertools::Itertools;
 use std::borrow::Borrow;
-use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::HashMap;
+use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::ffi::CString;
 use std::fmt::Write;
 use std::hash::Hash;

@@ -95,15 +95,15 @@ pub mod unset;
 #[cfg(feature = "yash-semantics")]
 pub mod wait;
 
+#[cfg(doc)]
+use yash_env::Env;
 #[doc(no_inline)]
 pub use yash_env::builtin::*;
 #[cfg(doc)]
 use yash_env::stack::{Frame, Stack};
-#[cfg(doc)]
-use yash_env::Env;
 
-use std::future::ready;
 use Type::{Elective, Mandatory, Special};
+use std::future::ready;
 
 /// Array of all the implemented built-in utilities.
 ///

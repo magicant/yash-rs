@@ -79,9 +79,9 @@
 
 use crate::common::report_error;
 use crate::common::report_simple_failure;
+use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
-use yash_env::Env;
 
 // pub mod display;
 pub mod semantics;
@@ -107,14 +107,14 @@ mod tests {
     use futures_util::FutureExt;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
+    use yash_env::Env;
+    use yash_env::VirtualSystem;
     use yash_env::builtin::Result;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
-    use yash_env::Env;
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
 

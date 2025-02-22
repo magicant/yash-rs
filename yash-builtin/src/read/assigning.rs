@@ -16,10 +16,10 @@
 
 //! Assigning the input to variables
 
-use yash_env::semantics::Field;
-use yash_env::variable::Scope;
-use yash_env::variable::IFS;
 use yash_env::Env;
+use yash_env::semantics::Field;
+use yash_env::variable::IFS;
+use yash_env::variable::Scope;
 use yash_semantics::expansion::attr::AttrChar;
 use yash_semantics::expansion::attr_strip::Strip as _;
 use yash_semantics::expansion::quote_removal::skip_quotes;

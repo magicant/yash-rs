@@ -20,6 +20,7 @@ use crate::command::Command;
 use crate::trap::run_exit_trap;
 use std::ops::ControlFlow::Break;
 use std::rc::Rc;
+use yash_env::Env;
 use yash_env::io::print_error;
 use yash_env::job::Job;
 use yash_env::semantics::Divert;
@@ -27,7 +28,6 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
-use yash_env::Env;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::List;
 
@@ -84,8 +84,8 @@ mod tests {
     use yash_env::job::ProcessState;
     use yash_env::option::Option::{ErrExit, Monitor};
     use yash_env::option::State::On;
-    use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::system::r#virtual::SIGSTOP;
+    use yash_env::system::r#virtual::VirtualSystem;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
     use yash_env_test_helper::in_virtual_system;

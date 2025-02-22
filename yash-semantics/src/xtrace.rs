@@ -33,14 +33,14 @@
 //! you should create an `XTrace` only if the option is on.
 //! [`XTrace::from_options`] is a convenient method to do so.
 
-use crate::expansion::expand_text;
 use crate::Handle;
+use crate::expansion::expand_text;
 use std::fmt::Write;
+use yash_env::Env;
 use yash_env::option::OptionSet;
 use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_env::variable::PS4;
-use yash_env::Env;
 use yash_quote::quoted;
 use yash_syntax::syntax::Text;
 

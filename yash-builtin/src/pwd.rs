@@ -76,16 +76,16 @@ use crate::common::arrange_message_and_divert;
 use crate::common::output;
 use crate::common::report_error;
 use std::borrow::Cow;
-use yash_env::builtin::Result;
-use yash_env::semantics::ExitStatus;
-use yash_env::semantics::Field;
 use yash_env::Env;
 #[cfg(doc)]
 use yash_env::System;
+use yash_env::builtin::Result;
+use yash_env::semantics::ExitStatus;
+use yash_env::semantics::Field;
+use yash_syntax::source::Location;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
-use yash_syntax::source::Location;
 
 /// Choice of the behavior of the built-in
 #[derive(Debug, Clone, Copy, Default, Eq, Hash, PartialEq)]

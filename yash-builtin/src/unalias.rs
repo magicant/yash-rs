@@ -57,8 +57,8 @@
 
 use crate::common::report_error;
 use crate::common::report_failure;
-use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::semantics::Field;
 use yash_syntax::source::pretty::Message;
 use yash_syntax::source::pretty::MessageBase;
 

@@ -78,8 +78,8 @@
 use crate::expansion::expand_text;
 use crate::expansion::expand_word;
 use crate::xtrace::XTrace;
-use enumset::enum_set;
 use enumset::EnumSet;
+use enumset::enum_set;
 use std::borrow::Cow;
 use std::ffi::CString;
 use std::ffi::NulError;
@@ -88,6 +88,8 @@ use std::num::ParseIntError;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use thiserror::Error;
+use yash_env::Env;
+use yash_env::System;
 use yash_env::io::Fd;
 use yash_env::io::MIN_INTERNAL_FD;
 use yash_env::option::Option::Clobber;
@@ -100,13 +102,11 @@ use yash_env::system::FileType;
 use yash_env::system::Mode;
 use yash_env::system::OfdAccess;
 use yash_env::system::OpenFlag;
-use yash_env::Env;
-use yash_env::System;
 use yash_quote::quoted;
+use yash_syntax::source::Location;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
-use yash_syntax::source::Location;
 use yash_syntax::syntax::HereDoc;
 use yash_syntax::syntax::Redir;
 use yash_syntax::syntax::RedirBody;
@@ -308,7 +308,7 @@ fn open_file_noclobber(env: &mut Env, path: Field) -> Result<(FdSpec, Location),
             return Err(Error {
                 cause: ErrorCause::OpenFile(path, errno),
                 location: origin,
-            })
+            });
         }
     }
 
@@ -368,7 +368,7 @@ fn copy_fd(
             return Err(Error {
                 cause: ErrorCause::MalformedFd(target.value, error),
                 location: target.origin,
-            })
+            });
         }
     };
 
@@ -489,7 +489,7 @@ async fn perform(
             return Err(Error {
                 cause: ErrorCause::FdNotOverwritten(target_fd, errno),
                 location: redir.body.operand().location.clone(),
-            })
+            });
         }
     };
 
@@ -671,12 +671,12 @@ mod tests {
     use futures_util::FutureExt;
     use std::cell::RefCell;
     use std::rc::Rc;
-    use yash_env::system::r#virtual::FileBody;
-    use yash_env::system::r#virtual::Inode;
-    use yash_env::system::resource::LimitPair;
-    use yash_env::system::resource::Resource;
     use yash_env::Env;
     use yash_env::VirtualSystem;
+    use yash_env::system::resource::LimitPair;
+    use yash_env::system::resource::Resource;
+    use yash_env::system::r#virtual::FileBody;
+    use yash_env::system::r#virtual::Inode;
     use yash_env_test_helper::in_virtual_system;
     use yash_syntax::syntax::Text;
 

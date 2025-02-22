@@ -64,10 +64,10 @@
 
 use std::iter::Peekable;
 use thiserror::Error;
+use yash_syntax::source::Location;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
-use yash_syntax::source::Location;
 
 #[doc(no_inline)]
 pub use yash_env::semantics::Field;
@@ -496,7 +496,7 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
                 ParseError::UnknownLongOption(field)
             } else {
                 ParseError::AmbiguousLongOption(field, matched_specs)
-            })
+            });
         }
     };
 
@@ -505,7 +505,7 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
     let argument = match (spec.get_argument(), equal) {
         (OptionArgumentSpec::None, None) => None,
         (OptionArgumentSpec::None, Some(_)) => {
-            return Err(ParseError::UnexpectedOptionArgument(field, spec))
+            return Err(ParseError::UnexpectedOptionArgument(field, spec));
         }
         (OptionArgumentSpec::Required, None) => {
             let argument = arguments.next();

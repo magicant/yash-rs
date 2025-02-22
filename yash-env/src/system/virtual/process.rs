@@ -16,23 +16,23 @@
 
 //! Processes in a virtual system.
 
-use super::io::FdBody;
-use super::signal::{self, SignalEffect};
 use super::Disposition;
 use super::Gid;
 use super::Mode;
 use super::SigmaskOp;
 use super::Uid;
+use super::io::FdBody;
+use super::signal::{self, SignalEffect};
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessResult;
 use crate::job::ProcessState;
 use crate::path::Path;
 use crate::path::PathBuf;
+use crate::system::SelectSystem;
+use crate::system::resource::INFINITY;
 use crate::system::resource::LimitPair;
 use crate::system::resource::Resource;
-use crate::system::resource::INFINITY;
-use crate::system::SelectSystem;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -595,8 +595,8 @@ mod tests {
     use crate::system::r#virtual::file_system::{FileBody, Inode, Mode};
     use crate::system::r#virtual::io::OpenFileDescription;
     use enumset::EnumSet;
-    use futures_util::task::LocalSpawnExt;
     use futures_util::FutureExt;
+    use futures_util::task::LocalSpawnExt;
     use std::collections::VecDeque;
     use std::future::poll_fn;
     use std::rc::Rc;

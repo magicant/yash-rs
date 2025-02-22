@@ -16,9 +16,9 @@
 
 //! Items that define trap conditions
 
+use super::SignalSystem;
 #[cfg(doc)]
 use super::state::Action;
-use super::SignalSystem;
 use crate::signal;
 use std::borrow::Cow;
 use std::num::NonZero;

@@ -4,11 +4,11 @@
 use futures_task::noop_waker_ref;
 use pin_utils::pin_mut;
 use std::cell::Cell;
-use std::future::poll_fn;
 use std::future::Future as _;
+use std::future::poll_fn;
 use std::task::{Context, Poll};
-use yash_executor::forwarder::*;
 use yash_executor::Executor;
+use yash_executor::forwarder::*;
 
 #[test]
 fn send_and_try_receive() {

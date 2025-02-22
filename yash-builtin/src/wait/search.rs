@@ -18,10 +18,10 @@
 
 use super::JobSpec;
 use std::borrow::Cow;
+use yash_env::job::JobList;
 use yash_env::job::id::FindError;
 use yash_env::job::id::JobId;
 use yash_env::job::id::ParseError;
-use yash_env::job::JobList;
 use yash_env::semantics::Field;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;

@@ -17,13 +17,13 @@
 //! Working directory path handling
 
 use super::Env;
-use crate::path::Path;
-use crate::system::Errno;
-use crate::system::AT_FDCWD;
-use crate::variable::AssignError;
-use crate::variable::Scope::Global;
-use crate::variable::PWD;
 use crate::System;
+use crate::path::Path;
+use crate::system::AT_FDCWD;
+use crate::system::Errno;
+use crate::variable::AssignError;
+use crate::variable::PWD;
+use crate::variable::Scope::Global;
 use std::ffi::CString;
 use thiserror::Error;
 
@@ -109,11 +109,11 @@ impl Env {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::VirtualSystem;
     use crate::path::PathBuf;
     use crate::system::r#virtual::FileBody;
     use crate::system::r#virtual::Inode;
     use crate::variable::Value;
-    use crate::VirtualSystem;
     use std::cell::RefCell;
     use std::rc::Rc;
 

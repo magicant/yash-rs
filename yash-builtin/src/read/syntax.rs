@@ -17,12 +17,12 @@
 //! Command line argument parser for the read built-in
 
 use super::Command;
-use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
 use crate::common::syntax::OptionSpec;
+use crate::common::syntax::parse_arguments;
 use thiserror::Error;
-use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::semantics::Field;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
 

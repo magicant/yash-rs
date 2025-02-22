@@ -19,12 +19,12 @@
 use super::Command;
 use crate::common::report_error;
 use crate::common::report_simple_error;
-use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
 use crate::common::syntax::ParseError;
+use crate::common::syntax::parse_arguments;
 use thiserror::Error;
-use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::semantics::Field;
 
 /// Error in parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]

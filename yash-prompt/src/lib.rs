@@ -73,5 +73,5 @@ pub use expand_posix::expand_posix;
 // TODO Yash-specific prompt expansion
 
 mod prompter;
-pub use prompter::fetch_posix;
 pub use prompter::Prompter;
+pub use prompter::fetch_posix;

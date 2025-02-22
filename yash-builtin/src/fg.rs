@@ -84,21 +84,21 @@ use crate::bg::OperandErrorKind;
 use crate::bg::ResumeError;
 use crate::common::report_error;
 use crate::common::report_simple_failure;
-use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
+use crate::common::syntax::parse_arguments;
+use yash_env::Env;
 use yash_env::io::Fd;
-use yash_env::job::id::parse;
 #[cfg(doc)]
 use yash_env::job::JobList;
 use yash_env::job::Pid;
 use yash_env::job::ProcessState;
+use yash_env::job::id::parse;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::signal;
 use yash_env::system::Errno;
 use yash_env::system::System as _;
 use yash_env::system::SystemEx as _;
-use yash_env::Env;
 
 /// Waits for the specified job to finish (or suspend again).
 async fn wait_until_halt(env: &mut Env, pid: Pid) -> Result<ProcessState, Errno> {
@@ -200,6 +200,7 @@ mod tests {
     use futures_util::FutureExt as _;
     use std::cell::Cell;
     use std::rc::Rc;
+    use yash_env::VirtualSystem;
     use yash_env::job::Job;
     use yash_env::job::ProcessResult;
     use yash_env::option::Option::Monitor;
@@ -208,7 +209,6 @@ mod tests {
     use yash_env::subshell::Subshell;
     use yash_env::system::r#virtual::Process;
     use yash_env::system::r#virtual::SIGSTOP;
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
     use yash_env_test_helper::in_virtual_system;

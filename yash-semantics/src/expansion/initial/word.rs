@@ -16,9 +16,9 @@
 
 //! Initial expansion of words and word units.
 
+use super::super::Error;
 use super::super::attr::AttrChar;
 use super::super::attr::Origin;
-use super::super::Error;
 use super::Env;
 use super::Expand;
 use super::Phrase;

@@ -16,18 +16,18 @@
 
 //! [`SelectSystem`] and related items
 
-use super::signal;
 use super::Disposition;
 use super::Errno;
 use super::Result;
 use super::SigmaskOp;
 use super::System;
+use super::signal;
 use crate::io::Fd;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::cmp::Reverse;
-use std::collections::binary_heap::PeekMut;
 use std::collections::BinaryHeap;
+use std::collections::binary_heap::PeekMut;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::rc::Rc;

@@ -19,9 +19,9 @@
 use crate::expansion::attr::AttrChar;
 use crate::expansion::attr::Origin;
 use std::ffi::CString;
-use yash_env::variable::HOME;
 use yash_env::Env;
 use yash_env::System;
+use yash_env::variable::HOME;
 
 fn into_attr_chars<I>(i: I) -> Vec<AttrChar>
 where
@@ -57,10 +57,10 @@ pub fn expand(name: &str, env: &Env) -> Vec<AttrChar> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use yash_env::VirtualSystem;
     use yash_env::path::PathBuf;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
-    use yash_env::VirtualSystem;
 
     #[test]
     fn empty_name_with_scalar_home() {

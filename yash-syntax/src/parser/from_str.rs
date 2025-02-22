@@ -14,6 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use super::Error;
+use super::ErrorCause;
+use super::Parser;
+use super::SyntaxError;
 use super::lex::Lexer;
 use super::lex::Operator;
 use super::lex::ParseOperatorError;
@@ -21,10 +25,6 @@ use super::lex::Token;
 use super::lex::TokenId;
 use super::lex::WordContext;
 use super::lex::WordLexer;
-use super::Error;
-use super::ErrorCause;
-use super::Parser;
-use super::SyntaxError;
 use crate::syntax::*;
 use std::future::Future;
 use std::str::FromStr;

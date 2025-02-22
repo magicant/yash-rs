@@ -18,11 +18,11 @@
 
 use std::ffi::CString;
 use thiserror::Error;
+use yash_env::System;
 use yash_env::path::Path;
 use yash_env::path::PathBuf;
 use yash_env::str::UnixStr;
 use yash_env::str::UnixString;
-use yash_env::System;
 
 #[derive(Debug, Clone, Eq, Error, PartialEq)]
 #[error("non-existing directory component '{}'", missing.display())]

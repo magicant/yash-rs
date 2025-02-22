@@ -48,13 +48,13 @@ use crate::read_eval_loop;
 use std::cell::RefCell;
 use std::ops::ControlFlow::Break;
 use std::rc::Rc;
+use yash_env::Env;
 use yash_env::semantics::Divert;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 use yash_env::trap::Condition;
 #[cfg(doc)]
 use yash_env::trap::TrapSet;
-use yash_env::Env;
 use yash_syntax::parser::lex::Lexer;
 use yash_syntax::source::Location;
 use yash_syntax::source::Source;

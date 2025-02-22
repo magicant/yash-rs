@@ -90,17 +90,17 @@ use crate::common::output;
 use crate::common::report_error;
 use crate::common::report_failure;
 use crate::common::to_single_message;
-use crate::typeset::syntax::interpret;
-use crate::typeset::syntax::parse;
-use crate::typeset::syntax::OptionSpec;
-use crate::typeset::syntax::PRINT_OPTION;
 use crate::typeset::Command;
 use crate::typeset::PrintContext;
 use crate::typeset::Scope::Global;
 use crate::typeset::VariableAttr::Export;
+use crate::typeset::syntax::OptionSpec;
+use crate::typeset::syntax::PRINT_OPTION;
+use crate::typeset::syntax::interpret;
+use crate::typeset::syntax::parse;
+use yash_env::Env;
 use yash_env::option::State::On;
 use yash_env::semantics::Field;
-use yash_env::Env;
 
 /// List of portable options applicable to the export built-in
 pub const PORTABLE_OPTIONS: &[OptionSpec<'static>] = &[PRINT_OPTION];

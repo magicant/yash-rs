@@ -144,11 +144,11 @@
 //! POSIX.
 
 use crate::common::{output, report_error, report_simple_failure};
-use yash_env::semantics::Field;
-use yash_env::system::resource::{Limit, Resource};
-use yash_env::system::Errno;
 use yash_env::Env;
 use yash_env::System as _;
+use yash_env::semantics::Field;
+use yash_env::system::Errno;
+use yash_env::system::resource::{Limit, Resource};
 
 /// Type of limit to show
 ///

@@ -17,11 +17,11 @@
 //! Here-documents
 
 use super::ErrorCause;
+use yash_env::Env;
+use yash_env::System;
 use yash_env::io::Fd;
 use yash_env::path::Path;
 use yash_env::system::Errno;
-use yash_env::Env;
-use yash_env::System;
 
 async fn fill_content(env: &mut Env, fd: Fd, content: &str) -> Result<(), Errno> {
     env.system.write_all(fd, content.as_bytes()).await?;

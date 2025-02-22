@@ -46,9 +46,9 @@ impl<T: Expand> Expand for [T] {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::expansion::Error;
     use crate::expansion::attr::AttrChar;
     use crate::expansion::attr::Origin;
-    use crate::expansion::Error;
     use futures_util::FutureExt as _;
     use std::cell::Cell;
 

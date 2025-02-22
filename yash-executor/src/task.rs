@@ -3,8 +3,8 @@
 
 //! Implementation of `Task`
 
-use crate::waker::into_waker;
 use crate::Task;
+use crate::waker::into_waker;
 use alloc::rc::Rc;
 use core::task::Context;
 

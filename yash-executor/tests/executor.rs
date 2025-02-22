@@ -4,8 +4,8 @@
 use std::cell::Cell;
 use std::future::{pending, poll_fn};
 use std::task::Poll;
-use yash_executor::forwarder::{Receiver, TryReceiveError};
 use yash_executor::Executor;
+use yash_executor::forwarder::{Receiver, TryReceiveError};
 
 mod spawn_pinned {
     use super::*;

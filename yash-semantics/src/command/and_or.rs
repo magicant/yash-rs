@@ -18,9 +18,9 @@
 
 use super::Command;
 use std::ops::ControlFlow::Continue;
+use yash_env::Env;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
-use yash_env::Env;
 use yash_syntax::syntax::AndOr::{self, AndThen, OrElse};
 use yash_syntax::syntax::AndOrList;
 use yash_syntax::syntax::Pipeline;
@@ -92,12 +92,12 @@ mod tests {
     use std::ops::ControlFlow::Break;
     use std::pin::Pin;
     use std::rc::Rc;
+    use yash_env::VirtualSystem;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stdout;
 
     #[test]

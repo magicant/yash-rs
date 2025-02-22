@@ -16,14 +16,14 @@
 
 //! Parsing command line arguments to the `umask` built-in
 
-use super::symbol::{parse_clauses, ParseClausesError};
 use super::Command;
-use crate::common::syntax::{parse_arguments, Mode, OptionSpec, ParseError};
+use super::symbol::{ParseClausesError, parse_clauses};
+use crate::common::syntax::{Mode, OptionSpec, ParseError, parse_arguments};
 use std::borrow::Cow;
 use std::num::ParseIntError;
 use thiserror::Error;
-use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::semantics::Field;
 use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]

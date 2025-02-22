@@ -16,17 +16,17 @@
 
 //! Implementations of function definition semantics.
 
-use crate::command::Command;
-use crate::expansion::expand_word;
-use crate::expansion::Field;
 use crate::Handle;
+use crate::command::Command;
+use crate::expansion::Field;
+use crate::expansion::expand_word;
 use std::ops::ControlFlow::Continue;
 use std::rc::Rc;
+use yash_env::Env;
 use yash_env::function::DefineError;
 use yash_env::function::Function;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
-use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
@@ -108,10 +108,10 @@ mod tests {
     use super::*;
     use futures_util::FutureExt;
     use std::ops::ControlFlow::Break;
+    use yash_env::VirtualSystem;
     use yash_env::option::On;
     use yash_env::option::Option::ErrExit;
     use yash_env::semantics::Divert;
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stderr;
     use yash_syntax::source::Location;
 

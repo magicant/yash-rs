@@ -17,9 +17,9 @@
 //! Setting resource limits
 
 use super::{Error, ResourceExt as _, SetLimitType, SetLimitValue};
-use yash_env::system::resource::{LimitPair, Resource, INFINITY};
-use yash_env::system::Errno;
 use yash_env::System;
+use yash_env::system::Errno;
+use yash_env::system::resource::{INFINITY, LimitPair, Resource};
 
 /// Environment for setting resource limits
 ///
@@ -99,8 +99,8 @@ pub fn set<E: Env>(
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use yash_env::system::resource::Limit;
     use yash_env::VirtualSystem;
+    use yash_env::system::resource::Limit;
 
     #[test]
     fn set_soft_to_zero() {

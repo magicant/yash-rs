@@ -55,8 +55,8 @@
 //! arguments to the `true` command.
 
 use crate::Result;
-use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::semantics::Field;
 
 /// Executes the `true` built-in.
 ///

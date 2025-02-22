@@ -22,9 +22,9 @@
 //! facilities such as job control.
 
 use crate::run_with_preexec;
-use nix::fcntl::{open, OFlag};
+use nix::fcntl::{OFlag, open};
 use nix::libc;
-use nix::pty::{grantpt, posix_openpt, ptsname, unlockpt, PtyMaster};
+use nix::pty::{PtyMaster, grantpt, posix_openpt, ptsname, unlockpt};
 use nix::sys::stat::Mode;
 use nix::unistd::{close, getpgrp, setsid, tcgetpgrp};
 use std::ffi::c_int;

@@ -20,8 +20,8 @@
 //! from the current mask and a command. It is part of the implementation of the
 //! `umask` built-in. (See [`Command::execute`].)
 
-use super::symbol::{Operator, Permission};
 use super::Command;
+use super::symbol::{Operator, Permission};
 
 /// Computes a mask to be set.
 ///

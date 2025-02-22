@@ -20,18 +20,18 @@ use super::indexes_to_optind;
 use super::model;
 use super::verify::GetoptsState;
 use thiserror::Error;
+use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::variable::AssignError;
+use yash_env::variable::OPTARG;
+use yash_env::variable::OPTIND;
 use yash_env::variable::Scope;
 use yash_env::variable::UnsetError;
 use yash_env::variable::Value;
-use yash_env::variable::OPTARG;
-use yash_env::variable::OPTIND;
-use yash_env::Env;
+use yash_syntax::source::Location;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
-use yash_syntax::source::Location;
 
 /// Error in reporting the result to the environment
 #[derive(Clone, Debug, Eq, Error, PartialEq)]

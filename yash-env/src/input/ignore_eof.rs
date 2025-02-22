@@ -17,10 +17,10 @@
 //! Defines the [`IgnoreEof`] input decorator.
 
 use super::{Context, Input, Result};
+use crate::Env;
 use crate::io::Fd;
 use crate::option::{IgnoreEof as IgnoreEofOption, Interactive, Off};
 use crate::system::System as _;
-use crate::Env;
 use std::cell::RefCell;
 
 /// `Input` decorator that ignores EOF on a terminal
@@ -110,8 +110,8 @@ where
 mod tests {
     use super::*;
     use crate::option::On;
-    use crate::system::r#virtual::{FdBody, FileBody, Inode, OpenFileDescription, VirtualSystem};
     use crate::system::Mode;
+    use crate::system::r#virtual::{FdBody, FileBody, Inode, OpenFileDescription, VirtualSystem};
     use crate::tests::assert_stderr;
     use enumset::EnumSet;
     use futures_util::FutureExt as _;

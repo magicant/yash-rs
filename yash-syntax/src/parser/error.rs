@@ -16,10 +16,10 @@
 
 //! Definition of errors that happen in the parser
 
+use crate::source::Location;
 use crate::source::pretty::Annotation;
 use crate::source::pretty::AnnotationType;
 use crate::source::pretty::MessageBase;
-use crate::source::Location;
 use crate::syntax::AndOr;
 use std::borrow::Cow;
 use std::rc::Rc;
@@ -510,9 +510,9 @@ impl MessageBase for Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::source::pretty::Message;
     use crate::source::Code;
     use crate::source::Source;
+    use crate::source::pretty::Message;
     use std::num::NonZeroU64;
     use std::rc::Rc;
 

@@ -61,15 +61,15 @@
 //!
 //! [`command`]: crate::command
 
-use crate::command::syntax::interpret;
 use crate::command::Command;
+use crate::command::syntax::interpret;
 use crate::common::report_error;
-use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
 use crate::common::syntax::OptionOccurrence;
 use crate::common::syntax::OptionSpec;
-use yash_env::semantics::Field;
+use crate::common::syntax::parse_arguments;
 use yash_env::Env;
+use yash_env::semantics::Field;
 use yash_syntax::source::Location;
 
 const OPTION_SPECS: &[OptionSpec] = &[

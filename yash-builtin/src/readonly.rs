@@ -191,19 +191,19 @@ use crate::common::output;
 use crate::common::report_error;
 use crate::common::report_failure;
 use crate::common::to_single_message;
-use crate::typeset::syntax::interpret;
-use crate::typeset::syntax::parse;
-use crate::typeset::syntax::OptionSpec;
-use crate::typeset::syntax::PRINT_OPTION;
 use crate::typeset::Command;
 use crate::typeset::FunctionAttr;
 use crate::typeset::PrintContext;
 use crate::typeset::Scope::Global;
 use crate::typeset::VariableAttr;
+use crate::typeset::syntax::OptionSpec;
+use crate::typeset::syntax::PRINT_OPTION;
+use crate::typeset::syntax::interpret;
+use crate::typeset::syntax::parse;
+use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::option::State::On;
 use yash_env::semantics::Field;
-use yash_env::Env;
 
 /// List of portable options applicable to the readonly built-in
 pub const PORTABLE_OPTIONS: &[OptionSpec<'static>] = &[PRINT_OPTION];
@@ -250,9 +250,9 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
 mod tests {
     use super::*;
     use futures_util::FutureExt;
+    use yash_env::Env;
     use yash_env::semantics::ExitStatus;
     use yash_env::variable::Value;
-    use yash_env::Env;
 
     #[test]
     fn builtin_defines_read_only_variable() {

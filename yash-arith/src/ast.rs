@@ -379,7 +379,7 @@ fn parse_leaf<'a>(tokens: &mut PeekableTokens<'a>, result: &mut Vec<Ast<'a>>) ->
                     return Err(Error {
                         cause: SyntaxError::InvalidOperator,
                         location: token.location,
-                    })
+                    });
                 }
             };
             parse_leaf(tokens, result)?;
@@ -472,7 +472,7 @@ fn parse_tree<'a>(
                 return Err(Error {
                     cause: SyntaxError::InvalidOperator,
                     location,
-                })
+                });
             }
         };
         parse_binary_rhs(tokens, operator, location, rhs_precedence, result)?

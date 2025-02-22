@@ -25,8 +25,8 @@ pub mod simple_command;
 
 use crate::trap::run_traps_for_caught_signals;
 use std::ops::ControlFlow::{Break, Continue};
-use yash_env::semantics::Result;
 use yash_env::Env;
+use yash_env::semantics::Result;
 use yash_syntax::syntax;
 
 /// Syntactic construct that can be executed.
@@ -90,8 +90,8 @@ mod tests {
     use futures_util::FutureExt;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
-    use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::system::r#virtual::SIGUSR1;
+    use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::trap::Action;
     use yash_env_test_helper::assert_stdout;
     use yash_syntax::source::Location;

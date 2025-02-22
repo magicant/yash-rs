@@ -19,6 +19,7 @@
 use super::run_trap;
 use std::ops::ControlFlow::Continue;
 use std::rc::Rc;
+use yash_env::Env;
 use yash_env::semantics::Result;
 use yash_env::signal;
 use yash_env::stack::Frame;
@@ -27,7 +28,6 @@ use yash_env::trap::Condition;
 use yash_env::trap::Origin;
 #[cfg(doc)]
 use yash_env::trap::TrapSet;
-use yash_env::Env;
 
 /// Runs a trap action for a signal if it has been caught.
 ///

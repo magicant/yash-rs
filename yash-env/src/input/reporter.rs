@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::Env;
 use crate::job::fmt::Accumulator;
 use crate::option::{Interactive, Monitor, Off};
-use crate::Env;
 use std::cell::RefCell;
 use yash_syntax::input::{Context, Input, Result};
 use yash_syntax::syntax::Fd;
@@ -84,11 +84,11 @@ async fn report(env: &mut Env) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::VirtualSystem;
     use crate::job::{Job, Pid, ProcessState};
     use crate::option::On;
     use crate::system::r#virtual::SystemState;
     use crate::tests::assert_stderr;
-    use crate::VirtualSystem;
     use futures_util::FutureExt as _;
     use std::rc::Rc;
     use yash_syntax::input::Memory;

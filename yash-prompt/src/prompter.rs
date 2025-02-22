@@ -17,9 +17,9 @@
 //! Defines the `Prompter` decorator.
 
 use std::cell::RefCell;
-use yash_env::input::{Context, Input, Result};
-use yash_env::variable::{VariableSet, PS1, PS2};
 use yash_env::Env;
+use yash_env::input::{Context, Input, Result};
+use yash_env::variable::{PS1, PS2, VariableSet};
 
 /// [`Input`] decorator that shows a command prompt
 ///
@@ -92,9 +92,9 @@ mod tests {
     use yash_env::input::Memory;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::system::r#virtual::VirtualSystem;
-    use yash_env::variable::Value;
     use yash_env::variable::PS1;
     use yash_env::variable::PS1_INITIAL_VALUE_NON_ROOT;
+    use yash_env::variable::Value;
     use yash_env_test_helper::assert_stderr;
 
     fn define_variable<N: Into<String>, V: Into<Value>>(env: &mut Env, name: N, value: V) {

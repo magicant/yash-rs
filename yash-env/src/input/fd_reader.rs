@@ -121,14 +121,14 @@ impl Input for FdReader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::system::r#virtual::FileBody;
-    use crate::system::r#virtual::Inode;
-    use crate::system::r#virtual::VirtualSystem;
+    use crate::System;
     use crate::system::Errno;
     use crate::system::Mode;
     use crate::system::OfdAccess;
     use crate::system::OpenFlag;
-    use crate::System;
+    use crate::system::r#virtual::FileBody;
+    use crate::system::r#virtual::Inode;
+    use crate::system::r#virtual::VirtualSystem;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
 

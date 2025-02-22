@@ -43,8 +43,8 @@ use crate::signal;
 use crate::system::{Disposition, Errno};
 #[cfg(doc)]
 use crate::system::{SharedSystem, System};
-use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 use yash_syntax::source::Location;
 
 /// System interface for signal handling configuration
@@ -488,13 +488,13 @@ impl<'a> IntoIterator for &'a TrapSet {
 mod tests {
     use super::*;
     use crate::job::ProcessState;
+    use crate::system::System as _;
+    use crate::system::SystemEx as _;
     use crate::system::r#virtual::VirtualSystem;
     use crate::system::r#virtual::{
         SIGCHLD, SIGINT, SIGKILL, SIGQUIT, SIGSTOP, SIGTERM, SIGTSTP, SIGTTIN, SIGTTOU, SIGUSR1,
         SIGUSR2,
     };
-    use crate::system::System as _;
-    use crate::system::SystemEx as _;
     use crate::tests::in_virtual_system;
     use std::collections::HashMap;
 

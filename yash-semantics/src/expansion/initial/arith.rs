@@ -16,14 +16,14 @@
 
 //! Arithmetic expansion
 
+use super::super::ErrorCause;
 use super::super::attr::AttrChar;
 use super::super::attr::Origin;
 use super::super::phrase::Phrase;
-use super::super::ErrorCause;
 use super::Env;
 use super::Error;
-use crate::expansion::expand_text;
 use crate::expansion::AssignReadOnlyError;
+use crate::expansion::expand_text;
 use std::ops::Range;
 use std::rc::Rc;
 use yash_arith::eval;

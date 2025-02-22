@@ -20,11 +20,11 @@ use super::Error;
 use super::ResourceExt as _;
 use super::ShowLimitType;
 use std::fmt::Write as _;
+use yash_env::system::Errno;
+use yash_env::system::resource::INFINITY;
 use yash_env::system::resource::Limit as RawLimit;
 use yash_env::system::resource::LimitPair;
 use yash_env::system::resource::Resource;
-use yash_env::system::resource::INFINITY;
-use yash_env::system::Errno;
 
 /// Wrapper for the raw limit value for implementing `std::fmt::Display`.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

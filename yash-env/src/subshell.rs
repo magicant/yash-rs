@@ -26,6 +26,7 @@
 //! of creating a subshell because it helps to arrange the child process
 //! properly.
 
+use crate::Env;
 use crate::job::Pid;
 use crate::job::ProcessResult;
 use crate::job::ProcessState;
@@ -36,7 +37,6 @@ use crate::system::Errno;
 use crate::system::SigmaskOp;
 use crate::system::System;
 use crate::system::SystemEx;
-use crate::Env;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -316,11 +316,11 @@ mod tests {
     use crate::option::Option::{Interactive, Monitor};
     use crate::option::State::On;
     use crate::semantics::ExitStatus;
+    use crate::system::Disposition;
+    use crate::system::Errno;
     use crate::system::r#virtual::Inode;
     use crate::system::r#virtual::SystemState;
     use crate::system::r#virtual::{SIGCHLD, SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU};
-    use crate::system::Disposition;
-    use crate::system::Errno;
     use crate::tests::in_virtual_system;
     use crate::trap::Action;
     use assert_matches::assert_matches;
@@ -689,8 +689,8 @@ mod tests {
     }
 
     #[test]
-    fn internal_dispositions_for_stoppers_kept_in_uncontrolled_subshell_of_controlling_interactive_shell(
-    ) {
+    fn internal_dispositions_for_stoppers_kept_in_uncontrolled_subshell_of_controlling_interactive_shell()
+     {
         in_virtual_system(|mut parent_env, state| async move {
             parent_env.options.set(Interactive, On);
             parent_env.options.set(Monitor, On);
@@ -773,8 +773,8 @@ mod tests {
     }
 
     #[test]
-    fn internal_dispositions_for_stoppers_unset_in_uncontrolled_subshell_of_controlling_non_interactive_shell(
-    ) {
+    fn internal_dispositions_for_stoppers_unset_in_uncontrolled_subshell_of_controlling_non_interactive_shell()
+     {
         in_virtual_system(|mut parent_env, state| async move {
             parent_env.options.set(Monitor, On);
             stub_tty(&state);

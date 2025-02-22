@@ -16,8 +16,8 @@
 
 //! Resolving parameter names to values
 
-use yash_env::variable::Expansion;
 use yash_env::Env;
+use yash_env::variable::Expansion;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::Param;
 use yash_syntax::syntax::ParamType::*;
@@ -63,9 +63,9 @@ pub fn resolve<'a>(env: &'a Env, param: &Param, location: &Location) -> Expansio
 mod tests {
     use super::*;
     use yash_env::job::Pid;
+    use yash_env::variable::PATH;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
-    use yash_env::variable::PATH;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::SpecialParam;
 

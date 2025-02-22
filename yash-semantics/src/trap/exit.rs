@@ -18,10 +18,10 @@
 
 use super::run_trap;
 use std::rc::Rc;
+use yash_env::Env;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
 use yash_env::trap::Origin;
-use yash_env::Env;
 
 /// Executes the EXIT trap.
 ///

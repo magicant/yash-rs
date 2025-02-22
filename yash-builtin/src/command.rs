@@ -116,12 +116,12 @@
 use crate::common::report_error;
 use enumset::EnumSet;
 use enumset::EnumSetType;
+use yash_env::Env;
 use yash_env::semantics::Field;
-#[cfg(all(doc, unix))]
-use yash_env::system::real::RealSystem;
 #[cfg(doc)]
 use yash_env::system::System;
-use yash_env::Env;
+#[cfg(all(doc, unix))]
+use yash_env::system::real::RealSystem;
 
 /// Category of command name resolution
 ///

@@ -19,9 +19,9 @@
 use super::evaluate_condition;
 use crate::command::Command;
 use std::ops::ControlFlow::Continue;
+use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
-use yash_env::Env;
 use yash_syntax::syntax::ElifThen;
 use yash_syntax::syntax::List;
 
@@ -58,9 +58,9 @@ mod tests {
     use std::cell::RefCell;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
+    use yash_env::VirtualSystem;
     use yash_env::semantics::Divert;
     use yash_env::system::r#virtual::SystemState;
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stdout;
     use yash_syntax::syntax::CompoundCommand;
 

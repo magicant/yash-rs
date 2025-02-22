@@ -21,11 +21,11 @@
 //! in the function.
 
 use thiserror::Error;
+use yash_env::Env;
+use yash_env::System as _;
 use yash_env::job::Pid;
 use yash_env::signal;
 use yash_env::system::Errno;
-use yash_env::Env;
-use yash_env::System as _;
 use yash_semantics::trap::run_trap_if_caught;
 
 /// Errors that may occur while waiting for a job
@@ -96,12 +96,13 @@ pub async fn wait_for_any_job_or_trap(env: &mut Env) -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::poll;
     use futures_util::FutureExt as _;
+    use futures_util::poll;
     use std::future::{pending, ready};
     use std::ops::ControlFlow::Continue;
     use std::pin::pin;
     use std::task::Poll;
+    use yash_env::VirtualSystem;
     use yash_env::job::Job;
     use yash_env::job::ProcessState;
     use yash_env::semantics::ExitStatus;
@@ -109,7 +110,6 @@ mod tests {
     use yash_env::system::r#virtual::{SIGSTOP, SIGTERM};
     use yash_env::trap::Action;
     use yash_env::variable::Value;
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::in_virtual_system;
     use yash_syntax::source::Location;
 

@@ -25,14 +25,14 @@ use crate::common::{report_failure, to_single_message};
 use std::borrow::Cow;
 use std::num::ParseIntError;
 use thiserror::Error;
-use yash_env::job::id::parse_tail;
+use yash_env::Env;
 use yash_env::job::Pid;
-use yash_env::job::{id::FindError, JobList};
+use yash_env::job::id::parse_tail;
+use yash_env::job::{JobList, id::FindError};
 use yash_env::semantics::Field;
 use yash_env::signal;
 use yash_env::system::Errno;
 use yash_env::system::System as _;
-use yash_env::Env;
 use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 
 /// Error that may occur while [sending](send) a signal.

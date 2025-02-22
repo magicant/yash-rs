@@ -18,10 +18,10 @@
 
 use crate::command::Command;
 use std::ops::ControlFlow::{Break, Continue};
+use yash_env::Env;
 use yash_env::semantics::Divert;
 use yash_env::semantics::{ExitStatus, Result};
 use yash_env::stack::Frame;
-use yash_env::Env;
 use yash_syntax::syntax::List;
 
 /// Execution context for loops
@@ -54,7 +54,7 @@ impl Loop<'_> {
                 Break(Divert::Break { count }) => return Break(Divert::Break { count: count - 1 }),
                 Break(Divert::Continue { count: 0 }) => continue,
                 Break(Divert::Continue { count }) => {
-                    return Break(Divert::Continue { count: count - 1 })
+                    return Break(Divert::Continue { count: count - 1 });
                 }
                 other => return other,
             }
@@ -103,13 +103,13 @@ mod tests {
     use std::future::Future;
     use std::pin::Pin;
     use std::rc::Rc;
+    use yash_env::VirtualSystem;
     use yash_env::builtin::Builtin;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stdout;
     use yash_syntax::syntax::CompoundCommand;
 

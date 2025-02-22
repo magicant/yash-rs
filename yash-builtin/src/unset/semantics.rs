@@ -18,16 +18,16 @@
 
 use crate::common::arrange_message_and_divert;
 use thiserror::Error;
+use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 #[cfg(doc)]
 use yash_env::system::SharedSystem;
 use yash_env::variable::Scope::Global;
-use yash_env::Env;
+use yash_syntax::source::Location;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
-use yash_syntax::source::Location;
 
 /// Error returned by [`unset_variables`].
 #[derive(Clone, Debug, Eq, Error, PartialEq)]

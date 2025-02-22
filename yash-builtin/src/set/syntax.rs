@@ -19,11 +19,11 @@
 use super::Command;
 use std::iter::Peekable;
 use thiserror::Error;
+use yash_env::option::FromStrError::*;
+use yash_env::option::State;
 use yash_env::option::canonicalize;
 use yash_env::option::parse_long;
 use yash_env::option::parse_short;
-use yash_env::option::FromStrError::*;
-use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;

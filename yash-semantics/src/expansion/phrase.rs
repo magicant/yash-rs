@@ -37,9 +37,9 @@ use crate::expansion::attr::Origin;
 use std::iter::FusedIterator;
 use std::ops::Add;
 use std::ops::AddAssign;
+use yash_env::variable::IFS;
 use yash_env::variable::Value;
 use yash_env::variable::VariableSet;
-use yash_env::variable::IFS;
 
 /// Array of fields with optimized data structure
 ///

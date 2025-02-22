@@ -17,16 +17,16 @@
 //! Command line argument parsing for the `unalias` built-in
 
 use super::Command;
-use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
 use crate::common::syntax::OptionSpec;
+use crate::common::syntax::parse_arguments;
 use thiserror::Error;
-use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::semantics::Field;
+use yash_syntax::source::Location;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
-use yash_syntax::source::Location;
 
 /// List of all options supported by the `unalias` built-in
 pub const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('a')];

@@ -3,7 +3,7 @@
 
 //! Implementation of `Executor`
 
-use crate::forwarder::{forwarder, Receiver};
+use crate::forwarder::{Receiver, forwarder};
 use crate::{Executor, ExecutorState, Spawner, Task};
 use alloc::boxed::Box;
 use alloc::rc::Rc;

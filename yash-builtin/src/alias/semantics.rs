@@ -19,8 +19,8 @@
 use super::Command;
 use std::borrow::Cow;
 use thiserror::Error;
-use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::semantics::Field;
 use yash_quote::quoted;
 use yash_syntax::alias::Alias;
 use yash_syntax::alias::HashEntry;

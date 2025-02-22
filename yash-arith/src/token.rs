@@ -292,7 +292,7 @@ impl<'a> Tokens<'a> {
                         return Err(Error {
                             cause: TokenError::InvalidNumericConstant,
                             location,
-                        })
+                        });
                     }
                 }
             } else {

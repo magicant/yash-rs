@@ -17,21 +17,21 @@
 //! Simple command semantics for functions
 
 use super::perform_assignments;
+use crate::Handle;
 use crate::command::Command;
 use crate::redir::RedirGuard;
+use crate::xtrace::XTrace;
 use crate::xtrace::print;
 use crate::xtrace::trace_fields;
-use crate::xtrace::XTrace;
-use crate::Handle;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
+use yash_env::Env;
 use yash_env::function::Function;
 use yash_env::semantics::Divert;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::variable::Context;
 use yash_env::variable::PositionalParams;
-use yash_env::Env;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
 
@@ -101,11 +101,11 @@ mod tests {
     use futures_util::FutureExt;
     use std::rc::Rc;
     use std::str::from_utf8;
+    use yash_env::VirtualSystem;
     use yash_env::option::State::On;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::variable::Scope;
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
     use yash_syntax::source::Location;

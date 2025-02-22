@@ -20,19 +20,19 @@
 //! submodule for [parsing command line arguments](syntax).
 
 use std::ops::ControlFlow::{Break, Continue};
+use yash_env::Env;
+#[cfg(doc)]
+use yash_env::SharedSystem;
 use yash_env::io::Fd;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 #[cfg(doc)]
 use yash_env::stack::Stack;
-use yash_env::Env;
-#[cfg(doc)]
-use yash_env::SharedSystem;
+use yash_syntax::source::Location;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
 use yash_syntax::source::pretty::MessageBase;
-use yash_syntax::source::Location;
 
 pub mod syntax;
 
