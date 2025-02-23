@@ -76,9 +76,9 @@
 
 use crate::common::report_error;
 use crate::common::report_simple_failure;
+use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
-use yash_env::Env;
 
 // pub mod display;
 pub mod semantics;

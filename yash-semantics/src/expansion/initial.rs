@@ -19,8 +19,8 @@
 //! The initial expansion evaluates a word to a phrase. This module defines the
 //! [`Expand`] trait and its implementors that perform the expansion.
 
-use super::phrase::Phrase;
 use super::Error;
+use super::phrase::Phrase;
 use std::fmt::Debug;
 use yash_env::semantics::ExitStatus;
 

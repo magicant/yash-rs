@@ -20,14 +20,14 @@ use super::Command;
 use super::Identify;
 use super::Invoke;
 use super::Search;
-use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
 use crate::common::syntax::OptionOccurrence;
 use crate::common::syntax::OptionSpec;
 use crate::common::syntax::ParseError;
+use crate::common::syntax::parse_arguments;
 use thiserror::Error;
-use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::semantics::Field;
 use yash_syntax::source::pretty::Message;
 
 /// Error in parsing command line arguments

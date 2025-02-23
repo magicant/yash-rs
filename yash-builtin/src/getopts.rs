@@ -188,14 +188,14 @@
 
 use crate::common::report_error;
 use crate::common::report_simple_error;
-use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
+use crate::common::syntax::parse_arguments;
 use either::Either::{Left, Right};
 use std::num::NonZeroUsize;
+use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::variable::OPTIND;
-use yash_env::Env;
 
 pub mod model;
 pub mod report;

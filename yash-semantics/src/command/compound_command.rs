@@ -17,17 +17,17 @@
 //! Implementation of the compound command semantics.
 
 use super::Command;
-use crate::redir::RedirGuard;
-use crate::xtrace::finish;
-use crate::xtrace::XTrace;
 use crate::Handle;
+use crate::redir::RedirGuard;
+use crate::xtrace::XTrace;
+use crate::xtrace::finish;
 use std::ops::ControlFlow::Continue;
+use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 #[cfg(doc)]
 use yash_env::subshell::Subshell;
-use yash_env::Env;
 use yash_syntax::syntax;
 use yash_syntax::syntax::Redir;
 
@@ -154,11 +154,11 @@ mod tests {
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
-    use std::future::Future;
     use std::ops::ControlFlow::{Break, Continue};
     use std::pin::Pin;
     use std::rc::Rc;
     use std::str::from_utf8;
+    use yash_env::VirtualSystem;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
     use yash_env::option::Option::ErrExit;
@@ -167,7 +167,6 @@ mod tests {
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
     use yash_env::system::r#virtual::FileBody;
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
 

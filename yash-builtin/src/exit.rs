@@ -86,11 +86,11 @@
 use crate::common::syntax_error;
 use std::num::ParseIntError;
 use std::ops::ControlFlow::Break;
+use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::Env;
 use yash_syntax::source::Location;
 
 // TODO Split into syntax and semantics submodules
@@ -128,9 +128,9 @@ mod tests {
     use super::*;
     use futures_util::FutureExt;
     use std::rc::Rc;
+    use yash_env::VirtualSystem;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stderr;
 
     #[test]

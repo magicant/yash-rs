@@ -16,7 +16,6 @@
 
 //! [`SharedSystem`] and related items
 
-use super::signal;
 use super::ChildProcessStarter;
 use super::Dir;
 use super::Disposition;
@@ -41,19 +40,19 @@ use super::SystemEx;
 use super::Times;
 use super::Uid;
 use super::UnixString;
+use super::signal;
+#[cfg(doc)]
+use crate::Env;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessState;
-#[cfg(doc)]
-use crate::Env;
 use enumset::EnumSet;
 use std::cell::RefCell;
 use std::convert::Infallible;
-use std::ffi::c_int;
 use std::ffi::CStr;
 use std::ffi::CString;
+use std::ffi::c_int;
 use std::future::poll_fn;
-use std::future::Future;
 use std::io::SeekFrom;
 use std::pin::Pin;
 use std::rc::Rc;
@@ -757,13 +756,13 @@ impl SignalSystem for SharedSystem {
 
 #[cfg(test)]
 mod tests {
-    use super::super::r#virtual::VirtualSystem;
     use super::super::r#virtual::PIPE_SIZE;
+    use super::super::r#virtual::VirtualSystem;
     use super::super::r#virtual::{SIGCHLD, SIGINT, SIGTERM, SIGUSR1};
     use super::*;
     use assert_matches::assert_matches;
-    use futures_util::task::noop_waker_ref;
     use futures_util::FutureExt as _;
+    use futures_util::task::noop_waker_ref;
     use std::task::Context;
     use std::task::Poll;
     use std::time::Duration;

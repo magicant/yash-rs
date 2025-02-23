@@ -18,14 +18,14 @@
 
 use std::iter::Peekable;
 use thiserror::Error;
-use yash_env::option::canonicalize;
-use yash_env::option::parse_long;
-use yash_env::option::parse_short;
+#[cfg(doc)]
+use yash_env::Env;
 use yash_env::option::FromStrError::{Ambiguous, NoSuchOption};
 use yash_env::option::Option as ShellOption;
 use yash_env::option::State;
-#[cfg(doc)]
-use yash_env::Env;
+use yash_env::option::canonicalize;
+use yash_env::option::parse_long;
+use yash_env::option::parse_short;
 
 /// Input to the main read-eval loop
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]

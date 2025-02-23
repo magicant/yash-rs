@@ -18,11 +18,11 @@
 
 use self::args::{Run, Source, Work};
 use yash_builtin::BUILTINS;
+use yash_env::Env;
+use yash_env::System;
 use yash_env::io::Fd;
 use yash_env::option::Option::{Interactive, Monitor, Stdin};
 use yash_env::option::State::On;
-use yash_env::Env;
-use yash_env::System;
 
 pub mod args;
 pub mod init_file;

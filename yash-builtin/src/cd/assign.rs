@@ -18,16 +18,16 @@
 
 use super::Mode;
 use crate::common::arrange_message_and_divert;
+use yash_env::Env;
+use yash_env::System;
 use yash_env::path::Path;
 use yash_env::path::PathBuf;
 use yash_env::system::Errno;
 use yash_env::variable::AssignError;
-use yash_env::variable::Scope::Global;
-use yash_env::variable::Value::Scalar;
 use yash_env::variable::OLDPWD;
 use yash_env::variable::PWD;
-use yash_env::Env;
-use yash_env::System;
+use yash_env::variable::Scope::Global;
+use yash_env::variable::Value::Scalar;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
@@ -103,10 +103,10 @@ mod tests {
     use super::*;
     use futures_util::FutureExt;
     use std::rc::Rc;
+    use yash_env::VirtualSystem;
     use yash_env::semantics::Field;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::{assert_stderr, assert_stdout};
     use yash_syntax::source::Location;
 

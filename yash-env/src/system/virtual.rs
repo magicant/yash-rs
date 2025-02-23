@@ -53,9 +53,7 @@ pub use self::file_system::*;
 pub use self::io::*;
 pub use self::process::*;
 pub use self::signal::*;
-use super::resource::LimitPair;
-use super::resource::Resource;
-use super::resource::INFINITY;
+use super::AT_FDCWD;
 use super::Dir;
 use super::Disposition;
 use super::Errno;
@@ -68,7 +66,10 @@ use super::SigmaskOp;
 use super::Stat;
 use super::Times;
 use super::Uid;
-use super::AT_FDCWD;
+use super::resource::INFINITY;
+use super::resource::LimitPair;
+use super::resource::Resource;
+use crate::System;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessState;
@@ -77,7 +78,6 @@ use crate::path::PathBuf;
 use crate::str::UnixStr;
 use crate::str::UnixString;
 use crate::system::ChildProcessStarter;
-use crate::System;
 use enumset::EnumSet;
 use std::borrow::Cow;
 use std::cell::Cell;
@@ -89,12 +89,11 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::convert::TryInto;
-use std::ffi::c_int;
 use std::ffi::CStr;
 use std::ffi::CString;
+use std::ffi::c_int;
 use std::fmt::Debug;
 use std::future::poll_fn;
-use std::future::Future;
 use std::io::SeekFrom;
 use std::num::NonZero;
 use std::ops::DerefMut as _;
@@ -323,7 +322,7 @@ impl System for VirtualSystem {
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
         let path = Path::new(UnixStr::from_bytes(path.to_bytes()));
         let inode = self.resolve_existing_file(dir_fd, path, follow_symlinks)?;
-        Ok({ inode }.borrow().stat())
+        Ok(inode.borrow().stat())
     }
 
     /// Tests whether the specified file is executable or not.
@@ -1060,7 +1059,7 @@ fn send_signal_to_processes(
 
     if let Some(signal) = signal {
         for (&_pid, process) in &mut state.processes {
-            if target_pgid.map_or(true, |target_pgid| process.pgid == target_pgid) {
+            if target_pgid.is_none_or(|target_pgid| process.pgid == target_pgid) {
                 let result = process.raise_signal(signal);
                 results.push((result, process.ppid));
             }
@@ -1245,10 +1244,10 @@ impl Future for ProcessRunner<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Env;
     use crate::job::ProcessResult;
     use crate::semantics::ExitStatus;
     use crate::system::FileType;
-    use crate::Env;
     use assert_matches::assert_matches;
     use futures_executor::LocalPool;
     use futures_util::FutureExt;

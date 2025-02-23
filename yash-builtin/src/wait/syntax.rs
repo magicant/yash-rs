@@ -20,12 +20,12 @@ use super::{Command, JobSpec};
 use std::borrow::Cow;
 use std::num::ParseIntError;
 use thiserror::Error;
+use yash_env::Env;
 use yash_env::job::Pid;
 use yash_env::semantics::Field;
-use yash_env::Env;
 use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 
-use crate::common::syntax::{parse_arguments, Mode, ParseError};
+use crate::common::syntax::{Mode, ParseError, parse_arguments};
 
 /// Errors that may occur while parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]

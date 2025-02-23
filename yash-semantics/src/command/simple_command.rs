@@ -21,13 +21,14 @@
 //! of simple commands, see the implementation of [`Command`] for
 //! [`syntax::SimpleCommand`].
 
+use crate::Handle;
 use crate::command::Command;
 use crate::command_search::search;
 use crate::expansion::expand_word_with_mode;
 use crate::xtrace::XTrace;
-use crate::Handle;
 use std::ffi::CString;
 use std::ops::ControlFlow::Continue;
+use yash_env::Env;
 #[cfg(doc)]
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
@@ -36,7 +37,6 @@ use yash_env::semantics::Result;
 #[cfg(doc)]
 use yash_env::variable::Context;
 use yash_env::variable::Scope;
-use yash_env::Env;
 use yash_syntax::syntax;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::ExpansionMode;

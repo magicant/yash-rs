@@ -18,10 +18,10 @@
 
 use super::run_trap;
 use std::rc::Rc;
+use yash_env::Env;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
 use yash_env::trap::Origin;
-use yash_env::Env;
 
 /// Executes the EXIT trap.
 ///
@@ -57,7 +57,6 @@ mod tests {
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
-    use std::future::Future;
     use std::pin::Pin;
     use yash_env::builtin::Builtin;
     use yash_env::semantics::ExitStatus;

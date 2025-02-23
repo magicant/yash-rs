@@ -12,21 +12,29 @@ use alloc::rc::Rc;
 use core::task::{RawWaker, RawWakerVTable, Waker};
 
 unsafe fn clone(data: *const ()) -> RawWaker {
-    Rc::<Task>::increment_strong_count(data.cast());
-    RawWaker::new(data, VTABLE)
+    unsafe {
+        Rc::<Task>::increment_strong_count(data.cast());
+        RawWaker::new(data, VTABLE)
+    }
 }
 
 unsafe fn wake(data: *const ()) {
-    Rc::<Task>::from_raw(data.cast()).wake();
+    unsafe {
+        Rc::<Task>::from_raw(data.cast()).wake();
+    }
 }
 
 unsafe fn wake_by_ref(data: *const ()) {
-    Rc::<Task>::increment_strong_count(data.cast());
-    Rc::<Task>::from_raw(data.cast()).wake();
+    unsafe {
+        Rc::<Task>::increment_strong_count(data.cast());
+        Rc::<Task>::from_raw(data.cast()).wake();
+    }
 }
 
 unsafe fn drop(data: *const ()) {
-    Rc::<Task>::decrement_strong_count(data.cast());
+    unsafe {
+        Rc::<Task>::decrement_strong_count(data.cast());
+    }
 }
 
 const VTABLE: &RawWakerVTable = &RawWakerVTable::new(clone, wake, wake_by_ref, drop);

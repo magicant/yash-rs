@@ -16,24 +16,24 @@
 
 //! Command identifying semantics
 
-use super::search::SearchEnv;
 use super::Identify;
+use super::search::SearchEnv;
 use crate::command::Category;
 use crate::common::{output, report_failure, to_single_message};
 use std::borrow::Cow;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::rc::Rc;
+use yash_env::Env;
+use yash_env::System;
 use yash_env::builtin::Type;
 use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::str::UnixStr;
-use yash_env::Env;
-use yash_env::System;
 use yash_quote::quoted;
-use yash_semantics::command_search::search;
 use yash_semantics::command_search::Target;
+use yash_semantics::command_search::search;
 use yash_syntax::alias::Alias;
 use yash_syntax::parser::lex::Keyword;
 use yash_syntax::source::pretty::Annotation;

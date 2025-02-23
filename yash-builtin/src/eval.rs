@@ -62,10 +62,10 @@
 use crate::Result;
 use std::cell::RefCell;
 use std::rc::Rc;
+use yash_env::Env;
 #[cfg(doc)]
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::Env;
 use yash_semantics::read_eval_loop;
 use yash_syntax::input::Memory;
 use yash_syntax::parser::lex::Lexer;

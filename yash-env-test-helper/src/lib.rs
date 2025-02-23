@@ -19,15 +19,14 @@
 
 use assert_matches::assert_matches;
 use futures_executor::LocalSpawner;
-use futures_util::task::LocalSpawnExt as _;
 use futures_util::FutureExt as _;
+use futures_util::task::LocalSpawnExt as _;
 use std::cell::RefCell;
-use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::str::from_utf8;
-use yash_env::system::r#virtual::{Executor, FileBody, Inode, SystemState, VirtualSystem};
 use yash_env::Env;
+use yash_env::system::r#virtual::{Executor, FileBody, Inode, SystemState, VirtualSystem};
 
 /// Adapter for [`LocalSpawner`] to [`Executor`]
 #[derive(Clone, Debug)]

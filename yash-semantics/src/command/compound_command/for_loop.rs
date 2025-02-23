@@ -16,25 +16,25 @@
 
 //! Execution of the for loop
 
+use crate::Handle;
 use crate::assign::Error;
 use crate::assign::ErrorCause;
 use crate::command::Command;
+use crate::expansion::AssignReadOnlyError;
 use crate::expansion::expand_word;
 use crate::expansion::expand_words;
-use crate::expansion::AssignReadOnlyError;
+use crate::xtrace::XTrace;
 use crate::xtrace::print;
 use crate::xtrace::trace_fields;
-use crate::xtrace::XTrace;
-use crate::Handle;
 use std::fmt::Write;
 use std::ops::ControlFlow::{Break, Continue};
+use yash_env::Env;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 use yash_env::variable::Scope;
-use yash_env::Env;
 use yash_quote::quoted;
 use yash_syntax::syntax::List;
 use yash_syntax::syntax::Word;
@@ -85,7 +85,7 @@ pub async fn execute(
                 Break(Divert::Break { count }) => return Break(Divert::Break { count: count - 1 }),
                 Break(Divert::Continue { count: 0 }) => continue,
                 Break(Divert::Continue { count }) => {
-                    return Break(Divert::Continue { count: count - 1 })
+                    return Break(Divert::Continue { count: count - 1 });
                 }
                 other => other?,
             },
@@ -122,13 +122,12 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use futures_util::FutureExt;
-    use std::future::Future;
     use std::pin::Pin;
     use std::rc::Rc;
+    use yash_env::VirtualSystem;
     use yash_env::builtin::Builtin;
     use yash_env::option::Option::ErrExit;
     use yash_env::option::State::On;
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
     use yash_syntax::source::Location;

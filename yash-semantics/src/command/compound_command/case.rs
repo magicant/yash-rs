@@ -16,19 +16,19 @@
 
 //! Execution of the case command
 
+use crate::Handle;
 use crate::command::Command;
 use crate::expansion::attr::fnmatch::apply_escapes;
 use crate::expansion::attr::fnmatch::to_pattern_chars;
 use crate::expansion::expand_word;
 use crate::expansion::expand_word_attr;
-use crate::xtrace::print;
 use crate::xtrace::XTrace;
-use crate::Handle;
+use crate::xtrace::print;
 use std::fmt::Write;
 use std::ops::ControlFlow::Continue;
+use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
-use yash_env::Env;
 use yash_fnmatch::Config;
 use yash_fnmatch::Pattern;
 use yash_quote::quoted;
@@ -124,12 +124,12 @@ mod tests {
     use std::cell::RefCell;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
+    use yash_env::VirtualSystem;
     use yash_env::option::Option::ErrExit;
     use yash_env::option::State::On;
     use yash_env::semantics::Divert;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::variable::Scope;
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
     use yash_env_test_helper::in_virtual_system;

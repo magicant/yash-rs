@@ -89,14 +89,14 @@
 
 use std::ffi::CString;
 use std::ops::ControlFlow::Break;
+use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::io::print_error;
 use yash_env::semantics::Field;
-use yash_env::Env;
-use yash_semantics::command::simple_command::{replace_current_process, to_c_strings};
-use yash_semantics::command_search::search_path;
 use yash_semantics::Divert::Abort;
 use yash_semantics::ExitStatus;
+use yash_semantics::command::simple_command::{replace_current_process, to_c_strings};
+use yash_semantics::command_search::search_path;
 
 // TODO Split into syntax and semantics submodules
 
@@ -144,12 +144,12 @@ mod tests {
     use std::cell::RefCell;
     use std::ops::ControlFlow::Continue;
     use std::rc::Rc;
+    use yash_env::VirtualSystem;
     use yash_env::option::Option::Interactive;
     use yash_env::option::State::On;
-    use yash_env::system::r#virtual::{FileBody, Inode};
     use yash_env::system::Mode;
-    use yash_env::variable::{Scope, PATH};
-    use yash_env::VirtualSystem;
+    use yash_env::system::r#virtual::{FileBody, Inode};
+    use yash_env::variable::{PATH, Scope};
 
     fn executable_file() -> Inode {
         let mut content = Inode::default();

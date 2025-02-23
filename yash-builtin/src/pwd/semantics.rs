@@ -65,12 +65,12 @@ mod tests {
     use super::*;
     use std::cell::RefCell;
     use std::rc::Rc;
+    use yash_env::VirtualSystem;
     use yash_env::path::PathBuf;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::Inode;
-    use yash_env::variable::Scope::Global;
     use yash_env::variable::PWD;
-    use yash_env::VirtualSystem;
+    use yash_env::variable::Scope::Global;
 
     fn env_with_symlink_to_dir() -> Env {
         let mut system = Box::new(VirtualSystem::new());

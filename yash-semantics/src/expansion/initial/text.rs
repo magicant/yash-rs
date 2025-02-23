@@ -16,13 +16,13 @@
 
 //! Initial expansion of texts and text units.
 
+use super::super::Error;
 use super::super::attr::AttrChar;
 use super::super::attr::Origin;
-use super::super::Error;
-use super::param::ParamRef;
 use super::Env;
 use super::Expand;
 use super::Phrase;
+use super::param::ParamRef;
 use yash_syntax::syntax::Text;
 use yash_syntax::syntax::TextUnit::{self, *};
 use yash_syntax::syntax::Unquote;

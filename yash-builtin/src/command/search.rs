@@ -24,11 +24,11 @@ use super::Category;
 use super::Search;
 use std::ffi::CStr;
 use std::rc::Rc;
+use yash_env::Env;
 use yash_env::builtin::Builtin;
 use yash_env::function::Function;
 use yash_env::system::System;
 use yash_env::variable::Expansion;
-use yash_env::Env;
 
 /// Environment adapter for applying the search parameters
 ///
@@ -92,8 +92,8 @@ mod tests {
     use yash_env::builtin::Type::Special;
     use yash_env::str::UnixString;
     use yash_env::system::r#virtual::VirtualSystem;
-    use yash_env::variable::Scope;
     use yash_env::variable::PATH;
+    use yash_env::variable::Scope;
     use yash_semantics::command_search::PathEnv as _;
     use yash_semantics::command_search::SearchEnv as _;
     use yash_syntax::source::Location;

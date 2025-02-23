@@ -17,13 +17,13 @@
 //! Command line argument parser for the pwd built-in
 
 use super::Mode;
-use crate::common::syntax::parse_arguments;
 use crate::common::syntax::OptionOccurrence;
 use crate::common::syntax::OptionSpec;
+use crate::common::syntax::parse_arguments;
 use std::borrow::Cow;
 use thiserror::Error;
-use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::semantics::Field;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;

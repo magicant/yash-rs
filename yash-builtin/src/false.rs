@@ -58,9 +58,9 @@
 //! arguments to the `false` command.
 
 use crate::Result;
+use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::Env;
 
 /// Executes the `false` built-in.
 ///

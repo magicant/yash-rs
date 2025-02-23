@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   It now yields the current state even if the current action was not set by the
   user.
 - External dependency versions:
+    - Rust 1.82.0 → 1.85.0
     - yash-syntax 0.13.0 → 0.14.0
 - Internal dependency versions:
     - itertools 0.13.0 → 0.14.0

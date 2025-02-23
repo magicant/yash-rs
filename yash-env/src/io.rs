@@ -16,15 +16,15 @@
 
 //! Type definitions for I/O.
 
+use crate::Env;
 #[cfg(doc)]
 use crate::system::SharedSystem;
-use crate::Env;
 use annotate_snippets::Renderer;
 use std::borrow::Cow;
+use yash_syntax::source::Location;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
-use yash_syntax::source::Location;
 #[doc(no_inline)]
 pub use yash_syntax::syntax::Fd;
 

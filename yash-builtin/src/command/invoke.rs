@@ -16,17 +16,17 @@
 
 //! Command invoking semantics
 
+use super::Invoke;
 use super::identify::NotFound;
 use super::search::SearchEnv;
-use super::Invoke;
 use crate::common::report_failure;
+use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::Env;
 use yash_semantics::command::simple_command::execute_function_body;
 use yash_semantics::command::simple_command::start_external_utility_in_subshell_and_wait;
-use yash_semantics::command_search::search;
 use yash_semantics::command_search::Target;
+use yash_semantics::command_search::search;
 
 impl Invoke {
     /// Execute the command
@@ -85,11 +85,11 @@ mod tests {
     use futures_util::FutureExt as _;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
+    use yash_env::VirtualSystem;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
     use yash_env::function::Function;
     use yash_env::semantics::Field;
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
     use yash_semantics::Divert::Return;

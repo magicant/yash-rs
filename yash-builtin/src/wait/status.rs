@@ -25,15 +25,15 @@
 //! [`any_job_is_running`] to `wait_while_running`. The former tests if a
 //! specific job has finished, and the latter tests if all jobs have finished.
 
-use super::core::wait_for_any_job_or_trap;
 use super::core::Error;
+use super::core::wait_for_any_job_or_trap;
 use std::ops::ControlFlow;
+use yash_env::Env;
 use yash_env::job::JobList;
 use yash_env::job::ProcessResult;
 use yash_env::job::ProcessState;
 use yash_env::option::State;
 use yash_env::semantics::ExitStatus;
-use yash_env::Env;
 
 /// Waits while the given job is running.
 ///

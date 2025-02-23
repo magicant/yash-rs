@@ -2,8 +2,8 @@
 name = "yash-syntax"
 version = "0.14.0"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
-edition = "2021"
-rust-version = "1.82.0"
+edition = "2024"
+rust-version = "1.85.0"
 description = "POSIX-compatible shell script syntax parser"
 # documentation = "https://yash.osdn.jp/doc/"
 readme = "README.md"

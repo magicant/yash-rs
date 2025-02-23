@@ -17,12 +17,12 @@
 //! Part of the cd built-in that searches `$CDPATH`
 
 use std::ffi::CString;
+use yash_env::Env;
+use yash_env::System;
 use yash_env::path::Path;
 use yash_env::path::PathBuf;
 use yash_env::str::UnixString;
 use yash_env::variable::CDPATH;
-use yash_env::Env;
-use yash_env::System;
 
 /// Searches `$CDPATH` for the given path.
 ///
@@ -77,10 +77,10 @@ fn ensure_directory<S: System>(system: &S, path: PathBuf) -> Option<PathBuf> {
 mod tests {
     use super::*;
     use std::rc::Rc;
+    use yash_env::VirtualSystem;
     use yash_env::system::r#virtual::Inode;
     use yash_env::variable::Scope::Global;
     use yash_env::variable::Value;
-    use yash_env::VirtualSystem;
 
     fn create_dummy_file(system: &VirtualSystem, path: &str) {
         system

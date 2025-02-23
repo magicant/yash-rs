@@ -76,11 +76,7 @@ impl Not for State {
 /// Converts a Boolean to a state
 impl From<bool> for State {
     fn from(is_on: bool) -> Self {
-        if is_on {
-            On
-        } else {
-            Off
-        }
+        if is_on { On } else { Off }
     }
 }
 

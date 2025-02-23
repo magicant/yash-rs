@@ -38,14 +38,14 @@ use assert_matches::assert_matches;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::rc::Rc;
+use yash_env::Env;
+use yash_env::System;
 use yash_env::builtin::Builtin;
 use yash_env::builtin::Type::{Elective, Extension, Mandatory, Special, Substitutive};
 use yash_env::function::Function;
 use yash_env::path::PathBuf;
 use yash_env::variable::Expansion;
 use yash_env::variable::PATH;
-use yash_env::Env;
-use yash_env::System;
 
 /// Target of a simple command execution
 ///

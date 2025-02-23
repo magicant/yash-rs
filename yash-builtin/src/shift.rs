@@ -58,14 +58,14 @@
 use crate::common::arrange_message_and_divert;
 use crate::common::syntax_error;
 use std::borrow::Cow;
+use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::Env;
+use yash_syntax::source::Location;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
-use yash_syntax::source::Location;
 
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     // TODO: POSIX does not require the shift built-in to support XBD Utility
@@ -146,11 +146,11 @@ mod tests {
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
     use std::vec;
+    use yash_env::VirtualSystem;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stderr;
     use yash_syntax::source::Location;
 

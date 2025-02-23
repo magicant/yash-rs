@@ -87,7 +87,7 @@ impl Clause {
             match Action::parse(s) {
                 Ok(action) => actions.push(action),
                 Err(ParseActionError::NoOperator(_)) if !actions.is_empty() => {
-                    return Ok(Self { who, actions })
+                    return Ok(Self { who, actions });
                 }
                 Err(e) => return Err(ParseClauseError::BadAction(e)),
             }

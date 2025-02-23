@@ -27,11 +27,11 @@ use std::borrow::Cow;
 use std::fmt::Write;
 use std::num::NonZero;
 use thiserror::Error;
+use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::signal::{Name, Number};
 use yash_env::system::System;
 use yash_env::system::SystemEx;
-use yash_env::Env;
 use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 
 /// Returns an iterator over all supported signals.
@@ -147,8 +147,8 @@ pub async fn execute(env: &mut Env, signals: &[(Signal, Field)], verbose: bool) 
 mod tests {
     use super::*;
     use yash_env::semantics::ExitStatus;
-    use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::system::r#virtual::SIGKILL;
+    use yash_env::system::r#virtual::VirtualSystem;
 
     #[test]
     fn print_one_non_verbose() {

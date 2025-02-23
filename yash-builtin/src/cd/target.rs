@@ -20,16 +20,16 @@ use super::Command;
 use super::Mode;
 use std::borrow::Cow;
 use thiserror::Error;
+use yash_env::Env;
 use yash_env::path::Path;
 use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::variable::HOME;
 use yash_env::variable::OLDPWD;
-use yash_env::Env;
+use yash_syntax::source::Location;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
-use yash_syntax::source::Location;
 
 /// Indicates how the target directory was resolved.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]

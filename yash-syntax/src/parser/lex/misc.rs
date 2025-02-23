@@ -16,8 +16,8 @@
 
 //! Extension of the core for implementing the rest of the lexer
 
-use super::core::is_blank;
 use super::core::Lexer;
+use super::core::is_blank;
 use crate::parser::core::Result;
 
 impl Lexer<'_> {

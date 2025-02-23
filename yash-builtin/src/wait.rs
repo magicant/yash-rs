@@ -94,11 +94,11 @@ use crate::common::report_error;
 use crate::common::report_simple_failure;
 use crate::common::to_single_message;
 use itertools::Itertools as _;
+use yash_env::Env;
 use yash_env::job::Pid;
 use yash_env::option::State::Off;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::Env;
 
 /// Job specification (job ID or process ID)
 ///
@@ -193,11 +193,11 @@ mod tests {
     use futures_util::poll;
     use std::pin::pin;
     use std::task::Poll;
+    use yash_env::System as _;
     use yash_env::job::{Job, ProcessResult};
     use yash_env::option::{Monitor, On};
     use yash_env::subshell::{JobControl, Subshell};
     use yash_env::system::r#virtual::SIGSTOP;
-    use yash_env::System as _;
     use yash_env_test_helper::{in_virtual_system, stub_tty};
 
     async fn suspend(env: &mut Env) {

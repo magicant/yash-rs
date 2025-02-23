@@ -18,17 +18,17 @@
 
 use super::Command;
 use super::Mode;
-use crate::common::syntax::parse_arguments;
 use crate::common::syntax::OptionSpec;
+use crate::common::syntax::parse_arguments;
 use std::borrow::Cow;
 use std::collections::VecDeque;
 use thiserror::Error;
-use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::semantics::Field;
+use yash_syntax::source::Location;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
-use yash_syntax::source::Location;
 
 /// Error in parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]

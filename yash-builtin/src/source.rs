@@ -103,10 +103,10 @@
 //! error.
 
 use crate::Result;
+use yash_env::Env;
 #[cfg(doc)]
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::Env;
 
 mod semantics;
 pub mod syntax;

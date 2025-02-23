@@ -23,6 +23,7 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::ops::ControlFlow;
 use std::rc::Rc;
+use yash_env::Env;
 use yash_env::input::Echo;
 use yash_env::input::FdReader;
 use yash_env::io::Fd;
@@ -38,13 +39,12 @@ use yash_env::system::OpenFlag;
 use yash_env::system::System;
 use yash_env::system::SystemEx as _;
 use yash_env::variable::PATH;
-use yash_env::Env;
 use yash_semantics::read_eval_loop;
 use yash_syntax::parser::lex::Lexer;
+use yash_syntax::source::Source;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
-use yash_syntax::source::Source;
 
 impl Command {
     /// Executes the `.` built-in.
@@ -165,12 +165,12 @@ mod tests {
     use futures_util::FutureExt as _;
     use std::cell::RefCell;
     use std::rc::Rc;
+    use yash_env::VirtualSystem;
     use yash_env::io::MIN_INTERNAL_FD;
     use yash_env::path::Path;
-    use yash_env::system::r#virtual::Inode;
     use yash_env::system::FdFlag;
+    use yash_env::system::r#virtual::Inode;
     use yash_env::variable::Scope;
-    use yash_env::VirtualSystem;
 
     fn system_with_file<P: AsRef<Path>, C: Into<Vec<u8>>>(path: P, content: C) -> VirtualSystem {
         let system = VirtualSystem::new();

@@ -32,21 +32,19 @@ pub use self::errno::Errno;
 pub use self::errno::RawErrno;
 pub use self::errno::Result;
 pub use self::fd_flag::FdFlag;
+pub use self::file_system::AT_FDCWD;
 pub use self::file_system::Dir;
 pub use self::file_system::DirEntry;
 pub use self::file_system::FileType;
 pub use self::file_system::Mode;
 pub use self::file_system::RawMode;
 pub use self::file_system::Stat;
-pub use self::file_system::AT_FDCWD;
 pub use self::id::Gid;
 pub use self::id::RawGid;
 pub use self::id::RawUid;
 pub use self::id::Uid;
 pub use self::open_flag::OfdAccess;
 pub use self::open_flag::OpenFlag;
-#[cfg(doc)]
-use self::r#virtual::VirtualSystem;
 #[cfg(all(doc, unix))]
 use self::real::RealSystem;
 use self::resource::LimitPair;
@@ -54,6 +52,9 @@ use self::resource::Resource;
 use self::select::SelectSystem;
 use self::select::SignalStatus;
 pub use self::shared::SharedSystem;
+#[cfg(doc)]
+use self::r#virtual::VirtualSystem;
+use crate::Env;
 use crate::io::Fd;
 use crate::io::MIN_INTERNAL_FD;
 use crate::job::Pid;
@@ -66,14 +67,12 @@ use crate::str::UnixString;
 #[cfg(doc)]
 use crate::subshell::Subshell;
 use crate::trap::SignalSystem;
-use crate::Env;
 use enumset::EnumSet;
 use std::convert::Infallible;
-use std::ffi::c_int;
 use std::ffi::CStr;
 use std::ffi::CString;
+use std::ffi::c_int;
 use std::fmt::Debug;
-use std::future::Future;
 use std::io::SeekFrom;
 use std::pin::Pin;
 use std::time::Duration;

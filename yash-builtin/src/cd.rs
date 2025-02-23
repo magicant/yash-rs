@@ -182,15 +182,15 @@
 //! the above conditions are not met. The current implementation does it if and
 //! only if the final operand starts with `$PWD`.
 
-use crate::common::report;
 use crate::Result;
+use crate::common::report;
+use yash_env::Env;
 use yash_env::path::Path;
 use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::Errno;
 use yash_env::variable::PWD;
-use yash_env::Env;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Footer;
 use yash_syntax::source::pretty::Message;

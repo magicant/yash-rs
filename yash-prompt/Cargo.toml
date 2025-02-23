@@ -2,8 +2,8 @@
 name = "yash-prompt"
 version = "0.4.0"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
-edition = "2021"
-rust-version = "1.82.0"
+edition = "2024"
+rust-version = "1.85.0"
 description = "Command line prompt for yash shell"
 # documentation = "https://yash.osdn.jp/doc/"
 readme = "README.md"

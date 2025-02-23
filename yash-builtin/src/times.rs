@@ -71,9 +71,9 @@
 use crate::common::output;
 use crate::common::report_error;
 use crate::common::report_simple_failure;
-use yash_env::semantics::Field;
 use yash_env::Env;
 use yash_env::System;
+use yash_env::semantics::Field;
 
 mod format;
 mod syntax;

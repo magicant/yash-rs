@@ -57,8 +57,8 @@
 
 use crate::common::report_error;
 use crate::common::report_failure;
-use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::semantics::Field;
 use yash_syntax::source::pretty::Message;
 use yash_syntax::source::pretty::MessageBase;
 
@@ -94,7 +94,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     match syntax::parse(env, args) {
         Ok(command) => {
             let errors = command.execute(env);
-            match to_message(&{ errors }) {
+            match to_message(&errors) {
                 None => crate::Result::default(),
                 Some(message) => report_failure(env, message).await,
             }

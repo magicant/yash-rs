@@ -17,16 +17,16 @@
 //! Command-line argument parser for the `ulimit` built-in
 
 use super::{Command, ResourceExt as _, SetLimitType, SetLimitValue, ShowLimitType};
-use crate::common::syntax::{parse_arguments, Mode, OptionSpec, ParseError};
+use crate::common::syntax::{Mode, OptionSpec, ParseError, parse_arguments};
 use std::borrow::Cow;
 use std::num::ParseIntError;
 use std::str::FromStr;
 use thiserror::Error;
+use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::system::resource::Resource;
-use yash_env::Env;
-use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_syntax::source::Location;
+use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[non_exhaustive]
@@ -160,7 +160,7 @@ pub fn parse(env: &Env, args: Vec<Field>) -> Result {
                 Err(Error::AllWithOperand(operand))
             } else {
                 Ok(Command::ShowAll(show_limit_type(hard, soft)?))
-            }
+            };
         }
 
         Some(option_char) => Resource::ALL

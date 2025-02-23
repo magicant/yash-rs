@@ -16,19 +16,19 @@
 
 //! Implementation of the read-eval loop
 
+use crate::Handle;
 use crate::command::Command;
 use crate::trap::run_traps_for_caught_signals;
-use crate::Handle;
 use std::cell::Cell;
 use std::ops::ControlFlow::Continue;
 use std::rc::Rc;
+use yash_env::Env;
 use yash_env::option::Option::Verbose;
 use yash_env::option::State;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
-use yash_env::Env;
-use yash_syntax::parser::lex::Lexer;
 use yash_syntax::parser::Parser;
+use yash_syntax::parser::lex::Lexer;
 
 /// Read-eval-loop
 ///
@@ -177,8 +177,8 @@ mod tests {
     use yash_env::option::State::{Off, On};
     use yash_env::semantics::Divert;
     use yash_env::system::r#virtual::FileBody;
-    use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::system::r#virtual::SIGUSR1;
+    use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::trap::Action;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;

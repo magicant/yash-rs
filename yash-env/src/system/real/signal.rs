@@ -452,18 +452,20 @@ impl Disposition {
 
     /// Converts the `sigaction` to the signal disposition for the real system.
     pub(super) unsafe fn from_sigaction(sa: &MaybeUninit<libc::sigaction>) -> Self {
-        #[cfg(not(target_os = "aix"))]
-        let handler = (*sa.as_ptr()).sa_sigaction;
+        unsafe {
+            #[cfg(not(target_os = "aix"))]
+            let handler = (*sa.as_ptr()).sa_sigaction;
 
-        #[cfg(target_os = "aix")]
-        let handler = (*sa.as_ptr()).sa_union.__su_sigaction;
+            #[cfg(target_os = "aix")]
+            let handler = (*sa.as_ptr()).sa_union.__su_sigaction;
 
-        // It is platform-specific whether we really need to transmute the handler.
-        #[allow(clippy::useless_transmute)]
-        match std::mem::transmute(handler) {
-            libc::SIG_DFL => Self::Default,
-            libc::SIG_IGN => Self::Ignore,
-            _ => Self::Catch,
+            // It is platform-specific whether we really need to transmute the handler.
+            #[allow(clippy::useless_transmute)]
+            match std::mem::transmute(handler) {
+                libc::SIG_DFL => Self::Default,
+                libc::SIG_IGN => Self::Ignore,
+                _ => Self::Catch,
+            }
         }
     }
 }

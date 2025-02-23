@@ -24,11 +24,11 @@
 use super::Command;
 use super::Signal;
 use thiserror::Error;
+use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::signal;
-use yash_env::Env;
-use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
 use yash_syntax::source::Location;
+use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
 
 /// Error that may occur during parsing
 #[derive(Clone, Debug, Error, PartialEq, Eq)]

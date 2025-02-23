@@ -105,7 +105,7 @@ impl Parser<'_, '_> {
                     return Err(Error {
                         cause: SyntaxError::UnclosedArrayValue { opening_location }.into(),
                         location: next.word.location,
-                    })
+                    });
                 }
             }
         }

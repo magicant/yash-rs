@@ -21,8 +21,10 @@ use crate::trap::run_exit_trap;
 use super::Command;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
-use yash_env::io::print_error;
+use yash_env::Env;
+use yash_env::System;
 use yash_env::io::Fd;
+use yash_env::io::print_error;
 use yash_env::job::Job;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
@@ -31,8 +33,6 @@ use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Mode;
 use yash_env::system::OfdAccess;
-use yash_env::Env;
-use yash_env::System;
 use yash_syntax::source::Location;
 use yash_syntax::syntax;
 use yash_syntax::syntax::AndOrList;
@@ -129,22 +129,22 @@ mod tests {
     use crate::tests::cat_builtin;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use futures_util::task::LocalSpawnExt;
     use futures_util::FutureExt;
+    use futures_util::task::LocalSpawnExt;
     use std::cell::RefCell;
     use std::rc::Rc;
+    use yash_env::VirtualSystem;
     use yash_env::job::ProcessState;
     use yash_env::option::Option::Monitor;
     use yash_env::option::State::On;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::Inode;
     use yash_env::system::r#virtual::SystemState;
-    use yash_env::VirtualSystem;
+    use yash_env_test_helper::LocalExecutor;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
     use yash_env_test_helper::in_virtual_system;
     use yash_env_test_helper::stub_tty;
-    use yash_env_test_helper::LocalExecutor;
 
     #[test]
     fn item_execute_sync() {

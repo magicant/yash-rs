@@ -22,13 +22,12 @@
 //! `yash_env` crate. For implementations of specific built-ins like `cd` and
 //! `export`, see the `yash_builtin` crate.
 
+use crate::Env;
 #[cfg(doc)]
 use crate::semantics::Divert;
 use crate::semantics::ExitStatus;
 use crate::semantics::Field;
-use crate::Env;
 use std::fmt::Debug;
-use std::future::Future;
 use std::pin::Pin;
 
 /// Types of built-in utilities

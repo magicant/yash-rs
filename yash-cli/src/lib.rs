@@ -31,16 +31,16 @@ use self::startup::init_file::run_rcfile;
 use self::startup::input::prepare_input;
 use std::cell::RefCell;
 use std::ops::ControlFlow::{Break, Continue};
-use yash_env::option::{Interactive, On};
-use yash_env::signal;
-use yash_env::system::{Disposition, Errno};
 use yash_env::Env;
 use yash_env::RealSystem;
 use yash_env::System;
+use yash_env::option::{Interactive, On};
+use yash_env::signal;
+use yash_env::system::{Disposition, Errno};
 use yash_executor::Executor;
 use yash_semantics::trap::run_exit_trap;
-use yash_semantics::{interactive_read_eval_loop, read_eval_loop};
 use yash_semantics::{Divert, ExitStatus};
+use yash_semantics::{interactive_read_eval_loop, read_eval_loop};
 
 async fn print_version(env: &mut Env) -> ExitStatus {
     let version = env!("CARGO_PKG_VERSION");

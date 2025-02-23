@@ -16,9 +16,9 @@
 
 //! `Echo` definition
 
+use crate::Env;
 use crate::option::Option::Verbose;
 use crate::option::State::On;
-use crate::Env;
 use std::cell::RefCell;
 use yash_syntax::input::{Context, Input, Result};
 

@@ -42,8 +42,8 @@
 //! The colon built-in is specified in the POSIX standard.
 
 use crate::Result;
-use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::semantics::Field;
 
 /// Entry point for executing the `:` built-in
 pub fn main(_env: &mut Env, _args: Vec<Field>) -> Result {

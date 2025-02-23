@@ -33,14 +33,14 @@
 //! you should create an `XTrace` only if the option is on.
 //! [`XTrace::from_options`] is a convenient method to do so.
 
-use crate::expansion::expand_text;
 use crate::Handle;
+use crate::expansion::expand_text;
 use std::fmt::Write;
+use yash_env::Env;
 use yash_env::option::OptionSet;
 use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_env::variable::PS4;
-use yash_env::Env;
 use yash_quote::quoted;
 use yash_syntax::syntax::Text;
 
@@ -111,7 +111,7 @@ impl XTrace {
     /// When writing to the buffer, the content should end with a space.
     #[inline]
     #[must_use]
-    pub fn words(&mut self) -> &mut impl Write {
+    pub fn words(&mut self) -> &mut (impl Write + use<>) {
         &mut self.words
     }
 
@@ -121,7 +121,7 @@ impl XTrace {
     /// When writing to the buffer, the content should end with a space.
     #[inline]
     #[must_use]
-    pub fn assigns(&mut self) -> &mut impl Write {
+    pub fn assigns(&mut self) -> &mut (impl Write + use<>) {
         &mut self.assigns
     }
 
@@ -134,7 +134,7 @@ impl XTrace {
     /// See also [`here_doc_contents`](Self::here_doc_contents).
     #[inline]
     #[must_use]
-    pub fn redirs(&mut self) -> &mut impl Write {
+    pub fn redirs(&mut self) -> &mut (impl Write + use<>) {
         &mut self.redirs
     }
 
@@ -144,7 +144,7 @@ impl XTrace {
     /// [redirections buffer](Self::redirs()).
     #[inline]
     #[must_use]
-    pub fn here_doc_contents(&mut self) -> &mut impl Write {
+    pub fn here_doc_contents(&mut self) -> &mut (impl Write + use<>) {
         &mut self.here_doc_contents
     }
 

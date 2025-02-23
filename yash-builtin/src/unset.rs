@@ -69,10 +69,10 @@
 //! implementation unsets the both. This is not portable. Old versions of yash
 //! used to unset the local variable only.
 
-use crate::common::report_error;
 use crate::Result;
-use yash_env::semantics::Field;
+use crate::common::report_error;
 use yash_env::Env;
+use yash_env::semantics::Field;
 
 /// Selection of what to unset
 #[derive(Debug, Clone, Copy, Default, Eq, Hash, PartialEq)]

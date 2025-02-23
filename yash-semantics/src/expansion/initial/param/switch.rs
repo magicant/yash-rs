@@ -19,13 +19,13 @@
 use super::Env;
 use super::Error;
 use super::Phrase;
+use crate::expansion::AssignReadOnlyError;
+use crate::expansion::ErrorCause;
 use crate::expansion::attr::Origin;
 use crate::expansion::attr_strip::Strip;
 use crate::expansion::expand_word;
 use crate::expansion::initial::Expand as _;
 use crate::expansion::quote_removal::skip_quotes;
-use crate::expansion::AssignReadOnlyError;
-use crate::expansion::ErrorCause;
 use yash_env::variable::Scope;
 use yash_env::variable::Value;
 use yash_syntax::source::Location;

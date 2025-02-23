@@ -30,8 +30,8 @@
 //! `Stack`. [`Env::push_frame`] returns a [`EnvFrameGuard`] that implements
 //! `DerefMut<Target = Env>`.
 
-use crate::semantics::Field;
 use crate::Env;
+use crate::semantics::Field;
 use std::ops::Deref;
 use std::ops::DerefMut;
 

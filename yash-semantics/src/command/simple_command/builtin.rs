@@ -17,19 +17,19 @@
 //! Simple command semantics for built-ins
 
 use super::perform_assignments;
+use crate::Handle;
 use crate::redir::RedirGuard;
+use crate::xtrace::XTrace;
 use crate::xtrace::print;
 use crate::xtrace::trace_fields;
-use crate::xtrace::XTrace;
-use crate::Handle;
 use std::ops::ControlFlow::{Break, Continue};
+use yash_env::Env;
 use yash_env::builtin::Builtin;
 use yash_env::semantics::Divert;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::stack::Builtin as FrameBuiltin;
 use yash_env::variable::Context;
-use yash_env::Env;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
 
@@ -89,17 +89,16 @@ mod tests {
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
-    use std::future::Future;
     use std::pin::Pin;
     use std::rc::Rc;
     use std::str::from_utf8;
+    use yash_env::VirtualSystem;
     use yash_env::option::State::On;
     use yash_env::semantics::ExitStatus;
     use yash_env::stack::Frame;
-    use yash_env::system::r#virtual::FileBody;
     use yash_env::system::Errno;
+    use yash_env::system::r#virtual::FileBody;
     use yash_env::variable::Value;
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
     use yash_syntax::syntax;

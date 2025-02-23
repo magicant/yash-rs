@@ -17,14 +17,16 @@
 //! Simple command semantics for external utilities
 
 use super::perform_assignments;
+use crate::Handle;
 use crate::redir::RedirGuard;
+use crate::xtrace::XTrace;
 use crate::xtrace::print;
 use crate::xtrace::trace_fields;
-use crate::xtrace::XTrace;
-use crate::Handle;
 use itertools::Itertools;
 use std::ffi::CString;
 use std::ops::ControlFlow::Continue;
+use yash_env::Env;
+use yash_env::System;
 use yash_env::io::print_error;
 use yash_env::job::Job;
 use yash_env::semantics::ExitStatus;
@@ -34,8 +36,6 @@ use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
 use yash_env::variable::Context;
-use yash_env::Env;
-use yash_env::System;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
@@ -234,9 +234,9 @@ mod tests {
     use std::rc::Rc;
     use std::str::from_utf8;
     use yash_env::option::State::On;
+    use yash_env::system::Mode;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::Inode;
-    use yash_env::system::Mode;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
     use yash_env_test_helper::assert_stderr;

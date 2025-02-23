@@ -21,17 +21,17 @@ use super::super::attr::Origin;
 use super::super::phrase::Phrase;
 use super::Env;
 use super::Error;
+use crate::Handle;
 use crate::expansion::ErrorCause;
 use crate::read_eval_loop;
 use crate::trap::run_exit_trap;
-use crate::Handle;
 use std::cell::RefCell;
+use yash_env::System;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
-use yash_env::System;
 use yash_syntax::parser::lex::Lexer;
 use yash_syntax::source::Location;
 use yash_syntax::source::Source;
@@ -50,7 +50,7 @@ where
             return Err(Error {
                 cause: ErrorCause::CommandSubstError(errno),
                 location,
-            })
+            });
         }
     };
 
@@ -139,7 +139,7 @@ async fn expand_common(
             return Err(Error {
                 cause: ErrorCause::CommandSubstError(errno),
                 location,
-            })
+            });
         }
     }
 

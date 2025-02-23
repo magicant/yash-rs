@@ -150,8 +150,8 @@
 //! may change in the future.
 
 use crate::common::report_error;
-use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::semantics::Field;
 
 mod signal;
 

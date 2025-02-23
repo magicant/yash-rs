@@ -140,13 +140,15 @@ mod cond;
 pub use self::cond::CondSpec;
 use crate::common::report_error;
 use crate::common::report_failure;
-use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
+use crate::common::syntax::parse_arguments;
 use crate::common::to_single_message;
 use itertools::Itertools as _;
 use std::borrow::Cow;
 use std::fmt::Write;
 use thiserror::Error;
+use yash_env::Env;
+use yash_env::System;
 use yash_env::option::Option::Interactive;
 use yash_env::option::State::On;
 use yash_env::semantics::ExitStatus;
@@ -158,8 +160,6 @@ use yash_env::trap::Condition;
 use yash_env::trap::SetActionError;
 use yash_env::trap::SignalSystem;
 use yash_env::trap::TrapSet;
-use yash_env::Env;
-use yash_env::System;
 use yash_quote::quoted;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -428,7 +428,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
             // required by POSIX.
             errors.retain(|error| error.cause != SetActionError::InitiallyIgnored.into());
 
-            match to_single_message(&{ errors }) {
+            match to_single_message(&errors) {
                 None => crate::Result::default(),
                 Some(message) => report_failure(env, message).await,
             }
@@ -443,14 +443,14 @@ mod tests {
     use futures_util::future::FutureExt;
     use std::ops::ControlFlow::{Break, Continue};
     use std::rc::Rc;
+    use yash_env::Env;
+    use yash_env::VirtualSystem;
     use yash_env::io::Fd;
     use yash_env::semantics::Divert;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
-    use yash_env::system::r#virtual::{SIGINT, SIGPIPE, SIGUSR1, SIGUSR2};
     use yash_env::system::Disposition;
-    use yash_env::Env;
-    use yash_env::VirtualSystem;
+    use yash_env::system::r#virtual::{SIGINT, SIGPIPE, SIGUSR1, SIGUSR2};
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
 

@@ -25,7 +25,6 @@ use super::lex::Operator::{And, Newline, Semicolon};
 use super::lex::TokenId::{self, EndOfInput, IoNumber, Operator, Token};
 use crate::syntax::Item;
 use crate::syntax::List;
-use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 

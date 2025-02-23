@@ -49,7 +49,7 @@ impl Lexer<'_> {
             let Some(digit) = self.hex_digit().await? else {
                 break;
             };
-            value = value << 4 | digit;
+            value = (value << 4) | digit;
         }
         Ok(Some(value))
     }

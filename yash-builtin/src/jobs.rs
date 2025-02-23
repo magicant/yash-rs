@@ -86,16 +86,16 @@
 use crate::common::output;
 use crate::common::report_error;
 use crate::common::report_failure;
-use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
 use crate::common::syntax::OptionSpec;
+use crate::common::syntax::parse_arguments;
+use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::job::fmt::Accumulator;
+use yash_env::job::id::FindError;
 use yash_env::job::id::parse;
 use yash_env::job::id::parse_tail;
-use yash_env::job::id::FindError;
 use yash_env::semantics::Field;
-use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
@@ -157,7 +157,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             match job_id.find(&env.jobs) {
                 Ok(index) => accumulator.add(index, &env.jobs[index], &env.system),
                 Err(error) => {
-                    return report_failure(env, find_error_message(error, &operand)).await
+                    return report_failure(env, find_error_message(error, &operand)).await;
                 }
             }
         }

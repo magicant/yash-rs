@@ -16,14 +16,14 @@
 
 //! Command line argument parser for the break/continue built-in
 
-use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
+use crate::common::syntax::parse_arguments;
 use std::borrow::Cow;
 use std::num::NonZeroUsize;
 use std::num::ParseIntError;
 use thiserror::Error;
-use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::semantics::Field;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;

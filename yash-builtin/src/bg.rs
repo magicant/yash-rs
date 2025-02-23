@@ -83,24 +83,24 @@
 use crate::common::report_error;
 use crate::common::report_failure;
 use crate::common::report_simple_failure;
-use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
+use crate::common::syntax::parse_arguments;
 use crate::common::to_single_message;
 use std::borrow::Cow;
 use std::fmt::Display;
 use thiserror::Error;
+use yash_env::Env;
+use yash_env::System;
 use yash_env::io::Fd;
-use yash_env::job::id::parse;
-use yash_env::job::id::FindError;
-use yash_env::job::id::ParseError;
 #[cfg(doc)]
 use yash_env::job::JobList;
 use yash_env::job::ProcessState;
+use yash_env::job::id::FindError;
+use yash_env::job::id::ParseError;
+use yash_env::job::id::parse;
 use yash_env::semantics::Field;
 use yash_env::signal;
 use yash_env::system::Errno;
-use yash_env::Env;
-use yash_env::System;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
@@ -224,7 +224,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
                 Err(error) => errors.push(OperandError(operand, error)),
             }
         }
-        match to_single_message(&{ errors }) {
+        match to_single_message(&errors) {
             None => crate::Result::default(),
             Some(message) => report_failure(env, message).await,
         }
@@ -235,13 +235,13 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
 mod tests {
     use super::*;
     use futures_util::FutureExt as _;
+    use yash_env::VirtualSystem;
     use yash_env::job::Job;
     use yash_env::job::Pid;
     use yash_env::job::ProcessState;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::r#virtual::Process;
     use yash_env::system::r#virtual::{SIGSTOP, SIGTSTP, SIGTTIN};
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
 

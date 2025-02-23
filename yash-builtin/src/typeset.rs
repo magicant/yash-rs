@@ -278,13 +278,13 @@
 use self::syntax::OptionSpec;
 use crate::common::{output, report_error, report_failure, to_single_message};
 use thiserror::Error;
+use yash_env::Env;
 use yash_env::function::Function;
 use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_env::variable::{Value, Variable};
-use yash_env::Env;
-use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_syntax::source::Location;
+use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 
 mod print_functions;
 mod print_variables;

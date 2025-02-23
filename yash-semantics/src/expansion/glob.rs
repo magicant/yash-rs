@@ -56,11 +56,11 @@ use super::attr::Origin;
 use std::ffi::CString;
 use std::iter::Once;
 use std::marker::PhantomData;
+use yash_env::Env;
+use yash_env::System;
 use yash_env::option::State::Off;
 use yash_env::semantics::Field;
 use yash_env::system::AT_FDCWD;
-use yash_env::Env;
-use yash_env::System;
 use yash_fnmatch::Config;
 use yash_fnmatch::Pattern;
 use yash_fnmatch::PatternChar;
@@ -289,10 +289,10 @@ mod tests {
     use crate::expansion::AttrChar;
     use crate::expansion::Origin;
     use std::rc::Rc;
+    use yash_env::VirtualSystem;
     use yash_env::path::Path;
     use yash_env::str::UnixStr;
     use yash_env::system::Mode;
-    use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
 
     fn dummy_attr_field(s: &str) -> AttrField {

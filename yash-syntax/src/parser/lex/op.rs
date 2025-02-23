@@ -24,7 +24,6 @@ use crate::syntax::Literal;
 use crate::syntax::Unquoted;
 use crate::syntax::Word;
 use std::fmt;
-use std::future::Future;
 use std::pin::Pin;
 use thiserror::Error;
 

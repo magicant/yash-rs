@@ -16,11 +16,11 @@
 
 //! Command line syntax parsing for the times built-in
 
-use crate::common::syntax::{parse_arguments, Mode};
+use crate::common::syntax::{Mode, parse_arguments};
 use std::borrow::Cow;
 use thiserror::Error;
-use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::semantics::Field;
 use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 
 /// Error in parsing command line arguments

@@ -23,6 +23,8 @@ use enumset::EnumSet;
 use itertools::Itertools;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
+use yash_env::Env;
+use yash_env::System;
 use yash_env::io::Fd;
 use yash_env::job::Job;
 use yash_env::job::Pid;
@@ -36,8 +38,6 @@ use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
 use yash_env::system::SystemEx;
-use yash_env::Env;
-use yash_env::System;
 use yash_syntax::syntax;
 
 /// Executes the pipeline.
@@ -332,9 +332,9 @@ mod tests {
     use crate::tests::suspend_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
-    use std::future::Future;
     use std::pin::Pin;
     use std::rc::Rc;
+    use yash_env::VirtualSystem;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
     use yash_env::job::ProcessResult;
@@ -345,7 +345,6 @@ mod tests {
     use yash_env::semantics::Field;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::SIGSTOP;
-    use yash_env::VirtualSystem;
     use yash_env_test_helper::assert_stdout;
     use yash_env_test_helper::in_virtual_system;
     use yash_env_test_helper::stub_tty;
