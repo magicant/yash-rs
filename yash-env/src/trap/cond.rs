@@ -114,6 +114,7 @@ impl Condition {
         conditions.extend(non_real_time);
         conditions.extend(real_time);
         conditions.sort();
+        // Some names may share the same number, so deduplicate.
         conditions.into_iter().dedup()
     }
 }
