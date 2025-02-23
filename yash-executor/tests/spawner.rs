@@ -115,7 +115,7 @@ mod spawn {
         let executor = Executor::new();
         let spawner = executor.spawner();
 
-        let receiver = { unsafe { spawner.spawn(async { 123 }) }.unwrap() };
+        let receiver = unsafe { spawner.spawn(async { 123 }) }.unwrap();
         assert_eq!(executor.wake_count(), 1);
         assert_eq!(receiver.try_receive(), Err(TryReceiveError::NotSent));
 

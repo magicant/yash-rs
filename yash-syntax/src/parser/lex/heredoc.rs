@@ -99,7 +99,7 @@ impl Lexer<'_> {
                 break;
             }
 
-            content.extend({ line_text }.0.drain(skip_count..));
+            content.extend(line_text.0.into_iter().skip(skip_count));
             content.push(Literal(NEWLINE));
         }
 
