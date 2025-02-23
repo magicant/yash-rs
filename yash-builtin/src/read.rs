@@ -72,8 +72,8 @@
 //!
 //! The exit status is zero if a line was read successfully and non-zero
 //! otherwise. If the built-in reaches the end of the input before finding a
-//! newline, it returns non-zero, but the variables are still assigned with the
-//! line read so far.
+//! newline, the exit status is one, but the variables are still assigned with
+//! the line read so far. On other errors, the exit status is two or higher.
 //!
 //! # Portability
 //!
@@ -100,6 +100,21 @@ pub mod assigning;
 pub mod input;
 pub mod prompt;
 pub mod syntax;
+
+/// Exit status when the built-in succeeds
+pub const EXIT_STATUS_SUCCESS: ExitStatus = ExitStatus(0);
+
+/// Exit status when the built-in reaches the end of the input before finding a newline
+pub const EXIT_STATUS_EOF: ExitStatus = ExitStatus(1);
+
+/// Exit status when the built-in fails to assign a value to a variable
+pub const EXIT_STATUS_ASSIGN_ERROR: ExitStatus = ExitStatus(2);
+
+/// Exit status when the built-in fails to read from the input
+pub const EXIT_STATUS_READ_ERROR: ExitStatus = ExitStatus(3);
+
+/// Exit status on a command line syntax error
+pub const EXIT_STATUS_SYNTAX_ERROR: ExitStatus = ExitStatus(4);
 
 /// Abstract command line arguments of the `read` built-in
 ///
@@ -138,8 +153,8 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     let errors = assigning::assign(env, &input, command.variables, command.last_variable);
     let message = to_single_message(&errors);
     match message {
-        None if newline_found => ExitStatus::SUCCESS.into(),
-        None => ExitStatus::FAILURE.into(),
+        None if newline_found => EXIT_STATUS_SUCCESS.into(),
+        None => EXIT_STATUS_EOF.into(),
         Some(message) => report_failure(env, message).await,
     }
 }
