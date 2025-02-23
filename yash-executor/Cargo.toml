@@ -12,7 +12,3 @@ repository = "https://github.com/magicant/yash-rs"
 license = "MIT OR Apache-2.0"
 keywords = ["concurrency", "executor", "single-threaded"]
 categories = ["asynchronous", "concurrency", "no-std"]
-
-[dev-dependencies]
-futures-task = "0.3.31"
-pin-utils = "0.1.0"

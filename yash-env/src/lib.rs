@@ -57,13 +57,13 @@ use self::variable::PPID;
 use self::variable::Scope;
 use self::variable::VariableRefMut;
 use self::variable::VariableSet;
-use futures_util::task::noop_waker_ref;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::ops::ControlFlow::{self, Break, Continue};
 use std::rc::Rc;
 use std::task::Context;
 use std::task::Poll;
+use std::task::Waker;
 pub use unix_path as path;
 pub use unix_str as str;
 use yash_syntax::alias::AliasSet;
@@ -257,7 +257,7 @@ impl Env {
 
         let mut future = std::pin::pin!(self.wait_for_signals());
 
-        let mut context = Context::from_waker(noop_waker_ref());
+        let mut context = Context::from_waker(Waker::noop());
         if let Poll::Ready(signals) = future.as_mut().poll(&mut context) {
             return Some(signals);
         }

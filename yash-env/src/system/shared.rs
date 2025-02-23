@@ -762,9 +762,9 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use futures_util::FutureExt as _;
-    use futures_util::task::noop_waker_ref;
     use std::task::Context;
     use std::task::Poll;
+    use std::task::Waker;
     use std::time::Duration;
 
     #[test]
@@ -788,7 +788,7 @@ mod tests {
         let system2 = system.clone();
         let (reader, writer) = system.pipe().unwrap();
 
-        let mut context = Context::from_waker(noop_waker_ref());
+        let mut context = Context::from_waker(Waker::noop());
         let mut buffer = [0; 2];
         let mut future = Box::pin(system.read_async(reader, &mut buffer));
         let result = future.as_mut().poll(&mut context);
@@ -837,7 +837,7 @@ mod tests {
             .write(&[42; PIPE_SIZE])
             .unwrap();
 
-        let mut context = Context::from_waker(noop_waker_ref());
+        let mut context = Context::from_waker(Waker::noop());
         let mut out_buffer = [87; PIPE_SIZE];
         out_buffer[0] = 0;
         out_buffer[1] = 1;
@@ -898,7 +898,7 @@ mod tests {
             .unwrap();
 
         // Even if the pipe is full, empty write succeeds.
-        let mut context = Context::from_waker(noop_waker_ref());
+        let mut context = Context::from_waker(Waker::noop());
         let mut future = Box::pin(system.write_all(writer, &[]));
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Ready(Ok(0)));
@@ -917,7 +917,7 @@ mod tests {
         let target = start + Duration::from_millis(1_125);
 
         let mut future = Box::pin(system.wait_until(target));
-        let mut context = Context::from_waker(noop_waker_ref());
+        let mut context = Context::from_waker(Waker::noop());
         let poll = future.as_mut().poll(&mut context);
         assert_eq!(poll, Poll::Pending);
 
@@ -937,7 +937,7 @@ mod tests {
         system.set_disposition(SIGINT, Disposition::Catch).unwrap();
         system.set_disposition(SIGUSR1, Disposition::Catch).unwrap();
 
-        let mut context = Context::from_waker(noop_waker_ref());
+        let mut context = Context::from_waker(Waker::noop());
         let mut future = Box::pin(system.wait_for_signals());
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
@@ -971,7 +971,7 @@ mod tests {
         let mut system = SharedSystem::new(Box::new(system));
         system.set_disposition(SIGCHLD, Disposition::Catch).unwrap();
 
-        let mut context = Context::from_waker(noop_waker_ref());
+        let mut context = Context::from_waker(Waker::noop());
         let mut future = Box::pin(system.wait_for_signal(SIGCHLD));
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
@@ -999,7 +999,7 @@ mod tests {
         system.set_disposition(SIGINT, Disposition::Catch).unwrap();
         system.set_disposition(SIGTERM, Disposition::Catch).unwrap();
 
-        let mut context = Context::from_waker(noop_waker_ref());
+        let mut context = Context::from_waker(Waker::noop());
         let mut future = Box::pin(system.wait_for_signal(SIGINT));
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
@@ -1057,7 +1057,7 @@ mod tests {
         let mut buffer = [0];
         let mut read_future = Box::pin(system_1.read_async(reader, &mut buffer));
         let mut signal_future = Box::pin(system_2.wait_for_signals());
-        let mut context = Context::from_waker(noop_waker_ref());
+        let mut context = Context::from_waker(Waker::noop());
         let result = read_future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
         let result = signal_future.as_mut().poll(&mut context);
@@ -1081,7 +1081,7 @@ mod tests {
         let target = start + Duration::from_millis(1_125);
 
         let mut future = Box::pin(system.wait_until(target));
-        let mut context = Context::from_waker(noop_waker_ref());
+        let mut context = Context::from_waker(Waker::noop());
         let poll = future.as_mut().poll(&mut context);
         assert_eq!(poll, Poll::Pending);
 

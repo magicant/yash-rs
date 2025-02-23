@@ -1,11 +1,10 @@
 // This file is part of yash, an extended POSIX shell.
 // Copyright (C) 2024 WATANABE Yuki
 
-use futures_task::noop_waker_ref;
-use pin_utils::pin_mut;
 use std::cell::Cell;
 use std::future::poll_fn;
-use std::task::{Context, Poll};
+use std::pin::pin;
+use std::task::{Context, Poll, Waker};
 use yash_executor::Executor;
 use yash_executor::forwarder::*;
 
@@ -52,7 +51,7 @@ fn try_receive_after_received() {
 fn try_receive_does_not_modify_waker() {
     let received = Cell::new(false);
     let (sender, receiver) = forwarder::<()>();
-    pin_mut!(receiver); // TODO std::pin::pin requires Rust 1.68.0
+    let mut receiver = pin!(receiver);
     let executor = Executor::new();
     unsafe {
         executor.spawn_pinned(Box::pin(poll_fn(|context| {
@@ -121,11 +120,11 @@ fn second_poll_overwrites_waker() {
 
     let received = Cell::new(false);
     let (sender, receiver) = forwarder::<()>();
-    pin_mut!(receiver); // TODO std::pin::pin requires Rust 1.68.0
+    let mut receiver = pin!(receiver);
     let executor = Executor::new();
     unsafe {
         executor.spawn_pinned(Box::pin(poll_fn(|context| {
-            let mut null_context = Context::from_waker(noop_waker_ref());
+            let mut null_context = Context::from_waker(Waker::noop());
             match receiver.as_mut().poll(&mut null_context) {
                 Poll::Pending => receiver.as_mut().poll(context),
                 Poll::Ready(()) => {

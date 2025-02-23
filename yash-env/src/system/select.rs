@@ -465,7 +465,6 @@ mod tests {
     use super::super::r#virtual::{SIGCHLD, SIGUSR1};
     use super::*;
     use assert_matches::assert_matches;
-    use futures_util::task::noop_waker;
 
     #[test]
     fn async_io_has_no_default_readers_or_writers() {
@@ -477,7 +476,7 @@ mod tests {
     #[test]
     fn async_io_non_empty_readers_and_writers() {
         let mut async_io = AsyncIo::new();
-        let waker = Rc::new(RefCell::new(Some(noop_waker())));
+        let waker = Rc::new(RefCell::new(Some(Waker::noop().clone())));
         async_io.wait_for_reading(Fd::STDIN, Rc::downgrade(&waker));
         async_io.wait_for_writing(Fd::STDOUT, Rc::downgrade(&waker));
         async_io.wait_for_writing(Fd::STDERR, Rc::downgrade(&waker));
@@ -491,7 +490,7 @@ mod tests {
     #[test]
     fn async_io_wake() {
         let mut async_io = AsyncIo::new();
-        let waker = Rc::new(RefCell::new(Some(noop_waker())));
+        let waker = Rc::new(RefCell::new(Some(Waker::noop().clone())));
         async_io.wait_for_reading(Fd(3), Rc::downgrade(&waker));
         async_io.wait_for_reading(Fd(4), Rc::downgrade(&waker));
         async_io.wait_for_writing(Fd(4), Rc::downgrade(&waker));
@@ -504,7 +503,7 @@ mod tests {
     #[test]
     fn async_io_wake_all() {
         let mut async_io = AsyncIo::new();
-        let waker = Rc::new(RefCell::new(Some(noop_waker())));
+        let waker = Rc::new(RefCell::new(Some(Waker::noop().clone())));
         async_io.wait_for_reading(Fd::STDIN, Rc::downgrade(&waker));
         async_io.wait_for_writing(Fd::STDOUT, Rc::downgrade(&waker));
         async_io.wait_for_writing(Fd::STDERR, Rc::downgrade(&waker));
@@ -541,7 +540,7 @@ mod tests {
     fn async_time_wake_if_passed() {
         let mut async_time = AsyncTime::new();
         let now = Instant::now();
-        let waker = Rc::new(RefCell::new(Some(noop_waker())));
+        let waker = Rc::new(RefCell::new(Some(Waker::noop().clone())));
         async_time.push(Timeout {
             target: now,
             waker: Rc::downgrade(&waker),
@@ -577,8 +576,8 @@ mod tests {
         let mut async_signal = AsyncSignal::new();
         let status_1 = async_signal.wait_for_signals();
         let status_2 = async_signal.wait_for_signals();
-        *status_1.borrow_mut() = SignalStatus::Expected(Some(noop_waker()));
-        *status_2.borrow_mut() = SignalStatus::Expected(Some(noop_waker()));
+        *status_1.borrow_mut() = SignalStatus::Expected(Some(Waker::noop().clone()));
+        *status_2.borrow_mut() = SignalStatus::Expected(Some(Waker::noop().clone()));
 
         async_signal.wake(&(Rc::new([SIGCHLD, SIGUSR1]) as Rc<[signal::Number]>));
         assert_matches!(&*status_1.borrow(), SignalStatus::Caught(signals) => {
