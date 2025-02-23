@@ -64,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `builtin::getopts` module and its contents
   (the `GetoptsState` struct and the `Origin` enum)
 - Internal dependencies:
+    - futures-util 0.3.31
     - nix 0.29.0
 
 ## [0.5.0] - 2024-12-14

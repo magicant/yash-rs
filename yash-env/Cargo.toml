@@ -20,7 +20,6 @@ bitflags = { workspace = true }
 either = { workspace = true }
 enumset = { workspace = true }
 errno = { workspace = true, default-features = false }
-futures-util = { workspace = true }
 itertools = { workspace = true }
 slab = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
