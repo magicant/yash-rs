@@ -15,6 +15,8 @@ changing the working directory.
 
 The `cd` built-in now errors out when a given operand is an empty string.
 
+The command `kill -l` now shows signals in the ascending order of their numbers.
+
 The `trap` built-in now implements the POSIX.1-2024 behavior of showing signal
 dispositions that are not explicitly set by the user. It also supports the `-p`
 (`--print`) option.
@@ -61,6 +63,8 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
   `EXIT_STATUS_CHDIR_ERROR`.
 - The `cd::assign::new_pwd` function now returns `Result<PathBuf, Errno>` instead
   of `PathBuf`. Previously, it returned an empty `PathBuf` on failure.
+- The `kill::print::print` function now shows signals in the ascending order of
+  their numbers when given no signals.
 - The `trap::syntax::interpret` function now supports the `-p` option.
 - The output of the `trap` built-in now includes not only user-defined traps but
   also signal dispositions that are not explicitly set by the user.

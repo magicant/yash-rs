@@ -20,6 +20,7 @@ use super::SignalSystem;
 #[cfg(doc)]
 use super::state::Action;
 use crate::signal;
+use itertools::Itertools as _;
 use std::borrow::Cow;
 use std::num::NonZero;
 
@@ -80,18 +81,16 @@ impl Condition {
     /// Returns an iterator over all possible conditions.
     ///
     /// The iterator yields all the conditions supported by the given signal
-    /// system in the following order:
-    ///
-    /// 1. [`Condition::Exit`]
-    /// 2. Non-real-time signals
-    /// 3. Real-time signals
+    /// system. The first condition is [`Condition::Exit`], followed by all the
+    /// signals in the ascending order of their signal numbers.
     // TODO Most part of this function is duplicated from yash_builtin::kill::print::all_signals.
     // Consider refactoring to share the code. Note that all_signals requires a System
-    // while this function requires a SignalSystem.
+    // while this function requires a SignalSystem. Also note that all_signals does not
+    // deduplicate the signals.
     pub fn iter<S: SignalSystem>(system: &S) -> impl Iterator<Item = Condition> + '_ {
-        let exit = std::iter::once(Condition::Exit);
-
-        let non_real_time = signal::Name::iter()
+        let names = signal::Name::iter();
+        let non_real_time_count = names.len() - 2;
+        let non_real_time = names
             .filter(|name| !matches!(name, signal::Name::Rtmin(_) | signal::Name::Rtmax(_)))
             .filter_map(|name| Some(Condition::Signal(system.signal_number_from_name(name)?)));
 
@@ -105,10 +104,16 @@ impl Condition {
                 0..=-1
             }
         };
+        let real_time_count = range.size_hint().1.unwrap_or_default();
         let real_time = range.into_iter().map(|n| {
             Condition::Signal(signal::Number::from_raw_unchecked(NonZero::new(n).unwrap()))
         });
 
-        exit.chain(non_real_time).chain(real_time)
+        let mut conditions = Vec::with_capacity(1 + non_real_time_count + real_time_count);
+        conditions.push(Condition::Exit);
+        conditions.extend(non_real_time);
+        conditions.extend(real_time);
+        conditions.sort();
+        conditions.into_iter().dedup()
     }
 }

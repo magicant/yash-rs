@@ -36,12 +36,15 @@ use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 
 /// Returns an iterator over all supported signals.
 ///
-/// The iterator yields non-real-time signals first, followed by real-time signals.
+/// The iterator yields pairs of signal names and numbers in the ascending order of
+/// signal numbers. The iterator includes both real-time and non-real-time signals.
 // TODO Most part of this function is duplicated in yash_env::trap::Condition::iter.
 // Consider refactoring to avoid duplication. Note that the two functions require
-// different trait bounds.
+// different trait bounds. Also note Condition::iter deduplicates signals.
 fn all_signals<S: System>(system: &S) -> impl Iterator<Item = (Name, Number)> + '_ {
-    let non_real_time = Name::iter()
+    let names = Name::iter();
+    let non_real_time_count = names.len() - 2;
+    let non_real_time = names
         .filter(|name| !matches!(name, Name::Rtmin(_) | Name::Rtmax(_)))
         .filter_map(|name| Some((name, system.signal_number_from_name(name)?)));
 
@@ -55,13 +58,18 @@ fn all_signals<S: System>(system: &S) -> impl Iterator<Item = (Name, Number)> + 
             0..=-1
         }
     };
+    let real_time_count = range.size_hint().1.unwrap_or_default();
     let real_time = range.into_iter().map(|n| {
         let number = Number::from_raw_unchecked(NonZero::new(n).unwrap());
         let name = system.signal_name_from_number(number);
         (name, number)
     });
 
-    non_real_time.chain(real_time)
+    let mut signals = Vec::with_capacity(non_real_time_count + real_time_count);
+    signals.extend(non_real_time);
+    signals.extend(real_time);
+    signals.sort_by_key(|&(_, number)| number);
+    signals.into_iter()
 }
 
 /// Writes the specified signal into the output string.
@@ -214,9 +222,9 @@ mod tests {
         let result = print(system, &[], false).unwrap();
         assert_eq!(
             result,
-            "ABRT\nALRM\nBUS\nCHLD\nCLD\nCONT\nEMT\nFPE\nHUP\nILL\nINFO\nINT\n\
-            IO\nIOT\nKILL\nLOST\nPIPE\nPOLL\nPROF\nPWR\nQUIT\nSEGV\nSTKFLT\n\
-            STOP\nSYS\nTERM\nTHR\nTRAP\nTSTP\nTTIN\nTTOU\nURG\nUSR1\nUSR2\n\
+            "HUP\nINT\nQUIT\nABRT\nIOT\nKILL\nALRM\nTERM\nBUS\nCHLD\nCLD\n\
+            CONT\nEMT\nFPE\nILL\nINFO\nIO\nLOST\nPIPE\nPOLL\nPROF\nPWR\nSEGV\n\
+            STKFLT\nSTOP\nSYS\nTHR\nTRAP\nTSTP\nTTIN\nTTOU\nURG\nUSR1\nUSR2\n\
             VTALRM\nWINCH\nXCPU\nXFSZ\nRTMIN\nRTMIN+1\nRTMIN+2\nRTMIN+3\n\
             RTMIN+4\nRTMAX-3\nRTMAX-2\nRTMAX-1\nRTMAX\n"
         );
