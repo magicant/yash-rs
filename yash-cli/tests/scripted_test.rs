@@ -372,6 +372,11 @@ fn read_builtin() {
 }
 
 #[test]
+fn read_builtin_ex() {
+    run("read-y.sh");
+}
+
+#[test]
 fn readonly_builtin() {
     run("readonly-p.sh")
 }
