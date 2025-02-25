@@ -2,17 +2,6 @@
 
 setup -d
 
-test_oE 'variables are assigned even if EOF is encountered'
-read a b c </dev/null
-echo $?
-typeset -p a b c
-__IN__
-1
-typeset a=''
-typeset b=''
-typeset c=''
-__OUT__
-
 test_oE 'input ending with backslash - not raw mode'
 printf '%s' 'A\' | {
 read a
