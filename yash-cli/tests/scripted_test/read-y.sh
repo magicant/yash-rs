@@ -178,21 +178,31 @@ __IN__
 [A] [B:C:D]
 __OUT__
 
-test_O -d -e 1 'reading from closed stream'
+test_o -d 'assignment to read-only variable'
+readonly a
+echo A | {
+read a
+echo $? [$a]
+}
+__IN__
+2 []
+__OUT__
+
+test_O -d -e 3 'reading from closed stream'
 read foo <&-
 __IN__
 
 : TODO the -P option not yet implemented <<'__IN__'
-test_O -d -e 2 'specifying -P and -p both'
+test_O -d -e 4 'specifying -P and -p both'
 read -P -p X foo
 __IN__
 
-test_O -d -e 2 'missing operand'
+test_O -d -e 4 'missing operand'
 read
 __IN__
 
 : TODO should be a command line syntax error <<'__IN__'
-test_O -d -e 1 'invalid variable name'
+test_O -d -e 4 'invalid variable name'
 read a=b
 __IN__
 
@@ -203,6 +213,6 @@ __IN__
 readonly ''=foo
 __OUT__
 
-test_O -d -e 2 'invalid option'
+test_O -d -e 4 'invalid option'
 read --no-such-option foo
 __IN__

@@ -89,8 +89,7 @@
 //! Reading from an unseekable input may be slow because the built-in reads the
 //! input byte by byte to make sure it does not read past the end of the line.
 
-use crate::common::report_error;
-use crate::common::report_failure;
+use crate::common::report;
 use crate::common::to_single_message;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
@@ -142,12 +141,12 @@ pub struct Command {
 pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     let command = match syntax::parse(env, args) {
         Ok(command) => command,
-        Err(error) => return report_error(env, &error).await,
+        Err(error) => return report(env, &error, EXIT_STATUS_SYNTAX_ERROR).await,
     };
 
     let (input, newline_found) = match input::read(env, command.is_raw).await {
         Ok(input) => input,
-        Err(error) => return report_failure(env, &error).await,
+        Err(error) => return report(env, &error, EXIT_STATUS_READ_ERROR).await,
     };
 
     let errors = assigning::assign(env, &input, command.variables, command.last_variable);
@@ -155,6 +154,6 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     match message {
         None if newline_found => EXIT_STATUS_SUCCESS.into(),
         None => EXIT_STATUS_EOF.into(),
-        Some(message) => report_failure(env, message).await,
+        Some(message) => report(env, message, EXIT_STATUS_ASSIGN_ERROR).await,
     }
 }
