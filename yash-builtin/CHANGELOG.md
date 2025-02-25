@@ -17,6 +17,9 @@ The `cd` built-in now errors out when a given operand is an empty string.
 
 The command `kill -l` now shows signals in the ascending order of their numbers.
 
+The `read` built-in now returns a more specific exit status depending on the
+cause of the error.
+
 The `trap` built-in now implements the POSIX.1-2024 behavior of showing signal
 dispositions that are not explicitly set by the user. It also supports the `-p`
 (`--print`) option.
@@ -44,6 +47,11 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
       is an empty string.
 - `cd::target::TargetError::exit_status`
     - This method returns the exit status corresponding to the error.
+- `read::EXIT_STATUS_SUCCESS`, `read::EXIT_STATUS_EOF`,
+  `read::EXIT_STATUS_ASSIGN_ERROR`, `read::EXIT_STATUS_READ_ERROR`,
+  `read::EXIT_STATUS_SYNTAX_ERROR`
+    - These constants represent exit statuses that can be returned by the `read`
+      built-in.
 - `trap::Command::PrintAll::include_default`
     - This field represents the new `-p` option of the `trap` built-in used
       without operands.
@@ -65,6 +73,8 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
   of `PathBuf`. Previously, it returned an empty `PathBuf` on failure.
 - The `kill::print::print` function now shows signals in the ascending order of
   their numbers when given no signals.
+- The `read::main` function now returns a more specific exit status depending on
+  the cause of the error.
 - The `trap::syntax::interpret` function now supports the `-p` option.
 - The output of the `trap` built-in now includes not only user-defined traps but
   also signal dispositions that are not explicitly set by the user.

@@ -72,8 +72,8 @@
 //!
 //! The exit status is zero if a line was read successfully and non-zero
 //! otherwise. If the built-in reaches the end of the input before finding a
-//! newline, it returns non-zero, but the variables are still assigned with the
-//! line read so far.
+//! newline, the exit status is one, but the variables are still assigned with
+//! the line read so far. On other errors, the exit status is two or higher.
 //!
 //! # Portability
 //!
@@ -89,8 +89,7 @@
 //! Reading from an unseekable input may be slow because the built-in reads the
 //! input byte by byte to make sure it does not read past the end of the line.
 
-use crate::common::report_error;
-use crate::common::report_failure;
+use crate::common::report;
 use crate::common::to_single_message;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
@@ -100,6 +99,21 @@ pub mod assigning;
 pub mod input;
 pub mod prompt;
 pub mod syntax;
+
+/// Exit status when the built-in succeeds
+pub const EXIT_STATUS_SUCCESS: ExitStatus = ExitStatus(0);
+
+/// Exit status when the built-in reaches the end of the input before finding a newline
+pub const EXIT_STATUS_EOF: ExitStatus = ExitStatus(1);
+
+/// Exit status when the built-in fails to assign a value to a variable
+pub const EXIT_STATUS_ASSIGN_ERROR: ExitStatus = ExitStatus(2);
+
+/// Exit status when the built-in fails to read from the input
+pub const EXIT_STATUS_READ_ERROR: ExitStatus = ExitStatus(3);
+
+/// Exit status on a command line syntax error
+pub const EXIT_STATUS_SYNTAX_ERROR: ExitStatus = ExitStatus(4);
 
 /// Abstract command line arguments of the `read` built-in
 ///
@@ -127,19 +141,19 @@ pub struct Command {
 pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     let command = match syntax::parse(env, args) {
         Ok(command) => command,
-        Err(error) => return report_error(env, &error).await,
+        Err(error) => return report(env, &error, EXIT_STATUS_SYNTAX_ERROR).await,
     };
 
     let (input, newline_found) = match input::read(env, command.is_raw).await {
         Ok(input) => input,
-        Err(error) => return report_failure(env, &error).await,
+        Err(error) => return report(env, &error, EXIT_STATUS_READ_ERROR).await,
     };
 
     let errors = assigning::assign(env, &input, command.variables, command.last_variable);
     let message = to_single_message(&errors);
     match message {
-        None if newline_found => ExitStatus::SUCCESS.into(),
-        None => ExitStatus::FAILURE.into(),
-        Some(message) => report_failure(env, message).await,
+        None if newline_found => EXIT_STATUS_SUCCESS.into(),
+        None => EXIT_STATUS_EOF.into(),
+        Some(message) => report(env, message, EXIT_STATUS_ASSIGN_ERROR).await,
     }
 }

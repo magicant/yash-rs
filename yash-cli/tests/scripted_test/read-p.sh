@@ -52,6 +52,15 @@ B
 C
 __OUT__
 
+test_oE 'variables are assigned even if EOF is encountered'
+printf 'foo bar baz' | {
+read a b
+echo $? [$a] [$b]
+}
+__IN__
+1 [foo] [bar baz]
+__OUT__
+
 test_oE 'set -o allexport'
 (
 set -a
