@@ -24,6 +24,10 @@ __IN__
 typeset a='A\'
 __OUT__
 
+test_O -d -e 3 'input containing null byte'
+printf 'A\0B\n' | read a
+__IN__
+
 (
 skip=true # TODO the empty-last-field option not yet implemented
 setup 'set --empty-last-field'

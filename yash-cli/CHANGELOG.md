@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The command `kill -l` now shows signals in the ascending order of their
   numbers.
 - The `read` built-in now returns a more specific exit status depending on the
-  cause of the error.
+  cause of the error. It also rejects an input containing a null byte.
 - The output of the `trap` built-in now includes not only user-defined traps but
   also signal dispositions that are not explicitly set by the user.
 - The `wait` built-in no longer treats suspended jobs as terminated jobs. When
