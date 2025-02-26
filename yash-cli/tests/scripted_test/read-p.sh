@@ -52,7 +52,7 @@ B
 C
 __OUT__
 
-test_oE 'variables are assigned even if EOF is encountered'
+test_oE 'variables are assigned even if EOF is reached without newline'
 printf 'foo bar baz' | {
 read a b
 echo $? [$a] [$b]
@@ -266,15 +266,6 @@ echoraw $? "[${a-unset}]" "[${b-unset}]" "[${c-unset}]" "[${d-unset}]" \
     "[${e-unset}]" "[${f-unset}]"
 __IN__
 0 [A] [B] [] [D] [E] [- F\]
-__OUT__
-
-test_oE 'input ending without newline'
-printf 'A' | {
-read a
-echo $? $a
-}
-__IN__
-1 A
 __OUT__
 
 test_oE 'in subshell'
