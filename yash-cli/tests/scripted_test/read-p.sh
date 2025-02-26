@@ -61,6 +61,15 @@ __IN__
 1 [foo] [bar baz]
 __OUT__
 
+test_oE 'orphan backslash is ignored'
+printf 'foo\' | {
+read a
+printf '[%s]\n' "$a"
+}
+__IN__
+[foo]
+__OUT__
+
 test_oE 'set -o allexport'
 (
 set -a
