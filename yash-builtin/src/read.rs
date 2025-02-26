@@ -64,9 +64,11 @@
 //!
 //! # Errors
 //!
-//! It is an error if the standard input is not readable.
+//! This built-in fails if:
 //!
-//! It is an error if any variable to be assigned is read-only.
+//! - The standard input is not readable.
+//! - The input contains a nul byte.
+//! - A variable to be assigned is read-only.
 //!
 //! # Exit status
 //!
@@ -90,6 +92,7 @@
 //! input byte by byte to make sure it does not read past the end of the line.
 
 use crate::common::report;
+use crate::common::report_simple;
 use crate::common::to_single_message;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
@@ -148,6 +151,10 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
         Ok(input) => input,
         Err(error) => return report(env, &error, EXIT_STATUS_READ_ERROR).await,
     };
+
+    if input.iter().any(|c| c.value == '\0') {
+        return report_simple(env, "input contains a nul byte", EXIT_STATUS_READ_ERROR).await;
+    }
 
     let errors = assigning::assign(env, &input, command.variables, command.last_variable);
     let message = to_single_message(&errors);
