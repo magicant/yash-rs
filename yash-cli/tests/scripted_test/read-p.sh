@@ -209,6 +209,18 @@ __IN__
 0 [A A] [ B ] [C\C-C\] [D]
 __OUT__
 
+test_oE 'line continuation and newline as IFS'
+IFS='
+' read a b <<\END
+A\
+B
+C
+END
+echoraw $? "[${a-unset}]" "[${b-unset}]"
+__IN__
+0 [AB] []
+__OUT__
+
 test_oE 'variables are assigned empty string for missing fields'
 read a b c d <<\END
 A B
