@@ -243,9 +243,9 @@ impl OptionSpec<'_> {
 #[derive(Clone, Copy, Default, Debug, Eq, PartialEq)]
 pub struct Mode {
     long_options: bool,
+    // TODO Change long_options to non_portable_option_names
     // TODO options_after_operands
     // TODO negative_integer_operands
-    // TODO non_portable_option_specs
 }
 
 impl Mode {
@@ -311,6 +311,7 @@ pub enum ParseError<'a> {
     #[error("unknown option {:?}", long_option_name(.0))]
     UnknownLongOption(Field),
 
+    // TODO Change this to NonPortableOptionName
     /// Long option that is defined in an option spec but disabled by
     /// configuration ([`Mode`]).
     #[error("unsupported option {:?}", .0.value)]
@@ -366,6 +367,9 @@ impl MessageBase for ParseError<'_> {
             &field.origin,
         )
     }
+
+    // TODO provide more info about the erroneous option
+    // fn footers(&self) -> Vec<Footer> {}
 }
 
 /// Parses short options in an argument.
