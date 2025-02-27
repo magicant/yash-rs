@@ -18,11 +18,13 @@
 
 use super::Command;
 use crate::common::syntax::Mode;
+use crate::common::syntax::OptionArgumentSpec;
 use crate::common::syntax::OptionSpec;
 use crate::common::syntax::parse_arguments;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
+use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
 
@@ -34,6 +36,10 @@ pub enum Error {
     #[error(transparent)]
     CommonError(#[from] crate::common::syntax::ParseError<'static>),
 
+    /// The delimiter specified by the `-d` option is multibyte.
+    #[error("multibyte delimiter is not supported")]
+    MultibyteDelimiter { delimiter: Field },
+
     /// No operand is given.
     #[error("missing operand")]
     MissingOperand,
@@ -44,6 +50,22 @@ impl Error {
     pub fn to_message(&self) -> Message {
         match self {
             Error::CommonError(e) => e.into(),
+
+            Error::MultibyteDelimiter { delimiter } => Message {
+                r#type: AnnotationType::Error,
+                title: self.to_string().into(),
+                annotations: vec![Annotation::new(
+                    AnnotationType::Error,
+                    format!(
+                        "delimiter {:?} is {}-byte long",
+                        delimiter.value,
+                        delimiter.value.len()
+                    )
+                    .into(),
+                    &delimiter.origin,
+                )],
+                footers: vec![],
+            },
 
             Error::MissingOperand => Message {
                 r#type: AnnotationType::Error,
@@ -62,7 +84,13 @@ impl<'a> From<&'a Error> for Message<'a> {
     }
 }
 
-const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('r').long("raw-mode")];
+const OPTION_SPECS: &[OptionSpec] = &[
+    OptionSpec::new()
+        .short('d')
+        .long("delimiter")
+        .argument(OptionArgumentSpec::Required),
+    OptionSpec::new().short('r').long("raw-mode"),
+];
 
 /// Parses command line arguments.
 pub fn parse(env: &Env, args: Vec<Field>) -> Result<Command, Error> {
@@ -70,9 +98,18 @@ pub fn parse(env: &Env, args: Vec<Field>) -> Result<Command, Error> {
     let (options, operands) = parse_arguments(OPTION_SPECS, mode, args)?;
 
     // Parse options
+    let mut delimiter = b'\n';
     let mut is_raw = false;
     for option in options {
         match option.spec.get_short() {
+            Some('d') => {
+                let arg = option.argument.unwrap();
+                match arg.value.len() {
+                    0 => delimiter = b'\0',
+                    1 => delimiter = arg.value.as_bytes()[0],
+                    _ => return Err(Error::MultibyteDelimiter { delimiter: arg }),
+                }
+            }
             Some('r') => is_raw = true,
             _ => unreachable!(),
         }
@@ -83,6 +120,7 @@ pub fn parse(env: &Env, args: Vec<Field>) -> Result<Command, Error> {
     let last_variable = variables.pop().ok_or(Error::MissingOperand)?;
 
     Ok(Command {
+        delimiter,
         is_raw,
         variables,
         last_variable,
@@ -94,11 +132,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn no_raw_mode() {
+    fn one_operand() {
         let env = Env::new_virtual();
         assert_eq!(
             parse(&env, Field::dummies(["var"])),
             Ok(Command {
+                delimiter: b'\n',
                 is_raw: false,
                 variables: vec![],
                 last_variable: Field::dummy("var"),
@@ -112,9 +151,56 @@ mod tests {
         assert_eq!(
             parse(&env, Field::dummies(["-r", "var"])),
             Ok(Command {
+                delimiter: b'\n',
                 is_raw: true,
                 variables: vec![],
                 last_variable: Field::dummy("var"),
+            })
+        );
+    }
+
+    #[test]
+    fn nul_delimiter() {
+        let env = Env::new_virtual();
+        assert_eq!(
+            parse(&env, Field::dummies(["-d", "", "var"])),
+            Ok(Command {
+                delimiter: b'\0',
+                is_raw: false,
+                variables: vec![],
+                last_variable: Field::dummy("var"),
+            })
+        );
+    }
+
+    #[test]
+    fn non_default_non_nul_delimiter() {
+        let env = Env::new_virtual();
+        assert_eq!(
+            parse(&env, Field::dummies(["-d", ":", "var"])),
+            Ok(Command {
+                delimiter: b':',
+                is_raw: false,
+                variables: vec![],
+                last_variable: Field::dummy("var"),
+            })
+        );
+    }
+
+    #[test]
+    fn multibyte_delimiter_is_not_supported() {
+        let env = Env::new_virtual();
+        assert_eq!(
+            parse(&env, Field::dummies(["-d", "!?", "var"])),
+            Err(Error::MultibyteDelimiter {
+                delimiter: Field::dummy("!?")
+            })
+        );
+
+        assert_eq!(
+            parse(&env, Field::dummies(["-d", "あ", "var"])),
+            Err(Error::MultibyteDelimiter {
+                delimiter: Field::dummy("あ")
             })
         );
     }
@@ -125,6 +211,7 @@ mod tests {
         assert_eq!(
             parse(&env, Field::dummies(["foo", "bar"])),
             Ok(Command {
+                delimiter: b'\n',
                 is_raw: false,
                 variables: Field::dummies(["foo"]),
                 last_variable: Field::dummy("bar"),
@@ -134,6 +221,7 @@ mod tests {
         assert_eq!(
             parse(&env, Field::dummies(["first", "second", "third"])),
             Ok(Command {
+                delimiter: b'\n',
                 is_raw: false,
                 variables: Field::dummies(["first", "second"]),
                 last_variable: Field::dummy("third"),

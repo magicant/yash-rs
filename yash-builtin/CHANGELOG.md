@@ -17,6 +17,9 @@ The `cd` built-in now errors out when a given operand is an empty string.
 
 The command `kill -l` now shows signals in the ascending order of their numbers.
 
+The `read` built-in now supports the `-d` (`--delimiter`) option, which allows
+specifying a delimiter character to terminate the input.
+
 The `read` built-in now returns a more specific exit status depending on the
 cause of the error. It also rejects an input containing a null byte.
 
@@ -52,6 +55,11 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
   `read::EXIT_STATUS_SYNTAX_ERROR`
     - These constants represent exit statuses that can be returned by the `read`
       built-in.
+- `read::Command::delimiter`
+    - This field represents the new `-d` option of the `read` built-in.
+- `read::syntax::Error::MultibyteDelimiter`
+    - This error variant represents an error that occurs when a multibyte
+      character is specified as a delimiter.
 - `trap::Command::PrintAll::include_default`
     - This field represents the new `-p` option of the `trap` built-in used
       without operands.
@@ -73,6 +81,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
   of `PathBuf`. Previously, it returned an empty `PathBuf` on failure.
 - The `kill::print::print` function now shows signals in the ascending order of
   their numbers when given no signals.
+- The `read::syntax::parse` function now accepts the `-d` (`--delimiter`) option.
 - The `read::main` function now returns a more specific exit status depending on
   the cause of the error. It now returns `EXIT_STATUS_READ_ERROR` when finding a
   null byte in the input.

@@ -140,6 +140,11 @@ pub const EXIT_STATUS_SYNTAX_ERROR: ExitStatus = ExitStatus(4);
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct Command {
+    /// Delimiter specified by the `-d` option
+    ///
+    /// When the option is not specified, this field is `b'\n'`.
+    pub delimiter: u8,
+
     /// Whether the `-r` option is specified
     ///
     /// If this field is `true`, backslashes are not interpreted.
