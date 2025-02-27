@@ -96,6 +96,14 @@
 //! The read built-in is defined in the POSIX standard with the `-d` and `-r`
 //! options.
 //!
+//! In this implementation, a line continuation is always a backslash followed
+//! by a newline. Other implementations may allow a backslash followed by a
+//! delimiter to be a line continuation if the delimiter is not a newline.
+//!
+//! When a backslash is specified as the delimiter, no escape sequences are
+//! recognized. Other implementations may recognize escape sequences in the
+//! input line, effectively never recognizing the delimiter.
+//!
 //! In this implementation, the value of the `PS2` variable is subject to
 //! parameter expansion, command substitution, and arithmetic expansion. Other
 //! implementations may not perform these expansions.
@@ -167,7 +175,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
         Err(error) => return report(env, &error, EXIT_STATUS_SYNTAX_ERROR).await,
     };
 
-    let (input, newline_found) = match input::read(env, command.is_raw).await {
+    let (input, newline_found) = match input::read(env, command.delimiter, command.is_raw).await {
         Ok(input) => input,
         Err(error) => return report(env, &error, EXIT_STATUS_READ_ERROR).await,
     };

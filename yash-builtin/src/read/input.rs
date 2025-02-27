@@ -86,8 +86,8 @@ fn plain(value: char) -> AttrChar {
 /// Reads a line from the standard input.
 ///
 /// This function reads a line from the standard input and returns a vector of
-/// [`AttrChar`]s representing the line. The line is terminated by a newline
-/// character, which is not included in the returned vector.
+/// [`AttrChar`]s representing the line. The line is terminated by the specified
+/// `delimiter` byte, which is not included in the returned vector.
 ///
 /// If `is_raw` is `true`, the read line is not subject to backslash processing.
 /// Otherwise, backslash-newline pairs are treated as line continuations, and
@@ -100,15 +100,20 @@ fn plain(value: char) -> AttrChar {
 ///
 /// If successful, this function returns a vector of [`AttrChar`]s representing
 /// the line read and a boolean value indicating whether the line was terminated
-/// by a newline character.
-pub async fn read(env: &mut Env, is_raw: bool) -> Result<(Vec<AttrChar>, bool), Error> {
+/// by a delimiter. If the end of the input is reached before finding a
+/// delimiter, the boolean value is `false`.
+pub async fn read(
+    env: &mut Env,
+    delimiter: u8,
+    is_raw: bool,
+) -> Result<(Vec<AttrChar>, bool), Error> {
     let mut result = Vec::new();
 
     let newline_found = loop {
         // TODO Read in bulk if the standard input is seekable
         match read_char(env).await? {
             None => break false,
-            Some('\n') => break true,
+            Some(c) if c == delimiter.into() => break true,
 
             // Backslash escape
             Some('\\') if !is_raw => {
@@ -228,7 +233,7 @@ mod tests {
     #[test]
     fn empty_input() {
         in_virtual_system(|mut env, _| async move {
-            let result = read(&mut env, false).await;
+            let result = read(&mut env, b'\n', false).await;
             assert_eq!(result, Ok((vec![], false)));
         })
     }
@@ -238,13 +243,13 @@ mod tests {
         in_virtual_system(|mut env, system| async move {
             set_stdin(&system, "foo\nbar\n");
 
-            let result = read(&mut env, false).await;
+            let result = read(&mut env, b'\n', false).await;
             assert_eq!(result, Ok((attr_chars("foo"), true)));
 
-            let result = read(&mut env, false).await;
+            let result = read(&mut env, b'\n', false).await;
             assert_eq!(result, Ok((attr_chars("bar"), true)));
 
-            let result = read(&mut env, false).await;
+            let result = read(&mut env, b'\n', false).await;
             assert_eq!(result, Ok((vec![], false)));
         })
     }
@@ -254,10 +259,10 @@ mod tests {
         in_virtual_system(|mut env, system| async move {
             set_stdin(&system, "newline");
 
-            let result = read(&mut env, false).await;
+            let result = read(&mut env, b'\n', false).await;
             assert_eq!(result, Ok((attr_chars("newline"), false)));
 
-            let result = read(&mut env, false).await;
+            let result = read(&mut env, b'\n', false).await;
             assert_eq!(result, Ok((vec![], false)));
         })
     }
@@ -267,8 +272,37 @@ mod tests {
         in_virtual_system(|mut env, system| async move {
             set_stdin(&system, "©⁉😀\n");
 
-            let result = read(&mut env, false).await;
+            let result = read(&mut env, b'\n', false).await;
             assert_eq!(result, Ok((attr_chars("©⁉😀"), true)));
+        })
+    }
+
+    #[test]
+    fn nul_byte_delimiter() {
+        in_virtual_system(|mut env, system| async move {
+            set_stdin(&system, "foo\0bar\0");
+
+            let result = read(&mut env, b'\0', false).await;
+            assert_eq!(result, Ok((attr_chars("foo"), true)));
+
+            let result = read(&mut env, b'\0', false).await;
+            assert_eq!(result, Ok((attr_chars("bar"), true)));
+
+            let result = read(&mut env, b'\0', false).await;
+            assert_eq!(result, Ok((vec![], false)));
+        })
+    }
+
+    #[test]
+    fn alphabetic_delimiter() {
+        in_virtual_system(|mut env, system| async move {
+            set_stdin(&system, "foo\nbar\n");
+
+            let result = read(&mut env, b'a', false).await;
+            assert_eq!(result, Ok((attr_chars("foo\nb"), true)));
+
+            let result = read(&mut env, b'a', false).await;
+            assert_eq!(result, Ok((attr_chars("r\n"), false)));
         })
     }
 
@@ -277,7 +311,7 @@ mod tests {
         in_virtual_system(|mut env, system| async move {
             set_stdin(&system, "\\foo\\\nbar\\\nbaz\n");
 
-            let result = read(&mut env, true).await;
+            let result = read(&mut env, b'\n', true).await;
             assert_eq!(result, Ok((attr_chars("\\foo\\"), true)));
         })
     }
@@ -287,7 +321,7 @@ mod tests {
         in_virtual_system(|mut env, system| async move {
             set_stdin(&system, "\\foo\\\nbar\\\nbaz\n");
 
-            let result = read(&mut env, false).await;
+            let result = read(&mut env, b'\n', false).await;
             assert_eq!(
                 result,
                 Ok((
@@ -314,7 +348,7 @@ mod tests {
         in_virtual_system(|mut env, system| async move {
             set_stdin(&system, "foo\\");
 
-            let result = read(&mut env, false).await;
+            let result = read(&mut env, b'\n', false).await;
             assert_eq!(
                 result,
                 Ok((
@@ -330,21 +364,21 @@ mod tests {
         in_virtual_system(|mut env, system| async move {
             set_stdin(&system, *b"\xFF");
 
-            let result = read(&mut env, false).await;
+            let result = read(&mut env, b'\n', false).await;
             assert_eq!(result, Err(Errno::EILSEQ.into()));
         });
 
         in_virtual_system(|mut env, system| async move {
             set_stdin(&system, *b"\xCF\xD0");
 
-            let result = read(&mut env, false).await;
+            let result = read(&mut env, b'\n', false).await;
             assert_eq!(result, Err(Errno::EILSEQ.into()));
         });
 
         in_virtual_system(|mut env, system| async move {
             set_stdin(&system, *b"\xCF");
 
-            let result = read(&mut env, false).await;
+            let result = read(&mut env, b'\n', false).await;
             assert_eq!(result, Err(Errno::EILSEQ.into()));
         });
     }

@@ -82,6 +82,8 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 - The `kill::print::print` function now shows signals in the ascending order of
   their numbers when given no signals.
 - The `read::syntax::parse` function now accepts the `-d` (`--delimiter`) option.
+- The `read::input::read` function now takes one more argument, `delimiter`, to
+  specify the delimiter character.
 - The `read::main` function now returns a more specific exit status depending on
   the cause of the error. It now returns `EXIT_STATUS_READ_ERROR` when finding a
   null byte in the input.

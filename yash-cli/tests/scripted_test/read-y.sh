@@ -28,6 +28,28 @@ test_O -d -e 3 'input containing null byte'
 printf 'A\0B\n' | read a
 __IN__
 
+# Regardless of the -d option, only backslash-newline is treated as line continuation.
+test_oE 'line continuation with non-default delimiter'
+read -d : a <<'END'
+A\
+B:C
+END
+echoraw $? "[${a-unset}]"
+__IN__
+0 [AB]
+__OUT__
+
+# When the delimiter is backslash, no escape sequence is recognized.
+test_oE 'backslash as delimiter'
+read -d \\ a <<'END'
+A\
+B
+END
+echoraw $? "[${a-unset}]"
+__IN__
+0 [A]
+__OUT__
+
 (
 skip=true # TODO the empty-last-field option not yet implemented
 setup 'set --empty-last-field'
