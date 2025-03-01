@@ -81,12 +81,13 @@ __IN__
 if [ "$(uname)" = Darwin ]; then
     # On macOS, kill(2) does not appear to run any signal handlers
     # synchronously, making it impossible for the shell to respond to self-sent
-    # signals at a predictable time. To work around this issue, the kill
-    # built-in is called in a subshell on macOS, using the SIGCHLD signal as a
-    # synchronization trigger.
-    setup <<\__EOF__
-killx() (((command kill "$@"); :); :)
-alias kill=killx
+    # signals at a predictable time. To work around this issue, we call the kill
+    # built-in in a nested subshell on macOS. The subshell and the dummy sleep
+    # command generate some more SIGCHLD signals that must be handled by the
+    # shell, which makes it more likely that the signal sent by the kill built-in
+    # is delivered to the shell before the subshell exits.
+    setup <<'__EOF__'
+kill() (trap 'sleep 0' EXIT; (trap 'sleep 0' EXIT; (trap 'sleep 0' EXIT; command kill "$@")))
 __EOF__
 fi
 
