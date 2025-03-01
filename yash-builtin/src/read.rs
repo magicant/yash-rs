@@ -21,7 +21,7 @@
 //! # Synopsis
 //!
 //! ```sh
-//! read [-r] variable…
+//! read [-d delimiter] [-r] variable…
 //! ```
 //!
 //! # Description
@@ -33,6 +33,13 @@
 //! there are more fields than variables, the last variable receives all
 //! remaining fields, including the field separators, but not trailing
 //! whitespace separators.
+//!
+//! ## Non-default delimiters
+//!
+//! By default, the read built-in reads a line up to a newline character. The
+//! `-d` option changes the delimiter to the character specified by the
+//! `delimiter` value. If the `delimiter` value is empty, the read built-in reads
+//! a line up to the first nul byte.
 //!
 //! ## Escaping
 //!
@@ -55,7 +62,13 @@
 //!
 //! # Options
 //!
-//! The **`-r`** option disables the interpretation of backslashes.
+//! The **`-d`** (**`--delimiter`**) option takes an argument and changes the
+//! delimiter to the character specified by the argument. If the `delimiter`
+//! value is empty, the read built-in reads a line up to the first nul byte.
+//! Multibyte characters are not supported.
+//!
+//! The **`-r`** (**`--raw-mode`**) option disables the interpretation of
+//! backslashes.
 //!
 //! # Operands
 //!
@@ -67,20 +80,29 @@
 //! This built-in fails if:
 //!
 //! - The standard input is not readable.
-//! - The input contains a nul byte.
+//! - The delimiter is not a single-byte character.
+//! - The delimiter is not a nul byte and the input contains a nul byte.
 //! - A variable to be assigned is read-only.
 //!
 //! # Exit status
 //!
 //! The exit status is zero if a line was read successfully and non-zero
 //! otherwise. If the built-in reaches the end of the input before finding a
-//! newline, the exit status is one, but the variables are still assigned with
+//! delimiter, the exit status is one, but the variables are still assigned with
 //! the line read so far. On other errors, the exit status is two or higher.
 //!
 //! # Portability
 //!
-//! The read built-in is defined in the POSIX standard. The `-r` option is the
-//! only option defined in the POSIX standard.
+//! The read built-in is defined in the POSIX standard with the `-d` and `-r`
+//! options.
+//!
+//! In this implementation, a line continuation is always a backslash followed
+//! by a newline. Other implementations may allow a backslash followed by a
+//! delimiter to be a line continuation if the delimiter is not a newline.
+//!
+//! When a backslash is specified as the delimiter, no escape sequences are
+//! recognized. Other implementations may recognize escape sequences in the
+//! input line, effectively never recognizing the delimiter.
 //!
 //! In this implementation, the value of the `PS2` variable is subject to
 //! parameter expansion, command substitution, and arithmetic expansion. Other
@@ -88,8 +110,9 @@
 //!
 //! # Implementation notes
 //!
-//! Reading from an unseekable input may be slow because the built-in reads the
-//! input byte by byte to make sure it does not read past the end of the line.
+//! The built-in reads the input byte by byte. This is inefficient, but it is
+//! necessary not to read past the delimiter.
+//! (TODO: Use a buffered reader if the input is seekable)
 
 use crate::common::report;
 use crate::common::report_simple;
@@ -125,6 +148,11 @@ pub const EXIT_STATUS_SYNTAX_ERROR: ExitStatus = ExitStatus(4);
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct Command {
+    /// Delimiter specified by the `-d` option
+    ///
+    /// When the option is not specified, this field is `b'\n'`.
+    pub delimiter: u8,
+
     /// Whether the `-r` option is specified
     ///
     /// If this field is `true`, backslashes are not interpreted.
@@ -147,7 +175,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
         Err(error) => return report(env, &error, EXIT_STATUS_SYNTAX_ERROR).await,
     };
 
-    let (input, newline_found) = match input::read(env, command.is_raw).await {
+    let (input, newline_found) = match input::read(env, command.delimiter, command.is_raw).await {
         Ok(input) => input,
         Err(error) => return report(env, &error, EXIT_STATUS_READ_ERROR).await,
     };

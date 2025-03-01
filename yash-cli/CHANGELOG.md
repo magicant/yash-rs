@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The shell now supports declaration utilities as defined in POSIX.
 - The `cd` built-in now supports the `-e` option as defined in POSIX.
+- The `read` built-in now supports the `-d` (`--delimiter`) option, which allows
+  specifying a delimiter character to terminate the input.
 - The `trap` built-in now implements the POSIX.1-2024 behavior of showing
   signal dispositions that are not explicitly set by the user. It also supports
   the `-p` (`--print`) option.
