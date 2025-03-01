@@ -2,6 +2,19 @@
 
 posix="true"
 
+if [ "$(uname)" = Darwin ]; then
+    # On macOS, kill(2) does not appear to run any signal handlers
+    # synchronously, making it impossible for the shell to respond to self-sent
+    # signals at a predictable time. To work around this issue, we call the kill
+    # built-in in a nested subshell on macOS. The subshell and the dummy sleep
+    # command generate some more SIGCHLD signals that must be handled by the
+    # shell, which makes it more likely that the signal sent by the kill built-in
+    # is delivered to the shell before the subshell exits.
+    setup <<'__EOF__'
+kill() (trap 'sleep 0' EXIT; (trap 'sleep 0' EXIT; (trap 'sleep 0' EXIT; command kill "$@")))
+__EOF__
+fi
+
 test_oE 'returning from function, unnested'
 fn() {
     echo in function
@@ -143,15 +156,14 @@ test_OE -e 17 'specifying exit status in returning from dot script'
 . ./exitstatus17
 __IN__
 
-test_oE -e 0 'default exit status in function in trap'
+test_oE -e 42 'default exit status in function in trap'
 # In this test case the return built-in exits from the function, but not from
 # the trap. The exit status of the return built-in is just as if it were not
 # in a trap. See https://www.austingroupbugs.net/view.php?id=1602#c6012
 fn() { true; return; }
 trap 'fn; echo trapped $?' USR1
 (exit 19)
-(kill -s USR1 $$; exit 19)
-: # null command to ensure the trap to be handled
+(kill -s USR1 $$; exit 42)
 __IN__
 trapped 0
 __OUT__
