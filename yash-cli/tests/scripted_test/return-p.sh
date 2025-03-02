@@ -2,6 +2,8 @@
 
 posix="true"
 
+macos_kill_workaround
+
 test_oE 'returning from function, unnested'
 fn() {
     echo in function
@@ -143,15 +145,14 @@ test_OE -e 17 'specifying exit status in returning from dot script'
 . ./exitstatus17
 __IN__
 
-test_oE -e 0 'default exit status in function in trap'
+test_oE -e 42 'default exit status in function in trap'
 # In this test case the return built-in exits from the function, but not from
 # the trap. The exit status of the return built-in is just as if it were not
 # in a trap. See https://www.austingroupbugs.net/view.php?id=1602#c6012
 fn() { true; return; }
 trap 'fn; echo trapped $?' USR1
 (exit 19)
-(kill -s USR1 $$; exit 19)
-: # null command to ensure the trap to be handled
+(kill -s USR1 $$; exit 42)
 __IN__
 trapped 0
 __OUT__
