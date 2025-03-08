@@ -223,6 +223,10 @@ test_O -d -e 4 'specifying -P and -p both'
 read -P -p X foo
 __IN__
 
+test_O -d -e 4 'multi-character delimiter'
+read -d AB foo
+__IN__
+
 test_O -d -e 4 'missing operand'
 read
 __IN__
