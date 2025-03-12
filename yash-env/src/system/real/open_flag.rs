@@ -21,7 +21,7 @@ use std::ffi::c_int;
 
 impl OfdAccess {
     #[must_use]
-    pub(super) fn to_real_flags(self) -> Option<c_int> {
+    pub(super) fn to_real_flag(self) -> Option<c_int> {
         match self {
             Self::ReadOnly => Some(libc::O_RDONLY),
             Self::WriteOnly => Some(libc::O_WRONLY),
@@ -32,7 +32,7 @@ impl OfdAccess {
     }
 
     #[must_use]
-    pub(super) fn from_real_flags(flags: c_int) -> Self {
+    pub(super) fn from_real_flag(flags: c_int) -> Self {
         match flags & libc::O_ACCMODE {
             libc::O_RDONLY => Self::ReadOnly,
             libc::O_WRONLY => Self::WriteOnly,
@@ -44,7 +44,7 @@ impl OfdAccess {
 
 impl OpenFlag {
     #[must_use]
-    pub(super) fn to_real_flags(self) -> Option<c_int> {
+    pub(super) fn to_real_flag(self) -> Option<c_int> {
         match self {
             Self::Append => Some(libc::O_APPEND),
             Self::CloseOnExec => Some(libc::O_CLOEXEC),

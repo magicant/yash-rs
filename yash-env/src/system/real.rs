@@ -285,9 +285,9 @@ impl System for RealSystem {
         flags: EnumSet<OpenFlag>,
         mode: Mode,
     ) -> Result<Fd> {
-        let mut raw_flags = access.to_real_flags().ok_or(Errno::EINVAL)?;
+        let mut raw_flags = access.to_real_flag().ok_or(Errno::EINVAL)?;
         for flag in flags {
-            raw_flags |= flag.to_real_flags().ok_or(Errno::EINVAL)?;
+            raw_flags |= flag.to_real_flag().ok_or(Errno::EINVAL)?;
         }
 
         #[cfg(not(target_os = "redox"))]
@@ -325,7 +325,7 @@ impl System for RealSystem {
 
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
         let flags = unsafe { libc::fcntl(fd.0, libc::F_GETFL) }.errno_if_m1()?;
-        Ok(OfdAccess::from_real_flags(flags))
+        Ok(OfdAccess::from_real_flag(flags))
     }
 
     fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
