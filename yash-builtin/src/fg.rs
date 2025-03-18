@@ -91,6 +91,7 @@ use yash_env::io::Fd;
 #[cfg(doc)]
 use yash_env::job::JobList;
 use yash_env::job::Pid;
+use yash_env::job::ProcessResult;
 use yash_env::job::ProcessState;
 use yash_env::job::id::parse;
 use yash_env::semantics::ExitStatus;
@@ -101,12 +102,12 @@ use yash_env::system::System as _;
 use yash_env::system::SystemEx as _;
 
 /// Waits for the specified job to finish (or suspend again).
-async fn wait_until_halt(env: &mut Env, pid: Pid) -> Result<ProcessState, Errno> {
+async fn wait_until_halt(env: &mut Env, pid: Pid) -> Result<ProcessResult, Errno> {
     loop {
         let (_pid, state) = env.wait_for_subshell(pid).await?;
         match state {
             ProcessState::Running => (),
-            ProcessState::Halted(_) => return Ok(state),
+            ProcessState::Halted(result) => return Ok(result),
         }
     }
 }
@@ -117,7 +118,7 @@ async fn wait_until_halt(env: &mut Env, pid: Pid) -> Result<ProcessState, Errno>
 /// signal to it. It then waits for the job to finish (or suspend again).
 ///
 /// This function panics if there is no job at the specified index.
-async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<ProcessState, ResumeError> {
+async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<ProcessResult, ResumeError> {
     let tty = env.get_tty()?;
 
     let job = &env.jobs[index];
@@ -132,36 +133,45 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<ProcessState
     env.system.write_all(Fd::STDOUT, line.as_bytes()).await?;
     drop(line);
 
-    let mut state = job.state;
-    if state.is_alive() {
-        // TODO Should we save/restore the terminal state?
+    let result = match job.state {
+        // If the job is already finished, return the result immediately.
+        ProcessState::Halted(
+            result @ (ProcessResult::Exited(_) | ProcessResult::Signaled { .. }),
+        ) => result,
 
-        // Make sure to put the target job in the foreground before sending the
-        // SIGCONT signal, or the job may be immediately re-suspended.
-        env.system.tcsetpgrp_without_block(tty, job.pid)?;
+        // If the job is still alive, resume it.
+        ProcessState::Halted(ProcessResult::Stopped(_)) | ProcessState::Running => {
+            // TODO Should we save/restore the terminal state?
 
-        let pgid = -job.pid;
-        let sigcont = env.system.signal_number_from_name(signal::Name::Cont);
-        let sigcont = sigcont.ok_or(Errno::EINVAL)?;
-        env.system.kill(pgid, Some(sigcont)).await?;
+            // Make sure to put the target job in the foreground before sending the
+            // SIGCONT signal, or the job may be immediately re-suspended.
+            env.system.tcsetpgrp_without_block(tty, job.pid)?;
 
-        // Wait for the job to finish (or suspend again).
-        state = wait_until_halt(env, job.pid).await?;
+            let pgid = -job.pid;
+            let sigcont = env.system.signal_number_from_name(signal::Name::Cont);
+            let sigcont = sigcont.ok_or(Errno::EINVAL)?;
+            env.system.kill(pgid, Some(sigcont)).await?;
 
-        // Move the shell back to the foreground.
-        env.system.tcsetpgrp_with_block(tty, env.main_pgid)?;
-    }
+            // Wait for the job to finish (or suspend again).
+            let result = wait_until_halt(env, job.pid).await?;
+
+            // Move the shell back to the foreground.
+            env.system.tcsetpgrp_with_block(tty, env.main_pgid)?;
+
+            result
+        }
+    };
 
     // Remove the job if it has finished.
-    if !state.is_alive() {
+    if !result.is_stopped() {
         env.jobs.remove(index);
     }
 
-    Ok(state)
+    Ok(result)
 }
 
 /// Resumes the job specified by the operand.
-async fn resume_job_by_id(env: &mut Env, job_id: &str) -> Result<ProcessState, OperandErrorKind> {
+async fn resume_job_by_id(env: &mut Env, job_id: &str) -> Result<ProcessResult, OperandErrorKind> {
     let job_id = parse(job_id)?;
     let index = job_id.find(&env.jobs)?;
     Ok(resume_job_by_index(env, index).await?)
@@ -189,7 +199,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     };
 
     match result {
-        Ok(state) => ExitStatus::try_from(state).unwrap().into(),
+        Ok(result) => ExitStatus::from(result).into(),
         Err(error) => report_simple_failure(env, &error.to_string()).await,
     }
 }
@@ -292,7 +302,7 @@ mod tests {
 
             let result = resume_job_by_index(&mut env, index).await.unwrap();
 
-            assert_eq!(result, ProcessState::exited(42));
+            assert_eq!(result, ProcessResult::exited(42));
             let state = state.borrow().processes[&pid].state();
             assert_eq!(state, ProcessState::exited(42));
             // The finished job should be removed from the job list.
@@ -322,7 +332,7 @@ mod tests {
 
             let result = resume_job_by_index(&mut env, index).await.unwrap();
 
-            assert_eq!(result, ProcessState::stopped(SIGSTOP));
+            assert_eq!(result, ProcessResult::Stopped(SIGSTOP));
             let job_state = env.jobs[index].state;
             assert_eq!(job_state, ProcessState::stopped(SIGSTOP));
             let state = state.borrow().processes[&pid].state();
@@ -371,7 +381,7 @@ mod tests {
 
         let result = resume_job_by_index(&mut env, index).now_or_never().unwrap();
 
-        assert_eq!(result, Ok(ProcessState::exited(12)));
+        assert_eq!(result, Ok(ProcessResult::exited(12)));
         // The finished job should be removed from the job list.
         assert_eq!(env.jobs.get(index), None);
 
