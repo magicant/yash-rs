@@ -70,8 +70,13 @@ async fn invoke_target(env: &mut Env, target: Target, mut fields: Vec<Field>) ->
         }
 
         Target::External { path } => {
-            let exit_status = start_external_utility_in_subshell_and_wait(env, path, fields).await;
-            crate::Result::from(exit_status)
+            use std::ops::ControlFlow::{Break, Continue};
+            match start_external_utility_in_subshell_and_wait(env, path, fields).await {
+                Continue(exit_status) => exit_status.into(),
+                Break(divert) => {
+                    crate::Result::with_exit_status_and_divert(env.exit_status, Break(divert))
+                }
+            }
         }
     }
 }

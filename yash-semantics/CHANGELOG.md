@@ -11,12 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added the `expand_word_multiple` and `expand_word_with_mode` functions to the
   `expansion` module.
+- Added the `job` module, which contains the `add_job_if_suspended` utility
+  function.
 
 ### Changed
 
 - The execution of a simple command
   (`impl command::Command for yash_syntax::syntax::SimpleCommand`)
   now honors the `ExpansionMode` specified for the words in the command.
+- The `command::simple_command::start_external_utility_in_subshell_and_wait`
+  function now returns `Result<ExitStatus>` instead of `ExitStatus`.
 - External dependency versions:
     - Rust 1.82.0 → 1.85.0
     - yash-env 0.5.0 → 0.6.0

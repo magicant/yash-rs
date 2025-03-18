@@ -17,12 +17,12 @@
 //! Semantics of subshell compound commands
 
 use crate::command::Command;
+use crate::job::add_job_if_suspended;
 use crate::trap::run_exit_trap;
 use std::ops::ControlFlow::Break;
 use std::rc::Rc;
 use yash_env::Env;
 use yash_env::io::print_error;
-use yash_env::job::Job;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
@@ -38,15 +38,7 @@ pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Resu
     let subshell = subshell.job_control(JobControl::Foreground);
     match subshell.start_and_wait(env).await {
         Ok((pid, result)) => {
-            if result.is_stopped() {
-                let mut job = Job::new(pid);
-                job.job_controlled = true;
-                job.state = result.into();
-                job.name = body.to_string();
-                env.jobs.add(job);
-            }
-
-            env.exit_status = result.into();
+            env.exit_status = add_job_if_suspended(env, pid, result, || body.to_string())?;
             env.apply_errexit()
         }
         Err(errno) => {

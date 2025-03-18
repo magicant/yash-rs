@@ -18,6 +18,7 @@
 
 use super::perform_assignments;
 use crate::Handle;
+use crate::job::add_job_if_suspended;
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;
@@ -26,7 +27,6 @@ use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::Env;
 use yash_env::io::print_error;
-use yash_env::job::Job;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
@@ -68,20 +68,12 @@ pub async fn execute_absent_target(
         .job_control(JobControl::Foreground);
 
         match subshell.start_and_wait(env).await {
-            Ok((pid, result)) => {
-                if result.is_stopped() {
-                    let mut job = Job::new(pid);
-                    job.job_controlled = true;
-                    job.state = result.into();
-                    job.name = redirs
-                        .iter()
-                        .format_with(" ", |redir, f| f(&format_args!("{redir}")))
-                        .to_string();
-                    env.jobs.add(job);
-                }
-
-                result.into()
-            }
+            Ok((pid, result)) => add_job_if_suspended(env, pid, result, || {
+                redirs
+                    .iter()
+                    .format_with(" ", |redir, f| f(&format_args!("{redir}")))
+                    .to_string()
+            })?,
             Err(errno) => {
                 print_error(
                     env,

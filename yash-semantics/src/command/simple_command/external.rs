@@ -18,6 +18,7 @@
 
 use super::perform_assignments;
 use crate::Handle;
+use crate::job::add_job_if_suspended;
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;
@@ -28,7 +29,6 @@ use std::ops::ControlFlow::Continue;
 use yash_env::Env;
 use yash_env::System;
 use yash_env::io::print_error;
-use yash_env::job::Job;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
@@ -73,7 +73,7 @@ pub async fn execute_external_utility(
         return Continue(());
     }
 
-    env.exit_status = start_external_utility_in_subshell_and_wait(&mut env, path, fields).await;
+    env.exit_status = start_external_utility_in_subshell_and_wait(&mut env, path, fields).await?;
 
     Continue(())
 }
@@ -94,7 +94,7 @@ pub async fn start_external_utility_in_subshell_and_wait(
     env: &mut Env,
     path: CString,
     fields: Vec<Field>,
-) -> ExitStatus {
+) -> Result<ExitStatus> {
     let name = fields[0].clone();
     let location = name.origin.clone();
 
@@ -110,17 +110,7 @@ pub async fn start_external_utility_in_subshell_and_wait(
     .job_control(JobControl::Foreground);
 
     match subshell.start_and_wait(env).await {
-        Ok((pid, result)) => {
-            if result.is_stopped() {
-                let mut job = Job::new(pid);
-                job.job_controlled = true;
-                job.state = result.into();
-                job.name = job_name;
-                env.jobs.add(job);
-            }
-
-            result.into()
-        }
+        Ok((pid, result)) => add_job_if_suspended(env, pid, result, || job_name),
         Err(errno) => {
             print_error(
                 env,
@@ -129,7 +119,7 @@ pub async fn start_external_utility_in_subshell_and_wait(
                 &name.origin,
             )
             .await;
-            ExitStatus::NOEXEC
+            Continue(ExitStatus::NOEXEC)
         }
     }
 }
