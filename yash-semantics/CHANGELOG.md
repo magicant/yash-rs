@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now honors the `ExpansionMode` specified for the words in the command.
 - The `command::simple_command::start_external_utility_in_subshell_and_wait`
   function now returns `Result<ExitStatus>` instead of `ExitStatus`.
+- When a foreground job is suspended in an interactive shell, the shell now
+  discards any remaining commands in the current command line and prompts for
+  the next command line.
 - External dependency versions:
     - Rust 1.82.0 → 1.85.0
     - yash-env 0.5.0 → 0.6.0
