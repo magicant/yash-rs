@@ -63,8 +63,13 @@
 //!
 //! # Exit status
 //!
-//! The built-in returns the exit status of the resumed job. On error, it
-//! returns a non-zero exit status.
+//! If a resumed job suspends and the current environment is
+//! [interactive](Env::is_interactive), the built-in returns with the
+//! [`Interrupt`] divert, which should make the shell stop the current command
+//! execution and return to the prompt. Otherwise, the built-in returns with the
+//! exit status of the resumed job.
+//!
+//! On error, it returns a non-zero exit status.
 //!
 //! # Portability
 //!
@@ -86,6 +91,7 @@ use crate::common::report_error;
 use crate::common::report_simple_failure;
 use crate::common::syntax::Mode;
 use crate::common::syntax::parse_arguments;
+use std::ops::ControlFlow::Break;
 use yash_env::Env;
 use yash_env::io::Fd;
 #[cfg(doc)]
@@ -94,6 +100,7 @@ use yash_env::job::Pid;
 use yash_env::job::ProcessResult;
 use yash_env::job::ProcessState;
 use yash_env::job::id::parse;
+use yash_env::semantics::Divert::Interrupt;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::signal;
@@ -199,6 +206,10 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     };
 
     match result {
+        Ok(result) if env.is_interactive() => {
+            let divert = Break(Interrupt(Some(ExitStatus::from(result))));
+            crate::Result::with_exit_status_and_divert(env.exit_status, divert)
+        }
         Ok(result) => ExitStatus::from(result).into(),
         Err(error) => report_simple_failure(env, &error.to_string()).await,
     }
@@ -213,7 +224,7 @@ mod tests {
     use yash_env::VirtualSystem;
     use yash_env::job::Job;
     use yash_env::job::ProcessResult;
-    use yash_env::option::Option::Monitor;
+    use yash_env::option::Option::{Interactive, Monitor};
     use yash_env::option::State::On;
     use yash_env::subshell::JobControl;
     use yash_env::subshell::Subshell;
@@ -531,5 +542,69 @@ mod tests {
         assert_stderr(&system.state, |stderr| {
             assert!(stderr.contains("not found"), "{stderr:?}");
         });
+    }
+
+    #[test]
+    fn main_returns_exit_status_if_job_suspends_if_not_interactive() {
+        in_virtual_system(|mut env, state| async move {
+            stub_tty(&state);
+            env.options.set(Monitor, On);
+            env.exit_status = ExitStatus(42);
+            let subshell = Subshell::new(|env, _| {
+                Box::pin(async move {
+                    suspend(env).await;
+                    suspend(env).await;
+                    unreachable!("child process should not be resumed twice");
+                })
+            })
+            .job_control(JobControl::Foreground);
+            let (pid, subshell_result) = subshell.start_and_wait(&mut env).await.unwrap();
+            assert_eq!(subshell_result, ProcessResult::Stopped(SIGSTOP));
+            let mut job = Job::new(pid);
+            job.job_controlled = true;
+            job.state = subshell_result.into();
+            let index = env.jobs.add(job);
+            env.jobs.set_current_job(index).unwrap();
+
+            let result = main(&mut env, vec![]).await;
+            assert_eq!(
+                result,
+                crate::Result::from(ExitStatus(SIGSTOP.as_raw() + 0x180))
+            );
+        })
+    }
+
+    #[test]
+    fn main_returns_interrupt_if_job_suspends_if_interactive() {
+        in_virtual_system(|mut env, state| async move {
+            stub_tty(&state);
+            env.options.set(Interactive, On);
+            env.options.set(Monitor, On);
+            env.exit_status = ExitStatus(42);
+            let subshell = Subshell::new(|env, _| {
+                Box::pin(async move {
+                    suspend(env).await;
+                    suspend(env).await;
+                    unreachable!("child process should not be resumed twice");
+                })
+            })
+            .job_control(JobControl::Foreground);
+            let (pid, subshell_result) = subshell.start_and_wait(&mut env).await.unwrap();
+            assert_eq!(subshell_result, ProcessResult::Stopped(SIGSTOP));
+            let mut job = Job::new(pid);
+            job.job_controlled = true;
+            job.state = subshell_result.into();
+            let index = env.jobs.add(job);
+            env.jobs.set_current_job(index).unwrap();
+
+            let result = main(&mut env, vec![]).await;
+            assert_eq!(
+                result,
+                crate::Result::with_exit_status_and_divert(
+                    ExitStatus(42),
+                    Break(Interrupt(Some(ExitStatus(SIGSTOP.as_raw() + 0x180))))
+                )
+            );
+        })
     }
 }
