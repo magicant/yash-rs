@@ -98,7 +98,7 @@ mod tests {
             },
             || "foo".to_string(),
         );
-        assert_eq!(result, Continue(ExitStatus(42 + 0x180)));
+        assert_eq!(result, Continue(ExitStatus::from(signal)));
         assert_eq!(env.jobs.len(), 0);
     }
 
@@ -108,7 +108,7 @@ mod tests {
         let signal = signal::Number::from_raw_unchecked(NonZero::new(42).unwrap());
         let process_result = ProcessResult::Stopped(signal);
         let result = add_job_if_suspended(&mut env, Pid(123), process_result, || "foo".to_string());
-        assert_eq!(result, Continue(ExitStatus(42 + 0x180)));
+        assert_eq!(result, Continue(ExitStatus::from(signal)));
         assert_eq!(env.jobs.len(), 1);
         let job = env.jobs.get(0).unwrap();
         assert_eq!(job.pid, Pid(123));
@@ -126,7 +126,7 @@ mod tests {
         let result = add_job_if_suspended(&mut env, Pid(123), process_result, || "foo".to_string());
         assert_eq!(
             result,
-            Break(Divert::Interrupt(Some(ExitStatus(42 + 0x180))))
+            Break(Divert::Interrupt(Some(ExitStatus::from(signal))))
         );
         assert_eq!(env.jobs.len(), 1);
     }

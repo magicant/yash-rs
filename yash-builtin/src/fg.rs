@@ -556,10 +556,7 @@ mod tests {
             env.jobs.set_current_job(index).unwrap();
 
             let result = main(&mut env, vec![]).await;
-            assert_eq!(
-                result,
-                crate::Result::from(ExitStatus(SIGSTOP.as_raw() + 0x180))
-            );
+            assert_eq!(result, crate::Result::from(ExitStatus::from(SIGSTOP)));
         })
     }
 
@@ -591,7 +588,7 @@ mod tests {
                 result,
                 crate::Result::with_exit_status_and_divert(
                     ExitStatus(42),
-                    Break(Interrupt(Some(ExitStatus(SIGSTOP.as_raw() + 0x180))))
+                    Break(Interrupt(Some(ExitStatus::from(SIGSTOP))))
                 )
             );
         })
