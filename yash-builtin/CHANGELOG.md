@@ -79,6 +79,8 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
   `EXIT_STATUS_CHDIR_ERROR`.
 - The `cd::assign::new_pwd` function now returns `Result<PathBuf, Errno>` instead
   of `PathBuf`. Previously, it returned an empty `PathBuf` on failure.
+- The `fg::main` function now returns with `Divert::Interrupt` when the resumed
+  job is suspended.
 - The `kill::print::print` function now shows signals in the ascending order of
   their numbers when given no signals.
 - The `read::syntax::parse` function now accepts the `-d` (`--delimiter`) option.

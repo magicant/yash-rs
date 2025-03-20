@@ -30,6 +30,7 @@ pub mod assign;
 pub mod command;
 pub mod command_search;
 pub mod expansion;
+pub mod job;
 pub mod redir;
 pub mod trap;
 pub mod xtrace;

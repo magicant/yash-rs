@@ -16,9 +16,9 @@
 
 //! Implementation of pipeline semantics.
 
-use crate::trap::run_exit_trap;
-
 use super::Command;
+use crate::job::add_job_if_suspended;
+use crate::trap::run_exit_trap;
 use enumset::EnumSet;
 use itertools::Itertools;
 use std::ops::ControlFlow::{Break, Continue};
@@ -26,7 +26,6 @@ use std::rc::Rc;
 use yash_env::Env;
 use yash_env::System;
 use yash_env::io::Fd;
-use yash_env::job::Job;
 use yash_env::job::Pid;
 use yash_env::option::Option::{Exec, Interactive};
 use yash_env::option::State::Off;
@@ -145,15 +144,7 @@ async fn execute_job_controlled_pipeline(
 
     match subshell.start_and_wait(env).await {
         Ok((pid, result)) => {
-            if result.is_stopped() {
-                let mut job = Job::new(pid);
-                job.job_controlled = true;
-                job.state = result.into();
-                job.name = to_job_name(commands);
-                env.jobs.add(job);
-            }
-
-            env.exit_status = result.into();
+            env.exit_status = add_job_if_suspended(env, pid, result, || to_job_name(commands))?;
             Continue(())
         }
         Err(errno) => {

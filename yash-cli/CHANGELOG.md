@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- When a foreground job is suspended in an interactive shell, the shell now
+  discards any remaining commands in the current command line and prompts for
+  the next command line. This behavior basically conforms to POSIX.1-2024, but
+  differs in that the shell does not resume with the remaining commands
+  following the next asynchronous and-or list.
 - The `cd` built-in now errors out when a given operand is an empty string.
 - The `cd` built-in now returns different exit statuses for different errors.
 - The command `kill -l` now shows signals in the ascending order of their
