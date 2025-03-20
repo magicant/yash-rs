@@ -29,7 +29,6 @@
 use crate::Env;
 use crate::job::Pid;
 use crate::job::ProcessResult;
-use crate::job::ProcessState;
 use crate::signal;
 use crate::stack::Frame;
 use crate::system::ChildProcessTask;
@@ -236,11 +235,9 @@ where
     pub async fn start_and_wait(self, env: &mut Env) -> Result<(Pid, ProcessResult), Errno> {
         let (pid, job_control) = self.start(env).await?;
         let result = loop {
-            let state = env.wait_for_subshell(pid).await?.1;
-            if let ProcessState::Halted(result) = state {
-                if !result.is_stopped() || job_control.is_some() {
-                    break result;
-                }
+            let result = env.wait_for_subshell_to_halt(pid).await?.1;
+            if !result.is_stopped() || job_control.is_some() {
+                break result;
             }
         };
 
@@ -311,7 +308,7 @@ impl Drop for MaskGuard<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::job::Job;
+    use crate::job::{Job, ProcessState};
     use crate::option::Option::{Interactive, Monitor};
     use crate::option::State::On;
     use crate::semantics::ExitStatus;

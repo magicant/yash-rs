@@ -37,6 +37,7 @@ use self::function::FunctionSet;
 use self::io::Fd;
 use self::job::JobList;
 use self::job::Pid;
+use self::job::ProcessResult;
 use self::job::ProcessState;
 use self::option::On;
 use self::option::OptionSet;
@@ -366,6 +367,24 @@ impl Env {
         }
     }
 
+    /// Wait for a subshell to terminate or suspend.
+    ///
+    /// This function is similar to
+    /// [`wait_for_subshell`](Self::wait_for_subshell), but returns only when
+    /// the target is finished (either exited or killed by a signal) or
+    /// suspended.
+    pub async fn wait_for_subshell_to_halt(
+        &mut self,
+        target: Pid,
+    ) -> Result<(Pid, ProcessResult), Errno> {
+        loop {
+            let (pid, state) = self.wait_for_subshell(target).await?;
+            if let ProcessState::Halted(result) = state {
+                return Ok((pid, result));
+            }
+        }
+    }
+
     /// Wait for a subshell to terminate.
     ///
     /// This function is similar to
@@ -378,11 +397,9 @@ impl Env {
         target: Pid,
     ) -> Result<(Pid, ExitStatus), Errno> {
         loop {
-            let (pid, state) = self.wait_for_subshell(target).await?;
-            if let Ok(exit_status) = state.try_into() {
-                if !state.is_alive() {
-                    return Ok((pid, exit_status));
-                }
+            let (pid, result) = self.wait_for_subshell_to_halt(target).await?;
+            if !result.is_stopped() {
+                return Ok((pid, result.into()));
             }
         }
     }

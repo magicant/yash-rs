@@ -96,7 +96,6 @@ use yash_env::Env;
 use yash_env::io::Fd;
 #[cfg(doc)]
 use yash_env::job::JobList;
-use yash_env::job::Pid;
 use yash_env::job::ProcessResult;
 use yash_env::job::ProcessState;
 use yash_env::job::id::parse;
@@ -107,17 +106,6 @@ use yash_env::signal;
 use yash_env::system::Errno;
 use yash_env::system::System as _;
 use yash_env::system::SystemEx as _;
-
-/// Waits for the specified job to finish (or suspend again).
-async fn wait_until_halt(env: &mut Env, pid: Pid) -> Result<ProcessResult, Errno> {
-    loop {
-        let (_pid, state) = env.wait_for_subshell(pid).await?;
-        match state {
-            ProcessState::Running => (),
-            ProcessState::Halted(result) => return Ok(result),
-        }
-    }
-}
 
 /// Resumes the job at the specified index.
 ///
@@ -160,7 +148,7 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<ProcessResul
             env.system.kill(pgid, Some(sigcont)).await?;
 
             // Wait for the job to finish (or suspend again).
-            let result = wait_until_halt(env, job.pid).await?;
+            let result = env.wait_for_subshell_to_halt(job.pid).await?.1;
 
             // Move the shell back to the foreground.
             env.system.tcsetpgrp_with_block(tty, env.main_pgid)?;
@@ -223,6 +211,7 @@ mod tests {
     use std::rc::Rc;
     use yash_env::VirtualSystem;
     use yash_env::job::Job;
+    use yash_env::job::Pid;
     use yash_env::job::ProcessResult;
     use yash_env::option::Option::{Interactive, Monitor};
     use yash_env::option::State::On;
