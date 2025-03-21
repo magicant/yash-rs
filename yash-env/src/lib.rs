@@ -47,6 +47,9 @@ use self::semantics::ExitStatus;
 use self::stack::Frame;
 use self::stack::Stack;
 use self::system::Errno;
+use self::system::Mode;
+use self::system::OfdAccess;
+use self::system::OpenFlag;
 pub use self::system::SharedSystem;
 pub use self::system::System;
 use self::system::SystemEx;
@@ -295,12 +298,30 @@ impl Env {
             return Ok(fd);
         }
 
-        let first_fd = self.system.open(
-            c"/dev/tty",
-            crate::system::OfdAccess::ReadWrite,
-            crate::system::OpenFlag::CloseOnExec.into(),
-            crate::system::Mode::empty(),
-        )?;
+        let first_fd = {
+            // POSIX.1-2024 Job control specifications are written in the
+            // assumption that a job-control shell may not have a control
+            // terminal. The shell should not make an arbitrary terminal its
+            // control terminal, so we open /dev/tty with NoCtty.
+            let mut result = self.system.open(
+                c"/dev/tty",
+                OfdAccess::ReadWrite,
+                OpenFlag::CloseOnExec | OpenFlag::NoCtty,
+                Mode::empty(),
+            );
+            if result == Err(Errno::EINVAL) {
+                // However, some systems do not support NoCtty. In that case,
+                // we open /dev/tty without NoCtty.
+                result = self.system.open(
+                    c"/dev/tty",
+                    OfdAccess::ReadWrite,
+                    OpenFlag::CloseOnExec.into(),
+                    Mode::empty(),
+                );
+            }
+            result?
+        };
+
         let final_fd = self.system.move_fd_internal(first_fd);
         self.tty = final_fd.ok();
         final_fd

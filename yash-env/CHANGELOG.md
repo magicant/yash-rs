@@ -41,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `Env::get_tty` now uses `system::OpenFlag::NoCtty` when opening the terminal
+  device file.
 - `System::getpwnam_dir` now takes a `&CStr` parameter instead of a `&str`.
 - The `builtin::Builtin` struct is now `non_exhaustive`.
 - The `origin` field of the `trap::TrapState` struct is now `trap::Origin`.
