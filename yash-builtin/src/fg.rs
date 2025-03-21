@@ -55,8 +55,7 @@
 //!
 //! # Errors
 //!
-//! This built-in can be used only when the shell is in the foreground.
-//! Otherwise, the shell will be suspended.
+//! This built-in can be used only when job control is enabled.
 //!
 //! The built-in fails if the specified job is not found, not job-controlled, or
 //! not [owned] by the current shell environment.
@@ -99,6 +98,8 @@ use yash_env::job::JobList;
 use yash_env::job::ProcessResult;
 use yash_env::job::ProcessState;
 use yash_env::job::id::parse;
+use yash_env::option::Option::Monitor;
+use yash_env::option::State::Off;
 use yash_env::semantics::Divert::Interrupt;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -180,6 +181,10 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     };
     debug_assert_eq!(options, []);
 
+    if env.options.get(Monitor) == Off {
+        return report_simple_failure(env, "job control is disabled").await;
+    }
+
     let result = if operands.is_empty() {
         if let Some(index) = env.jobs.current_job() {
             resume_job_by_index(env, index).await.map_err(Into::into)
@@ -213,7 +218,7 @@ mod tests {
     use yash_env::job::Job;
     use yash_env::job::Pid;
     use yash_env::job::ProcessResult;
-    use yash_env::option::Option::{Interactive, Monitor};
+    use yash_env::option::Option::Interactive;
     use yash_env::option::State::On;
     use yash_env::subshell::JobControl;
     use yash_env::subshell::Subshell;
@@ -366,6 +371,7 @@ mod tests {
         let system = VirtualSystem::new();
         stub_tty(&system.state);
         let mut env = Env::with_system(Box::new(system.clone()));
+        env.options.set(Monitor, On);
         let pid = Pid(123);
         let mut job = Job::new(pid);
         job.job_controlled = true;
@@ -398,6 +404,7 @@ mod tests {
         let system = VirtualSystem::new();
         stub_tty(&system.state);
         let mut env = Env::with_system(Box::new(system));
+        env.options.set(Monitor, On);
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.is_owned = false;
@@ -412,6 +419,7 @@ mod tests {
         let system = VirtualSystem::new();
         stub_tty(&system.state);
         let mut env = Env::with_system(Box::new(system));
+        env.options.set(Monitor, On);
         let index = env.jobs.add(Job::new(Pid(123)));
 
         let result = resume_job_by_index(&mut env, index).now_or_never().unwrap();
@@ -463,6 +471,7 @@ mod tests {
     fn main_without_operands_fails_if_there_is_no_current_job() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
+        env.options.set(Monitor, On);
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
 
@@ -518,6 +527,7 @@ mod tests {
     fn main_with_operand_fails_if_jobs_is_not_found() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
+        env.options.set(Monitor, On);
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.name = "foo".to_string();

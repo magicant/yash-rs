@@ -98,6 +98,8 @@ use yash_env::job::ProcessState;
 use yash_env::job::id::FindError;
 use yash_env::job::id::ParseError;
 use yash_env::job::id::parse;
+use yash_env::option::Option::Monitor;
+use yash_env::option::State::Off;
 use yash_env::semantics::Field;
 use yash_env::signal;
 use yash_env::system::Errno;
@@ -207,6 +209,10 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     };
     debug_assert_eq!(options, []);
 
+    if env.options.get(Monitor) == Off {
+        return report_simple_failure(env, "job control is disabled").await;
+    }
+
     if operands.is_empty() {
         if let Some(index) = env.jobs.current_job() {
             match resume_job_by_index(env, index).await {
@@ -239,6 +245,7 @@ mod tests {
     use yash_env::job::Job;
     use yash_env::job::Pid;
     use yash_env::job::ProcessState;
+    use yash_env::option::State::On;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::r#virtual::Process;
     use yash_env::system::r#virtual::{SIGSTOP, SIGTSTP, SIGTTIN};
@@ -425,6 +432,7 @@ mod tests {
     fn main_without_operands_resumes_current_job() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
+        env.options.set(Monitor, On);
         let pgid = Pid(100);
         let orphan_id = Pid(200);
         let mut job = Job::new(pgid);
@@ -463,6 +471,7 @@ mod tests {
     fn main_without_operands_fails_if_there_is_no_current_job() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
+        env.options.set(Monitor, On);
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, crate::Result::from(ExitStatus::FAILURE));
@@ -476,6 +485,7 @@ mod tests {
     fn main_with_operands_resumes_specified_jobs() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
+        env.options.set(Monitor, On);
         let pgid1 = Pid(100);
         let pgid2 = Pid(200);
         let pgid3 = Pid(300);
@@ -526,6 +536,7 @@ mod tests {
         // remaining operands.
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
+        env.options.set(Monitor, On);
         let pgid = Pid(100);
         let mut job = Job::new(pgid);
         job.job_controlled = true;

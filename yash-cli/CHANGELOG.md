@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   following the next asynchronous and-or list.
 - The `cd` built-in now errors out when a given operand is an empty string.
 - The `cd` built-in now returns different exit statuses for different errors.
+- The `fg` and `bg` built-ins now error out if job control is not enabled.
 - The command `kill -l` now shows signals in the ascending order of their
   numbers.
 - The `read` built-in now returns a more specific exit status depending on the
