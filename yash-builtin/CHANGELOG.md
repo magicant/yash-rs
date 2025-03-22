@@ -83,6 +83,8 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
   enabled.
 - The `fg::main` function now returns with `Divert::Interrupt` when the resumed
   job is suspended.
+- The `fg::main` function no longer errors out if `yash_env::Env::get_tty`
+  fails.
 - The `kill::print::print` function now shows signals in the ascending order of
   their numbers when given no signals.
 - The `read::syntax::parse` function now accepts the `-d` (`--delimiter`) option.

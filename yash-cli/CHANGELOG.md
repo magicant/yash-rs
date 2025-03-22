@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the next command line. This behavior basically conforms to POSIX.1-2024, but
   differs in that the shell does not resume with the remaining commands
   following the next asynchronous and-or list.
+- If job control is enabled and the shell does not have a controlling terminal,
+  the shell now proceeds without managing foreground-ness of process groups.
+  Jobs are still assigned to their own process groups. Previously, the shell
+  would abort command execution in this case.
 - The `cd` built-in now errors out when a given operand is an empty string.
 - The `cd` built-in now returns different exit statuses for different errors.
 - The `fg` and `bg` built-ins now error out if job control is not enabled.

@@ -115,7 +115,7 @@ use yash_env::system::SystemEx as _;
 ///
 /// This function panics if there is no job at the specified index.
 async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<ProcessResult, ResumeError> {
-    let tty = env.get_tty()?;
+    let tty = env.get_tty().ok();
 
     let job = &env.jobs[index];
     if !job.is_owned {
@@ -141,7 +141,9 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<ProcessResul
 
             // Make sure to put the target job in the foreground before sending the
             // SIGCONT signal, or the job may be immediately re-suspended.
-            env.system.tcsetpgrp_without_block(tty, job.pid)?;
+            if let Some(tty) = tty {
+                env.system.tcsetpgrp_without_block(tty, job.pid)?;
+            }
 
             let pgid = -job.pid;
             let sigcont = env.system.signal_number_from_name(signal::Name::Cont);
@@ -152,7 +154,9 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<ProcessResul
             let result = env.wait_for_subshell_to_halt(job.pid).await?.1;
 
             // Move the shell back to the foreground.
-            env.system.tcsetpgrp_with_block(tty, env.main_pgid)?;
+            if let Some(tty) = tty {
+                env.system.tcsetpgrp_with_block(tty, env.main_pgid)?;
+            }
 
             result
         }
@@ -266,9 +270,34 @@ mod tests {
     }
 
     #[test]
+    fn resume_job_by_index_resume_job_even_without_tty() {
+        in_virtual_system(async |mut env, _| {
+            env.options.set(Monitor, On);
+            let reached = Rc::new(Cell::new(false));
+            let reached2 = Rc::clone(&reached);
+            let subshell = Subshell::new(|env, _| {
+                Box::pin(async move {
+                    suspend(env).await;
+                    reached2.set(true);
+                })
+            })
+            .job_control(JobControl::Foreground);
+            let (pid, subshell_result) = subshell.start_and_wait(&mut env).await.unwrap();
+            assert_eq!(subshell_result, ProcessResult::Stopped(SIGSTOP));
+            let mut job = Job::new(pid);
+            job.job_controlled = true;
+            job.state = subshell_result.into();
+            let index = env.jobs.add(job);
+
+            resume_job_by_index(&mut env, index).await.unwrap();
+
+            assert!(reached.get());
+        })
+    }
+
+    #[test]
     fn resume_job_by_index_prints_job_name() {
         in_virtual_system(|mut env, state| async move {
-            stub_tty(&state);
             env.options.set(Monitor, On);
             let subshell =
                 Subshell::new(|env, _| Box::pin(suspend(env))).job_control(JobControl::Foreground);
@@ -289,7 +318,6 @@ mod tests {
     #[test]
     fn resume_job_by_index_returns_after_job_exits() {
         in_virtual_system(|mut env, state| async move {
-            stub_tty(&state);
             env.options.set(Monitor, On);
             let subshell = Subshell::new(|env, _| {
                 Box::pin(async move {
@@ -318,7 +346,6 @@ mod tests {
     #[test]
     fn resume_job_by_index_returns_after_job_suspends() {
         in_virtual_system(|mut env, state| async move {
-            stub_tty(&state);
             env.options.set(Monitor, On);
             let subshell = Subshell::new(|env, _| {
                 Box::pin(async move {
@@ -369,7 +396,6 @@ mod tests {
     #[test]
     fn resume_job_by_index_sends_no_sigcont_to_dead_process() {
         let system = VirtualSystem::new();
-        stub_tty(&system.state);
         let mut env = Env::with_system(Box::new(system.clone()));
         env.options.set(Monitor, On);
         let pid = Pid(123);
@@ -402,7 +428,6 @@ mod tests {
     #[test]
     fn resume_job_by_index_rejects_unowned_job() {
         let system = VirtualSystem::new();
-        stub_tty(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.options.set(Monitor, On);
         let mut job = Job::new(Pid(123));
@@ -417,7 +442,6 @@ mod tests {
     #[test]
     fn resume_job_by_index_rejects_unmonitored_job() {
         let system = VirtualSystem::new();
-        stub_tty(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.options.set(Monitor, On);
         let index = env.jobs.add(Job::new(Pid(123)));
@@ -484,7 +508,6 @@ mod tests {
     #[test]
     fn main_with_operand_resumes_specified_job() {
         in_virtual_system(|mut env, state| async move {
-            stub_tty(&state);
             env.options.set(Monitor, On);
             // previous job
             let subshell =
@@ -545,8 +568,7 @@ mod tests {
 
     #[test]
     fn main_returns_exit_status_if_job_suspends_if_not_interactive() {
-        in_virtual_system(|mut env, state| async move {
-            stub_tty(&state);
+        in_virtual_system(|mut env, _| async move {
             env.options.set(Monitor, On);
             env.exit_status = ExitStatus(42);
             let subshell = Subshell::new(|env, _| {
@@ -572,8 +594,7 @@ mod tests {
 
     #[test]
     fn main_returns_interrupt_if_job_suspends_if_interactive() {
-        in_virtual_system(|mut env, state| async move {
-            stub_tty(&state);
+        in_virtual_system(|mut env, _| async move {
             env.options.set(Interactive, On);
             env.options.set(Monitor, On);
             env.exit_status = ExitStatus(42);

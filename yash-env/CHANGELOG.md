@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   device file.
 - `System::getpwnam_dir` now takes a `&CStr` parameter instead of a `&str`.
 - The `builtin::Builtin` struct is now `non_exhaustive`.
+- The `subshell::Subshell::start` method no longer fails if `Env::get_tty` fails.
 - The `origin` field of the `trap::TrapState` struct is now `trap::Origin`.
 - The `TrapSet::get_state` method now returns a `TrapState` reference even if
   the current action was not set by the user.

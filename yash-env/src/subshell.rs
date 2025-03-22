@@ -152,7 +152,7 @@ where
         let tty = match job_control {
             None | Some(JobControl::Background) => None,
             // Open the tty in the parent process so we can reuse the FD for other jobs
-            Some(JobControl::Foreground) => Some(env.get_tty()?),
+            Some(JobControl::Foreground) => env.get_tty().ok(),
         };
         // Block SIGINT and SIGQUIT before forking the child process to prevent
         // the child from being killed by those signals until the child starts
@@ -516,6 +516,34 @@ mod tests {
                 .unwrap();
             assert_matches!(parent_env.tty, Some(_));
         });
+    }
+
+    #[test]
+    fn job_control_without_tty() {
+        // When /dev/tty is not available, the shell cannot bring the subshell to
+        // the foreground. The subshell should still be in a new process group.
+        // This is the behavior required by POSIX.
+        in_virtual_system(async |mut parent_env, state| {
+            parent_env.options.set(Monitor, On);
+
+            let state_2 = Rc::clone(&state);
+            let (child_pid, job_control) = Subshell::new(move |child_env, job_control| {
+                Box::pin(async move {
+                    let child_pid = child_env.system.getpid();
+                    assert_eq!(state_2.borrow().processes[&child_pid].pgid, child_pid);
+                    assert_eq!(job_control, Some(JobControl::Foreground));
+                })
+            })
+            .job_control(JobControl::Foreground)
+            .start(&mut parent_env)
+            .await
+            .unwrap();
+            assert_eq!(job_control, Some(JobControl::Foreground));
+            assert_eq!(state.borrow().processes[&child_pid].pgid, child_pid);
+
+            parent_env.wait_for_subshell(child_pid).await.unwrap();
+            assert_eq!(state.borrow().processes[&child_pid].pgid, child_pid);
+        })
     }
 
     #[test]
