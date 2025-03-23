@@ -8,12 +8,12 @@ It will be extended to cover more features in the future.
 
 ## Features
 
-Currently, yash can run shell scripts that use POSIX-compatible syntax.
-Interactive features are under development, and locale support is not yet implemented.
+Currently, yash can run shell scripts written in POSIX-compatible syntax.
+Support for interactive shell features is limited.
 
 - [x] Running shell scripts that only use POSIX-compatible syntax and features
-- [ ] Interactive shell features
-- [ ] Enhanced scripting features (Extensions to POSIX shell)
+- [x] Minimal interactive shell features
+- [ ] Enhanced shell features (Extensions to POSIX shell)
 - [ ] Performance optimization
 - [ ] Locale support
 

@@ -12,7 +12,6 @@ repository = "https://github.com/magicant/yash-rs"
 license = "GPL-3.0-or-later"
 keywords = ["posix", "shell"]
 categories = ["command-line-utilities"]
-publish = false
 
 [dependencies]
 futures-util = { workspace = true }
