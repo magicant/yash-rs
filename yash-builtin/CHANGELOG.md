@@ -23,6 +23,9 @@ specifying a delimiter character to terminate the input.
 The `read` built-in now returns a more specific exit status depending on the
 cause of the error. It also rejects an input containing a null byte.
 
+The `set` bulit-in now suspends itself when the `-m` option is enabled in the
+background.
+
 The `trap` built-in now implements the POSIX.1-2024 behavior of showing signal
 dispositions that are not explicitly set by the user. It also supports the `-p`
 (`--print`) option.
@@ -93,6 +96,8 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 - The `read::main` function now returns a more specific exit status depending on
   the cause of the error. It now returns `EXIT_STATUS_READ_ERROR` when finding a
   null byte in the input.
+- The `set::main` function now internally calls `yash_env::Env::ensure_foreground`
+  when the `-m` option is enabled.
 - The `trap::syntax::interpret` function now supports the `-p` option.
 - The output of the `trap` built-in now includes not only user-defined traps but
   also signal dispositions that are not explicitly set by the user.

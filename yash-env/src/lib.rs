@@ -327,6 +327,36 @@ impl Env {
         final_fd
     }
 
+    /// Ensures the shell is in the foreground.
+    ///
+    /// If the current process belongs to the same process group as the session
+    /// leader, this function forces the current process to be in the foreground
+    /// by calling [`SystemEx::tcsetpgrp_with_block`]. Otherwise, this function
+    /// suspends the process until it is resumed in the foreground by another
+    /// job-controlling process (see [`SystemEx::tcsetpgrp_without_block`]).
+    ///
+    /// This function returns an error if the process does not have a controlling
+    /// terminal, that is, [`get_tty`](Self::get_tty) returns `Err(_)`.
+    ///
+    /// # Note on POSIX conformance
+    ///
+    /// This function implements part of the initialization of the job-control
+    /// shell. POSIX says that the shell should bring itself into the foreground
+    /// only if it is started as the controlling process (that is, the session
+    /// leader) for the terminal session. However, this function also brings the
+    /// shell into the foreground if the shell is in the same process group as
+    /// the session leader because it is unlikely that there is another
+    /// job-controlling process that can bring the shell into the foreground.
+    pub fn ensure_foreground(&mut self) -> Result<(), Errno> {
+        let fd = self.get_tty()?;
+
+        if self.system.tcgetpgrp(fd)? == self.main_pgid {
+            self.system.tcsetpgrp_with_block(fd, self.main_pgid)
+        } else {
+            self.system.tcsetpgrp_without_block(fd, self.main_pgid)
+        }
+    }
+
     /// Tests whether the current environment is an interactive shell.
     ///
     /// This function returns true if and only if:

@@ -166,13 +166,9 @@ pub mod syntax;
 // TODO pub mod semantics;
 
 /// Enables or disables the internal dispositions for the "stopper" signals
-/// depending on the `Interactive` and `Monitor` option states. The dispositions
-/// are disabled in subshells.
+/// depending on the `Interactive` and `Monitor` option states.
 fn update_internal_dispositions_for_stoppers(env: &mut Env) {
-    if env.options.get(Interactive) == State::On
-        && env.options.get(Monitor) == State::On
-        && !env.stack.contains(&Subshell)
-    {
+    if env.options.get(Interactive) == State::On && env.options.get(Monitor) == State::On {
         env.traps
             .enable_internal_dispositions_for_stoppers(&mut env.system)
     } else {
@@ -182,6 +178,14 @@ fn update_internal_dispositions_for_stoppers(env: &mut Env) {
     .ok();
 }
 
+/// Ensures that the shell is in the foreground process group if the `Monitor`
+/// option is enabled.
+fn ensure_foreground(env: &mut Env) {
+    if env.options.get(Monitor) == State::On {
+        env.ensure_foreground().ok();
+    }
+}
+
 /// Modifies shell options and positional parameters.
 fn modify(
     env: &mut Env,
@@ -189,10 +193,19 @@ fn modify(
     positional_params: Option<Vec<Field>>,
 ) {
     // Modify options
+    let mut monitor_changed = false;
     for (option, state) in options {
         env.options.set(option, state);
+        monitor_changed |= option == Monitor;
     }
-    update_internal_dispositions_for_stoppers(env);
+
+    // Reinitialize job control
+    if monitor_changed && !env.stack.contains(&Subshell) {
+        // We ignore errors in theses functions because they are not essential
+        // for updating the options.
+        update_internal_dispositions_for_stoppers(env);
+        ensure_foreground(env);
+    }
 
     // Modify positional parameters
     if let Some(fields) = positional_params {
@@ -472,4 +485,8 @@ xtrace           off
         let disposition = state.processes[&env.main_pid].disposition(SIGTSTP);
         assert_eq!(disposition, Disposition::Default);
     }
+
+    // TODO Test the case when the -m option is enabled while the shell is not
+    // in the foreground. This requires the correct implementation of the
+    // `VirtualSystem::tcsetpgrp` method.
 }

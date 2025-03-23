@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       It can be used to store arbitrary data.
 - The `Env` struct now has the `wait_for_subshell_to_halt` method.
     - This method waits for the subshell to terminate or stop.
+- The `Env` struct now has the `ensure_foreground` method.
+    - This method ensures that the shell is in the foreground.
 - The `System` trait now has the `get_sigaction` method.
     - This method returns the current signal handling configuration for a signal.
       This method does not modify anything, so it can be used with an immutable

@@ -86,6 +86,12 @@ pub fn configure_environment(env: &mut Env, run: Run) -> Work {
         }
     }
 
+    // Make sure the shell is in the foreground if job control is enabled
+    if env.options.get(Monitor) == On {
+        // Ignore failures as we can still proceed even if we can't get into the foreground
+        env.ensure_foreground().ok();
+    }
+
     // Prepare built-ins
     env.builtins.extend(BUILTINS.iter().cloned());
 

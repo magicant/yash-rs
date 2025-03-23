@@ -26,7 +26,8 @@ use nix::fcntl::{OFlag, open};
 use nix::libc;
 use nix::pty::{PtyMaster, grantpt, posix_openpt, ptsname, unlockpt};
 use nix::sys::stat::Mode;
-use nix::unistd::{close, getpgrp, setsid, tcgetpgrp};
+use nix::sys::termios::tcgetsid;
+use nix::unistd::{close, getpid, setsid};
 use std::ffi::c_int;
 use std::os::fd::{AsRawFd as _, BorrowedFd, FromRawFd as _, OwnedFd};
 use std::path::{Path, PathBuf};
@@ -94,7 +95,7 @@ fn prepare_as_slave(slave_path: &Path) -> nix::Result<()> {
     unsafe { libc::ioctl(raw_fd, libc::TIOCSCTTY as _, 0 as c_int) };
 
     let fd = unsafe { BorrowedFd::borrow_raw(raw_fd) };
-    if tcgetpgrp(fd) == Ok(getpgrp()) {
+    if tcgetsid(fd) == Ok(getpid()) {
         Ok(())
     } else {
         Err(nix::Error::ENOTSUP)
