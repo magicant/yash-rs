@@ -350,7 +350,7 @@ impl Env {
     pub fn ensure_foreground(&mut self) -> Result<(), Errno> {
         let fd = self.get_tty()?;
 
-        if self.system.tcgetpgrp(fd)? == self.main_pgid {
+        if self.system.getsid(Pid(0)) == Ok(self.main_pgid) {
             self.system.tcsetpgrp_with_block(fd, self.main_pgid)
         } else {
             self.system.tcsetpgrp_without_block(fd, self.main_pgid)

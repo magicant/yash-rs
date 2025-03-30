@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `System` trait now has the `getsid` method.
     - This method returns the session ID of the process with the given PID.
 
+### Fixed
+
+- The `Env::ensure_foreground` method now correctly determines if the shell
+  is in the same process group as the session leader. Previously, it
+  incorrectly assumed that the shell was in the session leader's process
+  group if the shell was in the foreground.
+
 ## [0.6.0] - 2025-03-23
 
 ### Added
