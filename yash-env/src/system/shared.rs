@@ -412,6 +412,9 @@ impl System for &SharedSystem {
     ) -> Result<c_int> {
         (**self.0.borrow_mut()).select(readers, writers, timeout, signal_mask)
     }
+    fn getsid(&self, pid: Pid) -> Result<Pid> {
+        self.0.borrow().getsid(pid)
+    }
     fn getpid(&self) -> Pid {
         self.0.borrow().getpid()
     }
@@ -621,6 +624,10 @@ impl System for SharedSystem {
         signal_mask: Option<&[signal::Number]>,
     ) -> Result<c_int> {
         (&mut &*self).select(readers, writers, timeout, signal_mask)
+    }
+    #[inline]
+    fn getsid(&self, pid: Pid) -> Result<Pid> {
+        (&self).getsid(pid)
     }
     #[inline]
     fn getpid(&self) -> Pid {

@@ -622,6 +622,10 @@ impl System for RealSystem {
         Ok(count)
     }
 
+    fn getsid(&self, pid: Pid) -> Result<Pid> {
+        unsafe { libc::getsid(pid.0) }.errno_if_m1().map(Pid)
+    }
+
     fn getpid(&self) -> Pid {
         Pid(unsafe { libc::getpid() })
     }

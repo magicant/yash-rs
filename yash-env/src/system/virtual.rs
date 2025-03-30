@@ -764,6 +764,15 @@ impl System for VirtualSystem {
         Ok(count)
     }
 
+    /// Currently, this function always returns `Pid(2)` if the process exists.
+    fn getsid(&self, pid: Pid) -> Result<Pid> {
+        self.state
+            .borrow()
+            .processes
+            .get(&pid)
+            .map_or(Err(Errno::ESRCH), |_| Ok(Pid(2)))
+    }
+
     fn getpid(&self) -> Pid {
         self.process_id
     }

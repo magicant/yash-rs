@@ -363,6 +363,12 @@ pub trait System: Debug {
         signal_mask: Option<&[signal::Number]>,
     ) -> Result<c_int>;
 
+    /// Returns the session ID of the specified process.
+    ///
+    /// If `pid` is `Pid(0)`, this function returns the session ID of the
+    /// current process.
+    fn getsid(&self, pid: Pid) -> Result<Pid>;
+
     /// Returns the process ID of the current process.
     #[must_use]
     fn getpid(&self) -> Pid;
