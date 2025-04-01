@@ -53,8 +53,6 @@
 //! - `--force`
 //! - `--help`
 //!
-//! The `--` separator is not yet supported.
-//!
 //! # Operands
 //!
 //! The operands are treated as a command to start an external utility.
@@ -87,6 +85,9 @@
 //! This implementation uses [`Result::retain_redirs`] to flag redirections to
 //! be made permanent.
 
+use crate::common::report_error;
+use crate::common::syntax::Mode;
+use crate::common::syntax::parse_arguments;
 use std::ffi::CString;
 use std::ops::ControlFlow::Break;
 use yash_env::Env;
@@ -103,6 +104,11 @@ use yash_semantics::command_search::search_path;
 /// Entry point for executing the `exec` built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     // TODO Support non-POSIX options
+    let args = match parse_arguments(&[], Mode::with_env(env), args) {
+        Ok((_options, operands)) => operands,
+        Err(error) => return report_error(env, &error).await,
+    };
+
     let mut result = Result::default();
     result.retain_redirs();
 
@@ -195,6 +201,28 @@ mod tests {
         assert_eq!(arguments.0, c"/bin/echo".to_owned());
         assert_eq!(arguments.1, [c"echo".to_owned()]);
         assert_eq!(arguments.2, [c"PATH=/bin".to_owned()]);
+    }
+
+    #[test]
+    fn accepts_double_hyphen_separator() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Box::new(system.clone()));
+
+        // Prepare the external utility file
+        system
+            .state
+            .borrow_mut()
+            .file_system
+            .save("/bin/echo", Rc::new(RefCell::new(executable_file())))
+            .unwrap();
+
+        let args = Field::dummies(["--", "/bin/echo"]);
+        _ = main(&mut env, args).now_or_never().unwrap();
+
+        let process = &system.current_process();
+        let arguments = process.last_exec().as_ref().unwrap();
+        assert_eq!(arguments.0, c"/bin/echo".to_owned());
+        assert_eq!(arguments.1, [c"/bin/echo".to_owned()]);
     }
 
     #[test]

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `exec` built-in implementation (`exec::main`) now accepts the `--`
+  separator between options and operands, as required by POSIX.1-2024.
 - As a small optimization, the `fg` built-in implementation (`fg::main`) now
   uses `yash_env::system::System::tcsetpgrp` instead of
   `yash_env::system::SystemEx::tcsetpgrp_without_block` to bring jobs to the
