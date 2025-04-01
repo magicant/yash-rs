@@ -5,6 +5,19 @@ All notable changes to `yash-semantics` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - Unreleased
+
+### Changed
+
+- The execution of a pipeline
+  (`impl command::Command for yash_syntax::syntax::Pipeline`)
+  no longer calls `yash_env::system::SystemEx::tcsetpgrp_without_block` before
+  starting the pipeline even if job control is enabled. Previously, it would
+  call this function to make sure that the shell is in the foreground process
+  group before creating a new process group for the pipeline. Now, this
+  operation is not performed as the shell is expected to already be in the
+  foreground process group when executing a pipeline.
+
 ## [0.6.0] - 2025-03-23
 
 ### Added

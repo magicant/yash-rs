@@ -142,7 +142,7 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<ProcessResul
             // Make sure to put the target job in the foreground before sending the
             // SIGCONT signal, or the job may be immediately re-suspended.
             if let Some(tty) = tty {
-                env.system.tcsetpgrp_without_block(tty, job.pid)?;
+                env.system.tcsetpgrp(tty, job.pid)?;
             }
 
             let pgid = -job.pid;
