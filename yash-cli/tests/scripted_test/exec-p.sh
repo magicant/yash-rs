@@ -12,7 +12,6 @@ __IN__
 reached
 __OUT__
 
-: TODO Not implemented yet <<\__OUT__
 test_oE 'exec without arguments but -- separator'
 exec --
 echo $?
