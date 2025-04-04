@@ -25,8 +25,10 @@ __IN__
 __OUT__
 
 test_o 'redirection error on compound command spares non-interactive shell'
+{
 if echo not printed 1; then echo not printed 2; fi <_no_such_dir_/foo
 printf 'reached\n'
+}
 __IN__
 reached
 __OUT__
@@ -39,16 +41,20 @@ reached 0
 __OUT__
 
 test_o 'redirection error on compound command spares interactive shell' -i +m
+{
 if echo not printed 1; then echo not printed 2; fi <_no_such_dir_/foo
 printf 'reached\n'
+}
 __IN__
 reached
 __OUT__
 
 test_o 'redirection error on function spares non-interactive shell'
 func() { echo not printed; }
+{
 func <_no_such_dir_/foo
 printf 'reached\n'
+}
 __IN__
 reached
 __OUT__
@@ -62,8 +68,10 @@ __OUT__
 
 test_o 'redirection error on function spares interactive shell' -i +m
 func() { echo not printed; }
+{
 func <_no_such_dir_/foo
 printf 'reached\n'
+}
 __IN__
 reached
 __OUT__
@@ -84,7 +92,7 @@ __OUT__
 
 test_o -d 'expansion error spares interactive shell' -i +m
 unset a
-echo ${a?}
+{ echo ${a?}; echo not reached; }
 echo $?
 __IN__
 2
@@ -96,6 +104,41 @@ echo $?
 __IN__
 127
 __OUT__
+
+###############################################################################
+
+test_O 'assignment error without command kills non-interactive shell'
+readonly a=a
+a=b
+printf 'not reached\n'
+__IN__
+
+test_o 'assignment error without command in subshell'
+readonly a=a
+(a=b; printf 'not reached\n')
+[ $? -ne 0 ]
+echo $?
+__IN__
+0
+__OUT__
+
+test_o 'assignment error without command spares interactive shell' -i +m
+readonly a=a
+{ a=b; printf 'not reached\n'; }
+printf 'reached\n'
+__IN__
+reached
+__OUT__
+
+test_o 'assignment error with command name spares interactive shell' -i +m
+readonly a=a
+{ a=b echo not printed; printf 'not reached\n'; }
+printf 'reached\n'
+__IN__
+reached
+__OUT__
+
+###############################################################################
 
 : TODO not yet implemented <<'__IN__'
 test_O -d -e 2 'built-in short option argument missing'
@@ -112,8 +155,7 @@ export -p-
 __IN__
 
 test_O -d -e 2 'built-in invalid short option'
-export -pX
-# TODO exec -cXaY
+exec -cXaY
 __IN__
 
 : TODO not yet implemented <<'__IN__'
@@ -241,10 +283,9 @@ test_special_builtin_syntax_i "$LINENO" continue
 # test_special_builtin_syntax   "$LINENO" eval
 # test_special_builtin_syntax_s "$LINENO" eval
 # test_special_builtin_syntax_i "$LINENO" eval
-# TODO exec should support the Utility Syntax Guidelines
-# test_special_builtin_syntax   "$LINENO" exec
-# test_special_builtin_syntax_s "$LINENO" exec
-# test_special_builtin_syntax_i "$LINENO" exec
+test_special_builtin_syntax   "$LINENO" exec
+test_special_builtin_syntax_s "$LINENO" exec
+test_special_builtin_syntax_i "$LINENO" exec
 test_special_builtin_syntax   "$LINENO" exit
 test_special_builtin_syntax_s "$LINENO" exit
 test_special_builtin_syntax_i "$LINENO" exit
@@ -393,10 +434,9 @@ test_special_builtin_syntax_i "$LINENO" continue
 # test_special_builtin_syntax   "$LINENO" eval
 # test_special_builtin_syntax_s "$LINENO" eval
 # test_special_builtin_syntax_i "$LINENO" eval
-# TODO exec should support the Utility Syntax Guidelines
-# test_special_builtin_syntax   "$LINENO" exec
-# test_special_builtin_syntax_s "$LINENO" exec
-# test_special_builtin_syntax_i "$LINENO" exec
+test_special_builtin_syntax   "$LINENO" exec
+test_special_builtin_syntax_s "$LINENO" exec
+test_special_builtin_syntax_i "$LINENO" exec
 test_special_builtin_syntax   "$LINENO" exit
 test_special_builtin_syntax_s "$LINENO" exit
 test_special_builtin_syntax_i "$LINENO" exit
