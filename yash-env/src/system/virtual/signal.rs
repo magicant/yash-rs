@@ -22,22 +22,22 @@ use std::num::NonZero;
 /// Signal number for `SIGABRT` in the virtual system
 ///
 /// POSIX effectively requires that the signal number for `SIGABRT` is 6.
-pub const SIGABRT: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(6) });
+pub const SIGABRT: Number = Number::from_raw_unchecked(NonZero::new(6).unwrap());
 
 /// Signal number for `SIGALRM` in the virtual system
 ///
 /// POSIX effectively requires that the signal number for `SIGALRM` is 14.
-pub const SIGALRM: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(14) });
+pub const SIGALRM: Number = Number::from_raw_unchecked(NonZero::new(14).unwrap());
 
 /// Signal number for `SIGBUS` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGBUS: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(101) });
+pub const SIGBUS: Number = Number::from_raw_unchecked(NonZero::new(101).unwrap());
 
 /// Signal number for `SIGCHLD` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGCHLD: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(102) });
+pub const SIGCHLD: Number = Number::from_raw_unchecked(NonZero::new(102).unwrap());
 
 /// Signal number for `SIGCLD` in the virtual system
 ///
@@ -47,42 +47,42 @@ pub const SIGCLD: Number = SIGCHLD;
 /// Signal number for `SIGCONT` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGCONT: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(103) });
+pub const SIGCONT: Number = Number::from_raw_unchecked(NonZero::new(103).unwrap());
 
 /// Signal number for `SIGEMT` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGEMT: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(104) });
+pub const SIGEMT: Number = Number::from_raw_unchecked(NonZero::new(104).unwrap());
 
 /// Signal number for `SIGFPE` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGFPE: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(105) });
+pub const SIGFPE: Number = Number::from_raw_unchecked(NonZero::new(105).unwrap());
 
 /// Signal number for `SIGHUP` in the virtual system
 ///
 /// POSIX effectively requires that the signal number for `SIGHUP` is 1.
-pub const SIGHUP: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(1) });
+pub const SIGHUP: Number = Number::from_raw_unchecked(NonZero::new(1).unwrap());
 
 /// Signal number for `SIGILL` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGILL: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(106) });
+pub const SIGILL: Number = Number::from_raw_unchecked(NonZero::new(106).unwrap());
 
 /// Signal number for `SIGINFO` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGINFO: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(107) });
+pub const SIGINFO: Number = Number::from_raw_unchecked(NonZero::new(107).unwrap());
 
 /// Signal number for `SIGINT` in the virtual system
 ///
 /// POSIX effectively requires that the signal number for `SIGINT` is 2.
-pub const SIGINT: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(2) });
+pub const SIGINT: Number = Number::from_raw_unchecked(NonZero::new(2).unwrap());
 
 /// Signal number for `SIGIO` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGIO: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(108) });
+pub const SIGIO: Number = Number::from_raw_unchecked(NonZero::new(108).unwrap());
 
 /// Signal number for `SIGIOT` in the virtual system
 ///
@@ -92,132 +92,132 @@ pub const SIGIOT: Number = SIGABRT;
 /// Signal number for `SIGKILL` in the virtual system
 ///
 /// POSIX effectively requires that the signal number for `SIGKILL` is 9.
-pub const SIGKILL: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(9) });
+pub const SIGKILL: Number = Number::from_raw_unchecked(NonZero::new(9).unwrap());
 
 /// Signal number for `SIGLOST` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGLOST: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(109) });
+pub const SIGLOST: Number = Number::from_raw_unchecked(NonZero::new(109).unwrap());
 
 /// Signal number for `SIGPIPE` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGPIPE: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(110) });
+pub const SIGPIPE: Number = Number::from_raw_unchecked(NonZero::new(110).unwrap());
 
 /// Signal number for `SIGPOLL` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGPOLL: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(111) });
+pub const SIGPOLL: Number = Number::from_raw_unchecked(NonZero::new(111).unwrap());
 
 /// Signal number for `SIGPROF` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGPROF: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(112) });
+pub const SIGPROF: Number = Number::from_raw_unchecked(NonZero::new(112).unwrap());
 
 /// Signal number for `SIGPWR` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGPWR: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(113) });
+pub const SIGPWR: Number = Number::from_raw_unchecked(NonZero::new(113).unwrap());
 
 /// Signal number for `SIGQUIT` in the virtual system
 ///
 /// POSIX effectively requires that the signal number for `SIGQUIT` is 3.
-pub const SIGQUIT: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(3) });
+pub const SIGQUIT: Number = Number::from_raw_unchecked(NonZero::new(3).unwrap());
 
 /// Signal number for `SIGSEGV` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGSEGV: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(114) });
+pub const SIGSEGV: Number = Number::from_raw_unchecked(NonZero::new(114).unwrap());
 
 /// Signal number for `SIGSTKFLT` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGSTKFLT: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(115) });
+pub const SIGSTKFLT: Number = Number::from_raw_unchecked(NonZero::new(115).unwrap());
 
 /// Signal number for `SIGSTOP` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGSTOP: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(116) });
+pub const SIGSTOP: Number = Number::from_raw_unchecked(NonZero::new(116).unwrap());
 
 /// Signal number for `SIGSYS` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGSYS: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(117) });
+pub const SIGSYS: Number = Number::from_raw_unchecked(NonZero::new(117).unwrap());
 
 /// Signal number for `SIGTERM` in the virtual system
 ///
 /// POSIX effectively requires that the signal number for `SIGTERM` is 15.
-pub const SIGTERM: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(15) });
+pub const SIGTERM: Number = Number::from_raw_unchecked(NonZero::new(15).unwrap());
 
 /// Signal number for `SIGTHR` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGTHR: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(118) });
+pub const SIGTHR: Number = Number::from_raw_unchecked(NonZero::new(118).unwrap());
 
 /// Signal number for `SIGTRAP` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGTRAP: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(119) });
+pub const SIGTRAP: Number = Number::from_raw_unchecked(NonZero::new(119).unwrap());
 
 /// Signal number for `SIGTSTP` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGTSTP: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(120) });
+pub const SIGTSTP: Number = Number::from_raw_unchecked(NonZero::new(120).unwrap());
 
 /// Signal number for `SIGTTIN` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGTTIN: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(121) });
+pub const SIGTTIN: Number = Number::from_raw_unchecked(NonZero::new(121).unwrap());
 
 /// Signal number for `SIGTTOU` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGTTOU: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(122) });
+pub const SIGTTOU: Number = Number::from_raw_unchecked(NonZero::new(122).unwrap());
 
 /// Signal number for `SIGURG` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGURG: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(123) });
+pub const SIGURG: Number = Number::from_raw_unchecked(NonZero::new(123).unwrap());
 
 /// Signal number for `SIGUSR1` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGUSR1: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(124) });
+pub const SIGUSR1: Number = Number::from_raw_unchecked(NonZero::new(124).unwrap());
 
 /// Signal number for `SIGUSR2` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGUSR2: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(125) });
+pub const SIGUSR2: Number = Number::from_raw_unchecked(NonZero::new(125).unwrap());
 
 /// Signal number for `SIGVTALRM` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGVTALRM: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(126) });
+pub const SIGVTALRM: Number = Number::from_raw_unchecked(NonZero::new(126).unwrap());
 
 /// Signal number for `SIGWINCH` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGWINCH: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(127) });
+pub const SIGWINCH: Number = Number::from_raw_unchecked(NonZero::new(127).unwrap());
 
 /// Signal number for `SIGXCPU` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGXCPU: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(128) });
+pub const SIGXCPU: Number = Number::from_raw_unchecked(NonZero::new(128).unwrap());
 
 /// Signal number for `SIGXFSZ` in the virtual system
 ///
 /// Note that this is not the same as the signal number in the real system.
-pub const SIGXFSZ: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(129) });
+pub const SIGXFSZ: Number = Number::from_raw_unchecked(NonZero::new(129).unwrap());
 
 /// Signal number for `SIGRTMIN` in the virtual system
 ///
 /// The current implementation supports nine real-time signals (201 through 209).
-pub const SIGRTMIN: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(201) });
+pub const SIGRTMIN: Number = Number::from_raw_unchecked(NonZero::new(201).unwrap());
 
 /// Signal number for `SIGRTMAX` in the virtual system
 ///
 /// The current implementation supports nine real-time signals (201 through 209).
-pub const SIGRTMAX: Number = Number::from_raw_unchecked(unsafe { NonZero::new_unchecked(209) });
+pub const SIGRTMAX: Number = Number::from_raw_unchecked(NonZero::new(209).unwrap());
 
 /// Range of the real-time signals supported by the virtual system.
 const RT_RANGE: std::ops::RangeInclusive<RawNumber> = SIGRTMIN.as_raw()..=SIGRTMAX.as_raw();
