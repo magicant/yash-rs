@@ -3,12 +3,11 @@ updates:
 
   - package-ecosystem: "cargo"
     directory: "/"
-    versioning-strategy: "increase-if-necessary"
+    versioning-strategy: "lockfile-only"
     schedule:
       interval: "daily"
 
   - package-ecosystem: "github-actions"
     directory: "/"
-    versioning-strategy: "increase"
     schedule:
       interval: "daily"
