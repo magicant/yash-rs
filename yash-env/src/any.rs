@@ -21,36 +21,26 @@
 //!
 //! [`Env`]: crate::Env
 
+use dyn_clone::DynClone;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::fmt::Debug;
 
+/// Trait for data stored in [`DataSet`]
+trait Data: Any + DynClone {}
+
+dyn_clone::clone_trait_object!(Data);
+
+impl<T: Clone + 'static> Data for T {}
+
 /// Entry in the [`DataSet`]
-#[derive(Debug)]
-struct Entry {
-    data: Box<dyn Any>,
-    clone: fn(&dyn Any) -> Box<dyn Any>,
-}
-// TODO: When dyn upcasting coercion[1] is stabilized, we will be able to define
-// `trait Data: Any + Clone {}` and insert `Box<dyn Data>` into `DataSet`
-// without the need to store the `clone` function.
-// [1]: https://github.com/rust-lang/rust/issues/65991
+#[derive(Clone)]
+struct Entry(Box<dyn Data>);
 
-impl Clone for Entry {
-    fn clone(&self) -> Self {
-        Self {
-            data: (self.clone)(&*self.data),
-            clone: self.clone,
-        }
+impl std::fmt::Debug for Entry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Entry").finish_non_exhaustive()
     }
-}
-
-/// Clones data of the specified type
-///
-/// This function is used to clone data stored in the [`DataSet`].
-#[must_use]
-fn clone<T: Clone + 'static>(data: &dyn Any) -> Box<dyn Any> {
-    Box::new(data.downcast_ref::<T>().unwrap().clone())
 }
 
 /// Collection of arbitrary data
@@ -73,12 +63,12 @@ impl DataSet {
     /// Inserts a new data into the `DataSet`.
     ///
     /// If data of the same type is already stored in `self`, it is replaced.
+    /// Returns the old data if it exists.
     pub fn insert<T: Clone + 'static>(&mut self, data: Box<T>) -> Option<Box<T>> {
-        let clone = clone::<T>;
-        let entry = Entry { data, clone };
+        let entry = Entry(data);
         self.inner
             .insert(TypeId::of::<T>(), entry)
-            .map(|old| old.data.downcast().unwrap())
+            .map(|old| (old.0 as Box<dyn Any>).downcast().unwrap())
     }
 
     /// Obtains a reference to the data of the specified type.
@@ -86,7 +76,7 @@ impl DataSet {
     pub fn get<T: 'static>(&self) -> Option<&T> {
         self.inner
             .get(&TypeId::of::<T>())
-            .map(|entry| entry.data.downcast_ref().unwrap())
+            .map(|entry| (&*entry.0 as &dyn Any).downcast_ref().unwrap())
     }
 
     /// Obtains a mutable reference to the data of the specified type.
@@ -94,7 +84,7 @@ impl DataSet {
     pub fn get_mut<T: 'static>(&mut self) -> Option<&mut T> {
         self.inner
             .get_mut(&TypeId::of::<T>())
-            .map(|entry| entry.data.downcast_mut().unwrap())
+            .map(|entry| (&mut *entry.0 as &mut dyn Any).downcast_mut().unwrap())
     }
 
     /// Obtains a reference to the data of the specified type, or inserts a new
@@ -109,16 +99,11 @@ impl DataSet {
         T: Clone + 'static,
         F: FnOnce() -> Box<T>,
     {
-        self.inner
+        let entry = self
+            .inner
             .entry(TypeId::of::<T>())
-            .or_insert_with(|| {
-                let data = f();
-                let clone = clone::<T>;
-                Entry { data, clone }
-            })
-            .data
-            .downcast_mut()
-            .unwrap()
+            .or_insert_with(|| Entry(f()));
+        (&mut *entry.0 as &mut dyn Any).downcast_mut().unwrap()
     }
 
     /// Removes the data of the specified type from the `DataSet`.
@@ -127,7 +112,7 @@ impl DataSet {
     pub fn remove<T: 'static>(&mut self) -> Option<Box<T>> {
         self.inner
             .remove(&TypeId::of::<T>())
-            .map(|entry| entry.data.downcast().unwrap())
+            .map(|entry| (entry.0 as Box<dyn Any>).downcast().unwrap())
     }
 }
 

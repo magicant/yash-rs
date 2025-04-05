@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `System` trait now has the `getsid` method.
     - This method returns the session ID of the process with the given PID.
+- Internal dependencies:
+    - dyn-clone 1.0.19
 
 ### Changed
 

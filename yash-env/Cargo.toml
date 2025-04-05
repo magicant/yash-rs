@@ -17,6 +17,7 @@ publish = false
 [dependencies]
 annotate-snippets = { workspace = true }
 bitflags = { workspace = true }
+dyn-clone = { workspace = true }
 either = { workspace = true }
 enumset = { workspace = true }
 errno = { workspace = true, default-features = false }

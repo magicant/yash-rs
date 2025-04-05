@@ -6,6 +6,7 @@ resolver = "2"
 annotate-snippets = "0.11.4"
 assert_matches = "1.5.0"
 bitflags = "2.6.0"
+dyn-clone = "1.0.19"
 either = "1.9.0"
 enumset = "1.1.2"
 errno = { version = "0.3.10", default-features = false }
