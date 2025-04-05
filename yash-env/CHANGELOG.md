@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `System` trait now has the `getsid` method.
     - This method returns the session ID of the process with the given PID.
 
+### Changed
+
+- External dependency versions:
+    - Rust 1.85.0 → 1.86.0
+
 ### Fixed
 
 - The `Env::ensure_foreground` method now correctly determines if the shell

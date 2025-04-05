@@ -700,11 +700,11 @@ impl VariableSet {
         assert_ne!(self.contexts.len(), 1, "cannot pop the base context");
         self.contexts.pop();
         self.all_variables.retain(|_, stack| {
-            if let Some(vic) = stack.last() {
-                if vic.context_index >= self.contexts.len() {
-                    stack.pop();
-                }
-            }
+            stack.pop_if(|vic| {
+                // Remove the variable if it is in a context that has been popped.
+                // The popped context is always the topmost context.
+                vic.context_index >= self.contexts.len()
+            });
             !stack.is_empty()
         })
     }

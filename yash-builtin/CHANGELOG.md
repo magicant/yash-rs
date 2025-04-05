@@ -5,7 +5,7 @@ All notable changes to `yash-builtin` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.1] - Unreleased
+## [0.7.0] - Unreleased
 
 ### Changed
 
@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   uses `yash_env::system::System::tcsetpgrp` instead of
   `yash_env::system::SystemEx::tcsetpgrp_without_block` to bring jobs to the
   foreground.
+- External dependency versions:
+    - Rust 1.85.0 → 1.86.0
 
 ## [0.6.0] - 2025-03-23
 

@@ -1,9 +1,9 @@
 [package]
 name = "yash-cli"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2024"
-rust-version = "1.85.0"
+rust-version = "1.86.0"
 description = "Extended POSIX shell"
 # documentation = "https://yash.osdn.jp/doc/"
 readme = "README.md"
@@ -12,6 +12,7 @@ repository = "https://github.com/magicant/yash-rs"
 license = "GPL-3.0-or-later"
 keywords = ["posix", "shell"]
 categories = ["command-line-utilities"]
+publish = false
 
 [[bin]]
 name = "yash3"

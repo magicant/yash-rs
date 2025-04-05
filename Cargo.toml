@@ -24,12 +24,12 @@ thiserror = "2.0.4"
 unix_path = "1.0.1"
 unix_str = "1.0.0"
 yash-arith = { path = "yash-arith", version = "0.2.1" }
-yash-builtin = { path = "yash-builtin", version = "0.6.0" }
-yash-env = { path = "yash-env", version = "0.6.0" }
-yash-env-test-helper = { path = "yash-env-test-helper", version = "0.4.0" }
+yash-builtin = { path = "yash-builtin", version = "0.7.0" }
+yash-env = { path = "yash-env", version = "0.7.0" }
+yash-env-test-helper = { path = "yash-env-test-helper", version = "0.5.0" }
 yash-executor = { path = "yash-executor", version = "1.0.0" }
 yash-fnmatch = { path = "yash-fnmatch", version = "1.1.1" }
-yash-prompt = { path = "yash-prompt", version = "0.4.0" }
+yash-prompt = { path = "yash-prompt", version = "0.5.0" }
 yash-quote = { path = "yash-quote", version = "1.1.1" }
-yash-semantics = { path = "yash-semantics", version = "0.6.0" }
+yash-semantics = { path = "yash-semantics", version = "0.7.0" }
 yash-syntax = { path = "yash-syntax", version = "0.14.0" }
