@@ -30,7 +30,7 @@ done 3
 __OUT__
 
 (
-setup <<\__END__
+setup <<'__END__'
 \unalias \x
 x() { return $1; }
 __END__

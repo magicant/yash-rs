@@ -128,7 +128,7 @@ x
 __OUT__
 
 test_oE 'here-document in command substitution'
-echoraw "$(cat <<\END
+echoraw "$(cat <<'END'
 foo)
 END
 )"
@@ -137,7 +137,7 @@ foo)
 __OUT__
 
 test_oE 'command substitution between here-document operator and body'
-cat <<\OUTER; echoraw "$(cat <<\INNER
+cat <<'OUTER'; echoraw "$(cat <<'INNER'
 inner
 INNER
 )"

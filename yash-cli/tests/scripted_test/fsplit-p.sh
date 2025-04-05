@@ -11,7 +11,7 @@ __IN__
 __OUT__
 
 test_o 'default IFS (overriding environment variable)'
-IFS=X $TESTEE <<\__INNER__
+IFS=X $TESTEE <<'__INNER__'
 printf "[%s]\n" "$IFS"
 __INNER__
 __IN__

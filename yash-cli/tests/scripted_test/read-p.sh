@@ -4,7 +4,7 @@ posix="true"
 setup -d
 
 test_oE 'single operand - without IFS'
-read a <<\END
+read a <<'END'
 A
 END
 echoraw $? "[${a-unset}]"
@@ -13,7 +13,7 @@ __IN__
 __OUT__
 
 test_oE 'single operand - with IFS whitespace'
-read a <<\END
+read a <<'END'
   A  
 END
 echoraw $? "[${a-unset}]"
@@ -22,7 +22,7 @@ __IN__
 __OUT__
 
 test_oE 'single operand - with IFS non-whitespace'
-read a <<\END
+read a <<'END'
  - A - 
 END
 echoraw $? "[${a-unset}]"
@@ -42,7 +42,7 @@ test_oE 'read does not read more than needed'
     read a
     echo B
     cat
-} <<\END
+} <<'END'
 \
 A
 C
@@ -73,7 +73,7 @@ __OUT__
 test_oE 'set -o allexport'
 (
 set -a
-read a b <<\END
+read a b <<'END'
 A B
 END
 sh -u -c 'echo "[$a]" "[$b]"'
@@ -83,7 +83,7 @@ __IN__
 __OUT__
 
 test_oE 'line continuation - followed by normal line'
-read a b <<\END
+read a b <<'END'
 A\
 A B\
 B
@@ -94,7 +94,7 @@ __IN__
 __OUT__
 
 test_oE 'line continuation - followed by EOF'
-! read a b <<\END
+! read a b <<'END'
 A\
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]"
@@ -103,7 +103,7 @@ __IN__
 __OUT__
 
 test_oE 'field splitting - 1'
-IFS=' -' read a b c <<\END
+IFS=' -' read a b c <<'END'
  AA B CC 
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]" "[${c-unset}]"
@@ -112,7 +112,7 @@ __IN__
 __OUT__
 
 test_oE 'field splitting - 2-1'
-IFS=' -' read a b c d e <<\END
+IFS=' -' read a b c d e <<'END'
 -BB-C-DD-
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]" "[${c-unset}]" \
@@ -122,7 +122,7 @@ __IN__
 __OUT__
 
 test_oE 'field splitting - 2-2'
-IFS=' -' read a b c d e <<\END
+IFS=' -' read a b c d e <<'END'
 - BB- C- DD- 
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]" "[${c-unset}]" \
@@ -132,7 +132,7 @@ __IN__
 __OUT__
 
 test_oE 'field splitting - 2-3'
-IFS=' -' read a b c d e <<\END
+IFS=' -' read a b c d e <<'END'
  -BB -C -DD -
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]" "[${c-unset}]" \
@@ -142,7 +142,7 @@ __IN__
 __OUT__
 
 test_oE 'field splitting - 2-4'
-IFS=' -' read a b c d e <<\END
+IFS=' -' read a b c d e <<'END'
  - BB - C - DD - 
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]" "[${c-unset}]" \
@@ -152,7 +152,7 @@ __IN__
 __OUT__
 
 test_oE 'field splitting - 3-1'
-IFS=' -' read a b c d e <<\END
+IFS=' -' read a b c d e <<'END'
 --CC--
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]" "[${c-unset}]" \
@@ -162,7 +162,7 @@ __IN__
 __OUT__
 
 test_oE 'field splitting - 3-2'
-IFS=' -' read a b c d e <<\END
+IFS=' -' read a b c d e <<'END'
   --CC  --
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]" "[${c-unset}]" \
@@ -172,7 +172,7 @@ __IN__
 __OUT__
 
 test_oE 'field splitting - 3-3'
-IFS=' -' read a b c d e <<\END
+IFS=' -' read a b c d e <<'END'
 -  -CC-  -
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]" "[${c-unset}]" \
@@ -182,7 +182,7 @@ __IN__
 __OUT__
 
 test_oE 'field splitting - 3-4'
-IFS=' -' read a b c d e <<\END
+IFS=' -' read a b c d e <<'END'
 --  CC--  
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]" "[${c-unset}]" \
@@ -192,7 +192,7 @@ __IN__
 __OUT__
 
 test_oE 'backslash prevents field splitting - backslash not in IFS'
-IFS=' -' read a b c d <<\END
+IFS=' -' read a b c d <<'END'
 A\ A \ \B\  C\\C\-C\\-D
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]" "[${c-unset}]" "[${d-unset}]"
@@ -201,7 +201,7 @@ __IN__
 __OUT__
 
 test_oE 'backslash prevents field splitting - backslash in IFS'
-IFS=' -\' read a b c d <<\END
+IFS=' -\' read a b c d <<'END'
 A\ A \ \B\  C\\C\-C\\-D
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]" "[${c-unset}]" "[${d-unset}]"
@@ -211,7 +211,7 @@ __OUT__
 
 test_oE 'line continuation and newline as IFS'
 IFS='
-' read a b <<\END
+' read a b <<'END'
 A\
 B
 C
@@ -222,7 +222,7 @@ __IN__
 __OUT__
 
 test_oE 'variables are assigned empty string for missing fields'
-read a b c d <<\END
+read a b c d <<'END'
 A B
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]" "[${c-unset}]" "[${d-unset}]"
@@ -231,7 +231,7 @@ __IN__
 __OUT__
 
 test_oE 'exact number of fields with non-whitespace IFS'
-IFS=' -' read a b c <<\END
+IFS=' -' read a b c <<'END'
 A-B-C - 
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]" "[${c-unset}]"
@@ -240,7 +240,7 @@ __IN__
 __OUT__
 
 test_oE 'too many fields are joined with trailing whitespaces removed'
-IFS=' -' read a b c <<\END
+IFS=' -' read a b c <<'END'
 A B C-C C\\C\
 C   
 END
@@ -250,7 +250,7 @@ __IN__
 __OUT__
 
 test_oE 'too many fields are joined, ending with non-whitespace delimiter'
-IFS=' -' read a b c <<\END
+IFS=' -' read a b c <<'END'
 A B C-C C\\C\
 C -  
 END
@@ -260,7 +260,7 @@ __IN__
 __OUT__
 
 test_oE 'no field splitting with empty IFS'
-IFS= read a b c d <<\END
+IFS= read a b c d <<'END'
  A\ B \ \C\  D\\E\-F\\-G 
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]" "[${c-unset}]" "[${d-unset}]"
@@ -272,7 +272,7 @@ test_oE 'non-default delimiters'
 {
 read -d : a b
 read -d x c d
-} <<\END
+} <<'END'
 A B:C D ExF
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]" "[${c-unset}]" "[${d-unset}]"
@@ -281,7 +281,7 @@ __IN__
 __OUT__
 
 test_oE 'raw mode - backslash not in IFS'
-IFS=' -' read -r a b c d <<\END
+IFS=' -' read -r a b c d <<'END'
 A\A\\ B-C\- D\
 X
 END
@@ -291,7 +291,7 @@ __IN__
 __OUT__
 
 test_oE 'raw mode - backslash in IFS'
-IFS=' -\' read -r a b c d e f <<\END
+IFS=' -\' read -r a b c d e f <<'END'
 A\B\\ D-E\- F\
 X
 END

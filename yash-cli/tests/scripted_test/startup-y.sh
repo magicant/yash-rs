@@ -346,7 +346,7 @@ __OUT__
 
 : TODO not yet implemented <<'__OUT__'
 test_oE 'program name yash disables POSIX mode (w/o directory name)'
-exec -a yash "$TESTEE" <<\__END__
+exec -a yash "$TESTEE" <<'__END__'
 set +o | grep posixlycorrect
 __END__
 __IN__
@@ -355,7 +355,7 @@ __OUT__
 
 : TODO not yet implemented <<'__OUT__'
 test_oE 'program name yash disables POSIX mode (with directory name)'
-exec -a /bin/yash "$TESTEE" <<\__END__
+exec -a /bin/yash "$TESTEE" <<'__END__'
 set +o | grep posixlycorrect
 __END__
 __IN__
@@ -364,7 +364,7 @@ __OUT__
 
 : TODO not yet implemented <<'__OUT__'
 test_oE 'program name sh enables POSIX mode (w/o directory name)'
-exec -a sh "$TESTEE" <<\__END__
+exec -a sh "$TESTEE" <<'__END__'
 set +o | grep posixlycorrect
 __END__
 __IN__
@@ -373,7 +373,7 @@ __OUT__
 
 : TODO not yet implemented <<'__OUT__'
 test_oE 'program name sh enables POSIX mode (with directory name)'
-exec -a /bin/sh "$TESTEE" <<\__END__
+exec -a /bin/sh "$TESTEE" <<'__END__'
 set +o | grep posixlycorrect
 __END__
 __IN__
@@ -382,7 +382,7 @@ __OUT__
 
 : TODO not yet implemented <<'__OUT__'
 test_oE 'hyphen prefix enables interactive mode (w/o directory name)'
-exec -a -yash "$TESTEE" <<\__END__
+exec -a -yash "$TESTEE" <<'__END__'
 echo $-
 __END__
 __IN__
@@ -391,7 +391,7 @@ __OUT__
 
 : TODO not yet implemented <<'__OUT__'
 test_oE 'hyphen prefix enables interactive mode (with directory name)'
-exec -a -/bin/yash "$TESTEE" <<\__END__
+exec -a -/bin/yash "$TESTEE" <<'__END__'
 echo $-
 __END__
 __IN__

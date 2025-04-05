@@ -141,7 +141,7 @@ __IN__
 test_assign_s() {
     testcase "$1" -d \
         "assignment error on command $2 in subshell" \
-        3<<__IN__ 4<<\__OUT__ 5<&-
+        3<<__IN__ 4<<'__OUT__' 5<&-
 readonly a=a
 (a=b $2; echo not reached)
 [ \$? -ne 0 ]
@@ -156,7 +156,7 @@ __OUT__
 test_assign_i() {
     testcase "$1" -d \
         "assignment error on command $2 spares interactive shell" \
-        -i +m 3<<__IN__ 4<<\__OUT__ 5<&-
+        -i +m 3<<__IN__ 4<<'__OUT__' 5<&-
 readonly a=a
 a=b $2
 printf 'reached\n'
@@ -355,7 +355,7 @@ __IN__
 test_special_builtin_redirect_s() {
     testcase "$1" -d \
         "redirection error on special built-in $2 in subshell" \
-        3<<__IN__ 4<<\__OUT__ 5<&-
+        3<<__IN__ 4<<'__OUT__' 5<&-
 ($2 <_no_such_file_; echo not reached)
 [ \$? -ne 0 ]
 echo \$?
@@ -369,7 +369,7 @@ __OUT__
 test_special_builtin_redirect_i() {
     testcase "$1" -d \
         "redirection error on special built-in $2 spares interactive shell" \
-        -i +m 3<<__IN__ 4<<\__OUT__ 5<&-
+        -i +m 3<<__IN__ 4<<'__OUT__' 5<&-
 $2 <_no_such_file_
 printf 'reached\n'
 __IN__

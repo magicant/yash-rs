@@ -40,7 +40,7 @@ command cat </dev/null
 __IN__
 
 test_oE -e 0 'command exec retains redirection'
-command exec 3<<\__END__
+command exec 3<<'__END__'
 here
 __END__
 cat <&3
@@ -49,7 +49,7 @@ here
 __OUT__
 
 test_oE 'effect on environment'
-command read a <<\__END__
+command read a <<'__END__'
 foo
 __END__
 echo $a

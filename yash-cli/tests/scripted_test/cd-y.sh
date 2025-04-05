@@ -26,8 +26,7 @@ HOME=
 cd
 __IN__
 
-testcase "$LINENO" 'unset PWD' \
-    3<<\__IN__ 5</dev/null 4<<__OUT__
+testcase "$LINENO" 'unset PWD' 3<<'__IN__' 5</dev/null 4<<__OUT__
 unset CDPATH PWD
 cd dir
 echo ---
@@ -46,7 +45,7 @@ cd -
 __IN__
 
 # It is POSIXly unclear what the exit status of cd should be in this case.
-testcase "$LINENO" -d 'read-only PWD' 3<<\__IN__ 4<<__OUT__
+testcase "$LINENO" -d 'read-only PWD' 3<<'__IN__' 4<<__OUT__
 unset CDPATH
 readonly PWD
 cd dir
@@ -126,7 +125,7 @@ __OUT__
 )
 
 testcase "$LINENO" 'redundant slashes are removed' \
-    3<<\__IN__ 5</dev/null 4<<__OUT__
+    3<<'__IN__' 5</dev/null 4<<__OUT__
 cd .//dir///
 pwd
 __IN__
@@ -155,7 +154,7 @@ __OUT__
 
 # TODO not implemented yet
 testcase "$LINENO" -f 'hyphen is literal in default directory option' \
-    3<<\__IN__ 5</dev/null 4<<__OUT__
+    3<<'__IN__' 5</dev/null 4<<__OUT__
 OLDPWD=/ cd --default-directory=-
 pwd
 __IN__

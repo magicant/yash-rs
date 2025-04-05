@@ -175,7 +175,7 @@ echo not printed
 __IN__
 
 mkdir dir1 dir2 dir3
-cat >dir2/ext_cmd <<\END
+cat >dir2/ext_cmd <<'END'
 echo external
 echo command
 printf '[%s]\n' "$@"
@@ -214,7 +214,7 @@ case $PWD in (*[:%]*)
     skip="true"
 esac
 
-setup - <<\__END__
+setup - <<'__END__'
 mkdir "$TEST_NO.path" && cd "$TEST_NO.path"
 make_command() for c do echo echo "Running $c" >"$c" && chmod a+x "$c"; done
 __END__
@@ -291,7 +291,7 @@ if [ "${GITHUB_ACTIONS-}" ] && [ "${RUNNER_OS-}" = Linux ]; then
 fi
 
 testcase "${LINENO-}" 'argv[0] (command name with slash)' \
-    3<<\__IN__ 4<<__OUT__ 5<&-
+    3<<'__IN__' 4<<__OUT__ 5<&-
 "$(command -v sh)" -c 'echo "$0"'
 ./dir2/link_to_sh -c 'echo "$0"'
 __IN__

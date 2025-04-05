@@ -47,7 +47,7 @@ out fn2
 after function
 __OUT__
 
-cat <<\__END__ >fn
+cat <<'__END__' >fn
 fn() {
     echo in function
     return
@@ -66,7 +66,7 @@ after function
 after dot
 __OUT__
 
-cat <<\__END__ >return
+cat <<'__END__' >return
 echo in return
 return
 echo out return, not reached
@@ -80,7 +80,7 @@ in return
 after .
 __OUT__
 
-cat <<\__END__ >outer
+cat <<'__END__' >outer
 echo in outer
 . ./return
 echo out outer
@@ -119,7 +119,7 @@ fn() {
 fn
 __IN__
 
-cat <<\__END__ >exitstatus
+cat <<'__END__' >exitstatus
 (exit 17)
 return
 __END__
@@ -136,7 +136,7 @@ fn() {
 fn
 __IN__
 
-cat <<\__END__ >exitstatus17
+cat <<'__END__' >exitstatus17
 (exit 1)
 return 17
 __END__

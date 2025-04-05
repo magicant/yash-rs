@@ -7,7 +7,7 @@ posix="true"
 # Without this, the "wait" built-in may return before the background jobs are
 # actually resumed.
 
-cat >job1 <<\__END__
+cat >job1 <<'__END__'
 exec sh -c 'kill -s STOP $$; echo'
 __END__
 

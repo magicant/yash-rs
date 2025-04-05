@@ -76,7 +76,7 @@ __IN__
 [11]
 __OUT__
 
-testcase "${LINENO-}" '$0 with -s' -s X 3<<\__IN__ 4<<__OUT__ 5<&-
+testcase "${LINENO-}" '$0 with -s' -s X 3<<'__IN__' 4<<__OUT__ 5<&-
 printf '[%s]\n' "$0"
 __IN__
 [$TESTEE]
@@ -84,7 +84,7 @@ __OUT__
 
 (
 input=./input-1
-cat >"$input" <<\__END__
+cat >"$input" <<'__END__'
 echo input "$*"
 cat
 exit 3
