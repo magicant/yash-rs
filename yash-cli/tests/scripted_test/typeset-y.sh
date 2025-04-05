@@ -308,8 +308,8 @@ f() { :; }
 g() (:)
 __OUT__
 
-: TODO Needs the funciton keyword support <<\__OUT__
-test_oE -e 0 'printing function with non-portable name (-fp)' -e
+# TODO Needs the function keyword support
+test_oE -e 0 -f 'printing function with non-portable name (-fp)' -e
 function f=/\'g() { :; }
 typeset -fp "f=/'g"
 __IN__
@@ -402,8 +402,8 @@ __IN__
 #'
 #`
 
-: TODO Needs the POSIX mode <<\__IN__
-test_O -d -e 127 'typeset built-in is unavailable in POSIX mode' --posix
+# TODO Needs the POSIX mode
+test_O -d -e 127 -f 'typeset built-in is unavailable in POSIX mode' --posix
 echo echo not reached > typeset
 chmod a+x typeset
 PATH=$PWD:$PATH

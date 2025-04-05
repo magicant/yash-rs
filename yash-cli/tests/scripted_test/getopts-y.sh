@@ -49,14 +49,10 @@ __ERR__
 
 )
 
-: TODO https://github.com/magicant/yash-rs/issues/448 <<\__ERR__
-test_Oe -e 1 'invalid operand variable name'
+: TODO https://github.com/magicant/yash-rs/issues/448
+test_Oe -d -e 1 -f 'invalid operand variable name'
 getopts '' =
 __IN__
-getopts: `=' is not a valid variable name
-__ERR__
-#'
-#`
 
 test_O -d -e 2 'unset OPTIND'
 unset OPTIND

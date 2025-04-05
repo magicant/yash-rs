@@ -48,7 +48,6 @@ test_OE -e 0 'executing external command with option'
 exec cat -u /dev/null
 __IN__
 
-: TODO Not implemented yet <<\__IN__
 test_OE -e 0 'executing external command with -- separator'
 exec -- cat /dev/null
 __IN__

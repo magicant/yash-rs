@@ -24,8 +24,8 @@ __IN__
 [123\]
 __OUT__
 
-: TODO function definition not yet implemented <<'__OUT__'
-test_oE 'line continuation in function definition'
+# TODO function keyword not yet implemented
+test_oE -f 'line continuation in function definition'
 \
 f\
 u\
@@ -63,8 +63,9 @@ $\
 __IN__
 1
 __OUT__
-: TODO nested parameter expansion not yet implemented <<'__OUT__'
-test_oE 'line continuation in parameter expansion'
+
+# TODO nested parameter expansion not yet implemented
+test_oE -f 'line continuation in parameter expansion'
 f=foo
 # echo ${#?} ${${f}} ${f[1,2]:+x}
 echo \

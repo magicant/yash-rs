@@ -1,14 +1,14 @@
 # startup-y.sh: yash-specific test of shell startup
 
-: TODO not yet implemented <<\__OUT__
-test_oE -e 0 'negating -c and enabling -s' -c +c -s
+# TODO not working as expected
+test_oE -e 0 -f 'negating -c and enabling -s' -c +c -s
 echo ok
 __IN__
 ok
 __OUT__
 
-: TODO not yet implemented <<\__OUT__
-test_oE -e 0 'negating -s and enabling -c' -s +s -c 'echo ok'
+# TODO not working as expected
+test_oE -e 0 -f 'negating -s and enabling -c' -s +s -c 'echo ok'
 __IN__
 ok
 __OUT__
@@ -41,8 +41,8 @@ __ERR__
 (
 unset YASH_LOADPATH
 
-: TODO not yet implemented <<\__OUT__
-test_o 'LOADPATH is set to default if missing'
+# TODO not yet implemented
+test_o -f 'LOADPATH is set to default if missing'
 echo ${YASH_LOADPATH:+set}
 __IN__
 set
@@ -53,7 +53,6 @@ __OUT__
 (
 export YASH_LOADPATH=/foo/bar:/baz
 
-: TODO not yet implemented <<\__OUT__
 test_o 'LOADPATH is not modified if exists in environment'
 echo ${YASH_LOADPATH:-unset}
 __IN__
@@ -243,7 +242,7 @@ skip="true"
 
 export HOME="${PWD%/}/home3"
 mkdir "$HOME"
-cat >"$HOME/.yash_profile" <<\__END__
+cat >"$HOME/.yash_profile" <<'__END__'
 echo error 1
 . "$HOME/profile2"
 echo error 1 syntax error \$\?=$?
@@ -253,7 +252,7 @@ echo error 1 expansion error \$\?=$?
 fi
 echo not reached
 __END__
-cat >"$HOME/profile2" <<\__END__
+cat >"$HOME/profile2" <<'__END__'
 echo error 2
 unset var
 echo ${var?}
@@ -345,7 +344,7 @@ __OUT__
 
 )
 
-: TODO not yet implemented <<\__OUT__
+: TODO not yet implemented <<'__OUT__'
 test_oE 'program name yash disables POSIX mode (w/o directory name)'
 exec -a yash "$TESTEE" <<\__END__
 set +o | grep posixlycorrect
@@ -354,7 +353,7 @@ __IN__
 set +o posixlycorrect
 __OUT__
 
-: TODO not yet implemented <<\__OUT__
+: TODO not yet implemented <<'__OUT__'
 test_oE 'program name yash disables POSIX mode (with directory name)'
 exec -a /bin/yash "$TESTEE" <<\__END__
 set +o | grep posixlycorrect
@@ -363,7 +362,7 @@ __IN__
 set +o posixlycorrect
 __OUT__
 
-: TODO not yet implemented <<\__OUT__
+: TODO not yet implemented <<'__OUT__'
 test_oE 'program name sh enables POSIX mode (w/o directory name)'
 exec -a sh "$TESTEE" <<\__END__
 set +o | grep posixlycorrect
@@ -372,7 +371,7 @@ __IN__
 set -o posixlycorrect
 __OUT__
 
-: TODO not yet implemented <<\__OUT__
+: TODO not yet implemented <<'__OUT__'
 test_oE 'program name sh enables POSIX mode (with directory name)'
 exec -a /bin/sh "$TESTEE" <<\__END__
 set +o | grep posixlycorrect
@@ -381,7 +380,7 @@ __IN__
 set -o posixlycorrect
 __OUT__
 
-: TODO not yet implemented <<\__OUT__
+: TODO not yet implemented <<'__OUT__'
 test_oE 'hyphen prefix enables interactive mode (w/o directory name)'
 exec -a -yash "$TESTEE" <<\__END__
 echo $-
@@ -390,7 +389,7 @@ __IN__
 ls
 __OUT__
 
-: TODO not yet implemented <<\__OUT__
+: TODO not yet implemented <<'__OUT__'
 test_oE 'hyphen prefix enables interactive mode (with directory name)'
 exec -a -/bin/yash "$TESTEE" <<\__END__
 echo $-
@@ -406,8 +405,8 @@ __OUT__
 #test_oE 'job control is on by default in interactive shell'
 
 (
-: TODO not yet implemented <<\__OUT__
-test_oE -e 0 'help' --help
+# TODO not yet implemented
+test_oE -e 0 -f 'help' --help
 __IN__
 Syntax:
 	yash [option...] [filename [argument...]]
@@ -469,11 +468,12 @@ Options:
 
 Try `man yash' for details.
 __OUT__
+#'
 #`
 
 # No long options in the POSIXly-correct mode
-: TODO not yet implemented <<\__OUT__
-test_oE -e 0 'help (POSIX)' --help --posixly-correct
+# TODO not yet implemented
+test_oE -e 0 -f 'help (POSIX)' --help --posixly-correct
 __IN__
 Syntax:
 	sh [option...] [filename [argument...]]
@@ -529,6 +529,7 @@ Options:
 
 Try `man yash' for details.
 __OUT__
+#'
 #`
 
 )
@@ -542,15 +543,15 @@ __IN__
 test_E -e 0 'verbose version, long option' --version --verbose
 __IN__
 
-: TODO not yet implemented <<\__ERR__
-testcase "$LINENO" -e 2 'version (short option in POSIX mode)' --posix -V \
+# TODO not yet implemented
+testcase "$LINENO" -e 2 -f 'version (short option in POSIX mode)' --posix -V \
         3</dev/null 4</dev/null 5<<__ERR__
 $testee: \`V' is not a valid option
 __ERR__
 #'
 
-: TODO not yet implemented <<\__ERR__
-testcase "$LINENO" -e 2 'version (long option in POSIX mode)' --posix --versi \
+# TODO not yet implemented
+testcase "$LINENO" -e 2 -f 'version (long option in POSIX mode)' --posix --versi \
         3</dev/null 4</dev/null 5<<__ERR__
 $testee: \`--versi' is not a valid option
 __ERR__
@@ -571,8 +572,8 @@ testcase "$LINENO" -e 2 'missing rcfile option argument' --rcfile \
 $testee: option \`--rcfile\` missing an argument
 __ERR__
 
-: TODO not yet implemented <<\__ERR__
-testcase "$LINENO" -e 2 'long option in POSIX mode' --posix --monitor \
+# TODO not yet implemented
+testcase "$LINENO" -e 2 -f 'long option in POSIX mode' --posix --monitor \
         3</dev/null 4</dev/null 5<<__ERR__
 $testee: \`--monitor' is not a valid option
 __ERR__

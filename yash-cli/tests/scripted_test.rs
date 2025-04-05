@@ -80,17 +80,18 @@ fn failures(log: &str) -> String {
     let mut test_case = Vec::new();
     let mut result = String::new();
 
-    // Each test case in the log file is enclosed by the "%%% START: " and
-    // "%%% PASSED: " or "%%% FAILED: " lines. We extract lines between these
-    // markers and append them to the result string.
+    // Each test case in the log file starts with a line that starts with
+    // "%%% START: " and ends with a line that starts with "%%% OK[",
+    // "%%% ERROR[", or "%%% SKIPPED: ". We extract lines between these markers
+    // and append them to the result string.
     while let Some(start) = lines.find(|line| line.starts_with("%%% START: ")) {
         test_case.clear();
         test_case.push(start);
         for line in lines.by_ref() {
-            if line.starts_with("%%% PASSED: ") {
+            if line.starts_with("%%% OK[") || line.starts_with("%%% SKIPPED: ") {
                 // Discard this test case
                 break;
-            } else if line.starts_with("%%% FAILED: ") {
+            } else if line.starts_with("%%% ERROR[") {
                 test_case.push(line);
 
                 // Add this test case to the result

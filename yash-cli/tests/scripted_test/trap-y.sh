@@ -128,15 +128,15 @@ trap -- 'echo X' USR1
 trap -- - TERM
 __OUT__
 
-: TODO not implemented yet <<'__OUT__'
-test_oE -e 0 'specifying signal with SIG-prefix'
+# TODO not implemented yet
+test_oE -e 0 -f 'specifying signal with SIG-prefix'
 trap 'echo trapped' SIGUSR1 && kill -s USR1 $$
 __IN__
 trapped
 __OUT__
 
-: TODO not implemented yet <<'__OUT__'
-test_oE -e 0 'signal name is case-insensitive'
+# TODO not implemented yet
+test_oE -e 0 -f 'signal name is case-insensitive'
 trap 'echo trapped' uSr1 && kill -s USR1 $$
 __IN__
 trapped

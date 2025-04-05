@@ -71,8 +71,8 @@ __IN__
 OLDPWD=/
 __OUT__
 
-: TODO not implemented yet <<\__OUT__
-test_oE -e 0 'YASH_AFTER_CD is iteratively executed after changing directory'
+# TODO not implemented yet
+test_oE -e 0 -f 'YASH_AFTER_CD is iteratively executed after changing directory'
 YASH_AFTER_CD=(
 'printf "PWD=%s\n" "$PWD"'
 'printf "status=%d\n" "$?"'
@@ -100,8 +100,8 @@ if ! [ / -ef /.. ]; then
     skip="true"
 fi
 
-: TODO not implemented yet <<\__OUT__
-test_oE '/.. is canonicalized to / (+o POSIX)'
+# TODO not implemented yet
+test_oE -f '/.. is canonicalized to / (+o POSIX)'
 cd /..//../dev
 printf '%s\n' "$PWD"
 cd /../..
@@ -133,8 +133,8 @@ __IN__
 $ORIGPWD/dir
 __OUT__
 
-: TODO not implemented yet <<\__OUT__
-test_oE 'default directory option with operand'
+# TODO not implemented yet
+test_oE -f 'default directory option with operand'
 HOME=/tmp cd --default-directory=/ /dev
 echo --- $?
 pwd
@@ -143,8 +143,8 @@ __IN__
 /dev
 __OUT__
 
-: TODO not implemented yet <<\__OUT__
-test_oE 'default directory option without operand'
+# TODO not implemented yet
+test_oE -f 'default directory option without operand'
 HOME=/tmp cd --default-directory=/
 echo --- $?
 pwd
@@ -153,8 +153,8 @@ __IN__
 /
 __OUT__
 
-: TODO not implemented yet <<\__OUT__
-testcase "$LINENO" 'hyphen is literal in default directory option' \
+# TODO not implemented yet
+testcase "$LINENO" -f 'hyphen is literal in default directory option' \
     3<<\__IN__ 5</dev/null 4<<__OUT__
 OLDPWD=/ cd --default-directory=-
 pwd

@@ -341,7 +341,7 @@ test_OE -e 0 'intrinsic built-in getopts can be invoked without $PATH'
 getopts o o -o
 __IN__
 
-: TODO hash built-in not yet implemented <<\__IN__
+: TODO hash built-in not yet implemented <<'__IN__'
 test_OE -e 0 'intrinsic built-in hash can be invoked without $PATH'
 hash -r
 __IN__

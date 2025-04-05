@@ -2,11 +2,11 @@
 
 posix="true"
 
-cat >job1 <<\__END__
+cat >job1 <<'__END__'
 exec sh -c 'echo 1; kill -s STOP $$; echo 2'
 __END__
 
-cat >job2 <<\__END__
+cat >job2 <<'__END__'
 exec sh -c 'echo a; kill -s STOP $$; echo b'
 __END__
 
@@ -30,7 +30,7 @@ __IN__
 1
 __OUT__
 
-: TODO Needs to find a way to test this <<\__IN__
+: TODO Needs to find a way to test this <<'__IN__'
 test_o 'resumed job is in foreground' -m
 sh -c 'kill -s STOP $$; ...'
 fg >/dev/null

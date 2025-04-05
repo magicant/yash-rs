@@ -2,18 +2,18 @@
 
 posix="true"
 
-cat <<\__END__ >file1
+cat <<'__END__' >file1
 echo $?
 (exit 3)
 __END__
 
-cat <<\__END__ >file2
+cat <<'__END__' >file2
 echo in
 . ./file1
 echo out
 __END__
 
-cat <<\__END__ >file3
+cat <<'__END__' >file3
 exit 11
 __END__
 
@@ -81,7 +81,6 @@ test_O -d -e n 'dot script not found, in $PATH, subshell, exit status'
 (. _no_such_file_)
 __IN__
 
-: TODO interactive shell behavior not implemented <<\__OUT__
 test_o -d 'dot script not found, in $PATH, interactive shell, no exiting' -i +m
 . _no_such_file_
 PATH=$savepath
@@ -112,7 +111,6 @@ test_O -d -e n 'dot script not found, relative, subshell, exit status'
 (. ./_no_such_file_)
 __IN__
 
-: TODO interactive shell behavior not implemented <<\__OUT__
 test_o -d 'dot script not found, relative, interactive shell, no exiting' -i +m
 . ./_no_such_file_
 echo reached

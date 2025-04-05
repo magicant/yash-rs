@@ -16,6 +16,14 @@ test_x -e 0 'hashondef (long) off: $-' +o hashondef
 printf '%s\n' "$-" | grep -qv h
 __IN__
 
+# TODO not implemented
+test_oE -f 'hashondef (short) on: effect' -h
+h_option_test() { cat /dev/null; }
+echo $(hash | grep '/cat$' | wc -l)
+__IN__
+1
+__OUT__
+
 test_O 'noexec takes effect immediately'
 set -n; echo not executed
 __IN__
@@ -26,34 +34,34 @@ __IN__
 printed
 __OUT__
 
-: TODO not yet implemented <<\__OUT__
-test_OE -e 0 'pipefail on: single command successful pipe' --pipefail
+# TODO not yet implemented
+test_OE -e 0 -f 'pipefail on: single command successful pipe' --pipefail
 true
 __IN__
 
-: TODO not yet implemented <<\__OUT__
-test_OE -e 13 'pipefail on: single command unsuccessful pipe' --pipefail
+# TODO not yet implemented
+test_OE -e 13 -f 'pipefail on: single command unsuccessful pipe' --pipefail
 (exit 13)
 __IN__
 
-: TODO not yet implemented <<\__OUT__
-test_OE -e 0 'pipefail on: multi-command successful pipe' --pipefail
+# TODO not yet implemented
+test_OE -e 0 -f 'pipefail on: multi-command successful pipe' --pipefail
 true | true | true | true
 __IN__
 
-: TODO not yet implemented <<\__OUT__
-test_OE -e 7 'pipefail on: multi-command unsuccessful pipe' --pipefail
+# TODO not yet implemented
+test_OE -e 7 -f 'pipefail on: multi-command unsuccessful pipe' --pipefail
 true | exit 2 | true | exit 7 | true | true
 __IN__
 
-: TODO not yet implemented <<\__OUT__
-test_OE -e 7 'pipefail on: multi-command unsuccessful pipe in subshell' \
+# TODO not yet implemented
+test_OE -e 7 -f 'pipefail on: multi-command unsuccessful pipe in subshell' \
     --pipefail
 (true | exit 2 | true | exit 7 | true | true)
 __IN__
 
-: TODO not yet implemented <<\__OUT__
-test_oE 'traceall on: effect' --traceall
+# TODO not yet implemented
+test_oE -f 'traceall on: effect' --traceall
 exec 2>&1
 COMMAND_NOT_FOUND_HANDLER='echo not found $* >&2; HANDLED=1'
 set -xv
@@ -66,8 +74,8 @@ not found no/such/command
 + HANDLED=1
 __OUT__
 
-: TODO not yet implemented <<\__OUT__
-test_oE 'traceall on: effect' --notraceall
+# TODO not yet implemented
+test_oE -f 'traceall on: effect' --notraceall
 exec 2>&1
 COMMAND_NOT_FOUND_HANDLER='echo not found $* >&2; HANDLED=1'
 set -xv
@@ -82,8 +90,8 @@ test_O -d -e 2 'unset off: unset variable $((foo))' -u
 eval '$((x))'
 __IN__
 
-: TODO not yet implemented <<\__ERR__
-test_oe 'xtrace on: recursion' -x
+# TODO not yet implemented
+test_oe -f 'xtrace on: recursion' -x
 PS4='$(echo X)+ '
 echo 1
 echo 2

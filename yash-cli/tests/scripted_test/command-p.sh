@@ -60,7 +60,7 @@ __OUT__
 (
 # TODO The -p option is not supported on some systems.
 case "$(uname)" in
-    (Darwin)
+    (Darwin|Linux)
         ;;
     (*)
         skip='true'
@@ -286,7 +286,7 @@ __IN__
 
 # TODO The -p option is not supported on some systems.
 case "$(uname)" in
-    (Darwin)
+    (Darwin|Linux)
         ;;
     (*)
         skip='true'

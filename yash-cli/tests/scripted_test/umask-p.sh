@@ -6,7 +6,7 @@ posix="true"
 test_restore_non_symbolic() {
     testcase "$1" -e 0 \
         "restoring umask using previous output, non-symbolic, $2" \
-        3<<\__IN__ 4</dev/null 5<&4
+        3<<'__IN__' 4</dev/null 5<&4
 mask=$(umask)
 umask 777
 umask "$mask"
@@ -31,7 +31,7 @@ test_restore_non_symbolic "$LINENO" 017
 test_restore_symbolic() {
     testcase "$1" -e 0 \
         "restoring umask using previous output, symbolic, $2" \
-        3<<\__IN__ 4</dev/null 5<&4
+        3<<'__IN__' 4</dev/null 5<&4
 mask=$(umask -S)
 umask 777
 umask "$mask"

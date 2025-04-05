@@ -51,11 +51,11 @@ __IN__
 __OUT__
 
 (
-skip=true # TODO the empty-last-field option not yet implemented
+# TODO the empty-last-field option not yet implemented
 setup 'set --empty-last-field'
 
-test_oE 'exact number of fields with non-whitespace IFS'
-IFS=' -' read a b c <<\END
+test_oE -f 'exact number of fields with non-whitespace IFS'
+IFS=' -' read a b c <<'END'
 A-B-C - 
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]" "[${c-unset}]"
@@ -63,8 +63,8 @@ __IN__
 0 [A] [B] [C -]
 __OUT__
 
-test_oE 'too many fields are joined with trailing whitespaces removed'
-IFS=' -' read a b c <<\END
+test_oE -f 'too many fields are joined with trailing whitespaces removed'
+IFS=' -' read a b c <<'END'
 A B C-C C\\C\
 C   
 END
@@ -73,8 +73,8 @@ __IN__
 0 [A] [B] [C-C C\CC]
 __OUT__
 
-test_oE 'too many fields are joined, ending with non-whitespace delimiter'
-IFS=' -' read a b c <<\END
+test_oE -f 'too many fields are joined, ending with non-whitespace delimiter'
+IFS=' -' read a b c <<'END'
 A B C-C C\\C\
 C -  
 END
@@ -87,15 +87,15 @@ __OUT__
 
 # Many other shells behave this way, too.
 test_oE 'too many fields are joined with leading whitespaces removed'
-IFS=' -' read a b <<\END
+IFS=' -' read a b <<'END'
  - -
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]"
-IFS=' -' read a b <<\END
+IFS=' -' read a b <<'END'
  - - -
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]"
-IFS=' -' read a b <<\END
+IFS=' -' read a b <<'END'
  - -  -   -
 END
 echoraw $? "[${a-unset}]" "[${b-unset}]"
@@ -105,9 +105,9 @@ __IN__
 0 [] [-  -   -]
 __OUT__
 
-: TODO not yet implemented <<'__OUT__'
-test_oE 'array - single operand - single field'
-read -A a <<\END
+# TODO not yet implemented
+test_oE -f 'array - single operand - single field'
+read -A a <<'END'
 A
 END
 echo $?
@@ -118,9 +118,9 @@ a=(A)
 typeset a
 __OUT__
 
-: TODO not yet implemented <<'__OUT__'
-test_oE 'array - single operand - no field'
-read -A a <<\END
+# TODO not yet implemented
+test_oE -f 'array - single operand - no field'
+read -A a <<'END'
 
 END
 echo $?
@@ -131,9 +131,9 @@ a=()
 typeset a
 __OUT__
 
-: TODO not yet implemented <<'__OUT__'
-test_oE 'array - many operands'
-read -A a b c <<\END
+# TODO not yet implemented
+test_oE -f 'array - many operands'
+read -A a b c <<'END'
 A B C
 END
 echo $?
@@ -146,9 +146,9 @@ c=(C)
 typeset c
 __OUT__
 
-: TODO not yet implemented <<'__OUT__'
-test_oE 'array - too many fields'
-IFS=' -' read -A a b c <<\END
+# TODO not yet implemented
+test_oE -f 'array - too many fields'
+IFS=' -' read -A a b c <<'END'
 A B C-D E\\E\
 E   
 END
@@ -162,9 +162,9 @@ c=(C D 'E\EE')
 typeset c
 __OUT__
 
-: TODO not yet implemented <<'__OUT__'
-test_oE 'array - too many variables'
-read -A a b c d <<\END
+# TODO not yet implemented
+test_oE -f 'array - too many variables'
+read -A a b c d <<'END'
 A B
 END
 echo $?
@@ -178,9 +178,9 @@ d=()
 typeset d
 __OUT__
 
-: TODO not yet implemented <<'__OUT__'
-test_oE 'array - long option'
-read --array a b c <<\END
+# TODO not yet implemented
+test_oE -f 'array - long option'
+read --array a b c <<'END'
 A B C
 END
 echo $?
@@ -193,10 +193,10 @@ c=(C)
 typeset c
 __OUT__
 
-: TODO not yet implemented <<'__OUT__'
-test_oE 'array - set -o allexport'
+# TODO not yet implemented
+test_oE -f 'array - set -o allexport'
 set -a
-read -A a b <<\END
+read -A a b <<'END'
 A B C D
 END
 sh -u -c 'echo "[$a]" "[$b]"'
@@ -231,8 +231,8 @@ test_O -d -e 4 'missing operand'
 read
 __IN__
 
-: TODO should be a command line syntax error <<'__IN__'
-test_O -d -e 4 'invalid variable name'
+# TODO should be a command line syntax error
+test_O -d -e 4 -f 'invalid variable name'
 read a=b
 __IN__
 
