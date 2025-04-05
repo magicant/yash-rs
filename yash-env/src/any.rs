@@ -65,9 +65,8 @@ impl DataSet {
     /// If data of the same type is already stored in `self`, it is replaced.
     /// Returns the old data if it exists.
     pub fn insert<T: Clone + 'static>(&mut self, data: Box<T>) -> Option<Box<T>> {
-        let entry = Entry(data);
         self.inner
-            .insert(TypeId::of::<T>(), entry)
+            .insert(TypeId::of::<T>(), Entry(data))
             .map(|old| (old.0 as Box<dyn Any>).downcast().unwrap())
     }
 
