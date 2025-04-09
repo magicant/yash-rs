@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- In pathname expansion (`expansion::glob`), pathname component patterns no
+  longer expand to the filename `.` or `..`.
 - The execution of a pipeline
   (`impl command::Command for yash_syntax::syntax::Pipeline`)
   no longer calls `yash_env::system::SystemEx::tcsetpgrp_without_block` before

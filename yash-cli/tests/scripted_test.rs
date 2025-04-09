@@ -348,6 +348,11 @@ fn pathname_expansion() {
 }
 
 #[test]
+fn pathname_expansion_ex() {
+    run("path-y.sh");
+}
+
+#[test]
 fn pipeline() {
     run("pipeline-p.sh")
 }

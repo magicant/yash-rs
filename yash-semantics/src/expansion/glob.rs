@@ -193,7 +193,7 @@ impl SearchEnv<'_> {
                 if let Ok(mut dir) = self.env.system.opendir(&dir_path) {
                     while let Ok(Some(entry)) = dir.next() {
                         if let Some(name) = entry.name.to_str() {
-                            if pattern.is_match(name) {
+                            if name != "." && name != ".." && pattern.is_match(name) {
                                 self.push_component(new_suffix, true, |prefix| {
                                     prefix.push_str(name)
                                 });
@@ -398,6 +398,15 @@ mod tests {
         let mut i = glob(&mut env, f);
         assert_eq!(i.next().unwrap().value, "foo.exe");
         assert_eq!(i.next().unwrap().value, "foo.txt");
+        assert_eq!(i.next(), None);
+    }
+
+    #[test]
+    fn no_pattern_matches_dot_or_dot_dot() {
+        let mut env = env_with_dummy_files([".foo"]);
+        let f = dummy_attr_field(".*");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, ".foo");
         assert_eq!(i.next(), None);
     }
 
