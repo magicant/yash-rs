@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `true`, `false`, and `pwd` built-ins are now substitutive, as specified in
+  POSIX.1-2024.
+    - In the `BUILTINS` array, these built-ins now have the `Type::Substitutive`
+      type.
 - The `exec` built-in implementation (`exec::main`) now accepts the `--`
   separator between options and operands, as required by POSIX.1-2024.
 - As a small optimization, the `fg` built-in implementation (`fg::main`) now

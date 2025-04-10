@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In pathname expansion, pathname component patterns no longer expand to the
   filename `.` or `..`. For example, the pattern `.*` may match `.config` and
   `.git`, but not `.` or `..`.
+- The `true`, `false`, and `pwd` built-ins are now substitutive, as specified in
+  POSIX.1-2024.
 - The `exec` built-in now accepts the `--` separator between options and
   operands, as required by POSIX.1-2024.
 

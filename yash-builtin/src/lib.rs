@@ -102,7 +102,7 @@ pub use yash_env::builtin::*;
 #[cfg(doc)]
 use yash_env::stack::{Frame, Stack};
 
-use Type::{Elective, Mandatory, Special};
+use Type::{Elective, Mandatory, Special, Substitutive};
 use std::future::ready;
 
 /// Array of all the implemented built-in utilities.
@@ -165,7 +165,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
     }),
     (
         "false",
-        Builtin::new(Mandatory, |env, args| Box::pin(r#false::main(env, args))),
+        Builtin::new(Substitutive, |env, args| Box::pin(r#false::main(env, args))),
     ),
     (
         "fg",
@@ -185,7 +185,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
     ),
     (
         "pwd",
-        Builtin::new(Mandatory, |env, args| Box::pin(pwd::main(env, args))),
+        Builtin::new(Substitutive, |env, args| Box::pin(pwd::main(env, args))),
     ),
     #[cfg(feature = "yash-semantics")]
     (
@@ -224,7 +224,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
     ),
     (
         "true",
-        Builtin::new(Mandatory, |env, args| Box::pin(r#true::main(env, args))),
+        Builtin::new(Substitutive, |env, args| Box::pin(r#true::main(env, args))),
     ),
     #[cfg(feature = "yash-semantics")]
     (

@@ -3,6 +3,5 @@
 posix="true"
 
 test_OE -e 0 'true'
-PATH=
 true
 __IN__

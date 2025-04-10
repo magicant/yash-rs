@@ -172,6 +172,11 @@ fn command_builtin() {
 }
 
 #[test]
+fn command_builtin_ex() {
+    run("command-y.sh")
+}
+
+#[test]
 fn command_substitution() {
     run("cmdsub-p.sh")
 }
@@ -451,6 +456,11 @@ fn trap_ex_2() {
 #[test]
 fn true_builtin() {
     run("true-p.sh")
+}
+
+#[test]
+fn type_builtin() {
+    run("type-y.sh");
 }
 
 #[test]
