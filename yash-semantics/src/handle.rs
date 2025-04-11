@@ -21,6 +21,7 @@ use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
 use yash_env::io::print_message;
 use yash_env::semantics::Divert;
+use yash_syntax::source::Source;
 
 /// Error handler.
 ///
@@ -36,13 +37,22 @@ pub trait Handle {
 /// Prints an error message.
 ///
 /// This implementation handles the error by printing an error message to the
-/// standard error and returning `Divert::Interrupt(Some(ExitStatus::ERROR))`.
+/// standard error and returning `Divert::Interrupt(Some(exit_status))`, where
+/// `exit_status` is [`ExitStatus::ERROR`] if the error cause is a syntax error
+/// or the error location is [`Source::DotScript`], or
+/// [`ExitStatus::READ_ERROR`] otherwise.
 /// Note that other POSIX-compliant implementations may use different non-zero
-/// exit statuses.
+/// exit statuses instead of `ExitStatus::ERROR`.
 impl Handle for yash_syntax::parser::Error {
     async fn handle(&self, env: &mut Env) -> super::Result {
         print_message(env, self).await;
-        Break(Divert::Interrupt(Some(ExitStatus::ERROR)))
+
+        use yash_syntax::parser::ErrorCause::*;
+        let exit_status = match (&self.cause, &*self.location.code.source) {
+            (Syntax(_), _) | (Io(_), Source::DotScript { .. }) => ExitStatus::ERROR,
+            (Io(_), _) => ExitStatus::READ_ERROR,
+        };
+        Break(Divert::Interrupt(Some(exit_status)))
     }
 }
 
@@ -87,5 +97,70 @@ impl Handle for crate::redir::Error {
         print_message(env, self).await;
         env.exit_status = ExitStatus::ERROR;
         Continue(())
+    }
+}
+
+#[cfg(test)]
+mod parser_error_tests {
+    use super::*;
+    use futures_util::FutureExt as _;
+    use yash_syntax::parser::{Error, ErrorCause, SyntaxError};
+    use yash_syntax::source::{Code, Location};
+
+    #[test]
+    fn handling_syntax_error() {
+        let mut env = Env::new_virtual();
+        let error = Error {
+            cause: ErrorCause::Syntax(SyntaxError::RedundantToken),
+            location: Location::dummy("test"),
+        };
+        let result = error.handle(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
+    }
+
+    #[test]
+    fn handling_io_error_in_command_file() {
+        let mut env = Env::new_virtual();
+        let code = Code {
+            value: "test".to_string().into(),
+            start_line_number: 1.try_into().unwrap(),
+            source: Source::CommandFile {
+                path: "test".to_string(),
+            }
+            .into(),
+        }
+        .into();
+        let range = 0..0;
+        let location = Location { code, range };
+        let cause = ErrorCause::Io(std::io::Error::other("error").into());
+        let error = Error { cause, location };
+
+        let result = error.handle(&mut env).now_or_never().unwrap();
+        assert_eq!(
+            result,
+            Break(Divert::Interrupt(Some(ExitStatus::READ_ERROR)))
+        );
+    }
+
+    #[test]
+    fn handling_io_error_in_dot_script() {
+        let mut env = Env::new_virtual();
+        let code = Code {
+            value: "test".to_string().into(),
+            start_line_number: 1.try_into().unwrap(),
+            source: Source::DotScript {
+                name: "test".to_string(),
+                origin: Location::dummy("test"),
+            }
+            .into(),
+        }
+        .into();
+        let range = 0..0;
+        let location = Location { code, range };
+        let cause = ErrorCause::Io(std::io::Error::other("error").into());
+        let error = Error { cause, location };
+
+        let result = error.handle(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
     }
 }

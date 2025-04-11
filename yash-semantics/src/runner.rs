@@ -410,7 +410,10 @@ mod tests {
         let result = interactive_read_eval_loop(&ref_env, &mut lexer)
             .now_or_never()
             .unwrap();
-        assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
+        assert_eq!(
+            result,
+            Break(Divert::Interrupt(Some(ExitStatus::READ_ERROR)))
+        );
     }
 
     #[test]

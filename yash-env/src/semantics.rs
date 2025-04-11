@@ -140,20 +140,23 @@ impl Termination for ExitStatus {
 }
 
 impl ExitStatus {
-    /// Exit status of 0: success.
+    /// Exit status of 0: success
     pub const SUCCESS: ExitStatus = ExitStatus(0);
 
-    /// Exit status of 1: failure.
+    /// Exit status of 1: failure
     pub const FAILURE: ExitStatus = ExitStatus(1);
 
-    /// Exit status of 2: error severer than failure.
+    /// Exit status of 2: error severer than failure
     pub const ERROR: ExitStatus = ExitStatus(2);
 
-    /// Exit Status of 126: command not executable.
+    /// Exit Status of 126: command not executable
     pub const NOEXEC: ExitStatus = ExitStatus(126);
 
-    /// Exit status of 127: command not found.
+    /// Exit status of 127: command not found
     pub const NOT_FOUND: ExitStatus = ExitStatus(127);
+
+    /// Exit status of 128: unrecoverable read error
+    pub const READ_ERROR: ExitStatus = ExitStatus(128);
 
     /// Returns true if and only if `self` is zero.
     pub const fn is_successful(&self) -> bool {

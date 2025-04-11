@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   POSIX.1-2024.
 - The `exec` built-in now accepts the `--` separator between options and
   operands, as required by POSIX.1-2024.
+- The shell now returns an exit status of 128 on an I/O error reading command
+  input, except when reading a script in the `.` built-in, as required by
+  POSIX.1-2024.
 
 ## [0.3.0] - 2025-03-23
 

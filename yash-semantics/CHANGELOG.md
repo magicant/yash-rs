@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   group before creating a new process group for the pipeline. Now, this
   operation is not performed as the shell is expected to already be in the
   foreground process group when executing a pipeline.
+- The shell now returns an exit status of 128 on an I/O error in the parser
+  except when the error location is in a script read by the `.` built-in.
+    - In `impl Handle for yash_syntax::parser::Error`, the `handle` method now
+      returns `yash_env::semantics::ExitStatus::READ_ERROR` instead of
+      `yash_env::semantics::ExitStatus::ERROR` if the error cause is an I/O
+      error and the error location is not
+      `yash_syntax::source::Source::DotScript`.
 - External dependency versions:
     - Rust 1.85.0 → 1.86.0
     - yash-env 0.6.0 → 0.7.0
