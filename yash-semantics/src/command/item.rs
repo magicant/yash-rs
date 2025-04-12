@@ -77,14 +77,24 @@ async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Locat
         .ignore_sigint_sigquit(true);
     match subshell.start(env).await {
         Ok((pid, job_control)) => {
+            // remember the process ID as a job
             let mut job = Job::new(pid);
+            job.state_changed = false;
             job.name = and_or.to_string();
             if let Some(job_control) = job_control {
                 debug_assert_eq!(job_control, JobControl::Background);
                 job.job_controlled = true;
             }
-            env.jobs.add(job);
+            let job_index = env.jobs.add(job);
             env.jobs.set_last_async_pid(pid);
+
+            if env.is_interactive() {
+                // report the job number and process ID
+                let job_number = job_index + 1;
+                let report = format!("[{job_number}] {pid}\n");
+                env.system.print_error(&report).await;
+            }
+
             env.exit_status = ExitStatus::SUCCESS;
             Continue(())
         }
@@ -135,7 +145,7 @@ mod tests {
     use std::rc::Rc;
     use yash_env::VirtualSystem;
     use yash_env::job::ProcessState;
-    use yash_env::option::Option::Monitor;
+    use yash_env::option::Option::{Interactive, Monitor};
     use yash_env::option::State::On;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::Inode;
@@ -216,7 +226,7 @@ mod tests {
 
             let job = &env.jobs[0];
             assert!(!job.job_controlled);
-            assert!(job.state_changed);
+            assert!(!job.state_changed);
             assert_eq!(job.state, ProcessState::Running);
             assert_eq!(job.pid, env.jobs.last_async_pid());
             assert_eq!(job.name, "return -n 42");
@@ -236,6 +246,38 @@ mod tests {
 
             let pids = state.borrow().processes.keys().copied().collect::<Vec<_>>();
             assert_eq!(pids, [env.main_pid, env.jobs.last_async_pid()]);
+        })
+    }
+
+    #[test]
+    fn item_execute_async_no_report_if_non_interactive() {
+        in_virtual_system(|mut env, state| async move {
+            env.builtins.insert("return", return_builtin());
+
+            let item = syntax::Item {
+                and_or: Rc::new("return -n 42".parse().unwrap()),
+                async_flag: Some(Location::dummy("")),
+            };
+            item.execute(&mut env).await;
+
+            assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
+        })
+    }
+
+    #[test]
+    fn item_execute_async_report_if_interactive() {
+        in_virtual_system(|mut env, state| async move {
+            env.builtins.insert("return", return_builtin());
+            env.options.set(Interactive, On);
+
+            let item = syntax::Item {
+                and_or: Rc::new("return -n 42".parse().unwrap()),
+                async_flag: Some(Location::dummy("")),
+            };
+            item.execute(&mut env).await;
+
+            let expected_report = format!("[1] {}\n", env.jobs.last_async_pid());
+            assert_stderr(&state, |stderr| assert_eq!(stderr, expected_report));
         })
     }
 

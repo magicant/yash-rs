@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - In pathname expansion (`expansion::glob`), pathname component patterns no
   longer expand to the filename `.` or `..`.
+- When an asynchronous command is executed
+  (`impl command::Command for yash_syntax::syntax::Item`) in an interactive
+  shell (`yash_env::Env::is_interactive`), the job number and the process ID are
+  now printed to the standard error, as required by POSIX.1-2024.
+- When an asynchronous command is executed
+  (`impl command::Command for yash_syntax::syntax::Item`), the job representing
+  the command now has the `yash_env::job::Job::state_changed` flag set to
+  `false` to avoid re-reporting the job state change before the next prompt.
 - The execution of a pipeline
   (`impl command::Command for yash_syntax::syntax::Pipeline`)
   no longer calls `yash_env::system::SystemEx::tcsetpgrp_without_block` before
