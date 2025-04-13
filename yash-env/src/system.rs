@@ -549,8 +549,12 @@ pub enum Disposition {
 /// executed in a child process initiated by the starter. The environment passed
 /// to the task is a clone of the parent environment, but it has a different
 /// process ID than the parent.
+///
+/// Note that the output type of the task is `Infallible`. This is to ensure that
+/// the task [exits](System::exit) cleanly or [kills](System::kill) itself with
+/// a signal.
 pub type ChildProcessTask =
-    Box<dyn for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>>>;
+    Box<dyn for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = Infallible> + 'a>>>;
 
 /// Abstract function that starts a child process
 ///

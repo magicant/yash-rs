@@ -191,7 +191,8 @@ where
                     keep_internal_dispositions_for_stoppers,
                 );
 
-                (self.task)(env, job_control).await
+                (self.task)(env, job_control).await;
+                env.system.exit(env.exit_status).await
             })
         });
 

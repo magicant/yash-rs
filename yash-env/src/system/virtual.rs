@@ -883,25 +883,12 @@ impl System for VirtualSystem {
             }
 
             let run_task_and_set_exit_status = Box::pin(async move {
-                let mut runner = ProcessRunner {
+                let runner = ProcessRunner {
                     task: task(&mut child_env),
                     system,
                     waker: Rc::new(Cell::new(None)),
                 };
-                (&mut runner).await;
-
-                let ProcessRunner { system, .. } = { runner };
-                let mut state = system.state.borrow_mut();
-                let process = state
-                    .processes
-                    .get_mut(&process_id)
-                    .expect("missing child process");
-                if process.state == ProcessState::Running
-                    && process.set_state(ProcessState::exited(child_env.exit_status))
-                {
-                    let ppid = process.ppid;
-                    raise_sigchld(&mut state, ppid);
-                }
+                runner.await;
             });
 
             executor
@@ -1226,7 +1213,7 @@ pub trait Executor: Debug {
 /// It basically runs the given task, but pauses or cancels it depending on
 /// the state of the process.
 struct ProcessRunner<'a> {
-    task: Pin<Box<dyn Future<Output = ()> + 'a>>,
+    task: Pin<Box<dyn Future<Output = Infallible> + 'a>>,
     system: VirtualSystem,
 
     /// Waker that is woken up when the process is resumed.
@@ -1243,8 +1230,9 @@ impl Future for ProcessRunner<'_> {
         if process_state == ProcessState::Running {
             // Let the task make progress
             let poll = this.task.as_mut().poll(cx);
-            if poll == Poll::Ready(()) {
-                return Poll::Ready(());
+            match poll {
+                // unreachable: Poll::Ready(_) => todo!(),
+                Poll::Pending => (),
             }
         }
 
@@ -2173,6 +2161,7 @@ mod tests {
                 Box::pin(async move {
                     let result = child_env.system.setpgid(Pid(0), Pid(0));
                     assert_eq!(result, Ok(()));
+                    child_env.system.exit(child_env.exit_status).await
                 })
             }),
         );
@@ -2229,6 +2218,7 @@ mod tests {
                 Box::pin(async move {
                     let result = child_env.system.setpgid(parent_pid, Pid(0));
                     assert_eq!(result, Err(Errno::ESRCH));
+                    child_env.system.exit(child_env.exit_status).await
                 })
             }),
         );
@@ -2259,6 +2249,7 @@ mod tests {
                 Box::pin(async move {
                     let path = CString::new(path).unwrap();
                     let _ = child_env.system.execve(&path, &[], &[]);
+                    child_env.system.exit(child_env.exit_status).await
                 })
             }),
         );
@@ -2344,7 +2335,10 @@ mod tests {
 
         let mut env = Env::with_system(Box::new(system));
         let child_process = result.unwrap();
-        let pid = child_process(&mut env, Box::new(|_env| Box::pin(async {})));
+        let pid = child_process(
+            &mut env,
+            Box::new(|env| Box::pin(async move { env.system.exit(env.exit_status).await })),
+        );
         assert_eq!(pid, Pid(3));
     }
 
@@ -2356,7 +2350,14 @@ mod tests {
 
         let mut env = Env::with_system(Box::new(system));
         let child_process = child_process.unwrap();
-        let pid = child_process(&mut env, Box::new(|_env| Box::pin(async move {})));
+        let pid = child_process(
+            &mut env,
+            Box::new(|_env| {
+                Box::pin(async {
+                    unreachable!("child process does not progress unless executor is used")
+                })
+            }),
+        );
 
         let result = env.system.wait(pid);
         assert_eq!(result, Ok(None))
@@ -2372,7 +2373,7 @@ mod tests {
         let child_process = child_process.unwrap();
         let pid = child_process(
             &mut env,
-            Box::new(|env| Box::pin(async move { env.exit_status = ExitStatus(5) })),
+            Box::new(|env| Box::pin(async move { env.system.exit(ExitStatus(5)).await })),
         );
         executor.run_until_stalled();
 
@@ -2452,7 +2453,7 @@ mod tests {
                     let pid = env.system.getpid();
                     let result = env.system.kill(pid, Some(SIGSTOP)).await;
                     assert_eq!(result, Ok(()));
-                    env.exit_status = ExitStatus(123);
+                    env.system.exit(ExitStatus(123)).await
                 })
             }),
         );
@@ -2498,7 +2499,10 @@ mod tests {
         let child_process = system.new_child_process().unwrap();
 
         let mut env = Env::with_system(Box::new(system));
-        let _pid = child_process(&mut env, Box::new(|_env| Box::pin(async {})));
+        let _pid = child_process(
+            &mut env,
+            Box::new(|env| Box::pin(async { env.system.exit(ExitStatus(0)).await })),
+        );
         executor.run_until_stalled();
 
         assert_eq!(env.system.caught_signals(), [SIGCHLD]);
@@ -2593,11 +2597,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let _pid = child_process(
             &mut env,
-            Box::new(|env| {
-                Box::pin(async {
-                    env.system.exit(ExitStatus(123)).await;
-                })
-            }),
+            Box::new(|env| Box::pin(async { env.system.exit(ExitStatus(123)).await })),
         );
         executor.run_until_stalled();
 

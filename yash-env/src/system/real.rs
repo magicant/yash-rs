@@ -674,10 +674,7 @@ impl System for RealSystem {
             // other concurrent tasks in the parent process do not interfere with the
             // child process.
             let executor = Executor::new();
-            let task = Box::pin(async move {
-                task(env).await;
-                env.system.exit(env.exit_status).await;
-            });
+            let task = Box::pin(async move { match task(env).await {} });
             // SAFETY: We never create new threads in the whole process, so wakers are
             // never shared between threads.
             unsafe { executor.spawn_pinned(task) }
