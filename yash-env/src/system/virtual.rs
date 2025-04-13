@@ -75,6 +75,7 @@ use crate::job::Pid;
 use crate::job::ProcessState;
 use crate::path::Path;
 use crate::path::PathBuf;
+use crate::semantics::ExitStatus;
 use crate::str::UnixStr;
 use crate::str::UnixString;
 use crate::system::ChildProcessStarter;
@@ -93,6 +94,7 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::c_int;
 use std::fmt::Debug;
+use std::future::pending;
 use std::future::poll_fn;
 use std::io::SeekFrom;
 use std::num::NonZero;
@@ -961,6 +963,18 @@ impl System for VirtualSystem {
         }
     }
 
+    fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<(dyn Future<Output = Infallible>)>> {
+        let mut myself = self.current_process_mut();
+        let parent_pid = myself.ppid;
+        let exited = myself.set_state(ProcessState::exited(exit_status));
+        drop(myself);
+        if exited {
+            raise_sigchld(&mut self.state.borrow_mut(), parent_pid);
+        }
+
+        Box::pin(pending())
+    }
+
     fn getcwd(&self) -> Result<PathBuf> {
         Ok(self.current_process().cwd.clone())
     }
@@ -1255,11 +1269,10 @@ mod tests {
     use super::*;
     use crate::Env;
     use crate::job::ProcessResult;
-    use crate::semantics::ExitStatus;
     use crate::system::FileType;
     use assert_matches::assert_matches;
     use futures_executor::LocalPool;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::future::pending;
 
     impl Executor for futures_executor::LocalSpawner {
@@ -2556,6 +2569,39 @@ mod tests {
         let mut system = VirtualSystem::new();
         let result = system.execve(c"/no/such/file", &[], &[]);
         assert_eq!(result, Err(Errno::ENOENT));
+    }
+
+    #[test]
+    fn exit_sets_current_process_state_to_exited() {
+        let mut system = VirtualSystem::new();
+        system.exit(ExitStatus(42)).now_or_never();
+
+        assert!(system.current_process().state_has_changed());
+        assert_eq!(
+            system.current_process().state(),
+            ProcessState::exited(ExitStatus(42))
+        );
+    }
+
+    #[test]
+    fn exit_sends_sigchld_to_parent() {
+        let (mut system, mut executor) = virtual_system_with_executor();
+        system.sigaction(SIGCHLD, Disposition::Catch).unwrap();
+
+        let child_process = system.new_child_process().unwrap();
+
+        let mut env = Env::with_system(Box::new(system));
+        let _pid = child_process(
+            &mut env,
+            Box::new(|env| {
+                Box::pin(async {
+                    env.system.exit(ExitStatus(123)).await;
+                })
+            }),
+        );
+        executor.run_until_stalled();
+
+        assert_eq!(env.system.caught_signals(), [SIGCHLD]);
     }
 
     #[test]

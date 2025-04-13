@@ -55,6 +55,7 @@ use crate::job::ProcessResult;
 use crate::job::ProcessState;
 use crate::path::Path;
 use crate::path::PathBuf;
+use crate::semantics::ExitStatus;
 use crate::str::UnixStr;
 use crate::str::UnixString;
 use enumset::EnumSet;
@@ -747,6 +748,10 @@ impl System for RealSystem {
                 return Err(errno);
             }
         }
+    }
+
+    fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<dyn Future<Output = Infallible>>> {
+        unsafe { libc::_exit(exit_status.0) }
     }
 
     fn getcwd(&self) -> Result<PathBuf> {

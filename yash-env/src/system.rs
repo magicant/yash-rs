@@ -435,6 +435,11 @@ pub trait System: Debug {
     /// This is a thin wrapper around the `execve` system call.
     fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible>;
 
+    /// Terminates the current process.
+    ///
+    /// This function is a thin wrapper around the `_exit` system call.
+    fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<dyn Future<Output = Infallible>>>;
+
     /// Returns the current working directory path.
     fn getcwd(&self) -> Result<PathBuf>;
 
