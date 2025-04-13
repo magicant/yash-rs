@@ -42,64 +42,68 @@ use yash_semantics::trap::run_exit_trap;
 use yash_semantics::{Divert, ExitStatus};
 use yash_semantics::{interactive_read_eval_loop, read_eval_loop};
 
-async fn print_version(env: &mut Env) -> ExitStatus {
+async fn print_version(env: &mut Env) {
     let version = env!("CARGO_PKG_VERSION");
     let result = yash_builtin::common::output(env, &format!("yash {}\n", version)).await;
-    result.exit_status()
+    env.exit_status = result.exit_status();
 }
 
 // The RefCell is local to this function, so it is safe to keep borrows across await points.
 #[allow(clippy::await_holding_refcell_ref)]
-async fn parse_and_print(mut env: Env) -> ExitStatus {
+async fn run_as_shell_process(env: &mut Env) {
     // Parse the command-line arguments
     let run = match self::startup::args::parse(std::env::args()) {
         Ok(Parse::Help) => todo!("print help"),
-        Ok(Parse::Version) => return print_version(&mut env).await,
+        Ok(Parse::Version) => return print_version(env).await,
         Ok(Parse::Run(run)) => run,
         Err(e) => {
             let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());
             env.system.print_error(&format!("{}: {}\n", arg0, e)).await;
-            return ExitStatus::ERROR;
+            env.exit_status = ExitStatus::ERROR;
+            return;
         }
     };
 
     // Import environment variables
     env.variables.extend_env(std::env::vars());
 
-    let work = self::startup::configure_environment(&mut env, run);
+    let work = self::startup::configure_environment(env, run);
 
     let is_interactive = env.options.get(Interactive) == On;
 
     // Run initialization files
     // TODO run profile if login
-    run_rcfile(&mut env, work.rcfile).await;
+    run_rcfile(env, work.rcfile).await;
 
     // Prepare the input for the main read-eval loop
-    let ref_env = &RefCell::new(&mut env);
-    let lexer = match prepare_input(ref_env, &work.source) {
+    let ref_env = RefCell::new(env);
+    let lexer = match prepare_input(&ref_env, &work.source) {
         Ok(lexer) => lexer,
         Err(e) => {
             let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());
             let message = format!("{}: {}\n", arg0, e);
             // The borrow checker of Rust 1.79.0 is not smart enough to reason
             // about the lifetime of `e` here, so we re-borrow from `ref_env`
-            // instead of reusing `env`.
-            // env.system.print_error(&message).await;
-            ref_env.borrow_mut().system.print_error(&message).await;
-            return match e.errno {
+            // instead of taking `env` out of `ref_env`.
+            // let mut env = ref_env.into_inner();
+            let mut env = ref_env.borrow_mut();
+            env.system.print_error(&message).await;
+            env.exit_status = match e.errno {
                 Errno::ENOENT | Errno::ENOTDIR | Errno::EILSEQ => ExitStatus::NOT_FOUND,
                 _ => ExitStatus::NOEXEC,
             };
+            return;
         }
     };
 
     // Run the read-eval loop
     let result = if is_interactive {
-        interactive_read_eval_loop(ref_env, &mut { lexer }).await
+        interactive_read_eval_loop(&ref_env, &mut { lexer }).await
     } else {
-        read_eval_loop(ref_env, &mut { lexer }).await
+        read_eval_loop(&ref_env, &mut { lexer }).await
     };
 
+    let env = ref_env.into_inner();
     env.apply_result(result);
 
     match result {
@@ -108,11 +112,9 @@ async fn parse_and_print(mut env: Env) -> ExitStatus {
         | Break(Divert::Break { .. })
         | Break(Divert::Return(_))
         | Break(Divert::Interrupt(_))
-        | Break(Divert::Exit(_)) => run_exit_trap(&mut env).await,
+        | Break(Divert::Exit(_)) => run_exit_trap(env).await,
         Break(Divert::Abort(_)) => (),
     }
-
-    env.exit_status
 }
 
 pub fn main() -> ! {
@@ -133,8 +135,8 @@ pub fn main() -> ! {
     let system = env.system.clone();
     let executor = Executor::new();
     let task = Box::pin(async {
-        let exit_status = parse_and_print(env).await;
-        std::process::exit(exit_status.0);
+        run_as_shell_process(&mut env).await;
+        env.system.exit(env.exit_status).await;
     });
     // SAFETY: We never create new threads in the whole process, so wakers are
     // never shared between threads.
