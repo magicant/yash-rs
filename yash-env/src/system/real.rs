@@ -676,7 +676,7 @@ impl System for RealSystem {
             let executor = Executor::new();
             let task = Box::pin(async move {
                 task(env).await;
-                std::process::exit(env.exit_status.0)
+                env.system.exit(env.exit_status).await;
             });
             // SAFETY: We never create new threads in the whole process, so wakers are
             // never shared between threads.
