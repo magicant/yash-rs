@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `semantics::ExitStatus` struct now has the `READ_ERROR` constant.
     - This constant represents an exit status indicating an unrecoverable
       read error. Its value is 128.
+- The `semantics::ExitStatus` struct now has the `to_signal` method.
+    - This method converts the exit status to a signal name and number if
+      applicable.
 - Internal dependencies:
     - dyn-clone 1.0.19
 
