@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - This method terminates the process with the given exit status.
 - The `System` trait now has the `raise` method.
     - This method sends a signal to the calling process.
+- The `SystemEx` trait now has the `exit_or_raise` method.
+    - This method terminates the current process with the given exit status,
+      possibly sending a signal to kill the process.
 - The `semantics::ExitStatus` struct now has the `READ_ERROR` constant.
     - This constant represents an exit status indicating an unrecoverable
       read error. Its value is 128.

@@ -77,6 +77,7 @@ use std::io::SeekFrom;
 use std::pin::Pin;
 use std::time::Duration;
 use std::time::Instant;
+use r#virtual::SignalEffect;
 
 /// API to the system-managed parts of the environment.
 ///
@@ -726,6 +727,52 @@ pub trait SystemEx: System {
         [0x180, 0x80, 0].into_iter().find_map(|offset| {
             let raw_number = status.0.checked_sub(offset)?;
             self.validate_signal(raw_number).map(|(_, number)| number)
+        })
+    }
+
+    /// Terminates the current process with the given exit status, possibly
+    /// sending a signal to kill the process.
+    ///
+    /// If the exit status represents a signal that killed the last executed
+    /// command, this function sends the signal to the current process to
+    /// propagate the signal to the parent process. Otherwise, this function
+    /// terminates the process with the given exit status.
+    fn exit_or_raise(
+        &mut self,
+        exit_status: ExitStatus,
+    ) -> Pin<Box<dyn Future<Output = Infallible> + '_>> {
+        async fn maybe_raise<S: System + ?Sized>(
+            exit_status: ExitStatus,
+            system: &mut S,
+        ) -> Option<Infallible> {
+            let signal = exit_status.to_signal(system, /* exact */ true)?;
+
+            if !matches!(SignalEffect::of(signal.0), SignalEffect::Terminate { .. }) {
+                return None;
+            }
+
+            // Disable core dump
+            system
+                .setrlimit(Resource::CORE, LimitPair { soft: 0, hard: 0 })
+                .ok()?;
+
+            // Reset signal disposition
+            system.sigaction(signal.1, Disposition::Default).ok()?;
+
+            // Unblock the signal
+            system
+                .sigmask(Some((SigmaskOp::Remove, &[signal.1])), None)
+                .ok()?;
+
+            // Send the signal to the current process
+            system.raise(signal.1).await.ok()?;
+
+            None
+        }
+
+        Box::pin(async move {
+            maybe_raise(exit_status, self).await;
+            self.exit(exit_status).await
         })
     }
 }
