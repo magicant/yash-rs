@@ -328,6 +328,15 @@ pub trait System: Debug {
         signal: Option<signal::Number>,
     ) -> Pin<Box<dyn Future<Output = Result<()>>>>;
 
+    /// Sends a signal to the current process.
+    ///
+    /// This is a thin wrapper around the `raise` system call.
+    ///
+    /// The virtual system version of this function blocks the calling thread if
+    /// the signal stops or terminates the current process, hence returning a
+    /// future. See [`VirtualSystem::kill`] for details.
+    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>>;
+
     /// Waits for a next event.
     ///
     /// This is a low-level function used internally by

@@ -702,6 +702,11 @@ impl System for VirtualSystem {
         })
     }
 
+    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+        let target = self.process_id;
+        self.kill(target, Some(signal))
+    }
+
     /// Waits for a next event.
     ///
     /// The `VirtualSystem` implementation for this method does not actually

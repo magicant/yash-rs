@@ -554,6 +554,14 @@ impl System for RealSystem {
         })
     }
 
+    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+        Box::pin(async move {
+            let raw = signal.as_raw();
+            unsafe { libc::raise(raw) }.errno_if_m1()?;
+            Ok(())
+        })
+    }
+
     fn select(
         &mut self,
         readers: &mut Vec<Fd>,

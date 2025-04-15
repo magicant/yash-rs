@@ -404,6 +404,9 @@ impl System for &SharedSystem {
     ) -> Pin<Box<(dyn Future<Output = Result<()>>)>> {
         self.0.borrow_mut().kill(target, signal)
     }
+    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+        self.0.borrow_mut().raise(signal)
+    }
     fn select(
         &mut self,
         readers: &mut Vec<Fd>,
@@ -618,6 +621,10 @@ impl System for SharedSystem {
         signal: Option<signal::Number>,
     ) -> Pin<Box<dyn Future<Output = Result<()>>>> {
         (&mut &*self).kill(target, signal)
+    }
+    #[inline]
+    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+        (&mut &*self).raise(signal)
     }
     #[inline]
     fn select(
