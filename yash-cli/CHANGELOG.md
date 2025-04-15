@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The shell now returns an exit status of 128 on an I/O error reading command
   input, except when reading a script in the `.` built-in, as required by
   POSIX.1-2024.
+- When a command is terminated by a signal and its exit status is used as the
+  exit status of the shell, the shell now terminates itself with the same
+  signal, as required by POSIX.1-2024.
 
 ## [0.3.0] - 2025-03-23
 

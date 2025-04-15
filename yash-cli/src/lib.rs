@@ -36,7 +36,7 @@ use yash_env::RealSystem;
 use yash_env::System;
 use yash_env::option::{Interactive, On};
 use yash_env::signal;
-use yash_env::system::{Disposition, Errno};
+use yash_env::system::{Disposition, Errno, SystemEx as _};
 use yash_executor::Executor;
 use yash_semantics::trap::run_exit_trap;
 use yash_semantics::{Divert, ExitStatus};
@@ -136,7 +136,7 @@ pub fn main() -> ! {
     let executor = Executor::new();
     let task = Box::pin(async {
         run_as_shell_process(&mut env).await;
-        env.system.exit(env.exit_status).await;
+        env.system.exit_or_raise(env.exit_status).await;
     });
     // SAFETY: We never create new threads in the whole process, so wakers are
     // never shared between threads.
