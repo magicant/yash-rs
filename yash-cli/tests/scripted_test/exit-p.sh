@@ -167,6 +167,8 @@ __OUT__
 
 test_o 'subshell kills itself according to final exit status'
 (
+# This dummy trap suppresses possible auto-exec optimization
+trap 'echo foo' TERM
 # This `sh` kills itself with SIGTERM
 sh -c 'kill $$'
 # Now the exit status should be a value greater than 256
