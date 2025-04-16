@@ -59,6 +59,9 @@
 //!
 //! In case of an error, the exit status is 2 ([`ExitStatus::ERROR`]).
 //!
+//! If the exit status indicates a signal that caused the process of the last
+//! command to terminate, the shell terminates with the same signal.
+//!
 //! # Portability
 //!
 //! The behavior is undefined in POSIX if *exit_status* is greater than 255.
@@ -79,6 +82,10 @@
 //!   use it as the exit status of the process. However, if the built-in is
 //!   invoked in a trap, the caller should use the value of `$?` before entering
 //!   trap.
+//!
+//! The exit status is meant to be passed to
+//! [`SystemEx::exit_or_raise`](yash_env::system::SystemEx::exit_or_raise) to
+//! exit (or terminate) the shell process properly.
 //!
 //! In case of an error, the result will have a [`Divert::Interrupt`] value
 //! instead, in which case the shell will not exit if it is interactive.
