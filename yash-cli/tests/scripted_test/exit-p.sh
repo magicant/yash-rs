@@ -112,7 +112,7 @@ then
     skip=true
 fi
 
-test_o 'exit built-in kills shell according to exit status'
+test_o 'exit built-in kills shell according to exit status (TERM)'
 "$TESTEE" -s <<'__END__'
 # This `sh` kills itself with SIGTERM
 sh -c 'kill $$'
@@ -128,6 +128,24 @@ echo "exit status $exit_status is not greater than 256"
 kill -l "$exit_status"
 __IN__
 TERM
+__OUT__
+
+test_o 'exit built-in kills shell according to exit status (KILL)'
+"$TESTEE" -s <<'__END__'
+# This `sh` kills itself with SIGKILL
+sh -c 'kill -s KILL $$'
+# Now the exit status should be a value greater than 256
+# indicating that the previous command was terminated by SIGKILL.
+# The exit built-in should kill the shell with the same signal
+# to propagate the exit status.
+exit
+__END__
+exit_status=$?
+test "$exit_status" -gt 256 ||
+echo "exit status $exit_status is not greater than 256"
+kill -l "$exit_status"
+__IN__
+KILL
 __OUT__
 
 test_o 'exit built-in kills subshell according to exit status'

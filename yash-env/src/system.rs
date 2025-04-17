@@ -756,8 +756,10 @@ pub trait SystemEx: System {
                 .setrlimit(Resource::CORE, LimitPair { soft: 0, hard: 0 })
                 .ok()?;
 
-            // Reset signal disposition
-            system.sigaction(signal.1, Disposition::Default).ok()?;
+            if signal.0 != signal::Name::Kill {
+                // Reset signal disposition
+                system.sigaction(signal.1, Disposition::Default).ok()?;
+            }
 
             // Unblock the signal
             system
