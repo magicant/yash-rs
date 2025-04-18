@@ -11,14 +11,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `System` trait now has the `getsid` method.
     - This method returns the session ID of the process with the given PID.
+- The `System` trait now has the `exit` method.
+    - This method terminates the process with the given exit status.
+- The `System` trait now has the `raise` method.
+    - This method sends a signal to the calling process.
+- The `SystemEx` trait now has the `exit_or_raise` method.
+    - This method terminates the current process with the given exit status,
+      possibly sending a signal to kill the process.
 - The `semantics::ExitStatus` struct now has the `READ_ERROR` constant.
     - This constant represents an exit status indicating an unrecoverable
       read error. Its value is 128.
+- The `semantics::ExitStatus` struct now has the `to_signal` method.
+    - This method converts the exit status to a signal name and number if
+      applicable.
 - Internal dependencies:
     - dyn-clone 1.0.19
 
 ### Changed
 
+- The definition of `system::ChildProcessTask` is updated so that the `Output`
+  type of the returned `Future` is now `std::convert::Infallible` instead of
+  `()`.
 - External dependency versions:
     - Rust 1.85.0 → 1.86.0
 

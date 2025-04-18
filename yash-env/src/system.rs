@@ -77,6 +77,7 @@ use std::io::SeekFrom;
 use std::pin::Pin;
 use std::time::Duration;
 use std::time::Instant;
+use r#virtual::SignalEffect;
 
 /// API to the system-managed parts of the environment.
 ///
@@ -328,6 +329,15 @@ pub trait System: Debug {
         signal: Option<signal::Number>,
     ) -> Pin<Box<dyn Future<Output = Result<()>>>>;
 
+    /// Sends a signal to the current process.
+    ///
+    /// This is a thin wrapper around the `raise` system call.
+    ///
+    /// The virtual system version of this function blocks the calling thread if
+    /// the signal stops or terminates the current process, hence returning a
+    /// future. See [`VirtualSystem::kill`] for details.
+    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>>;
+
     /// Waits for a next event.
     ///
     /// This is a low-level function used internally by
@@ -434,6 +444,11 @@ pub trait System: Debug {
     ///
     /// This is a thin wrapper around the `execve` system call.
     fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible>;
+
+    /// Terminates the current process.
+    ///
+    /// This function is a thin wrapper around the `_exit` system call.
+    fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<dyn Future<Output = Infallible>>>;
 
     /// Returns the current working directory path.
     fn getcwd(&self) -> Result<PathBuf>;
@@ -544,8 +559,12 @@ pub enum Disposition {
 /// executed in a child process initiated by the starter. The environment passed
 /// to the task is a clone of the parent environment, but it has a different
 /// process ID than the parent.
+///
+/// Note that the output type of the task is `Infallible`. This is to ensure that
+/// the task [exits](System::exit) cleanly or [kills](System::kill) itself with
+/// a signal.
 pub type ChildProcessTask =
-    Box<dyn for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>>>;
+    Box<dyn for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = Infallible> + 'a>>>;
 
 /// Abstract function that starts a child process
 ///
@@ -708,6 +727,54 @@ pub trait SystemEx: System {
         [0x180, 0x80, 0].into_iter().find_map(|offset| {
             let raw_number = status.0.checked_sub(offset)?;
             self.validate_signal(raw_number).map(|(_, number)| number)
+        })
+    }
+
+    /// Terminates the current process with the given exit status, possibly
+    /// sending a signal to kill the process.
+    ///
+    /// If the exit status represents a signal that killed the last executed
+    /// command, this function sends the signal to the current process to
+    /// propagate the signal to the parent process. Otherwise, this function
+    /// terminates the process with the given exit status.
+    fn exit_or_raise(
+        &mut self,
+        exit_status: ExitStatus,
+    ) -> Pin<Box<dyn Future<Output = Infallible> + '_>> {
+        async fn maybe_raise<S: System + ?Sized>(
+            exit_status: ExitStatus,
+            system: &mut S,
+        ) -> Option<Infallible> {
+            let signal = exit_status.to_signal(system, /* exact */ true)?;
+
+            if !matches!(SignalEffect::of(signal.0), SignalEffect::Terminate { .. }) {
+                return None;
+            }
+
+            // Disable core dump
+            system
+                .setrlimit(Resource::CORE, LimitPair { soft: 0, hard: 0 })
+                .ok()?;
+
+            if signal.0 != signal::Name::Kill {
+                // Reset signal disposition
+                system.sigaction(signal.1, Disposition::Default).ok()?;
+            }
+
+            // Unblock the signal
+            system
+                .sigmask(Some((SigmaskOp::Remove, &[signal.1])), None)
+                .ok()?;
+
+            // Send the signal to the current process
+            system.raise(signal.1).await.ok()?;
+
+            None
+        }
+
+        Box::pin(async move {
+            maybe_raise(exit_status, self).await;
+            self.exit(exit_status).await
         })
     }
 }

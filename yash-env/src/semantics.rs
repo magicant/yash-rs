@@ -127,6 +127,45 @@ impl ExitStatus {
             .next()
             .map(|(_name, number)| number)
     }
+
+    /// Returns the signal name and number corresponding to the exit status.
+    ///
+    /// This function is the inverse of the `From<signal::Number>` implementation
+    /// for `ExitStatus`. It tries to find a signal name and number by offsetting
+    /// the exit status by 384. If the offsetting does not result in a valid signal
+    /// name and number, it additionally tries with 128 and 0 unless `exact` is
+    /// `true`.
+    ///
+    /// If `self` is not a valid signal exit status, this function returns `None`.
+    #[must_use]
+    pub fn to_signal<S: System + ?Sized>(
+        self,
+        system: &S,
+        exact: bool,
+    ) -> Option<(signal::Name, signal::Number)> {
+        fn convert<S: System + ?Sized>(
+            exit_status: ExitStatus,
+            offset: c_int,
+            system: &S,
+        ) -> Option<(signal::Name, signal::Number)> {
+            let number = exit_status.0.checked_sub(offset)?;
+            system.validate_signal(number)
+        }
+
+        if let Some(signal) = convert(self, 0x180, system) {
+            return Some(signal);
+        }
+        if exact {
+            return None;
+        }
+        if let Some(signal) = convert(self, 0x80, system) {
+            return Some(signal);
+        }
+        if let Some(signal) = convert(self, 0, system) {
+            return Some(signal);
+        }
+        None
+    }
 }
 
 /// Converts the exit status to `ExitCode`.
@@ -261,5 +300,46 @@ mod tests {
         assert_eq!(exit_status.to_signal_number(&system), Some(SIGTERM));
         exit_status.0 &= 0x7F;
         assert_eq!(exit_status.to_signal_number(&system), Some(SIGTERM));
+    }
+
+    #[test]
+    fn exit_status_to_signal() {
+        let system = VirtualSystem::new();
+
+        assert_eq!(ExitStatus(0).to_signal(&system, false), None);
+        assert_eq!(ExitStatus(0).to_signal(&system, true), None);
+
+        assert_eq!(
+            ExitStatus(SIGINT.as_raw()).to_signal(&system, false),
+            Some((signal::Name::Int, SIGINT))
+        );
+        assert_eq!(ExitStatus(SIGINT.as_raw()).to_signal(&system, true), None);
+
+        assert_eq!(
+            ExitStatus(SIGINT.as_raw() + 0x80).to_signal(&system, false),
+            Some((signal::Name::Int, SIGINT))
+        );
+        assert_eq!(
+            ExitStatus(SIGINT.as_raw() + 0x80).to_signal(&system, true),
+            None
+        );
+
+        assert_eq!(
+            ExitStatus(SIGINT.as_raw() + 0x180).to_signal(&system, false),
+            Some((signal::Name::Int, SIGINT))
+        );
+        assert_eq!(
+            ExitStatus(SIGINT.as_raw() + 0x180).to_signal(&system, true),
+            Some((signal::Name::Int, SIGINT))
+        );
+
+        assert_eq!(
+            ExitStatus(SIGTERM.as_raw() + 0x180).to_signal(&system, false),
+            Some((signal::Name::Term, SIGTERM))
+        );
+        assert_eq!(
+            ExitStatus(SIGTERM.as_raw() + 0x180).to_signal(&system, true),
+            Some((signal::Name::Term, SIGTERM))
+        );
     }
 }

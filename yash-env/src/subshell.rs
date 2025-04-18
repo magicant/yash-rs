@@ -35,7 +35,7 @@ use crate::system::ChildProcessTask;
 use crate::system::Errno;
 use crate::system::SigmaskOp;
 use crate::system::System;
-use crate::system::SystemEx;
+use crate::system::SystemEx as _;
 use std::pin::Pin;
 
 /// Job state of a newly created subshell
@@ -191,7 +191,8 @@ where
                     keep_internal_dispositions_for_stoppers,
                 );
 
-                (self.task)(env, job_control).await
+                (self.task)(env, job_control).await;
+                env.system.exit_or_raise(env.exit_status).await
             })
         });
 

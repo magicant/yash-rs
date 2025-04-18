@@ -46,6 +46,7 @@ use crate::Env;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessState;
+use crate::semantics::ExitStatus;
 use enumset::EnumSet;
 use std::cell::RefCell;
 use std::convert::Infallible;
@@ -403,6 +404,9 @@ impl System for &SharedSystem {
     ) -> Pin<Box<(dyn Future<Output = Result<()>>)>> {
         self.0.borrow_mut().kill(target, signal)
     }
+    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+        self.0.borrow_mut().raise(signal)
+    }
     fn select(
         &mut self,
         readers: &mut Vec<Fd>,
@@ -441,6 +445,9 @@ impl System for &SharedSystem {
     }
     fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {
         self.0.borrow_mut().execve(path, args, envs)
+    }
+    fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<dyn Future<Output = Infallible>>> {
+        self.0.borrow_mut().exit(exit_status)
     }
     fn getcwd(&self) -> Result<PathBuf> {
         self.0.borrow().getcwd()
@@ -616,6 +623,10 @@ impl System for SharedSystem {
         (&mut &*self).kill(target, signal)
     }
     #[inline]
+    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+        (&mut &*self).raise(signal)
+    }
+    #[inline]
     fn select(
         &mut self,
         readers: &mut Vec<Fd>,
@@ -664,6 +675,10 @@ impl System for SharedSystem {
     #[inline]
     fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {
         (&mut &*self).execve(path, args, envs)
+    }
+    #[inline]
+    fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<dyn Future<Output = Infallible>>> {
+        (&mut &*self).exit(exit_status)
     }
     #[inline]
     fn getcwd(&self) -> Result<PathBuf> {

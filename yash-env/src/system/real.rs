@@ -55,6 +55,7 @@ use crate::job::ProcessResult;
 use crate::job::ProcessState;
 use crate::path::Path;
 use crate::path::PathBuf;
+use crate::semantics::ExitStatus;
 use crate::str::UnixStr;
 use crate::str::UnixString;
 use enumset::EnumSet;
@@ -553,6 +554,14 @@ impl System for RealSystem {
         })
     }
 
+    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+        Box::pin(async move {
+            let raw = signal.as_raw();
+            unsafe { libc::raise(raw) }.errno_if_m1()?;
+            Ok(())
+        })
+    }
+
     fn select(
         &mut self,
         readers: &mut Vec<Fd>,
@@ -673,10 +682,7 @@ impl System for RealSystem {
             // other concurrent tasks in the parent process do not interfere with the
             // child process.
             let executor = Executor::new();
-            let task = Box::pin(async move {
-                task(env).await;
-                std::process::exit(env.exit_status.0)
-            });
+            let task = Box::pin(async move { match task(env).await {} });
             // SAFETY: We never create new threads in the whole process, so wakers are
             // never shared between threads.
             unsafe { executor.spawn_pinned(task) }
@@ -747,6 +753,10 @@ impl System for RealSystem {
                 return Err(errno);
             }
         }
+    }
+
+    fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<dyn Future<Output = Infallible>>> {
+        unsafe { libc::_exit(exit_status.0) }
     }
 
     fn getcwd(&self) -> Result<PathBuf> {
