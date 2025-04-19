@@ -21,6 +21,7 @@ use super::Dir;
 use super::Disposition;
 use super::Errno;
 use super::FdFlag;
+use super::FlexFuture;
 use super::Gid;
 use super::LimitPair;
 use super::Mode;
@@ -397,11 +398,7 @@ impl System for &SharedSystem {
     fn caught_signals(&mut self) -> Vec<signal::Number> {
         self.0.borrow_mut().caught_signals()
     }
-    fn kill(
-        &mut self,
-        target: Pid,
-        signal: Option<signal::Number>,
-    ) -> Pin<Box<(dyn Future<Output = Result<()>>)>> {
+    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
         self.0.borrow_mut().kill(target, signal)
     }
     fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>> {
@@ -620,11 +617,7 @@ impl System for SharedSystem {
         (&mut &*self).caught_signals()
     }
     #[inline]
-    fn kill(
-        &mut self,
-        target: Pid,
-        signal: Option<signal::Number>,
-    ) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
         (&mut &*self).kill(target, signal)
     }
     #[inline]

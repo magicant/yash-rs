@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   type of the returned `Future` is now `std::convert::Infallible` instead of
   `()`.
 - The return value of `System::execve` is now wrapped in a future.
+- The methods of `System` and `SystemEx` that return a future now return
+  `FlexFuture` instead of `Pin<Box<dyn Future>>`:
+    - `System::kill`
 - External dependency versions:
     - Rust 1.85.0 → 1.86.0
 

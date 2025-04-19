@@ -37,6 +37,7 @@ use super::Env;
 use super::Errno;
 use super::FdFlag;
 use super::FileType;
+use super::FlexFuture;
 use super::Gid;
 use super::Mode;
 use super::OfdAccess;
@@ -542,16 +543,10 @@ impl System for RealSystem {
         signals
     }
 
-    fn kill(
-        &mut self,
-        target: Pid,
-        signal: Option<signal::Number>,
-    ) -> Pin<Box<(dyn Future<Output = Result<()>>)>> {
-        Box::pin(async move {
-            let raw = signal.map_or(0, signal::Number::as_raw);
-            unsafe { libc::kill(target.0, raw) }.errno_if_m1()?;
-            Ok(())
-        })
+    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
+        let raw = signal.map_or(0, signal::Number::as_raw);
+        let result = unsafe { libc::kill(target.0, raw) }.errno_if_m1().map(drop);
+        result.into()
     }
 
     fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>> {

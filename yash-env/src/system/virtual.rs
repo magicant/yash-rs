@@ -58,6 +58,7 @@ use super::Dir;
 use super::Disposition;
 use super::Errno;
 use super::FdFlag;
+use super::FlexFuture;
 use super::Gid;
 use super::OfdAccess;
 use super::OpenFlag;
@@ -659,11 +660,7 @@ impl System for VirtualSystem {
     /// the future will be ready only when the process is resumed. Similarly, if
     /// the signal causes the current process to terminate, the future will
     /// never be ready.
-    fn kill(
-        &mut self,
-        target: Pid,
-        signal: Option<signal::Number>,
-    ) -> Pin<Box<(dyn Future<Output = Result<()>>)>> {
+    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
         let result = match target {
             Pid::MY_PROCESS_GROUP => {
                 let target_pgid = self.current_process().pgid;
@@ -696,7 +693,7 @@ impl System for VirtualSystem {
         };
 
         let system = self.clone();
-        Box::pin(async move {
+        FlexFuture::boxed(async move {
             system.block_until_running().await;
             result
         })
@@ -704,7 +701,7 @@ impl System for VirtualSystem {
 
     fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>> {
         let target = self.process_id;
-        self.kill(target, Some(signal))
+        self.kill(target, Some(signal)).into()
     }
 
     /// Waits for a next event.

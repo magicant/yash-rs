@@ -325,11 +325,7 @@ pub trait System: Debug {
     /// The virtual system version of this function blocks the calling thread if
     /// the signal stops or terminates the current process, hence returning a
     /// future. See [`VirtualSystem::kill`] for details.
-    fn kill(
-        &mut self,
-        target: Pid,
-        signal: Option<signal::Number>,
-    ) -> Pin<Box<dyn Future<Output = Result<()>>>>;
+    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>>;
 
     /// Sends a signal to the current process.
     ///
