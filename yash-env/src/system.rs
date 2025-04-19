@@ -726,10 +726,7 @@ pub trait SystemEx: System {
     /// command, this function sends the signal to the current process to
     /// propagate the signal to the parent process. Otherwise, this function
     /// terminates the process with the given exit status.
-    fn exit_or_raise(
-        &mut self,
-        exit_status: ExitStatus,
-    ) -> Pin<Box<dyn Future<Output = Infallible> + '_>> {
+    fn exit_or_raise(&mut self, exit_status: ExitStatus) -> impl Future<Output = Infallible> {
         async fn maybe_raise<S: System + ?Sized>(
             exit_status: ExitStatus,
             system: &mut S,
@@ -761,10 +758,10 @@ pub trait SystemEx: System {
             None
         }
 
-        Box::pin(async move {
+        async move {
             maybe_raise(exit_status, self).await;
             self.exit(exit_status).await
-        })
+        }
     }
 }
 
