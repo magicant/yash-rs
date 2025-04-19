@@ -108,9 +108,7 @@ impl Signal {
         match self {
             Signal::Name(name) => Some((name, system.signal_number_from_name(name)?)),
             Signal::Number(number) => {
-                let exit_status = ExitStatus::from(number);
-                let number = exit_status.to_signal_number(system)?;
-                Some((system.signal_name_from_number(number), number))
+                ExitStatus(number).to_signal(system, /* exact = */ false)
             }
         }
     }

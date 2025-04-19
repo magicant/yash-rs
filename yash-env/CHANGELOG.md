@@ -46,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `SystemEx` trait no longer has the `signal_number_from_exit_status` method.
     - This method has been moved in favor of `semantics::ExitStatus::to_signal`.
+- The `semantics::ExitStatus` struct no longer has the `to_signal_number` method.
+    - This method has been moved in favor of `semantics::ExitStatus::to_signal`.
 
 ## [0.6.0] - 2025-03-23
 

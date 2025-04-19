@@ -104,7 +104,7 @@ impl From<ExitStatus> for c_int {
 /// POSIX requires the exit status to be greater than 128. The current
 /// implementation returns `signal_number + 384`.
 ///
-/// See [`ExitStatus::to_signal_number`] for the reverse conversion.
+/// See [`ExitStatus::to_signal`] for the reverse conversion.
 impl From<signal::Number> for ExitStatus {
     fn from(number: signal::Number) -> Self {
         Self::from(number.as_raw() + 0x180)
@@ -112,22 +112,6 @@ impl From<signal::Number> for ExitStatus {
 }
 
 impl ExitStatus {
-    /// Returns the signal number corresponding to the exit status.
-    ///
-    /// Basically, this function is the inverse of the `From<signal::Number>`
-    /// implementation for `ExitStatus`. It tries to find a signal number by
-    /// offsetting the exit status by 384. If the offsetting does not result in a
-    /// valid signal number, it additionally tries with 128 and 0.
-    #[must_use]
-    pub fn to_signal_number<S: System>(self, system: &S) -> Option<signal::Number> {
-        [0x180, 0x80, 0]
-            .into_iter()
-            .filter_map(|offset| self.0.checked_sub(offset))
-            .filter_map(|raw_number| system.validate_signal(raw_number))
-            .next()
-            .map(|(_name, number)| number)
-    }
-
     /// Returns the signal name and number corresponding to the exit status.
     ///
     /// This function is the inverse of the `From<signal::Number>` implementation
@@ -278,29 +262,6 @@ mod tests {
     use super::*;
     use crate::system::r#virtual::VirtualSystem;
     use crate::system::r#virtual::{SIGINT, SIGTERM};
-
-    #[test]
-    fn exit_status_to_signal_number() {
-        let system = VirtualSystem::new();
-
-        assert_eq!(ExitStatus(0).to_signal_number(&system), None);
-
-        assert_eq!(
-            ExitStatus(SIGINT.as_raw()).to_signal_number(&system),
-            Some(SIGINT)
-        );
-        assert_eq!(
-            ExitStatus::from(SIGINT).to_signal_number(&system),
-            Some(SIGINT)
-        );
-
-        let mut exit_status = ExitStatus::from(SIGTERM);
-        assert_eq!(exit_status.to_signal_number(&system), Some(SIGTERM));
-        exit_status.0 &= 0xFF;
-        assert_eq!(exit_status.to_signal_number(&system), Some(SIGTERM));
-        exit_status.0 &= 0x7F;
-        assert_eq!(exit_status.to_signal_number(&system), Some(SIGTERM));
-    }
 
     #[test]
     fn exit_status_to_signal() {
