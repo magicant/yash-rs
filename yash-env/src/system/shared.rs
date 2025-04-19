@@ -401,7 +401,7 @@ impl System for &SharedSystem {
     fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
         self.0.borrow_mut().kill(target, signal)
     }
-    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>> {
         self.0.borrow_mut().raise(signal)
     }
     fn select(
@@ -621,7 +621,7 @@ impl System for SharedSystem {
         (&mut &*self).kill(target, signal)
     }
     #[inline]
-    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>> {
         (&mut &*self).raise(signal)
     }
     #[inline]

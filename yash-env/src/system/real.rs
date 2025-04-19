@@ -549,12 +549,9 @@ impl System for RealSystem {
         result.into()
     }
 
-    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>> {
-        Box::pin(async move {
-            let raw = signal.as_raw();
-            unsafe { libc::raise(raw) }.errno_if_m1()?;
-            Ok(())
-        })
+    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>> {
+        let raw = signal.as_raw();
+        unsafe { libc::raise(raw) }.errno_if_m1().map(drop).into()
     }
 
     fn select(

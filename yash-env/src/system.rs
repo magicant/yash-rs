@@ -334,7 +334,7 @@ pub trait System: Debug {
     /// The virtual system version of this function blocks the calling thread if
     /// the signal stops or terminates the current process, hence returning a
     /// future. See [`VirtualSystem::kill`] for details.
-    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>>;
+    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>>;
 
     /// Waits for a next event.
     ///

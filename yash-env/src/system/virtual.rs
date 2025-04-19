@@ -699,9 +699,9 @@ impl System for VirtualSystem {
         })
     }
 
-    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>> {
         let target = self.process_id;
-        self.kill(target, Some(signal)).into()
+        self.kill(target, Some(signal))
     }
 
     /// Waits for a next event.
