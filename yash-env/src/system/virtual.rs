@@ -58,6 +58,7 @@ use super::Dir;
 use super::Disposition;
 use super::Errno;
 use super::FdFlag;
+use super::FlexFuture;
 use super::Gid;
 use super::OfdAccess;
 use super::OpenFlag;
@@ -659,11 +660,7 @@ impl System for VirtualSystem {
     /// the future will be ready only when the process is resumed. Similarly, if
     /// the signal causes the current process to terminate, the future will
     /// never be ready.
-    fn kill(
-        &mut self,
-        target: Pid,
-        signal: Option<signal::Number>,
-    ) -> Pin<Box<(dyn Future<Output = Result<()>>)>> {
+    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
         let result = match target {
             Pid::MY_PROCESS_GROUP => {
                 let target_pgid = self.current_process().pgid;
@@ -696,13 +693,13 @@ impl System for VirtualSystem {
         };
 
         let system = self.clone();
-        Box::pin(async move {
+        FlexFuture::boxed(async move {
             system.block_until_running().await;
             result
         })
     }
 
-    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>> {
         let target = self.process_id;
         self.kill(target, Some(signal))
     }
@@ -928,11 +925,19 @@ impl System for VirtualSystem {
     /// The `execve` system call cannot be simulated in the userland. This
     /// function returns `ENOSYS` if the file at `path` is a native executable,
     /// `ENOEXEC` if a non-executable file, and `ENOENT` otherwise.
-    fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {
+    fn execve(
+        &mut self,
+        path: &CStr,
+        args: &[CString],
+        envs: &[CString],
+    ) -> FlexFuture<Result<Infallible>> {
         let os_path = UnixStr::from_bytes(path.to_bytes());
         let mut state = self.state.borrow_mut();
         let fs = &state.file_system;
-        let file = fs.get(os_path)?;
+        let file = match fs.get(os_path) {
+            Ok(file) => file,
+            Err(e) => return Err(e).into(),
+        };
         // TODO Check file permissions
         let is_executable = matches!(
             &file.borrow().body,
@@ -949,13 +954,16 @@ impl System for VirtualSystem {
             let envs = envs.to_owned();
             process.last_exec = Some((path, args, envs));
 
-            Err(Errno::ENOSYS)
+            // TODO: We should abort the currently running task and start the new one.
+            // Just returning `pending()` would break existing tests that rely on
+            // the current behavior.
+            Err(Errno::ENOSYS).into()
         } else {
-            Err(Errno::ENOEXEC)
+            Err(Errno::ENOEXEC).into()
         }
     }
 
-    fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<(dyn Future<Output = Infallible>)>> {
+    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
         let mut myself = self.current_process_mut();
         let parent_pid = myself.ppid;
         let exited = myself.set_state(ProcessState::exited(exit_status));
@@ -964,7 +972,7 @@ impl System for VirtualSystem {
             raise_sigchld(&mut self.state.borrow_mut(), parent_pid);
         }
 
-        Box::pin(pending())
+        pending().into()
     }
 
     fn getcwd(&self) -> Result<PathBuf> {
@@ -2253,7 +2261,7 @@ mod tests {
             Box::new(move |child_env| {
                 Box::pin(async move {
                     let path = CString::new(path).unwrap();
-                    let _ = child_env.system.execve(&path, &[], &[]);
+                    child_env.system.execve(&path, &[], &[]).await.ok();
                     child_env.system.exit(child_env.exit_status).await
                 })
             }),
@@ -2528,7 +2536,7 @@ mod tests {
         state.file_system.save(path, content).unwrap();
         drop(state);
         let path = CString::new(path).unwrap();
-        let result = system.execve(&path, &[], &[]);
+        let result = system.execve(&path, &[], &[]).now_or_never().unwrap();
         assert_eq!(result, Err(Errno::ENOSYS));
     }
 
@@ -2549,7 +2557,7 @@ mod tests {
         let path = CString::new(path).unwrap();
         let args = [c"file".to_owned(), c"bar".to_owned()];
         let envs = [c"foo=FOO".to_owned(), c"baz".to_owned()];
-        let _ = system.execve(&path, &args, &envs);
+        system.execve(&path, &args, &envs).now_or_never();
 
         let process = system.current_process();
         let arguments = process.last_exec.as_ref().unwrap();
@@ -2569,14 +2577,17 @@ mod tests {
         state.file_system.save(path, content).unwrap();
         drop(state);
         let path = CString::new(path).unwrap();
-        let result = system.execve(&path, &[], &[]);
+        let result = system.execve(&path, &[], &[]).now_or_never().unwrap();
         assert_eq!(result, Err(Errno::ENOEXEC));
     }
 
     #[test]
     fn execve_returns_enoent_on_file_not_found() {
         let mut system = VirtualSystem::new();
-        let result = system.execve(c"/no/such/file", &[], &[]);
+        let result = system
+            .execve(c"/no/such/file", &[], &[])
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Err(Errno::ENOENT));
     }
 

@@ -19,6 +19,7 @@
 mod errno;
 mod fd_flag;
 mod file_system;
+mod future;
 mod id;
 mod open_flag;
 #[cfg(unix)]
@@ -39,6 +40,7 @@ pub use self::file_system::FileType;
 pub use self::file_system::Mode;
 pub use self::file_system::RawMode;
 pub use self::file_system::Stat;
+pub use self::future::FlexFuture;
 pub use self::id::Gid;
 pub use self::id::RawGid;
 pub use self::id::RawUid;
@@ -323,11 +325,7 @@ pub trait System: Debug {
     /// The virtual system version of this function blocks the calling thread if
     /// the signal stops or terminates the current process, hence returning a
     /// future. See [`VirtualSystem::kill`] for details.
-    fn kill(
-        &mut self,
-        target: Pid,
-        signal: Option<signal::Number>,
-    ) -> Pin<Box<dyn Future<Output = Result<()>>>>;
+    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>>;
 
     /// Sends a signal to the current process.
     ///
@@ -336,7 +334,7 @@ pub trait System: Debug {
     /// The virtual system version of this function blocks the calling thread if
     /// the signal stops or terminates the current process, hence returning a
     /// future. See [`VirtualSystem::kill`] for details.
-    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>>;
+    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>>;
 
     /// Waits for a next event.
     ///
@@ -443,12 +441,17 @@ pub trait System: Debug {
     /// Replaces the current process with an external utility.
     ///
     /// This is a thin wrapper around the `execve` system call.
-    fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible>;
+    fn execve(
+        &mut self,
+        path: &CStr,
+        args: &[CString],
+        envs: &[CString],
+    ) -> FlexFuture<Result<Infallible>>;
 
     /// Terminates the current process.
     ///
     /// This function is a thin wrapper around the `_exit` system call.
-    fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<dyn Future<Output = Infallible>>>;
+    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible>;
 
     /// Returns the current working directory path.
     fn getcwd(&self) -> Result<PathBuf>;
@@ -723,10 +726,7 @@ pub trait SystemEx: System {
     /// command, this function sends the signal to the current process to
     /// propagate the signal to the parent process. Otherwise, this function
     /// terminates the process with the given exit status.
-    fn exit_or_raise(
-        &mut self,
-        exit_status: ExitStatus,
-    ) -> Pin<Box<dyn Future<Output = Infallible> + '_>> {
+    fn exit_or_raise(&mut self, exit_status: ExitStatus) -> impl Future<Output = Infallible> {
         async fn maybe_raise<S: System + ?Sized>(
             exit_status: ExitStatus,
             system: &mut S,
@@ -758,10 +758,10 @@ pub trait SystemEx: System {
             None
         }
 
-        Box::pin(async move {
+        async move {
             maybe_raise(exit_status, self).await;
             self.exit(exit_status).await
-        })
+        }
     }
 }
 
