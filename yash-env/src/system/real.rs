@@ -727,7 +727,12 @@ impl System for RealSystem {
         }
     }
 
-    fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {
+    fn execve(
+        &mut self,
+        path: &CStr,
+        args: &[CString],
+        envs: &[CString],
+    ) -> Pin<Box<dyn Future<Output = Result<Infallible>>>> {
         fn to_pointer_array<S: AsRef<CStr>>(strs: &[S]) -> Vec<*const libc::c_char> {
             strs.iter()
                 .map(|s| s.as_ref().as_ptr())
@@ -750,7 +755,7 @@ impl System for RealSystem {
             let _ = unsafe { libc::execve(path.as_ptr(), args.as_ptr(), envs.as_ptr()) };
             let errno = Errno::last();
             if errno != Errno::EINTR {
-                return Err(errno);
+                return Box::pin(std::future::ready(Err(errno)));
             }
         }
     }

@@ -443,7 +443,12 @@ impl System for &SharedSystem {
     fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         self.0.borrow_mut().wait(target)
     }
-    fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {
+    fn execve(
+        &mut self,
+        path: &CStr,
+        args: &[CString],
+        envs: &[CString],
+    ) -> Pin<Box<dyn Future<Output = Result<Infallible>>>> {
         self.0.borrow_mut().execve(path, args, envs)
     }
     fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<dyn Future<Output = Infallible>>> {
@@ -673,7 +678,12 @@ impl System for SharedSystem {
         (&mut &*self).wait(target)
     }
     #[inline]
-    fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {
+    fn execve(
+        &mut self,
+        path: &CStr,
+        args: &[CString],
+        envs: &[CString],
+    ) -> Pin<Box<dyn Future<Output = Result<Infallible>>>> {
         (&mut &*self).execve(path, args, envs)
     }
     #[inline]

@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The definition of `system::ChildProcessTask` is updated so that the `Output`
   type of the returned `Future` is now `std::convert::Infallible` instead of
   `()`.
+- The return value of `System::execve` is now wrapped in a future.
 - External dependency versions:
     - Rust 1.85.0 → 1.86.0
 

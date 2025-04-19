@@ -443,7 +443,12 @@ pub trait System: Debug {
     /// Replaces the current process with an external utility.
     ///
     /// This is a thin wrapper around the `execve` system call.
-    fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible>;
+    fn execve(
+        &mut self,
+        path: &CStr,
+        args: &[CString],
+        envs: &[CString],
+    ) -> Pin<Box<dyn Future<Output = Result<Infallible>>>>;
 
     /// Terminates the current process.
     ///

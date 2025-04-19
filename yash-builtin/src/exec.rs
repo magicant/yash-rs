@@ -157,14 +157,22 @@ mod tests {
     use yash_env::system::r#virtual::{FileBody, Inode};
     use yash_env::variable::{PATH, Scope};
 
-    fn executable_file() -> Inode {
+    fn dummy_file(is_native_executable: bool) -> Inode {
         let mut content = Inode::default();
         content.body = FileBody::Regular {
             content: Vec::new(),
-            is_native_executable: true,
+            is_native_executable,
         };
         content.permissions.set(Mode::USER_EXEC, true);
         content
+    }
+
+    fn executable_file() -> Inode {
+        dummy_file(/* is_native_executable: */ true)
+    }
+
+    fn non_executable_file() -> Inode {
+        dummy_file(/* is_native_executable: */ false)
     }
 
     #[test]
@@ -194,7 +202,7 @@ mod tests {
         path.export(true);
 
         let args = Field::dummies(["echo"]);
-        _ = main(&mut env, args).now_or_never().unwrap();
+        main(&mut env, args).now_or_never();
 
         let process = &system.current_process();
         let arguments = process.last_exec().as_ref().unwrap();
@@ -217,7 +225,7 @@ mod tests {
             .unwrap();
 
         let args = Field::dummies(["--", "/bin/echo"]);
-        _ = main(&mut env, args).now_or_never().unwrap();
+        main(&mut env, args).now_or_never();
 
         let process = &system.current_process();
         let arguments = process.last_exec().as_ref().unwrap();
@@ -244,7 +252,7 @@ mod tests {
         path.export(true);
 
         let args = Field::dummies(["ls", "-l"]);
-        _ = main(&mut env, args).now_or_never().unwrap();
+        main(&mut env, args).now_or_never();
 
         let process = &system.current_process();
         let arguments = process.last_exec().as_ref().unwrap();
@@ -267,7 +275,7 @@ mod tests {
             .unwrap();
 
         let args = Field::dummies(["/bin/echo"]);
-        _ = main(&mut env, args).now_or_never().unwrap();
+        main(&mut env, args).now_or_never();
 
         let process = &system.current_process();
         let arguments = process.last_exec().as_ref().unwrap();
@@ -306,8 +314,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system.clone()));
 
         // Prepare the file without executable permission
-        let mut content = executable_file();
-        content.permissions.set(Mode::USER_EXEC, false);
+        let content = non_executable_file();
         system
             .state
             .borrow_mut()
@@ -328,8 +335,7 @@ mod tests {
         env.options.set(Interactive, On);
 
         // Prepare the file without executable permission
-        let mut content = executable_file();
-        content.permissions.set(Mode::USER_EXEC, false);
+        let content = non_executable_file();
         system
             .state
             .borrow_mut()
