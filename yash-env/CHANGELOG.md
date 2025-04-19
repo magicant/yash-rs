@@ -42,6 +42,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   incorrectly assumed that the shell was in the session leader's process
   group if the shell was in the foreground.
 
+## Removed
+
+- The `SystemEx` trait no longer has the `signal_number_from_exit_status` method.
+    - This method has been moved in favor of `semantics::ExitStatus::to_signal`.
+
 ## [0.6.0] - 2025-03-23
 
 ### Added
@@ -74,6 +79,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       be used in the output of the `trap` built-in.
 - The `system::errno::Errno` struct now can be converted to and from the `Errno`
   type from the `errno` crate.
+- The `SystemEx` trait now has the `signal_number_from_exit_status` method.
+    - This method converts an exit status to a signal number if applicable.
 - Internal dependencies:
     - errno 0.3.10
     - libc 0.2.169

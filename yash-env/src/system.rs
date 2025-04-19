@@ -716,20 +716,6 @@ pub trait SystemEx: System {
         self.validate_signal(number.as_raw()).unwrap().0
     }
 
-    /// Returns the signal number that corresponds to the exit status.
-    ///
-    /// This function is basically the inverse of `impl From<signal::Number> for
-    /// ExitStatus`. However, this function supports not only the offset of 384
-    /// but also the offset of 128 and zero to accept exit statuses returned
-    /// from other processes.
-    #[must_use]
-    fn signal_number_from_exit_status(&self, status: ExitStatus) -> Option<signal::Number> {
-        [0x180, 0x80, 0].into_iter().find_map(|offset| {
-            let raw_number = status.0.checked_sub(offset)?;
-            self.validate_signal(raw_number).map(|(_, number)| number)
-        })
-    }
-
     /// Terminates the current process with the given exit status, possibly
     /// sending a signal to kill the process.
     ///
