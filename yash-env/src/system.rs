@@ -19,6 +19,7 @@
 mod errno;
 mod fd_flag;
 mod file_system;
+mod future;
 mod id;
 mod open_flag;
 #[cfg(unix)]
@@ -39,6 +40,7 @@ pub use self::file_system::FileType;
 pub use self::file_system::Mode;
 pub use self::file_system::RawMode;
 pub use self::file_system::Stat;
+pub use self::future::FlexFuture;
 pub use self::id::Gid;
 pub use self::id::RawGid;
 pub use self::id::RawUid;

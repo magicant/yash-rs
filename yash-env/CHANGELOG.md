@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `semantics::ExitStatus` struct now has the `to_signal` method.
     - This method converts the exit status to a signal name and number if
       applicable.
+- The `system::FlexFuture` enum has been added.
+    - This enum is returned by some `System` methods to allow optimizing
+      the return value of the method.
 - Internal dependencies:
     - dyn-clone 1.0.19
 
