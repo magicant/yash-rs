@@ -963,7 +963,7 @@ impl System for VirtualSystem {
         }
     }
 
-    fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<(dyn Future<Output = Infallible>)>> {
+    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
         let mut myself = self.current_process_mut();
         let parent_pid = myself.ppid;
         let exited = myself.set_state(ProcessState::exited(exit_status));
@@ -972,7 +972,7 @@ impl System for VirtualSystem {
             raise_sigchld(&mut self.state.borrow_mut(), parent_pid);
         }
 
-        Box::pin(pending())
+        pending().into()
     }
 
     fn getcwd(&self) -> Result<PathBuf> {

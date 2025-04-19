@@ -72,7 +72,6 @@ use std::mem::MaybeUninit;
 use std::num::NonZero;
 use std::os::unix::ffi::OsStrExt as _;
 use std::os::unix::io::IntoRawFd;
-use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering;
@@ -752,7 +751,7 @@ impl System for RealSystem {
         }
     }
 
-    fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<dyn Future<Output = Infallible>>> {
+    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
         unsafe { libc::_exit(exit_status.0) }
     }
 

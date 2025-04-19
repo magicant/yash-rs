@@ -56,7 +56,6 @@ use std::ffi::CString;
 use std::ffi::c_int;
 use std::future::poll_fn;
 use std::io::SeekFrom;
-use std::pin::Pin;
 use std::rc::Rc;
 use std::task::Poll;
 use std::time::Duration;
@@ -448,7 +447,7 @@ impl System for &SharedSystem {
     ) -> FlexFuture<Result<Infallible>> {
         self.0.borrow_mut().execve(path, args, envs)
     }
-    fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<dyn Future<Output = Infallible>>> {
+    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
         self.0.borrow_mut().exit(exit_status)
     }
     fn getcwd(&self) -> Result<PathBuf> {
@@ -680,7 +679,7 @@ impl System for SharedSystem {
         (&mut &*self).execve(path, args, envs)
     }
     #[inline]
-    fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<dyn Future<Output = Infallible>>> {
+    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
         (&mut &*self).exit(exit_status)
     }
     #[inline]

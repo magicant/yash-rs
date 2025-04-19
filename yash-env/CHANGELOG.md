@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The return value of `System::execve` is now wrapped in a future.
 - The methods of `System` and `SystemEx` that return a future now return
   `FlexFuture` instead of `Pin<Box<dyn Future>>`:
+    - `System::exit`
     - `System::kill`
     - `System::raise`
 - External dependency versions:

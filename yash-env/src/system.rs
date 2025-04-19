@@ -451,7 +451,7 @@ pub trait System: Debug {
     /// Terminates the current process.
     ///
     /// This function is a thin wrapper around the `_exit` system call.
-    fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<dyn Future<Output = Infallible>>>;
+    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible>;
 
     /// Returns the current working directory path.
     fn getcwd(&self) -> Result<PathBuf>;
