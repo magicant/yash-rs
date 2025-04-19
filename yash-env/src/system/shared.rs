@@ -445,7 +445,7 @@ impl System for &SharedSystem {
         path: &CStr,
         args: &[CString],
         envs: &[CString],
-    ) -> Pin<Box<dyn Future<Output = Result<Infallible>>>> {
+    ) -> FlexFuture<Result<Infallible>> {
         self.0.borrow_mut().execve(path, args, envs)
     }
     fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<dyn Future<Output = Infallible>>> {
@@ -676,7 +676,7 @@ impl System for SharedSystem {
         path: &CStr,
         args: &[CString],
         envs: &[CString],
-    ) -> Pin<Box<dyn Future<Output = Result<Infallible>>>> {
+    ) -> FlexFuture<Result<Infallible>> {
         (&mut &*self).execve(path, args, envs)
     }
     #[inline]

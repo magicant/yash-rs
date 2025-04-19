@@ -930,13 +930,13 @@ impl System for VirtualSystem {
         path: &CStr,
         args: &[CString],
         envs: &[CString],
-    ) -> Pin<Box<dyn Future<Output = Result<Infallible>>>> {
+    ) -> FlexFuture<Result<Infallible>> {
         let os_path = UnixStr::from_bytes(path.to_bytes());
         let mut state = self.state.borrow_mut();
         let fs = &state.file_system;
         let file = match fs.get(os_path) {
             Ok(file) => file,
-            Err(e) => return Box::pin(std::future::ready(Err(e))),
+            Err(e) => return Err(e).into(),
         };
         // TODO Check file permissions
         let is_executable = matches!(
@@ -957,9 +957,9 @@ impl System for VirtualSystem {
             // TODO: We should abort the currently running task and start the new one.
             // Just returning `pending()` would break existing tests that rely on
             // the current behavior.
-            Box::pin(std::future::ready(Err(Errno::ENOSYS)))
+            Err(Errno::ENOSYS).into()
         } else {
-            Box::pin(std::future::ready(Err(Errno::ENOEXEC)))
+            Err(Errno::ENOEXEC).into()
         }
     }
 

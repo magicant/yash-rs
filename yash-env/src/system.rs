@@ -446,7 +446,7 @@ pub trait System: Debug {
         path: &CStr,
         args: &[CString],
         envs: &[CString],
-    ) -> Pin<Box<dyn Future<Output = Result<Infallible>>>>;
+    ) -> FlexFuture<Result<Infallible>>;
 
     /// Terminates the current process.
     ///
