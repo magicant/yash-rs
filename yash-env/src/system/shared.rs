@@ -21,6 +21,7 @@ use super::Dir;
 use super::Disposition;
 use super::Errno;
 use super::FdFlag;
+use super::FlexFuture;
 use super::Gid;
 use super::LimitPair;
 use super::Mode;
@@ -55,7 +56,6 @@ use std::ffi::CString;
 use std::ffi::c_int;
 use std::future::poll_fn;
 use std::io::SeekFrom;
-use std::pin::Pin;
 use std::rc::Rc;
 use std::task::Poll;
 use std::time::Duration;
@@ -397,14 +397,10 @@ impl System for &SharedSystem {
     fn caught_signals(&mut self) -> Vec<signal::Number> {
         self.0.borrow_mut().caught_signals()
     }
-    fn kill(
-        &mut self,
-        target: Pid,
-        signal: Option<signal::Number>,
-    ) -> Pin<Box<(dyn Future<Output = Result<()>>)>> {
+    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
         self.0.borrow_mut().kill(target, signal)
     }
-    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>> {
         self.0.borrow_mut().raise(signal)
     }
     fn select(
@@ -443,10 +439,15 @@ impl System for &SharedSystem {
     fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         self.0.borrow_mut().wait(target)
     }
-    fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {
+    fn execve(
+        &mut self,
+        path: &CStr,
+        args: &[CString],
+        envs: &[CString],
+    ) -> FlexFuture<Result<Infallible>> {
         self.0.borrow_mut().execve(path, args, envs)
     }
-    fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<dyn Future<Output = Infallible>>> {
+    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
         self.0.borrow_mut().exit(exit_status)
     }
     fn getcwd(&self) -> Result<PathBuf> {
@@ -615,15 +616,11 @@ impl System for SharedSystem {
         (&mut &*self).caught_signals()
     }
     #[inline]
-    fn kill(
-        &mut self,
-        target: Pid,
-        signal: Option<signal::Number>,
-    ) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
         (&mut &*self).kill(target, signal)
     }
     #[inline]
-    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>> {
         (&mut &*self).raise(signal)
     }
     #[inline]
@@ -673,11 +670,16 @@ impl System for SharedSystem {
         (&mut &*self).wait(target)
     }
     #[inline]
-    fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {
+    fn execve(
+        &mut self,
+        path: &CStr,
+        args: &[CString],
+        envs: &[CString],
+    ) -> FlexFuture<Result<Infallible>> {
         (&mut &*self).execve(path, args, envs)
     }
     #[inline]
-    fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<dyn Future<Output = Infallible>>> {
+    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
         (&mut &*self).exit(exit_status)
     }
     #[inline]

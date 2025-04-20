@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `semantics::ExitStatus` struct now has the `to_signal` method.
     - This method converts the exit status to a signal name and number if
       applicable.
+- The `system::FlexFuture` enum has been added.
+    - This enum is returned by some `System` methods to allow optimizing
+      the return value of the method.
 - Internal dependencies:
     - dyn-clone 1.0.19
 
@@ -32,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The definition of `system::ChildProcessTask` is updated so that the `Output`
   type of the returned `Future` is now `std::convert::Infallible` instead of
   `()`.
+- The return value of `System::execve` is now wrapped in a future.
+- The methods of `System` that return a future now return `FlexFuture` instead
+  of `Pin<Box<dyn Future>>`:
+    - `System::exit`
+    - `System::kill`
+    - `System::raise`
 - External dependency versions:
     - Rust 1.85.0 → 1.86.0
 

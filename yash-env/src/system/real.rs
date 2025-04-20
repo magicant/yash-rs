@@ -37,6 +37,7 @@ use super::Env;
 use super::Errno;
 use super::FdFlag;
 use super::FileType;
+use super::FlexFuture;
 use super::Gid;
 use super::Mode;
 use super::OfdAccess;
@@ -71,7 +72,6 @@ use std::mem::MaybeUninit;
 use std::num::NonZero;
 use std::os::unix::ffi::OsStrExt as _;
 use std::os::unix::io::IntoRawFd;
-use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering;
@@ -542,24 +542,15 @@ impl System for RealSystem {
         signals
     }
 
-    fn kill(
-        &mut self,
-        target: Pid,
-        signal: Option<signal::Number>,
-    ) -> Pin<Box<(dyn Future<Output = Result<()>>)>> {
-        Box::pin(async move {
-            let raw = signal.map_or(0, signal::Number::as_raw);
-            unsafe { libc::kill(target.0, raw) }.errno_if_m1()?;
-            Ok(())
-        })
+    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
+        let raw = signal.map_or(0, signal::Number::as_raw);
+        let result = unsafe { libc::kill(target.0, raw) }.errno_if_m1().map(drop);
+        result.into()
     }
 
-    fn raise(&mut self, signal: signal::Number) -> Pin<Box<dyn Future<Output = Result<()>>>> {
-        Box::pin(async move {
-            let raw = signal.as_raw();
-            unsafe { libc::raise(raw) }.errno_if_m1()?;
-            Ok(())
-        })
+    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>> {
+        let raw = signal.as_raw();
+        unsafe { libc::raise(raw) }.errno_if_m1().map(drop).into()
     }
 
     fn select(
@@ -727,7 +718,12 @@ impl System for RealSystem {
         }
     }
 
-    fn execve(&mut self, path: &CStr, args: &[CString], envs: &[CString]) -> Result<Infallible> {
+    fn execve(
+        &mut self,
+        path: &CStr,
+        args: &[CString],
+        envs: &[CString],
+    ) -> FlexFuture<Result<Infallible>> {
         fn to_pointer_array<S: AsRef<CStr>>(strs: &[S]) -> Vec<*const libc::c_char> {
             strs.iter()
                 .map(|s| s.as_ref().as_ptr())
@@ -750,12 +746,12 @@ impl System for RealSystem {
             let _ = unsafe { libc::execve(path.as_ptr(), args.as_ptr(), envs.as_ptr()) };
             let errno = Errno::last();
             if errno != Errno::EINTR {
-                return Err(errno);
+                return Err(errno).into();
             }
         }
     }
 
-    fn exit(&mut self, exit_status: ExitStatus) -> Pin<Box<dyn Future<Output = Infallible>>> {
+    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
         unsafe { libc::_exit(exit_status.0) }
     }
 

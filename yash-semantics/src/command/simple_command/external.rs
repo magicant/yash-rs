@@ -165,12 +165,12 @@ pub async fn replace_current_process(
         .ok();
 
     let envs = env.variables.env_c_strings();
-    let result = env.system.execve(path.as_c_str(), &args, &envs);
+    let result = env.system.execve(path.as_c_str(), &args, &envs).await;
     // TODO Prefer into_err to unwrap_err
     let errno = result.unwrap_err();
     match errno {
         Errno::ENOEXEC => {
-            fall_back_on_sh(&mut env.system, path.clone(), args, envs);
+            fall_back_on_sh(&mut env.system, path.clone(), args, envs).await;
             env.exit_status = ExitStatus::NOEXEC;
         }
         Errno::ENOENT | Errno::ENOTDIR => {
@@ -190,7 +190,7 @@ pub async fn replace_current_process(
 }
 
 /// Invokes the shell with the given arguments.
-fn fall_back_on_sh<S: System>(
+async fn fall_back_on_sh<S: System>(
     system: &mut S,
     mut script_path: CString,
     mut args: Vec<CString>,
@@ -210,7 +210,7 @@ fn fall_back_on_sh<S: System>(
     c"sh".clone_into(&mut args[0]);
 
     let sh_path = system.shell_path();
-    let _ = system.execve(&sh_path, &args, &envs);
+    system.execve(&sh_path, &args, &envs).await.ok();
 }
 
 #[cfg(test)]
