@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - When a command is terminated by a signal and its exit status is used as the
   exit status of the shell, the shell now terminates itself with the same
   signal, as required by POSIX.1-2024.
+- As specified in POSIX.1-2024, the shell now becomes interactive if the `+i`
+  option is not set, the `-s` option is set, and the standard input and error are
+  connected to a terminal, regardless of positional parameters. Previously, the
+  shell would become interactive only if there were no positional parameters.
 
 ## [0.3.0] - 2025-03-23
 

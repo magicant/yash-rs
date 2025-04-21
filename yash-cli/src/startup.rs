@@ -30,17 +30,17 @@ pub mod input;
 
 /// Tests whether the shell should be implicitly interactive.
 ///
-/// As per POSIX, "if there are no operands and the shell's standard input and
-/// standard error are attached to a terminal, the shell is considered to be
-/// interactive." This function implements this rule.
+/// As per POSIX, "if the shell reads commands from the standard input and the
+/// shell's standard input and standard error are attached to a terminal, the
+/// shell is considered to be interactive." This function implements this rule.
+///
+/// This function returns `false` if the interactive option is explicitly
+/// specified in the command line arguments to honor the user's intent.
 pub fn auto_interactive<S: System>(system: &S, run: &Run) -> bool {
     if run.work.source != Source::Stdin {
         return false;
     }
     if run.options.iter().any(|&(o, _)| o == Interactive) {
-        return false;
-    }
-    if !run.positional_params.is_empty() {
         return false;
     }
     system.isatty(Fd::STDIN) && system.isatty(Fd::STDERR)
