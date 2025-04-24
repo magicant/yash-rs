@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - In pathname expansion (`expansion::glob`), pathname component patterns no
   longer expand to the filename `.` or `..`.
+- When a value is assigned to a variable in an expansion of the form
+  `${name=word}` or `${name:=word}`, the resulting expansion is now the value of
+  the variable after the assignment, rather than the expansion of `word`.
+    - In `impl expansion::initial::Expand for TextUnit`, the `expand` method now
+      returns the value of the variable after the assignment instead of the
+      expansion of `word`. All characters in the result now have the `is_quoted`
+      flag set to `false`, so they will be subject to field splitting and
+      pathname expansion even if they were quoted in the original `word`.
 - When an asynchronous command is executed
   (`impl command::Command for yash_syntax::syntax::Item`) in an interactive
   shell (`yash_env::Env::is_interactive`), the job number and the process ID are

@@ -19,6 +19,7 @@
 use super::Env;
 use super::Error;
 use super::Phrase;
+use super::to_field;
 use crate::expansion::AssignReadOnlyError;
 use crate::expansion::ErrorCause;
 use crate::expansion::attr::Origin;
@@ -187,6 +188,10 @@ fn attribute(mut phrase: Phrase) -> Phrase {
 }
 
 /// Assigns the expansion of `value` to variable `name`.
+///
+/// As specified in the POSIX standard, this function expands the `value` and
+/// performs quote removal. The result is assigned to the variable `name` in the
+/// global scope and returned as a [`Phrase`].
 async fn assign(
     env: &mut Env<'_>,
     param: &Param,
@@ -202,8 +207,9 @@ async fn assign(
         return Err(Error { cause, location });
     }
     let value_phrase = attribute(value.expand(env).await?);
-    let joined_value = value_phrase.clone().ifs_join(&env.inner.variables);
+    let joined_value = value_phrase.ifs_join(&env.inner.variables);
     let final_value = skip_quotes(joined_value).strip().collect::<String>();
+    let result = to_field(&final_value).into();
     env.inner
         .get_or_create_variable(&param.id, Scope::Global)
         .assign(final_value, location)
@@ -217,7 +223,7 @@ async fn assign(
             });
             Error { cause, location }
         })?;
-    Ok(value_phrase)
+    Ok(result)
 }
 
 /// Expands a word to be used as a vacant expansion error message.
@@ -488,35 +494,25 @@ mod tests {
             .now_or_never()
             .unwrap();
 
-        fn quoting(value: char) -> AttrChar {
+        fn char(value: char) -> AttrChar {
             AttrChar {
                 value,
                 origin: Origin::SoftExpansion,
                 is_quoted: false,
-                is_quoting: true,
-            }
-        }
-        fn quoted(value: char) -> AttrChar {
-            AttrChar {
-                value,
-                origin: Origin::SoftExpansion,
-                is_quoted: true,
                 is_quoting: false,
             }
         }
         assert_eq!(
             result,
-            Some(Ok(Phrase::Full(vec![
-                vec![quoting('"'), quoted('1'), quoting('"')],
-                vec![
-                    quoting('"'),
-                    quoted('2'),
-                    quoted(' '),
-                    quoted(' '),
-                    quoted('2'),
-                    quoting('"'),
-                ],
-                vec![quoting('"'), quoted('3'), quoting('"')],
+            Some(Ok(Phrase::Field(vec![
+                char('1'),
+                char('~'),
+                char('2'),
+                char(' '),
+                char(' '),
+                char('2'),
+                char('~'),
+                char('3'),
             ])))
         );
 

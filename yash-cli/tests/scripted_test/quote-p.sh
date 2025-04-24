@@ -526,7 +526,6 @@ __OUT__
 
 # Quote removal is performed before assignment, so the resultant expansions are
 # subject to field splitting.
-# TODO The first expected line should not contain a space.
 test_oE 'quotes in substitution of expansion ${a=b}'
 bracket ${a=\ \!\$x\%\&\(\)\*\+\,\-\.\/ \# \"x\" \'x\'}
 bracket ${b=\0\1\2\3\4\5\6\7\8\9\:\;\<\=\>\? \\ \\\\}
@@ -537,7 +536,7 @@ bracket $b
 bracket $c
 bracket $d
 __IN__
-[ !$x%&()*+,-./][#]["x"]['x']
+[!$x%&()*+,-./][#]["x"]['x']
 [0123456789:;<=>?][\][\\]
 [@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_]
 [abcdefghijklmnopqrstuvwxyz{|}~][``]
