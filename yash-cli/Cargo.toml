@@ -13,6 +13,9 @@ license = "GPL-3.0-or-later"
 keywords = ["posix", "shell"]
 categories = ["command-line-utilities"]
 
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/yash-cli-{ version }/{ name }-{ target }{ archive-suffix }"
+
 [[bin]]
 name = "yash3"
 path = "src/main.rs"
