@@ -424,8 +424,6 @@ impl GrandState {
     }
 
     /// Marks this signal as caught.
-    ///
-    /// This function does nothing unless a user-specified trap action is set.
     pub fn mark_as_caught(&mut self) {
         self.current_state.pending = true;
     }
