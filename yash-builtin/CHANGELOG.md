@@ -5,7 +5,7 @@ All notable changes to `yash-builtin` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.0] - Unreleased
+## [0.7.0] - 2025-04-26
 
 ### Changed
 
@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   foreground.
 - External dependency versions:
     - Rust 1.85.0 → 1.86.0
+    - yash-env 0.6.0 → 0.7.0
+    - yash-semantics (optional) 0.6.0 → 0.7.0
+- Internal dependency versions:
+    - yash-prompt (optional) 0.4.0 → 0.5.0
 
 ## [0.6.0] - 2025-03-23
 
@@ -124,11 +128,11 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 - External dependency versions:
     - Rust 1.82.0 → 1.85.0
     - yash-env 0.5.0 → 0.6.0
-    - yash-semantics 0.5.0 → 0.6.0 (optional)
+    - yash-semantics (optional) 0.5.0 → 0.6.0
     - yash-syntax 0.13.0 → 0.14.0
 - Internal dependency versions:
     - itertools 0.13.0 → 0.14.0
-    - yash-prompt 0.3.0 → 0.4.0 (optional)
+    - yash-prompt (optional) 0.3.0 → 0.4.0
 
 ## [0.5.0] - 2024-12-14
 
@@ -136,10 +140,10 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - External dependency versions:
     - yash-env 0.4.0 → 0.5.0
-    - yash-semantics 0.4.0 → 0.5.0 (optional)
+    - yash-semantics (optional) 0.4.0 → 0.5.0
     - yash-syntax 0.12.0 → 0.13.0
 - Internal dependency versions:
-    - yash-prompt 0.2.0 → 0.3.0 (optional)
+    - yash-prompt (optional) 0.2.0 → 0.3.0
 
 ## [0.4.1] - 2024-12-14
 
@@ -189,10 +193,10 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 - External dependency versions:
     - Rust 1.77.0 → 1.79.0
     - yash-env 0.2.0 → 0.4.0
-    - yash-semantics 0.3.0 → 0.4.0 (optional)
+    - yash-semantics (optional) 0.3.0 → 0.4.0
     - yash-syntax 0.10.0 → 0.12.0
 - Internal dependency versions:
-    - yash-prompt 0.1.0 → 0.2.0 (optional)
+    - yash-prompt (optional) 0.1.0 → 0.2.0
 
 ## [0.3.0] - 2024-07-13
 
@@ -273,6 +277,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
+[0.7.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.7.0
 [0.6.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.6.0
 [0.5.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.5.0
 [0.4.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.4.1
