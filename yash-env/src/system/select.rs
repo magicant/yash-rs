@@ -299,6 +299,7 @@ impl AsyncIo {
 
     /// Wakes and removes all awaiters.
     pub fn wake_all(&mut self) {
+        // Dropping awaiters wakes the wakers.
         self.readers.clear();
         self.writers.clear();
     }
