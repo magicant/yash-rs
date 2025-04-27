@@ -446,33 +446,54 @@ impl AsyncSignal {
 
     /// Adds an awaiter for signals.
     ///
-    /// This function returns a reference-counted
-    /// `SignalStatus::Expected(None)`. The caller must set a waker to the
-    /// returned `SignalStatus::Expected`. When signals are caught, the waker is
-    /// woken and replaced with `SignalStatus::Caught(signals)`. The caller can
-    /// replace the waker in the `SignalStatus::Expected` with another if the
-    /// previous waker gets expired and the caller wants to be woken again.
+    /// If any signal has already been caught, this function returns
+    /// `SignalStatus::Caught(signals)`.
+    ///
+    /// Otherwise, this function returns a reference-counted
+    /// `SignalStatus::Expected(None)`. The caller should set a waker to the
+    /// returned `SignalStatus::Expected` and retain the shared status. When a
+    /// signal is caught later ([`wake`](Self::wake)), the waker set to
+    /// `SignalStatus::Expected` is woken and the status is replaced with
+    /// `SignalStatus::Caught(signals)`.
+    ///
+    /// The caller can replace the waker in the `SignalStatus::Expected` with
+    /// another if the previous waker gets expired and the caller wants to be
+    /// woken again.
     pub fn wait_for_signals(&mut self) -> Rc<RefCell<SignalStatus>> {
-        match self {
-            AsyncSignal::Awaiting(awaiters) => {
+        match std::mem::replace(self, AsyncSignal::Awaiting(Vec::new())) {
+            AsyncSignal::Awaiting(mut awaiters) => {
                 let status = Rc::new(RefCell::new(SignalStatus::Expected(None)));
                 awaiters.push(Rc::downgrade(&status));
+                *self = AsyncSignal::Awaiting(awaiters);
                 status
             }
 
-            AsyncSignal::Caught(_signals) => todo!(),
+            AsyncSignal::Caught(signals) => {
+                debug_assert!(!signals.is_empty());
+                Rc::new(RefCell::new(SignalStatus::Caught(signals)))
+            }
         }
     }
 
-    /// Wakes awaiters for caught signals.
+    /// Passes caught signals to awaiters.
     ///
     /// This function wakes up all wakers in pending `SignalStatus`es and
     /// removes them from `self`.
     ///
-    /// This function borrows `SignalStatus`es returned from `wait_for_signals`
-    /// so you must not have conflicting borrows.
+    /// This function borrows `SignalStatus`es returned from
+    /// [`wait_for_signals`](Self::wait_for_signals) so you must not have
+    /// conflicting borrows.
+    ///
+    /// If there is no pending awaiters, that is, `wait_for_signals` has not
+    /// been called, then this function retains the given signals so that they
+    /// can be immediately returned next time `wait_for_signals` is called.
     pub fn wake(&mut self, signals: &Rc<[signal::Number]>) {
         match self {
+            AsyncSignal::Awaiting(awaiters) if awaiters.is_empty() => {
+                // No awaiters, so we just retain the signals.
+                *self = AsyncSignal::Caught(Rc::clone(signals));
+            }
+
             AsyncSignal::Awaiting(awaiters) => {
                 for status in awaiters.drain(..) {
                     let Some(status) = status.upgrade() else {
@@ -495,7 +516,7 @@ impl AsyncSignal {
 
 #[cfg(test)]
 mod tests {
-    use super::super::r#virtual::{SIGCHLD, SIGUSR1};
+    use super::super::r#virtual::{SIGCHLD, SIGINT, SIGUSR1};
     use super::*;
     use assert_matches::assert_matches;
     use std::sync::Arc;
@@ -641,4 +662,18 @@ mod tests {
             assert_eq!(**signals, [SIGCHLD, SIGUSR1]);
         });
     }
+
+    #[test]
+    fn async_signal_wake_and_wait() {
+        let mut async_signal = AsyncSignal::new();
+        async_signal.wake(&(Rc::new([SIGINT, SIGCHLD]) as Rc<[signal::Number]>));
+
+        let status = async_signal.wait_for_signals();
+
+        assert_matches!(&*status.borrow(), SignalStatus::Caught(signals) => {
+            assert_eq!(**signals, [SIGINT, SIGCHLD]);
+        });
+    }
+
+    // TODO async_signal_wake_twice_and_wait
 }
