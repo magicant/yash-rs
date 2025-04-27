@@ -399,11 +399,18 @@ impl Timeout {
 
 /// Helper for `select`ing on signals
 ///
-/// An `AsyncSignal` is a set of [`Waker`]s that are waiting for a signal to be
-/// caught by the current process. It wakes the wakers when signals are caught.
-#[derive(Clone, Debug, Default)]
-struct AsyncSignal {
-    awaiters: Vec<Weak<RefCell<SignalStatus>>>,
+/// `AsyncSignal` is a synchronization primitive for `select`ing on signals.
+/// It retains either a list of signals that have been caught or a list of
+/// awaiters that are waiting for signals. When both signals and awaiters are
+/// present, the awaiters are woken and the signals are passed to the awaiters.
+#[derive(Clone, Debug)]
+enum AsyncSignal {
+    /// No signals have been caught yet, so awaiters are lining up.
+    /// The awaiters will be woken when the signal is caught.
+    Awaiting(Vec<Weak<RefCell<SignalStatus>>>),
+    /// One or more signals have been caught but not yet delivered to any awaiter.
+    /// The signals will be passed to the next awaiter.
+    Caught(Rc<[signal::Number]>),
 }
 
 /// Status of awaited signals
@@ -421,12 +428,19 @@ pub enum SignalStatus {
 impl AsyncSignal {
     /// Returns a new empty `AsyncSignal`.
     pub fn new() -> Self {
-        Self::default()
+        Self::Awaiting(Vec::new())
     }
 
-    /// Removes internal weak pointers whose `SignalStatus` has gone.
+    /// Discards awaiters that are no longer valid.
+    ///
+    /// This function removes [`SignalStatus`]es that are not retained with any
+    /// strong references. Such `SignalStatus`es will never wake any task, so it
+    /// does not make sense to keep them in memory.
     pub fn gc(&mut self) {
-        self.awaiters.retain(|awaiter| awaiter.strong_count() > 0);
+        match self {
+            Self::Awaiting(awaiters) => awaiters.retain(|awaiter| awaiter.strong_count() > 0),
+            Self::Caught(_) => {}
+        }
     }
 
     /// Adds an awaiter for signals.
@@ -438,9 +452,15 @@ impl AsyncSignal {
     /// replace the waker in the `SignalStatus::Expected` with another if the
     /// previous waker gets expired and the caller wants to be woken again.
     pub fn wait_for_signals(&mut self) -> Rc<RefCell<SignalStatus>> {
-        let status = Rc::new(RefCell::new(SignalStatus::Expected(None)));
-        self.awaiters.push(Rc::downgrade(&status));
-        status
+        match self {
+            AsyncSignal::Awaiting(awaiters) => {
+                let status = Rc::new(RefCell::new(SignalStatus::Expected(None)));
+                awaiters.push(Rc::downgrade(&status));
+                status
+            }
+
+            AsyncSignal::Caught(_signals) => todo!(),
+        }
     }
 
     /// Wakes awaiters for caught signals.
@@ -451,17 +471,23 @@ impl AsyncSignal {
     /// This function borrows `SignalStatus`es returned from `wait_for_signals`
     /// so you must not have conflicting borrows.
     pub fn wake(&mut self, signals: &Rc<[signal::Number]>) {
-        for status in self.awaiters.drain(..) {
-            let Some(status) = status.upgrade() else {
-                continue;
-            };
-            let mut status_ref = status.borrow_mut();
-            let new_status = SignalStatus::Caught(Rc::clone(signals));
-            let old_status = std::mem::replace(&mut *status_ref, new_status);
-            drop(status_ref);
-            if let SignalStatus::Expected(Some(waker)) = old_status {
-                waker.wake();
+        match self {
+            AsyncSignal::Awaiting(awaiters) => {
+                for status in awaiters.drain(..) {
+                    let Some(status) = status.upgrade() else {
+                        continue;
+                    };
+                    let mut status_ref = status.borrow_mut();
+                    let new_status = SignalStatus::Caught(Rc::clone(signals));
+                    let old_status = std::mem::replace(&mut *status_ref, new_status);
+                    drop(status_ref);
+                    if let SignalStatus::Expected(Some(waker)) = old_status {
+                        waker.wake();
+                    }
+                }
             }
+
+            AsyncSignal::Caught(_signals) => todo!(),
         }
     }
 }
