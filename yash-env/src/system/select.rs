@@ -180,7 +180,7 @@ impl SelectSystem {
         if signals.is_empty() {
             self.signal.gc()
         } else {
-            self.signal.wake(&signals.into())
+            self.signal.wake(signals)
         }
     }
 
@@ -411,7 +411,7 @@ enum AsyncSignal {
     Awaiting(Vec<Weak<RefCell<SignalStatus>>>),
     /// One or more signals have been caught but not yet delivered to any awaiter.
     /// The signals will be passed to the next awaiter.
-    Caught(Rc<[signal::Number]>),
+    Caught(Vec<signal::Number>),
 }
 
 /// Status of awaited signals
@@ -470,7 +470,7 @@ impl AsyncSignal {
 
             AsyncSignal::Caught(signals) => {
                 debug_assert!(!signals.is_empty());
-                Rc::new(RefCell::new(SignalStatus::Caught(signals)))
+                Rc::new(RefCell::new(SignalStatus::Caught(signals.into())))
             }
         }
     }
@@ -487,42 +487,45 @@ impl AsyncSignal {
     /// If there is no pending awaiters, that is, `wait_for_signals` has not
     /// been called, then this function retains the given signals so that they
     /// can be immediately returned next time `wait_for_signals` is called.
-    pub fn wake(&mut self, signals: &Rc<[signal::Number]>) {
+    pub fn wake(&mut self, signals: Vec<signal::Number>) {
         if signals.is_empty() {
             return;
         }
 
         match self {
+            AsyncSignal::Caught(accumulated_signals) => accumulated_signals.extend(signals),
+
             AsyncSignal::Awaiting(awaiters) => {
-                let mut woke_any = false;
+                enum Woke {
+                    None(Vec<signal::Number>),
+                    Some(Rc<[signal::Number]>),
+                }
+                let mut woke = Woke::None(signals);
+
                 for status in awaiters.drain(..) {
                     let Some(status) = status.upgrade() else {
                         continue;
                     };
+
+                    let signals = match woke {
+                        Woke::None(signals) => Rc::from(signals),
+                        Woke::Some(signals) => signals,
+                    };
+                    woke = Woke::Some(Rc::clone(&signals));
+
                     let mut status_ref = status.borrow_mut();
-                    let new_status = SignalStatus::Caught(Rc::clone(signals));
+                    let new_status = SignalStatus::Caught(signals);
                     let old_status = std::mem::replace(&mut *status_ref, new_status);
                     drop(status_ref);
                     if let SignalStatus::Expected(Some(waker)) = old_status {
                         waker.wake();
                     }
-                    woke_any = true;
                 }
 
-                if !woke_any {
-                    // woke no awaiters, so retain the signals for a next awaiter
-                    *self = AsyncSignal::Caught(Rc::clone(signals));
+                if let Woke::None(signals) = woke {
+                    // retain the signals for a next awaiter
+                    *self = AsyncSignal::Caught(signals);
                 }
-            }
-
-            AsyncSignal::Caught(accumulated_signals) => {
-                // add the new signals to the accumulation
-                let new_accumulated_signals = accumulated_signals
-                    .iter()
-                    .chain(signals.iter())
-                    .copied()
-                    .collect();
-                *accumulated_signals = new_accumulated_signals;
             }
         }
     }
@@ -665,7 +668,7 @@ mod tests {
             *waker = Some(wake_flag_2.clone().into());
         });
 
-        async_signal.wake(&(Rc::new([SIGCHLD, SIGUSR1]) as Rc<[signal::Number]>));
+        async_signal.wake(vec![SIGCHLD, SIGUSR1]);
 
         assert!(wake_flag_1.0.load(Ordering::Relaxed));
         assert!(wake_flag_2.0.load(Ordering::Relaxed));
@@ -680,7 +683,7 @@ mod tests {
     #[test]
     fn async_signal_wake_and_wait() {
         let mut async_signal = AsyncSignal::new();
-        async_signal.wake(&(Rc::new([SIGINT, SIGCHLD]) as Rc<[signal::Number]>));
+        async_signal.wake(vec![SIGINT, SIGCHLD]);
 
         let status = async_signal.wait_for_signals();
 
@@ -692,8 +695,8 @@ mod tests {
     #[test]
     fn async_signal_wake_twice_and_wait() {
         let mut async_signal = AsyncSignal::new();
-        async_signal.wake(&(Rc::new([SIGINT]) as Rc<[signal::Number]>));
-        async_signal.wake(&(Rc::new([SIGUSR1]) as Rc<[signal::Number]>));
+        async_signal.wake(vec![SIGINT]);
+        async_signal.wake(vec![SIGUSR1]);
 
         let status = async_signal.wait_for_signals();
 
@@ -719,7 +722,7 @@ mod tests {
             *waker = Some(wake_flag.clone().into());
         });
 
-        async_signal.wake(&(Rc::new([]) as Rc<[signal::Number]>));
+        async_signal.wake(vec![]);
 
         assert!(!wake_flag.0.load(Ordering::Relaxed));
         // to assert that the waker is not modified, we wake the waker ourself
@@ -739,7 +742,7 @@ mod tests {
         let status_1 = async_signal.wait_for_signals();
         drop(status_1);
 
-        async_signal.wake(&(Rc::new([SIGINT]) as Rc<[signal::Number]>));
+        async_signal.wake(vec![SIGINT]);
 
         let status_2 = async_signal.wait_for_signals();
         assert_matches!(&*status_2.borrow(), SignalStatus::Caught(signals) => {
