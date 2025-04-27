@@ -406,9 +406,15 @@ struct AsyncSignal {
     awaiters: Vec<Weak<RefCell<SignalStatus>>>,
 }
 
+/// Status of awaited signals
 #[derive(Clone, Debug)]
 pub enum SignalStatus {
+    /// No signal has been caught.
+    /// The waker will be woken when the signal is caught.
     Expected(Option<Waker>),
+
+    /// One or more signals have been caught.
+    /// The slice contains the caught signals.
     Caught(Rc<[signal::Number]>),
 }
 
