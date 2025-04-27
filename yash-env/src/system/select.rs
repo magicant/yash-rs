@@ -488,6 +488,10 @@ impl AsyncSignal {
     /// been called, then this function retains the given signals so that they
     /// can be immediately returned next time `wait_for_signals` is called.
     pub fn wake(&mut self, signals: &Rc<[signal::Number]>) {
+        if signals.is_empty() {
+            return;
+        }
+
         match self {
             AsyncSignal::Awaiting(awaiters) if awaiters.is_empty() => {
                 // No awaiters, so we just retain the signals.
@@ -694,5 +698,32 @@ mod tests {
         assert_matches!(&*status.borrow(), SignalStatus::Caught(signals) => {
             assert_eq!(**signals, [SIGINT, SIGUSR1]);
         });
+    }
+
+    #[test]
+    fn async_signal_empty_wake() {
+        struct WakeFlag(AtomicBool);
+        impl Wake for WakeFlag {
+            fn wake(self: Arc<Self>) {
+                self.0.store(true, Ordering::Relaxed);
+            }
+        }
+
+        let mut async_signal = AsyncSignal::new();
+        let status = async_signal.wait_for_signals();
+        let wake_flag = Arc::new(WakeFlag(AtomicBool::new(false)));
+        assert_matches!(&mut *status.borrow_mut(), SignalStatus::Expected(waker) => {
+            assert!(waker.is_none());
+            *waker = Some(wake_flag.clone().into());
+        });
+
+        async_signal.wake(&(Rc::new([]) as Rc<[signal::Number]>));
+
+        assert!(!wake_flag.0.load(Ordering::Relaxed));
+        // to assert that the waker is not modified, we wake the waker ourself
+        assert_matches!(&*status.borrow(), SignalStatus::Expected(Some(waker)) => {
+            waker.wake_by_ref();
+        });
+        assert!(wake_flag.0.load(Ordering::Relaxed));
     }
 }
