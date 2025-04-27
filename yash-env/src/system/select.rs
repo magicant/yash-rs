@@ -498,6 +498,9 @@ mod tests {
     use super::super::r#virtual::{SIGCHLD, SIGUSR1};
     use super::*;
     use assert_matches::assert_matches;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::task::Wake;
 
     #[test]
     fn async_io_has_no_default_readers_or_writers() {
@@ -605,14 +608,32 @@ mod tests {
     }
 
     #[test]
-    fn async_signal_wake() {
+    fn async_signal_wait_and_wake() {
+        struct WakeFlag(AtomicBool);
+        impl Wake for WakeFlag {
+            fn wake(self: Arc<Self>) {
+                self.0.store(true, Ordering::Relaxed);
+            }
+        }
+
         let mut async_signal = AsyncSignal::new();
         let status_1 = async_signal.wait_for_signals();
         let status_2 = async_signal.wait_for_signals();
-        *status_1.borrow_mut() = SignalStatus::Expected(Some(Waker::noop().clone()));
-        *status_2.borrow_mut() = SignalStatus::Expected(Some(Waker::noop().clone()));
+        let wake_flag_1 = Arc::new(WakeFlag(AtomicBool::new(false)));
+        let wake_flag_2 = Arc::new(WakeFlag(AtomicBool::new(false)));
+        assert_matches!(&mut *status_1.borrow_mut(), SignalStatus::Expected(waker) => {
+            assert!(waker.is_none());
+            *waker = Some(wake_flag_1.clone().into());
+        });
+        assert_matches!(&mut *status_2.borrow_mut(), SignalStatus::Expected(waker) => {
+            assert!(waker.is_none());
+            *waker = Some(wake_flag_2.clone().into());
+        });
 
         async_signal.wake(&(Rc::new([SIGCHLD, SIGUSR1]) as Rc<[signal::Number]>));
+
+        assert!(wake_flag_1.0.load(Ordering::Relaxed));
+        assert!(wake_flag_2.0.load(Ordering::Relaxed));
         assert_matches!(&*status_1.borrow(), SignalStatus::Caught(signals) => {
             assert_eq!(**signals, [SIGCHLD, SIGUSR1]);
         });
