@@ -509,7 +509,15 @@ impl AsyncSignal {
                 }
             }
 
-            AsyncSignal::Caught(_signals) => todo!(),
+            AsyncSignal::Caught(accumulated_signals) => {
+                // add the new signals to the accumulation
+                let new_accumulated_signals = accumulated_signals
+                    .iter()
+                    .chain(signals.iter())
+                    .copied()
+                    .collect();
+                *accumulated_signals = new_accumulated_signals;
+            }
         }
     }
 }
@@ -675,5 +683,16 @@ mod tests {
         });
     }
 
-    // TODO async_signal_wake_twice_and_wait
+    #[test]
+    fn async_signal_wake_twice_and_wait() {
+        let mut async_signal = AsyncSignal::new();
+        async_signal.wake(&(Rc::new([SIGINT]) as Rc<[signal::Number]>));
+        async_signal.wake(&(Rc::new([SIGUSR1]) as Rc<[signal::Number]>));
+
+        let status = async_signal.wait_for_signals();
+
+        assert_matches!(&*status.borrow(), SignalStatus::Caught(signals) => {
+            assert_eq!(**signals, [SIGINT, SIGUSR1]);
+        });
+    }
 }
