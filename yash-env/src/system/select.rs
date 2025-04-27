@@ -493,12 +493,8 @@ impl AsyncSignal {
         }
 
         match self {
-            AsyncSignal::Awaiting(awaiters) if awaiters.is_empty() => {
-                // No awaiters, so we just retain the signals.
-                *self = AsyncSignal::Caught(Rc::clone(signals));
-            }
-
             AsyncSignal::Awaiting(awaiters) => {
+                let mut woke_any = false;
                 for status in awaiters.drain(..) {
                     let Some(status) = status.upgrade() else {
                         continue;
@@ -510,6 +506,12 @@ impl AsyncSignal {
                     if let SignalStatus::Expected(Some(waker)) = old_status {
                         waker.wake();
                     }
+                    woke_any = true;
+                }
+
+                if !woke_any {
+                    // woke no awaiters, so retain the signals for a next awaiter
+                    *self = AsyncSignal::Caught(Rc::clone(signals));
                 }
             }
 
@@ -725,5 +727,23 @@ mod tests {
             waker.wake_by_ref();
         });
         assert!(wake_flag.0.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    fn async_signal_phantom_wake() {
+        // In this test case, we drop the `SignalStatus` returned from the first
+        // `wait_for_signals` call before calling `wake`. `AsyncSignal` should
+        // retain the signals and return them to the next `wait_for_signals`
+        // call.
+        let mut async_signal = AsyncSignal::new();
+        let status_1 = async_signal.wait_for_signals();
+        drop(status_1);
+
+        async_signal.wake(&(Rc::new([SIGINT]) as Rc<[signal::Number]>));
+
+        let status_2 = async_signal.wait_for_signals();
+        assert_matches!(&*status_2.borrow(), SignalStatus::Caught(signals) => {
+            assert_eq!(**signals, [SIGINT]);
+        });
     }
 }
