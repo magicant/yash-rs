@@ -9,11 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- The `read::syntax::Error` enum now has the `InvalidVariableName` variant,
-  which indicates that the variable name is invalid.
+- The `getopts::report::Error` and `read::syntax::Error` enums now have the
+  `InvalidVariableName` variant, which indicates that the variable name is
+  invalid.
 
 ### Fixed
 
+- The `getopts` built-in now fails when the second operand is not a valid
+  variable name. The `getopts::model::Result::report` function now returns the
+  `InvalidVariableName` error in this case.
 - The `read` built-in now fails when a specified variable name contains an `=`
   character. The `read::syntax::parse` function returns the
   `InvalidVariableName` error in this case.

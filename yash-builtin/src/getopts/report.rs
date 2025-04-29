@@ -15,6 +15,9 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! Reporting the result to the environment
+//!
+//! See [`model::Result::report`] for the implementation of the reporting
+//! logic.
 
 use super::indexes_to_optind;
 use super::model;
@@ -36,6 +39,10 @@ use yash_syntax::source::pretty::Message;
 /// Error in reporting the result to the environment
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum Error {
+    /// Variable name not acceptable
+    #[error("invalid variable name")]
+    InvalidVariableName { name: Field },
+
     /// Error in assigning to a read-only variable
     #[error("cannot update read-only variable `{name}`")]
     AssignReadOnlyError {
@@ -84,6 +91,14 @@ impl Error {
         let mut annotations = Vec::new();
 
         match self {
+            Error::InvalidVariableName { name } => {
+                annotations.push(Annotation::new(
+                    AnnotationType::Error,
+                    format!("variable name {:?} is not valid", name.value).into(),
+                    &name.origin,
+                ));
+            }
+
             Error::AssignReadOnlyError {
                 name,
                 new_value,
@@ -153,6 +168,10 @@ impl model::Result {
         colon: bool,
         var_name: Field,
     ) -> Result<Option<String>, Error> {
+        if var_name.value.contains('=') {
+            return Err(Error::InvalidVariableName { name: var_name });
+        }
+
         let location = env.stack.current_builtin().map(|b| b.name.origin.clone());
 
         let (var_value, optarg, message) = match self.option {
@@ -505,6 +524,25 @@ mod tests {
         assert_variable_scalar(&env, "opt_var", "?");
         assert_variable_scalar(&env, OPTIND, "2");
         assert_variable_none(&env, OPTARG);
+    }
+
+    #[test]
+    fn report_with_invalid_variable_name() {
+        let mut env = env_with_dummy_arg0_and_optarg();
+        let result = model::Result {
+            option: Some(model::OptionOccurrence {
+                option: 'a',
+                argument: None,
+                error: None,
+            }),
+            next_arg_index: non_zero(2),
+            next_char_index: non_zero(1),
+        };
+
+        let name = Field::dummy("opt=var");
+        let report = result.report(&mut env, false, name.clone());
+
+        assert_eq!(report, Err(Error::InvalidVariableName { name }));
     }
 
     #[test]
