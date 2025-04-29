@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `read` built-in now fails when a specified variable name contains an `=`
   character. The `read::syntax::parse` function returns the
   `InvalidVariableName` error in this case.
+- The `export`, `readonly`, and `typeset` built-ins no longer print variables
+  with a name containing an `=` character.
+  The `typeset::PrintVariables::execute` function now ignores such variables.
 
 ## [0.7.0] - 2025-04-26
 

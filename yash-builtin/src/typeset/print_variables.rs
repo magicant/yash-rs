@@ -60,6 +60,13 @@ fn print_one(
     context: &PrintContext,
     output: &mut String,
 ) {
+    // Skip if the variable name contains `=`.
+    // Such variables should not be printed since the output would be
+    // re-interpreted as a variable with a different name.
+    if name.contains('=') {
+        return;
+    }
+
     // Skip if the variable does not match the filter.
     if filter_attrs
         .iter()
@@ -540,6 +547,31 @@ mod tests {
                 ExecuteError::PrintUnsetVariable(foo),
                 ExecuteError::PrintUnsetVariable(bar)
             ]
+        );
+    }
+
+    #[test]
+    fn variable_name_containing_equal_is_ignored() {
+        let mut vars = VariableSet::new();
+        vars.get_or_new("first", Scope::Global.into())
+            .assign("1", None)
+            .unwrap();
+        vars.get_or_new("second=!", Scope::Global.into())
+            .assign("2", None)
+            .unwrap();
+        vars.get_or_new("third", Scope::Global.into())
+            .assign("3", None)
+            .unwrap();
+        let pv = PrintVariables {
+            variables: Field::dummies(["first", "second=!", "third"]),
+            attrs: vec![],
+            scope: Scope::Global,
+        };
+
+        assert_eq!(
+            pv.execute(&vars, &PRINT_CONTEXT).unwrap(),
+            "typeset first=1\n\
+             typeset third=3\n",
         );
     }
 
