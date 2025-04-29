@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.1] - Unreleased
 
+### Changed
+
+- External dependency versions:
+    - yash-syntax 0.14.0 → 0.14.1
+
 ### Fixed
 
 - `system::SharedSystem::wait_for_signals` now returns signals that have already

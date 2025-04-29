@@ -5,6 +5,13 @@ All notable changes to `yash-semantics` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - Unreleased
+
+### Changed
+
+- External dependency versions:
+    - yash-syntax 0.14.0 → 0.14.1
+
 ## [0.7.0] - 2025-04-26
 
 ### Changed
@@ -217,6 +224,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial implementation of the `yash-semantics` crate
 
+[0.7.1]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.7.1
 [0.7.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.7.0
 [0.6.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.6.0
 [0.5.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.5.0

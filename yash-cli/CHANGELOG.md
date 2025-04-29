@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reading a command. Previously, the shell would ignore such signals.
 - The `getopts` and `read` built-ins now fail when a specified variable name
   contains an `=` character.
+- The `set` built-in without arguments no longer prints variables that have an
+  invalid name.
 
 ## [0.4.0] - 2025-04-26
 
