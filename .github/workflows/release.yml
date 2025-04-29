@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build and upload Rust binary to GitHub Releases
-        uses: taiki-e/upload-rust-binary-action@v1.24.0
+        uses: taiki-e/upload-rust-binary-action@v1.25.0
         with:
           bin: yash3
           target: ${{ matrix.target }}
