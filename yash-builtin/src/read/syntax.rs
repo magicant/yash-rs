@@ -43,6 +43,10 @@ pub enum Error {
     /// No operand is given.
     #[error("missing operand")]
     MissingOperand,
+
+    /// An operand is not a valid variable name.
+    #[error("invalid variable name")]
+    InvalidVariableName { name: Field },
 }
 
 impl Error {
@@ -71,6 +75,17 @@ impl Error {
                 r#type: AnnotationType::Error,
                 title: self.to_string().into(),
                 annotations: vec![],
+                footers: vec![],
+            },
+
+            Error::InvalidVariableName { name } => Message {
+                r#type: AnnotationType::Error,
+                title: self.to_string().into(),
+                annotations: vec![Annotation::new(
+                    AnnotationType::Error,
+                    format!("variable name {:?} is not valid", name.value).into(),
+                    &name.origin,
+                )],
                 footers: vec![],
             },
         }
@@ -116,7 +131,7 @@ pub fn parse(env: &Env, args: Vec<Field>) -> Result<Command, Error> {
     }
 
     // Parse operands
-    let mut variables = operands;
+    let mut variables = validate_names(operands)?;
     let last_variable = variables.pop().ok_or(Error::MissingOperand)?;
 
     Ok(Command {
@@ -125,6 +140,19 @@ pub fn parse(env: &Env, args: Vec<Field>) -> Result<Command, Error> {
         variables,
         last_variable,
     })
+}
+
+/// Tests if all the variable names are valid.
+///
+/// If all the variable names are valid, this function returns `names` as is.
+/// Otherwise, this function returns an `Error::InvalidVariableName`.
+fn validate_names(names: Vec<Field>) -> Result<Vec<Field>, Error> {
+    match names.iter().position(|name| name.value.contains('=')) {
+        None => Ok(names),
+        Some(i) => Err(Error::InvalidVariableName {
+            name: { names }.swap_remove(i),
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -233,5 +261,22 @@ mod tests {
     fn missing_operand() {
         let env = Env::new_virtual();
         assert_eq!(parse(&env, vec![]), Err(Error::MissingOperand));
+    }
+
+    #[test]
+    fn operand_containing_equal() {
+        let env = Env::new_virtual();
+        assert_eq!(
+            parse(&env, Field::dummies(["="])),
+            Err(Error::InvalidVariableName {
+                name: Field::dummy("=")
+            })
+        );
+        assert_eq!(
+            parse(&env, Field::dummies(["foo", "bar=bar", "baz"])),
+            Err(Error::InvalidVariableName {
+                name: Field::dummy("bar=bar")
+            })
+        );
     }
 }

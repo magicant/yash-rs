@@ -82,6 +82,7 @@
 //! - The standard input is not readable.
 //! - The delimiter is not a single-byte character.
 //! - The delimiter is not a nul byte and the input contains a nul byte.
+//! - A variable name is not valid.
 //! - A variable to be assigned is read-only.
 //!
 //! # Exit status
@@ -107,6 +108,11 @@
 //! In this implementation, the value of the `PS2` variable is subject to
 //! parameter expansion, command substitution, and arithmetic expansion. Other
 //! implementations may not perform these expansions.
+//!
+//! The current implementation considers variable names containing a `=` as
+//! invalid names. However, more names many be considered invalid in the future.
+//! For best forward-compatibility and portability, only use portable name
+//! characters (ASCII alphanumerics and underscore).
 //!
 //! # Implementation notes
 //!

@@ -5,6 +5,19 @@ All notable changes to `yash-builtin` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - Unreleased
+
+### Added
+
+- The `read::syntax::Error` enum now has the `InvalidVariableName` variant,
+  which indicates that the variable name is invalid.
+
+### Fixed
+
+- The `read` built-in now fails when a specified variable name contains an `=`
+  character. The `read::syntax::parse` function returns the
+  `InvalidVariableName` error in this case.
+
 ## [0.7.0] - 2025-04-26
 
 ### Changed
@@ -277,6 +290,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
+[0.7.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.7.1
 [0.7.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.7.0
 [0.6.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.6.0
 [0.5.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.5.0

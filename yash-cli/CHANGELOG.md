@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The shell now correctly handles traps for signals that are caught while
   reading a command. Previously, the shell would ignore such signals.
+- The `read` built-in now fails when a specified variable name contains an `=`
+  character.
 
 ## [0.4.0] - 2025-04-26
 
