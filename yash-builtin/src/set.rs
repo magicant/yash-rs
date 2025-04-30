@@ -37,6 +37,11 @@
 //! executed (unless the assignment fails because of a read-only variable).
 //! The list is ordered alphabetically.
 //!
+//! Some built-ins allow creating variables that do not have a valid name. For
+//! example, `export 1a=foo` defines a variable named `1a`, which cannot be
+//! assigned to with the normal assignment syntax of the simple command.
+//! Such variables are not printed by the `set` built-in.
+//!
 //! ## Printing options
 //!
 //! ```sh
@@ -139,6 +144,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::stack::Frame::Subshell;
 use yash_env::variable::Scope::Global;
+use yash_syntax::parser::lex::is_name;
 
 /// Interpretation of command-line arguments that determine the behavior of the
 /// set built-in
@@ -219,14 +225,17 @@ fn modify(
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     match syntax::parse(args) {
         Ok(Command::PrintVariables) => {
-            let mut vars: Vec<_> = env.variables.iter(Global).collect();
+            let mut vars: Vec<_> = env
+                .variables
+                .iter(Global)
+                .filter(|(name, _)| is_name(name))
+                .collect();
             // TODO apply current locale's collation
             vars.sort_unstable_by_key(|&(name, _)| name);
 
             let mut print = String::new();
             for (name, var) in vars {
                 if let Some(value) = &var.value {
-                    // TODO skip if the name contains a character inappropriate for a name
                     writeln!(print, "{}={}", name, value.quote()).unwrap();
                 }
             }
@@ -300,6 +309,8 @@ mod tests {
         var.assign("Hello, world!", None).unwrap();
         let mut var = env.variables.get_or_new("baz", Scope::Global);
         var.assign(Value::array(["one", ""]), None).unwrap();
+        let mut var = env.variables.get_or_new("bad=name", Scope::Global);
+        var.assign("Oops!", None).unwrap();
 
         let args = vec![];
         let result = main(&mut env, args).now_or_never().unwrap();

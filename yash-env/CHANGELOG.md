@@ -7,11 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.1] - Unreleased
 
+### Changed
+
+- External dependency versions:
+    - yash-syntax 0.14.0 → 0.14.1
+
 ### Fixed
 
 - `system::SharedSystem::wait_for_signals` now returns signals that have already
   been caught before the call to `wait_for_signals`, if any. Previously, signals
   that have been caught were ignored.
+- `variable::VariableSet::env_c_strings` now excludes variables with a name that
+  contains a `=` character because the variable name would never be interpreted
+  correctly by the program that would receive the exported variable.
 
 ## [0.7.0] - 2025-04-26
 

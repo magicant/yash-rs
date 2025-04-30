@@ -38,6 +38,7 @@ mod tilde;
 mod token;
 mod word;
 
+pub use self::braced_param::is_name;
 pub use self::braced_param::is_name_char;
 pub use self::core::*;
 pub use self::keyword::Keyword;
@@ -46,6 +47,7 @@ pub use self::op::Operator;
 pub use self::op::ParseOperatorError;
 pub use self::op::TryFromOperatorError;
 pub use self::op::is_operator_char;
+pub use self::raw_param::is_portable_name;
 pub use self::raw_param::is_portable_name_char;
 pub use self::raw_param::is_single_char_name;
 pub use self::raw_param::is_special_parameter_char;

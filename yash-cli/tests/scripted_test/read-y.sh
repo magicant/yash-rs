@@ -231,8 +231,7 @@ test_O -d -e 4 'missing operand'
 read
 __IN__
 
-# TODO should be a command line syntax error
-test_O -d -e 4 -f 'invalid variable name'
+test_O -d -e 4 'invalid variable name'
 read a=b
 __IN__
 

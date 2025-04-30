@@ -17,6 +17,7 @@
 //! Part of the lexer that parses braced parameter expansion
 
 use super::core::WordLexer;
+use super::raw_param::is_portable_name;
 use super::raw_param::is_portable_name_char;
 use crate::parser::core::Result;
 use crate::parser::error::Error;
@@ -35,6 +36,15 @@ use std::num::IntErrorKind;
 pub fn is_name_char(c: char) -> bool {
     // TODO support other Unicode name characters
     is_portable_name_char(c)
+}
+
+/// Tests if a string is a valid name.
+///
+/// The current implementation is the same as [`is_portable_name`].
+/// Other (POSIXly non-portable) characters may be allowed in the future.
+pub fn is_name(s: &str) -> bool {
+    // TODO support other Unicode name characters
+    is_portable_name(s)
 }
 
 /// Determines the type of the parameter.

@@ -27,9 +27,22 @@ use crate::syntax::TextUnit;
 ///
 /// Returns true if the character is an ASCII alphanumeric or underscore.
 ///
-/// Note that a valid name cannot start with a digit.
+/// Note that a valid name cannot start with a digit, but this function
+/// returns true for digits as well.
+///
+/// Use [`is_portable_name`] to check if a string is a valid name.
 pub const fn is_portable_name_char(c: char) -> bool {
     matches!(c, '0'..='9' | 'A'..='Z' | '_' | 'a'..='z')
+}
+
+/// Tests if a string is a valid POSIXly-portable name.
+///
+/// Returns true if the string is non-empty, the first character is not a digit,
+/// and all characters are ASCII alphanumeric or underscore.
+///
+/// Use [`is_portable_name_char`] to check each character.
+pub fn is_portable_name(s: &str) -> bool {
+    s.starts_with(|c: char| !c.is_ascii_digit()) && s.chars().all(is_portable_name_char)
 }
 
 /// Tests if a character names a special parameter.
@@ -95,6 +108,15 @@ mod tests {
     use crate::syntax::Param;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
+
+    #[test]
+    fn test_is_portable_name() {
+        assert!(!is_portable_name(""));
+        assert!(is_portable_name("valid_name"));
+        assert!(!is_portable_name("1invalid_name"));
+        assert!(is_portable_name("valid_name_123"));
+        assert!(is_portable_name("_VALID_NAME"));
+    }
 
     #[test]
     fn lexer_raw_param_special_parameter() {

@@ -575,14 +575,29 @@ impl VariableSet {
         }
     }
 
-    /// Returns environment variables in a new vector of C string.
+    /// Returns environment variables in a new vector of C strings.
+    ///
+    /// This function returns a vector of C strings that represent the currently
+    /// defined environment variables. The strings are of the form `name=value`.
+    /// For variables that have an array value, the array items are concatenated
+    /// with a `:` between them to represent the value in a single string.
+    ///
+    /// This function ignores variables that have a name that contains a `=`,
+    /// since the `=` would be misinterpreted as the name-value separator.
+    ///
+    /// Currently, this function also ignores the variable if the name or value
+    /// contains a nul character, but this behavior may be changed in the
+    /// future.
     #[must_use]
     pub fn env_c_strings(&self) -> Vec<CString> {
         self.all_variables
             .iter()
             .filter_map(|(name, vars)| {
                 let var = &vars.last()?.variable;
-                let value = var.value.as_ref().filter(|_| var.is_exported)?;
+                if !var.is_exported || name.contains('=') {
+                    return None;
+                }
+                let value = var.value.as_ref()?;
                 let mut result = name.clone();
                 result.push('=');
                 match value {
@@ -1348,6 +1363,24 @@ mod tests {
                 c"foo=FOO".to_owned()
             ]
         );
+    }
+
+    #[test]
+    fn env_c_strings_with_equal_in_name() {
+        let mut variables = VariableSet::new();
+        let mut var = variables.get_or_new("foo", Scope::Global);
+        var.assign("FOO", None).unwrap();
+        var.export(true);
+        let mut var = variables.get_or_new("foo=bar", Scope::Global);
+        var.assign("BAR", None).unwrap();
+        var.export(true);
+
+        let mut ss = variables.env_c_strings();
+        ss.sort_unstable();
+        // The expected behavior is that the variable named "foo=bar" is
+        // ignored since the name contains `=`, and only variable "foo" is
+        // exported.
+        assert_eq!(&ss, &[c"foo=FOO".to_owned(),]);
     }
 
     #[test]

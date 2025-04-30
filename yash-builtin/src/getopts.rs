@@ -102,6 +102,7 @@
 //! The following conditions are considered errors of the built-in:
 //!
 //! - The built-in is invoked with less than two operands.
+//! - The second operand is not a valid variable name.
 //! - `$OPTIND`, `$OPTARG`, or the specified variable is read-only.
 //! - The built-in is re-invoked with different arguments or a different value
 //!   of `$OPTIND` than the previous invocation (except when `$OPTIND` is reset
@@ -161,6 +162,11 @@
 //! The getopts built-in is specified by POSIX. Only ASCII alphanumeric
 //! characters are allowed for option names, though this implementation allows
 //! any characters but `:`.
+//!
+//! The current implementation considers variable names containing a `=` as
+//! invalid names. However, more names many be considered invalid in the future.
+//! For best forward-compatibility and portability, only use portable name
+//! characters (ASCII alphanumerics and underscore).
 //!
 //! Although POSIX requires the built-in to support the Utility Syntax
 //! Guidelines 3 to 10, some implementations do not support the `--` separator
