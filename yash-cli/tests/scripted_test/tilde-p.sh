@@ -99,9 +99,19 @@ __IN__
 
 )
 
+test_oE -e 0 'empty HOME'
+HOME=
+bracket ~
+__IN__
+[]
+__OUT__
+
 (
 if
-    ! { LOGNAME="$(logname)" && export LOGNAME; }
+    logname=$(logname)
+    if [ "$logname" ]; then LOGNAME=$logname; fi
+    unset logname
+    ! { [ "${LOGNAME-}" ] && export LOGNAME; }
 then
     skip="true"
 elif

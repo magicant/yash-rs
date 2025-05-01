@@ -126,6 +126,10 @@ fn double_quote(phrase: &mut Phrase) {
 /// `Tilde(user)` expands to the `user`'s home directory.
 ///
 /// TODO: `~+`, `~-`, `~+n`, `~-n`
+///
+/// In all cases, if the result would be empty, it expands to a dummy quote to
+/// prevent it from being removed in field splitting. The quote is expected to
+/// be removed by quote removal.
 impl Expand for WordUnit {
     async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
         match self {

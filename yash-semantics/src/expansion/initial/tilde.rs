@@ -18,40 +18,56 @@
 
 use crate::expansion::attr::AttrChar;
 use crate::expansion::attr::Origin;
+use std::borrow::Cow;
 use std::ffi::CString;
 use yash_env::Env;
 use yash_env::System;
 use yash_env::variable::HOME;
 
-fn into_attr_chars<I>(i: I) -> Vec<AttrChar>
-where
-    I: IntoIterator<Item = char>,
-{
-    i.into_iter()
+/// Computes the main result of tilde expansion.
+fn expand_body<'n: 'r, 'e: 'r, 'r>(name: &'n str, env: &'e Env) -> Cow<'r, str> {
+    if name.is_empty() {
+        return Cow::Borrowed(env.variables.get_scalar(HOME).unwrap_or("~"));
+    }
+    if let Ok(name) = CString::new(name) {
+        if let Ok(Some(path)) = env.system.getpwnam_dir(&name) {
+            if let Ok(path) = path.into_unix_string().into_string() {
+                return Cow::Owned(path);
+            }
+        }
+    }
+    Cow::Owned(format!("~{name}"))
+}
+
+/// Produces the final result of tilde expansion.
+fn finish(chars: &str) -> Vec<AttrChar> {
+    let mut attr_chars: Vec<AttrChar> = chars
+        .chars()
         .map(|c| AttrChar {
             value: c,
             origin: Origin::HardExpansion,
             is_quoted: false,
             is_quoting: false,
         })
-        .collect()
+        .collect();
+
+    if attr_chars.is_empty() {
+        // add a dummy quote to keep the result from removal in field splitting
+        attr_chars.push(AttrChar {
+            value: '"',
+            origin: Origin::HardExpansion,
+            is_quoted: false,
+            is_quoting: true,
+        });
+    }
+
+    attr_chars
 }
 
 /// Performs tilde expansion.
 pub fn expand(name: &str, env: &Env) -> Vec<AttrChar> {
-    if name.is_empty() {
-        let result = env.variables.get_scalar(HOME).unwrap_or("~");
-        into_attr_chars(result.chars())
-    } else {
-        if let Ok(name) = CString::new(name) {
-            if let Ok(Some(path)) = env.system.getpwnam_dir(&name) {
-                if let Ok(path) = path.into_unix_string().into_string() {
-                    return into_attr_chars(path.chars());
-                }
-            }
-        }
-        into_attr_chars(std::iter::once('~').chain(name.chars()))
-    }
+    let chars = expand_body(name, env);
+    finish(&chars)
 }
 
 #[cfg(test)]
@@ -109,6 +125,25 @@ mod tests {
                 origin: Origin::HardExpansion,
                 is_quoted: false,
                 is_quoting: false
+            }]
+        );
+    }
+
+    #[test]
+    fn empty_name_with_empty_home() {
+        let mut env = Env::new_virtual();
+        env.variables
+            .get_or_new(HOME, Scope::Global)
+            .assign("", None)
+            .unwrap();
+
+        assert_eq!(
+            expand("", &env),
+            [AttrChar {
+                value: '"',
+                origin: Origin::HardExpansion,
+                is_quoted: false,
+                is_quoting: true
             }]
         );
     }

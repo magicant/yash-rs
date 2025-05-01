@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- When a field is made up of a single tilde expansion that expands to an empty
+  string, the expanded field is no longer removed from the command line.
+    - This is done by producing a dummy quote in the tilde expansion
+      (`impl expansion::initial::Expand for WordUnit`).
 - External dependency versions:
     - yash-syntax 0.14.0 → 0.14.1
 

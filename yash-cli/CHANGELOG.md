@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   contains an `=` character.
 - The `set` built-in without arguments no longer prints variables that have an
   invalid name.
+- When a field is made up of a single tilde expansion that expands to an empty
+  string, the expanded field is no longer removed from the command line, as
+  required by POSIX.1-2024.
 
 ## [0.4.0] - 2025-04-26
 
