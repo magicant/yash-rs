@@ -40,7 +40,13 @@ fn expand_body<'n: 'r, 'e: 'r, 'r>(name: &'n str, env: &'e Env) -> Cow<'r, str> 
 }
 
 /// Produces the final result of tilde expansion.
-fn finish(chars: &str) -> Vec<AttrChar> {
+fn finish(mut chars: &str, followed_by_slash: bool) -> Vec<AttrChar> {
+    if followed_by_slash {
+        if let Some(stripped) = chars.strip_suffix('/') {
+            chars = stripped;
+        }
+    }
+
     let mut attr_chars: Vec<AttrChar> = chars
         .chars()
         .map(|c| AttrChar {
@@ -65,9 +71,9 @@ fn finish(chars: &str) -> Vec<AttrChar> {
 }
 
 /// Performs tilde expansion.
-pub fn expand(name: &str, env: &Env) -> Vec<AttrChar> {
+pub fn expand(name: &str, followed_by_slash: bool, env: &Env) -> Vec<AttrChar> {
     let chars = expand_body(name, env);
-    finish(&chars)
+    finish(&chars, followed_by_slash)
 }
 
 #[cfg(test)]
@@ -86,7 +92,7 @@ mod tests {
             .assign("/home/foobar", None)
             .unwrap();
 
-        let expansion = expand("", &env);
+        let expansion = expand("", false, &env);
         let value: String = expansion.iter().copied().map(|c| c.value).collect();
         assert_eq!(value, "/home/foobar");
         for c in expansion {
@@ -100,7 +106,7 @@ mod tests {
     fn empty_name_with_undefined_home() {
         let env = Env::new_virtual();
         assert_eq!(
-            expand("", &env),
+            expand("", false, &env),
             [AttrChar {
                 value: '~',
                 origin: Origin::HardExpansion,
@@ -119,7 +125,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            expand("", &env),
+            expand("", false, &env),
             [AttrChar {
                 value: '~',
                 origin: Origin::HardExpansion,
@@ -138,7 +144,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            expand("", &env),
+            expand("", false, &env),
             [AttrChar {
                 value: '"',
                 origin: Origin::HardExpansion,
@@ -158,7 +164,7 @@ mod tests {
             .insert("love".to_string(), PathBuf::from("/usr/home/love"));
         let env = Env::with_system(system);
 
-        let expansion = expand("love", &env);
+        let expansion = expand("love", false, &env);
         let value: String = expansion.iter().copied().map(|c| c.value).collect();
         assert_eq!(value, "/usr/home/love");
         for c in expansion {
@@ -172,7 +178,7 @@ mod tests {
     fn non_existing_user_home_directory() {
         let env = Env::new_virtual();
 
-        let expansion = expand("love", &env);
+        let expansion = expand("love", false, &env);
         let value: String = expansion.iter().copied().map(|c| c.value).collect();
         assert_eq!(value, "~love");
         for c in expansion {
@@ -183,4 +189,43 @@ mod tests {
     }
 
     // TODO other forms of tilde expansion
+
+    #[test]
+    fn value_ending_with_slash_without_following_slash() {
+        let mut env = Env::new_virtual();
+        env.variables
+            .get_or_new(HOME, Scope::Global)
+            .assign("/home/user/", None)
+            .unwrap();
+
+        let expansion = expand("", false, &env);
+        let value: String = expansion.iter().copied().map(|c| c.value).collect();
+        assert_eq!(value, "/home/user/");
+    }
+
+    #[test]
+    fn value_not_ending_with_slash_with_following_slash() {
+        let mut env = Env::new_virtual();
+        env.variables
+            .get_or_new(HOME, Scope::Global)
+            .assign("/home/user", None)
+            .unwrap();
+
+        let expansion = expand("", true, &env);
+        let value: String = expansion.iter().copied().map(|c| c.value).collect();
+        assert_eq!(value, "/home/user");
+    }
+
+    #[test]
+    fn value_ending_with_slash_with_following_slash() {
+        let mut env = Env::new_virtual();
+        env.variables
+            .get_or_new(HOME, Scope::Global)
+            .assign("/home/user/", None)
+            .unwrap();
+
+        let expansion = expand("", true, &env);
+        let value: String = expansion.iter().copied().map(|c| c.value).collect();
+        assert_eq!(value, "/home/user");
+    }
 }

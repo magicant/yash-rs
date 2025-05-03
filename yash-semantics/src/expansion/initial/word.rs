@@ -148,7 +148,7 @@ impl Expand for WordUnit {
             Tilde {
                 name,
                 followed_by_slash,
-            } => Ok(super::tilde::expand(name, env.inner).into()),
+            } => Ok(super::tilde::expand(name, *followed_by_slash, env.inner).into()),
         }
     }
 }
