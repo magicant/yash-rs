@@ -78,7 +78,7 @@ impl Word {
     /// # use yash_syntax::syntax::{Word, WordUnit::Tilde};
     /// let mut word = Word::from_str("~").unwrap();
     /// word.parse_tilde_front();
-    /// assert_eq!(word.units, [Tilde("".to_string())]);
+    /// assert_eq!(word.units, [Tilde { name: "".to_string(), followed_by_slash: false }]);
     /// ```
     ///
     /// ```
@@ -86,7 +86,7 @@ impl Word {
     /// # use yash_syntax::syntax::{Word, WordUnit::Tilde};
     /// let mut word = Word::from_str("~foo").unwrap();
     /// word.parse_tilde_front();
-    /// assert_eq!(word.units, [Tilde("foo".to_string())]);
+    /// assert_eq!(word.units, [Tilde { name: "foo".to_string(), followed_by_slash: false }]);
     /// ```
     ///
     /// If there is no leading tilde, `self.units` will have the same content
@@ -116,7 +116,13 @@ impl Word {
     #[inline]
     pub fn parse_tilde_front(&mut self) {
         if let Some((len, name)) = parse_tilde(&self.units, false) {
-            self.units.splice(..len, std::iter::once(Tilde(name)));
+            self.units.splice(
+                ..len,
+                std::iter::once(Tilde {
+                    name,
+                    followed_by_slash: false,
+                }),
+            );
         }
     }
 
@@ -135,13 +141,13 @@ impl Word {
     /// assert_eq!(
     ///     word.units,
     ///     [
-    ///         Tilde("".to_string()),
+    ///         Tilde { name: "".to_string(), followed_by_slash: false },
     ///         Unquoted(Literal(':')),
-    ///         Tilde("a".to_string()),
+    ///         Tilde { name: "a".to_string(), followed_by_slash: false },
     ///         Unquoted(Literal('/')),
     ///         Unquoted(Literal('b')),
     ///         Unquoted(Literal(':')),
-    ///         Tilde("c".to_string()),
+    ///         Tilde { name: "c".to_string(), followed_by_slash: false },
     ///     ]
     /// );
     /// ```
@@ -175,11 +181,11 @@ impl Word {
     ///         Unquoted(Literal('=')),
     ///         // This tilde is parsed because it is at index 2,
     ///         // even though it is not after a colon.
-    ///         Tilde("a".to_string()),
+    ///         Tilde { name: "a".to_string(), followed_by_slash: false },
     ///         Unquoted(Literal('/')),
     ///         Unquoted(Literal('b')),
     ///         Unquoted(Literal(':')),
-    ///         Tilde("c".to_string()),
+    ///         Tilde { name: "c".to_string(), followed_by_slash: false },
     ///     ]
     /// );
     /// ```
@@ -191,7 +197,13 @@ impl Word {
         loop {
             // Parse a tilde expansion at index `i`.
             if let Some((len, name)) = parse_tilde(&self.units[i..], true) {
-                self.units.splice(i..i + len, std::iter::once(Tilde(name)));
+                self.units.splice(
+                    i..i + len,
+                    std::iter::once(Tilde {
+                        name,
+                        followed_by_slash: false,
+                    }),
+                );
                 i += 1;
             }
 
@@ -247,7 +259,13 @@ mod tests {
         let input = Word::from_str("~").unwrap();
         let result = parse_tilde_front(&input);
         assert_eq!(result.location, input.location);
-        assert_eq!(result.units, [Tilde("".to_string())]);
+        assert_eq!(
+            result.units,
+            [Tilde {
+                name: "".to_string(),
+                followed_by_slash: false
+            }]
+        );
     }
 
     #[test]
@@ -255,7 +273,13 @@ mod tests {
         let input = Word::from_str("~foo").unwrap();
         let result = parse_tilde_front(&input);
         assert_eq!(result.location, input.location);
-        assert_eq!(result.units, [Tilde("foo".to_string())]);
+        assert_eq!(
+            result.units,
+            [Tilde {
+                name: "foo".to_string(),
+                followed_by_slash: false
+            }]
+        );
     }
 
     #[test]
@@ -266,7 +290,10 @@ mod tests {
         assert_eq!(
             result.units,
             [
-                Tilde("bar".to_string()),
+                Tilde {
+                    name: "bar".to_string(),
+                    followed_by_slash: false, // FIXME: this should be true
+                },
                 Unquoted(Literal('/')),
                 SingleQuote("".to_string()),
             ]
@@ -278,7 +305,13 @@ mod tests {
         let input = Word::from_str("~bar:baz").unwrap();
         let result = parse_tilde_front(&input);
         assert_eq!(result.location, input.location);
-        assert_eq!(result.units, [Tilde("bar:baz".to_string())]);
+        assert_eq!(
+            result.units,
+            [Tilde {
+                name: "bar:baz".to_string(),
+                followed_by_slash: false
+            }]
+        );
     }
 
     #[test]
@@ -364,7 +397,10 @@ mod tests {
         assert_eq!(
             result.units,
             [
-                Tilde("a".to_string()),
+                Tilde {
+                    name: "a".to_string(),
+                    followed_by_slash: false // FIXME: this should be true
+                },
                 Unquoted(Literal('/')),
                 Unquoted(Literal('b')),
                 Unquoted(Literal(':')),
@@ -396,7 +432,13 @@ mod tests {
         let input = Word::from_str("~").unwrap();
         let result = parse_tilde_everywhere(&input);
         assert_eq!(result.location, input.location);
-        assert_eq!(result.units, [Tilde("".to_string())]);
+        assert_eq!(
+            result.units,
+            [Tilde {
+                name: "".to_string(),
+                followed_by_slash: false
+            }]
+        );
     }
 
     #[test]
@@ -404,7 +446,13 @@ mod tests {
         let input = Word::from_str("~foo").unwrap();
         let result = parse_tilde_everywhere(&input);
         assert_eq!(result.location, input.location);
-        assert_eq!(result.units, [Tilde("foo".to_string())]);
+        assert_eq!(
+            result.units,
+            [Tilde {
+                name: "foo".to_string(),
+                followed_by_slash: false
+            }]
+        );
     }
 
     #[test]
@@ -415,7 +463,10 @@ mod tests {
         assert_eq!(
             result.units,
             [
-                Tilde("bar".to_string()),
+                Tilde {
+                    name: "bar".to_string(),
+                    followed_by_slash: false
+                },
                 Unquoted(Literal('/')),
                 SingleQuote("".to_string()),
             ]
@@ -430,7 +481,10 @@ mod tests {
         assert_eq!(
             result.units,
             [
-                Tilde("bar".to_string()),
+                Tilde {
+                    name: "bar".to_string(),
+                    followed_by_slash: false
+                },
                 Unquoted(Literal(':')),
                 DoubleQuote(Text(vec![])),
             ]
@@ -490,7 +544,13 @@ mod tests {
         assert_eq!(result.location, input.location);
         assert_eq!(
             result.units,
-            [Unquoted(Literal(':')), Tilde("".to_string())]
+            [
+                Unquoted(Literal(':')),
+                Tilde {
+                    name: "".to_string(),
+                    followed_by_slash: false
+                }
+            ]
         );
 
         let input = Word::from_str(":~foo/a:~bar").unwrap();
@@ -500,11 +560,17 @@ mod tests {
             result.units,
             [
                 Unquoted(Literal(':')),
-                Tilde("foo".to_string()),
+                Tilde {
+                    name: "foo".to_string(),
+                    followed_by_slash: false // FIXME: this should be true
+                },
                 Unquoted(Literal('/')),
                 Unquoted(Literal('a')),
                 Unquoted(Literal(':')),
-                Tilde("bar".to_string()),
+                Tilde {
+                    name: "bar".to_string(),
+                    followed_by_slash: false
+                },
             ]
         );
 
@@ -514,16 +580,25 @@ mod tests {
         assert_eq!(
             result.units,
             [
-                Tilde("a".to_string()),
+                Tilde {
+                    name: "a".to_string(),
+                    followed_by_slash: false, // FIXME: this should be true
+                },
                 Unquoted(Literal('/')),
                 Unquoted(Literal('b')),
                 Unquoted(Literal(':')),
-                Tilde("c".to_string()),
+                Tilde {
+                    name: "c".to_string(),
+                    followed_by_slash: false, // FIXME: this should be true
+                },
                 Unquoted(Literal('/')),
                 Unquoted(Literal('d')),
                 Unquoted(Literal(':')),
                 Unquoted(Literal(':')),
-                Tilde("".to_string()),
+                Tilde {
+                    name: "".to_string(),
+                    followed_by_slash: false
+                },
             ]
         );
     }

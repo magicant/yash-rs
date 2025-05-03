@@ -131,7 +131,13 @@ mod tests {
         let mut lexer = Lexer::with_code("~a:~");
 
         let t = lexer.token().now_or_never().unwrap().unwrap();
-        assert_eq!(t.word.units, [WordUnit::Tilde("a:~".to_string())]);
+        assert_eq!(
+            t.word.units,
+            [WordUnit::Tilde {
+                name: "a:~".to_string(),
+                followed_by_slash: false
+            }]
+        );
     }
 
     #[test]

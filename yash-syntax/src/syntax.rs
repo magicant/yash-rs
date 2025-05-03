@@ -412,9 +412,19 @@ pub enum WordUnit {
     /// String surrounded with a pair of single quotations and preceded by a dollar sign
     DollarSingleQuote(EscapedString),
     /// Tilde expansion
-    ///
-    /// The `String` value does not contain the initial tilde.
-    Tilde(String),
+    Tilde {
+        /// User name part of the tilde expansion
+        ///
+        /// This is the string that follows the tilde in the source code, up to
+        /// (but not including) the following delimiter. The name may be empty.
+        name: String,
+        /// Whether the tilde expansion is followed by a slash
+        ///
+        /// This value is `true` if and only if this word unit is followed by
+        /// `WordUnit::Unquoted(TextUnit::Literal('/'))`. It affects the
+        /// expansion to directory names that end with a slash.
+        followed_by_slash: bool,
+    },
 }
 
 pub use WordUnit::*;

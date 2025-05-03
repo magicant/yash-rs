@@ -400,7 +400,13 @@ mod tests {
 
         let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
-            assert_eq!(switch.word.units, [WordUnit::Tilde("".to_string())]);
+            assert_eq!(
+                switch.word.units,
+                [WordUnit::Tilde {
+                    name: "".to_string(),
+                    followed_by_slash: false
+                }]
+            );
         });
     }
 
@@ -540,7 +546,13 @@ mod tests {
 
         let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Trim(trim) => {
-            assert_eq!(trim.pattern.units, [WordUnit::Tilde("".to_string())]);
+            assert_eq!(
+                trim.pattern.units,
+                [WordUnit::Tilde {
+                    name: "".to_string(),
+                    followed_by_slash: false
+                }]
+            );
         });
     }
 

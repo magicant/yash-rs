@@ -649,7 +649,13 @@ mod tests {
             .unwrap();
         assert_matches!(result.units[..], [Unquoted(BracedParam(ref param))] => {
             assert_matches!(param.modifier, Modifier::Switch(ref switch) => {
-                assert_eq!(switch.word.units, [Tilde("".to_string())]);
+                assert_eq!(
+                    switch.word.units,
+                    [Tilde {
+                        name: "".to_string(),
+                        followed_by_slash: false,
+                    }]
+                );
             });
         });
     }

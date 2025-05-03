@@ -457,8 +457,8 @@ impl Unquote for WordUnit {
             }
             DoubleQuote(inner) => inner.write_unquoted(w),
             DollarSingleQuote(inner) => inner.write_unquoted(w),
-            Tilde(s) => {
-                write!(w, "~{s}")?;
+            Tilde { name, .. } => {
+                write!(w, "~{name}")?;
                 Ok(false)
             }
         }
@@ -927,7 +927,10 @@ mod tests {
         assert_eq!(word.to_string_if_literal(), None);
 
         let word = Word {
-            units: vec![Tilde("foo".to_string())],
+            units: vec![Tilde {
+                name: "foo".to_string(),
+                followed_by_slash: false,
+            }],
             ..word
         };
         assert_eq!(word.to_string_if_literal(), None);
@@ -976,9 +979,15 @@ mod tests {
             assert_eq!(
                 value.units,
                 [
-                    WordUnit::Tilde("".to_string()),
+                    WordUnit::Tilde{
+                        name: "".to_string(),
+                        followed_by_slash: false,
+                    },
                     WordUnit::Unquoted(TextUnit::Literal(':')),
-                    WordUnit::Tilde("b".to_string()),
+                    WordUnit::Tilde {
+                        name: "b".to_string(),
+                        followed_by_slash: false,
+                    },
                 ]
             );
         });

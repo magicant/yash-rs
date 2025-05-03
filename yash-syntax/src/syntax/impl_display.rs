@@ -165,7 +165,7 @@ impl fmt::Display for WordUnit {
             SingleQuote(s) => write!(f, "'{s}'"),
             DoubleQuote(content) => write!(f, "\"{content}\""),
             DollarSingleQuote(content) => write!(f, "$'{content}'"),
-            Tilde(s) => write!(f, "~{s}"),
+            Tilde { name, .. } => write!(f, "~{name}"),
         }
     }
 }
@@ -621,9 +621,15 @@ mod tests {
         ]));
         assert_eq!(dollar_single_quote.to_string(), r"$'A\\'");
 
-        let tilde = Tilde("".to_string());
+        let tilde = Tilde {
+            name: "".to_string(),
+            followed_by_slash: false,
+        };
         assert_eq!(tilde.to_string(), "~");
-        let tilde = Tilde("foo".to_string());
+        let tilde = Tilde {
+            name: "foo".to_string(),
+            followed_by_slash: true,
+        };
         assert_eq!(tilde.to_string(), "~foo");
     }
 

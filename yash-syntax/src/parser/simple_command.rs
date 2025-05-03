@@ -250,9 +250,15 @@ mod tests {
             [
                 WordUnit::Unquoted(TextUnit::Literal('~')),
                 WordUnit::Unquoted(TextUnit::Literal('=')),
-                WordUnit::Tilde("".to_string()),
+                WordUnit::Tilde {
+                    name: "".to_string(),
+                    followed_by_slash: false
+                },
                 WordUnit::Unquoted(TextUnit::Literal(':')),
-                WordUnit::Tilde("b".to_string()),
+                WordUnit::Tilde {
+                    name: "b".to_string(),
+                    followed_by_slash: false
+                },
             ]
         );
         assert_eq!(mode, ExpansionMode::Single);

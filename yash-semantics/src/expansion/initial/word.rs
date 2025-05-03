@@ -145,7 +145,10 @@ impl Expand for WordUnit {
                 Ok(phrase)
             }
             DollarSingleQuote(string) => Ok(dollar_single_quote(&string.unquote().0)),
-            Tilde(name) => Ok(super::tilde::expand(name, env.inner).into()),
+            Tilde {
+                name,
+                followed_by_slash,
+            } => Ok(super::tilde::expand(name, env.inner).into()),
         }
     }
 }
