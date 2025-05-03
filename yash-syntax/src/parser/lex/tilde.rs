@@ -30,14 +30,15 @@ use crate::syntax::WordUnit::{self, Tilde, Unquoted};
 /// slash character (or a colon character if `delimit_at_colon` is `true`).
 ///
 /// If successful, this function returns a tuple of the length of the parsed
-/// word units (including the tilde character) and the name of the tilde
-/// expansion (excluding the tilde character and the delimiter). Note that the
-/// name may be empty.
+/// word units (including the tilde character), the name of the tilde
+/// expansion (excluding the tilde character and the delimiter), and a Boolean
+/// indicating whether the name is followed by a slash character.
+/// Note that the name may be empty.
 ///
 /// If the first word unit is not an unquoted tilde character or the name is
 /// delimited by a word unit other than an unquoted literal character, this
 /// function returns `None`.
-fn parse_tilde<'a, I>(units: I, delimit_at_colon: bool) -> Option<(usize, String)>
+fn parse_tilde<'a, I>(units: I, delimit_at_colon: bool) -> Option<(usize, String, bool)>
 where
     I: IntoIterator<Item = &'a WordUnit>,
 {
@@ -51,7 +52,7 @@ where
 
     for unit in units {
         match unit {
-            Unquoted(Literal('/')) => break,
+            Unquoted(Literal('/')) => return Some((count, name, true)),
             Unquoted(Literal(':')) if delimit_at_colon => break,
             Unquoted(Literal(c)) => {
                 name.push(*c);
@@ -61,7 +62,7 @@ where
         }
     }
 
-    Some((count, name))
+    Some((count, name, false))
 }
 
 impl Word {
@@ -115,12 +116,12 @@ impl Word {
     /// delimiters.
     #[inline]
     pub fn parse_tilde_front(&mut self) {
-        if let Some((len, name)) = parse_tilde(&self.units, false) {
+        if let Some((len, name, followed_by_slash)) = parse_tilde(&self.units, false) {
             self.units.splice(
                 ..len,
                 std::iter::once(Tilde {
                     name,
-                    followed_by_slash: false,
+                    followed_by_slash,
                 }),
             );
         }
@@ -143,7 +144,7 @@ impl Word {
     ///     [
     ///         Tilde { name: "".to_string(), followed_by_slash: false },
     ///         Unquoted(Literal(':')),
-    ///         Tilde { name: "a".to_string(), followed_by_slash: false },
+    ///         Tilde { name: "a".to_string(), followed_by_slash: true },
     ///         Unquoted(Literal('/')),
     ///         Unquoted(Literal('b')),
     ///         Unquoted(Literal(':')),
@@ -181,7 +182,7 @@ impl Word {
     ///         Unquoted(Literal('=')),
     ///         // This tilde is parsed because it is at index 2,
     ///         // even though it is not after a colon.
-    ///         Tilde { name: "a".to_string(), followed_by_slash: false },
+    ///         Tilde { name: "a".to_string(), followed_by_slash: true },
     ///         Unquoted(Literal('/')),
     ///         Unquoted(Literal('b')),
     ///         Unquoted(Literal(':')),
@@ -196,12 +197,12 @@ impl Word {
         let mut i = index;
         loop {
             // Parse a tilde expansion at index `i`.
-            if let Some((len, name)) = parse_tilde(&self.units[i..], true) {
+            if let Some((len, name, followed_by_slash)) = parse_tilde(&self.units[i..], true) {
                 self.units.splice(
                     i..i + len,
                     std::iter::once(Tilde {
                         name,
-                        followed_by_slash: false,
+                        followed_by_slash,
                     }),
                 );
                 i += 1;
@@ -292,7 +293,7 @@ mod tests {
             [
                 Tilde {
                     name: "bar".to_string(),
-                    followed_by_slash: false, // FIXME: this should be true
+                    followed_by_slash: true,
                 },
                 Unquoted(Literal('/')),
                 SingleQuote("".to_string()),
@@ -399,7 +400,7 @@ mod tests {
             [
                 Tilde {
                     name: "a".to_string(),
-                    followed_by_slash: false // FIXME: this should be true
+                    followed_by_slash: true,
                 },
                 Unquoted(Literal('/')),
                 Unquoted(Literal('b')),
@@ -465,7 +466,7 @@ mod tests {
             [
                 Tilde {
                     name: "bar".to_string(),
-                    followed_by_slash: false
+                    followed_by_slash: true
                 },
                 Unquoted(Literal('/')),
                 SingleQuote("".to_string()),
@@ -562,7 +563,7 @@ mod tests {
                 Unquoted(Literal(':')),
                 Tilde {
                     name: "foo".to_string(),
-                    followed_by_slash: false // FIXME: this should be true
+                    followed_by_slash: true,
                 },
                 Unquoted(Literal('/')),
                 Unquoted(Literal('a')),
@@ -582,14 +583,14 @@ mod tests {
             [
                 Tilde {
                     name: "a".to_string(),
-                    followed_by_slash: false, // FIXME: this should be true
+                    followed_by_slash: true,
                 },
                 Unquoted(Literal('/')),
                 Unquoted(Literal('b')),
                 Unquoted(Literal(':')),
                 Tilde {
                     name: "c".to_string(),
-                    followed_by_slash: false, // FIXME: this should be true
+                    followed_by_slash: true,
                 },
                 Unquoted(Literal('/')),
                 Unquoted(Literal('d')),
