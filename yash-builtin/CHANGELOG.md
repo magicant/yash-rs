@@ -5,7 +5,7 @@ All notable changes to `yash-builtin` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.1] - Unreleased
+## [0.8.0] - 2025-05-03
 
 ### Added
 
@@ -15,7 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `getopts::report::Error` enum now has the `InvalidVariableName` variant, which
+  indicates that the variable name is invalid.
 - External dependency versions:
+    - yash-env 0.7.0 → 0.7.1
+    - yash-semantics (optional) 0.7.0 → 0.7.1
     - yash-syntax 0.14.0 → 0.14.1
 
 ### Fixed
@@ -305,7 +309,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
-[0.7.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.7.1
+[0.8.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.8.0
 [0.7.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.7.0
 [0.6.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.6.0
 [0.5.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.5.0
