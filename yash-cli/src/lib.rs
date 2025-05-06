@@ -14,10 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! This is a library crate that implements the command-line frontend for the
-//! yash shell. It is used by the `yash3` binary crate to provide the shell
-//! functionality. Currently, this crate is not intended to be used as a library
-//! by other crates.
+//! This is an internal library crate for the yash shell. Currently, **this
+//! crate is not intended to be used as a library by other crates. No part of
+//! this crate is covered by semantic versioning.**
 //!
 //! The entry point for the shell is the [`main`] function, which is to be used
 //! as the `main` function in the binary crate. The function sets up the shell
