@@ -27,6 +27,7 @@ use crate::syntax::Fd;
 use crate::syntax::HereDoc;
 use crate::syntax::Redir;
 use crate::syntax::RedirBody;
+use crate::syntax::RedirFd;
 use crate::syntax::RedirOp;
 use crate::syntax::Word;
 use std::cell::OnceCell;
@@ -106,7 +107,7 @@ impl Parser<'_, '_> {
         let fd = if self.peek_token().await?.id == IoNumber {
             let token = self.take_token_raw().await?;
             if let Ok(fd) = token.word.to_string().parse() {
-                Some(Fd(fd))
+                Some(RedirFd::Fd(Fd(fd)))
             } else {
                 return Err(Error {
                     cause: SyntaxError::FdOutOfRange.into(),
@@ -321,7 +322,7 @@ mod tests {
 
         let result = parser.redirection().now_or_never().unwrap();
         let redir = result.unwrap().unwrap();
-        assert_eq!(redir.fd, Some(Fd(12)));
+        assert_eq!(redir.fd, Some(RedirFd::Fd(Fd(12))));
         assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::FileIn);
             assert_eq!(operand.to_string(), "/dev/null")

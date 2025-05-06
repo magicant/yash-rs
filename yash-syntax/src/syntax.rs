@@ -492,6 +492,17 @@ impl Fd {
     pub const STDERR: Fd = Fd(2);
 }
 
+/// Specification of a file descriptor to which a redirection is applied
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RedirFd {
+    /// Raw file descriptor number
+    Fd(Fd),
+    /// Variable name surrounded by braces
+    ///
+    /// The word should begin with a `{` and end with a `}`.
+    Location(Word),
+}
+
 /// Redirection operators
 ///
 /// This enum defines the redirection operator types except here-document and
@@ -516,6 +527,22 @@ pub enum RedirOp {
     Pipe,
     /// `<<<` (here-string)
     String,
+}
+
+impl RedirOp {
+    /// Returns the default file descriptor for this redirection operator.
+    ///
+    /// The default file descriptor is the one that is used when a target FD is
+    /// not specified in the redirection. It is [`Fd::STDIN`] for operators that
+    /// start with `<` and [`Fd::STDOUT`] for operators that start with `>`.
+    #[must_use]
+    pub const fn default_fd(&self) -> Fd {
+        use RedirOp::*;
+        match self {
+            FileIn | FileInOut | FdIn | String => Fd::STDIN,
+            FileOut | FileAppend | FileClobber | FdOut | Pipe => Fd::STDOUT,
+        }
+    }
 }
 
 /// Here-document
@@ -568,8 +595,8 @@ impl RedirBody {
 /// Redirection
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Redir {
-    /// File descriptor that is modified by this redirection
-    pub fd: Option<Fd>,
+    /// File descriptor to which the redirection is applied
+    pub fd: Option<RedirFd>,
     /// Nature of the resulting file descriptor
     pub body: RedirBody,
 }
@@ -577,17 +604,30 @@ pub struct Redir {
 impl Redir {
     /// Computes the file descriptor that is modified by this redirection.
     ///
-    /// If `self.fd` is `Some(_)`, the `RawFd` value is returned intact. Otherwise,
-    /// the default file descriptor is selected depending on the type of `self.body`.
+    /// If `self.fd` is `Some(RedirFd::Fd(_))`, the `Fd` value is returned
+    /// intact. For `Some(RedirFd::Location(_))`, the returned value is
+    /// `Fd(-1)`. Otherwise, the default file descriptor is selected depending
+    /// on the type of `self.body`.
+    ///
+    /// # Deprecation
+    ///
+    /// This method is deprecated because it does not return a meaningful value
+    /// for `RedirFd::Location`. The actual FD used with `RedirFd::Location` is
+    /// supposed to be determined at runtime, so the value returned by this
+    /// method is not useful.
+    ///
+    /// To compute the default file descriptor from a redirection operator,
+    /// use [`RedirOp::default_fd`].
+    #[deprecated = "this method does not return a meaningful value for `RedirFd::Location`"]
     pub fn fd_or_default(&self) -> Fd {
-        use RedirOp::*;
-        self.fd.unwrap_or(match self.body {
-            RedirBody::Normal { operator, .. } => match operator {
-                FileIn | FileInOut | FdIn | String => Fd::STDIN,
-                FileOut | FileAppend | FileClobber | FdOut | Pipe => Fd::STDOUT,
+        match self.fd {
+            Some(RedirFd::Fd(fd)) => fd,
+            Some(RedirFd::Location(_)) => Fd(-1),
+            None => match self.body {
+                RedirBody::Normal { operator, .. } => operator.default_fd(),
+                RedirBody::HereDoc { .. } => Fd::STDIN,
             },
-            RedirBody::HereDoc { .. } => Fd::STDIN,
-        })
+        }
     }
 }
 

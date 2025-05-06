@@ -197,6 +197,15 @@ impl fmt::Display for Fd {
     }
 }
 
+impl fmt::Display for RedirFd {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RedirFd::Fd(fd) => fd.fmt(f),
+            RedirFd::Location(word) => word.fmt(f),
+        }
+    }
+}
+
 impl fmt::Display for RedirOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         Operator::from(*self).fmt(f)
@@ -227,7 +236,7 @@ impl fmt::Display for RedirBody {
 
 impl fmt::Display for Redir {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(fd) = self.fd {
+        if let Some(fd) = &self.fd {
             write!(f, "{fd}")?;
         }
         write!(f, "{}", self.body)
@@ -718,15 +727,29 @@ mod tests {
         };
         assert_eq!(redir.to_string(), "<<END");
         let redir = Redir {
-            fd: Some(Fd(0)),
+            fd: Some(RedirFd::Fd(Fd(0))),
             ..redir
         };
         assert_eq!(redir.to_string(), "0<<END");
         let redir = Redir {
-            fd: Some(Fd(9)),
+            fd: Some(RedirFd::Fd(Fd(9))),
             ..redir
         };
         assert_eq!(redir.to_string(), "9<<END");
+        let redir = Redir {
+            fd: Some(RedirFd::Location(Word::from_str("{foo}").unwrap())),
+            ..redir
+        };
+        assert_eq!(redir.to_string(), "{foo}<<END");
+
+        let redir = Redir {
+            body: RedirBody::Normal {
+                operator: RedirOp::FileClobber,
+                operand: Word::from_str("example.txt").unwrap(),
+            },
+            ..redir
+        };
+        assert_eq!(redir.to_string(), "{foo}>|example.txt");
     }
 
     #[test]
@@ -775,7 +798,7 @@ mod tests {
         assert_eq!(command.to_string(), "<<END");
 
         Rc::make_mut(&mut command.redirs).push(Redir {
-            fd: Some(Fd(1)),
+            fd: Some(RedirFd::Fd(Fd(1))),
             body: RedirBody::from(HereDoc {
                 delimiter: Word::from_str("here").unwrap(),
                 remove_tabs: true,

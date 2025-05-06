@@ -617,7 +617,7 @@ mod tests {
     fn redir_from_str() {
         block_on(async {
             let parse: Redir = "2> /dev/null".parse().unwrap();
-            assert_eq!(parse.fd, Some(Fd(2)));
+            assert_eq!(parse.fd, Some(RedirFd::Fd(Fd(2))));
             assert_matches!(parse.body, RedirBody::Normal { operator, operand } => {
                 assert_eq!(operator, RedirOp::FileOut);
                 assert_eq!(operand.to_string(), "/dev/null");

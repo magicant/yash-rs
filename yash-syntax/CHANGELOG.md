@@ -7,12 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.15.0] - Unreleased
 
+### Added
+
+- The `syntax::RedirFd` enum is added to represent the file descriptor in
+  redirections.
+- The `syntax::RedirOp::default_fd` method is added to return the default file
+  descriptor for the redirection operator.
+
 ### Changed
 
 - The associated value of the `syntax::WordUnit::Tilde` enum variant has been
   changed to have two named fields: `name: String` and `followed_by_slash: bool`.
   This is needed to support correct adjustment of the number of slashes in the
   tilde expansion that is followed by a slash.
+- The `fd` field of the `syntax::Redir` struct is now of type `Option<RedirFd>`
+  instead of `Option<Fd>`. This change is made to allow the parser to support
+  the braced location syntax for redirections, such as `{foo}>bar`.
+
+### Deprecated
+
+- The `syntax::Redir::fd_or_default` method is deprecated because it does not
+  return a meaningful value for `syntax::RedirFd::Location`.
+    - You can use the `syntax::RedirFd::default_fd` method to get the default file
+      descriptor for the redirection operator.
 
 ## [0.14.1] - 2025-05-03
 

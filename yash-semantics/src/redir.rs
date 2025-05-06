@@ -678,6 +678,7 @@ mod tests {
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::Inode;
     use yash_env_test_helper::in_virtual_system;
+    use yash_syntax::syntax::RedirFd;
     use yash_syntax::syntax::Text;
 
     /// Returns a virtual system with a file descriptor limit.
@@ -944,7 +945,7 @@ mod tests {
             env.builtins.insert("return", return_builtin());
             let mut env = RedirGuard::new(&mut env);
             let redir = Redir {
-                fd: Some(Fd(4)),
+                fd: Some(RedirFd::Fd(Fd(4))),
                 body: RedirBody::HereDoc(Rc::new(HereDoc {
                     delimiter: "-END".parse().unwrap(),
                     remove_tabs: false,
@@ -988,7 +989,7 @@ mod tests {
         let mut env = RedirGuard::new(&mut env);
 
         let redir = Redir {
-            fd: Some(Fd(4)),
+            fd: Some(RedirFd::Fd(Fd(4))),
             body: RedirBody::HereDoc(Rc::new(HereDoc {
                 delimiter: r"-\END".parse().unwrap(),
                 remove_tabs: false,
@@ -1001,7 +1002,7 @@ mod tests {
             .unwrap();
 
         let redir = Redir {
-            fd: Some(Fd(5)),
+            fd: Some(RedirFd::Fd(Fd(5))),
             body: RedirBody::HereDoc(Rc::new(HereDoc {
                 delimiter: r"EOF".parse().unwrap(),
                 remove_tabs: false,
