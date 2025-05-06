@@ -103,10 +103,10 @@ impl Parser<'_, '_> {
                 Token(_) | IoNumber => {
                     values.push(next.word);
                 }
-                Operator(Semicolon) | Operator(Newline) => {
+                Operator(Semicolon) | Operator(Newline) | EndOfInput => {
                     return Ok((Some(values), opening_location));
                 }
-                _ => {
+                Operator(_) => {
                     let cause = SyntaxError::InvalidForValue.into();
                     let location = next.word.location;
                     return Err(Error { cause, location });

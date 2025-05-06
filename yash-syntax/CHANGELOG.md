@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   changed to have two named fields: `name: String` and `followed_by_slash: bool`.
   This is needed to support correct adjustment of the number of slashes in the
   tilde expansion that is followed by a slash.
+- The for loop parser (`parser::Parser::for_loop`) now returns
+  `SyntaxError::MissingForBody` instead of `SyntaxError::InvalidForValue` if it
+  encounters the end of the input while parsing the word list of the for loop.
+  This should provide a more accurate error message for this case.
 
 ## [0.14.1] - 2025-05-03
 
