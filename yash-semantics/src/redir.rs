@@ -468,7 +468,17 @@ async fn perform(
     redir: &Redir,
     xtrace: Option<&mut XTrace>,
 ) -> Result<(SavedFd, Option<ExitStatus>), Error> {
+    // We continue to use this deprecated method
+    // until we substantially support the `RedirFd::Location` variant.
+    #[allow(deprecated)]
     let target_fd = redir.fd_or_default();
+    if target_fd.0 < 0 {
+        // So, we don't support the `RedirFd::Location` variant yet.
+        return Err(Error {
+            cause: ErrorCause::UnsupportedRedirFdLocation,
+            location: redir.body.operand().location.clone(),
+        });
+    }
 
     // Make sure target_fd doesn't have the CLOEXEC flag
     if is_cloexec(env, target_fd) {
