@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.15.0] - Unreleased
 
+### Added
+
+- The `parser::lex::TokenId` enum now has the `IoLocation` variant.
+
 ### Changed
 
 - The associated value of the `syntax::WordUnit::Tilde` enum variant has been

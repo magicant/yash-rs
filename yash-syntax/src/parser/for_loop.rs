@@ -23,7 +23,7 @@ use super::error::Error;
 use super::error::SyntaxError;
 use super::lex::Keyword::{Do, For, In};
 use super::lex::Operator::{Newline, Semicolon};
-use super::lex::TokenId::{EndOfInput, IoNumber, Operator, Token};
+use super::lex::TokenId::{EndOfInput, IoLocation, IoNumber, Operator, Token};
 use crate::source::Location;
 use crate::syntax::CompoundCommand;
 use crate::syntax::List;
@@ -46,7 +46,7 @@ impl Parser<'_, '_> {
                 let location = name.word.location;
                 return Err(Error { cause, location });
             }
-            Token(_) | IoNumber => (),
+            Token(_) | IoNumber | IoLocation => (),
         }
 
         // TODO reject non-portable names in POSIXly-correct mode
@@ -100,7 +100,7 @@ impl Parser<'_, '_> {
         loop {
             let next = self.take_token_auto(&[]).await?;
             match next.id {
-                Token(_) | IoNumber => {
+                Token(_) | IoNumber | IoLocation => {
                     values.push(next.word);
                 }
                 Operator(Semicolon) | Operator(Newline) | EndOfInput => {

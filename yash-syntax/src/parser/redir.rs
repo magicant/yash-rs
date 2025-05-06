@@ -21,7 +21,7 @@ use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
 use super::lex::Operator::{LessLess, LessLessDash};
-use super::lex::TokenId::{EndOfInput, IoNumber, Operator, Token};
+use super::lex::TokenId::{EndOfInput, IoLocation, IoNumber, Operator, Token};
 use crate::source::Location;
 use crate::syntax::Fd;
 use crate::syntax::HereDoc;
@@ -39,7 +39,7 @@ impl Parser<'_, '_> {
         match operand.id {
             Token(_) => (),
             Operator(_) | EndOfInput => return Ok(Err(operand.word.location)),
-            IoNumber => (), // TODO reject if POSIXly-correct
+            IoNumber | IoLocation => (), // TODO reject if POSIXly-correct
         }
         Ok(Ok(operand.word))
     }
