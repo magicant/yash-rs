@@ -5,6 +5,15 @@ All notable changes to `yash-syntax` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - Unreleased
+
+### Changed
+
+- The associated value of the `syntax::WordUnit::Tilde` enum variant has been
+  changed to have two named fields: `name: String` and `followed_by_slash: bool`.
+  This is needed to support correct adjustment of the number of slashes in the
+  tilde expansion that is followed by a slash.
+
 ## [0.14.1] - 2025-05-03
 
 ### Added
@@ -449,6 +458,7 @@ command.
 - Functionalities to parse POSIX shell scripts
 - Alias substitution support
 
+[0.15.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.15.0
 [0.14.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.14.1
 [0.14.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.14.0
 [0.13.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.13.0
