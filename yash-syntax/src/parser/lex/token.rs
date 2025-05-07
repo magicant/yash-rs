@@ -25,7 +25,9 @@ use super::core::is_blank;
 use super::op::is_operator_char;
 use crate::parser::core::Result;
 use crate::syntax::MaybeLiteral;
+use crate::syntax::TextUnit;
 use crate::syntax::Word;
+use crate::syntax::WordUnit;
 
 /// Tests whether the given character is a token delimiter.
 ///
@@ -45,16 +47,29 @@ impl Lexer<'_> {
         }
 
         if let Some(literal) = word.to_string_if_literal() {
+            // keyword?
             if let Ok(keyword) = literal.parse() {
                 return Ok(TokenId::Token(Some(keyword)));
             }
 
-            if literal.chars().all(|c| c.is_ascii_digit()) {
-                if let Some(next) = self.peek_char().await? {
-                    if next == '<' || next == '>' {
-                        return Ok(TokenId::IoNumber);
-                    }
-                }
+            // IO_NUMBER?
+            if literal.chars().all(|c| c.is_ascii_digit())
+                && matches!(self.peek_char().await?, Some('<' | '>'))
+            {
+                return Ok(TokenId::IoNumber);
+            }
+        }
+
+        // IO_LOCATION?
+        if word.units.first() == Some(&WordUnit::Unquoted(TextUnit::Literal('{'))) {
+            let braced = match word.units.last() {
+                Some(WordUnit::Unquoted(TextUnit::Literal('}'))) => word.units.len() >= 3,
+                Some(WordUnit::Unquoted(TextUnit::Backslashed('}'))) => true,
+                Some(WordUnit::Unquoted(TextUnit::BracedParam(_))) => true,
+                _ => false,
+            };
+            if braced && matches!(self.peek_char().await?, Some('<' | '>')) {
+                return Ok(TokenId::IoLocation);
             }
         }
 
@@ -89,9 +104,7 @@ impl Lexer<'_> {
 mod tests {
     use super::*;
     use crate::source::Source;
-    use crate::syntax::TextUnit;
-    use crate::syntax::WordUnit;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn lexer_token_empty() {
@@ -192,6 +205,75 @@ mod tests {
         assert_eq!(t.word.location.range, 0..2);
         assert_eq!(t.id, TokenId::Token(None));
         assert_eq!(t.index, 0);
+
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some(';')));
+    }
+
+    #[test]
+    fn lexer_token_io_location_delimited_by_less() {
+        let mut lexer = Lexer::with_code("{n}<");
+
+        let t = lexer.token().now_or_never().unwrap().unwrap();
+        assert_eq!(t.word.units.len(), 3);
+        assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('{')));
+        assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('n')));
+        assert_eq!(t.word.units[2], WordUnit::Unquoted(TextUnit::Literal('}')));
+        assert_eq!(*t.word.location.code.value.borrow(), "{n}<");
+        assert_eq!(t.word.location.code.start_line_number.get(), 1);
+        assert_eq!(*t.word.location.code.source, Source::Unknown);
+        assert_eq!(t.word.location.range, 0..3);
+        assert_eq!(t.id, TokenId::IoLocation);
+        assert_eq!(t.index, 0);
+
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
+    }
+
+    #[test]
+    fn lexer_token_io_location_delimited_by_greater() {
+        let mut lexer = Lexer::with_code("{n}>");
+
+        let t = lexer.token().now_or_never().unwrap().unwrap();
+        assert_eq!(t.id, TokenId::IoLocation);
+
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('>')));
+    }
+
+    #[test]
+    fn lexer_token_io_location_ending_with_backslashed_brace() {
+        let mut lexer = Lexer::with_code(r"{\}<");
+
+        let t = lexer.token().now_or_never().unwrap().unwrap();
+        assert_eq!(t.id, TokenId::IoLocation);
+
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
+    }
+
+    #[test]
+    fn lexer_token_io_location_ending_with_braced_parameter() {
+        let mut lexer = Lexer::with_code("{${n}<");
+
+        let t = lexer.token().now_or_never().unwrap().unwrap();
+        assert_eq!(t.id, TokenId::IoLocation);
+
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
+    }
+
+    #[test]
+    fn lexer_token_empty_braces_followed_by_less() {
+        let mut lexer = Lexer::with_code("{}<");
+
+        let t = lexer.token().now_or_never().unwrap().unwrap();
+        assert_eq!(t.id, TokenId::Token(None));
+
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
+    }
+
+    #[test]
+    fn lexer_token_braced_word_not_followed_by_less_or_greater() {
+        let mut lexer = Lexer::with_code("{n};");
+
+        let t = lexer.token().now_or_never().unwrap().unwrap();
+        assert_eq!(t.id, TokenId::Token(None));
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some(';')));
     }

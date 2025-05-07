@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `parser::lex::Lexer::token` method now returns a `Token` with the
+  `TokenId::IoLocation` variant if the token is of the form `{...}` and
+  immediately precedes a redirection operator.
 - The associated value of the `syntax::WordUnit::Tilde` enum variant has been
   changed to have two named fields: `name: String` and `followed_by_slash: bool`.
   This is needed to support correct adjustment of the number of slashes in the
