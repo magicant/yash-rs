@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - The `parser::lex::TokenId` enum now has the `IoLocation` variant.
+- The `parser::SyntaxError` enum now has the `InvalidIoLocation` variant.
+    - Currently, the parser does not support parsing of I/O location tokens
+      (e.g., `{n}>/dev/null`). This error is returned whenever the parser
+      finds an I/O location token attached to a redirection operator.
 
 ### Changed
 
