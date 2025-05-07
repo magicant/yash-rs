@@ -103,18 +103,27 @@ impl Parser<'_, '_> {
     /// [`MissingRedirOperand`](SyntaxError::MissingRedirOperand) or
     /// [`MissingHereDocDelimiter`](SyntaxError::MissingHereDocDelimiter).
     pub async fn redirection(&mut self) -> Result<Option<Redir>> {
-        let fd = if self.peek_token().await?.id == IoNumber {
-            let token = self.take_token_raw().await?;
-            if let Ok(fd) = token.word.to_string().parse() {
-                Some(Fd(fd))
-            } else {
+        let fd = match self.peek_token().await?.id {
+            IoNumber => {
+                let token = self.take_token_raw().await?;
+                if let Ok(fd) = token.word.to_string().parse() {
+                    Some(Fd(fd))
+                } else {
+                    return Err(Error {
+                        cause: SyntaxError::FdOutOfRange.into(),
+                        location: token.word.location,
+                    });
+                }
+            }
+            IoLocation => {
+                let token = self.take_token_raw().await?;
+                // TODO parse the I/O location
                 return Err(Error {
-                    cause: SyntaxError::FdOutOfRange.into(),
+                    cause: SyntaxError::InvalidIoLocation.into(),
                     location: token.word.location,
                 });
             }
-        } else {
-            None
+            _ => None,
         };
 
         Ok(self
@@ -345,6 +354,19 @@ mod tests {
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 0..40);
+    }
+
+    #[test]
+    fn parser_redirection_io_location() {
+        let mut lexer = Lexer::with_code("{n}< /dev/null\n");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.redirection().now_or_never().unwrap().unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidIoLocation));
+        assert_eq!(*e.location.code.value.borrow(), "{n}< /dev/null\n");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(*e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.range, 0..3);
     }
 
     #[test]
