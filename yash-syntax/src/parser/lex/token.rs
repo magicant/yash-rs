@@ -179,6 +179,24 @@ mod tests {
     }
 
     #[test]
+    fn lexer_token_digit_not_followed_by_less_or_greater() {
+        let mut lexer = Lexer::with_code("12;");
+
+        let t = lexer.token().now_or_never().unwrap().unwrap();
+        assert_eq!(t.word.units.len(), 2);
+        assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('1')));
+        assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('2')));
+        assert_eq!(*t.word.location.code.value.borrow(), "12;");
+        assert_eq!(t.word.location.code.start_line_number.get(), 1);
+        assert_eq!(*t.word.location.code.source, Source::Unknown);
+        assert_eq!(t.word.location.range, 0..2);
+        assert_eq!(t.id, TokenId::Token(None));
+        assert_eq!(t.index, 0);
+
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some(';')));
+    }
+
+    #[test]
     fn lexer_token_after_blank() {
         let mut lexer = Lexer::with_code(" a  ");
 
