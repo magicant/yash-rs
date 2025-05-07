@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.2] - Unreleased
 
+### Changed
+
+- The shell now recognizes the I/O location notation attached to a redirection
+  operator as in `{n}<file`. Currently, the shell does not support this
+  notation, but it is reserved for future use.
+
 ### Fixed
 
 - When a tilde expansion produces a directory name that ends with a slash and
