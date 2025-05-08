@@ -84,6 +84,8 @@ pub enum TokenId {
     Operator(Operator),
     /// `IO_NUMBER`
     IoNumber,
+    /// `IO_LOCATION`
+    IoLocation,
     /// Imaginary token identifier for the end of input
     EndOfInput,
 }
@@ -102,6 +104,7 @@ impl TokenId {
             Token(None) => false,
             Operator(operator) => operator.is_clause_delimiter(),
             IoNumber => false,
+            IoLocation => false,
             EndOfInput => true,
         }
     }

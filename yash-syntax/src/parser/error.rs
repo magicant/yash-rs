@@ -64,6 +64,8 @@ pub enum SyntaxError {
     MissingSeparator,
     /// The file descriptor specified for a redirection cannot be used.
     FdOutOfRange,
+    /// An I/O location prefix attached to a redirection has an unsupported format.
+    InvalidIoLocation,
     /// A redirection operator is missing its operand.
     MissingRedirOperand,
     /// A here-document operator is missing its delimiter token.
@@ -208,6 +210,7 @@ impl SyntaxError {
             InvalidCommandToken => "the command starts with an inappropriate token",
             MissingSeparator => "a separator is missing between the commands",
             FdOutOfRange => "the file descriptor is too large",
+            InvalidIoLocation => "the I/O location prefix is not valid",
             MissingRedirOperand => "the redirection operator is missing its operand",
             MissingHereDocDelimiter => "the here-document operator is missing its delimiter",
             MissingHereDocContent => "content of the here-document is missing",
@@ -310,6 +313,7 @@ impl SyntaxError {
             InvalidCommandToken => "does not begin a valid command",
             MissingSeparator => "expected `;` or `&` before this token",
             FdOutOfRange => "unsupported file descriptor",
+            InvalidIoLocation => "unsupported I/O location prefix",
             MissingRedirOperand => "expected a redirection operand",
             MissingHereDocDelimiter => "expected a delimiter word",
             MissingHereDocContent => "content not found",

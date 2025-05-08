@@ -7,8 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.15.0] - Unreleased
 
+### Added
+
+- The `parser::lex::TokenId` enum now has the `IoLocation` variant.
+- The `parser::SyntaxError` enum now has the `InvalidIoLocation` variant.
+
 ### Changed
 
+- The `parser::lex::Lexer::token` method now returns a `Token` with the
+  `TokenId::IoLocation` variant if the token is of the form `{...}` and
+  immediately precedes a redirection operator.
+- The `parser::Parser::redirection` method now fails with a
+  `SyntaxError::InvalidIoLocation` if it encounters an I/O location token
+  (e.g., `{n}>/dev/null`) preceding a redirection operator.
+    - Currently, the parser does not support parsing of I/O location tokens.
+      This error is returned whenever the parser finds an I/O location token
+      attached to a redirection operator.
 - The associated value of the `syntax::WordUnit::Tilde` enum variant has been
   changed to have two named fields: `name: String` and `followed_by_slash: bool`.
   This is needed to support correct adjustment of the number of slashes in the

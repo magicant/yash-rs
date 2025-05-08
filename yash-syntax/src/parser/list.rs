@@ -22,7 +22,7 @@ use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
 use super::lex::Operator::{And, Newline, Semicolon};
-use super::lex::TokenId::{self, EndOfInput, IoNumber, Operator, Token};
+use super::lex::TokenId::{self, EndOfInput, IoLocation, IoNumber, Operator, Token};
 use crate::syntax::Item;
 use crate::syntax::List;
 use std::pin::Pin;
@@ -34,7 +34,7 @@ fn error_type_for_trailing_token_in_command_line(token_id: TokenId) -> Option<Sy
     use SyntaxError::*;
     match token_id {
         EndOfInput => None,
-        Token(None) | IoNumber => Some(MissingSeparator),
+        Token(None) | IoNumber | IoLocation => Some(MissingSeparator),
         Token(Some(keyword)) => match keyword {
             Bang | OpenBracketBracket | Case | For | Function | If | Until | While | OpenBrace => {
                 Some(MissingSeparator)
