@@ -584,7 +584,7 @@ dependencies = [
 
 [[package]]
 name = "yash-cli"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "assert_matches",
  "futures-util",
@@ -628,7 +628,7 @@ dependencies = [
 
 [[package]]
 name = "yash-env-test-helper"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "assert_matches",
  "futures-executor",
