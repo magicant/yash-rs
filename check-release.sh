@@ -1,10 +1,8 @@
 set -Ceu
 
 package=${1:?package name required as first argument}
-version=$(
-    grep '^version *=' "$package/Cargo.toml" |
-    sed -e 's/.*"\(.*\)".*/\1/'
-)
+version=$(cargo metadata --format-version=1 --no-deps --all-features |
+    jq -r '.packages[] | select(.name == "'"$package"'") | .version')
 today=$(date +%Y-%m-%d)
 success=true
 
