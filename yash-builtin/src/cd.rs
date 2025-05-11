@@ -115,22 +115,20 @@
 //! In these cases, the working directory remains changed, the `$PWD` variable
 //! is left empty, and the exit status depends on the `-e` option.
 //!
-//! The built-in may also fail in the following cases, but the working directory
-//! will remain changed and the exit status will be zero:
+//! The built-in may also fail if `$PWD` or `$OLDPWD` is read-only. In this case,
+//! the working directory remains changed, but the variable is not updated.
 //!
-//! - The new working directory cannot be written to the standard output.
-//! - `$PWD` or `$OLDPWD` is read-only.
+//! If the new working directory name cannot be printed to the standard output,
+//! the built-in prints a warning message to the standard error, but this does
+//! not affect the working directory change or the exit status.
 //!
 //! # Exit Status
 //!
-//! - If the working directory is successfully changed:
-//!   - If the `-L` option is effective, the exit status is zero.
-//!   - If the `-P` option is effective:
-//!     - If the new working directory pathname is successfully determined, the
-//!       exit status is zero.
-//!     - If the new working directory pathname cannot be determined:
-//!       - If the `-e` option is effective, the exit status is one.
-//!       - Otherwise, the exit status is zero.
+//! - If the working directory is changed successfully, the exit status is zero,
+//!   except in the following cases where the exit status is one:
+//!   - The `-P` and `-e` options are effective and the new working directory
+//!     pathname cannot be determined.
+//!   - The `$PWD` or `$OLDPWD` variable is read-only.
 //! - If the working directory cannot be changed because of an error in the
 //!   underlying `chdir` system call, the exit status is two.
 //! - If the `-L` option is effective and canonicalization fails because of a
@@ -200,6 +198,9 @@ pub const EXIT_STATUS_SUCCESS: ExitStatus = ExitStatus(0);
 
 /// Exit status when the new `$PWD` value cannot be determined
 pub const EXIT_STATUS_STALE_PWD: ExitStatus = ExitStatus(1);
+
+/// Exit status when `$PWD` or `$OLDPWD` cannot be updated
+pub const EXIT_STATUS_ASSIGN_ERROR: ExitStatus = ExitStatus(1);
 
 /// Exit status for an error in the underlying `chdir` system call
 pub const EXIT_STATUS_CHDIR_ERROR: ExitStatus = ExitStatus(2);
@@ -303,7 +304,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
         Err(e) => return chdir::report_failure(env, command.operand.as_ref(), &path, &e).await,
     }
 
-    let (new_pwd, result) = match assign::new_pwd(env, command.mode, &path) {
+    let (new_pwd, result1) = match assign::new_pwd(env, command.mode, &path) {
         Ok(new_pwd) => (new_pwd, Result::from(EXIT_STATUS_SUCCESS)),
         Err(errno) => (
             PathBuf::default(),
@@ -313,10 +314,10 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
 
     print::print_path(env, &new_pwd, &origin).await;
 
-    assign::set_oldpwd(env, pwd).await;
-    assign::set_pwd(env, new_pwd).await;
+    let result2 = assign::set_oldpwd(env, pwd).await;
+    let result3 = assign::set_pwd(env, new_pwd).await;
 
-    result
+    result1.max(result2).max(result3)
 }
 
 #[cfg(test)]

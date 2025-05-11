@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - When a tilde expansion produces a directory name that ends with a slash and
   the expansion is followed by a slash, the trailing slash in the directory name
   is now removed to maintain the correct number of slashes.
+- The `cd` built-in now returns exit status 1 if updating `$PWD` or `$OLDPWD`
+  fails because the variable is read-only. Previously, it returned status 0,
+  which did not conform to POSIX.1-2024 XBD 8.1.
 
 ## [0.4.1] - 2025-05-03
 

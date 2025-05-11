@@ -44,7 +44,6 @@ unset OLDPWD
 cd -
 __IN__
 
-# It is POSIXly unclear what the exit status of cd should be in this case.
 testcase "$LINENO" -d 'read-only PWD' 3<<'__IN__' 4<<__OUT__
 unset CDPATH
 readonly PWD
@@ -53,12 +52,11 @@ echo --- $?
 printf 'PWD=%s\n' "$PWD"
 pwd
 __IN__
---- 0
+--- 1
 PWD=$ORIGPWD
 $ORIGPWD/dir
 __OUT__
 
-# It is POSIXly unclear what the exit status of cd should be in this case.
 test_o -d 'unset OLDPWD'
 unset CDPATH
 readonly OLDPWD=/
@@ -66,7 +64,7 @@ cd dir
 echo --- $?
 printf 'OLDPWD=%s\n' "$OLDPWD"
 __IN__
---- 0
+--- 1
 OLDPWD=/
 __OUT__
 
