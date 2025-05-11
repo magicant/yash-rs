@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.0] - Unreleased
 
+### Added
+
+- The new constant `cd::EXIT_STATUS_ASSIGN_ERROR` represents the exit
+  status returned by the `cd` built-in when the `$PWD` or `$OLDPWD` variable is
+  read-only.
+
 ### Changed
 
 - External dependency versions:
@@ -14,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - yash-prompt (optional) 0.5.0 → 0.6.0
     - yash-semantics (optional) 0.8.0 → 0.9.0
     - yash-syntax 0.14.1 → 0.15.0
+
+### Fixed
+
+- The `cd` built-in now returns exit status 1 when the `$PWD` or `$OLDPWD`
+  variable cannot be updated because it is read-only. The new constant
+  `cd::EXIT_STATUS_ASSIGN_ERROR` represents this exit status. The `cd::main`
+  function now returns a result that includes this exit status.
+  This fix reflects the requirements in POSIX.1-2024 XBD 8.1.
 
 ## [0.8.0] - 2025-05-03
 

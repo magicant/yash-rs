@@ -427,3 +427,53 @@ __IN__
 test_O -d -e n 'empty operand (-P)'
 cd -P ''
 __IN__
+
+test_O -d -e n 'readonly PWD (-L)'
+# As specified in POSIX XBD 8.1, one of the following should happen:
+# - The readonly built-in fails.
+# - The cd built-in fails.
+# - The cd built-in succeeds as if the readonly built-in had not been executed.
+readonly PWD && cd -L / &&
+if [ "$PWD" = / ]; then
+    printf 'PWD successfully changed\n' >&2
+    false # The expected exit status of this test is non-zero.
+fi
+__IN__
+
+test_O -d -e n 'readonly PWD (-P)'
+# As specified in POSIX XBD 8.1, one of the following should happen:
+# - The readonly built-in fails.
+# - The cd built-in fails.
+# - The cd built-in succeeds as if the readonly built-in had not been executed.
+readonly PWD && cd -P / &&
+if [ "$PWD" = / ]; then
+    printf 'PWD successfully changed\n' >&2
+    false # The expected exit status of this test is non-zero.
+fi
+__IN__
+
+test_x -d -e n 'readonly OLDPWD (-L)'
+# As specified in POSIX XBD 8.1, one of the following should happen:
+# - The readonly built-in fails.
+# - The cd built-in fails.
+# - The cd built-in succeeds as if the readonly built-in had not been executed.
+cd /
+readonly OLDPWD && cd -L - &&
+if [ "$OLDPWD" = / ]; then
+    printf 'OLDPWD successfully changed\n' >&2
+    false # The expected exit status of this test is non-zero.
+fi
+__IN__
+
+test_x -d -e n 'readonly OLDPWD (-P)'
+# As specified in POSIX XBD 8.1, one of the following should happen:
+# - The readonly built-in fails.
+# - The cd built-in fails.
+# - The cd built-in succeeds as if the readonly built-in had not been executed.
+cd /
+readonly OLDPWD && cd -P - &&
+if [ "$OLDPWD" = / ]; then
+    printf 'OLDPWD successfully changed\n' >&2
+    false # The expected exit status of this test is non-zero.
+fi
+__IN__

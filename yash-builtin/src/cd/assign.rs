@@ -17,7 +17,7 @@
 //! Part of the cd built-in that updates `$PWD` and `$OLDPWD`
 
 use super::Mode;
-use crate::common::arrange_message_and_divert;
+use crate::common::report;
 use yash_env::Env;
 use yash_env::System;
 use yash_env::path::Path;
@@ -39,7 +39,7 @@ use yash_syntax::source::pretty::Message;
 ///
 /// This function examines the stack to find the command location that invoked
 /// the cd built-in.
-pub async fn set_oldpwd(env: &mut Env, value: String) {
+pub async fn set_oldpwd(env: &mut Env, value: String) -> crate::Result {
     set_variable(env, OLDPWD, value).await
 }
 
@@ -51,12 +51,12 @@ pub async fn set_oldpwd(env: &mut Env, value: String) {
 ///
 /// This function examines the stack to find the command location that invoked
 /// the cd built-in.
-pub async fn set_pwd(env: &mut Env, path: PathBuf) {
+pub async fn set_pwd(env: &mut Env, path: PathBuf) -> crate::Result {
     let value = path.into_unix_string().into_string().unwrap_or_default();
     set_variable(env, PWD, value).await
 }
 
-async fn set_variable(env: &mut Env, name: &str, value: String) {
+async fn set_variable(env: &mut Env, name: &str, value: String) -> crate::Result {
     let current_builtin = env.stack.current_builtin();
     let current_location = current_builtin.map(|builtin| builtin.name.origin.clone());
     let var = &mut env.get_or_create_variable(name, Global);
@@ -65,14 +65,13 @@ async fn set_variable(env: &mut Env, name: &str, value: String) {
         Err(error) => return handle_assign_error(env, name, error).await,
     }
     var.export(true);
+    crate::Result::default()
 }
 
-/// Prints a warning message for a read-only variable.
-///
-/// The message is only a warning because it does not affect the exit status.
-async fn handle_assign_error(env: &mut Env, name: &str, error: AssignError) {
+/// Prints an error message for a read-only variable.
+async fn handle_assign_error(env: &mut Env, name: &str, error: AssignError) -> crate::Result {
     let message = Message {
-        r#type: AnnotationType::Warning,
+        r#type: AnnotationType::Error,
         title: format!("cannot update read-only variable `{}`", name).into(),
         annotations: vec![Annotation::new(
             AnnotationType::Info,
@@ -81,8 +80,7 @@ async fn handle_assign_error(env: &mut Env, name: &str, error: AssignError) {
         )],
         footers: vec![],
     };
-    let (message, _divert) = arrange_message_and_divert(env, message);
-    env.system.print_error(&message).await;
+    report(env, message, super::EXIT_STATUS_ASSIGN_ERROR).await
 }
 
 /// Computes the new value of `$PWD`.
@@ -104,6 +102,7 @@ mod tests {
     use futures_util::FutureExt;
     use std::rc::Rc;
     use yash_env::VirtualSystem;
+    use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
@@ -122,9 +121,10 @@ mod tests {
             is_special: false,
         }));
 
-        set_oldpwd(&mut env, "/some/path".to_string())
+        let result = set_oldpwd(&mut env, "/some/path".to_string())
             .now_or_never()
             .unwrap();
+        assert_eq!(result, crate::Result::default());
         let variable = env.variables.get(OLDPWD).unwrap();
         assert_eq!(variable.value, Some(Scalar("/some/path".to_string())));
         assert_eq!(variable.quirk, None);
@@ -150,9 +150,10 @@ mod tests {
             .assign("/old/pwd", None)
             .unwrap();
 
-        set_oldpwd(&mut env, "/some/dir".to_string())
+        let result = set_oldpwd(&mut env, "/some/dir".to_string())
             .now_or_never()
             .unwrap();
+        assert_eq!(result, crate::Result::default());
         let variable = env.variables.get(OLDPWD).unwrap();
         assert_eq!(variable.value, Some(Scalar("/some/dir".to_string())));
         assert_eq!(variable.quirk, None);
@@ -177,9 +178,10 @@ mod tests {
         oldpwd.assign("/old/pwd", None).unwrap();
         oldpwd.make_read_only(read_only_location.clone());
 
-        set_oldpwd(&mut env, "/foo".to_string())
+        let result = set_oldpwd(&mut env, "/foo".to_string())
             .now_or_never()
             .unwrap();
+        assert_eq!(result, crate::Result::from(ExitStatus(1)));
         let variable = env.variables.get(OLDPWD).unwrap();
         assert_eq!(variable.value, Some(Scalar("/old/pwd".to_string())));
         assert_eq!(variable.last_assigned_location, None);
@@ -200,9 +202,10 @@ mod tests {
             is_special: false,
         }));
 
-        set_pwd(&mut env, PathBuf::from("/some/path"))
+        let result = set_pwd(&mut env, PathBuf::from("/some/path"))
             .now_or_never()
             .unwrap();
+        assert_eq!(result, crate::Result::default());
         let variable = env.variables.get(PWD).unwrap();
         assert_eq!(variable.value, Some(Scalar("/some/path".to_string())));
         assert_eq!(variable.quirk, None);
@@ -228,9 +231,10 @@ mod tests {
             .assign("/old/path", None)
             .unwrap();
 
-        set_pwd(&mut env, PathBuf::from("/some/path"))
+        let result = set_pwd(&mut env, PathBuf::from("/some/path"))
             .now_or_never()
             .unwrap();
+        assert_eq!(result, crate::Result::default());
         let variable = env.variables.get(PWD).unwrap();
         assert_eq!(variable.value, Some(Scalar("/some/path".to_string())));
         assert_eq!(variable.quirk, None);
@@ -256,9 +260,10 @@ mod tests {
         pwd.assign("/old/path", None).unwrap();
         pwd.make_read_only(read_only_location.clone());
 
-        set_pwd(&mut env, PathBuf::from("/some/path"))
+        let result = set_pwd(&mut env, PathBuf::from("/some/path"))
             .now_or_never()
             .unwrap();
+        assert_eq!(result, crate::Result::from(ExitStatus(1)));
         let variable = env.variables.get(PWD).unwrap();
         assert_eq!(variable.value, Some(Scalar("/old/path".to_string())));
         assert_eq!(variable.last_assigned_location, None);
