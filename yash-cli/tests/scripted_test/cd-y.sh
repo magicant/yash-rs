@@ -26,6 +26,10 @@ HOME=
 cd
 __IN__
 
+test_O -d -e 5 'empty operand'
+cd ''
+__IN__
+
 testcase "$LINENO" 'unset PWD' 3<<'__IN__' 5</dev/null 4<<__OUT__
 unset CDPATH PWD
 cd dir
@@ -165,6 +169,10 @@ __IN__
 
 test_O -d -e 5 'invalid option'
 cd --no-such-option
+__IN__
+
+test_O -d -e 5 -- '-e without -P'
+cd -e
 __IN__
 
 test_O -e 0 'printing to closed stream'
