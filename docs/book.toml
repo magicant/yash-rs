@@ -1,0 +1,5 @@
+[book]
+authors = ["WATANABE Yuki"]
+language = "en"
+src = "src"
+title = "Yash-rs User Manual"
