@@ -21,7 +21,7 @@ The full license text can be found at <https://github.com/magicant/yash-rs/blob/
 ## Documentation
 
 Navigate the documentation using the left sidebar.
-If the sidebar is not visible, you can toggle it by clicking the "hamburger" icon in the top left corner.
+If the sidebar is not visible, you can toggle it by clicking the "hamburger" icon in the top-left corner.
 
 Currently, the documentation is a work in progress and may not cover all features or usage scenarios.
-Please feel free to contribute by submitting issues or pull requests to improve the documentation.
+Contributions are welcome via issues or pull requests to enhance the documentation.
