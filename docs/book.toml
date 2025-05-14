@@ -1,0 +1,17 @@
+[book]
+authors = ["WATANABE Yuki"]
+language = "en"
+src = "src"
+title = "Yash-rs User Manual"
+
+[rust]
+edition = "2024"
+
+[build]
+create-missing = false
+
+[output.html]
+smart-punctuation = true
+git-repository-url = "https://github.com/magicant/yash-rs/tree/master/docs"
+edit-url-template = "https://github.com/magicant/yash-rs/edit/master/docs/{path}"
+site-url = "https://magicant.github.io/yash-rs/"
