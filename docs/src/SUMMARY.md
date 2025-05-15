@@ -5,11 +5,7 @@
 # User manual
 
 - [Installation](installation.md)
-- [Getting started]()
-<!--
-    - Using the shell interactively
-    - Running scripts
--->
+- [Getting started](getting_started.md)
 - [Shell language]()
     - [Invoking utilities]()
     - [Words, tokens, and fields]()
