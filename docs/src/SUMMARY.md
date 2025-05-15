@@ -4,7 +4,7 @@
 
 # User manual
 
-- [Installation]()
+- [Installation](installation.md)
 - [Getting started]()
 <!--
     - Using the shell interactively
@@ -87,4 +87,5 @@
     - [unalias]()
     - [unset]()
     - [wait]()
+- [Versioning and compatibility]()
 - [FAQ and troubleshooting]()
