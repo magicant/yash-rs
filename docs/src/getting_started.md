@@ -20,29 +20,27 @@ Once the shell is running, you can type commands. The shell executes each comman
 
 Most commands run a utility, which is a program that performs a specific task. For example, you can run the `echo` utility to print a message:
 
-```sh
-echo "Hello, world!"
-```
-
-This outputs:
-
-```text
+```shell
+$ echo "Hello, world!"
 Hello, world!
 ```
 
-You can also run other utilities, such as `ls`, which lists the files in the current directory:
+In this example, `$` is the shell prompt, and `echo "Hello, world!"` is the command you entered. The shell executed the `echo` utility, which printed "Hello, world!" to the terminal.
 
-```sh
-ls
+You can also run other utilities, such as `ls`, which lists the files in the working directory:
+
+```shell
+$ ls
+Documents  Downloads  Music  Pictures  Videos
 ```
 
-This lists the files in the current directory.
+The output varies depending on the files in your working directory.
 
 ## Interrupting a command
 
 To interrupt a running command, press `Ctrl+C`. This sends an interrupt signal to the running utility, causing it to terminate. For example, if you run a command that takes a long time, you can cancel it with `Ctrl+C`:
 
-```sh
+```shell
 sleep 10
 ```
 
@@ -54,7 +52,7 @@ Note: Some utilities may not respond to `Ctrl+C` if they are designed to ignore 
 
 To exit the shell, use the `exit` command:
 
-```sh
+```shell
 exit
 ```
 
@@ -73,35 +71,29 @@ echo "Running in the shell"
 
 Run this script in the shell by using the `.` utility:
 
-```sh
-. ./script.sh
-```
-
-This executes the commands in the script file and prints the output:
-
-```text
+```shell
+$ . ./script.sh
 This is a script
 Running in the shell
 ```
 
 You can also run the script by passing it as an argument to the shell:
 
-```sh
-yash3 script.sh
-```
-
-This runs the script in a new shell session. The output will be the same:
-
-```text
+```shell
+$ yash3 ./script.sh
 This is a script
 Running in the shell
 ```
 
+This runs the script in a new shell session. The output will be the same.
+
 If you make the script executable, you can run it directly:
 
-```sh
-chmod a+x script.sh
-./script.sh
+```shell
+$ chmod a+x script.sh
+$ ./script.sh
+This is a script
+Running in the shell
 ```
 
 The `chmod` utility makes the script file executable. This allows you to run the script directly, without specifying the shell explicitly, as in the previous example.
