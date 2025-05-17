@@ -399,7 +399,7 @@ mod tests {
         struct BrokenInput;
         impl yash_syntax::input::Input for BrokenInput {
             async fn next_line(&mut self, _context: &Context) -> std::io::Result<String> {
-                Err(std::io::Error::new(std::io::ErrorKind::Other, "broken"))
+                Err(std::io::Error::other("broken"))
             }
         }
 

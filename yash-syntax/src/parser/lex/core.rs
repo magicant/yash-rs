@@ -986,7 +986,7 @@ mod tests {
         impl std::error::Error for Failing {}
         impl Input for Failing {
             async fn next_line(&mut self, _: &Context) -> crate::input::Result {
-                Err(std::io::Error::new(std::io::ErrorKind::Other, Failing))
+                Err(std::io::Error::other(Failing))
             }
         }
         let line = NonZeroU64::new(42).unwrap();

@@ -223,7 +223,7 @@ impl VariableRefMut<'_> {
             });
         }
 
-        let old_value = std::mem::replace(&mut self.0.value, Some(value));
+        let old_value = self.0.value.replace(value);
         let old_location = std::mem::replace(&mut self.0.last_assigned_location, location);
         Ok((old_value, old_location))
         // TODO Apply quirk
