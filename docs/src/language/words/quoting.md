@@ -6,22 +6,18 @@ Quoting and escaping control how the shell interprets special characters and whi
 
 Single quotes enclose a string and prevent the shell from interpreting special characters. Everything inside single quotes is treated literally, including spaces and special characters.
 
-For example, the following command prints the string `$"foo"` without interpreting the `$` as a parameter expansion or the `"` as a double quote:
+For example, the following command prints the string `"$foo"` without interpreting the `$` as a parameter expansion or the `"` as a double quote:
 
 ```shell
-echo '$"foo"'
+$ echo '"$foo"'
+"$foo"
 ```
 
 Single quotes can contain newline characters:
 
 ```shell
-echo 'foo
-bar'
-```
-
-This prints:
-
-```text
+$ echo 'foo
+> bar'
 foo
 bar
 ```
@@ -39,13 +35,8 @@ Double quotes enclose a string. Most characters inside double quotes are treated
 For example, single quote characters are treated literally and parameter expansion is performed inside double quotes:
 
 ```shell
-foo="*  *"
-echo "foo='$foo'"
-```
-
-This prints:
-
-```text
+$ foo="*  *"
+$ echo "foo='$foo'"
 foo='*  *'
 ```
 
@@ -57,7 +48,7 @@ The backslash escapes special characters, allowing you to include them in a stri
 
 Outside double quotes, a backslash can escape any character except newline. For example:
 
-```shell
+```bash
 cat My\ Diary.txt
 ```
 
@@ -65,7 +56,7 @@ This prints the contents of the file `My Diary.txt`.
 
 When used in double quotes, the backslash only escapes the following characters: `$`, `` ` ``, and `\`. For example:
 
-```shell
+```bash
 cat "My\ Diary\$.txt"
 ```
 
@@ -76,13 +67,8 @@ This will print the contents of the file `My\ Diary$.txt`. Note that the backsla
 When a backslash is placed at the end of a line, it indicates that the command continues on the next line. This is useful for breaking long commands into multiple lines for better readability. The combination of a backslash and newline is ignored by the shell as if it were not there. Line continuation can be used inside and outside double quotes.
 
 ```shell
-echo "This is a long command that \
-continues on the next line"
-```
-
-This will print:
-
-```text
+$ echo "This is a long command that \
+> continues on the next line"
 This is a long command that continues on the next line
 ```
 

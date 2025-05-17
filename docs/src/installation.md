@@ -23,13 +23,13 @@ For alternative installation methods, refer to [the rustup book](https://rust-la
 By default, installing rustup also installs the stable Rust toolchain.
 If the stable toolchain is not installed, you can add it with the following command:
 
-```shell
+```bash
 rustup default stable
 ```
 
 To install yash, run:
 
-```shell
+```bash
 cargo install yash-cli
 ```
 

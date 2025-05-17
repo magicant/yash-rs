@@ -4,13 +4,13 @@
 
 To start the shell, run `yash3` from the command line. This starts an interactive shell session.
 
-```shell
+```bash
 yash3
 ```
 
 You will see a prompt, indicating the shell is ready for commands:
 
-```text
+```shell
 $
 ```
 
@@ -20,7 +20,7 @@ Once the shell is running, you can type commands. The shell executes each comman
 
 Most commands run a utility, which is a program that performs a specific task. For example, you can run the `echo` utility to print a message:
 
-```shell
+```bash
 echo "Hello, world!"
 ```
 
@@ -32,7 +32,7 @@ Hello, world!
 
 You can also run other utilities, such as `ls`, which lists the files in the current directory:
 
-```shell
+```bash
 ls
 ```
 
@@ -42,7 +42,7 @@ This lists the files in the current directory.
 
 To interrupt a running command, press `Ctrl+C`. This sends an interrupt signal to the running utility, causing it to terminate. For example, if you run a command that takes a long time, you can cancel it with `Ctrl+C`:
 
-```shell
+```bash
 sleep 10
 ```
 
@@ -54,7 +54,7 @@ Note: Some utilities may not respond to `Ctrl+C` if they are designed to ignore 
 
 To exit the shell, use the `exit` command:
 
-```shell
+```bash
 exit
 ```
 
@@ -66,14 +66,14 @@ Alternatively, you can press `Ctrl+D` to exit the shell. This sends an empty com
 
 You can also run scripts in the shell. To do this, create a script file with the commands you want to run. For example, create a file called `script.sh` with the following content:
 
-```shell
+```bash
 echo "This is a script"
 echo "Running in the shell"
 ```
 
 Run this script in the shell by using the `.` utility:
 
-```shell
+```bash
 . ./script.sh
 ```
 
@@ -86,7 +86,7 @@ Running in the shell
 
 You can also run the script by passing it as an argument to the shell:
 
-```shell
+```bash
 yash3 script.sh
 ```
 
@@ -99,7 +99,7 @@ Running in the shell
 
 If you make the script executable, you can run it directly:
 
-```shell
+```bash
 chmod a+x script.sh
 ./script.sh
 ```
