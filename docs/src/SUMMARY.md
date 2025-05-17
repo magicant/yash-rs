@@ -4,17 +4,13 @@
 
 # User manual
 
-- [Installation]()
-- [Getting started]()
-<!--
-    - Using the shell interactively
-    - Running scripts
--->
+- [Installation](installation.md)
+- [Getting started](getting_started.md)
 - [Shell language]()
     - [Invoking utilities]()
     - [Words, tokens, and fields]()
         - [Reserved words]()
-        - [Quoting and escaping]()
+        - [Quoting and escaping](language/words/quoting.md)
         - [Comments]()
         - [Tilde expansion]()
         - [Parameter expansion]()
@@ -87,4 +83,5 @@
     - [unalias]()
     - [unset]()
     - [wait]()
+- [Versioning and compatibility]()
 - [FAQ and troubleshooting]()
