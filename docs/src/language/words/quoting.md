@@ -48,7 +48,7 @@ The backslash escapes special characters, allowing you to include them in a stri
 
 Outside double quotes, a backslash can escape any character except newline. For example:
 
-```bash
+```sh
 cat My\ Diary.txt
 ```
 
@@ -56,7 +56,7 @@ This prints the contents of the file `My Diary.txt`.
 
 When used in double quotes, the backslash only escapes the following characters: `$`, `` ` ``, and `\`. For example:
 
-```bash
+```sh
 cat "My\ Diary\$.txt"
 ```
 
