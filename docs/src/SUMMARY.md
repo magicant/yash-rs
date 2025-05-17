@@ -11,7 +11,7 @@
     - [Words, tokens, and fields]()
         - [Reserved words]()
         - [Quoting and escaping](language/words/quoting.md)
-        - [Comments]()
+        - [Comments](language/words/comments.md)
         - [Tilde expansion]()
         - [Parameter expansion]()
         - [Command substitution]()
