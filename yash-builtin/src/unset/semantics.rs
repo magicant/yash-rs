@@ -79,7 +79,7 @@ pub fn unset_variables<'a>(
 /// Creates a message that describes the errors.
 ///
 /// See [`arrange_message_and_divert`] for the second return value.
-#[must_use]
+#[must_use = "returned message should be printed"]
 pub fn unset_variables_error_message(
     env: &Env,
     errors: &[UnsetVariablesError],
@@ -162,7 +162,7 @@ pub fn unset_functions<'a>(
 /// Creates a message that describes the errors.
 ///
 /// See [`arrange_message_and_divert`] for the second return value.
-#[must_use]
+#[must_use = "returned message should be printed"]
 pub fn unset_functions_error_message(
     env: &mut Env,
     errors: &[UnsetFunctionsError<'_>],

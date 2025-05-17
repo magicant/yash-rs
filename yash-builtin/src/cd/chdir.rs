@@ -66,7 +66,7 @@ pub fn chdir(env: &mut Env, path: &Path) -> Result<(), Error> {
 /// location.
 ///
 /// See [`arrange_message_and_divert`] for the second return value.
-#[must_use]
+#[must_use = "returned message should be printed"]
 pub fn failure_message(
     env: &Env,
     operand: Option<&Field>,

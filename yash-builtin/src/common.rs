@@ -56,7 +56,7 @@ pub mod syntax;
 /// Use [`SharedSystem::print_error`] to print the returned message and
 /// [`crate::Result::with_exit_status_and_divert`] to return the divert value
 /// along with an exit status.
-#[must_use]
+#[must_use = "returned message should be printed"]
 pub fn arrange_message_and_divert<'e: 'm, 'm>(
     env: &'e Env,
     mut message: Message<'m>,
