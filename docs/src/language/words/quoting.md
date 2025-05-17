@@ -76,4 +76,49 @@ To treat a newline literally rather than as a line continuation, use single or d
 
 ## Dollar single quotes
 
-TODO: to be documented
+Dollar single quotes (`$'...'`) are used to specify strings with escape sequences, similar to those in C. The content inside the quotes is parsed, and recognized escape sequences are replaced with their corresponding characters.
+
+For example, `\n` is replaced with a newline character:
+
+```shell
+$ echo $'foo\nbar'
+foo
+bar
+```
+
+The following escape sequences are recognized inside dollar single quotes:
+
+- `\\` – backslash
+- `\'` – single quote
+- `\"` – double quote
+- `\n` – newline
+- `\t` – tab
+- `\r` – carriage return
+- `\a` – alert (bell)
+- `\b` – backspace
+- `\e` or `\E` – escape
+- `\f` – form feed
+- `\v` – vertical tab
+- `\?` – question mark
+- `\cX` – control character (e.g., `\cA` for `^A`)
+- `\xHH` – byte with hexadecimal value `HH` (1–2 hex digits)
+- `\uHHHH` – Unicode character with hexadecimal value `HHHH` (4 hex digits)
+- `\UHHHHHHHH` – Unicode character with hexadecimal value `HHHHHHHH` (8 hex digits)
+- `\NNN` – byte with octal value `NNN` (1–3 octal digits)
+
+Unrecognized or incomplete escape sequences cause an error.
+
+A backslash followed by a newline is not treated as a line continuation inside dollar single quotes; they are rejected as an error.
+
+Example with Unicode:
+
+```shell
+$ echo $'\u3042'
+あ
+```
+
+Dollar single quotes are useful for specifying strings with special characters<!-- or binary data-->.
+
+<p class="warning">
+In the current implementation, escape sequences that produce a byte are treated as a Unicode character with the same value and converted to UTF-8. This means that byte values greater than or equal to 0x80 are converted to two bytes of UTF-8. This behavior does not conform to the POSIX standard and may change in the future.
+</p>
