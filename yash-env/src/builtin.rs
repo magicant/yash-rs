@@ -157,7 +157,6 @@ impl Result {
     /// The return value is the argument to the previous invocation of
     /// [`set_divert`](Self::set_divert). The default is `Continue(())`.
     #[inline]
-    #[must_use]
     pub const fn divert(&self) -> crate::semantics::Result {
         self.divert
     }

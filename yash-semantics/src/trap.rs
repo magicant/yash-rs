@@ -74,7 +74,6 @@ use yash_syntax::source::Source;
 /// simplicity. The exit status section of the POSIX return built-in
 /// specification mentions the intended behavior for the `Divert::Return` case,
 /// implying that the diversion should be passed on to the caller.)
-#[must_use]
 async fn run_trap(env: &mut Env, cond: Condition, code: Rc<str>, origin: Location) -> Result {
     let condition = cond.to_string(&env.system).into_owned();
     let mut lexer = Lexer::from_memory(&code, Source::Trap { condition, origin });
