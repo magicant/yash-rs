@@ -378,7 +378,7 @@ mod tests {
     fn simple_command_assigns_variables_in_volatile_context_for_external_utility() {
         in_virtual_system(|mut env, _state| async move {
             let command: syntax::SimpleCommand = "a=123 /foo/bar".parse().unwrap();
-            command.execute(&mut env).await;
+            _ = command.execute(&mut env).await;
             assert_eq!(env.variables.get("a"), None);
         });
     }
@@ -388,7 +388,7 @@ mod tests {
         in_virtual_system(|mut env, state| async move {
             let command: syntax::SimpleCommand =
                 "foo=${bar=baz} no_such_utility >/tmp/file".parse().unwrap();
-            command.execute(&mut env).await;
+            _ = command.execute(&mut env).await;
             assert_eq!(env.variables.get("foo"), None);
             assert_eq!(
                 env.variables.get("bar").unwrap().value,

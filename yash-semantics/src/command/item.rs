@@ -222,7 +222,7 @@ mod tests {
                 and_or: Rc::new("return  -n  42".parse().unwrap()),
                 async_flag: Some(Location::dummy("")),
             };
-            item.execute(&mut env).await;
+            _ = item.execute(&mut env).await;
 
             let job = &env.jobs[0];
             assert!(!job.job_controlled);
@@ -242,7 +242,7 @@ mod tests {
                 and_or: Rc::new("return -n 42".parse().unwrap()),
                 async_flag: Some(Location::dummy("")),
             };
-            item.execute(&mut env).await;
+            _ = item.execute(&mut env).await;
 
             let pids = state.borrow().processes.keys().copied().collect::<Vec<_>>();
             assert_eq!(pids, [env.main_pid, env.jobs.last_async_pid()]);
@@ -258,7 +258,7 @@ mod tests {
                 and_or: Rc::new("return -n 42".parse().unwrap()),
                 async_flag: Some(Location::dummy("")),
             };
-            item.execute(&mut env).await;
+            _ = item.execute(&mut env).await;
 
             assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
         })
@@ -274,7 +274,7 @@ mod tests {
                 and_or: Rc::new("return -n 42".parse().unwrap()),
                 async_flag: Some(Location::dummy("")),
             };
-            item.execute(&mut env).await;
+            _ = item.execute(&mut env).await;
 
             let expected_report = format!("[1] {}\n", env.jobs.last_async_pid());
             assert_stderr(&state, |stderr| assert_eq!(stderr, expected_report));
@@ -315,7 +315,7 @@ mod tests {
                 async_flag: Some(Location::dummy("")),
             };
 
-            item.execute(&mut env).await;
+            _ = item.execute(&mut env).await;
 
             let state = state.borrow();
             let process = &state.processes[&env.jobs.last_async_pid()];
@@ -367,7 +367,7 @@ mod tests {
                 async_flag: Some(Location::dummy("")),
             };
 
-            item.execute(&mut env).await;
+            _ = item.execute(&mut env).await;
             env.wait_for_subshell(env.jobs.last_async_pid())
                 .await
                 .unwrap();
@@ -389,7 +389,7 @@ mod tests {
                 async_flag: Some(Location::dummy("")),
             };
 
-            item.execute(&mut env).await;
+            _ = item.execute(&mut env).await;
             env.wait_for_subshell(env.jobs.last_async_pid())
                 .await
                 .unwrap();

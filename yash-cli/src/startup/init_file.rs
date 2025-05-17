@@ -176,7 +176,7 @@ pub async fn run_init_file(env: &mut Env, path: &str) {
     }));
     let input = Box::new(Echo::new(FdReader::new(fd, system), &ref_env));
     let mut lexer = config.input(input);
-    read_eval_loop(&ref_env, &mut { lexer }).await;
+    _ = read_eval_loop(&ref_env, &mut { lexer }).await;
 
     if let Err(errno) = env.system.close(fd) {
         env.system

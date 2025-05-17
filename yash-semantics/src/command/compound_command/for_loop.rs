@@ -237,7 +237,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         env.options.set(yash_env::option::Option::XTrace, On);
         let command: CompoundCommand = r"for i in 1 \$ 3; do echo $i; done".parse().unwrap();
-        command.execute(&mut env).now_or_never().unwrap();
+        _ = command.execute(&mut env).now_or_never().unwrap();
         assert_stderr(&state, |stderr| {
             assert_eq!(stderr, "for i in 1 '$' 3\necho 1\necho '$'\necho 3\n");
         });

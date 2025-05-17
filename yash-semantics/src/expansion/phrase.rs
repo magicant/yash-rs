@@ -62,7 +62,6 @@ pub enum Phrase {
 use Phrase::*;
 
 impl PartialEq for Phrase {
-    #[must_use]
     fn eq(&self, other: &Phrase) -> bool {
         match (self, other) {
             (Char(left), Char(right)) => left == right,
@@ -311,7 +310,6 @@ impl Phrase {
 
 impl From<AttrChar> for Phrase {
     #[inline]
-    #[must_use]
     fn from(c: AttrChar) -> Self {
         Char(c)
     }
@@ -319,7 +317,6 @@ impl From<AttrChar> for Phrase {
 
 impl From<Vec<AttrChar>> for Phrase {
     #[inline]
-    #[must_use]
     fn from(chars: Vec<AttrChar>) -> Self {
         Field(chars)
     }
@@ -327,14 +324,12 @@ impl From<Vec<AttrChar>> for Phrase {
 
 impl From<Vec<Vec<AttrChar>>> for Phrase {
     #[inline]
-    #[must_use]
     fn from(fields: Vec<Vec<AttrChar>>) -> Self {
         Full(fields)
     }
 }
 
 impl From<Phrase> for Vec<Vec<AttrChar>> {
-    #[must_use]
     fn from(phrase: Phrase) -> Self {
         match phrase {
             Char(c) => vec![vec![c]],
@@ -379,7 +374,6 @@ impl Iterator for IntoIter {
         }
     }
 
-    #[must_use]
     fn size_hint(&self) -> (usize, Option<usize>) {
         match &self.0 {
             IntoIterState::None => (0, Some(0)),
@@ -389,7 +383,6 @@ impl Iterator for IntoIter {
     }
 
     #[inline]
-    #[must_use]
     fn count(self) -> usize {
         self.len()
     }
@@ -421,7 +414,6 @@ impl FusedIterator for IntoIter {}
 impl IntoIterator for Phrase {
     type Item = Vec<AttrChar>;
     type IntoIter = IntoIter;
-    #[must_use]
     fn into_iter(self) -> IntoIter {
         IntoIter(match self {
             Char(c) => IntoIterState::Char(c),
@@ -446,7 +438,6 @@ impl AddAssign for Phrase {
 impl Add for Phrase {
     type Output = Phrase;
     #[inline]
-    #[must_use]
     fn add(mut self, other: Phrase) -> Self {
         self.add_assign(other);
         self

@@ -136,7 +136,7 @@ mod tests {
         in_virtual_system(|mut env, _state| async move {
             env.builtins.insert("return", return_builtin());
             let command: syntax::SimpleCommand = ">/tmp/foo$(return -n 42)".parse().unwrap();
-            command.execute(&mut env).await;
+            _ = command.execute(&mut env).await;
             assert_eq!(env.exit_status, ExitStatus(42));
         });
     }
@@ -147,7 +147,7 @@ mod tests {
             env.builtins.insert("return", return_builtin());
             let command = &"$(return -n 11) < /no/such/file$(return -n 22)";
             let command: syntax::SimpleCommand = command.parse().unwrap();
-            command.execute(&mut env).await;
+            _ = command.execute(&mut env).await;
             assert_eq!(env.exit_status, ExitStatus::ERROR);
         });
     }
@@ -181,7 +181,7 @@ mod tests {
         in_virtual_system(|mut env, _state| async move {
             env.builtins.insert("return", return_builtin());
             let command: syntax::SimpleCommand = "a=$(return -n 12)".parse().unwrap();
-            command.execute(&mut env).await;
+            _ = command.execute(&mut env).await;
             assert_eq!(env.exit_status, ExitStatus(12));
         })
     }

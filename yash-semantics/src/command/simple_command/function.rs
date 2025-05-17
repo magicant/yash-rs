@@ -143,7 +143,7 @@ mod tests {
         env.functions.define(function).unwrap();
         let command: SimpleCommand = "foo >/tmp/file".parse().unwrap();
 
-        command.execute(&mut env).now_or_never().unwrap();
+        _ = command.execute(&mut env).now_or_never().unwrap();
         let file = state.borrow().file_system.get("/tmp/file").unwrap();
         let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
@@ -243,7 +243,7 @@ mod tests {
         env.functions.define(function).unwrap();
         let command: SimpleCommand = "foo".parse().unwrap();
 
-        command.execute(&mut env).now_or_never().unwrap();
+        _ = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(env.variables.get("x"), None);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "42\n"));
     }
@@ -262,7 +262,7 @@ mod tests {
         env.functions.define(function).unwrap();
         let command: SimpleCommand = "x=hello foo".parse().unwrap();
 
-        command.execute(&mut env).now_or_never().unwrap();
+        _ = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(env.variables.get("x"), None);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "hello\n"));
     }
@@ -304,7 +304,7 @@ mod tests {
         env.options.set(yash_env::option::XTrace, On);
         let command: SimpleCommand = "x=hello foo bar <>/dev/null".parse().unwrap();
 
-        command.execute(&mut env).now_or_never().unwrap();
+        _ = command.execute(&mut env).now_or_never().unwrap();
         assert_stderr(&state, |stderr| {
             assert_eq!(stderr, "x=hello foo bar 0<>/dev/null\nfor i in\n");
         });

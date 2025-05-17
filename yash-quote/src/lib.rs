@@ -167,7 +167,6 @@ impl<'a> From<&'a str> for Quoted<'a> {
 
 /// Constructs a quoted string.
 impl<'a> From<Quoted<'a>> for Cow<'a, str> {
-    #[must_use]
     fn from(q: Quoted<'a>) -> Self {
         if q.needs_quoting() {
             Owned(q.to_string())

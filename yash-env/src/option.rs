@@ -64,7 +64,6 @@ impl Display for State {
 
 impl Not for State {
     type Output = Self;
-    #[must_use]
     fn not(self) -> Self {
         match self {
             On => Off,

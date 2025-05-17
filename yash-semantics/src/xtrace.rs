@@ -50,7 +50,7 @@ async fn expand_ps4(env: &mut Env) -> String {
     let text = match value.parse::<Text>() {
         Ok(text) => text,
         Err(error) => {
-            error.handle(env).await;
+            _ = error.handle(env).await;
             return value;
         }
     };
@@ -58,7 +58,7 @@ async fn expand_ps4(env: &mut Env) -> String {
     match expand_text(env, &text).await {
         Ok((expansion, _exit_status)) => expansion,
         Err(error) => {
-            error.handle(env).await;
+            _ = error.handle(env).await;
             value
         }
     }

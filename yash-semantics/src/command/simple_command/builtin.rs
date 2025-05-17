@@ -140,7 +140,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         let command: syntax::SimpleCommand = "echo hello >/tmp/file".parse().unwrap();
-        command.execute(&mut env).now_or_never().unwrap();
+        _ = command.execute(&mut env).now_or_never().unwrap();
 
         let file = state.borrow().file_system.get("/tmp/file").unwrap();
         let file = file.borrow();
@@ -156,9 +156,9 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         let command: syntax::SimpleCommand = "echo hello >/tmp/file".parse().unwrap();
-        command.execute(&mut env).now_or_never().unwrap();
+        _ = command.execute(&mut env).now_or_never().unwrap();
         let command: syntax::SimpleCommand = "echo world".parse().unwrap();
-        command.execute(&mut env).now_or_never().unwrap();
+        _ = command.execute(&mut env).now_or_never().unwrap();
 
         assert_stdout(&state, |stdout| assert_eq!(stdout, "world\n"));
     }
@@ -180,9 +180,9 @@ mod tests {
             }),
         );
         let command: syntax::SimpleCommand = "exec >/tmp/file".parse().unwrap();
-        command.execute(&mut env).now_or_never().unwrap();
+        _ = command.execute(&mut env).now_or_never().unwrap();
         let command: syntax::SimpleCommand = "echo hello".parse().unwrap();
-        command.execute(&mut env).now_or_never().unwrap();
+        _ = command.execute(&mut env).now_or_never().unwrap();
 
         let file = state.borrow().file_system.get("/tmp/file").unwrap();
         let file = file.borrow();
@@ -226,7 +226,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let command: syntax::SimpleCommand = "v=42 return -n 0".parse().unwrap();
-        command.execute(&mut env).now_or_never().unwrap();
+        _ = command.execute(&mut env).now_or_never().unwrap();
         let v = env.variables.get("v").unwrap();
         assert_eq!(v.value, Some(Value::scalar("42")));
         assert!(!v.is_exported);
@@ -239,7 +239,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("local", local_builtin());
         let command: syntax::SimpleCommand = "v=42 local v".parse().unwrap();
-        command.execute(&mut env).now_or_never().unwrap();
+        _ = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(env.variables.get("v"), None);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "v=42\n"));
     }
@@ -281,9 +281,9 @@ mod tests {
             Builtin::new(yash_env::builtin::Type::Special, special_main),
         );
         let command: syntax::SimpleCommand = "builtin".parse().unwrap();
-        command.execute(&mut env).now_or_never().unwrap();
+        _ = command.execute(&mut env).now_or_never().unwrap();
         let command: syntax::SimpleCommand = "special".parse().unwrap();
-        command.execute(&mut env).now_or_never().unwrap();
+        _ = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(env.stack[..], []);
     }
 
@@ -295,7 +295,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         env.options.set(yash_env::option::XTrace, On);
         let command: syntax::SimpleCommand = "foo=bar echo hello >/dev/null".parse().unwrap();
-        command.execute(&mut env).now_or_never().unwrap();
+        _ = command.execute(&mut env).now_or_never().unwrap();
 
         assert_stderr(&state, |stderr| {
             assert_eq!(stderr, "foo=bar echo hello 1>/dev/null\n");

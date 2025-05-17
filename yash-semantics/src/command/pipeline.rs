@@ -378,7 +378,7 @@ mod tests {
             env.builtins.insert("return", return_builtin());
             let pipeline: syntax::Pipeline =
                 "return -n 1 | return -n 2 | return -n 3".parse().unwrap();
-            pipeline.execute(&mut env).await;
+            _ = pipeline.execute(&mut env).await;
 
             // Only the original process remains.
             for (pid, process) in &state.borrow().processes {
@@ -400,7 +400,7 @@ mod tests {
             env.builtins.insert("return", return_builtin());
 
             let list: syntax::List = "return -n 7&".parse().unwrap();
-            list.execute(&mut env).await;
+            _ = list.execute(&mut env).await;
             let async_pid = {
                 let state = state.borrow();
                 let mut iter = state.processes.keys();
@@ -412,7 +412,7 @@ mod tests {
 
             let pipeline: syntax::Pipeline =
                 "return -n 1 | return -n 2 | return -n 3".parse().unwrap();
-            pipeline.execute(&mut env).await;
+            _ = pipeline.execute(&mut env).await;
 
             let state = state.borrow();
             let process = &state.processes[&async_pid];

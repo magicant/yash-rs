@@ -368,7 +368,8 @@ mod tests {
             .parse()
             .unwrap();
 
-        command.execute(&mut env).now_or_never().unwrap();
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
         assert_stdout(&state, |stdout| assert_eq!(stdout, "1\n"));
     }
 
@@ -436,7 +437,7 @@ mod tests {
             "case ${unset-X} in (foo);; (bar | ${unset-X} | not_reached) esac"
                 .parse()
                 .unwrap();
-        command.execute(&mut env).now_or_never().unwrap();
+        _ = command.execute(&mut env).now_or_never().unwrap();
         assert_stderr(&state, |stderr| assert_eq!(stderr, "case X in\n"));
     }
 
