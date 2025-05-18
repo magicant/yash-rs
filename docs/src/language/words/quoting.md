@@ -19,6 +19,7 @@ Additionally, the following characters are treated specially in certain contexts
 ```
 
 It is best to quote or escape these characters when they are used to stand for themselves in a command.
+You also need to quote [reserved words](keywords.md) (e.g., `if`, `while`, etc.) to treat them as regular words.
 
 The following subsections explain methods for quoting and escaping characters in the shell.
 

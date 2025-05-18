@@ -8,7 +8,7 @@
 - [Getting started](getting_started.md)
 - [Shell language]()
     - [Invoking utilities]()
-    - [Words, tokens, and fields]()
+    - [Words, tokens, and fields](language/words/README.md)
         - [Quoting and escaping](language/words/quoting.md)
         - [Reserved words](language/words/keywords.md)
         - [Comments](language/words/comments.md)
