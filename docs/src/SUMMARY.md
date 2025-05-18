@@ -20,7 +20,7 @@
         - [Pathname expansion]()
         - [Quote removal]()
     - [Parameters](language/parameters/README.md)
-        - [Variables]()
+        - [Variables](language/parameters/variables.md)
             - [Arrays]()
         - [Special parameters]()
         - [Positional parameters]()
