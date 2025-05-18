@@ -47,9 +47,9 @@ Note that the `>` prompt indicates that the command continues on the next line.
 You cannot include a single quote character inside a single-quoted string. Use double quotes or a backslash to escape it:
 
 ```shell
-$ echo \'
-'
 $ echo "'"
+'
+$ echo \'
 '
 ```
 
