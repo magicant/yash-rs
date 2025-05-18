@@ -1,10 +1,30 @@
 # Quoting and escaping
 
-Quoting and escaping control how the shell interprets special characters and whitespace in commands and arguments. This section describes the quoting and escaping mechanisms available in the shell.
+Some characters have special meanings in the shell. For example, the dollar sign (`$`) is used for parameter expansion, and the asterisk (`*`) is used for pathname expansion. To include these characters literally in a command, you need to quote or escape them.
+
+## What characters need quoting?
+
+The following characters have special meanings in the shell and may need quoting or escaping:
+
+```text
+|  &  ;  <  >  (  )  $  `  \  "  '
+```
+
+Whitespace characters (spaces, tabs, and newlines) also need quoting or escaping if they are part of a command word.
+
+Additionally, the following characters are treated specially in certain contexts:
+
+```text
+*  ?  [  ]  ^  -  !  #  ~  =  %  {  ,  }
+```
+
+It is best to quote or escape these characters when they are used to stand for themselves in a command.
+
+The following subsections explain methods for quoting and escaping characters in the shell.
 
 ## Single quotes
 
-Single quotes enclose a string and prevent the shell from interpreting special characters. Everything inside single quotes is treated literally, including spaces and special characters.
+**Single quotes** enclose a string and prevent the shell from interpreting special characters. Everything inside single quotes is treated literally, including spaces and special characters.
 
 For example, the following command prints the string `"$foo"` without interpreting the `$` as a parameter expansion or the `"` as a double quote:
 
@@ -22,15 +42,24 @@ foo
 bar
 ```
 
-You cannot include a single quote character inside a single-quoted string. You need to use double quotes or a backslash to escape it.
+Note that the `>` prompt indicates that the command continues on the next line.
+
+You cannot include a single quote character inside a single-quoted string. Use double quotes or a backslash to escape it:
+
+```shell
+$ echo "'"
+'
+$ echo \'
+'
+```
 
 ## Double quotes
 
-Double quotes enclose a string. Most characters inside double quotes are treated literally, but some characters are still interpreted by the shell:
+**Double quotes** enclose a string. Most characters inside double quotes are treated literally, but some characters are still interpreted by the shell:
 
 - `$`: Parameter expansion, command substitution, and arithmetic expansion
 - `` ` ``: Command substitution
-- `\`: Character escape, only before `$`, `` ` ``, `\`, and newline
+- `\`: Character escape, only before `"`, `$`, `` ` ``, `\`, and newline
 
 For example, single quote characters are treated literally and parameter expansion is performed inside double quotes:
 
@@ -44,19 +73,19 @@ Double quotes prevent field splitting and pathname expansion on the result of ex
 
 ## Backslash
 
-The backslash escapes special characters, allowing you to include them in a string without interpretation.
+The **backslash** escapes special characters, allowing you to include them in a string without interpretation.
 
 Outside double quotes, a backslash can escape any character except newline. For example:
 
-```bash
+```sh
 cat My\ Diary.txt
 ```
 
 This prints the contents of the file `My Diary.txt`.
 
-When used in double quotes, the backslash only escapes the following characters: `$`, `` ` ``, and `\`. For example:
+When used in double quotes, the backslash only escapes the following characters: `"`, `$`, `` ` ``, and `\`. For example:
 
-```bash
+```sh
 cat "My\ Diary\$.txt"
 ```
 
@@ -64,7 +93,7 @@ This will print the contents of the file `My\ Diary$.txt`. Note that the backsla
 
 ### Line continuation
 
-When a backslash is placed at the end of a line, it indicates that the command continues on the next line. This is useful for breaking long commands into multiple lines for better readability. The combination of a backslash and newline is ignored by the shell as if it were not there. Line continuation can be used inside and outside double quotes.
+**Line continuation** allows you to split long commands into multiple lines for better readability. Use a backslash followed by a newline to indicate that the command continues on the next line. A backslash-newline pair is ignored by the shell as if it were not there. Line continuation can be used inside and outside double quotes, but not inside single quotes.
 
 ```shell
 $ echo "This is a long command that \
@@ -76,7 +105,7 @@ To treat a newline literally rather than as a line continuation, use single or d
 
 ## Dollar single quotes
 
-Dollar single quotes (`$'...'`) are used to specify strings with escape sequences, similar to those in C. The content inside the quotes is parsed, and recognized escape sequences are replaced with their corresponding characters.
+**Dollar single quotes** (`$'...'`) are used to specify strings with escape sequences, similar to those in C. The content inside the quotes is parsed, and recognized escape sequences are replaced with their corresponding characters.
 
 For example, `\n` is replaced with a newline character:
 
