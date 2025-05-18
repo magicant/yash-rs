@@ -19,7 +19,7 @@
         - [Field splitting]()
         - [Pathname expansion]()
         - [Quote removal]()
-    - [Parameters]()
+    - [Parameters](language/parameters/README.md)
         - [Variables]()
             - [Arrays]()
         - [Special parameters]()
