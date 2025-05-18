@@ -44,10 +44,6 @@
 - [Shell options]()
 - [Shell environment and subshells]()
 - [Signals and traps]()
-- [Interactive shell]()
-    - [Command prompt]()
-    - [Job control]()
-- [Script debugging]() <!-- errexit, noexec, xtrace, etc. -->
 - [Built-in utilities]()
     - [. (dot)]()
     - [: (colon)]()
@@ -83,5 +79,9 @@
     - [unalias]()
     - [unset]()
     - [wait]()
+- [Interactive shell]()
+    - [Command prompt]()
+    - [Job control]()
+- [Script debugging]() <!-- errexit, noexec, xtrace, etc. -->
 - [Versioning and compatibility]()
 - [FAQ and troubleshooting]()
