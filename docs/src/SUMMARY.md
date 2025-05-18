@@ -12,7 +12,7 @@
         - [Quoting and escaping](language/words/quoting.md)
         - [Reserved words](language/words/keywords.md)
         - [Comments](language/words/comments.md)
-        - [Tilde expansion]()
+        - [Tilde expansion](language/words/tilde.md)
         - [Parameter expansion]()
         - [Command substitution]()
         - [Arithmetic expansion]()
