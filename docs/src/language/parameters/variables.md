@@ -38,7 +38,7 @@ $ echo $rawdir
 ~/$user
 ```
 
-Note that <!-- brace expansion, --> field splitting and pathname expansion do not happen during variable assignment.
+Note that <!-- TODO: brace expansion, --> field splitting and pathname expansion do not happen during variable assignment.
 
 ```shell
 $ star=* # assigns a literal `*` to the variable `star`
