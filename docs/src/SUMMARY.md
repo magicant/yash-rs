@@ -6,6 +6,7 @@
 
 - [Installation](installation.md)
 - [Getting started](getting_started.md)
+- [Versioning and compatibility]() <!-- POSIX conformance -->
 - [Shell language]()
     - [Invoking utilities]()
     - [Words, tokens, and fields](language/words/README.md)
@@ -13,7 +14,7 @@
         - [Reserved words](language/words/keywords.md)
         - [Comments](language/words/comments.md)
         - [Tilde expansion](language/words/tilde.md)
-        - [Parameter expansion]()
+        - [Parameter expansion](language/words/parameters.md)
         - [Command substitution]()
         - [Arithmetic expansion]()
         - [Field splitting]()
@@ -83,5 +84,4 @@
     - [Command prompt]()
     - [Job control]()
 - [Script debugging]() <!-- errexit, noexec, xtrace, etc. -->
-- [Versioning and compatibility]()
 - [FAQ and troubleshooting]()
