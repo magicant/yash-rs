@@ -63,7 +63,7 @@ foo2
 
 ## Modifiers
 
-Modifiers manipulate the value of a parameter during expansion. Modifiers can only be used in braced parameter expansions.
+Modifiers manipulate the value of a parameter during expansion. Modifiers can only be used in braced parameter expansions. At most one modifier can be used in a single expansion.
 
 ### Length
 
@@ -81,9 +81,9 @@ As an extension to POSIX, the length modifier can also be used with an array or 
 $ users=(Alice Bob Charlie)
 $ echo "Lengths of users: ${#users}"
 Lengths of users: 5 3 7
-$ set sprint summer fall winter # set four positional parameters
+$ set yellow red green blue # set four positional parameters
 $ echo "Lengths of positional parameters: ${#*}"
-Lengths of positional parameters: 6 6 4 6
+Lengths of positional parameters: 6 3 5 4
 ```
 
 ### Switch
@@ -99,7 +99,45 @@ The switch modifier triggers a specific action based on (non-)existence of a par
 - `${parameter?word}` – If `parameter` is unset, fail with `word` as the error message.
 - `${parameter:?word}` – If `parameter` is unset or empty, fail with `word` as the error message.
 
-<!-- TODO: add examples for all switch modifiers -->
+```shell
+$ user="Alice"
+$ echo "Hello, ${user-World}!"
+Hello, Alice!
+$ unset user
+$ echo "Hello, ${user-World}!"
+Hello, World!
+```
+
+```shell
+$ unset PATH
+$ PATH="/bin${PATH:+:$PATH}"
+$ echo "$PATH"
+/bin
+$ PATH="/usr/bin${PATH:+:$PATH}"
+$ echo "$PATH"
+/usr/bin:/bin
+```
+
+```shell
+$ unset user
+$ echo "Hello, ${user=Alice}!"
+Hello, Alice!
+$ echo "Hello, ${user=Bob}!"
+Hello, Alice!
+```
+
+```shell
+$ user="Alice"
+$ echo "Hello, ${user?tell me your name}!"
+Hello, Alice!
+$ unset user
+$ echo "Hello, ${user?tell me your name}!"
+error: tell me your name
+ --> <stdin>:1:14
+  |
+1 | echo "Hello, ${user?tell me your name}!"
+  |              ^^^^^^^^^^^^^^^^^^^^^^^^^ parameter `user` is not set
+```
 
 In all cases, `word` is expanded before being used; specifically, the following expansions are performed:
 
