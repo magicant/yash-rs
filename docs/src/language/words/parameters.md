@@ -63,11 +63,11 @@ foo2
 
 ## Modifiers
 
-Modifiers manipulate the value of a parameter during expansion. Modifiers can only be used in braced parameter expansions. At most one modifier can be used in a single expansion.
+**Modifiers** manipulate the value of a parameter during expansion. Modifiers can only be used in braced parameter expansions. At most one modifier can be used in a single expansion.
 
 ### Length
 
-The length modifier `${#parameter}` returns the length of the value of the parameter. The length is the number of characters in the value, not the number of bytes.
+The **length** modifier `${#parameter}` returns the length of the value of the parameter. The length is the number of characters in the value, not the number of bytes.
 
 ```shell
 $ user="Alice"
@@ -75,7 +75,7 @@ $ echo "Length of user: ${#user}"
 Length of user: 5
 ```
 
-As an extension to POSIX, the length modifier can also be used with an array or the special parameter `*` or `@`, in which case the modifier is applied to each element of the array or positional parameters.
+As an extension to POSIX, the length modifier can also be used with an array or special parameter `*` or `@`, in which case the modifier is applied to each element of the array or positional parameters.
 
 ```shell
 $ users=(Alice Bob Charlie)
@@ -88,7 +88,7 @@ Lengths of positional parameters: 6 3 5 4
 
 ### Switch
 
-The switch modifier triggers a specific action based on (non-)existence of a parameter. There are eight forms of the switch modifier:
+The **switch** modifier triggers a specific action based on (non-)existence of a parameter. There are eight forms of the switch modifier:
 
 - `${parameter-word}` – If `parameter` is unset, use `word` as the value.
 - `${parameter:-word}` – If `parameter` is unset or empty, use `word` as the value.
@@ -156,4 +156,52 @@ The `nounset` shell option does not apply to parameters expanded with a switch m
 
 ### Trim
 
-<!-- TODO: describe trim modifier -->
+The **trim** modifier removes leading or trailing characters from the value of a parameter. There are four forms of the trim modifier:
+
+- `${parameter#pattern}` – Remove the shortest match of `pattern` from the start of the value.
+- `${parameter##pattern}` – Remove the longest match of `pattern` from the start of the value.
+- `${parameter%pattern}` – Remove the shortest match of `pattern` from the end of the value.
+- `${parameter%%pattern}` – Remove the longest match of `pattern` from the end of the value.
+
+In all cases, the value is matched against the pattern. <!-- TODO: See [Pattern matching]() for more details. -->
+The part of the value that matches the pattern is removed.
+
+```shell
+$ var="banana"
+$ echo "${var#*a}"
+nana
+$ echo "${var##*a}"
+
+$ echo "${var%a*}"
+banan
+$ echo "${var%%a*}"
+b
+```
+
+The pattern is expanded before being used, specifically, the following expansions are performed:
+
+- [Tilde expansion](../words/tilde.md)
+- Parameter expansion (recursive!)
+- Command substitution
+- Arithmetic expansion
+
+You can quote (part of) the pattern to treat it literally:
+
+```shell
+$ asterisks="***"
+$ echo "${asterisks#*}" # matches nothing
+***
+$ echo "${asterisks#\*}" # removes the first * only
+**
+$ echo "${asterisks#'**'}" # removes the first two *s
+*
+```
+
+### Compatibility
+
+Some modifiers are ambiguous when used with a certain special parameter. Yash and many other shells interpret `${##}`, `${#-}`, and `${#?}` as length modifiers applied to special parameters `#`, `-`, and `?`, respectively, rather than switch and trim modifiers being applied to special parameter `#`. The POSIX standard is unclear on this point.
+
+The result is unspecified in POSIX for the following cases:
+
+- a length or switch modifier applied to special parameter `*` or `@`
+- a trim modifier applied to special parameter `#`, `*`, or `@`

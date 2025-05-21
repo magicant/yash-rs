@@ -92,6 +92,14 @@ cat "My\ Diary\$.txt"
 
 This will print the contents of the file `My\ Diary$.txt`. Note that the backslash before the space is treated literally, and the backslash before the dollar sign is treated as an escape character.
 
+When used in a braced [parameter expansion](parameters.md) that occurs inside double quotes, the backslash additionally escapes `}`:
+
+```shell
+$ var="{foo}bar"
+$ echo "${var#*\}}"
+bar
+```
+
 ### Line continuation
 
 **Line continuation** allows you to split long commands into multiple lines for better readability. Use a backslash followed by a newline to indicate that the command continues on the next line. A backslash-newline pair is ignored by the shell as if it were not there. Line continuation can be used inside and outside double quotes, but not inside single quotes.
