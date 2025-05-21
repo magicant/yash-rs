@@ -1,7 +1,6 @@
 # Parameter expansion
 
-**Parameter expansion** retrieves the value of a [parameter](../parameters/README.md) when the containing command is executed.
-The basic syntax is `${parameter}`.
+**Parameter expansion** retrieves the value of a [parameter](../parameters/README.md) when a command is executed. The basic syntax is `${parameter}`.
 
 ```shell
 $ user="Alice" # define a variable
@@ -11,15 +10,15 @@ Hello, Alice!
 
 ## Unset parameters
 
-If a parameter is unset, the shell by default expands it to an empty string.
+If a parameter is unset, the shell expands it to an empty string by default.
 
 ```shell
-$ unset user # unset the variable
+$ unset user
 $ echo "Hello, ${user}!"
 Hello, !
 ```
 
-However, if the `nounset` shell option is set, the shell treats unset parameters as an error.
+If the `nounset` shell option is enabled, expanding an unset parameter is an error:
 
 ```shell
 $ set -o nounset
@@ -33,41 +32,40 @@ error: cannot expand unset parameter
   = info: unset parameters are disallowed by the nounset option
 ```
 
-It is highly recommended to use this option to catch misspelled variable names in scripts.
+Using `nounset` is recommended to catch typos in variable names.
 
 ## Omitting braces
 
-The braces are optional if the parameter is one of:
+Braces are optional if the parameter is:
 
-- a variable name that consists only of ASCII letters, digits, and underscores (e.g., `$HOME`, `$user`, etc.)
-- a special parameter (e.g., `$?`, `$#`, etc.)
-- a single-digit positional parameter (e.g., `$1`, `$2`, etc.)
+- a variable name with only ASCII letters, digits, and underscores (e.g., `$HOME`, `$user`)
+- a special parameter (e.g., `$?`, `$#`)
+- a single-digit positional parameter (e.g., `$1`, `$2`)
 
-For a variable name without braces, the shell assumes the longest possible name regardless of whether the named variable exists.
-In the following example, `username` is the longest name after `$`, so the shell attempts to expand it. The existing variable `user` is not considered.
+For variable names, the shell uses the longest possible name after `$`, regardless of whether the variable exists:
 
 ```shell
 $ user="Alice"
 $ unset username
-$ echo "Hello, $username!"
+$ echo "Hello, $username!" # $user is not considered
 Hello, !
 ```
 
-For a positional parameter without braces, the shell assumes a single-digit parameter, even if it is followed by another digit. In the following example, `1` is treated as a positional parameter, while `2` is treated as a literal character.
+For positional parameters, only a single digit is used, even if followed by more digits:
 
 ```shell
 $ set foo bar baz # set three positional parameters
-$ echo "$12"
+$ echo "$12" # $1 expands to the first positional parameter
 foo2
 ```
 
 ## Modifiers
 
-**Modifiers** manipulate the value of a parameter during expansion. Modifiers can only be used in braced parameter expansions. At most one modifier can be used in a single expansion.
+**Modifiers** change the value of a parameter during expansion. Modifiers can only be used in braced expansions, and only one modifier is allowed per expansion.
 
 ### Length
 
-The **length** modifier `${#parameter}` returns the length of the value of the parameter. The length is the number of characters in the value, not the number of bytes.
+The **length** modifier `${#parameter}` returns the number of characters in the parameter's value.
 
 ```shell
 $ user="Alice"
@@ -75,7 +73,7 @@ $ echo "Length of user: ${#user}"
 Length of user: 5
 ```
 
-As an extension to POSIX, the length modifier can also be used with an array or special parameter `*` or `@`, in which case the modifier is applied to each element of the array or positional parameters.
+As an extension, the length modifier can be used with arrays or special parameters `*` or `@`, applying the modifier to each element:
 
 ```shell
 $ users=(Alice Bob Charlie)
@@ -88,16 +86,18 @@ Lengths of positional parameters: 6 3 5 4
 
 ### Switch
 
-The **switch** modifier triggers a specific action based on (non-)existence of a parameter. There are eight forms of the switch modifier:
+The **switch** modifier changes the result based on whether a parameter is set or empty. There are eight forms:
 
-- `${parameter-word}` – If `parameter` is unset, use `word` as the value.
-- `${parameter:-word}` – If `parameter` is unset or empty, use `word` as the value.
-- `${parameter+word}` – If `parameter` is set, use `word` as the value.
-- `${parameter:+word}` – If `parameter` is set and not empty, use `word` as the value.
-- `${parameter=word}` – If `parameter` is unset, assign `word` to it and use `word` as the value.
-- `${parameter:=word}` – If `parameter` is unset or empty, assign `word` to it and use `word` as the value.
-- `${parameter?word}` – If `parameter` is unset, fail with `word` as the error message.
-- `${parameter:?word}` – If `parameter` is unset or empty, fail with `word` as the error message.
+- `${parameter-word}` – Use `word` if `parameter` is unset.
+- `${parameter:-word}` – Use `word` if `parameter` is unset or empty.
+- `${parameter+word}` – Use `word` if `parameter` is set.
+- `${parameter:+word}` – Use `word` if `parameter` is set and not empty.
+- `${parameter=word}` – Assign `word` to `parameter` if unset, using the new value.
+- `${parameter:=word}` – Assign `word` to `parameter` if unset or empty, using the new value.
+- `${parameter?word}` – Error with `word` if `parameter` is unset.
+- `${parameter:?word}` – Error with `word` if `parameter` is unset or empty.
+
+Examples:
 
 ```shell
 $ user="Alice"
@@ -139,32 +139,31 @@ error: tell me your name
   |              ^^^^^^^^^^^^^^^^^^^^^^^^^ parameter `user` is not set
 ```
 
-In all cases, `word` is expanded before being used; specifically, the following expansions are performed:
+In all cases, the following expansions are performed on `word` before use:
 
 - [Tilde expansion](../words/tilde.md)
 - Parameter expansion (recursive!)
 - Command substitution
 - Arithmetic expansion
 
-For the `=` and `:=` forms, quote removal is also performed on `word` before assignment.
+For the `=` and `:=` forms, quote removal is also performed before assignment.
 
-An empty `word` is allowed. A default error message is used if `word` is empty for the `?` and `:?` forms.
+If `word` is empty in the `?` and `:?` forms, a default error message is used.
 
-For the `=` and `:=` forms, the assignment is possible only if the parameter is a variable. If the parameter is a special or positional parameter, the expansion fails with an error message.
+Assignment with `=` and `:=` only works for variables, not special or positional parameters.
 
-The `nounset` shell option does not apply to parameters expanded with a switch modifier.
+The `nounset` option does not apply to expansions with a switch modifier.
 
 ### Trim
 
-The **trim** modifier removes leading or trailing characters from the value of a parameter. There are four forms of the trim modifier:
+The **trim** modifier removes leading or trailing characters matching a pattern from a parameter's value. There are four forms:
 
-- `${parameter#pattern}` – Remove the shortest match of `pattern` from the start of the value.
-- `${parameter##pattern}` – Remove the longest match of `pattern` from the start of the value.
-- `${parameter%pattern}` – Remove the shortest match of `pattern` from the end of the value.
-- `${parameter%%pattern}` – Remove the longest match of `pattern` from the end of the value.
+- `${parameter#pattern}` – Remove the shortest match of `pattern` from the start.
+- `${parameter##pattern}` – Remove the longest match of `pattern` from the start.
+- `${parameter%pattern}` – Remove the shortest match of `pattern` from the end.
+- `${parameter%%pattern}` – Remove the longest match of `pattern` from the end.
 
-In all cases, the value is matched against the pattern. <!-- TODO: See [Pattern matching]() for more details. -->
-The part of the value that matches the pattern is removed.
+The value is matched against the pattern, and the matching part is removed. <!-- TODO: link to [pattern matching] -->
 
 ```shell
 $ var="banana"
@@ -178,30 +177,30 @@ $ echo "${var%%a*}"
 b
 ```
 
-The pattern is expanded before being used, specifically, the following expansions are performed:
+The pattern is expanded before use:
 
 - [Tilde expansion](../words/tilde.md)
 - Parameter expansion (recursive!)
 - Command substitution
 - Arithmetic expansion
 
-You can quote (part of) the pattern to treat it literally:
+You can quote part or all of the pattern to treat it literally:
 
 ```shell
 $ asterisks="***"
-$ echo "${asterisks#*}" # matches nothing
-***
-$ echo "${asterisks#\*}" # removes the first * only
+$ echo "${asterisks##*}" # removes the whole value
+
+$ echo "${asterisks##\*}" # removes the first *
 **
-$ echo "${asterisks#'**'}" # removes the first two *s
+$ echo "${asterisks##'**'}" # removes the first two *
 *
 ```
 
 ### Compatibility
 
-Some modifiers are ambiguous when used with a certain special parameter. Yash and many other shells interpret `${##}`, `${#-}`, and `${#?}` as length modifiers applied to special parameters `#`, `-`, and `?`, respectively, rather than switch and trim modifiers being applied to special parameter `#`. The POSIX standard is unclear on this point.
+Some modifiers are ambiguous when used with a certain special parameter. Yash and many other shells interpret `${##}`, `${#-}`, and `${#?}` as length modifiers applied to special parameters `#`, `-`, and `?`, not as switch or trim modifiers applied to `#`. The POSIX standard is unclear on this point.
 
-The result is unspecified in POSIX for the following cases:
+The result is unspecified in POSIX for:
 
 - a length or switch modifier applied to special parameter `*` or `@`
 - a trim modifier applied to special parameter `#`, `*`, or `@`
