@@ -1,0 +1,124 @@
+set -Ceu
+
+while getopts '' option; do
+  case $option in
+    (\?)
+      printf '%s: invalid option: -%s\n' "$0" "$OPTARG" >&2
+      exit 2
+      ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+if [ $# -eq 0 ]; then
+    # scan all files
+    exec find "$(dirname -- "$0")" -type f -name '*.md' -exec "$0" {} +
+    exit
+fi
+
+tmpdir="${TMPDIR:-/tmp}"
+tmpdir="${tmpdir%/}/tmp.$$"
+trap 'rm -rf -- "$tmpdir"' EXIT
+trap 'rm -rf -- "$tmpdir"; exit 99' HUP INT QUIT TERM
+mkdir -p "$tmpdir"
+
+script="$tmpdir/script.sh"
+expected="$tmpdir/expected.log"
+actual="$tmpdir/actual.log"
+
+success="true"
+
+nextline() {
+    lineno=$((lineno + 1))
+    IFS= read -r line
+}
+checksyntax() {
+    case " $* " in
+    (*' ignore '*)
+        ;;
+    (*)
+        if ! cargo run --quiet -- -n < "$script"; then
+            printf '%s:%d: error: syntax error in script\n' "$file" "$blocklineno" >&2
+            success="false"
+        fi
+        ;;
+    esac
+}
+checkoutput() {
+    case " $* " in
+    (*' ignore '*)
+        ;;
+    (*' no_run '*)
+        checksyntax "$@"
+        ;;
+    (*)
+        if cargo run --quiet < "$script" >| "$actual" 2>&1; ! diff -u "$expected" "$actual"; then
+            printf '%s:%d: error: script output does not match\n' "$file" "$blocklineno" >&2
+            success="false"
+        fi
+        ;;
+    esac
+}
+
+for file do
+    exec < "$file"
+    lineno=0
+
+    while nextline; do
+        case "$line" in
+        ('```'*)
+            blocklineno="$lineno"
+
+            # split attributes
+            attrs="${line#'```'}"
+            oldifs="$IFS"
+            IFS=', 	'
+            set -- $attrs
+            IFS="$oldifs"
+
+            case "${1-}" in
+            (sh)
+                # copy script to temporary file
+                while nextline && test "$line" != '```'; do
+                    printf '%s\n' "$line"
+                done >| "$script"
+
+                # check script syntax
+                checksyntax "$@"
+                ;;
+            (shell)
+                # clear file content
+                >| "$script" >| "$expected"
+
+                # read script and expected output from the block
+                # run the script and check the output against the expected
+                while nextline; do
+                    case "$line" in
+                    ('$ '*)
+                        checkoutput "$@"
+                        printf '%s\n' "${line#'$ '}" >> "$script"
+                        ;;
+                    ('> '*)
+                        printf '%s\n' "${line#'> '}" >> "$script"
+                        ;;
+                    ('```')
+                        checkoutput "$@"
+                        break
+                        ;;
+                    (*)
+                        printf '%s\n' "$line" >> "$expected"
+                        ;;
+                    esac
+                done
+                ;;
+            (*)
+                # skip without any check
+                while nextline && test "$line" != '```'; do :; done
+                ;;
+            esac
+            ;;
+        esac
+    done
+done
+
+"$success"
