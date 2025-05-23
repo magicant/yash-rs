@@ -16,6 +16,11 @@ if [ $# -eq 0 ]; then
     exit
 fi
 
+if ! [ "${YASH+set}" ]; then
+    YASH="$(cargo run --quiet -- -c 'printf "%s\n" "$0"')"
+    export YASH
+fi
+
 tmpdir="${TMPDIR:-/tmp}"
 tmpdir="${tmpdir%/}/tmp.$$"
 trap 'rm -rf -- "$tmpdir"' EXIT
@@ -50,7 +55,7 @@ checksyntax() {
     (*' ignore '*)
         ;;
     (*)
-        if ! cargo run --quiet -- -n < "$script"; then
+        if ! "$YASH" -n < "$script"; then
             printf '%s:%d: error: syntax error in script\n' "$file" "$blocklineno" >&2
             success="false"
         fi
@@ -65,7 +70,7 @@ checkoutput() {
         checksyntax "$@"
         ;;
     (*)
-        if cargo run --quiet < "$script" >| "$actual" 2>&1; ! diff -u "$expected" "$actual"; then
+        if "$YASH" < "$script" >| "$actual" 2>&1; ! diff -u "$expected" "$actual"; then
             printf '%s:%d: error: script output does not match\n' "$file" "$blocklineno" >&2
             success="false"
         fi
