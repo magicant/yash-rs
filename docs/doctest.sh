@@ -32,6 +32,19 @@ nextline() {
     lineno=$((lineno + 1))
     IFS= read -r line
 }
+gethidelines() {
+    hidelines=
+    for attr do
+        case "$attr" in
+        (hidelines=*)
+            hidelines="${attr#hidelines=}"
+            ;;
+        esac
+    done
+}
+applyhidelines() {
+    line=${line#"$hidelines"}
+}
 checksyntax() {
     case " $* " in
     (*' ignore '*)
@@ -76,10 +89,13 @@ for file do
             set -- $attrs
             IFS="$oldifs"
 
+            gethidelines "$@"
+
             case "${1-}" in
             (sh)
                 # copy script to temporary file
                 while nextline && test "$line" != '```'; do
+                    applyhidelines
                     printf '%s\n' "$line"
                 done >| "$script"
 
@@ -93,6 +109,12 @@ for file do
                 # read script and expected output from the block
                 # run the script and check the output against the expected
                 while nextline; do
+                    if [ "$line" = '```' ]; then
+                        checkoutput "$@"
+                        break
+                    fi
+
+                    applyhidelines
                     case "$line" in
                     ('$ '*)
                         checkoutput "$@"
@@ -100,10 +122,6 @@ for file do
                         ;;
                     ('> '*)
                         printf '%s\n' "${line#'> '}" >> "$script"
-                        ;;
-                    ('```')
-                        checkoutput "$@"
-                        break
                         ;;
                     (*)
                         printf '%s\n' "$line" >> "$expected"

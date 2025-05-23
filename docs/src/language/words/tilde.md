@@ -1,9 +1,10 @@
 # Tilde expansion
 
 In **tilde expansion**, the shell replaces a tilde (`~`) at the start of a word with the value of the `HOME` variable, allowing you to specify paths relative to your home directory.
-For example, if `HOME` is `/home/alice`, `~/Documents` expands to `/home/alice/Documents`.
+For example, if `HOME` is `/home/alice`:
 
-```shell
+```shell,hidelines=#
+#$ HOME=/home/alice
 $ echo ~
 /home/alice
 $ echo ~/Documents
@@ -14,7 +15,7 @@ The `HOME` variable is usually passed as an environment variable to the shell wh
 
 You can also use `~` followed by a username to refer to another user's home directory:
 
-```shell
+```shell,no_run
 $ echo ~bob
 /home/bob
 $ echo ~bob/Documents
@@ -23,7 +24,7 @@ $ echo ~bob/Documents
 
 In variable assignments, tilde expansion happens at the start of the value and after each `:` character:
 
-```shell
+```shell,no_run
 $ PATH=~/bin:~bob/bin:~clara/bin:/usr/bin
 $ echo "$PATH"
 /home/alice/bin:/home/bob/bin:/home/clara/bin:/usr/bin

@@ -133,10 +133,11 @@ Hello, Alice!
 $ unset user
 $ echo "Hello, ${user?tell me your name}!"
 error: tell me your name
- --> <stdin>:1:14
+ --> <stdin>:4:14
   |
-1 | echo "Hello, ${user?tell me your name}!"
+4 | echo "Hello, ${user?tell me your name}!"
   |              ^^^^^^^^^^^^^^^^^^^^^^^^^ parameter `user` is not set
+  |
 ```
 
 In all cases, the following expansions are performed on `word` before use:

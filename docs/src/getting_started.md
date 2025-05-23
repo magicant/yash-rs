@@ -10,7 +10,7 @@ yash3
 
 You will see a prompt, indicating the shell is ready for commands:
 
-```shell
+```shell,ignore
 $
 ```
 
@@ -29,7 +29,7 @@ In this example, `$` is the shell prompt, and `echo "Hello, world!"` is the comm
 
 You can also run other utilities, such as `ls`, which lists the files in the working directory:
 
-```shell
+```shell,no_run
 $ ls
 Documents  Downloads  Music  Pictures  Videos
 ```
@@ -40,8 +40,8 @@ The output varies depending on the files in your working directory.
 
 To interrupt a running command, press `Ctrl+C`. This sends an interrupt signal to the running utility, causing it to terminate. For example, if you run a command that takes a long time, you can cancel it with `Ctrl+C`:
 
-```shell
-sleep 10
+```shell,no_run
+$ sleep 10
 ```
 
 This command sleeps for 10 seconds, but you can interrupt it by pressing `Ctrl+C`. This aborts the `sleep` utility and returns you to the shell prompt immediately.
@@ -53,7 +53,7 @@ Note: Some utilities may not respond to `Ctrl+C` if they are designed to ignore 
 To exit the shell, use the `exit` command:
 
 ```shell
-exit
+$ exit
 ```
 
 This ends the shell session and returns you to your previous shell.
@@ -71,7 +71,7 @@ echo "Running in the shell"
 
 Run this script in the shell by using the `.` utility:
 
-```shell
+```shell,no_run
 $ . ./script.sh
 This is a script
 Running in the shell
@@ -79,7 +79,7 @@ Running in the shell
 
 You can also run the script by passing it as an argument to the shell:
 
-```shell
+```shell,no_run
 $ yash3 ./script.sh
 This is a script
 Running in the shell
@@ -89,7 +89,7 @@ This runs the script in a new shell session. The output will be the same.
 
 If you make the script executable, you can run it directly:
 
-```shell
+```shell,no_run
 $ chmod a+x script.sh
 $ ./script.sh
 This is a script
