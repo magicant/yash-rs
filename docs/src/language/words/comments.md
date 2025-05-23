@@ -21,7 +21,7 @@ Everything after `#` on the same line is ignored by the shell. You cannot use [l
 
 ```shell
 $ echo one # This backslash is not a line continuation 👉 \
-$ echo two # so these lines are separate commands
 one
+$ echo two # So this line is a separate command
 two
 ```

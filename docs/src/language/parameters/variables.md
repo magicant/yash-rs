@@ -28,7 +28,8 @@ Before a value is assigned, the following expansions are performed, if any:
 - Arithmetic expansion
 - Quote removal
 
-```shell
+```shell,hidelines=#
+#$ HOME=/home/alice
 $ topdir=~/my_project
 $ subdir=$topdir/docs
 $ echo $subdir
@@ -40,7 +41,7 @@ $ echo $rawdir
 
 Note that <!-- TODO: brace expansion, --> field splitting and pathname expansion do not happen during variable assignment.
 
-```shell
+```shell,no_run
 $ star=* # assigns a literal `*` to the variable `star`
 $ echo "$star" # shows the value of `star`
 *

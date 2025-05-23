@@ -64,9 +64,9 @@ Reserved words are recognized only when they appear as a whole word. In this exa
 ```shell
 $ {echo Hello}
 error: cannot execute external utility "{echo"
- --> <stdin>:2:1
+ --> <stdin>:1:1
   |
-2 | {echo Hello}
+1 | {echo Hello}
   | ^^^^^ utility not found
   |
 ```
