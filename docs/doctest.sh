@@ -1,3 +1,22 @@
+# This script runs documentation tests for markdown files in the docs directory.
+# It extracts code examples from the markdown files and executes them to ensure
+# that all documented code snippets are correct and up-to-date.
+#
+# Usage:
+#   ./doctest.sh [<file>...]
+#
+# Input parameters:
+#   Without any operands, the script scans all markdown files in the directory
+#   where the script is located and runs the tests on each file.
+#   If one or more file names are provided, the script runs the tests only on
+#   those files.
+#
+# Expected output:
+#   The script prints the results of failed tests.
+#   If any code snippet fails, the script exits with a non-zero status.
+#
+# If all tests pass, the script exits with a zero status.
+
 set -Ceu
 
 while getopts '' option; do
