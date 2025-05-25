@@ -100,6 +100,8 @@ $ echo "${var#*\}}"
 bar
 ```
 
+Within backquotes and arithmetic expansions, backslashes only escape `$`, `` ` ``, and `\`. If backquotes appear inside double quotes, backslashes also escape `"`. See examples in the [Command substitution](command_substitution.md#syntax) and [Arithmetic expansion](arithmetic.md#quoting) sections.
+
 ### Line continuation
 
 **Line continuation** allows you to split long commands into multiple lines for better readability. Use a backslash followed by a newline to indicate that the command continues on the next line. A backslash-newline pair is ignored by the shell as if it were not there. Line continuation can be used inside and outside double quotes, but not inside single quotes.

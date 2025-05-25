@@ -15,8 +15,8 @@
         - [Comments](language/words/comments.md)
         - [Tilde expansion](language/words/tilde.md)
         - [Parameter expansion](language/words/parameters.md)
-        - [Command substitution]()
-        - [Arithmetic expansion]()
+        - [Command substitution](language/words/command_substitution.md)
+        - [Arithmetic expansion](language/words/arithmetic.md)
         - [Field splitting]()
         - [Pathname expansion]()
         - [Quote removal]()
@@ -84,4 +84,6 @@
     - [Command prompt]()
     - [Job control]()
 - [Script debugging]() <!-- errexit, noexec, xtrace, etc. -->
+- [Pattern matching]()
+- [Arithmetic expressions](arithmetic.md)
 - [FAQ and troubleshooting]()
