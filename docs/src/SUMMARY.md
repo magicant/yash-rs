@@ -16,8 +16,8 @@
         - [Tilde expansion](language/words/tilde.md)
         - [Parameter expansion](language/words/parameters.md)
         - [Command substitution](language/words/command_substitution.md)
-        - [Arithmetic expansion](language/words/arithmetic.md)
-        - [Field splitting]()
+        - [Arithmetic expansion](language/words/arithmetic.md) <!-- TODO: Brace expansion -->
+        - [Field splitting](language/words/field_splitting.md)
         - [Pathname expansion]()
         - [Quote removal]()
     - [Parameters](language/parameters/README.md)
