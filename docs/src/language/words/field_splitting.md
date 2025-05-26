@@ -1,6 +1,6 @@
 # Field splitting
 
-**Field splitting** breaks a word into fields at delimiters. This happens after [parameter expansion], [command substitution], and [arithmetic expansion], but before pathname expansion and quote removal.
+**Field splitting** breaks a word into fields at delimiters. This happens after [parameter expansion], [command substitution], and [arithmetic expansion], but before [pathname expansion] and quote removal.
 
 In this example, `$flags` is split at the space, so `ls` receives two arguments:
 
@@ -166,3 +166,4 @@ $ for value in "$space"; do echo "[$value]"; done
 [parameter expansion]: parameters.md
 [command substitution]: command_substitution.md
 [arithmetic expansion]: arithmetic.md
+[pathname expansion]: globbing.md

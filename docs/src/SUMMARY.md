@@ -10,7 +10,7 @@
 - [Shell language]()
     - [Invoking utilities]()
     - [Words, tokens, and fields](language/words/README.md)
-        - [Quoting and escaping](language/words/quoting.md)
+        - [Quoting and escaping](language/words/quoting.md) <!-- TODO: quote removal -->
         - [Reserved words](language/words/keywords.md)
         - [Comments](language/words/comments.md)
         - [Tilde expansion](language/words/tilde.md)
@@ -18,8 +18,7 @@
         - [Command substitution](language/words/command_substitution.md)
         - [Arithmetic expansion](language/words/arithmetic.md) <!-- TODO: Brace expansion -->
         - [Field splitting](language/words/field_splitting.md)
-        - [Pathname expansion]()
-        - [Quote removal]()
+        - [Pathname expansion](language/words/globbing.md)
     - [Parameters](language/parameters/README.md)
         - [Variables](language/parameters/variables.md)
             - [Arrays]()
@@ -84,6 +83,6 @@
     - [Command prompt]()
     - [Job control]()
 - [Script debugging]() <!-- errexit, noexec, xtrace, etc. -->
-- [Pattern matching]()
+- [Pattern matching](patterns.md)
 - [Arithmetic expressions](arithmetic.md)
 - [FAQ and troubleshooting]()
