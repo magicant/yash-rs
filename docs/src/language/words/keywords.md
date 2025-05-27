@@ -30,7 +30,7 @@ Additionally, the POSIX standard allows for the following optional reserved word
 - `select` – Select command
 - `time` – Time command
 
-These four words are not reserved in yash now, but may be in the future.
+These four words are not reserved in yash-rs now, but may be in the future.
 
 ## Where are reserved words recognized?
 
