@@ -102,6 +102,7 @@ for file do
     lineno=0
 
     while nextline; do
+        # TODO support indented code blocks
         case "$line" in
         ('```'*)
             blocklineno="$lineno"
