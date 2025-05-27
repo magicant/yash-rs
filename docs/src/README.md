@@ -25,3 +25,6 @@ If the sidebar is not visible, you can toggle it by clicking the "hamburger" ico
 
 Currently, the documentation is a work in progress and may not cover all features or usage scenarios.
 Contributions are welcome via issues or pull requests to enhance the documentation.
+
+This documentation, hosted at <https://magicant.github.io/yash-rs/>, is licensed under the Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0).
+The full license text can be found at <https://github.com/magicant/yash-rs/blob/master/docs/LICENSE>.
