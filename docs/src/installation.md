@@ -14,7 +14,7 @@ Download the appropriate binary for your platform and place it in a directory in
 
 ## Building from source
 
-Yash is written in Rust, so you need to have the Rust toolchain installed.
+Yash-rs is written in Rust, so you need to have the Rust toolchain installed.
 The recommended way to install Rust is via [rustup](https://rustup.rs/).
 
 If you are using Windows Subsystem for Linux (WSL), make sure to install the Linux version of rustup, not the native Windows version.
@@ -27,12 +27,12 @@ If the stable toolchain is not installed, you can add it with the following comm
 rustup default stable
 ```
 
-To install yash, run:
+To install yash-rs, run:
 
 ```sh
 cargo install yash-cli
 ```
 
-## Running yash
+## Running yash-rs
 
 After installation, you can run `yash3` from the command line.

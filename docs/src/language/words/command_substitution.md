@@ -36,4 +36,4 @@ The `$(…)` form can be confused with arithmetic expansion. Command substitutio
 
 The command runs in a subshell, and its standard output is captured. Standard error is not captured unless redirected. Trailing newlines are removed, and the result replaces the command substitution in the command line.
 
-Currently, yash parses the command when the substitution is executed, not when it is parsed. This may change in the future, affecting when syntax errors are detected and when aliases are substituted.
+Currently, yash-rs parses the command when the substitution is executed, not when it is parsed. This may change in the future, affecting when syntax errors are detected and when aliases are substituted.
