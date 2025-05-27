@@ -10,7 +10,7 @@
 - [Shell language]()
     - [Invoking utilities]()
     - [Words, tokens, and fields](language/words/README.md)
-        - [Quoting and escaping](language/words/quoting.md) <!-- TODO: quote removal -->
+        - [Quoting and escaping](language/words/quoting.md)
         - [Reserved words](language/words/keywords.md)
         - [Comments](language/words/comments.md)
         - [Tilde expansion](language/words/tilde.md)

@@ -162,3 +162,22 @@ Dollar single quotes are useful for specifying strings with special characters<!
 <p class="warning">
 In the current implementation, escape sequences that produce a byte are treated as a Unicode character with the same value and converted to UTF-8. This means that byte values greater than or equal to 0x80 are converted to two bytes of UTF-8. This behavior does not conform to the POSIX standard and may change in the future.
 </p>
+
+## Quote removal
+
+When a word is expanded, any quotation marks (single quotes, double quotes, or backslashes used for quoting) that were present in the original command are removed. This process is called **quote removal**.
+
+For example:
+
+```shell
+$ echo 'Hello, world!' # the single quotes are removed during expansion
+Hello, world!
+```
+
+Quote removal only affects quotes that were part of the original input, not those introduced by expansions:
+
+```shell
+$ x='\*'
+$ echo $x # the backslash is not removed because it was introduced by expansion
+\*
+```
