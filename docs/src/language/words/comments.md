@@ -1,6 +1,6 @@
 # Comments
 
-Use comments to add notes or explanations to shell scripts and commands. The shell ignores comments during execution.
+Use comments to add notes or explanations to shell scripts and commands. The shell ignores comments while parsing commands.
 
 A comment starts with the `#` character and continues to the end of the line.
 
