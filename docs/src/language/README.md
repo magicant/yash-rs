@@ -18,9 +18,9 @@ echo "Hello, world!"
 
 Most simple commands run a utility—a program that performs a specific task. The first word is the utility name; the rest are arguments.
 
-All words (except redirection operators) in a simple command are expanded before the utility runs. See [Words, tokens, and fields](words/README.md) for details on parsing and expansion.
+All words (except redirection operators) in a simple command are expanded before the utility runs. See [Words, tokens, and fields](words/index.html) for details on parsing and expansion.
 
-You can use [parameters](parameters/README.md) to change command behavior dynamically. See the Assignment section for how to define variables.
+You can use [parameters](parameters/index.html) to change command behavior dynamically. See the Assignment section for how to define variables.
 
 See the Simple command details section for more on how simple commands work, including word expansion, assignment, and redirection.
 

@@ -1,6 +1,6 @@
 # Parameter expansion
 
-**Parameter expansion** retrieves the value of a [parameter](../parameters/README.md) when a command is executed. The basic syntax is `${parameter}`.
+**Parameter expansion** retrieves the value of a [parameter](../parameters/index.html) when a command is executed. The basic syntax is `${parameter}`.
 
 ```shell
 $ user="Alice" # define a variable
