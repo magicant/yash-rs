@@ -7,10 +7,9 @@
 - [Installation](installation.md)
 - [Getting started](getting_started.md)
 - [Versioning and compatibility]() <!-- POSIX conformance -->
-- [Shell language]()
-    - [Invoking utilities]()
+- [Shell language](language/README.md)
     - [Words, tokens, and fields](language/words/README.md)
-        - [Quoting and escaping](language/words/quoting.md) <!-- TODO: quote removal -->
+        - [Quoting and escaping](language/words/quoting.md)
         - [Reserved words](language/words/keywords.md)
         - [Comments](language/words/comments.md)
         - [Tilde expansion](language/words/tilde.md)
