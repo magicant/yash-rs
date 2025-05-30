@@ -161,3 +161,58 @@ Some variable names are reserved for special purposes. These variables may affec
 
 - **`PWD`**: The current working directory
     - This variable is initialized to the working directory when the shell starts and updated by the `cd` built-in when changing directories.
+
+## Arrays
+
+Arrays are variables that can hold multiple values.
+
+### Defining arrays
+
+To define an array, wrap the values in parentheses in the assignment syntax:
+
+```shell
+$ fruits=(apple banana cherry)
+```
+
+### Accessing array elements
+
+Unfortunately, accessing individual elements of an array is not yet implemented in yash-rs.
+
+To access all elements of an array, just use the array name in [parameter expansion](../words/parameters.md):
+
+```shell,hidelines=#
+#$ fruits=(apple banana cherry)
+$ for fruit in "$fruits"; do echo "$fruit"; done
+apple
+banana
+cherry
+```
+
+<!-- TODO
+### Array length
+
+To get the length of an array, use the `${#array[@]}` syntax:
+
+```shell,ignore
+$ echo "${#fruits[@]}"
+3
+```
+
+### Array slicing
+
+You can slice arrays using the `${array[@]:start:length}` syntax:
+
+```shell,ignore
+$ echo "${fruits[@]:1:2}"
+banana cherry
+```
+
+### Array operations
+
+Yash-rs provides several built-in operations for working with arrays, such as adding or removing elements, concatenating arrays, and more.
+
+```shell,ignore
+$ fruits+=(date)
+$ echo "${fruits[@]}"
+apple banana cherry date
+-->
