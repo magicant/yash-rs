@@ -54,7 +54,7 @@ success="true"
 
 nextline() {
     lineno=$((lineno + 1))
-    IFS= read -r line
+    IFS= read -r line && line="${line#"$indent"}"
 }
 gethidelines() {
     hidelines=
@@ -101,8 +101,10 @@ for file do
     exec < "$file"
     lineno=0
 
-    while nextline; do
-        # TODO support indented code blocks
+    while indent=''; nextline; do
+        indent="${line%%[![:space:]]*}"
+        line="${line#"$indent"}"
+
         case "$line" in
         ('```'*)
             blocklineno="$lineno"
