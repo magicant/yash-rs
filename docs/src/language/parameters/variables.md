@@ -49,6 +49,8 @@ $ echo $star # unquoted, the value is subject to field splitting and pathname ex
 Documents  Downloads  Music  Pictures  Videos
 ```
 
+See the Simple command details section for more information on assignment syntax and semantics.
+
 ## Environment variables
 
 Environment variables are variables exported to child processes. To export a variable, use the `export` built-in:
@@ -120,4 +122,97 @@ user=
 
 Undefined variables by default expand to an empty string. Use the `-u` shell option to make the shell treat undefined variables as an error.
 
-<!-- TODO: ## Variables used or assigned to by the shell -->
+## Reserved variable names
+
+Some variable names are reserved for special purposes. These variables may affect or be affected by the shell's behavior.
+
+- **`CDPATH`**: A colon-separated list of directories to search in the `cd` built-in
+
+- **`ENV`**: The name of a file to be sourced when starting an interactive shell
+
+- **`HOME`**: The user's home directory, used in [tilde expansion](../words/tilde.md)
+
+- **`IFS`**: A list of delimiters used in [field splitting](../words/field_splitting.md)
+    - The default value is a space, tab, and newline.
+
+- **`LINENO`**: The current line number in the shell script
+    - This variable is automatically updated as the shell executes commands.
+    - Currently, yash-rs does not support exporting this variable.
+
+- **`OLDPWD`**: The previous working directory, updated by the `cd` built-in
+
+- **`OPTARG`**: The value of the last option argument processed by the `getopts` built-in
+
+- **`OPTIND`**: The index of the next option to be processed by the `getopts` built-in
+
+- **`PATH`**: A colon-separated list of directories to search for executable files when running external utilities
+
+- **`PPID`**: The process ID of the parent process of the shell
+    - This variable is initialized when the shell starts.
+
+- **`PS1`**: The primary prompt string, displayed before each command in interactive mode
+    - The default value is `$ ` (a dollar sign followed by a space). <!-- TODO: The default value should be `# ` for the root user. -->
+
+- **`PS2`**: The secondary prompt string, displayed when a command is continued on the next line
+    - The default value is `> ` (a greater-than sign followed by a space).
+
+- **`PS4`**: The pseudo-prompt string, used for debugging output
+    - The default value is `+ ` (a plus sign followed by a space).
+
+- **`PWD`**: The current working directory
+    - This variable is initialized to the working directory when the shell starts and updated by the `cd` built-in when changing directories.
+
+## Arrays
+
+Arrays are variables that can hold multiple values.
+
+### Defining arrays
+
+To define an array, wrap the values in parentheses in the assignment syntax:
+
+```shell
+$ fruits=(apple banana cherry)
+```
+
+### Accessing array elements
+
+Unfortunately, accessing individual elements of an array is not yet implemented in yash-rs.
+
+To access all elements of an array, just use the array name in [parameter expansion](../words/parameters.md):
+
+```shell,hidelines=#
+#$ fruits=(apple banana cherry)
+$ for fruit in "$fruits"; do echo "$fruit"; done
+apple
+banana
+cherry
+```
+
+<!-- TODO
+### Array length
+
+To get the length of an array, use the `${#array[@]}` syntax:
+
+```shell,ignore
+$ echo "${#fruits[@]}"
+3
+```
+
+### Array slicing
+
+You can slice arrays using the `${array[@]:start:length}` syntax:
+
+```shell,ignore
+$ echo "${fruits[@]:1:2}"
+banana cherry
+```
+
+### Array operations
+
+Yash-rs provides several built-in operations for working with arrays, such as adding or removing elements, concatenating arrays, and more.
+
+```shell,ignore
+$ fruits+=(date)
+$ echo "${fruits[@]}"
+apple banana cherry date
+-->
