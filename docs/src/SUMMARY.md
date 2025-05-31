@@ -20,7 +20,7 @@
         - [Pathname expansion](language/words/globbing.md)
     - [Parameters](language/parameters/README.md)
         - [Variables](language/parameters/variables.md)
-        - [Special parameters]()
+        - [Special parameters](language/parameters/special.md)
         - [Positional parameters]()
     - [Commands]()
         - [Assignment]()

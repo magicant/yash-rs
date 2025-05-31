@@ -11,7 +11,7 @@ Hello, world!
 
 The first word (`echo`) is the name of the utility to run. The other words are arguments passed to that utility.
 
-Before running the utility, the shell expands words. This means the shell processes certain characters and sequences in the words to produce the final command line. For example, `$` is used for parameter expansion, letting you access variable values:
+Before running the utility, the shell expands words. This means the shell processes certain characters and sequences in the words to produce the final command line. For example, `$` is used for [parameter expansion](parameters.md), letting you access variable values:
 
 ```shell
 $ name="Alice"
@@ -89,7 +89,9 @@ error: the pattern is not a valid word token
 
 ## Word expansion
 
-The shell performs several types of word expansion. The following expansions happen first:
+The shell performs several kinds of **word expansion** before running a utility, such as replacing parameters with their values or evaluating arithmetic expressions.
+
+The following expansions happen first:
 
 - Tilde expansion
 - Parameter expansion
@@ -104,3 +106,5 @@ After these, the shell performs these steps in order:
 3. Quote removal
 
 The result is a list of words passed to the utility. Each word resulting from these expansions is called a **field**.
+
+A subset of these expansions are performed depending on the context. For example, when assigning a variable, the shell performs tilde expansion, parameter expansion, command substitution, arithmetic expansion, and quote removal before the assignment. However, field splitting and pathname expansion do not occur during variable assignment, since the value of a variable cannot be split into multiple fields.
