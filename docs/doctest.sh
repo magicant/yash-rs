@@ -37,14 +37,18 @@ fi
 
 if ! [ "${YASH+set}" ]; then
     YASH="$(cargo run --quiet -- -c 'printf "%s\n" "$0"')"
+    case "$YASH" in
+    (/*) ;;
+    (*)  YASH="${PWD%/}/$YASH" ;;
+    esac
     export YASH
 fi
 
 tmpdir="${TMPDIR:-/tmp}"
-tmpdir="${tmpdir%/}/tmp.$$"
+tmpdir="${tmpdir%/}/doctest-$$"
 trap 'rm -rf -- "$tmpdir"' EXIT
 trap 'rm -rf -- "$tmpdir"; exit 99' HUP INT QUIT TERM
-mkdir -p "$tmpdir"
+mkdir -p -- "$tmpdir"
 
 script="$tmpdir/script.sh"
 expected="$tmpdir/expected.log"
@@ -89,7 +93,10 @@ checkoutput() {
         checksyntax "$@"
         ;;
     (*)
-        if "$YASH" < "$script" >| "$actual" 2>&1; ! diff -u "$expected" "$actual"; then
+        if
+            (cd -- "$tmpdir" && "$YASH" < "$script" >| "$actual" 2>&1)
+            ! diff -u "$expected" "$actual"
+        then
             printf '%s:%d: error: script output does not match\n' "$file" "$blocklineno" >&2
             success="false"
         fi
