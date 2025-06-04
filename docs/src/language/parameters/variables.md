@@ -49,7 +49,7 @@ $ echo $star # unquoted, the value is subject to field splitting and pathname ex
 Documents  Downloads  Music  Pictures  Videos
 ```
 
-See the [Simple commands](../commands/simple.md) section for more information on assignment syntax and semantics.
+See the [Simple commands](../commands/simple.md) section for more information on assignment behavior.
 
 ## Environment variables
 
