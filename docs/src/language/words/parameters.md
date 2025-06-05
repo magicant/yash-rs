@@ -142,16 +142,14 @@ error: tell me your name
 
 In all cases, the following expansions are performed on `word` before use:
 
-- [Tilde expansion](../words/tilde.md)
+- [Tilde expansion](../words/tilde.md) (unless the parameter expansion is in [double quotes](quoting.md#double-quotes))
 - Parameter expansion (recursive!)
-- Command substitution
-- Arithmetic expansion
+- [Command substitution](command_substitution.md)
+- [Arithmetic expansion](arithmetic.md)
 
-For the `=` and `:=` forms, quote removal is also performed before assignment.
+For the `=` and `:=` forms, [quote removal](quoting.md#quote-removal) is also performed before assignment. Assignment only works for [variables](../parameters/variables.md), not [special](../parameters/special.md) or [positional parameters](../parameters/positional.md).
 
 If `word` is empty in the `?` and `:?` forms, a default error message is used.
-
-Assignment with `=` and `:=` only works for variables, not special or positional parameters.
 
 The `nounset` option does not apply to expansions with a switch modifier.
 
@@ -164,7 +162,7 @@ The **trim** modifier removes leading or trailing characters matching a pattern 
 - `${parameter%pattern}` – Remove the shortest match of `pattern` from the end.
 - `${parameter%%pattern}` – Remove the longest match of `pattern` from the end.
 
-The value is matched against the pattern, and the matching part is removed. <!-- TODO: link to [pattern matching] -->
+The value is matched against the [pattern](../../patterns.md), and the matching part is removed.
 
 ```shell
 $ var="banana"
@@ -182,8 +180,8 @@ The pattern is expanded before use:
 
 - [Tilde expansion](../words/tilde.md)
 - Parameter expansion (recursive!)
-- Command substitution
-- Arithmetic expansion
+- [Command substitution](command_substitution.md)
+- [Arithmetic expansion](arithmetic.md)
 
 You can quote part or all of the pattern to treat it literally:
 
