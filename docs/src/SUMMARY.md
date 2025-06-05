@@ -23,8 +23,7 @@
         - [Special parameters](language/parameters/special.md)
         - [Positional parameters](language/parameters/positional.md)
     - [Commands]()
-        - [Assignment]()
-        - [Simple command details]()
+        - [Simple commands](language/commands/simple.md)
         - [Pipelines]()
         - [Compound commands]()
             - [Grouping]() <!-- incl. subshells -->

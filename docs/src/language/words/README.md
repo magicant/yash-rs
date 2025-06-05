@@ -93,17 +93,17 @@ The shell performs several kinds of **word expansion** before running a utility,
 
 The following expansions happen first:
 
-- Tilde expansion
-- Parameter expansion
-- Command substitution
-- Arithmetic expansion
+- [Tilde expansion](tilde.md)
+- [Parameter expansion](parameters.md)
+- [Command substitution](command_substitution.md)
+- [Arithmetic expansion](arithmetic.md)
 
 After these, the shell performs these steps in order:
 
 <!-- Brace expansion is not yet implemented. -->
-1. Field splitting
-2. Pathname expansion
-3. Quote removal
+1. [Field splitting](field_splitting.md)
+2. [Pathname expansion](globbing.md)
+3. [Quote removal](quoting.md#quote-removal)
 
 The result is a list of words passed to the utility. Each word resulting from these expansions is called a **field**.
 

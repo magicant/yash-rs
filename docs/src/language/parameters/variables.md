@@ -22,11 +22,11 @@ This creates a variable named `user` with the value `Alice`. There must be no sp
 
 Before a value is assigned, the following expansions are performed, if any:
 
-- Tilde expansion
-- Parameter expansion
-- Command substitution
-- Arithmetic expansion
-- Quote removal
+- [Tilde expansion](../words/tilde.md)
+- [Parameter expansion](../words/parameters.md)
+- [Command substitution](../words/command_substitution.md)
+- [Arithmetic expansion](../words/arithmetic.md)
+- [Quote removal](../words/quoting.md#quote-removal)
 
 ```shell,hidelines=#
 #$ HOME=/home/alice
@@ -39,7 +39,7 @@ $ echo $rawdir
 ~/$user
 ```
 
-Note that <!-- TODO: brace expansion, --> field splitting and pathname expansion do not happen during variable assignment.
+Note that <!-- TODO: brace expansion, --> [field splitting](../words/field_splitting.md) and [pathname expansion](../words/globbing.md) do not happen during variable assignment.
 
 ```shell,no_run
 $ star=* # assigns a literal `*` to the variable `star`
@@ -49,7 +49,7 @@ $ echo $star # unquoted, the value is subject to field splitting and pathname ex
 Documents  Downloads  Music  Pictures  Videos
 ```
 
-See the Simple command details section for more information on assignment syntax and semantics.
+See the [Simple commands](../commands/simple.md) section for more information on assignment behavior.
 
 ## Environment variables
 
