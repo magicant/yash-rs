@@ -24,7 +24,7 @@
         - [Positional parameters](language/parameters/positional.md)
     - [Commands]()
         - [Simple commands](language/commands/simple.md)
-        - [Pipelines]()
+        - [Pipelines](language/commands/pipelines.md)
         - [Compound commands]()
             - [Grouping]() <!-- incl. subshells -->
             - [Exit status and conditionals]()
