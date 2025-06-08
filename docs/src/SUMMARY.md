@@ -26,7 +26,7 @@
         - [Simple commands](language/commands/simple.md)
         - [Pipelines](language/commands/pipelines.md)
         - [Grouping](language/commands/grouping.md)
-        - [Exit status and conditionals]()
+        - [Exit status and conditionals](language/commands/exit_status.md)
         - [Pattern-based branching]()
         - [Loops]()
         - [Lists and asynchronous commands]()
