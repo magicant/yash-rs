@@ -2,7 +2,7 @@
 
 The **case command** performs [pattern matching](../../patterns.md) on a value and executes commands for the first matching pattern. This is useful for branching logic based on specific values or patterns.
 
-## Basic syntax and behavior
+## Case command basics
 
 A `case` command begins with the `case` keyword, followed by the value to match. Each branch specifies a pattern in parentheses, followed by a block of commands. Each block ends with `;;`, and the command ends with `esac`.
 
