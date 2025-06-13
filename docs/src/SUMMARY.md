@@ -27,7 +27,7 @@
         - [Pipelines](language/commands/pipelines.md)
         - [Grouping](language/commands/grouping.md)
         - [Exit status and conditionals](language/commands/exit_status.md)
-        - [Pattern-based branching]()
+        - [Pattern-based branching](language/commands/case.md)
         - [Loops]()
         - [Lists and asynchronous commands]()
     - [Functions]()
