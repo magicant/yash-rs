@@ -4,7 +4,7 @@ The **case command** performs [pattern matching](../../patterns.md) on a value a
 
 ## Case command basics
 
-A `case` command begins with the `case` keyword, followed by the value to match. Each branch specifies a pattern in parentheses, followed by a block of commands. Each block ends with `;;`, and the command ends with `esac`.
+A `case` command begins with the `case` [reserved word](../words/keywords.md), followed by the value to match. After the `in` reserved word, each branch specifies a pattern in parentheses, followed by a block of commands. Each block ends with `;;`, and the command ends with `esac`.
 
 For example, this command matches the value of `foo` and runs the corresponding commands:
 
@@ -141,6 +141,17 @@ $ case foo in
 Matched anything else
 ```
 
+Use `''` or `""` as an empty value or pattern:
+
+```shell
+$ case "" in
+> ('')
+>     echo "Matched empty string"
+>     ;;
+> esac
+Matched empty string
+```
+
 The opening parenthesis `(` can be omitted if the first pattern is not literally `esac`, but parentheses are recommended for clarity:
 
 ```shell
@@ -195,5 +206,5 @@ last_branch  := pattern_list, branch_body;
 pattern_list := "(", word, { "|" , word }, ")"
               | (word - "esac"), { "|" , word }, ")";
 branch_body  := { newline }, [ list, [ newline, branch_body ] ];
-terminator   := ";;" | ";&" | ";|";
+terminator   := ";;" | ";&" | ";;&" | ";|";
 ```
