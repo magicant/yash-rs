@@ -28,7 +28,7 @@
         - [Grouping](language/commands/grouping.md)
         - [Exit status and conditionals](language/commands/exit_status.md)
         - [Pattern-based branching](language/commands/case.md)
-        - [Loops]()
+        - [Loops](language/commands/loops.md)
         - [Lists and asynchronous commands]()
     - [Functions]()
     - [Aliases]()

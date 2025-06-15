@@ -150,6 +150,8 @@ $ if [ -e "$file" ]; then
 
 The exit status of an if command is the exit status of the last command executed in the `then` or `else` clause. If no condition is met and there is no `else` clause, the exit status is 0 (success).
 
+For repeating commands depending on a condition, see [While and until loops](loops.md#while-and-until-loops).
+
 ## The `errexit` option
 
 By default, the shell continues running commands even if one fails (returns a non-zero exit status). This can cause later commands to run when they shouldn't. If you enable the `errexit` shell option, the shell will exit immediately when any command fails, stopping further execution.
@@ -169,7 +171,7 @@ The `errexit` option only applies to the result of [pipelines](pipelines.md). It
 
 - When the pipeline is negated with the `!` [reserved word].
 - When the pipeline is the left side of an [`&&` or `||`](#and-or-lists) operator.
-- When the pipeline is part of the condition in an [`if`](#if-commands) command, `while` loop, or `until` loop.
+- When the pipeline is part of the condition in an [`if` command](#if-commands) or a [`while` or `until` loop](loops.md#while-and-until-loops).
 
 Although `errexit` does not catch every error, it is recommended for scripts to avoid unexpected results from failed commands. To skip `errexit` for a specific command, append `&& true`:
 
