@@ -106,30 +106,32 @@ An **if command** is a conditional command that executes a block of commands bas
 
 The minimal form of an if command uses the `if`, `then`, and `fi` [reserved words] that surround commands:
 
-```shell
-$ if [ -r /dev/null ]; then echo "/dev/null is readable"; fi
-/dev/null is readable
+```shell,hidelines=#
+#$ mkdir $$ && cd $$ && > foo.txt > bar.txt || exit
+$ if diff -q foo.txt bar.txt; then echo "Files are identical"; fi
+Files are identical
 ```
 
 For readability, each reserved word can be on a separate line:
 
-```shell
-$ if [ -r /dev/null ]
+```shell,hidelines=#
+#$ mkdir $$ && cd $$ && > foo.txt > bar.txt || exit
+$ if diff -q foo.txt bar.txt
 > then
->   echo "/dev/null is readable"
+>     echo "Files are identical"
 > fi
-/dev/null is readable
+Files are identical
 ```
 
 You can also use the `elif` [reserved word] to add additional conditions:
 
 ```shell
 $ if [ -f /dev/tty ]; then
->   echo "/dev/tty is a regular file"
+>     echo "/dev/tty is a regular file"
 > elif [ -d /dev/tty ]; then
->   echo "/dev/tty is a directory"
+>     echo "/dev/tty is a directory"
 > elif [ -c /dev/tty ]; then
->   echo "/dev/tty is a character device"
+>     echo "/dev/tty is a character device"
 > fi
 /dev/tty is a character device
 ```
@@ -139,11 +141,11 @@ The `else` [reserved word] can be used to provide a default action if none of th
 ```shell
 $ file=/nonexistent/file
 $ if [ -e "$file" ]; then
->   echo "$file exists"
+>     echo "$file exists"
 > elif [ -L "$file" ]; then
->   echo "$file is a symbolic link to a nonexistent file"
+>     echo "$file is a symbolic link to a nonexistent file"
 > else
->   echo "$file does not exist"
+>     echo "$file does not exist"
 > fi
 /nonexistent/file does not exist
 ```
