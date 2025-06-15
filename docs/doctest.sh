@@ -29,12 +29,6 @@ while getopts '' option; do
 done
 shift $((OPTIND - 1))
 
-if [ $# -eq 0 ]; then
-    # scan all files
-    exec find "$(dirname -- "$0")" -type f -name '*.md' -exec "$0" {} +
-    exit
-fi
-
 if ! [ "${YASH+set}" ]; then
     YASH="$(cargo run --quiet -- -c 'printf "%s\n" "$0"')"
     case "$YASH" in
@@ -42,6 +36,12 @@ if ! [ "${YASH+set}" ]; then
     (*)  YASH="${PWD%/}/$YASH" ;;
     esac
     export YASH
+fi
+
+if [ $# -eq 0 ]; then
+    # scan all files
+    exec find "$(dirname -- "$0")" -type f -name '*.md' -exec "$0" {} +
+    exit
 fi
 
 tmpdir="${TMPDIR:-/tmp}"
