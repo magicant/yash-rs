@@ -29,7 +29,7 @@
         - [Exit status and conditionals](language/commands/exit_status.md)
         - [Pattern-based branching](language/commands/case.md)
         - [Loops](language/commands/loops.md)
-        - [Lists and asynchronous commands]()
+        - [Lists and asynchronous commands](language/commands/lists.md)
     - [Functions]()
     - [Aliases]()
     - [File descriptors and redirections]()
