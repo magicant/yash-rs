@@ -29,12 +29,6 @@ while getopts '' option; do
 done
 shift $((OPTIND - 1))
 
-if [ $# -eq 0 ]; then
-    # scan all files
-    exec find "$(dirname -- "$0")" -type f -name '*.md' -exec "$0" {} +
-    exit
-fi
-
 if ! [ "${YASH+set}" ]; then
     YASH="$(cargo run --quiet -- -c 'printf "%s\n" "$0"')"
     case "$YASH" in
@@ -42,6 +36,20 @@ if ! [ "${YASH+set}" ]; then
     (*)  YASH="${PWD%/}/$YASH" ;;
     esac
     export YASH
+fi
+
+if [ $# -eq 0 ]; then
+    # scan all files
+
+    # prepare for parallel execution
+    nproc="$({ nproc || sysctl -n hw.logicalcpu; } 2>/dev/null || echo 1)"
+    # if xargs supports -P, use it
+    if [ "$nproc" -gt 1 ] && echo true | xargs -0 -L 1 -P "$nproc" sh -c 2>/dev/null; then
+        find "$(dirname -- "$0")" -type f -name '*.md' -print0 | xargs -0 -L 1 -P "$nproc" "$0"
+    else
+        exec find "$(dirname -- "$0")" -type f -name '*.md' -exec "$0" {} +
+    fi
+    exit
 fi
 
 tmpdir="${TMPDIR:-/tmp}"
