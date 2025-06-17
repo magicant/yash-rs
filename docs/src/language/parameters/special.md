@@ -52,7 +52,7 @@ Below are the special parameters and their meanings:
 - **`$`**: Process ID of the current shell.
     - Set when the shell starts and remains constant, even in subshells.
 
-- **`!`**: Process ID of the last asynchronous command.
+- **`!`**: Process ID of the last [asynchronous command](../commands/lists.md#asynchronous-commands).
     - Updated when an asynchronous command is started or resumed. <!-- TODO: The value is unset until any asynchronous command is executed. -->
 
 - **`0`**: Name of the shell or script being executed.
