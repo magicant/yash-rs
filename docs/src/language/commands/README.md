@@ -19,7 +19,7 @@ I like cherry
 
 ## Lists
 
-A [**list**](lists.md) is a sequence of and-or lists separated by `;` or `&`. Lists let you write multiple commands on one line or run commands asynchronously.
+A [list](lists.md) is a sequence of and-or lists separated by `;` or `&`. Lists let you write multiple commands on one line or run commands asynchronously.
 
 ```shell
 $ echo "Hello"; echo "World"
@@ -29,7 +29,7 @@ World
 
 ## And-or lists
 
-An [**and-or list**](exit_status.md#and-or-lists) is a sequence of pipelines separated by `&&` or `||`. This lets you control execution flow based on the success or failure of previous commands.
+An [and-or list](exit_status.md#and-or-lists) is a sequence of pipelines separated by `&&` or `||`. This lets you control execution flow based on the success or failure of previous commands.
 
 ```shell
 $ test -f /nonexistent/file && echo "File exists" || echo "File does not exist"
@@ -38,7 +38,7 @@ File does not exist
 
 ## Pipelines
 
-A [**pipeline**](pipelines.md) is a sequence of commands connected by `|`, where the output of one command is passed as input to the next. Pipelines let you combine commands to process data in a stream.
+A [pipeline](pipelines.md) is a sequence of commands connected by `|`, where the output of one command is passed as input to the next. Pipelines let you combine commands to process data in a stream.
 
 You can prefix a pipeline with the `!` [reserved word](../words/keywords.md) to negate its [exit status](exit_status.md):
 
@@ -51,17 +51,17 @@ TODO: Fix this issue
 
 A command (in the narrow sense) is a pipeline component: a simple command, a compound command, or a function definition.
 
-A [**simple command**](simple.md) runs a utility or function, or assigns values to [variables](../parameters/variables.md).
+A [simple command](simple.md) runs a utility or function, or assigns values to [variables](../parameters/variables.md).
 
 **Compound commands** control execution flow and include:
 
-- [**Grouping commands**](grouping.md): Group multiple commands to run as a unit, in the current shell or a subshell.
-- [**If commands**](exit_status.md#if-commands): Run commands conditionally based on exit status.
-- [**Case commands**](case.md): Run commands based on pattern matching a value.
-- [**For loops**](loops.md#for-loops): Iterate over a list, running commands for each item.
-- [**While loops**](loops.md#while-and-until-loops): Repeat commands while a condition is true.
-- [**Until loops**](loops.md#while-and-until-loops): Repeat commands until a condition becomes true.
+- [Grouping commands](grouping.md): Group multiple commands to run as a unit, in the current shell or a subshell.
+- [If commands](exit_status.md#if-commands): Run commands conditionally based on exit status.
+- [Case commands](case.md): Run commands based on pattern matching a value.
+- [For loops](loops.md#for-loops): Iterate over a list, running commands for each item.
+- [While loops](loops.md#while-and-until-loops): Repeat commands while a condition is true.
+- [Until loops](loops.md#while-and-until-loops): Repeat commands until a condition becomes true.
 
 <!-- TODO: Double bracket command -->
 
-A **function definition** creates a reusable block of code that can be invoked by name.
+A function definition creates a reusable block of code that can be invoked by name.
