@@ -22,7 +22,7 @@
         - [Variables](language/parameters/variables.md)
         - [Special parameters](language/parameters/special.md)
         - [Positional parameters](language/parameters/positional.md)
-    - [Commands]()
+    - [Commands](language/commands/README.md)
         - [Simple commands](language/commands/simple.md)
         - [Pipelines](language/commands/pipelines.md)
         - [Grouping](language/commands/grouping.md)

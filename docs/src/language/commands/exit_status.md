@@ -51,6 +51,7 @@ This signal-passing behavior is not supported by all shells; in shells that do n
 The `true` and `false` utilities simply return an exit status of 0 and 1, respectively. They are often used as placeholders in conditional statements or loops. See the examples in the [And-or lists](#and-or-lists) section below.
 
 <!-- TODO: ## The `test` utility -->
+<!-- TODO: ## The double bracket command -->
 
 ## And-or lists
 

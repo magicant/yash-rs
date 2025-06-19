@@ -4,7 +4,7 @@ The shell interprets input as commands written in the shell language. The langua
 
 ## Simple commands
 
-A simple command is a sequence of words that are not reserved words or operators. For example:
+A [simple command](commands/simple.md) is the most basic command type. It consists of a sequence of words that are not [reserved words](words/keywords.md) or [operators](words/index.html#tokens-and-operators). For example:
 
 ```sh
 ls
@@ -20,17 +20,18 @@ Most simple commands run a utility—a program that performs a specific task. Th
 
 All words (except redirection operators) in a simple command are expanded before the utility runs. See [Words, tokens, and fields](words/index.html) for details on parsing and expansion.
 
-You can use [parameters](parameters/index.html) to change command behavior dynamically. See the Assignment section for how to define variables.
+You can use [parameters](parameters/index.html) to change command behavior dynamically. There are three types: [variables](parameters/variables.md), [special parameters](parameters/special.md), and [positional parameters](parameters/positional.md).
 
-See the Simple command details section for more on how simple commands work, including word expansion, assignment, and redirection.
+See [Simple commands](commands/simple.md) for more on assignments, redirections, and command search.
 
-## Compound commands
+## Other commands
 
-Compound commands group commands, control execution, and handle conditions and loops. Examples include `if`, `for`, `while`, and `case`. Compound commands can contain multiple simple commands and be nested. See the Compound commands section for details.
+Other command types construct more complex behavior by combining commands. See [Commands](commands/index.html) for the full list. For example:
 
-## Pipelines and lists
-
-Pipelines connect the output of one command to the input of another, letting you chain commands. A list is a sequence of commands separated by operators like `;`, `&&`, or `||`. See the Pipelines and Lists sections for usage.
+- Compound commands group commands, control execution, and handle conditions and loops. Examples: [`if`](commands/exit_status.md#if-commands), [`for`](commands/loops.md#for-loops), [`while`](commands/loops.md#while-and-until-loops), [`case`](commands/case.md).
+- [Pipelines](commands/pipelines.md) connect the output of one command to the input of another, letting you chain commands.
+- [And-or lists](commands/exit_status.md#and-or-lists) control execution flow based on command success or failure.
+- [Lists](commands/lists.md) let you run multiple commands in sequence or in parallel.
 
 ## Functions
 
