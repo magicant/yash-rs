@@ -64,4 +64,4 @@ A [simple command](simple.md) runs a utility or function, or assigns values to [
 
 <!-- TODO: Double bracket command -->
 
-A function definition creates a reusable block of code that can be invoked by name.
+A [function definition](../functions.md#defining-functions) creates a reusable block of code that can be invoked by name.

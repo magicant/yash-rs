@@ -87,7 +87,7 @@ Variables are read-only only in the current shell session. Environment variables
 
 ## Local variables
 
-Variables defined by the `typeset` built-in (without the `--global` option) are local to the current shell function. Such variables are removed when the function returns.
+Variables defined by the `typeset` built-in (without the `--global` option) are local to the current shell [function](../functions.md). Such variables are removed when the function returns.
 
 ```shell
 $ i=0
