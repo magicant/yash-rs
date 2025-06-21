@@ -35,7 +35,7 @@ Other command types construct more complex behavior by combining commands. See [
 
 ## Functions
 
-Functions are reusable blocks of code you can define and call in the shell. They help organize scripts and interactive sessions. Functions can take parameters. See the Functions section for details.
+[Functions](functions.md) are reusable blocks of code you can define and call in the shell. They help organize scripts and interactive sessions.
 
 ## Redirections
 
