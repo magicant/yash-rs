@@ -39,7 +39,7 @@ $ echo $rawdir
 ~/$user
 ```
 
-Note that <!-- TODO: brace expansion, --> [field splitting](../words/field_splitting.md) and [pathname expansion](../words/globbing.md) do not happen during variable assignment.
+Note that <!-- TODO: brace expansion, --> [field splitting](../words/field_splitting.md) and [pathname expansion](../words/globbing.md) do not happen during assignment.
 
 ```shell,no_run
 $ star=* # assigns a literal `*` to the variable `star`
@@ -49,7 +49,7 @@ $ echo $star # unquoted, the value is subject to field splitting and pathname ex
 Documents  Downloads  Music  Pictures  Videos
 ```
 
-See the [Simple commands](../commands/simple.md) section for more information on assignment behavior.
+See [Simple commands](../commands/simple.md) for more on assignment behavior.
 
 ## Environment variables
 
@@ -61,7 +61,7 @@ $ sh -c 'echo $user'
 Alice
 ```
 
-When the shell starts, it inherits environment variables from its parent. These variables are automatically exported to child processes.
+When the shell starts, it inherits environment variables from its parent. These are automatically exported to child processes.
 
 ## Read-only variables
 
@@ -83,11 +83,11 @@ error: error assigning to variable
   |
 ```
 
-Variables are read-only only in the current shell session. Environment variables exported to child processes are no longer read-only.
+Variables are read-only only in the current shell session. Exported environment variables are not read-only in child processes.
 
 ## Local variables
 
-Variables defined by the `typeset` built-in (without the `--global` option) are **local** to the current shell [function](../functions.md). Such variables are removed when the function returns. This is useful for avoiding variable name conflicts and not polluting the global namespace with temporary variables.
+Variables defined by the `typeset` built-in (without `--global`) are **local** to the current shell [function](../functions.md). Local variables are removed when the function returns. This helps avoid name conflicts and keeps temporary variables out of the global namespace.
 
 ```shell
 $ i=0
@@ -105,9 +105,9 @@ $ echo "Outside function: $i"
 Outside function: 0
 ```
 
-As shown above, the original (**global**) variable `i` is hidden by the local variable `i` inside the function and is restored when the function returns.
+The original (global) variable is hidden by the local variable inside the function and restored when the function returns.
 
-Variables have dynamic scope, so functions can access local variables defined in the function that called them, as well as global variables.
+Variables have dynamic scope: functions can access local variables defined in the function that called them, as well as global variables.
 
 ```shell
 $ outer() {
@@ -130,7 +130,7 @@ $ echo "User in global scope: ${user-not set}"
 User in global scope: Bob
 ```
 
-In the example above, the `inner` function called from `outer` accesses the local variable `user` defined in `outer`. The value of `user` is changed in `inner`, and this change is visible in `outer` after `inner` returns. After `outer` returns, the local variable `user` no longer exists. Then, `inner` is called directly, and it tries to access `user` in the global scope, which is not set. Since `user` is not defined locally, the assignment in `inner` creates a new global variable `user`.
+In this example, `inner` called from `outer` accesses the local variable `user` defined in `outer`. The value is changed in `inner`, and this change is visible in `outer` after `inner` returns. After `outer` returns, the local variable no longer exists. When `inner` is called directly, it creates a new global variable `user`.
 
 ## Removing variables
 
@@ -193,7 +193,7 @@ Arrays are variables that can hold multiple values.
 
 ### Defining arrays
 
-To define an array, wrap the values in parentheses in the assignment syntax:
+To define an array, wrap the values in parentheses:
 
 ```shell
 $ fruits=(apple banana cherry)
@@ -201,9 +201,9 @@ $ fruits=(apple banana cherry)
 
 ### Accessing array elements
 
-Unfortunately, accessing individual elements of an array is not yet implemented in yash-rs.
+Accessing individual elements is not yet implemented in yash-rs.
 
-To access all elements of an array, just use the array name in [parameter expansion](../words/parameters.md):
+To access all elements, use the array name in [parameter expansion](../words/parameters.md):
 
 ```shell,hidelines=#
 #$ fruits=(apple banana cherry)
@@ -216,7 +216,7 @@ cherry
 <!-- TODO
 ### Array length
 
-To get the length of an array, use the `${#array[@]}` syntax:
+To get the length of an array, use `${#array[@]}`:
 
 ```shell,ignore
 $ echo "${#fruits[@]}"
@@ -225,7 +225,7 @@ $ echo "${#fruits[@]}"
 
 ### Array slicing
 
-You can slice arrays using the `${array[@]:start:length}` syntax:
+You can slice arrays using `${array[@]:start:length}`:
 
 ```shell,ignore
 $ echo "${fruits[@]:1:2}"

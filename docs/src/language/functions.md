@@ -1,6 +1,6 @@
 # Functions
 
-A **function** is a named block of code that can be executed by calling its name. Functions allow you to encapsulate code for reuse, making scripts and interactive sessions more organized and efficient.
+A **function** is a named block of code you can call by name. Functions let you organize and reuse code in scripts and interactive sessions.
 
 ```shell
 $ greet() {
@@ -14,7 +14,7 @@ Hello, Bob!
 
 ## Defining functions
 
-To define a function, the function name is followed by parentheses `()` and a [compound command](commands/index.html#commands-1). The compound command is the function body, which is the code that runs when the function is called.
+To define a function, write the function name followed by parentheses `()` and a [compound command](commands/index.html#commands-1) as the body:
 
 ```shell
 $ greet() {
@@ -22,7 +22,7 @@ $ greet() {
 > }
 ```
 
-Parentheses may appear separately and the function body may be on the next line:
+You can also write the parentheses separately, and put the body on the next line:
 
 ```shell
 $ cleanup ( )
@@ -31,9 +31,9 @@ $ cleanup ( )
 > fi
 ```
 
-Functions do not share namespaces with [variables](parameters/variables.md). Function names are case-sensitive.
+Function names are case-sensitive and do not share a namespace with [variables](parameters/variables.md).
 
-In POSIX.1-2024, function names must consist of ASCII letters, digits, and underscores, and must not start with a digit. As an extension, yash-rs currently allows any word as a function name. The function name word is [expanded](words/index.html#word-expansion) when the function is defined.
+By POSIX.1-2024, function names must use ASCII letters, digits, and underscores, and not start with a digit. As an extension, yash-rs allows any word as a function name. The function name is [expanded](words/index.html#word-expansion) when defined:
 
 ```shell
 $ "$(echo foo)"() { echo "This function is named foo."; }
@@ -41,7 +41,7 @@ $ foo
 This function is named foo.
 ```
 
-The function is defined when the function definition command is executed, not when parsed. In the example below, the function `greet` is defined only if the current year is 2001.
+A function is defined when the definition command is executed, not when parsed. For example, `greet` is only defined if the current year is 2001:
 
 ```shell
 $ if [ "$(date +%Y)" = 2001 ]; then
@@ -56,22 +56,22 @@ error: cannot execute external utility "greet"
   |
 ```
 
-Redirections in function definitions applies to the function body when the function is called, not when it is defined:
+Redirections in a function definition apply when the function is called, not when it is defined:
 
 ```shell
 $ dumb() { echo "Hello, $1!"; } > /dev/null
 $ dumb Alice
 ```
 
-Functions can be redefined by defining a function with the same name again. The new definition replaces the old one.
+You can redefine a function by defining it again with the same name. The new definition replaces the old one.
 
-The [exit status](commands/exit_status.md#exit-status) of a function definition is 0 if the function is defined successfully. A function definition fails with a non-zero exit status if the function name expansion fails or if there is a readonly function with the same name.
+The [exit status](commands/exit_status.md#exit-status) of a function definition is 0 if successful. It is nonzero if the function name expansion fails or if a readonly function with the same name exists.
 
-Defining functions with the `function` [reserved word](words/keywords.md) is not specified in POSIX.1-2024, and not yet implemented in yash-rs.
+Defining functions with the `function` [reserved word](words/keywords.md) is not POSIX and is not yet implemented in yash-rs.
 
 ### Readonly functions
 
-Functions can be made readonly with the `typeset` built-in. Readonly functions cannot be redefined or removed.
+Make a function readonly with the `typeset` built-in. Readonly functions cannot be redefined or removed.
 
 ```shell
 $ greet() { echo "Hello, World!"; }
@@ -99,7 +99,7 @@ The `readonly` built-in does not yet support making functions readonly in yash-r
 
 ## Executing functions
 
-To execute a function, specify the function name as a command name in a [simple command](commands/simple.md).
+To run a function, specify its name as a command name in a [simple command](commands/simple.md).
 
 ```shell
 $ greet() { echo "Hello, World!"; }
@@ -107,12 +107,12 @@ $ greet
 Hello, World!
 ```
 
-Because of the [command search](commands/simple.md#command-search) algorithm, a function cannot be executed with a simple command if the function name matches a special built-in name or contains a slash.
+A function cannot be executed as a simple command if its name matches a special built-in or contains a slash. (See [command search](commands/simple.md#command-search).)
 <!-- TODO: Use the command built-in to call such functions -->
 
 ### Function parameters
 
-The fields other than the first in the simple command are passed as parameters to the function. The parameters are accessible within the function body as [positional parameters](parameters/positional.md). The original positional parameters are restored when the function returns.
+Fields after the function name are passed as [positional parameters](parameters/positional.md). The original positional parameters are restored when the function returns.
 
 ```shell
 $ foo() {
@@ -129,7 +129,7 @@ Positional parameters after calling foo: alice bob charlie
 
 ### Returning from functions
 
-Execution of a function continues until it reaches the end of the function body or an invocation of the `return` built-in. The `return` built-in can be used to exit the function early and optionally specify an exit status.
+A function runs until the end of its body or until the `return` built-in is called. `return` can exit the function early and set the exit status.
 
 ```shell
 $ is_positive() {
@@ -152,7 +152,7 @@ Exit status: 1
 
 ## Removing functions
 
-To remove a function, use the `unset` built-in with the `-f` option.
+Remove a function with the `unset` built-in and the `-f` option:
 
 ```shell
 $ greet() { echo "Hello, World!"; }
@@ -168,6 +168,6 @@ error: cannot execute external utility "greet"
 
 ## Related topics
 
-See [Local variables](parameters/variables.md#local-variables) to define temporary variables that are removed when the function returns.
+See [Local variables](parameters/variables.md#local-variables) for temporary variables that are removed when the function returns.
 
 <!-- TODO Aliases -->
