@@ -87,7 +87,7 @@ Variables are read-only only in the current shell session. Environment variables
 
 ## Local variables
 
-Variables defined by the `typeset` built-in (without the `--global` option) are local to the current shell [function](../functions.md). Such variables are removed when the function returns.
+Variables defined by the `typeset` built-in (without the `--global` option) are **local** to the current shell [function](../functions.md). Such variables are removed when the function returns. This is useful for avoiding variable name conflicts and not polluting the global namespace with temporary variables.
 
 ```shell
 $ i=0
@@ -105,7 +105,32 @@ $ echo "Outside function: $i"
 Outside function: 0
 ```
 
-As shown above, the original variable `i` is hidden by the local variable `i` inside the function and is restored when the function returns.
+As shown above, the original (**global**) variable `i` is hidden by the local variable `i` inside the function and is restored when the function returns.
+
+Variables have dynamic scope, so functions can access local variables defined in the function that called them, as well as global variables.
+
+```shell
+$ outer() {
+>     typeset user="Alice"
+>     inner
+>     echo "User in outer: $user"
+> }
+$ inner() {
+>     echo "User in inner: ${user-not set}"
+>     user="Bob"
+> }
+$ outer
+User in inner: Alice
+User in outer: Bob
+$ echo "User in global scope: ${user-not set}"
+User in global scope: not set
+$ inner
+User in inner: not set
+$ echo "User in global scope: ${user-not set}"
+User in global scope: Bob
+```
+
+In the example above, the `inner` function called from `outer` accesses the local variable `user` defined in `outer`. The value of `user` is changed in `inner`, and this change is visible in `outer` after `inner` returns. After `outer` returns, the local variable `user` no longer exists. Then, `inner` is called directly, and it tries to access `user` in the global scope, which is not set. Since `user` is not defined locally, the assignment in `inner` creates a new global variable `user`.
 
 ## Removing variables
 
