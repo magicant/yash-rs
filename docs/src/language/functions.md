@@ -166,8 +166,20 @@ error: cannot execute external utility "greet"
   |
 ```
 
+## Replacing existing utilities
+
+You can override existing utilities (except special built-ins) by defining a function with the same name. This is useful for customizing or extending utility behavior. To run the original utility from within your function, use the `command` built-in:
+
+```shell,no_run
+$ ls() {
+>     command ls --color=auto "$@"
+> }
+$ ls
+Documents  Downloads  Music  Pictures  Videos
+```
+
 ## Related topics
 
 See [Local variables](parameters/variables.md#local-variables) for temporary variables that are removed when the function returns.
 
-<!-- TODO Aliases -->
+See [Aliases and functions](aliases.md#aliases-and-functions) for comparison between aliases and functions.
