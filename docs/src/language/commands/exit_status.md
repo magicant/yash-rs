@@ -53,6 +53,21 @@ The `true` and `false` utilities simply return an exit status of 0 and 1, respec
 <!-- TODO: ## The `test` utility -->
 <!-- TODO: ## The double bracket command -->
 
+## Inverting exit status
+
+You can invert a command's exit status using the `!` [reserved word]. This treats a successful command as a failure, and vice versa.
+
+```shell
+$ test -f /nonexistent/file
+$ echo $?
+1
+$ ! test -f /nonexistent/file
+$ echo $?
+0
+```
+
+See [Negation](pipelines.md#negation) for more details.
+
 ## And-or lists
 
 An **and-or list** is a sequence of commands that are executed based on the success or failure of previous commands. It allows you to control the flow of execution based on the exit status of commands.
