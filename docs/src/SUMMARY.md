@@ -31,7 +31,7 @@
         - [Loops](language/commands/loops.md)
         - [Lists and asynchronous commands](language/commands/lists.md)
     - [Functions](language/functions.md)
-    - [Aliases]()
+    - [Aliases](language/aliases.md)
     - [File descriptors and redirections]()
         - [Here documents]()
 - [Startup]()
