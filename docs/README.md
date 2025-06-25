@@ -22,3 +22,10 @@ See the mdbook documentation for more details on the structure and build setup.
 - `doctest.sh`: A hand-written shell script that runs the examples in the documentation to ensure they work as expected. It is used to verify that the examples in the documentation are correct and executable.
 
 Use the `check-docs.sh` script in the parent directory to build the documentation and run all tests in the documentation.
+
+## Linking
+
+To link to other sections of the documentation, use relative links in Markdown format.
+
+- In the `src/SUMMARY.md` file, all files are referred to by their true pathnames. Pathnames ending with `/README.md` are converted to `index.html` in their respective directories.
+- In other Markdown files, to link to a file named `README.md`, use the relative path ending with `/index.html` because the pathnames are not converted to `index.html` in the rendered HTML due to <https://github.com/rust-lang/mdBook/issues/984>.
