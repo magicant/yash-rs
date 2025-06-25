@@ -32,7 +32,7 @@
         - [Lists and asynchronous commands](language/commands/lists.md)
     - [Functions](language/functions.md)
     - [Aliases](language/aliases.md)
-    - [File descriptors and redirections]()
+    - [Redirections](language/redirections/README.md)
         - [Here documents]()
 - [Startup]()
 - [Termination]()
