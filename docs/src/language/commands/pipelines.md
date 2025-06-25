@@ -42,7 +42,7 @@ $ ls \
 2
 ```
 
-If a pipeline contains only one command, the shell runs that command directly. For multiple commands, the shell creates a subshell for each and connects them with pipes. Each command's standard output is connected to the next command's standard input. The first command's input and the last command's output are not changed. All commands in the pipeline run concurrently.
+If a pipeline contains only one command, the shell runs that command directly. For multiple commands, the shell creates a subshell for each and connects them with pipes. Each command's standard output is connected to the next command's standard input. The first command's input and the last command's output are not changed. All commands in the pipeline run concurrently. (See [What are file descriptors?](../redirections/index.html#what-are-file-descriptors) for more on standard input and output.)
 
 The shell waits for all commands in the pipeline to finish before proceeding. The exit status of the pipeline is the exit status of the last command in the pipeline. (In the future, yash-rs may only wait for the last command to finish.)
 
