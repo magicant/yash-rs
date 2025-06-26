@@ -33,7 +33,7 @@
     - [Functions](language/functions.md)
     - [Aliases](language/aliases.md)
     - [Redirections](language/redirections/README.md)
-        - [Here documents](language/redirections/here_documents.md)
+        - [Here-documents](language/redirections/here_documents.md)
 - [Startup]()
 - [Termination]()
 - [Shell options]()
