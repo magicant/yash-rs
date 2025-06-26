@@ -1,6 +1,6 @@
 # Here-documents
 
-**Here-documents** are a type of [redirection](index.html) that let you provide multi-line input directly within a script or command line. They are useful for supplying input to commands or scripts without creating a separate file.
+**Here-documents** are a type of [redirection](index.html) that lets you provide multi-line input directly within a script or command line. They are useful for supplying input to commands or scripts without creating a separate file.
 
 ## Syntax
 
