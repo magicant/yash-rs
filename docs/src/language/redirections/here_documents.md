@@ -61,6 +61,7 @@ EOF
 
 If you use `<<-` instead of `<<`, all leading tab characters are removed from the here-document content and the delimiter line. This allows you to indent here-documents in your scripts for readability, without affecting the output.
 
+<!-- markdownlint-disable MD010 -->
 ```shell
 $ cat <<-EOF
 > 		Hello,
@@ -69,6 +70,7 @@ $ cat <<-EOF
 Hello,
 World!
 ```
+<!-- markdownlint-enable MD010 -->
 
 Note: Only leading tabs are removed, not spaces.
 
