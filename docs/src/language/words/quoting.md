@@ -100,7 +100,7 @@ $ echo "${var#*\}}"
 bar
 ```
 
-Within backquotes and arithmetic expansions, backslashes only escape `$`, `` ` ``, and `\`. If backquotes appear inside double quotes, backslashes also escape `"`. See examples in the [Command substitution](command_substitution.md#syntax) and [Arithmetic expansion](arithmetic.md#quoting) sections.
+Within backquotes, arithmetic expansions, and unquoted [here-document](../redirections/here_documents.md) contents, backslashes only escape `$`, `` ` ``, and `\`. If backquotes appear inside double quotes, backslashes also escape `"`. See examples in the [Command substitution](command_substitution.md#syntax) and [Arithmetic expansion](arithmetic.md#quoting) sections.
 
 ### Line continuation
 
