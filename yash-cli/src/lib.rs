@@ -43,7 +43,7 @@ use yash_semantics::{interactive_read_eval_loop, read_eval_loop};
 
 async fn print_version(env: &mut Env) {
     let version = env!("CARGO_PKG_VERSION");
-    let result = yash_builtin::common::output(env, &format!("yash {}\n", version)).await;
+    let result = yash_builtin::common::output(env, &format!("yash {version}\n")).await;
     env.exit_status = result.exit_status();
 }
 
@@ -57,7 +57,7 @@ async fn run_as_shell_process(env: &mut Env) {
         Ok(Parse::Run(run)) => run,
         Err(e) => {
             let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());
-            env.system.print_error(&format!("{}: {}\n", arg0, e)).await;
+            env.system.print_error(&format!("{arg0}: {e}\n")).await;
             env.exit_status = ExitStatus::ERROR;
             return;
         }
@@ -80,7 +80,7 @@ async fn run_as_shell_process(env: &mut Env) {
         Ok(lexer) => lexer,
         Err(e) => {
             let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());
-            let message = format!("{}: {}\n", arg0, e);
+            let message = format!("{arg0}: {e}\n");
             // The borrow checker of Rust 1.79.0 is not smart enough to reason
             // about the lifetime of `e` here, so we re-borrow from `ref_env`
             // instead of taking `env` out of `ref_env`.

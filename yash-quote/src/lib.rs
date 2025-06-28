@@ -225,7 +225,7 @@ mod tests {
     #[test]
     fn single_quoted() {
         fn test(s: &str) {
-            assert_eq!(quote(s), Owned::<str>(format!("'{}'", s)));
+            assert_eq!(quote(s), Owned::<str>(format!("'{s}'")));
         }
         test("");
         for c in ";&|()<> \t\n\u{3000}$`\\\"=*?#~".chars() {

@@ -190,7 +190,7 @@ where
                 writeln!(result)?;
             } else {
                 let output = path.as_deref().unwrap_or(&name.value);
-                writeln!(result, "{}", output)?;
+                writeln!(result, "{output}")?;
             }
             Ok(())
         }
@@ -214,7 +214,7 @@ where
                     quoted(&path)
                 )?;
             } else {
-                writeln!(result, "{}", path)?;
+                writeln!(result, "{path}")?;
             }
             Ok(())
         }

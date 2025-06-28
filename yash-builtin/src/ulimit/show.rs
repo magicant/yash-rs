@@ -91,7 +91,7 @@ where
             };
             let scale = resource.scale();
             let limit = Limit { value, scale };
-            Ok(format!("{}\n", limit))
+            Ok(format!("{limit}\n"))
         }
 
         Err(Errno::EINVAL) => Err(Error::UnsupportedResource),

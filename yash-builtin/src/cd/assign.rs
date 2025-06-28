@@ -72,7 +72,7 @@ async fn set_variable(env: &mut Env, name: &str, value: String) -> crate::Result
 async fn handle_assign_error(env: &mut Env, name: &str, error: AssignError) -> crate::Result {
     let message = Message {
         r#type: AnnotationType::Error,
-        title: format!("cannot update read-only variable `{}`", name).into(),
+        title: format!("cannot update read-only variable `{name}`").into(),
         annotations: vec![Annotation::new(
             AnnotationType::Info,
             "the variable was made read-only here".into(),

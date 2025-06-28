@@ -193,7 +193,7 @@ impl std::fmt::Display for Report<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "[{}] {} ", self.number, self.marker)?;
         if let Some(pid) = self.pid {
-            write!(f, "{:5} ", pid)?;
+            write!(f, "{pid:5} ")?;
         }
         write!(f, "{:20} {}", self.state, self.name)
     }

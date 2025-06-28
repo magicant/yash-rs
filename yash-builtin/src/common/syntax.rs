@@ -183,13 +183,13 @@ impl OptionSpec<'_> {
 impl std::fmt::Display for OptionSpec<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(short) = self.short {
-            write!(f, "-{}", short)?;
+            write!(f, "-{short}")?;
             if let Some(long) = self.long {
-                write!(f, "/--{}", long)?;
+                write!(f, "/--{long}")?;
             }
             Ok(())
         } else if let Some(long) = self.long {
-            write!(f, "--{}", long)
+            write!(f, "--{long}")
         } else {
             write!(f, "?")
         }

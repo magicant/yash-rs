@@ -43,7 +43,7 @@ pub fn compute(env: &Env, mode: Mode) -> Result {
     match mode {
         Mode::Logical => {
             if let Some(pwd) = env.get_pwd_if_correct() {
-                return Ok(format!("{}\n", pwd));
+                return Ok(format!("{pwd}\n"));
             }
         }
         Mode::Physical => (),

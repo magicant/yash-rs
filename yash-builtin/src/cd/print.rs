@@ -55,7 +55,7 @@ pub async fn print_path(env: &mut Env, path: &Path, origin: &Origin) {
 async fn handle_print_error(env: &mut Env, errno: Errno) {
     let message = Message {
         r#type: AnnotationType::Warning,
-        title: format!("cannot print new $PWD: {}", errno).into(),
+        title: format!("cannot print new $PWD: {errno}").into(),
         annotations: vec![],
         footers: vec![],
     };

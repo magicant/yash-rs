@@ -56,7 +56,7 @@ where
         command.pre_exec(pre_exec);
     }
     let result = command.output().unwrap();
-    assert!(result.status.success(), "{:?}", result);
+    assert!(result.status.success(), "{result:?}");
 
     // The `run-test.sh` script returns a successful exit status even if there
     // is a failed test case. Check the log file to see if there is one.
