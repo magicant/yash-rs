@@ -53,7 +53,7 @@ See [Simple commands](../commands/simple.md) for more on assignment behavior.
 
 ## Environment variables
 
-Environment variables are variables exported to child processes. To export a variable, use the `export` built-in:
+**Environment variables** are variables exported to child processes. To export a variable, use the `export` built-in:
 
 ```shell
 $ export user=Alice
