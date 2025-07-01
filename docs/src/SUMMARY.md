@@ -36,7 +36,7 @@
         - [Here-documents](language/redirections/here_documents.md)
 - [Startup]()
 - [Termination]()
-- [Shell options]()
+- [Shell options](options.md)
 - [Shell environment and subshells]()
 - [Signals and traps]()
 - [Built-in utilities]()
