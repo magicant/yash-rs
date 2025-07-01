@@ -164,7 +164,7 @@ Below is a list of all shell options in yash-rs, with their long and short names
 
 - **`allexport`** (**`-a`**): If set, all [variables] assigned in the shell are [exported](language/parameters/variables.md#environment-variables).
 
-- **`clobber`** (**`+C`**): If set (default), the `>` [redirection](language/redirections/README.md) operator overwrites existing files. If unset, `>` fails if the file exists. The `>|` operator always overwrites files.
+- **`clobber`** (**`+C`**): If set (default), the `>` [redirection](language/redirections/index.html) operator overwrites existing files. If unset, `>` fails if the file exists. The `>|` operator always overwrites files.
 
 - **`cmdline`** (**`-c`**): If set, the shell executes the first operand from the command line as a command. Mutually exclusive with `stdin`, and only settable at startup. <!-- TODO: Link to startup -->
 
