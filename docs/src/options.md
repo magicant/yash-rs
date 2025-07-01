@@ -195,10 +195,11 @@ Below is a list of all shell options in yash-rs, with their long and short names
     - Enabled by default in interactive shells.
 
 - **`notify`** (**`-b`**): If set, the shell notifies you of background job completions and suspensions as soon as they occur. If unset, notifications are delayed until the next prompt. <!-- TODO: link to job control -->
-    - ⚠️ Not yet implemented in yash-rs.
+    - ⚠️ Currently has no effect in yash-rs. In the future, it will enable immediate notifications for background jobs.
     - Only takes effect if `interactive` and `monitor` are enabled.
 
-<!-- TODO: pipefail -->
+- **`pipefail`**: If set, the shell returns the [exit status](language/commands/exit_status.md) of the last command in a [pipeline](language/commands/pipelines.md) that failed, instead of the last command's exit status.
+    - ⚠️ Not yet implemented in yash-rs.
 
 - **`posixlycorrect`**: If set, the shell behaves as POSIX-compliant as possible. Useful for portable scripts. <!-- TODO: link to POSIX compliance -->
     - Enabled on startup if the shell is started as `sh`.
@@ -212,7 +213,7 @@ Below is a list of all shell options in yash-rs, with their long and short names
 - **`verbose`** (**`-v`**): If set, the shell prints each command before executing it. Useful for debugging. <!-- TODO: link to debugging -->
 
 - **`vi`**: If set, the shell uses vi-style keybindings for command line editing. <!-- TODO: link to interactive shell and command line editing -->
-    - ⚠️ Not yet implemented in yash-rs.
+    - ⚠️ Currently has no effect in yash-rs. In the future, it will enable vi-style editing in interactive shells.
 
 - **`xtrace`** (**`-x`**): If set, the shell prints each field after [expansion](language/words/index.html#word-expansion), before executing it. Useful for debugging. <!-- TODO: link to debugging -->
 
