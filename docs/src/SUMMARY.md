@@ -37,7 +37,7 @@
 - [Startup]()
 - [Termination]()
 - [Shell options](options.md)
-- [Shell environment and subshells]()
+- [Shell environment and subshells](environment.md)
 - [Signals and traps]()
 - [Built-in utilities]()
     - [. (dot)]()
