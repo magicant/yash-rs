@@ -19,6 +19,8 @@ The **shell execution environment** is the set of state the shell maintains to c
 - Traps <!-- TODO: link to Signals and traps -->
 - Jobs <!-- TODO: link to Job control -->
 
+## Subshells
+
 A **subshell** is a separate environment created as a copy of the current shell environment. Changes in a subshell do not affect the parent shell. A subshell starts with the same state as the parent, except that traps with custom commands are reset to default behavior.
 
 Create a subshell using [parentheses](language/commands/grouping.md#subshells). Subshells are also created implicitly when running an [external utility](language/commands/simple.md#command-search), a [command substitution](language/words/command_substitution.md), an [asynchronous command], or a multi-command [pipeline](language/commands/pipelines.md).

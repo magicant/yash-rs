@@ -35,7 +35,7 @@
     - [Redirections](language/redirections/README.md)
         - [Here-documents](language/redirections/here_documents.md)
 - [Startup](startup.md)
-- [Termination]()
+- [Termination](termination.md)
 - [Shell options](options.md)
 - [Shell environment and subshells](environment.md)
 - [Signals and traps]()

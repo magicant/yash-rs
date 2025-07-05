@@ -168,7 +168,7 @@ Below is a list of all shell options in yash-rs, with their long and short names
 
 - **`cmdline`** (**`-c`**): If set, the shell executes the first operand from the command line as a command. Mutually exclusive with `stdin`, and only settable at startup. <!-- TODO: Link to startup -->
 
-- **`errexit`** (**`-e`**): If set, the shell exits if a command fails. Useful for scripts to stop on errors. <!-- TODO: link to termination and debugging -->
+- **`errexit`** (**`-e`**): If set, the shell [exits](termination.md) if a command fails. Useful for scripts to stop on errors. <!-- TODO: link to the debugging section -->
 
 - **`exec`** (**`+n`**): If set (default), the shell executes commands. If unset, it only parses commands (useful for syntax checking). <!-- TODO: Link to debugging -->
     - Once unset, it cannot be set again in the same session.
@@ -180,8 +180,8 @@ Below is a list of all shell options in yash-rs, with their long and short names
     - The short name `-h` is currently a synonym for `--hashondefinition`, but this may change.
     - Many shells implement `-h` differently, so behavior may vary.
 
-- **`ignoreeof`**: If set, the shell ignores end-of-file (usually `Ctrl+D`) and does not exit. Useful to prevent accidental exits. <!-- TODO: link to interactive shell and termination -->
-    - Only takes effect if the shell is interactive and input is a terminal.
+- **`ignoreeof`**: If set, the shell ignores end-of-file (usually `Ctrl+D`) and does not exit. See [Preventing accidental exits](termination.md#preventing-accidental-exits).
+    - Only takes effect if the shell is interactive and input is a terminal. <!-- TODO: link to interactive shell -->
 
 - **`interactive`** (**`-i`**): If set, the shell is interactive. <!-- TODO: link to interactive -->
     - Enabled on startup if `stdin` is enabled and standard input and error are terminals.

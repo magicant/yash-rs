@@ -111,6 +111,15 @@ checkoutput() {
         ;;
     esac
 }
+checkoutputsofar() {
+    case " $* " in
+    (*' one_shot '*)
+        ;;
+    (*)
+        checkoutput "$@"
+        ;;
+    esac
+}
 
 for file do
     exec < "$file"
@@ -159,7 +168,7 @@ for file do
                     applyhidelines
                     case "$line" in
                     ('$ '*)
-                        checkoutput "$@"
+                        checkoutputsofar "$@"
                         printf '%s\n' "${line#'$ '}" >> "$script"
                         ;;
                     ('> '*)
