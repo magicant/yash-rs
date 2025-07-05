@@ -13,9 +13,35 @@
 #
 # Expected output:
 #   The script prints the results of failed tests.
-#   If any code snippet fails, the script exits with a non-zero status.
 #
-# If all tests pass, the script exits with a zero status.
+# The exit status of the script indicates whether all tests passed.
+#
+# This script examines attributes attached to code blocks to determine how to
+# handle them. The following attributes are recognized:
+#
+# - `shell`: The code block is a shell session. Lines starting with `$ ` and `>
+#   ` are commands to be executed, and the rest is expected output.
+# - `sh`: The code block is a shell script. The entire block is parsed as a
+#   shell script, and its syntax is checked.
+# - `ignore`: The code block is ignored and not tested.
+# - `no_run`: The code block is not executed, but its syntax is checked.
+# - `one_shot`: The code block is executed, but the output is checked only once
+#   against the expected output. (By default, the output is checked for each
+#   input/output pair.)
+# - `hidelines=<prefix>`: The prefix is stripped from each line of the code
+#   block before processing. See also the mdBook documentation about this
+#   attribute: <https://rust-lang.github.io/mdBook/format/configuration/renderers.html?highlight=hidelines#outputhtmlcode>
+#
+# Script structure:
+#
+# 1. Parses command-line arguments and determines which markdown files to
+#    process.
+# 2. For each file, scans for code blocks and interprets their attributes.
+# 3. For shell session and script blocks, extracts commands and expected output.
+# 4. Executes or checks the extracted code as appropriate, comparing actual
+#    output to expected.
+# 5. Reports any mismatches or syntax errors, and sets the exit status
+#    accordingly.
 
 set -Ceu
 
