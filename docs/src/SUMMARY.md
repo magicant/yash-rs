@@ -38,7 +38,7 @@
 - [Termination](termination.md)
 - [Shell options](options.md)
 - [Shell environment and subshells](environment.md)
-- [Signals and traps]()
+- [Signals and traps](traps.md)
 - [Built-in utilities]()
     - [. (dot)]()
     - [: (colon)]()

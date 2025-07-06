@@ -27,7 +27,7 @@ When one of the above conditions occurs in a [subshell](environment.md#subshells
 
 ## `EXIT` trap
 
-You can set a trap for the `EXIT` condition to run commands when the shell exits. This can be useful for cleanup tasks or logging. The trap is executed regardless of how the shell exits, whether due to an error, end-of-file, or explicit `exit` command, except when the shell is killed by a signal, in which case the trap is not executed.
+You can set a [trap](traps.md) for the `EXIT` condition to run commands when the shell exits. This can be useful for cleanup tasks or logging. The trap is executed regardless of how the shell exits, whether due to an error, end-of-file, or explicit `exit` command, except when the shell is killed by a signal, in which case the trap is not executed.
 
 ```shell,one_shot
 $ trap 'rm -f temporary.txt; echo "Temporary file removed."' EXIT
@@ -37,6 +37,8 @@ Some data
 $ exit
 Temporary file removed.
 ```
+
+The `EXIT` trap is run at most once per shell session. Modifying the `EXIT` trap while it is running does not have any effect on trap execution.
 
 ## Exit status
 
