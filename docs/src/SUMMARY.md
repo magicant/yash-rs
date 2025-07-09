@@ -39,7 +39,7 @@
 - [Shell options](options.md)
 - [Shell environment and subshells](environment.md)
 - [Signals and traps](traps.md)
-- [Built-in utilities]()
+- [Built-in utilities](builtins/README.md)
     - [. (dot)]()
     - [: (colon)]()
     - [alias]()
