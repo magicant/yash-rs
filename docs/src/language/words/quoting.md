@@ -116,7 +116,7 @@ To treat a newline literally rather than as a line continuation, use single or d
 
 ## Dollar single quotes
 
-**Dollar single quotes** (`$'...'`) are used to specify strings with escape sequences, similar to those in C. The content inside the quotes is parsed, and recognized escape sequences are replaced with their corresponding characters.
+**Dollar single quotes** (`$'…'`) are used to specify strings with escape sequences, similar to those in C. The content inside the quotes is parsed, and recognized escape sequences are replaced with their corresponding characters.
 
 For example, `\n` is replaced with a newline character:
 

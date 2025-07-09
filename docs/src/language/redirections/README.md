@@ -214,7 +214,7 @@ Read: One
 Read: One
 Read: One
 Read: One
-(The loop never ends...)
+(The loop never ends…)
 ```
 
 If a command has multiple redirections, they are applied in order. If several affect the same file descriptor, the last one takes effect:

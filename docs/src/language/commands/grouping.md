@@ -4,7 +4,7 @@ A **grouping** command combines multiple commands so they are treated as a singl
 
 ## Braces
 
-Commands grouped in braces `{ ... }` run in the current shell environment.
+Commands grouped in braces `{ … }` run in the current shell environment.
 
 ```shell
 $ { echo "Hello"; echo "World"; }
@@ -39,7 +39,7 @@ $ test -f ~/cache/file || { mkdir -p ~/cache; > ~/cache/file; }
 
 ## Subshells
 
-Commands grouped in parentheses `( ... )` run in a subshell—a copy of the current shell environment. Changes made in a subshell do not affect the parent shell.
+Commands grouped in parentheses `( … )` run in a subshell—a copy of the current shell environment. Changes made in a subshell do not affect the parent shell.
 
 ```shell
 $ greeting="Morning"
