@@ -76,7 +76,7 @@ More may be added in the future.
 
 **Substitutive built-ins** replace external utilities to avoid process creation overhead for common tasks.
 
-Because substitutive built-ins work like external utilities, they are found in [command search](../language/commands/simple.md#command-search) and can be overridden by functions. If the corresponding executable is not found in `PATH`, the built-in does not run.
+Substitutive built-ins behave like external utilities: they are located during [command search](../language/commands/simple.md#command-search) and can be overridden by [functions](../language/functions.md). However, the built-in is only available if the corresponding external utility exists in `PATH`. If the external utility is missing from `PATH`, the built-in is also unavailable, ensuring consistent behavior with the absence of the utility.
 
 Yash-rs implements these substitutive built-ins:
 
