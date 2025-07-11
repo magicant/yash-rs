@@ -61,7 +61,7 @@ The rcfile is only executed if:
 
 ## Compatibility
 
-Options for initialization files (`--profile`, `--noprofile`, `--rcfile`, `--norcfile`) are not part of POSIX.1-2024 and may not be available in other shells. See [Compatibility](options.md#compatibility) in the options documentation for portable shell options.
+Options for initialization files (`--profile`, `--noprofile`, `--rcfile`, `--norcfile`) are not part of POSIX.1-2024 and may not be available in other shells. See [Compatibility](environment/options.md#compatibility) in the options documentation for portable shell options.
 
 POSIX.1-2024 does not specify login shells or profile files. The behavior described here is specific to yash-rs and may differ from other shells.
 
@@ -72,5 +72,5 @@ Using the `ENV` [environment variable] for initialization files is POSIX-specifi
 [environment variable]: language/parameters/variables.md#environment-variables
 [parameter expansion]: language/words/parameters.md
 [positional parameters]: language/parameters/positional.md
-[shell options]: options.md
+[shell options]: environment/options.md
 [special parameter]: language/parameters/special.md

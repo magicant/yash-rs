@@ -47,7 +47,7 @@ Below are the special parameters and their meanings:
 - **`?`**: [Exit status](../commands/exit_status.md) of the last command.
 
 - **`-`**: Current shell options.
-    - Expands to the short names of all currently set [shell options](../../options.md), concatenated together. Options without a short name are omitted. For example, if `-i` and `-m` are set, the value is `im`.
+    - Expands to the short names of all currently set [shell options](../../environment/options.md), concatenated together. Options without a short name are omitted. For example, if `-i` and `-m` are set, the value is `im`.
 
 - **`$`**: Process ID of the current shell.
     - Set when the shell starts and remains constant, even in subshells.

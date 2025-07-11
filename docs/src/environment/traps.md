@@ -35,13 +35,13 @@ The shell checks for pending signals and executes corresponding trap actions at 
 
 ### Special conditions
 
-In addition to signals, the shell supports the [`EXIT` condition](termination.md#exit-trap), which is triggered when the shell exits (but not when killed by a signal). This allows you to run cleanup commands or perform other actions when the shell session ends.
+In addition to signals, the shell supports the [`EXIT` condition](../termination.md#exit-trap), which is triggered when the shell exits (but not when killed by a signal). This allows you to run cleanup commands or perform other actions when the shell session ends.
 
 More conditions may be supported in future versions of the shell.
 
 ### Trap inheritance and subshells
 
-When the shell creates a [subshell](environment.md#subshells):
+When the shell creates a [subshell](index.html#subshells):
 
 - Traps set to ignore are inherited by the subshell.
 - Traps with custom actions are reset to default behavior.
@@ -67,4 +67,4 @@ Signal traps run when signals are caught.
 
 `EXIT` traps run when the shell exits normally, after all other commands complete.
 
-The [exit status](language/commands/exit_status.md) is preserved across trap action execution, but trap actions can use the `exit` built-in to terminate the shell with a specific exit status.
+The [exit status](../language/commands/exit_status.md) is preserved across trap action execution, but trap actions can use the `exit` built-in to terminate the shell with a specific exit status.

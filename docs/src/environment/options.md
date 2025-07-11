@@ -148,7 +148,7 @@ $ set -o | grep allexport
 allexport        off
 ```
 
-The `-` [special parameter](language/parameters/special.md) contains the currently set short options. For example, if `-i` and `-m` are set, the value of `-` is `im`. Options without a short name are not included. Short options that negate long options are included when the long option is unset.
+The `-` [special parameter](../language/parameters/special.md) contains the currently set short options. For example, if `-i` and `-m` are set, the value of `-` is `im`. Options without a short name are not included. Short options that negate long options are included when the long option is unset.
 
 ```shell
 $ set -a -o noclobber
@@ -162,25 +162,25 @@ aCs
 
 Below is a list of all shell options in yash-rs, with their long and short names, and a brief description. Unless noted, all options are disabled by default.
 
-- **`allexport`** (**`-a`**): If set, all [variables] assigned in the shell are [exported](language/parameters/variables.md#environment-variables).
+- **`allexport`** (**`-a`**): If set, all [variables] assigned in the shell are [exported](../language/parameters/variables.md#environment-variables).
 
-- **`clobber`** (**`+C`**): If set (default), the `>` [redirection](language/redirections/index.html) operator overwrites existing files. If unset, `>` fails if the file exists. The `>|` operator always overwrites files.
+- **`clobber`** (**`+C`**): If set (default), the `>` [redirection](../language/redirections/index.html) operator overwrites existing files. If unset, `>` fails if the file exists. The `>|` operator always overwrites files.
 
 - **`cmdline`** (**`-c`**): If set, the shell executes the first operand from the command line as a command. Mutually exclusive with `stdin`, and only settable at startup. <!-- TODO: Link to startup -->
 
-- **`errexit`** (**`-e`**): If set, the shell [exits](termination.md) if a command fails. Useful for scripts to stop on errors. <!-- TODO: link to the debugging section -->
+- **`errexit`** (**`-e`**): If set, the shell [exits](../termination.md) if a command fails. Useful for scripts to stop on errors. <!-- TODO: link to the debugging section -->
 
 - **`exec`** (**`+n`**): If set (default), the shell executes commands. If unset, it only parses commands (useful for syntax checking). <!-- TODO: Link to debugging -->
     - Once unset, it cannot be set again in the same session.
     - In interactive shells, this option is ignored and commands are always executed.
 
-- **`glob`** (**`+f`**): If set (default), the shell performs [pathname expansion](language/words/globbing.md) on words containing metacharacters. If unset, pathname expansion is skipped.
+- **`glob`** (**`+f`**): If set (default), the shell performs [pathname expansion](../language/words/globbing.md) on words containing metacharacters. If unset, pathname expansion is skipped.
 
 - **`hashondefinition`** (**`-h`**): Deprecated and has no effect. Remains for compatibility.
     - The short name `-h` is currently a synonym for `--hashondefinition`, but this may change.
     - Many shells implement `-h` differently, so behavior may vary.
 
-- **`ignoreeof`**: If set, the shell ignores end-of-file (usually `Ctrl+D`) and does not exit. See [Preventing accidental exits](termination.md#preventing-accidental-exits).
+- **`ignoreeof`**: If set, the shell ignores end-of-file (usually `Ctrl+D`) and does not exit. See [Preventing accidental exits](../termination.md#preventing-accidental-exits).
     - Only takes effect if the shell is interactive and input is a terminal. <!-- TODO: link to interactive shell -->
 
 - **`interactive`** (**`-i`**): If set, the shell is interactive. <!-- TODO: link to interactive -->
@@ -198,7 +198,7 @@ Below is a list of all shell options in yash-rs, with their long and short names
     - ⚠️ Currently has no effect in yash-rs. In the future, it will enable immediate notifications for background jobs.
     - Only takes effect if `interactive` and `monitor` are enabled.
 
-- **`pipefail`**: If set, the shell returns the [exit status](language/commands/exit_status.md) of the last command in a [pipeline](language/commands/pipelines.md) that failed, instead of the last command's exit status.
+- **`pipefail`**: If set, the shell returns the [exit status](../language/commands/exit_status.md) of the last command in a [pipeline](../language/commands/pipelines.md) that failed, instead of the last command's exit status.
     - ⚠️ Not yet implemented in yash-rs.
 
 - **`posixlycorrect`**: If set, the shell behaves as POSIX-compliant as possible. Useful for portable scripts. <!-- TODO: link to POSIX compliance -->
@@ -208,14 +208,14 @@ Below is a list of all shell options in yash-rs, with their long and short names
 - **`stdin`** (**`-s`**): If set, the shell reads commands from standard input. Mutually exclusive with `cmdline`, and only settable at startup. <!-- TODO: Link to startup -->
     - Enabled if `cmdline` is not set and the shell is started with no operands.
 
-- **`unset`** (**`+u`**): If set (default), the shell [expands](language/words/parameters.md) unset [variables] to an empty string. If unset, expanding an unset variable raises an error.
+- **`unset`** (**`+u`**): If set (default), the shell [expands](../language/words/parameters.md) unset [variables] to an empty string. If unset, expanding an unset variable raises an error.
 
 - **`verbose`** (**`-v`**): If set, the shell prints each command before executing it. Useful for debugging. <!-- TODO: link to debugging -->
 
 - **`vi`**: If set, the shell uses vi-style keybindings for command line editing. <!-- TODO: link to interactive shell and command line editing -->
     - ⚠️ Currently has no effect in yash-rs. In the future, it will enable vi-style editing in interactive shells.
 
-- **`xtrace`** (**`-x`**): If set, the shell prints each field after [expansion](language/words/index.html#word-expansion), before executing it. Useful for debugging. <!-- TODO: link to debugging -->
+- **`xtrace`** (**`-x`**): If set, the shell prints each field after [expansion](../language/words/index.html#word-expansion), before executing it. Useful for debugging. <!-- TODO: link to debugging -->
 
 ## Compatibility
 
@@ -253,4 +253,4 @@ POSIX.1-2024 options:
 - `-o pipefail`
 - `-o vi`
 
-[variables]: language/parameters/variables.md
+[variables]: ../language/parameters/variables.md
