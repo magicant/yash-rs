@@ -16,48 +16,10 @@
 
 //! Alias built-in.
 //!
-//! The **`alias`** built-in defines [aliases] or prints alias definitions.
+//! This module implements the [`alias` built-in], which defines aliases or prints
+//! alias definitions.
 //!
-//! [aliases]: yash_syntax::alias
-//!
-//! # Synopsis
-//!
-//! ```sh
-//! alias [name[=value]…]
-//! ```
-//!
-//! # Description
-//!
-//! The alias built-in defines aliases or prints alias definitions as specified
-//! by the operands. If there are no operands, the alias built-in prints all
-//! alias definitions. The printed definitions are in the form of assignments
-//! with proper quoting that can be used as operands to the alias built-in to
-//! restore the definitions.
-//!
-//! # Options
-//!
-//! None. (TODO: Non-POSIX options)
-//!
-//! # Operands
-//!
-//! Each operand must be of the form `name=value` or `name`. The first form
-//! defines an alias named *name* that expands to *value*. The second form
-//! prints the definition of the alias named *name*.
-//!
-//! # Errors
-//!
-//! It is an error if an operand without `=` names a non-existent alias.
-//!
-//! # Exit status
-//!
-//! Zero unless an error occurs.
-//!
-//! # Portability
-//!
-//! The alias built-in is specified in POSIX.
-//!
-//! Some shells have a set of predefined aliases that are printed even if you
-//! don't define any explicitly.
+//! [`alias` built-in]: https://magicant.github.io/yash-rs/builtins/alias.html
 
 use crate::common::output;
 use crate::common::report_error;

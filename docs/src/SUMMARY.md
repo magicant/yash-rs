@@ -42,7 +42,7 @@
 - [Built-in utilities](builtins/README.md)
     - [. (dot)]()
     - [: (colon)]()
-    - [alias]()
+    - [alias](builtins/alias.md)
     - [bg]()
     - [break]()
     - [cd]()

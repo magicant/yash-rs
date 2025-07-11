@@ -7,9 +7,9 @@ This section describes how yash-rs is started and configured.
 Start the shell by running the `yash3` executable. The general syntax is:
 
 ```sh
-yash3 [options] [file [arguments...]]
-yash3 [options] -c command [command_name [arguments...]]
-yash3 [options] -s [arguments...]
+yash3 [options] [file [arguments…]]
+yash3 [options] -c command [command_name [arguments…]]
+yash3 [options] -s [arguments…]
 ```
 
 The shell's behavior is determined by the options and operands you provide.

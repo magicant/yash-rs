@@ -29,10 +29,10 @@ The following characters have special meanings in patterns:
 
 - `?` – Matches any single character.
 - `*` – Matches any number of characters, including none.
-- `[...]` – Matches any single character from the set of characters inside the brackets. For example, `[abc]` matches `a`, `b`, or `c`. Ranges can be specified with a hyphen, like `[a-z]` for lowercase letters.
-- `[!...]` and `[^...]` – Matches any single character not in the set of characters inside the brackets. For example, `[!abc]` matches any character except `a`, `b`, or `c`.
+- `[…]` – Matches any single character from the set of characters inside the brackets. For example, `[abc]` matches `a`, `b`, or `c`. Ranges can be specified with a hyphen, like `[a-z]` for lowercase letters.
+- `[!…]` and `[^…]` – Matches any single character not in the set of characters inside the brackets. For example, `[!abc]` matches any character except `a`, `b`, or `c`.
 
-The `[^...]` form is not supported in all shells; prefer using `[!...]` for compatibility.
+The `[^…]` form is not supported in all shells; prefer using `[!…]` for compatibility.
 
 ```shell,no_run
 $ echo ?????? # prints all six-character long filenames

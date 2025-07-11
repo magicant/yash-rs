@@ -4,7 +4,7 @@
 
 ## Basic usage
 
-Define an alias with the `alias` built-in. When the first word in a [simple command](commands/simple.md) matches an alias, the shell replaces it with the alias definition before parsing the rest of the command.
+Define an alias with the [`alias` built-in](../builtins/alias.md). When the first word in a [simple command](commands/simple.md) matches an alias, the shell replaces it with the alias definition before parsing the rest of the command.
 
 ```shell,no_run
 $ alias ll='ls -l'

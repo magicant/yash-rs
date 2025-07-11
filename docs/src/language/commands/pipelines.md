@@ -7,7 +7,7 @@ A **pipeline** is a sequence of commands connected by pipes (`|`). The output of
 The syntax for a pipeline is:
 
 ```sh
-command1 | command2 | command3 ...
+command1 | command2 | command3 …
 ```
 
 For example, to list files and filter the output:
