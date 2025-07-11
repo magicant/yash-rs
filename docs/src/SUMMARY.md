@@ -38,6 +38,7 @@
 - [Termination](termination.md)
 - [Shell options](options.md)
 - [Shell environment and subshells](environment.md)
+- [Dynamic command evaluation](dynamic_evaluation.md)
 - [Signals and traps](traps.md)
 - [Built-in utilities](builtins/README.md)
     - [. (dot)]()
