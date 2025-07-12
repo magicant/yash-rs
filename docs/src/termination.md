@@ -23,11 +23,11 @@ This option is only effective in interactive shells and only when the input is a
 
 ## Exiting subshells
 
-When one of the above conditions occurs in a [subshell](environment.md#subshells), the subshell exits. It does not directly cause the parent shell to exit, but the [exit status] of the subshell may affect the parent shell's behavior, conditionally causing it to exit if the `errexit` option is set.
+When one of the above conditions occurs in a [subshell](environment/index.html#subshells), the subshell exits. It does not directly cause the parent shell to exit, but the [exit status] of the subshell may affect the parent shell's behavior, conditionally causing it to exit if the `errexit` option is set.
 
 ## `EXIT` trap
 
-You can set a [trap](traps.md) for the `EXIT` condition to run commands when the shell exits. This can be useful for cleanup tasks or logging. The trap is executed regardless of how the shell exits, whether due to an error, end-of-file, or explicit `exit` command, except when the shell is killed by a signal, in which case the trap is not executed.
+You can set a [trap](environment/traps.md) for the `EXIT` condition to run commands when the shell exits. This can be useful for cleanup tasks or logging. The trap is executed regardless of how the shell exits, whether due to an error, end-of-file, or explicit `exit` command, except when the shell is killed by a signal, in which case the trap is not executed.
 
 ```shell,one_shot
 $ trap 'rm -f temporary.txt; echo "Temporary file removed."' EXIT
@@ -69,4 +69,4 @@ POSIX.1-2024 allows shells to exit on [command search](language/commands/simple.
 
 [exit status]: #exit-status
 [shell error]: #shell-errors
-[shell option]: options.md
+[shell option]: environment/options.md

@@ -1,5 +1,8 @@
 # Summary
 
+<!-- Disable linting rules that conflict with the mdBook summary format. -->
+<!-- markdownlint-disable MD025 MD042 -->
+
 [Homepage](README.md)
 
 # User manual
@@ -34,11 +37,16 @@
     - [Aliases](language/aliases.md)
     - [Redirections](language/redirections/README.md)
         - [Here-documents](language/redirections/here_documents.md)
+- [Shell environment and subshells](environment/README.md)
+    - [Shell options](environment/options.md)
+    - [Signals and traps](environment/traps.md)
 - [Startup](startup.md)
 - [Termination](termination.md)
-- [Shell options](options.md)
-- [Shell environment and subshells](environment.md)
-- [Signals and traps](traps.md)
+- [Dynamic command evaluation](dynamic_evaluation.md)
+- [Script debugging]() <!-- errexit, noexec, xtrace, etc. -->
+- [Interactive shell]()
+    - [Command prompt]()
+    - [Job control]()
 - [Built-in utilities](builtins/README.md)
     - [. (dot)]()
     - [: (colon)]()
@@ -74,10 +82,6 @@
     - [unalias]()
     - [unset]()
     - [wait]()
-- [Interactive shell]()
-    - [Command prompt]()
-    - [Job control]()
-- [Script debugging]() <!-- errexit, noexec, xtrace, etc. -->
 - [Pattern matching](patterns.md)
 - [Arithmetic expressions](arithmetic.md)
 - [FAQ and troubleshooting]()
