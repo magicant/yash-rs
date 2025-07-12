@@ -1,5 +1,8 @@
 # Summary
 
+<!-- Disable linting rules that conflict with the mdBook summary format. -->
+<!-- markdownlint-disable MD025 MD042 -->
+
 [Homepage](README.md)
 
 # User manual
