@@ -18,7 +18,7 @@ $ echo "Hello, ${user}!"
 Hello, !
 ```
 
-If the `nounset` shell option is enabled, expanding an unset parameter is an error:
+If the `nounset` [shell option](../../environment/options.md) is enabled, expanding an unset parameter is an error:
 
 ```shell
 $ set -o nounset

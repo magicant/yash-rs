@@ -43,7 +43,7 @@
 - [Startup](startup.md)
 - [Termination](termination.md)
 - [Dynamic command evaluation](dynamic_evaluation.md)
-- [Script debugging]() <!-- errexit, noexec, xtrace, etc. -->
+- [Script debugging](debugging.md)
 - [Interactive shell]()
     - [Command prompt]()
     - [Job control]()
@@ -85,3 +85,4 @@
 - [Pattern matching](patterns.md)
 - [Arithmetic expressions](arithmetic.md)
 - [FAQ and troubleshooting]()
+- [Index]()
