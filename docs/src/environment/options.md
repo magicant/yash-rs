@@ -166,11 +166,11 @@ Below is a list of all shell options in yash-rs, with their long and short names
 
 - **`clobber`** (**`+C`**): If set (default), the `>` [redirection](../language/redirections/index.html) operator overwrites existing files. If unset, `>` fails if the file exists. The `>|` operator always overwrites files.
 
-- **`cmdline`** (**`-c`**): If set, the shell executes the first operand from the command line as a command. Mutually exclusive with `stdin`, and only settable at startup. <!-- TODO: Link to startup -->
+- **`cmdline`** (**`-c`**): If set, the shell executes the first operand from the command line as a command. Mutually exclusive with `stdin`, and only settable at [startup](../startup.md).
 
-- **`errexit`** (**`-e`**): If set, the shell [exits](../termination.md) if a command fails. Useful for scripts to stop on errors. <!-- TODO: link to the debugging section -->
+- **`errexit`** (**`-e`**): If set, the shell [exits](../termination.md) if a command fails. Useful for scripts to stop on errors. See [Exiting on errors](../debugging.md#exiting-on-errors) for details.
 
-- **`exec`** (**`+n`**): If set (default), the shell executes commands. If unset, it only parses commands (useful for syntax checking). <!-- TODO: Link to debugging -->
+- **`exec`** (**`+n`**): If set (default), the shell executes commands. If unset, it only parses commands (useful for [syntax checking](../debugging.md#checking-syntax)).
     - Once unset, it cannot be set again in the same session.
     - In interactive shells, this option is ignored and commands are always executed.
 
@@ -188,7 +188,7 @@ Below is a list of all shell options in yash-rs, with their long and short names
 
 - **`log`**: Deprecated and has no effect. Remains for compatibility.
 
-- **`login`** (**`-l`**): If set, the shell behaves as a login shell. Only settable at startup. <!-- TODO: link to startup -->
+- **`login`** (**`-l`**): If set, the shell behaves as a login shell. Only settable at [startup](../startup.md).
     - ⚠️ Currently has no effect in yash-rs. In the future, login shells will read extra initialization files.
 
 - **`monitor`** (**`-m`**): If set, the shell performs job control for background jobs and suspended processes. <!-- TODO: link to job control -->
@@ -198,24 +198,24 @@ Below is a list of all shell options in yash-rs, with their long and short names
     - ⚠️ Currently has no effect in yash-rs. In the future, it will enable immediate notifications for background jobs.
     - Only takes effect if `interactive` and `monitor` are enabled.
 
-- **`pipefail`**: If set, the shell returns the [exit status](../language/commands/exit_status.md) of the last command in a [pipeline](../language/commands/pipelines.md) that failed, instead of the last command's exit status.
+- **`pipefail`**: If set, the shell returns the [exit status](../language/commands/exit_status.md) of the last command in a [pipeline](../language/commands/pipelines.md) that failed, instead of the last command's exit status. See [Catching errors across pipeline components](../debugging.md#catching-errors-across-pipeline-components) for details.
     - ⚠️ Not yet implemented in yash-rs.
 
 - **`posixlycorrect`**: If set, the shell behaves as POSIX-compliant as possible. Useful for portable scripts. <!-- TODO: link to POSIX compliance -->
     - Enabled on startup if the shell is started as `sh`.
     - When unset, yash-rs may deviate from POSIX in some areas.
 
-- **`stdin`** (**`-s`**): If set, the shell reads commands from standard input. Mutually exclusive with `cmdline`, and only settable at startup. <!-- TODO: Link to startup -->
+- **`stdin`** (**`-s`**): If set, the shell reads commands from standard input. Mutually exclusive with `cmdline`, and only settable at [startup](../startup.md).
     - Enabled if `cmdline` is not set and the shell is started with no operands.
 
-- **`unset`** (**`+u`**): If set (default), the shell [expands](../language/words/parameters.md) unset [variables] to an empty string. If unset, expanding an unset variable raises an error.
+- **`unset`** (**`+u`**): If set (default), the shell [expands](../language/words/parameters.md) unset [variables] to an empty string. If unset, expanding an unset variable raises an error. See [Unset parameters](../language/words/parameters.md#unset-parameters) (in parameter expansion) and [Variables](../arithmetic.md#variables) (in arithmetic expression) for details.
 
-- **`verbose`** (**`-v`**): If set, the shell prints each command before executing it. Useful for debugging. <!-- TODO: link to debugging -->
+- **`verbose`** (**`-v`**): If set, the shell prints each command before executing it. See [Reviewing command input](../debugging.md#reviewing-command-input) for details.
 
 - **`vi`**: If set, the shell uses vi-style keybindings for command line editing. <!-- TODO: link to interactive shell and command line editing -->
     - ⚠️ Currently has no effect in yash-rs. In the future, it will enable vi-style editing in interactive shells.
 
-- **`xtrace`** (**`-x`**): If set, the shell prints each field after [expansion](../language/words/index.html#word-expansion), before executing it. Useful for debugging. <!-- TODO: link to debugging -->
+- **`xtrace`** (**`-x`**): If set, the shell prints each field after [expansion](../language/words/index.html#word-expansion), before executing it. See [Tracing command execution](../debugging.md#tracing-command-execution) for details.
 
 ## Compatibility
 

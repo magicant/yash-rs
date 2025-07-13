@@ -14,9 +14,11 @@ According to POSIX.1-2024, only ASCII letters, digits, and underscores are porta
 
 To define a variable, use the assignment syntax:
 
+<!-- markdownlint-disable MD014 -->
 ```shell
 $ user=Alice
 ```
+<!-- markdownlint-enable MD014 -->
 
 This creates a variable named `user` with the value `Alice`. There must be no spaces around the `=` sign.
 
@@ -176,13 +178,13 @@ Some variable names are reserved for special purposes. These variables may affec
     - This variable is initialized when the shell starts.
 
 - **`PS1`**: The primary prompt string, displayed before each command in interactive mode
-    - The default value is `$ ` (a dollar sign followed by a space). <!-- TODO: The default value should be `# ` for the root user. -->
+    - The default value is `$ ` (a dollar sign followed by a space). <!-- TODO: The default value should be `# ` for the root user. --> <!-- markdownlint-disable-line MD038 -->
 
 - **`PS2`**: The secondary prompt string, displayed when a command is continued on the next line
-    - The default value is `> ` (a greater-than sign followed by a space).
+    - The default value is `> ` (a greater-than sign followed by a space). <!-- markdownlint-disable-line MD038 -->
 
-- **`PS4`**: The pseudo-prompt string, used for debugging output
-    - The default value is `+ ` (a plus sign followed by a space).
+- **`PS4`**: The pseudo-prompt string, used for [command execution tracing](../../debugging.md#tracing-command-execution)
+    - The default value is `+ ` (a plus sign followed by a space). <!-- markdownlint-disable-line MD038 -->
 
 - **`PWD`**: The current working directory
     - This variable is initialized to the working directory when the shell starts and updated by the `cd` built-in when changing directories.
@@ -195,9 +197,11 @@ Arrays are variables that can hold multiple values.
 
 To define an array, wrap the values in parentheses:
 
+<!-- markdownlint-disable MD014 -->
 ```shell
 $ fruits=(apple banana cherry)
 ```
+<!-- markdownlint-enable MD014 -->
 
 ### Accessing array elements
 

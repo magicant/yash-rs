@@ -170,9 +170,9 @@ The exit status of an if command is the exit status of the last command executed
 
 For repeating commands depending on a condition, see [While and until loops](loops.md#while-and-until-loops).
 
-## The `errexit` option
+## Exiting on errors
 
-By default, the shell continues running commands even if one fails (returns a non-zero exit status). This can cause later commands to run when they shouldn't. If you enable the `errexit` shell option, the shell will exit immediately when any command fails, stopping further execution.
+By default, the shell continues running commands even if one fails (returns a non-zero exit status). This can cause later commands to run when they shouldn't. If you enable the `errexit` [shell option], the shell will exit immediately when any command fails, stopping further execution.
 
 ```shell
 $ set -o errexit # or: set -e
@@ -200,8 +200,9 @@ $ echo "The exit status was $?"
 The exit status was 1
 ```
 
-<!-- TODO: ## The `errerturn` option -->
+<!-- TODO: ## The `errreturn` option -->
 
 [reserved word]: ../words/keywords.md
 [reserved words]: ../words/keywords.md
+[shell option]: ../../environment/options.md
 [special parameter]: ../parameters/special.md

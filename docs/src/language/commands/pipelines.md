@@ -47,6 +47,7 @@ If a pipeline contains only one command, the shell runs that command directly. F
 The shell waits for all commands in the pipeline to finish before proceeding. The exit status of the pipeline is the exit status of the last command in the pipeline. (In the future, yash-rs may only wait for the last command to finish.)
 
 <!-- TODO: ## Pipefail -->
+<!-- TODO: Description and example of `pipefail`. -->
 
 ## Negation
 
