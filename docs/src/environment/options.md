@@ -172,7 +172,7 @@ Below is a list of all shell options in yash-rs, with their long and short names
 
 - **`exec`** (**`+n`**): If set (default), the shell executes commands. If unset, it only parses commands (useful for [syntax checking](../debugging.md#checking-syntax)).
     - Once unset, it cannot be set again in the same session.
-    - In interactive shells, this option is ignored and commands are always executed.
+    - In [interactive shells], this option is ignored and commands are always executed.
 
 - **`glob`** (**`+f`**): If set (default), the shell performs [pathname expansion](../language/words/globbing.md) on words containing metacharacters. If unset, pathname expansion is skipped.
 
@@ -181,9 +181,9 @@ Below is a list of all shell options in yash-rs, with their long and short names
     - Many shells implement `-h` differently, so behavior may vary.
 
 - **`ignoreeof`**: If set, the shell ignores end-of-file (usually `Ctrl+D`) and does not exit. See [Preventing accidental exits](../termination.md#preventing-accidental-exits).
-    - Only takes effect if the shell is interactive and input is a terminal. <!-- TODO: link to interactive shell -->
+    - Only takes effect if the shell is [interactive] and input is a terminal.
 
-- **`interactive`** (**`-i`**): If set, the shell is interactive. <!-- TODO: link to interactive -->
+- **`interactive`** (**`-i`**): If set, the shell is [interactive].
     - Enabled on startup if `stdin` is enabled and standard input and error are terminals.
 
 - **`log`**: Deprecated and has no effect. Remains for compatibility.
@@ -192,7 +192,7 @@ Below is a list of all shell options in yash-rs, with their long and short names
     - ⚠️ Currently has no effect in yash-rs. In the future, login shells will read extra initialization files.
 
 - **`monitor`** (**`-m`**): If set, the shell performs job control for background jobs and suspended processes. <!-- TODO: link to job control -->
-    - Enabled by default in interactive shells.
+    - Enabled by default in [interactive] shells.
 
 - **`notify`** (**`-b`**): If set, the shell notifies you of background job completions and suspensions as soon as they occur. If unset, notifications are delayed until the next prompt. <!-- TODO: link to job control -->
     - ⚠️ Currently has no effect in yash-rs. In the future, it will enable immediate notifications for background jobs.
@@ -213,7 +213,7 @@ Below is a list of all shell options in yash-rs, with their long and short names
 - **`verbose`** (**`-v`**): If set, the shell prints each command before executing it. See [Reviewing command input](../debugging.md#reviewing-command-input) for details.
 
 - **`vi`**: If set, the shell uses vi-style keybindings for command line editing. <!-- TODO: link to interactive shell and command line editing -->
-    - ⚠️ Currently has no effect in yash-rs. In the future, it will enable vi-style editing in interactive shells.
+    - ⚠️ Currently has no effect in yash-rs. In the future, it will enable vi-style editing in [interactive shells].
 
 - **`xtrace`** (**`-x`**): If set, the shell prints each field after [expansion](../language/words/index.html#word-expansion), before executing it. See [Tracing command execution](../debugging.md#tracing-command-execution) for details.
 
@@ -253,4 +253,6 @@ POSIX.1-2024 options:
 - `-o pipefail`
 - `-o vi`
 
+[interactive]: ../interactive.md
+[interactive shells]: ../interactive.md
 [variables]: ../language/parameters/variables.md
