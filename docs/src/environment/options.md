@@ -253,6 +253,6 @@ POSIX.1-2024 options:
 - `-o pipefail`
 - `-o vi`
 
-[interactive]: ../interactive.md
-[interactive shells]: ../interactive.md
+[interactive]: ../interactive/index.html
+[interactive shells]: ../interactive/index.html
 [variables]: ../language/parameters/variables.md

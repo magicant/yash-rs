@@ -44,7 +44,7 @@
 - [Termination](termination.md)
 - [Dynamic command evaluation](dynamic_evaluation.md)
 - [Script debugging](debugging.md)
-- [Interactive shell](interactive.md)
+- [Interactive shell](interactive/README.md)
     - [Command prompt]()
     - [Job control]()
 - [Built-in utilities](builtins/README.md)
