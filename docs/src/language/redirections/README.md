@@ -8,9 +8,9 @@ A **file descriptor** is a non-negative integer that identifies an open file or 
 
 The first three file descriptors have standard meanings:
 
-- **0**: Standard Input – the source of input data
-- **1**: Standard Output – the destination for command results
-- **2**: Standard Error – the destination for error messages and diagnostics
+- **0**: Standard input – the source of input data
+- **1**: Standard output – the destination for command results
+- **2**: Standard error – the destination for error messages and diagnostics
 
 By default, these are connected to the terminal, but they can be redirected to files or other destinations.
 

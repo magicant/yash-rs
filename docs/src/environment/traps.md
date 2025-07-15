@@ -68,3 +68,12 @@ Signal traps run when signals are caught.
 `EXIT` traps run when the shell exits normally, after all other commands complete.
 
 The [exit status](../language/commands/exit_status.md) is preserved across trap action execution, but trap actions can use the `exit` built-in to terminate the shell with a specific exit status.
+
+## Auto-ignored signals
+
+In an [interactive shell](../interactive.md), certain signals are automatically ignored by default to prevent the shell from being terminated or stopped unintentionally. Specifically:
+
+- `SIGINT`, `SIGTERM`, and `SIGQUIT` are always ignored.
+- If job control is enabled, `SIGTSTP`, `SIGTTIN`, and `SIGTTOU` are also ignored.
+
+This ensures the shell remains responsive and in control, even if these signals are sent. You can still set traps for these signals if needed. In [subshells](index.html#subshells), which are non-interactive, this automatic ignoring does not apply.
