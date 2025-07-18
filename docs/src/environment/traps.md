@@ -71,7 +71,7 @@ The [exit status](../language/commands/exit_status.md) is preserved across trap 
 
 ## Auto-ignored signals
 
-In an [interactive shell](../interactive.md), certain signals are automatically ignored by default to prevent the shell from being terminated or stopped unintentionally. Specifically:
+In an [interactive shell](../interactive/index.html), certain signals are automatically ignored by default to prevent the shell from being terminated or stopped unintentionally. Specifically:
 
 - `SIGINT`, `SIGTERM`, and `SIGQUIT` are always ignored.
 - If job control is enabled, `SIGTSTP`, `SIGTTIN`, and `SIGTTOU` are also ignored.
