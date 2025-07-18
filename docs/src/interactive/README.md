@@ -49,7 +49,7 @@ When the shell is interactive:
 - The shell does not exit immediately on most [shell errors](../termination.md#shell-errors).
 - [Some signals are automatically ignored](../environment/traps.md#auto-ignored-signals).
 - [Signals ignored on entry can be trapped](../environment/traps.md#restrictions).
-- Command prompts are displayed when reading input.
+- [Command prompts](prompt.md) are displayed when reading input.
 - Job status changes are reported before prompting for input if job control is enabled.
 - The `read` built-in displays a prompt when reading a second or subsequent line of input.
 

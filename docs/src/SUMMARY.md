@@ -45,7 +45,7 @@
 - [Dynamic command evaluation](dynamic_evaluation.md)
 - [Script debugging](debugging.md)
 - [Interactive shell](interactive/README.md)
-    - [Command prompt]()
+    - [Command prompt](interactive/prompt.md)
     - [Job control]()
 - [Built-in utilities](builtins/README.md)
     - [. (dot)]()
