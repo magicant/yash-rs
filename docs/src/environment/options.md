@@ -191,10 +191,10 @@ Below is a list of all shell options in yash-rs, with their long and short names
 - **`login`** (**`-l`**): If set, the shell behaves as a login shell. Only settable at [startup](../startup.md).
     - ⚠️ Currently has no effect in yash-rs. In the future, login shells will read extra initialization files.
 
-- **`monitor`** (**`-m`**): If set, the shell performs job control for background jobs and suspended processes. <!-- TODO: link to job control -->
+- **`monitor`** (**`-m`**): If set, the shell performs [job control] (allows managing background and foreground jobs).
     - Enabled by default in [interactive] shells.
 
-- **`notify`** (**`-b`**): If set, the shell notifies you of background job completions and suspensions as soon as they occur. If unset, notifications are delayed until the next prompt. <!-- TODO: link to job control -->
+- **`notify`** (**`-b`**): If set, the shell notifies you of background job completions and suspensions as soon as they occur. If unset, notifications are delayed until the next prompt.
     - ⚠️ Currently has no effect in yash-rs. In the future, it will enable immediate notifications for background jobs.
     - Only takes effect if `interactive` and `monitor` are enabled.
 
@@ -255,4 +255,5 @@ POSIX.1-2024 options:
 
 [interactive]: ../interactive/index.html
 [interactive shells]: ../interactive/index.html
+[job control]: ../interactive/job_control.md
 [variables]: ../language/parameters/variables.md
