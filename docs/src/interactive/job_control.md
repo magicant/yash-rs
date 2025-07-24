@@ -60,7 +60,8 @@ By default, job control is enabled if (and only if) the shell is [interactive](i
 yash3 -o monitor
 ```
 
-## Job control details
+<!-- TODO: Revisit headings -->
+## Creating and managing jobs
 
 Job control is a complex feature, and yash-rs implements it basically according to the POSIX.1-2024 standard, with some deviations. Behavior that does not strictly conform to POSIX is marked with ⚠️.
 
@@ -74,17 +75,19 @@ In the context of job control, a **terminal** is an entity managed by the operat
 
 From now on, controlling terminals are referred to simply as terminals when it is clear from the context.
 
-A **job** is a [subshell] that is implemented as a child process of the shell. (⚠️This terminology differs from POSIX, which uses "job" to refer to a broader sequence of commands, including lists.) Each job is identified by a unique **job number**, which is a positive integer assigned by the shell when the job is created. The job number is used to refer to the job in built-in utilities like `fg`, `bg`, and `jobs`.
+A **job** is a [subshell] that is implemented as a child process of the shell. (⚠️This terminology differs from POSIX, which uses "job" to refer to a broader sequence of commands, including [lists](../language/commands/lists.md).) Each job is identified by a unique **job number**, which is a positive integer assigned by the shell when the job is created. The job number is used to refer to the job in built-in utilities like `fg`, `bg`, and `jobs`. The shell internally maintains a **job list**, which is a collection of all jobs managed by the shell. The job list includes information about each job's number, status, etc.
 
-### Basic job control behavior
+### Creating process groups
 
 When job control is enabled, the shell manages each [subshell] as a job. Each job is created in a new process group, which allows controlling the job independently of other processes. A multi-command [pipeline] is treated as a single job, with all commands in the pipeline running in the same process group. ⚠️Subshells created for [command substitutions](../language/words/command_substitution.md) are not treated as jobs, and thus do not create a new process group, because the shell does not support suspending and resuming whole commands containing command substitutions.
+
+Job control does not recursively affect nested subshells. However, if a subshell starts another shell that supports job control, the new shell can manage jobs independently of the parent shell.
+
+### Foreground and background jobs
 
 Except when the shell is starting an [asynchronous command], the shell runs the job as the foreground process group of the terminal. This directs signals produced by key sequences like `intr` and `susp` to the job rather than the shell itself or background jobs.
 
 When a foreground job terminates or suspends, the shell brings itself back to the foreground. This allows the shell to continue running remaining commands (which may create other jobs) and reading next commands from the terminal. Note that the shell can only examine the status of its direct child processes. Descendant processes created as part of a job do not affect the shell's job control.
-
-Job control do not recursively affect nested subshells. However, if a subshell starts another shell that supports job control, the new shell can manage jobs independently of the parent shell.
 
 ### Suspending foreground jobs
 
@@ -92,35 +95,23 @@ When you press the `susp` key sequence (usually `Ctrl-Z`), the terminal sends a 
 
 When a foreground job suspends, the shell displays a message indicating that the job has been stopped, and discards any pending commands that have been read but not yet executed. This is to prevent the shell from executing commands that may depend on the result of the suspended job, which is not yet finished. (⚠️POSIX.1-2024 allows discarding commands only up to and including the next asynchronous command, but yash-rs discards all pending commands.)
 
-### Job list
+## Job list
 
-The shell maintains a list of jobs, which includes information about each job's number, process (group) ID, status, and command string. The shell updates this list as jobs are created, terminated, or suspended.
+The job list includes information about each job's number, process (group) ID, status, and command string. The shell updates this list as jobs are created, suspended, resumed, or terminated. Note that the process group ID of a job equals the process ID of the job's main process, so they are not distinguished in the job list.
 
-When a foreground job terminates, the shell removes it from the job list. If a job terminates in the background, the shell keeps it in the job list so that the user can see its status and retrieve its exit status later. Such jobs are removed from the list when their result is retrieved using the `jobs` or `wait` built-ins. The shell also updates the job list when a job is suspended or resumed.
+When a foreground job terminates, the shell removes it from the job list. If a job terminates in the background, the shell keeps it in the job list so that the user can see its status and retrieve its exit status later. Such jobs are removed from the list when their result is retrieved using the `jobs` or `wait` built-ins.
 
 ### Job numbers
 
 When a job is created, the shell assigns it a unique job number, regardless of whether job control is enabled. The job number is assigned sequentially, starting from 1. After a job is removed from the job list, its job number may be reused for a new job.
 
-### Jobs without job control
+### Current and previous jobs
 
-Each [asynchronous command] started when job control is disabled is also managed as a job, but it runs in the same process group as the shell. Signals generated by key sequences like `intr` and `susp` are sent to the whole process group, which includes the shell and the asynchronous command. This means that the job cannot be interrupted, suspended, or resumed independently of the shell. The shell still assigns a job number to the job and maintains it in the job list so that the user can see its status and retrieve its exit status later.
+Two jobs are automatically selected as the **current job** and the **previous job** from the job list. These jobs can be referred to with special job IDs (see below). Some built-ins operate on the current job by default. This allows you to specify jobs easily without having to remember their job numbers.
 
-### Background shells
+TBD: How the current and previous jobs are selected, and how they are updated.
 
-When a shell starts job control, if the shell is in the background, it suspends itself until it is brought to the foreground by another process. This is to prevent the shell from disturbing the current foreground process group. (⚠️POSIX.1-2024 requires that the shell use `SIGTTIN` to suspend itself in this case, but yash-rs uses `SIGTTOU` instead. See [the comment on Issue #421](https://github.com/magicant/yash-rs/issues/421#issuecomment-2717123069) for rationale.)
-
-⚠️POSIX.1-2024 requires that the shell make sure that it is a process group leader (the first process in a new process group) when it starts job control. However, yash-rs does not currently implement this requirement. See [Issue #483](https://github.com/magicant/yash-rs/issues/483) for why this cannot be implemented straightforwardly.
-
-### Termios
-
-TBD
-
-## Current and previous jobs
-
-TBD
-
-## Job ID
+### Job IDs
 
 Some built-in utilities, such as `fg` and `kill`, use a **job ID** to refer to a job. The job ID is a string that matches one of the following formats:
 
@@ -131,9 +122,23 @@ TBD
 (TBD: kill, jobs, etc.)
 (TBD: organize this section into subsections)
 
+## Terminal setting management
+
+⚠️This paragraph is not yet implemented in yash-rs: Some utilities, such as `less` and `vi`, modify the terminal settings to interact with the user and display complex UI beyond line-wise I/O. If they are suspended, they may leave the terminal in a state that is not suitable for normal shell operation. To prevent this, the shell restores the terminal settings to their original state when a foreground job is suspended, and restores them again when the job is resumed in the foreground.
+
 ## Job control in non-interactive shells
 
 TBD
+
+## Jobs without job control
+
+Each [asynchronous command] started when job control is disabled is also managed as a job, but it runs in the same process group as the shell. Signals generated by key sequences like `intr` and `susp` are sent to the whole process group, which includes the shell and the asynchronous command. This means that the job cannot be interrupted, suspended, or resumed independently of the shell. The shell still assigns a job number to the job and maintains it in the job list so that the user can see its status and retrieve its exit status later.
+
+## Background shells
+
+When a shell starts job control, if the shell is in the background, it suspends itself until it is brought to the foreground by another process. This is to prevent the shell from disturbing the current foreground process group. (⚠️POSIX.1-2024 requires that the shell use `SIGTTIN` to suspend itself in this case, but yash-rs uses `SIGTTOU` instead. See [the comment on Issue #421](https://github.com/magicant/yash-rs/issues/421#issuecomment-2717123069) for rationale.)
+
+⚠️POSIX.1-2024 requires that the shell make sure that it is a process group leader (the first process in a new process group) when it starts job control. However, yash-rs does not currently implement this requirement. See [Issue #483](https://github.com/magicant/yash-rs/issues/483) for why this cannot be implemented straightforwardly.
 
 ## Compatibility
 
@@ -144,4 +149,5 @@ Job control is a complex feature and existing implementations differ in various 
 [subshell]: ../environment/index.html#subshells
 
 (TBD: I think we should have many more examples in this section)
+(TBD: Instead of "key sequences like `intr` and `susp`", we should simply refer to them as `Ctrl-C` and `Ctrl-Z` with explanations that the key sequences can be different depending on the environment and possibly user configuration.)
 (TBD: Review the whole section for consistency, completeness, and fluency before polishing it up.)
