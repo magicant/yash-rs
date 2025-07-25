@@ -109,9 +109,9 @@ When a job is created, the shell assigns it a unique job number, regardless of w
 
 ### Current and previous jobs
 
-Two jobs are automatically selected as the **current job** and the **previous job** from the job list. These jobs can be referred to with special job IDs (see below). Some built-ins operate on the current job by default. This allows you to specify jobs easily without having to remember their job numbers.
+Two jobs are automatically selected as the **current job** and the **previous job** from the job list. These jobs can be referred to with special job IDs (see below). Some built-ins operate on the current job by default. This allows you to specify jobs easily without having to type a job ID containing a job number or command string.
 
-TBD: How the current and previous jobs are selected, and how they are updated.
+The current job is typically the most recently suspended job, or if there are no suspended jobs, another job in the list. When a job is suspended, it becomes the current job and the previous current job becomes the previous job. When a suspended job is resumed or removed, the current and previous jobs are updated so that the current job is always a suspended job if any exist, and the previous job is another suspended job if possible. If there is only one job, there is no previous job. The selection and update of these jobs are automatic and follow these rules to ensure that job-related built-ins like `fg` and `bg` always operate on the most relevant jobs by default.
 
 ### Job IDs
 
@@ -159,9 +159,9 @@ When a shell starts job control, if the shell is in the background, it suspends 
 
 ## Compatibility
 
-Job control is a complex feature and existing implementations differ in various ways. Perfect POSIX compliance should not be expected in any shell, and yash-rs is no exception.
+POSIX.1-2024 defines job control, but leaves room for implementation-defined behavior in many areas. Yash-rs implements job control basically according to the standard, with some deviations. Behavior that does not strictly conform to POSIX is marked with ⚠️ in this document. Job control is a complex feature and existing implementations differ in various ways. Perfect POSIX compliance should not be expected in any shell, and yash-rs is no exception.
 
-The job ID `%` is an extension to POSIX.1-2024 that is commonly available in many shells. The portable way to refer to the current job is `%%` and `%+`.
+The job ID `%` is an extension to POSIX.1-2024 that is commonly available in many shells. The strictly portable way to refer to the current job is `%%` and `%+`.
 
 [asynchronous command]: ../language/commands/lists.md#asynchronous-commands
 [pipeline]: ../language/commands/pipelines.md
