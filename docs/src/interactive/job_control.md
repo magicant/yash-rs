@@ -95,6 +95,8 @@ When you press the `susp` key sequence (usually `Ctrl-Z`), the terminal sends a 
 
 When a foreground job suspends, the shell displays a message indicating that the job has been stopped, and discards any pending commands that have been read but not yet executed. This is to prevent the shell from executing commands that may depend on the result of the suspended job, which is not yet finished. (⚠️POSIX.1-2024 allows discarding commands only up to and including the next asynchronous command, but yash-rs discards all pending commands.)
 
+After suspension, the `?` [special parameter] indicates the exit status of the suspended job as if it had been terminated by the signal that suspended it.
+
 ## Job list
 
 The job list includes information about each job's number, process (group) ID, status, and command string. The shell updates this list as jobs are created, suspended, resumed, or terminated. Note that the process group ID of a job equals the process ID of the job's main process, so they are not distinguished in the job list.
@@ -115,7 +117,17 @@ TBD: How the current and previous jobs are selected, and how they are updated.
 
 Some built-in utilities, such as `fg` and `kill`, use a **job ID** to refer to a job. The job ID is a string that matches one of the following formats:
 
-TBD
+- **`%`**, **`%%`**, or **`%+`**: the current job.
+- **`%-`**: the previous job.
+- **`%n`**: the job with the specified job number `n`.
+- **`%foo`**: the job with a command string that starts with `foo`.
+- **`%?foo`**: the job with a command string that contains `foo`.
+
+### Knowing job status
+
+The shell notifies the user of job status changes before showing a prompt for the next command. This automatic notification includes jobs whose status has changed since the last notification. Its format is the same as the default output of the `jobs` built-in.
+
+The `jobs` built-in can be used to display the current job list at any time. It shows the job number, status, and command string of each job.
 
 ## Built-ins for job control
 
@@ -128,7 +140,12 @@ TBD
 
 ## Job control in non-interactive shells
 
-TBD
+It is technically possible to enable job control in non-interactive shells, but it will be of little use. Job control is primarily designed for interactive use, where the user dynamically manages jobs using key sequences and built-ins. In non-interactive shells, there is no user interaction, so job control features like suspending and resuming jobs are not applicable.
+
+When job control is enabled in a non-interactive shell, the following differences apply:
+
+- The shell does not by default ignore the `SIGINT`, `SIGTSTP`, or other signals that are used to control jobs. That is, the shell itself may be interrupted or suspended with `Ctrl-C` or `Ctrl-Z`.
+- The shell does not automatically notify the user of job status changes. The latest job status has to be retrieved explicitly using the `jobs` built-in.
 
 ## Jobs without job control
 
@@ -144,8 +161,11 @@ When a shell starts job control, if the shell is in the background, it suspends 
 
 Job control is a complex feature and existing implementations differ in various ways. Perfect POSIX compliance should not be expected in any shell, and yash-rs is no exception.
 
+The job ID `%` is an extension to POSIX.1-2024 that is commonly available in many shells. The portable way to refer to the current job is `%%` and `%+`.
+
 [asynchronous command]: ../language/commands/lists.md#asynchronous-commands
 [pipeline]: ../language/commands/pipelines.md
+[special parameter]: ../language/parameters/special.md
 [subshell]: ../environment/index.html#subshells
 
 (TBD: I think we should have many more examples in this section)
