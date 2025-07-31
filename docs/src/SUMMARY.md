@@ -51,7 +51,7 @@
     - [. (dot)]()
     - [: (colon)]()
     - [alias](builtins/alias.md)
-    - [bg]()
+    - [bg](builtins/bg.md)
     - [break]()
     - [cd]()
     - [command]()
