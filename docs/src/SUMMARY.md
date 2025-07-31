@@ -52,7 +52,7 @@
     - [: (colon)]()
     - [alias](builtins/alias.md)
     - [bg](builtins/bg.md)
-    - [break]()
+    - [break](builtins/break.md)
     - [cd]()
     - [command]()
     - [continue]()
