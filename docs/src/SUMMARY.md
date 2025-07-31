@@ -46,7 +46,7 @@
 - [Script debugging](debugging.md)
 - [Interactive shell](interactive/README.md)
     - [Command prompt](interactive/prompt.md)
-    - [Job control]()
+    - [Job control](interactive/job_control.md)
 - [Built-in utilities](builtins/README.md)
     - [. (dot)]()
     - [: (colon)]()

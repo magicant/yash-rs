@@ -80,4 +80,4 @@ Here, the shell starts an asynchronous command that writes to a file. `wait $!` 
 
 ### Job control
 
-In yash-rs, all asynchronous commands start as background jobs. If the `monitor` shell option is enabled, you can use job control commands to manage these jobs. <!-- TODO: Link to the job control section when it is written. -->
+In yash-rs, all asynchronous commands start as background jobs. If the `monitor` shell option is enabled, you can use job control commands to manage these jobs. See the [job control documentation](../../interactive/job_control.md) for details.
