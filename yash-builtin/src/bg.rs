@@ -19,6 +19,8 @@
 //! This module implements the [`bg` built-in], which resumes suspended jobs in
 //! the background.
 //!
+//! [`bg` built-in]: https://magicant.github.io/yash-rs/builtins/bg.html
+//!
 //! # Implementation notes
 //!
 //! This implementation sends the `SIGCONT` signal even to jobs that are already
