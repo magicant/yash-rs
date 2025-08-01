@@ -48,7 +48,7 @@
     - [Command prompt](interactive/prompt.md)
     - [Job control](interactive/job_control.md)
 - [Built-in utilities](builtins/README.md)
-    - [. (dot)]()
+    - [. (dot)](builtins/source.md)
     - [: (colon)](builtins/colon.md)
     - [alias](builtins/alias.md)
     - [bg](builtins/bg.md)
