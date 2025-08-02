@@ -16,48 +16,10 @@
 
 //! Eval built-in
 //!
-//! The **`eval`** built-in evaluates the arguments as shell commands.
+//! This module implements the [`eval` built-in], which evaluates the arguments
+//! as shell commands.
 //!
-//! # Synopsis
-//!
-//! ```sh
-//! eval [command…]
-//! ```
-//!
-//! # Description
-//!
-//! This built-in parses and executes the argument as a shell script in
-//! the current shell environment.
-//!
-//! # Options
-//!
-//! None.
-//!
-//! (TODO: non-portable options)
-//!
-//! # Operands
-//!
-//! The operand is a command string to be evaluated.
-//! If more than one operand is given, they are concatenated with spaces
-//! between them to form a single command string.
-//!
-//! # Errors
-//!
-//! During parsing and execution, any syntax error or runtime error may
-//! occur.
-//!
-//! # Exit status
-//!
-//! The exit status of the `eval` built-in is the exit status of the last
-//! command executed in the command string.
-//! If there is no command in the string, the exit status is zero.
-//! In case of a syntax error, the exit status is 2 ([`ExitStatus::ERROR`]).
-//!
-//! # Portability
-//!
-//! POSIX does not require the eval built-in to conform to the Utility Syntax
-//! Guidelines, which means portable scripts cannot use any options or the `--`
-//! separator for the built-in.
+//! [`eval` built-in]: https://magicant.github.io/yash-rs/builtins/eval.html
 
 use crate::Result;
 use std::cell::RefCell;

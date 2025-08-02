@@ -16,55 +16,10 @@
 
 //! Bg built-in
 //!
-//! The **`bg`** built-in resumes suspended jobs in the background.
+//! This module implements the [`bg` built-in], which resumes suspended jobs in
+//! the background.
 //!
-//! # Synopsis
-//!
-//! ```sh
-//! bg [job_id…]
-//! ```
-//!
-//! # Description
-//!
-//! The built-in resumes the specified jobs by sending the `SIGCONT` signal to
-//! them.
-//!
-//! The (last) resumed job's process ID is set to the `!` special parameter
-//! ([`JobList::set_last_async_pid`]).
-//!
-//! # Options
-//!
-//! None.
-//!
-//! # Operands
-//!
-//! Operands specify which jobs to resume. See the module documentation of
-//! [`yash_env::job::id`] for the format of job IDs. If omitted, the built-in
-//! resumes the [current job](JobList::current_job).
-//!
-//! (TODO: allow omitting the leading `%`)
-//!
-//! # Standard output
-//!
-//! The built-in writes the job number and name of each resumed job to the
-//! standard output.
-//!
-//! # Errors
-//!
-//! It is an error if the specified job is not found, not job-controlled, or
-//! not [owned] by the current shell environment.
-//!
-//! # Exit status
-//!
-//! Zero unless an error occurs.
-//!
-//! # Portability
-//!
-//! Many implementations allow omitting the leading `%` from job IDs, though it
-//! is not required by POSIX.
-//!
-//! Some implementations (including the previous version of yash, but not this
-//! version) regard it is an error to resume a job that has already terminated.
+//! [`bg` built-in]: https://magicant.github.io/yash-rs/builtins/bg.html
 //!
 //! # Implementation notes
 //!
@@ -77,7 +32,6 @@
 //! [`ProcessState::Running`] so that the status changes are not reported again
 //! on the next command prompt.
 //!
-//! [owned]: yash_env::job::Job::is_owned
 //! [expected state]: yash_env::job::Job::expected_state
 
 use crate::common::report_error;
