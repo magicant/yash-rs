@@ -73,6 +73,10 @@ utility is found but cannot be executed, the exit status is 126.
 With the `-v` or `-V` option, the exit status is 0 if the utility is found
 and 1 if not found.
 
+## Examples
+
+See [Replacing existing utilities](../language/functions.md#replacing-existing-utilities).
+
 ## Portability
 
 POSIX requires that the `name` operand be specified, but many

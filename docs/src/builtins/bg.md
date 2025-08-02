@@ -40,6 +40,10 @@ It is an error if:
 
 Zero unless an error occurs.
 
+## Examples
+
+See [Job control](../interactive/job_control.md).
+
 ## Portability
 
 Many implementations allow omitting the leading `%` from job IDs, though it is not required by POSIX.

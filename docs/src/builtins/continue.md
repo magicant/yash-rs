@@ -41,6 +41,10 @@ decimal integer.
 
 Zero if the built-in successfully continues the loop; non-zero otherwise.
 
+## Examples
+
+See [Break and continue](../language/commands/loops.md#break-and-continue).
+
 ## Portability
 
 The behavior is unspecified in POSIX when the continue built-in is used

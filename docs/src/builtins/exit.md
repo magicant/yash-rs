@@ -41,10 +41,19 @@ If the operand is not given, the shell exits with the current exit status
 (`$?`). If the built-in is invoked in a trap, the exit status will be the
 value of `$?` before entering the trap.
 
-In case of an error, the exit status is 2 ([`ExitStatus::ERROR`]).
+In case of an error, the exit status is 2.
 
-If the exit status indicates a signal that caused the process of the last
-command to terminate, the shell terminates with the same signal.
+If the exit status indicates a signal that caused the process of the last command to terminate, the shell terminates with the same signal. See [Exit status of the shell](../language/commands/exit_status.md#exit-status-of-the-shell) for details.
+
+## Examples
+
+To exit the shell with exit status 42:
+
+<!-- markdownlint-disable MD014 -->
+```shell
+$ exit 42
+```
+<!-- markdownlint-enable MD014 -->
 
 ## Portability
 

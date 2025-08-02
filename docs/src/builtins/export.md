@@ -56,6 +56,10 @@ variable.
 
 Zero unless an error occurs.
 
+## Examples
+
+See [Environment variables](../language/parameters/variables.md#environment-variables).
+
 ## Portability
 
 This built-in is part of the POSIX standard. Printing variables is portable

@@ -49,7 +49,7 @@ Otherwise, the shell will [search `$PATH`](../language/commands/simple.md#comman
 
 ## Errors
 
-If the `name` operand is given, the named utility cannot be invoked, and the shell is not [interactive](../interactive/index.html), the current shell process will exit with an error.
+If the *name* operand is given, the named utility cannot be invoked, and the shell is not [interactive](../interactive/index.html), the current shell process will exit with an error.
 
 ## Exit status
 
@@ -60,3 +60,16 @@ If there is no utility matching the first operand, the exit status will be
 127.
 
 If no operands are given, the exit status will be 0.
+
+## Examples
+
+To make the current shell process run `echo`:
+
+```shell
+$ exec echo "Hello, World!"
+Hello, World!
+```
+
+Note that the `echo` executed here is not the built-in, but the external utility found in the `$PATH`. The shell process is replaced by the `echo` process, so you don't return to the shell prompt after the command.
+
+See [Persistent redirections](../language/redirections/index.html#persistent-redirections) for examples of using the exec built-in to make redirections permanent.

@@ -168,7 +168,7 @@ error: cannot execute external utility "greet"
 
 ## Replacing existing utilities
 
-You can override existing utilities (except special built-ins) by defining a function with the same name. This is useful for customizing or extending utility behavior. To run the original utility from within your function, use the `command` built-in:
+You can override existing utilities (except special built-ins) by defining a function with the same name. This is useful for customizing or extending utility behavior. To run the original utility from within your function, use the [`command` built-in](../builtins/command.md):
 
 ```shell,no_run
 $ ls() {

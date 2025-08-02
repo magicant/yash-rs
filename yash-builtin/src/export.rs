@@ -29,13 +29,6 @@
 //! except that:
 //! - Printed commands name the export built-in instead of the typeset built-in.
 //! - Printed commands do not include options that modify variable attributes.
-//!
-//! The implementation of this built-in depends on that of the
-//! [`typeset`](crate::typeset) built-in. The export built-in basically works
-//! like the typeset built-in with the `-gx` (`--global --export`) options,
-//! except that:
-//! - Printed commands name the export built-in instead of the typeset built-in.
-//! - Printed commands do not include options that modify variable attributes.
 
 use crate::common::output;
 use crate::common::report_error;

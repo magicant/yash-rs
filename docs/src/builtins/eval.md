@@ -37,6 +37,10 @@ command executed in the command string.
 If there is no command in the string, the exit status is zero.
 In case of a syntax error, the exit status is 2.
 
+## Examples
+
+See [Evaluating command strings](../dynamic_evaluation.md#evaluating-command-strings).
+
 ## Portability
 
 POSIX does not require the eval built-in to conform to the Utility Syntax

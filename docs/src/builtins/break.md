@@ -39,6 +39,10 @@ It is an error if the value is not a positive decimal integer.
 
 Zero if the built-in successfully breaks the loop; non-zero otherwise.
 
+## Examples
+
+See [Break and continue](../language/commands/loops.md#break-and-continue).
+
 ## Portability
 
 The behavior is unspecified in POSIX when the break built-in is used without
