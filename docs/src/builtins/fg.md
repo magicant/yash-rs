@@ -10,13 +10,9 @@ fg [job_id]
 
 ## Description
 
-The built-in brings the specified job to the foreground and resumes its
-execution by sending the `SIGCONT` signal to it. The built-in then waits for
-the job to finish (or suspend again).
+See [Job control](../interactive/job_control.md) for an overview of job control in yash-rs. The built-in brings the specified job to the foreground and resumes its execution by sending the `SIGCONT` signal to it. The built-in then waits for the job to finish (or suspend again).
 
-If the resumed job finishes, it is removed from the [job list](JobList).
-If the job gets suspended again, it is set as the [current
-job](JobList::current_job).
+If the resumed job finishes, it is removed from the [job list](../interactive/job_control.md#job-list). If the job gets suspended again, it is set as the [current job](../interactive/job_control.md#current-and-previous-jobs).
 
 ## Options
 
@@ -24,9 +20,7 @@ None.
 
 ## Operands
 
-Operand *job_id* specifies which job to resume. See the module documentation
-of [`yash_env::job::id`] for the format of job IDs. If omitted, the built-in
-resumes the [current job](JobList::current_job).
+Operand *job_id* specifies which job to resume. See [Job IDs](../interactive/job_control.md#job-ids) for the operand format. If omitted, the built-in resumes the [current job](../interactive/job_control.md#current-and-previous-jobs).
 
 (TODO: allow omitting the leading `%`)
 (TODO: allow multiple operands)
@@ -39,20 +33,21 @@ The built-in writes the selected job name to the standard output.
 
 ## Errors
 
-This built-in can be used only when job control is enabled.
+It is an error if:
 
-The built-in fails if the specified job is not found, not job-controlled, or
-not [owned] by the current shell environment.
+- the specified job is not found,
+- the specified job is not job-controlled, that is, job control was off when the job was started, or
+- job control is off in the current shell environment.
 
 ## Exit status
 
-If a resumed job suspends and the current environment is
-[interactive](Env::is_interactive), the built-in returns with the
-[`Interrupt`] divert, which should make the shell stop the current command
-execution and return to the prompt. Otherwise, the built-in returns with the
-exit status of the resumed job.
+The built-in returns with the exit status of the resumed job. If the job is suspended, the exit status is as if the job had been terminated with the signal that suspended it.
 
 On error, it returns a non-zero exit status.
+
+## Examples
+
+See [Job control](../interactive/job_control.md).
 
 ## Portability
 

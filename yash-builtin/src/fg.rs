@@ -26,8 +26,6 @@
 //! running. The signal is not sent to jobs that have already terminated, to
 //! prevent unrelated processes that happen to have the same process IDs as the
 //! jobs from receiving the signal.
-//!
-//! [owned]: yash_env::job::Job::is_owned
 
 use crate::bg::OperandErrorKind;
 use crate::bg::ResumeError;
