@@ -29,13 +29,13 @@ detailed description of the utility.
 
 ## Options
 
-The **`-p`** option causes the built-in to search for the utility in the
+The **`-p`** (**`--path`**) option causes the built-in to search for the utility in the
 standard search path instead of the current `$PATH`.
 
-The **`-v`** option identifies the type of the command name and prints the
+The **`-v`** (**`--identify`**) option identifies the type of the command name and prints the
 pathname of the utility, if found.
 
-The **`-V`** option identifies the type of the command name and prints a
+The **`-V`** (**`--verbose-identify`**) option identifies the type of the command name and prints a
 more detailed description of the utility.
 
 ## Operands
