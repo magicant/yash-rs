@@ -110,9 +110,9 @@ not affect the working directory change or the exit status.
 
 - If the working directory is changed successfully, the exit status is zero,
   except in the following cases where the exit status is one:
-  - The `-P` and `-e` options are effective and the new working directory
+    - The `-P` and `-e` options are effective and the new working directory
     pathname cannot be determined.
-  - The `$PWD` or `$OLDPWD` variable is read-only.
+    - The `$PWD` or `$OLDPWD` variable is read-only.
 - If the working directory cannot be changed because of an error in the
   underlying `chdir` system call, the exit status is two.
 - If the `-L` option is effective and canonicalization fails because of a
