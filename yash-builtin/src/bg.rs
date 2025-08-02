@@ -32,7 +32,6 @@
 //! [`ProcessState::Running`] so that the status changes are not reported again
 //! on the next command prompt.
 //!
-//! [`bg` built-in]: https://magicant.github.io/yash-rs/builtins/bg.html
 //! [expected state]: yash_env::job::Job::expected_state
 
 use crate::common::report_error;
