@@ -23,6 +23,11 @@
 //!
 //! # Implementation notes
 //!
+//! If an operand is given and the utility cannot be invoked successfully, the
+//! built-in returns a [`Result`] having a `Divert` value of [`Abort`] to
+//! request the calling shell to exit, unless the shell is
+//! [interactive](Env::is_interactive).
+//!
 //! This implementation uses [`Result::retain_redirs`] to flag redirections to
 //! be made permanent.
 

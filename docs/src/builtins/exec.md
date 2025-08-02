@@ -45,14 +45,11 @@ its arguments.
 
 If the utility name contains a slash character, the shell will treat it as a
 path to the utility.
-Otherwise, the shell will [search `$PATH`](search_path) for the utility.
+Otherwise, the shell will [search `$PATH`](../language/commands/simple.md#command-search) for the utility.
 
 ## Errors
 
-If an operand is given and the utility cannot be invoked successfully, the
-built-in returns a [`Result`] having a `Divert` value of [`Abort`] to
-request the calling shell to exit, unless the shell is
-[interactive](Env::is_interactive).
+If the `name` operand is given, the named utility cannot be invoked, and the shell is not [interactive](../interactive/index.html), the current shell process will exit with an error.
 
 ## Exit status
 
