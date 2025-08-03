@@ -5,24 +5,42 @@ The **`jobs`** built-in reports job status.
 ## Synopsis
 
 ```sh
-jobs [-lnprst] [job_id…]
+jobs [-lp] [job_id…]
 ```
 
 ## Description
 
-The jobs built-in prints information about jobs the shell is currently
-controlling, one line for each job. The results follow the
-[format](yash_env::job::fmt) specified by the POSIX.
+See [Job control](../interactive/job_control.md) for an overview of job control in yash-rs. The `jobs` built-in prints information about jobs the shell is currently controlling, one line for each job. The results follow the format specified by the POSIX.
 
 When the built-in reports a finished job (either exited or signaled), it
-removes the job from the current execution environment.
+removes the job from the [job list](../interactive/job_control.md#job-list).
+
+### Format
+
+An example output of the built-in in the default format is:
+
+```text
+[1] - Running              cargo build
+[2] + Stopped(SIGTSTP)     vim
+[3]   Done                 rm -rf /tmp/foo
+```
+
+The first column is the job number in brackets. The second column indicates the [current job](../interactive/job_control.md#current-and-previous-jobs) (`+`) or the [previous job](../interactive/job_control.md#current-and-previous-jobs) (`-`). The third column is the job state, which can be one of:
+
+- `Running`: the job is running in the background
+- `Stopped(signal)`: the job is stopped by *signal*
+- `Done`: the job has finished with an exit status of zero
+- `Done(n)`: the job has finished with non-zero exit status *n*
+- `Killed(signal)`: the job has been killed by *signal*
+- `Killed(signal: core dumped)`: the job has been killed by *signal* and a core dump was produced
+
+The last column is the command line of the job.
 
 ## Options
 
 ### Format
 
-By default, the results are printed in the standard format defined in the
-[`yash_env::job::fmt`] module. You can use two options to change the output.
+You can use two options to change the output.
 
 The **`-l`** (**`--verbose`**) option uses the alternate format, which
 inserts the process ID before each job state. The **`-p`**
@@ -34,25 +52,38 @@ TODO `-n`, `-r`, `-s`, `-t`
 
 ## Operands
 
-Each operand is parsed as a [job ID](yash_env::job::id) that specifies which
+Each operand is parsed as a [job ID](../interactive/job_control.md#job-ids) that specifies which
 job to report. If no operands are given, the built-in prints all jobs.
+
+## Errors
+
+If an operand does not specify a valid job, the built-in prints an error message to the standard error and returns a non-zero exit status. An ambiguous job ID (matching multiple jobs) is also an error.
 
 ## Exit status
 
-`ExitStatus::SUCCESS` or `ExitStatus::FAILURE` depending on the results
+Zero if successful, non-zero if an error occurred.
 
 ## Portability
 
+The output format may differ between shells. Specifically:
+
+- For a job stopped by `SIGTSTP`, other shells may omit the signal name and simply print `Stopped`.
+- Other shells may report stopped jobs as `Suspended` instead of `Stopped`.
+- The job state format for jobs terminated by a signal is implementation-defined.
+- With the `-l` option, shells that manage more than one process per job may print an additional line containing the process ID and name for each process in the job.
+
 The current implementation of this built-in removes finished jobs from the
-environment after reporting all jobs. This behavior should not be relied
+job list after reporting all jobs. This behavior should not be relied
 upon. The following script shows a "job not found" error in many other
 shells because the built-in removes the job when processing the first
 operand so the job is gone when the second is processed:
 
-```sh
-sleep 0&
-jobs %sleep %sleep
+<!-- markdownlint-disable MD014 -->
+```shell,no_run
+$ sleep 0&
+$ jobs %sleep %sleep
 ```
+<!-- markdownlint-enable MD014 -->
 
 When the built-in is used in a subshell, the built-in reports not only jobs
 that were started in the subshell but also jobs that were started in the
