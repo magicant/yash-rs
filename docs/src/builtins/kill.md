@@ -1,6 +1,6 @@
 # Kill built-in
 
-The **`kill`** built-in sends a signal to processes.
+The **`kill`** built-in sends a [signal](../environment/traps.md#what-are-signals) to processes.
 
 ## Synopsis
 
@@ -36,10 +36,7 @@ directly after the hyphen like `-TERM` and `-15` instead of `-s TERM` and
 The **`-l`** option lists signal names. The names are printed one per line,
 without the `SIG` prefix.
 
-The **`-v`** option lists signal descriptions. This works like the `-l`
-option, but prints the signal number, name, and description instead of
-just the name. The `-v` option may be used with the `-l` option, in which
-case the `-l` option is ignored. (TODO: The description is not yet printed)
+The **`-v`** option lists signal descriptions. This works like the `-l` option, but prints the signal number before the name. The `-v` option may be used with the `-l` option, in which case the `-l` option is ignored. (TODO: Make the `-v` option print signal descriptions as well)
 
 ## Operands
 
@@ -50,7 +47,7 @@ that specify the target processes. Each operand is one of the following:
 - A negative decimal integer, which should be a negated process group ID
 - `0`, which means the current process group
 - `-1`, which means all processes
-- A [job ID](yash_env::job::id) with a leading `%`
+- A [job ID](../interactive/job_control.md#job-ids), which means the process group of the job
 
 With the `-l` or `-v` option, the built-in may take operands that limit the
 output to the specified signals. Each operand is one of the following:
@@ -69,14 +66,11 @@ It is an error if:
   specified.
 - A specified signal is not supported by the shell.
 - A specified target process does not exist.
-- The target job specified by a job ID operand is not [job-controlled] by
-  the shell.
+- The target job specified by a job ID operand is not job-controlled, that is, [job control](../interactive/job_control.md) was off when the job was started.
 - The signal cannot be sent to any of the target processes specified by an
   operand.
 - An operand specified with the `-l` or `-v` option does not identify a
   supported signal.
-
-[job-controlled]: yash_env::job::Job::job_controlled
 
 ## Exit status
 
