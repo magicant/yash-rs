@@ -25,6 +25,8 @@
 //! The built-in reads the input byte by byte. This is inefficient, but it is
 //! necessary not to read past the delimiter.
 //! (TODO: Use a buffered reader if the input is seekable)
+//!
+//! Prompting requires the optional `yash-prompt` feature.
 
 use crate::common::report;
 use crate::common::report_simple;
