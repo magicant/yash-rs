@@ -107,7 +107,7 @@ $ echo "$#"
 
 ## Parsing positional parameters
 
-To parse positional parameters as options and arguments, use the `getopts` built-in. This is useful for scripts that handle command-line options:
+To parse positional parameters as options and arguments, use the [`getopts` built-in](../../builtins/getopts.md). This is useful for scripts that handle command-line options:
 
 ```shell
 $ set -- -a arg1 -b arg2 operand1 operand2
