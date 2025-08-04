@@ -1,4 +1,4 @@
-# Readonly built-in.
+# Readonly built-in
 
 The **`readonly`** built-in behaves differently depending on the arguments.
 
@@ -35,7 +35,7 @@ If no operands are given, the built-in prints variables (see below).
 
 None.
 
-# Printing read-only variables
+## Printing read-only variables
 
 If the `-p` (`--print`) option is specified and the `-f` (`--functions`)
 option is not specified, the built-in prints the names and values of the
@@ -44,7 +44,7 @@ variables named by the operands in the format that can be
 If there are no operands and the `-f` (`--functions`) option is not
 specified, the built-in prints all read-only variables in the same format.
 
-## Synopsis
+### Synopsis
 
 ```sh
 readonly -p [name…]
@@ -54,17 +54,17 @@ readonly -p [name…]
 readonly
 ```
 
-## Options
+### Options
 
 The **`-p`** (**`--print`**) option must be specified to print variables
 unless there are no operands.
 
-## Operands
+### Operands
 
 Operands specify the names of the variables to be printed. If no operands
 are given, all read-only variables are printed.
 
-## Standard output
+### Standard output
 
 A command string that invokes the readonly built-in to recreate the variable
 is printed for each read-only variable. Note that the command does not
@@ -79,31 +79,31 @@ For array variables, the readonly built-in invocation is preceded by a
 separate assignment command since the readonly built-in does not support
 assigning values to array variables.
 
-# Making functions read-only
+## Making functions read-only
 
 If the `-f` (`--functions`) option is specified, the built-in makes the
 specified functions read-only.
 
-## Synopsis
+### Synopsis
 
 ```sh
 readonly -f name…
 ```
 
-## Options
+### Options
 
 The **`-f`** (**`--functions`**) option must be specified to make functions
 read-only.
 
-## Operands
+### Operands
 
 Operands specify the names of the functions to be made read-only.
 
-## Standard output
+### Standard output
 
 None.
 
-# Printing read-only functions
+## Printing read-only functions
 
 If the `-f` (`--functions`) and `-p` (`--print`) options are specified, the
 built-in prints the attributes and definitions of the shell functions named
@@ -112,7 +112,7 @@ code to recreate the functions.
 If there are no operands and the `-f` (`--functions`) option is specified,
 the built-in prints all read-only functions in the same format.
 
-## Synopsis
+### Synopsis
 
 ```sh
 readonly -fp [name…]
@@ -122,18 +122,18 @@ readonly -fp [name…]
 readonly -f
 ```
 
-## Options
+### Options
 
 The **`-f`** (**`--functions`**) and **`-p`** (**`--print`**) options must be
 specified to print functions. The `-p` option may be omitted if there are no
 operands.
 
-## Operands
+### Operands
 
 Operands specify the names of the functions to be printed. If no operands
 are given, all read-only functions are printed.
 
-## Standard output
+### Standard output
 
 A command string of a function definition command is printed for each
 function, followed by a simple command invoking the readonly built-in to
@@ -142,7 +142,7 @@ make the function read-only.
 Note that executing the printed commands in the current context will fail
 because the function is already defined and read-only.
 
-# Errors
+## Errors
 
 When making a variable read-only with a value, it is an error if the
 variable is already read-only.
@@ -152,11 +152,11 @@ It is an error to specify a non-existing function for making it read-only.
 When printing variables or functions, it is an error if an operand names a
 non-existing variable or function.
 
-# Exit status
+## Exit status
 
 Zero unless an error occurs.
 
-# Portability
+## Portability
 
 This built-in is part of the POSIX standard. Printing variables is portable
 only when the `-p` option is used without operands. Operations on functions
