@@ -61,7 +61,7 @@ otherwise. If the built-in reaches the end of the input before finding a
 delimiter, the exit status is one, but the variables are still assigned with
 the line read so far. On other errors, the exit status is two or higher.
 
-## Portability
+## Compatibility
 
 The `read` built-in is defined in the POSIX standard with the `-d` and `-r` options.
 

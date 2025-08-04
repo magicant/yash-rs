@@ -76,7 +76,7 @@ mask.
 
 Zero unless an error occurred.
 
-## Portability
+## Compatibility
 
 The `umask` built-in is defined in POSIX.
 

@@ -33,7 +33,7 @@ It is an error if the *name* is not found.
 The exit status is zero if all the *name*s are found, and non-zero
 otherwise.
 
-## Portability
+## Compatibility
 
 POSIX requires that the *name* operand be specified, but many
 implementations allow it to be omitted, in which case the built-in does

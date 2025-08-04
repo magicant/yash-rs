@@ -63,7 +63,7 @@ If an operand does not specify a valid job, the built-in prints an error message
 
 Zero if successful, non-zero if an error occurred.
 
-## Portability
+## Compatibility
 
 The output format may differ between shells. Specifically:
 

@@ -55,7 +55,7 @@ $ exit 42
 ```
 <!-- markdownlint-enable MD014 -->
 
-## Portability
+## Compatibility
 
 The behavior is undefined in POSIX if *exit_status* is greater than 255.
 The current implementation passes such a value as is in the result, but this

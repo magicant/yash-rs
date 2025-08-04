@@ -57,7 +57,7 @@ signal.
 
 The exit status is between 1 and 126 (inclusive) for any other error.
 
-## Portability
+## Compatibility
 
 The wait built-in is contained in the POSIX standard.
 

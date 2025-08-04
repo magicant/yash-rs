@@ -32,7 +32,7 @@ It is an error if an operand names a non-existent alias.
 
 Zero unless an error occurs.
 
-## Portability
+## Compatibility
 
 The unalias built-in is specified in POSIX.
 

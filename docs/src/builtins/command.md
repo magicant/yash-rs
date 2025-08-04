@@ -77,7 +77,7 @@ and 1 if not found.
 
 See [Replacing existing utilities](../language/functions.md#replacing-existing-utilities).
 
-## Portability
+## Compatibility
 
 POSIX requires that the `name` operand be specified, but many
 implementations allow it to be omitted, in which case the built-in does

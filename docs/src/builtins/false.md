@@ -35,7 +35,7 @@ None.
 
 See [And-or lists](../language/commands/exit_status.md#and-or-lists) for examples of using `false` in and-or lists. The [examples of the `getopts` built-in](getopts.md#examples) also use `false` to indicate that an option is not specified.
 
-## Portability
+## Compatibility
 
 POSIX allows the `false` built-in to return any non-zero exit status, but
 most implementations return 1.

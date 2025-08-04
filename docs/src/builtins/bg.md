@@ -44,7 +44,7 @@ Zero unless an error occurs.
 
 See [Job control](../interactive/job_control.md).
 
-## Portability
+## Compatibility
 
 Many implementations allow omitting the leading `%` from job IDs, though it is not required by POSIX.
 

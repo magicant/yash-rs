@@ -60,7 +60,7 @@ Zero unless an error occurs.
 
 See [Environment variables](../language/parameters/variables.md#environment-variables).
 
-## Portability
+## Compatibility
 
 This built-in is part of the POSIX standard. Printing variables is portable
 only when the `-p` option is used without operands.

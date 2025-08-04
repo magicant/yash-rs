@@ -37,7 +37,7 @@ The built-in ignores such operands.
 
 Zero unless an error occurs.
 
-## Portability
+## Compatibility
 
 The behavior is not portable when both `-f` and `-v` are specified. Earlier
 versions of yash used to honor the last specified option, but this version

@@ -41,7 +41,7 @@ In case of a syntax error, the exit status is 2.
 
 See [Evaluating command strings](../dynamic_evaluation.md#evaluating-command-strings).
 
-## Portability
+## Compatibility
 
 POSIX does not require the eval built-in to conform to the Utility Syntax
 Guidelines, which means portable scripts cannot use any options or the `--`

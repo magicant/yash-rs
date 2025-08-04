@@ -223,7 +223,7 @@ non-existing variable or function.
 
 Zero unless an error occurs.
 
-# Portability
+# Compatibility
 
 The typeset built-in is not specified by POSIX and many shells implement it
 differently. This implementation is based on common characteristics seen in

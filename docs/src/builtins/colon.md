@@ -21,6 +21,6 @@ None.
 
 Zero.
 
-## Portability
+## Compatibility
 
 The colon built-in is specified in the POSIX standard.

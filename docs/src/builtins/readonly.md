@@ -128,7 +128,7 @@ When printing variables<!-- TODO: or functions -->, it is an error if an operand
 
 Zero if successful, non-zero if an error occurred.
 
-## Portability
+## Compatibility
 
 This built-in is part of the POSIX standard. Printing variables is portable only when the `-p` option is used without operands. <!-- TODO: Operations on functions with the `-f` option are non-portable extensions. -->
 

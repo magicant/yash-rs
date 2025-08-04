@@ -89,7 +89,7 @@ reported and does not affect the exit status of the built-in.
 
 Zero if successful, non-zero if an error is reported.
 
-## Portability
+## Compatibility
 
 Portable scripts should specify signals in uppercase letters without the
 `SIG` prefix. Specifying signals by numbers is discouraged as signal numbers

@@ -83,7 +83,7 @@ positional parameters.
 - 1: error printing output
 - 2: invalid options
 
-## Portability
+## Compatibility
 
 POSIX defines only the following option names:
 

@@ -46,7 +46,7 @@ status will be the value of `$?` before entering the trap.
 
 In case of an error, the exit status is 2 ([`ExitStatus::ERROR`]).
 
-## Portability
+## Compatibility
 
 POSIX only requires the return built-in to quit a function or dot script.
 The behavior for other kinds of scripts is a non-standard extension.

@@ -31,7 +31,7 @@ None.
 
 Zero.
 
-## Portability
+## Compatibility
 
 Most implementations ignore any arguments, but some implementations may
 accept them. For example, the GNU coreutils implementation accepts the

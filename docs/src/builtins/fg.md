@@ -49,7 +49,7 @@ On error, it returns a non-zero exit status.
 
 See [Job control](../interactive/job_control.md).
 
-## Portability
+## Compatibility
 
 Many implementations allow omitting the leading `%` from job IDs and
 specifying multiple job IDs at once, though this is not required by POSIX.

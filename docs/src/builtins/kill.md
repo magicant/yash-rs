@@ -86,7 +86,7 @@ terminated and another process group has been created with the same
 process group ID, the built-in will send the signal to the new process
 group.
 
-## Portability
+## Compatibility
 
 Specifying a signal number other than `0` to the `-s` option is a
 non-standard extension.

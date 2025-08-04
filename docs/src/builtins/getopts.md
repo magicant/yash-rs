@@ -141,7 +141,7 @@ while getopts :ab:c opt; do
 done
 ```
 
-## Portability
+## Compatibility
 
 The getopts built-in is specified by POSIX. Only ASCII alphanumeric
 characters are allowed for option names, though this implementation allows

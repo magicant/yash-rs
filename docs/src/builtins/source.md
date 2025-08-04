@@ -62,7 +62,7 @@ If the file cannot be found or read, the exit status is 1
 In case of a syntax error in the file, the exit status is 2
 ([`ExitStatus::ERROR`]).
 
-## Portability
+## Compatibility
 
 The `.` built-in is specified in the POSIX standard. The built-in name
 `source` is a non-portable extension that is also available in some other

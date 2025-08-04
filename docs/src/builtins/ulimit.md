@@ -110,7 +110,7 @@ ulimit -m soft
 ulimit -a
 ```
 
-## Portability
+## Compatibility
 
 The `ulimit` built-in is defined in POSIX, but only the `-f` option is
 required. All the other options are extensions. However, many options

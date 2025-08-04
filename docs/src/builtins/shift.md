@@ -32,7 +32,7 @@ parameters.
 
 Zero unless an error occurs.
 
-## Portability
+## Compatibility
 
 POSIX does not specify whether an invalid operand is a syntax error or a
 runtime error. This implementation treats it as a syntax error.

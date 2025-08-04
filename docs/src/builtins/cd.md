@@ -133,7 +133,7 @@ behaves as intended, shell script writers should unset the variable at the
 beginning of the script. Users can configure `$CDPATH` in their shell
 sessions, but should avoid exporting the variable to the environment.
 
-## Portability
+## Compatibility
 
 The `-L`, `-P`, and `-e` options are defined in POSIX. The other options are
 non-standard.

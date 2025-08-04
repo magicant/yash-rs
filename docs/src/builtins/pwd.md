@@ -40,7 +40,7 @@ This built-in may fail for various reasons. For example:
 
 Zero if the path was successfully printed; non-zero otherwise.
 
-## Portability
+## Compatibility
 
 The `-L` and `-P` options are defined in POSIX.
 

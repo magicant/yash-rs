@@ -43,7 +43,7 @@ Zero if the built-in successfully breaks the loop; non-zero otherwise.
 
 See [Break and continue](../language/commands/loops.md#break-and-continue).
 
-## Portability
+## Compatibility
 
 The behavior is unspecified in POSIX when the break built-in is used without
 an enclosing loop, in which case the current implementation returns an
