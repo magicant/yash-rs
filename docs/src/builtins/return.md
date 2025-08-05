@@ -1,7 +1,6 @@
-# Return built-in.
+# Return built-in
 
-The **`return`** built-in quits the currently executing innermost function
-or script.
+The **`return`** built-in quits the currently executing innermost [function](../language/functions.md) or script.
 
 ## Synopsis
 
@@ -13,6 +12,8 @@ return [-n] [exit_status]
 
 `return exit_status` makes the shell return from the currently executing
 function or script with the specified exit status.
+
+If the shell is not executing a function or script, the built-in will work like [`exit`](exit.md), but this behavior may change in the future.
 
 ## Options
 
@@ -33,18 +34,17 @@ it is a syntax error.
 This implementation treats an *exit_status* value greater than 2147483647 as
 a syntax error.
 
-TODO: What if there is no function or script to return from?
-
 ## Exit status
 
 The *exit_status* operand will be the exit status of the built-in.
 
-If the operand is not given, the exit status will be the current exit status
-(`$?`). If the built-in is invoked in a trap executed in a function or
-script and the built-in returns from that function or script, the exit
-status will be the value of `$?` before entering the trap.
+If the operand is not given, the exit status will be the current exit status ([`$?`](../language/parameters/special.md)). If the built-in is invoked in a trap executed in a function or script and the built-in returns from that function or script, the exit status will be the value of `$?` before entering the trap.
 
-In case of an error, the exit status is 2 ([`ExitStatus::ERROR`]).
+In case of an error, the exit status is 2.
+
+## Examples
+
+See [Returning from functions](../language/functions.md#returning-from-functions).
 
 ## Compatibility
 

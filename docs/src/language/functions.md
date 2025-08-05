@@ -129,7 +129,7 @@ Positional parameters after calling foo: alice bob charlie
 
 ### Returning from functions
 
-A function runs until the end of its body or until the `return` built-in is called. `return` can exit the function early and set the exit status.
+A function runs until the end of its body or until the [`return` built-in](../builtins/return.md) is called. `return` can exit the function early and set the exit status.
 
 ```shell
 $ is_positive() {
