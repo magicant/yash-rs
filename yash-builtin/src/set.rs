@@ -20,6 +20,12 @@
 //! positional parameters.
 //!
 //! [`set` built-in]: https://magicant.github.io/yash-rs/builtins/set.html
+//!
+//! # Implementation notes
+//!
+//! See [`parse_short`] for a list of available short options and [`parse_long`]
+//! to learn how long options are parsed.
+//! Long options are [canonicalize]d before being passed to `parse_long`.
 
 use crate::common::output;
 use crate::common::report_error;

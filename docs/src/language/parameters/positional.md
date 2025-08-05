@@ -32,7 +32,7 @@ Positional parameters are set when the shell starts:
 
 ## Modifying positional parameters
 
-To set positional parameters, use the `set` built-in:
+To set positional parameters, use the [`set` built-in](../../builtins/set.md):
 
 ```shell
 $ set foo bar baz
