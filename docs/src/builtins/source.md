@@ -15,21 +15,16 @@ source file [arguments…]
 ## Description
 
 The `.` built-in reads and executes commands from the specified file in the
-current shell environment.
+current [shell environment](../environment/index.html).
 
-If the filename does not contain a slash, the shell searches the directories
-in the `$PATH` variable for the file. The file does not need to be
-executable; any readable file found first is used. (TODO: If no file is
-found, the built-in falls back to the file in the current working
-directory.)
+If the filename does not contain a slash, the shell searches the directories in the `PATH` [variable](../language/parameters/variables.md) for the file. The search is similar to [command search](../language/commands/simple.md#command-search), but the file does not need to be
+executable; any readable file found first is used.
 
-If there are any operands after the filename, they are assigned to the
-positional parameters (`$1`, `$2`, etc.) during the execution of the file.
-In this case, a regular [variable context](yash_env::variable::Context) is
-pushed to secure the positional parameters. The context will also affect
-local variables possibly defined in the file. The context is popped when the
-execution of the file is finished. No context is pushed if there are no
-operands other than the filename.
+<!-- TODO
+If there are any operands after the filename, they are assigned to the [positional parameters](../language/parameters/positional.md) (`$1`, `$2`, etc.) like in a [function](../language/functions.md) call. In this case, the script can define local variables that are removed when the script finishes. The positional parameters are restored to their previous values when the script finishes.
+
+If there are no operands, the positional parameters are not changed and the script cannot declare local variables.
+-->
 
 ## Options
 
@@ -43,8 +38,8 @@ The first operand ***file*** must be given and is the pathname of the file
 to be executed. If it does not contain a slash, it is subject to the search
 described above.
 
-Any remaining ***arguments*** are passed to the executed file as positional
-parameters.
+Any additional ***arguments*** are currently ignored. Future versions may support assigning these to the [positional parameters](../language/parameters/positional.md).
+<!-- TODO: Any remaining ***arguments*** are passed to the executed file as positional parameters. -->
 
 ## Errors
 
@@ -53,35 +48,21 @@ During parsing and execution, any syntax error or runtime error may occur.
 
 ## Exit status
 
-The exit status of the source built-in is the exit status of the last
-command executed in the file.
-If there is no command in the file, the exit status is zero.
+The exit status of the built-in is the exit status of the last command executed in the file. If there is no command in the file, the exit status is zero.
 
-If the file cannot be found or read, the exit status is 1
-([`ExitStatus::FAILURE`]).
-In case of a syntax error in the file, the exit status is 2
-([`ExitStatus::ERROR`]).
+If the file cannot be found or read, the exit status is 1.
+In case of a syntax error in the file, the exit status is 2.
 
 ## Compatibility
 
-The `.` built-in is specified in the POSIX standard. The built-in name
-`source` is a non-portable extension that is also available in some other
-shells.
+The `.` built-in is specified in the POSIX standard. The built-in name `source` is a non-standard extension that is also available in some other shells.
 
-POSIX does not require the `.` built-in to conform to the Utility Syntax
-Guidelines, which means portable scripts cannot use any options or the `--`
-separator for the built-in.
+POSIX does not require the `.` built-in to conform to the Utility Syntax Guidelines, which means portable scripts cannot use any options or the `--` separator for the built-in.
 
-Falling back to the file in the current working directory when the file is
-not found in the `$PATH` is a non-portable extension. This behavior is
-disabled if the TBD shell option is set. The result of the `$PATH` search
-may be unpredictable depending on the environment. Prefix the filename with
-`./` to avoid the search and make sure the file in the current working
-directory is used.
+If the pathname of the file does not contain a slash and the file is not found in the command search, some shells may fall back to the file in the current working directory. This is a non-portable extension that is not specified in POSIX. The portable way to specify a file in the current working directory is to prefix the filename with `./` as in `. ./foo.sh`.
 
-Setting the positional parameters with additional operands is a non-portable
-extension that is supported by some other shells. The behavior about the
-local variable context may differ in other shells.
+Setting the positional parameters with additional operands is a non-standard extension that is supported by some other shells. The behavior about the local variable context may differ in other shells.
 
-Other implementations may return a different non-zero exit status for an
-error.
+Other implementations may return a different non-zero exit status for an error.
+
+According to POSIX.1-2024, "An unrecoverable read error while reading from the file operand of the dot special built-in shall be treated as a special built-in utility error." This means that if you use the `.` built-in through the [`command` built-in](command.md) and an unrecoverable read error occurs, the shell should not exit immediately. However, yash-rs does not currently support this behavior: if an unrecoverable read error happens and the shell is not running [interactively](../interactive/index.html), yash-rs will always exit. See [Shell errors](../termination.md#shell-errors) for the conditions under which the shell should exit.

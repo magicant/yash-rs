@@ -20,6 +20,13 @@
 //! commands from a file.
 //!
 //! [`source` (`.`) built-in]: https://magicant.github.io/yash-rs/builtins/source.html
+//!
+//! # Implementation notes
+//!
+//! When there are any positional parameters specified, a regular
+//! [variable context](yash_env::variable::Context) is pushed to secure the
+//! existing positional parameters. The context is popped when the execution of
+//! the file is finished.
 
 use crate::Result;
 use yash_env::Env;

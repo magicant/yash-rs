@@ -1,6 +1,6 @@
 # Shift built-in
 
-The **`shift`** built-in removes some positional parameters.
+The **`shift`** built-in removes some [positional parameters](../language/parameters/positional.md).
 
 ## Synopsis
 
@@ -15,7 +15,7 @@ positional parameters. If *n* is omitted, it is assumed to be `1`.
 
 ## Options
 
-None. (TBD: non-portable extensions)
+None.
 
 ## Operands
 
@@ -30,11 +30,8 @@ parameters.
 
 ## Exit status
 
-Zero unless an error occurs.
+Zero if successful, non-zero if an error occurred.
 
 ## Compatibility
 
-POSIX does not specify whether an invalid operand is a syntax error or a
-runtime error. This implementation treats it as a syntax error.
-
-(TODO: the array option and negative operands)
+The `shift` built-in is part of POSIX.1-2024.
