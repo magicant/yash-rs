@@ -73,3 +73,7 @@ Hello, World!
 Note that the `echo` executed here is not the built-in, but the external utility found in the `$PATH`. The shell process is replaced by the `echo` process, so you don't return to the shell prompt after the command.
 
 See [Persistent redirections](../language/redirections/index.html#persistent-redirections) for examples of using the exec built-in to make redirections permanent.
+
+## Compatibility
+
+The `exec` built-in is part of POSIX.1-2024.

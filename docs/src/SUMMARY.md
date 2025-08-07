@@ -39,6 +39,7 @@
         - [Here-documents](language/redirections/here_documents.md)
 - [Shell environment and subshells](environment/README.md)
     - [Shell options](environment/options.md)
+    - [Working directory]()
     - [Signals and traps](environment/traps.md)
 - [Startup](startup.md)
 - [Termination](termination.md)

@@ -63,6 +63,27 @@ If an operand does not specify a valid job, the built-in prints an error message
 
 Zero if successful, non-zero if an error occurred.
 
+## Examples
+
+[Job list](../interactive/job_control.md#job-list) includes an example of using the `jobs` built-in to list jobs.
+
+The built-in with different arguments:
+
+```shell,no_run
+$ vim
+[1] + Stopped(SIGTSTP)     vim
+$ sleep 60 && echo "1 minute elapsed!"&
+[2] 38776
+$ jobs
+[1] + Stopped(SIGTSTP)     vim
+[2] - Running              sleep 60 && echo "1 minute elapsed!"
+$ jobs -l
+[1] + 37424 Stopped(SIGTSTP)     vim
+[2] - 38776 Running              sleep 60 && echo "1 minute elapsed!"
+$ jobs -p %2
+38776
+```
+
 ## Compatibility
 
 The output format may differ between shells. Specifically:

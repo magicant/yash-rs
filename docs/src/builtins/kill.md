@@ -86,6 +86,50 @@ terminated and another process group has been created with the same
 process group ID, the built-in will send the signal to the new process
 group.
 
+## Examples
+
+Sending `SIGTERM` to the last started asynchronous command and showing the signal name represented by the exit status:
+
+```shell,one_shot
+$ sleep 10&
+$ kill $!
+$ wait $!
+$ echo "Exit status $? corresponds to SIG$(kill -l $?)"
+Exit status 399 corresponds to SIGTERM
+```
+
+Specifying a signal name and job ID:
+
+```shell,one_shot
+$ set -m
+$ sleep 10&
+$ kill -s INT %1
+$ wait %1
+$ echo "Exit status $? corresponds to SIG$(kill -l $?)"
+Exit status 386 corresponds to SIGINT
+```
+
+Specifying a signal number:
+
+```shell,one_shot
+$ sleep 10&
+$ kill -n 1 $!
+$ wait $!
+$ echo "Exit status $? corresponds to SIG$(kill -l $?)"
+Exit status 385 corresponds to SIGHUP
+```
+
+The `--` separator is needed if the first operand starts with a hyphen (a negated process group ID):
+
+```shell,one_shot
+$ set -m
+$ sleep 10&
+$ kill -n 15 -- -$!
+$ wait $!
+$ echo "Exit status $? corresponds to SIG$(kill -l $?)"
+Exit status 399 corresponds to SIGTERM
+```
+
 ## Compatibility
 
 Specifying a signal number other than `0` to the `-s` option is a
