@@ -53,6 +53,10 @@ The exit status of the built-in is the exit status of the last command executed 
 If the file cannot be found or read, the exit status is 1.
 In case of a syntax error in the file, the exit status is 2.
 
+## Examples
+
+See [Reading and executing files](../dynamic_evaluation.md#reading-and-executing-files).
+
 ## Compatibility
 
 The `.` built-in is specified in the POSIX standard. The built-in name `source` is a non-standard extension that is also available in some other shells.

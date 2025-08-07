@@ -32,6 +32,10 @@ parameters.
 
 Zero if successful, non-zero if an error occurred.
 
+## Examples
+
+[Modifying positional parameters](../language/parameters/positional.md#modifying-positional-parameters) includes an example of the `shift` built-in.
+
 ## Compatibility
 
 The `shift` built-in is part of POSIX.1-2024.

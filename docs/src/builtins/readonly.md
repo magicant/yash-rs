@@ -1,6 +1,6 @@
 # Readonly built-in
 
-The **`readonly`** built-in behaves differently depending on the arguments:
+The **`readonly`** built-in provides several operations related to [read-only variables](../language/parameters/variables.md#read-only-variables):
 
 - [Making variables read-only](#making-variables-read-only)
 - [Printing read-only variables](#printing-read-only-variables)
@@ -127,6 +127,28 @@ When printing variables<!-- TODO: or functions -->, it is an error if an operand
 ## Exit status
 
 Zero if successful, non-zero if an error occurred.
+
+## Examples
+
+```shell
+$ readonly foo='Hello, world!'
+$ echo "$foo"
+Hello, world!
+$ readonly
+readonly foo='Hello, world!'
+$ foo='Goodbye, world!'
+error: error assigning to variable
+ --> <stdin>:4:1
+  |
+4 | foo='Goodbye, world!'
+  | ^^^^^^^^^^^^^^^^^^^^^ cannot assign to read-only variable "foo"
+  |
+ ::: <stdin>:1:10
+  |
+1 | readonly foo='Hello, world!'
+  |          ------------------- info: the variable was made read-only here
+  |
+```
 
 ## Compatibility
 
