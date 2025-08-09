@@ -17,7 +17,7 @@ The **shell execution environment** is the set of state the shell maintains to c
 - [Aliases](../language/aliases.md)
 - [Shell options](options.md)
 - [Traps](traps.md)
-- Jobs <!-- TODO: link to Job control -->
+- [Job list](../interactive/job_control.md#job-list)
 
 ## Subshells
 

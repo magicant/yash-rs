@@ -16,71 +16,17 @@
 
 //! Exec built-in
 //!
-//! The **`exec`** built-in replaces the current shell process with an external
-//! utility invoked by treating the specified operands as a command. Without
-//! operands, the built-in makes redirections applied to it permanent in the
-//! current shell process.
+//! This module implements the [`exec` built-in], which replaces the current
+//! shell process with an external utility.
 //!
-//! # Synopsis
+//! [`exec` built-in]: https://magicant.github.io/yash-rs/builtins/exec.html
 //!
-//! ```sh
-//! exec [name [arguments...]]
-//! ```
-//!
-//! # Description
-//!
-//! When invoked with operands, the exec built-in replaces the currently
-//! executing shell process with a new process image, regarding the operands as
-//! command words to start the external utility. The first operand identifies
-//! the utility, and the other operands are passed to the utility as
-//! command-line arguments.
-//!
-//! Without operands, the built-in does not start any utility. Instead, it makes
-//! any redirections performed in the calling simple command permanent in the
-//! current shell environment. (This is done even if there are operands, but the
-//! effect can be observed only when the utility cannot be invoked and the shell
-//! does not exit.)
-//!
-//! # Options
-//!
-//! POSIX defines no options for the exec built-in.
-//!
-//! The following non-portable options are yet to be implemented:
-//!
-//! - `--as`
-//! - `--clear`
-//! - `--cloexec`
-//! - `--force`
-//! - `--help`
-//!
-//! # Operands
-//!
-//! The operands are treated as a command to start an external utility.
-//! If any operands are given, the first is the utility name, and the others are
-//! its arguments.
-//!
-//! If the utility name contains a slash character, the shell will treat it as a
-//! path to the utility.
-//! Otherwise, the shell will [search `$PATH`](search_path) for the utility.
-//!
-//! # Errors
+//! # Implementation notes
 //!
 //! If an operand is given and the utility cannot be invoked successfully, the
 //! built-in returns a [`Result`] having a `Divert` value of [`Abort`] to
 //! request the calling shell to exit, unless the shell is
 //! [interactive](Env::is_interactive).
-//!
-//! # Exit status
-//!
-//! If the external utility is invoked successfully, it replaces the shell
-//! executing the built-in, so there is no exit status of the built-in.
-//! If the built-in fails to invoke the utility, the exit status will be 126.
-//! If there is no utility matching the first operand, the exit status will be
-//! 127.
-//!
-//! If no operands are given, the exit status will be 0.
-//!
-//! # Implementation notes
 //!
 //! This implementation uses [`Result::retain_redirs`] to flag redirections to
 //! be made permanent.

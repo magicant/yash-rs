@@ -40,6 +40,8 @@ Read: Two
 Read: Three
 ```
 
+(The [`read` built-in](../../builtins/read.md) reads a line from standard input into a [variable](../parameters/variables.md).)
+
 ## Redirection operators
 
 Yash-rs supports these redirection operators:
