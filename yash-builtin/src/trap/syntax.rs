@@ -42,7 +42,7 @@ pub enum Error {
 }
 
 impl MessageBase for Error {
-    fn message_title(&self) -> Cow<str> {
+    fn message_title(&self) -> Cow<'_, str> {
         match self {
             Error::UnknownCondition(_) => "cannot update trap",
             Error::MissingCondition { action: _ } => "trap condition is missing",
@@ -64,7 +64,7 @@ impl MessageBase for Error {
         Annotation::new(AnnotationType::Error, label, location)
     }
 
-    fn footers(&self) -> Vec<Footer> {
+    fn footers(&self) -> Vec<Footer<'_>> {
         match self {
             Error::UnknownCondition(_) => vec![],
             Error::MissingCondition { action } => vec![Footer {

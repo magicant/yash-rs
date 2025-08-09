@@ -226,7 +226,7 @@ pub trait MessageBase {
     // TODO message tag
 
     /// Returns the main caption of the message.
-    fn message_title(&self) -> Cow<str>;
+    fn message_title(&self) -> Cow<'_, str>;
 
     /// Returns an annotation to be the first in the message.
     fn main_annotation(&self) -> Annotation<'_>;
@@ -239,7 +239,7 @@ pub trait MessageBase {
     }
 
     /// Returns footers that are included in the message.
-    fn footers(&self) -> Vec<Footer> {
+    fn footers(&self) -> Vec<Footer<'_>> {
         Vec::new()
     }
 }

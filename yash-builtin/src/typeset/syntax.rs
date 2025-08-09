@@ -182,7 +182,7 @@ impl ParseError {
 }
 
 impl MessageBase for ParseError {
-    fn message_title(&self) -> Cow<str> {
+    fn message_title(&self) -> Cow<'_, str> {
         self.to_string().into()
     }
 
@@ -325,7 +325,7 @@ pub enum InterpretError<'a> {
 }
 
 impl MessageBase for InterpretError<'_> {
-    fn message_title(&self) -> Cow<str> {
+    fn message_title(&self) -> Cow<'_, str> {
         self.to_string().into()
     }
 

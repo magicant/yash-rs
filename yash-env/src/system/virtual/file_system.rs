@@ -355,7 +355,7 @@ where
     I: Debug,
     I: Iterator<Item = Rc<UnixStr>>,
 {
-    fn next(&mut self) -> Result<Option<DirEntry>, Errno> {
+    fn next(&mut self) -> Result<Option<DirEntry<'_>>, Errno> {
         match self.iter.next() {
             Some(name) => {
                 self.current = name;

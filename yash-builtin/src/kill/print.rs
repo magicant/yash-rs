@@ -95,7 +95,7 @@ pub struct InvalidSignal<'a> {
 }
 
 impl MessageBase for InvalidSignal<'_> {
-    fn message_title(&self) -> Cow<str> {
+    fn message_title(&self) -> Cow<'_, str> {
         "unrecognized operand".into()
     }
 

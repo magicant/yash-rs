@@ -79,7 +79,7 @@ pub enum Error {
 
 impl Error {
     /// Converts this error to a printable message
-    pub fn to_message(&self) -> Message {
+    pub fn to_message(&self) -> Message<'_> {
         let title = self.to_string().into();
         let annotations = match self {
             Error::UnknownOption(field) => vec![Annotation::new(

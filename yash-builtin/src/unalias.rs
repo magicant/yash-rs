@@ -82,7 +82,7 @@ pub mod syntax;
 /// This is a utility for printing errors returned by [`Command::execute`].
 /// The returned message can be passed to [`report_failure`].
 #[must_use]
-pub fn to_message(errors: &[semantics::Error]) -> Option<Message> {
+pub fn to_message(errors: &[semantics::Error]) -> Option<Message<'_>> {
     let mut message = Message::from(errors.first()?);
     let other_errors = errors[1..].iter().map(MessageBase::main_annotation);
     message.annotations.extend(other_errors);

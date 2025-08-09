@@ -77,7 +77,7 @@ pub struct NotFound<'a> {
 }
 
 impl MessageBase for NotFound<'_> {
-    fn message_title(&self) -> Cow<str> {
+    fn message_title(&self) -> Cow<'_, str> {
         "command not found".into()
     }
 
@@ -270,7 +270,7 @@ impl Identify {
     /// This function returns a string that should be printed to the standard
     /// output, as well as a list of errors that should be printed to the
     /// standard error.
-    pub fn result(&self, env: &mut Env) -> (String, Vec<NotFound>) {
+    pub fn result(&self, env: &mut Env) -> (String, Vec<NotFound<'_>>) {
         let params = &self.search;
         let env = &mut SearchEnv { env, params };
         let mut result = String::new();

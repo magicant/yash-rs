@@ -480,11 +480,11 @@ pub struct Error {
 }
 
 impl MessageBase for Error {
-    fn message_title(&self) -> Cow<str> {
+    fn message_title(&self) -> Cow<'_, str> {
         self.cause.message()
     }
 
-    fn main_annotation(&self) -> Annotation {
+    fn main_annotation(&self) -> Annotation<'_> {
         Annotation::new(
             AnnotationType::Error,
             self.cause.label().into(),

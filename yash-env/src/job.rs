@@ -478,7 +478,7 @@ impl JobList {
     ///
     /// The result is `None` if there is no job for the index.
     #[inline]
-    pub fn get_mut(&mut self, index: usize) -> Option<JobRefMut> {
+    pub fn get_mut(&mut self, index: usize) -> Option<JobRefMut<'_>> {
         self.jobs.get_mut(index).map(JobRefMut)
     }
 
@@ -499,7 +499,7 @@ impl JobList {
     /// The item type of the returned iterator is `(usize, &Job)`.
     /// Jobs are iterated in the order of indices.
     #[inline]
-    pub fn iter(&self) -> Iter {
+    pub fn iter(&self) -> Iter<'_> {
         Iter(self.jobs.iter())
     }
 
@@ -511,7 +511,7 @@ impl JobList {
     ///
     /// Jobs are iterated in the order of indices.
     #[inline]
-    pub fn iter_mut(&mut self) -> IterMut {
+    pub fn iter_mut(&mut self) -> IterMut<'_> {
         IterMut(self.jobs.iter_mut())
     }
 

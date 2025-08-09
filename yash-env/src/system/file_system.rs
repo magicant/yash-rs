@@ -50,7 +50,7 @@ pub struct DirEntry<'a> {
 /// file descriptor is released when the implementor object is dropped.
 pub trait Dir: Debug {
     /// Returns the next directory entry.
-    fn next(&mut self) -> Result<Option<DirEntry>>;
+    fn next(&mut self) -> Result<Option<DirEntry<'_>>>;
 }
 
 #[cfg(unix)]

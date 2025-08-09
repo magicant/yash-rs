@@ -30,7 +30,7 @@ pub fn resolve<'a>(env: &'a Env, param: &Param, location: &Location) -> Expansio
             .get(name)
             .map_or(Expansion::Unset, |v| v.expand(location))
     }
-    fn options(env: &Env) -> Expansion {
+    fn options(env: &Env) -> Expansion<'_> {
         let mut value = String::new();
         for option in yash_env::option::Option::iter() {
             if let Some((name, state)) = option.short_name() {

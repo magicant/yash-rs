@@ -255,7 +255,7 @@ impl SearchEnv<'_> {
 /// expansion.
 ///
 /// If the `Glob` option is `Off` in `env.options`, the expansion is skipped.
-pub fn glob(env: &mut Env, field: AttrField) -> Glob {
+pub fn glob(env: &mut Env, field: AttrField) -> Glob<'_> {
     if env.options.get(yash_env::option::Option::Glob) == Off {
         return Glob::from(Inner::from(field.remove_quotes_and_strip()));
     }

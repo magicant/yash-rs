@@ -32,7 +32,7 @@ use yash_syntax::source::pretty::MessageBase;
 pub struct AmbiguousJobId(Field);
 
 impl MessageBase for AmbiguousJobId {
-    fn message_title(&self) -> Cow<str> {
+    fn message_title(&self) -> Cow<'_, str> {
         "ambiguous job ID".into()
     }
 

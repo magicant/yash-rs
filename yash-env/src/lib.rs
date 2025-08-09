@@ -478,7 +478,7 @@ impl Env {
     ///
     /// You should prefer using this method over [`VariableSet::get_or_new`] to
     /// make sure that the [`AllExport`] option is applied.
-    pub fn get_or_create_variable<S>(&mut self, name: S, scope: Scope) -> VariableRefMut
+    pub fn get_or_create_variable<S>(&mut self, name: S, scope: Scope) -> VariableRefMut<'_>
     where
         S: Into<String>,
     {

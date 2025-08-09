@@ -223,11 +223,11 @@ impl From<crate::expansion::Error> for Error {
 }
 
 impl MessageBase for Error {
-    fn message_title(&self) -> Cow<str> {
+    fn message_title(&self) -> Cow<'_, str> {
         self.cause.message().into()
     }
 
-    fn main_annotation(&self) -> Annotation {
+    fn main_annotation(&self) -> Annotation<'_> {
         Annotation::new(AnnotationType::Error, self.cause.label(), &self.location)
     }
 }
