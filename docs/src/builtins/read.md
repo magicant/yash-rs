@@ -61,9 +61,85 @@ otherwise. If the built-in reaches the end of the input before finding a
 delimiter, the exit status is one, but the variables are still assigned with
 the line read so far. On other errors, the exit status is two or higher.
 
+## Examples
+
+Reading a line from a file:
+
+```shell,hidelines=#
+#$ mkdir $$ && cd $$ || exit
+$ cat > users.txt <<END
+> 1 James Carter
+> 2 Emily Johnson
+> 3 Michael Anthony Davis
+> END
+$ read id fullname < users.txt
+$ echo "ID: $id, Full Name: $fullname"
+ID: 1, Full Name: James Carter
+```
+
+Reading all lines from a file:
+
+```shell,hidelines=#
+#$ mkdir $$ && cd $$ || exit
+$ cat > users.txt <<END
+> 1 James Carter
+> 2 Emily Johnson
+> 3 Michael Anthony Davis
+> END
+$ while read id fullname; do
+>     echo "ID: $id, Full Name: $fullname"
+> done < users.txt
+ID: 1, Full Name: James Carter
+ID: 2, Full Name: Emily Johnson
+ID: 3, Full Name: Michael Anthony Davis
+```
+
+Note that the `< users.txt` redirection must be applied to the while loop, not to the read command. See redirection [Semantic details](../language/redirections/index.html#semantic-details) for why.
+
+Using a non-default [field separator](../language/words/field_splitting.md#ifs):
+
+```shell,hidelines=#
+#$ mkdir $$ && cd $$ || exit
+$ cat > users.txt <<END
+> 1:James Carter
+> 2:Emily Johnson
+> 3:Michael Anthony Davis
+> END
+$ while IFS=: read id fullname; do
+>     echo "ID: $id, Full Name: $fullname"
+> done < users.txt
+ID: 1, Full Name: James Carter
+ID: 2, Full Name: Emily Johnson
+ID: 3, Full Name: Michael Anthony Davis
+```
+
+Reading a nul-terminated string:
+
+```shell,hidelines=#
+#$ mkdir $$ && cd $$ || exit
+$ echo "Hello, world!" > foo.txt
+$ find . -type f -print0 |
+> while read -d '' file; do
+>     echo "File ${file#./} contains:"
+>     cat "$file"
+> done
+File foo.txt contains:
+Hello, world!
+```
+
+Use the `-r` option and an empty `IFS` to read a line literally:
+
+```shell,hidelines=#
+#$ mkdir $$ && cd $$ || exit
+$ echo ' No field splitting.  Nor line continuation. \' > line.txt
+$ IFS= read -r line < line.txt
+$ printf '[%s]\n' "$line"
+[ No field splitting.  Nor line continuation. \]
+```
+
 ## Compatibility
 
-The `read` built-in is defined in the POSIX standard with the `-d` and `-r` options.
+POSIX.1-2024 defines the `read` built-in with the `-d` and `-r` options.
 
 In this implementation, a line continuation is always a backslash followed by a newline. Other implementations may allow a backslash followed by a delimiter to be a line continuation if the delimiter is not a newline.
 
