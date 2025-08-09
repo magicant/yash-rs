@@ -239,6 +239,16 @@ impl From<ExitStatus> for Result {
 pub type Main = fn(&mut Env, Vec<Field>) -> Pin<Box<dyn Future<Output = Result> + '_>>;
 
 /// Built-in utility definition
+///
+/// # Notes on equality
+///
+/// Although this type implements `PartialEq`, comparison between instances of
+/// this type may not always yield predictable results due to the presence of
+/// function pointers. As a result, it is recommended to avoid relying on
+/// equality comparisons for values of this type. See
+/// <https://doc.rust-lang.org/std/ptr/fn.fn_addr_eq.html> for the
+/// characteristics of function pointer comparisons.
+#[allow(unpredictable_function_pointer_comparisons)]
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct Builtin {

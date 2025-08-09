@@ -41,6 +41,15 @@ use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
 
 /// Result of [categorizing](categorize) a command
+///
+/// # Notes on equality
+///
+/// Although this type implements `PartialEq`, comparison between instances of
+/// this type may not always yield predictable results due to the presence of
+/// function pointers in [`Target`]. As a result, it is recommended to avoid
+/// relying on equality comparisons for values of this type. See
+/// <https://doc.rust-lang.org/std/ptr/fn.fn_addr_eq.html> for the
+/// characteristics of function pointer comparisons.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Categorization {
     /// Shell reserved word
