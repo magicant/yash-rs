@@ -44,7 +44,7 @@ const OPTIONS: &[OptionSpec] = &[
     OptionSpec::new().short('p').long("pgid-only"),
 ];
 
-fn find_error_message(error: FindError, operand: &Field) -> Message {
+fn find_error_message(error: FindError, operand: &Field) -> Message<'_> {
     Message {
         r#type: AnnotationType::Error,
         title: "cannot report job status".into(),

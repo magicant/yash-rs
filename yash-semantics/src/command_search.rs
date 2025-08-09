@@ -50,6 +50,15 @@ use yash_env::variable::PATH;
 /// Target of a simple command execution
 ///
 /// This is the result of the [command search](search).
+///
+/// # Notes on equality
+///
+/// Although this type implements `PartialEq`, comparison between instances of
+/// this type may not always yield predictable results due to the presence of
+/// function pointers in [`Builtin`]. As a result, it is recommended to avoid
+/// relying on equality comparisons for values of this type. See
+/// <https://doc.rust-lang.org/std/ptr/fn.fn_addr_eq.html> for the
+/// characteristics of function pointer comparisons.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Target {
     /// Built-in utility
@@ -112,7 +121,7 @@ pub trait PathEnv {
     /// variable value because the path may be dynamically computed in the
     /// function.
     #[must_use]
-    fn path(&self) -> Expansion;
+    fn path(&self) -> Expansion<'_>;
 
     /// Whether there is an executable file at the specified path.
     #[must_use]
@@ -251,7 +260,7 @@ mod tests {
     }
 
     impl PathEnv for DummyEnv {
-        fn path(&self) -> Expansion {
+        fn path(&self) -> Expansion<'_> {
             self.path.as_ref()
         }
         fn is_executable_file(&self, path: &CStr) -> bool {

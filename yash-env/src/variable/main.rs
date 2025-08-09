@@ -151,7 +151,7 @@ impl Variable {
     /// variable, so that `Quirk::LineNumber` can yield the line number of the
     /// location.
     #[inline]
-    pub fn expand(&self, location: &Location) -> Expansion {
+    pub fn expand(&self, location: &Location) -> Expansion<'_> {
         super::quirk::expand(self, location)
     }
 }

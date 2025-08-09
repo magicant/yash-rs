@@ -154,7 +154,7 @@ enum LongOption {
 }
 
 /// Intermediate object for parsing a long option
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 enum NonShellOptionConstructor {
     WithoutArgument(LongOption),
     WithArgument(fn(String) -> LongOption),

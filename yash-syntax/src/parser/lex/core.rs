@@ -587,7 +587,7 @@ impl<'a> Lexer<'a> {
     /// [`config`](Self::config) to set the source and [`input`](Config::input)
     /// to create a lexer, which is more descriptive.
     pub fn from_memory<S: Into<Rc<Source>>>(code: &'a str, source: S) -> Lexer<'a> {
-        fn inner(code: &str, source: Rc<Source>) -> Lexer {
+        fn inner(code: &str, source: Rc<Source>) -> Lexer<'_> {
             let mut config = Lexer::config();
             config.source = Some(source);
             config.input(Box::new(Memory::new(code)))

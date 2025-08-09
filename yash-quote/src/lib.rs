@@ -181,7 +181,7 @@ impl<'a> From<Quoted<'a>> for Cow<'a, str> {
 /// This function scans the string to cache the value for
 /// [`Quoted::needs_quoting`], so this is an _O_(_n_) operation.
 #[inline]
-pub fn quoted(raw: &str) -> Quoted {
+pub fn quoted(raw: &str) -> Quoted<'_> {
     Quoted::from(raw)
 }
 

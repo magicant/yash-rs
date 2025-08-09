@@ -239,11 +239,11 @@ pub struct Error {
 }
 
 impl MessageBase for Error {
-    fn message_title(&self) -> Cow<str> {
+    fn message_title(&self) -> Cow<'_, str> {
         self.cause.message().into()
     }
 
-    fn main_annotation(&self) -> Annotation {
+    fn main_annotation(&self) -> Annotation<'_> {
         Annotation::new(AnnotationType::Error, self.cause.label(), &self.location)
     }
 
@@ -288,7 +288,7 @@ impl MessageBase for Error {
         }
     }
 
-    fn footers(&self) -> Vec<Footer> {
+    fn footers(&self) -> Vec<Footer<'_>> {
         self.cause
             .footer()
             .into_iter()

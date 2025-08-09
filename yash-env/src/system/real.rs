@@ -921,7 +921,7 @@ impl Drop for RealDir {
 }
 
 impl Dir for RealDir {
-    fn next(&mut self) -> Result<Option<DirEntry>> {
+    fn next(&mut self) -> Result<Option<DirEntry<'_>>> {
         Errno::clear();
         let entry = unsafe { libc::readdir(self.0.as_ptr()) };
         let errno = Errno::last();

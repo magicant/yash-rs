@@ -105,7 +105,7 @@ pub struct ParseError;
 /// assert_eq!(parse_tail("foo"), JobId::NamePrefix("foo"));
 /// assert_eq!(parse_tail("?foo"), JobId::NameSubstring("foo"));
 /// ```
-pub fn parse_tail(tail: &str) -> JobId {
+pub fn parse_tail(tail: &str) -> JobId<'_> {
     match tail {
         "" | "%" | "+" => JobId::CurrentJob,
         "-" => JobId::PreviousJob,
@@ -134,7 +134,7 @@ pub fn parse_tail(tail: &str) -> JobId {
 /// assert_eq!(parse("%?foo"), Ok(JobId::NameSubstring("foo")));
 /// assert_eq!(parse("foo"), Err(ParseError));
 /// ```
-pub fn parse(job_id: &str) -> Result<JobId, ParseError> {
+pub fn parse(job_id: &str) -> Result<JobId<'_>, ParseError> {
     match job_id.strip_prefix('%') {
         Some(tail) => Ok(parse_tail(tail)),
         None => Err(ParseError),

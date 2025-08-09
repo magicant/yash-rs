@@ -39,7 +39,7 @@ pub struct Error {
 impl Error {
     /// Converts this error to a message.
     #[must_use]
-    pub fn to_message(&self) -> Message {
+    pub fn to_message(&self) -> Message<'_> {
         Message {
             r#type: AnnotationType::Error,
             title: self.to_string().into(),

@@ -49,7 +49,7 @@ pub enum Error {
 
 impl Error {
     /// Converts the error into a [`Message`].
-    pub fn to_message(&self) -> Message {
+    pub fn to_message(&self) -> Message<'_> {
         let (title, annotations) = match self {
             Error::CommonError(e) => return e.into(),
 

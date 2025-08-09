@@ -355,7 +355,7 @@ impl ParseError<'_> {
 }
 
 impl MessageBase for ParseError<'_> {
-    fn message_title(&self) -> std::borrow::Cow<str> {
+    fn message_title(&self) -> std::borrow::Cow<'_, str> {
         self.to_string().into()
     }
 
@@ -661,7 +661,7 @@ impl<'a> From<ConflictingOptionError<'a>> for Vec<OptionOccurrence<'a>> {
 }
 
 impl MessageBase for ConflictingOptionError<'_> {
-    fn message_title(&self) -> std::borrow::Cow<str> {
+    fn message_title(&self) -> std::borrow::Cow<'_, str> {
         self.to_string().into()
     }
 

@@ -87,7 +87,7 @@ impl Error {
     }
 
     /// Converts this error to a printable message.
-    pub fn to_message(&self) -> Message {
+    pub fn to_message(&self) -> Message<'_> {
         let mut annotations = Vec::new();
 
         match self {

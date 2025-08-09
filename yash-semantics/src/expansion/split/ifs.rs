@@ -33,7 +33,7 @@ pub enum Class {
 
 /// Extracts a subsequence of the given string containing non-whitespace
 /// characters only.
-fn non_whitespaces(s: &str) -> Cow<str> {
+fn non_whitespaces(s: &str) -> Cow<'_, str> {
     // Find a subsequence of `s` consisting of non-whitespaces
     let start = match s.find(|c: char| !c.is_whitespace()) {
         None => return Cow::Borrowed(&s[0..0]),

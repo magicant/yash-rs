@@ -87,7 +87,7 @@ impl Value {
     /// let array = Value::array(vec!["1", "", "'\\'"]);
     /// assert_eq!(array.quote().to_string(), r#"(1 '' "'\\'")"#);
     /// ```
-    pub fn quote(&self) -> QuotedValue {
+    pub fn quote(&self) -> QuotedValue<'_> {
         QuotedValue::from(self)
     }
 }

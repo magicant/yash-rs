@@ -99,7 +99,7 @@ impl Display for OperandError {
 }
 
 impl MessageBase for OperandError {
-    fn message_title(&self) -> Cow<str> {
+    fn message_title(&self) -> Cow<'_, str> {
         "cannot resume job".into()
     }
 

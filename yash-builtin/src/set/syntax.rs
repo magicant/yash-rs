@@ -72,11 +72,11 @@ impl Error {
 }
 
 impl MessageBase for Error {
-    fn message_title(&self) -> std::borrow::Cow<str> {
+    fn message_title(&self) -> std::borrow::Cow<'_, str> {
         self.to_string().into()
     }
 
-    fn main_annotation(&self) -> Annotation {
+    fn main_annotation(&self) -> Annotation<'_> {
         let field = self.field();
         Annotation::new(
             AnnotationType::Error,

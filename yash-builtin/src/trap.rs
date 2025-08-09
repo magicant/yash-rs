@@ -178,7 +178,7 @@ impl std::fmt::Display for Error {
 }
 
 impl MessageBase for Error {
-    fn message_title(&self) -> Cow<str> {
+    fn message_title(&self) -> Cow<'_, str> {
         match &self.cause {
             ErrorCause::UnsupportedSignal => "invalid trap condition".into(),
             ErrorCause::SetAction(_) => "cannot update trap".into(),

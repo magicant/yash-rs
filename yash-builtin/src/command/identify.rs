@@ -41,6 +41,15 @@ use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
 
 /// Result of [categorizing](categorize) a command
+///
+/// # Notes on equality
+///
+/// Although this type implements `PartialEq`, comparison between instances of
+/// this type may not always yield predictable results due to the presence of
+/// function pointers in [`Target`]. As a result, it is recommended to avoid
+/// relying on equality comparisons for values of this type. See
+/// <https://doc.rust-lang.org/std/ptr/fn.fn_addr_eq.html> for the
+/// characteristics of function pointer comparisons.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Categorization {
     /// Shell reserved word
@@ -77,7 +86,7 @@ pub struct NotFound<'a> {
 }
 
 impl MessageBase for NotFound<'_> {
-    fn message_title(&self) -> Cow<str> {
+    fn message_title(&self) -> Cow<'_, str> {
         "command not found".into()
     }
 
@@ -270,7 +279,7 @@ impl Identify {
     /// This function returns a string that should be printed to the standard
     /// output, as well as a list of errors that should be printed to the
     /// standard error.
-    pub fn result(&self, env: &mut Env) -> (String, Vec<NotFound>) {
+    pub fn result(&self, env: &mut Env) -> (String, Vec<NotFound<'_>>) {
         let params = &self.search;
         let env = &mut SearchEnv { env, params };
         let mut result = String::new();

@@ -516,7 +516,7 @@ mod tests {
     use super::*;
     use crate::token::Value;
 
-    fn parse_str(source: &str) -> Result<Vec<Ast>, Error> {
+    fn parse_str(source: &str) -> Result<Vec<Ast<'_>>, Error> {
         parse(PeekableTokens::from(source))
     }
 

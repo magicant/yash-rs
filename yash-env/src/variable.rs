@@ -378,11 +378,11 @@ impl VariableSet {
     /// [regular]: Context::Regular
     /// [volatile]: Context::Volatile
     #[inline]
-    pub fn get_or_new<S: Into<String>>(&mut self, name: S, scope: Scope) -> VariableRefMut {
+    pub fn get_or_new<S: Into<String>>(&mut self, name: S, scope: Scope) -> VariableRefMut<'_> {
         self.get_or_new_impl(name.into(), scope)
     }
 
-    fn get_or_new_impl(&mut self, name: String, scope: Scope) -> VariableRefMut {
+    fn get_or_new_impl(&mut self, name: String, scope: Scope) -> VariableRefMut<'_> {
         let stack = match self.all_variables.entry(name) {
             Vacant(vacant) => vacant.insert(Vec::new()),
             Occupied(occupied) => occupied.into_mut(),
@@ -568,7 +568,7 @@ impl VariableSet {
     /// The order of iterated variables is unspecified.
     ///
     /// [regular]: Context::Regular
-    pub fn iter(&self, scope: Scope) -> Iter {
+    pub fn iter(&self, scope: Scope) -> Iter<'_> {
         Iter {
             inner: self.all_variables.iter(),
             min_context_index: Self::index_of_context(scope, &self.contexts),

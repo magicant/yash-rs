@@ -51,7 +51,7 @@ pub enum Error {
 
 impl Error {
     /// Converts this error into a message.
-    pub fn to_message(&self) -> Message {
+    pub fn to_message(&self) -> Message<'_> {
         match self {
             Error::CommonError(e) => e.into(),
 

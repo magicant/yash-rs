@@ -101,7 +101,7 @@ struct UnsupportedSignal<'a> {
 }
 
 impl MessageBase for UnsupportedSignal<'_> {
-    fn message_title(&self) -> Cow<str> {
+    fn message_title(&self) -> Cow<'_, str> {
         "unsupported signal".into()
     }
 
@@ -122,7 +122,7 @@ struct TargetError<'a> {
 }
 
 impl MessageBase for TargetError<'_> {
-    fn message_title(&self) -> Cow<str> {
+    fn message_title(&self) -> Cow<'_, str> {
         "cannot send signal".into()
     }
 

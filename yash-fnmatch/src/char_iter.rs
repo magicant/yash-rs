@@ -71,7 +71,7 @@ impl Iterator for WithEscape<'_> {
 ///
 /// Compare [`without_escape`], which ignores backslash escapes.
 #[must_use]
-pub fn with_escape(pattern: &str) -> WithEscape {
+pub fn with_escape(pattern: &str) -> WithEscape<'_> {
     let chars = pattern.chars();
     WithEscape { chars }
 }
@@ -105,7 +105,7 @@ impl Iterator for WithoutEscape<'_> {
 ///
 /// Compare [`with_escape`], which handles backslash escapes.
 #[must_use]
-pub fn without_escape(pattern: &str) -> WithoutEscape {
+pub fn without_escape(pattern: &str) -> WithoutEscape<'_> {
     let chars = pattern.chars();
     WithoutEscape { chars }
 }

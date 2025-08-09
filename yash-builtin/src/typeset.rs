@@ -295,7 +295,7 @@ impl From<AssignReadOnlyError> for yash_semantics::expansion::AssignReadOnlyErro
 }
 
 impl MessageBase for AssignReadOnlyError {
-    fn message_title(&self) -> std::borrow::Cow<str> {
+    fn message_title(&self) -> std::borrow::Cow<'_, str> {
         "cannot assign to read-only variable".into()
     }
 
@@ -346,7 +346,7 @@ pub enum ExecuteError {
 }
 
 impl MessageBase for ExecuteError {
-    fn message_title(&self) -> std::borrow::Cow<str> {
+    fn message_title(&self) -> std::borrow::Cow<'_, str> {
         match self {
             Self::AssignReadOnlyVariable(error) => return error.message_title(),
             Self::UndoReadOnlyVariable(_) => "cannot cancel read-only-ness of variable",

@@ -93,7 +93,7 @@ impl TargetError {
 }
 
 impl MessageBase for TargetError {
-    fn message_title(&self) -> Cow<str> {
+    fn message_title(&self) -> Cow<'_, str> {
         self.to_string().into()
     }
 

@@ -233,7 +233,7 @@ impl FunctionSet {
     /// Returns an iterator over functions in the set.
     ///
     /// The order of iteration is not specified.
-    pub fn iter(&self) -> Iter {
+    pub fn iter(&self) -> Iter<'_> {
         let inner = self.entries.iter();
         Iter { inner }
     }
