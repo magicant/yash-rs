@@ -58,10 +58,12 @@ error: cannot execute external utility "greet"
 
 Redirections in a function definition apply when the function is called, not when it is defined:
 
+<!-- markdownlint-disable MD014 -->
 ```shell
 $ dumb() { echo "Hello, $1!"; } > /dev/null
 $ dumb Alice
 ```
+<!-- markdownlint-enable MD014 -->
 
 You can redefine a function by defining it again with the same name. The new definition replaces the old one.
 
@@ -96,6 +98,18 @@ error: cannot redefine read-only function `greet`
 ```
 
 The `readonly` built-in does not yet support making functions readonly in yash-rs.
+
+### Showing function definitions
+
+To display the definition of a function, use the [`typeset` built-in](../builtins/typeset.md) with the `-f` and `-p` options:
+
+```shell
+$ greet() {
+>     echo "Hello, World!"
+> }
+$ typeset -fp greet
+greet() { echo "Hello, World!"; }
+```
 
 ## Executing functions
 
