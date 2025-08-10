@@ -50,7 +50,7 @@ External utilities inherit the signal dispositions from the shell, but not custo
 
 ## Setting traps
 
-Use the `trap` built-in to configure traps or view current traps.
+Use the [`trap` built-in](../builtins/trap.md) to configure traps or view current traps.
 
 ### Restrictions
 

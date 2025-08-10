@@ -27,7 +27,7 @@ When one of the above conditions occurs in a [subshell](environment/index.html#s
 
 ## `EXIT` trap
 
-You can set a [trap](environment/traps.md) for the `EXIT` condition to run commands when the shell exits. This can be useful for cleanup tasks or logging. The trap is executed regardless of how the shell exits, whether due to an error, end-of-file, or explicit `exit` command, except when the shell is killed by a signal, in which case the trap is not executed.
+You can set a [trap](environment/traps.md) for the `EXIT` condition to run commands when the shell exits. This can be useful for cleanup tasks or logging. The trap is executed regardless of how the shell exits, whether due to an error, end-of-file, or explicit `exit` command, except when the shell is killed by a signal, in which case the trap is not executed (in yash-rs).
 
 ```shell,one_shot
 $ trap 'rm -f temporary.txt; echo "Temporary file removed."' EXIT
