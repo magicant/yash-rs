@@ -148,7 +148,7 @@ None.
 
 ### Examples
 
-See [Readonly functions](../language/functions.md#readonly-functions).
+See [Read-only functions](../language/functions.md#read-only-functions).
 
 ## Printing functions
 

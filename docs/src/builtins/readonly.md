@@ -111,7 +111,7 @@ Operands specify the names of the functions to be printed. If no operands are gi
 
 ### Standard output
 
-A command string of a function definition command is printed for each function, followed by a simple command invoking the readonly built-in to make the function read-only.
+A command string of a function definition command is printed for each function, followed by a simple command invoking the `readonly` built-in to make the function read-only.
 
 Note that executing the printed commands in the current context will fail because the function is already defined and read-only.
 -->
