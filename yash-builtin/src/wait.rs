@@ -23,8 +23,6 @@
 //!
 //! # Implementation notes
 //!
-//! # Implementation notes
-//!
 //! The built-in treats disowned jobs as if they were finished with an exit
 //! status of 127.
 

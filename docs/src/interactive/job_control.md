@@ -232,7 +232,7 @@ TODO: disown
 
 The job list includes each job's number, process (group) ID, status, and command string. The shell updates this list as jobs are created, suspended, resumed, or terminated. The process group ID of a job equals the process ID of its main process, so they are not distinguished in the job list.
 
-Use the `jobs` built-in to display the current job list:
+Use the [`jobs` built-in](../builtins/jobs.md) to display the current job list:
 
 ```shell,no_run
 $ rm -r foo& rm -r bar& rm -r baz&
@@ -245,7 +245,7 @@ $ jobs
 [3]   Running              rm -r baz
 ```
 
-When a foreground job terminates, the shell removes it from the job list. If a job terminates in the background, the shell keeps it in the list so you can see its status and retrieve its [exit status] later. Such jobs are removed when their result is retrieved using `jobs` or `wait`.
+When a foreground job terminates, the shell removes it from the job list. If a job terminates in the background, the shell keeps it in the list so you can see its status and retrieve its [exit status] later. Such jobs are removed when their result is retrieved using [`jobs`](../builtins/jobs.md) or [`wait`](../builtins/wait.md).
 
 ### Job numbers
 
