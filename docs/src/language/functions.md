@@ -166,7 +166,7 @@ Exit status: 1
 
 ## Removing functions
 
-Remove a function with the `unset` built-in and the `-f` option:
+Remove a function with the [`unset` built-in](../builtins/unset.md) and the `-f` option:
 
 ```shell
 $ greet() { echo "Hello, World!"; }
