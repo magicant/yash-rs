@@ -1,6 +1,6 @@
 # Ulimit built-in
 
-The **`ulimit`** built-in sets or shows system resource limits.
+The **`ulimit`** built-in displays or sets system resource limits for the current shell process.
 
 ## Synopsis
 
@@ -10,119 +10,143 @@ ulimit [-SH] [-a|-b|-c|-d|-e|-f|-i|-k|-l|-m|-n|-q|-R|-r|-s|-t|-u|-v|-w|-x] [limi
 
 ## Description
 
-The built-in sets or shows the system resource limits. The limits are
-specified by the *limit* operand. If the *limit* operand is omitted, the
-built-in shows the current limits.
+The `ulimit` built-in allows you to view or change resource limits imposed by the operating system on the shell and its child processes. The *limit* operand specifies the new value for a resource limit. If *limit* is omitted, the current value is displayed.
 
-There are two types of limits for each resource: the soft limit and the hard
-limit. The soft limit is the value that the kernel enforces for the process.
-The process can increase the soft limit up to the hard limit. The hard limit
-is the maximum value that the soft limit can be set to. Any process can
-decrease the hard limit, but only a process with the appropriate privilege
-can increase the hard limit.
+Each resource has two limits:
+
+- **Soft limit**: The value enforced by the kernel for the process. It can be increased up to the hard limit.
+- **Hard limit**: The maximum value to which the soft limit can be set. Any process can lower its hard limit, but only privileged processes can raise it.
 
 ## Options
 
-The **`-S`** (**`--soft`**) option sets or shows the soft limit. The
-**`-H`** (**`--hard`**) option sets or shows the hard limit. If neither option
-is specified:
+- **`-S`** (**`--soft`**): Set or display the soft limit.
+- **`-H`** (**`--hard`**): Set or display the hard limit.
 
-- both the soft limit and the hard limit are set, or
-- the soft limit is shown.
+If neither `-S` nor `-H` is specified:
 
-You can also set both limits at once by specifying both options.
-However, it is an error to specify both options when the *limit* operand is
-omitted.
+- When setting a limit, both soft and hard limits are changed.
+- When displaying a limit, only the soft limit is shown.
 
-### Resources
+Specifying both `-S` and `-H` together sets both limits. However, when displaying limits, using both options is an error.
 
-You use an option to specify the resource to set or show the limit on.
-Available resources vary depending on the platform, so not all of the
-following options are universally accepted:
+### Resource selection
 
-- **`-b`** (**`--sbsize`**): [`Resource::SBSIZE`] (bytes)
-- **`-c`** (**`--core`**): [`Resource::CORE`] (512-byte blocks)
-- **`-d`** (**`--data`**): [`Resource::DATA`] (kilobytes)
-- **`-e`** (**`--nice`**): [`Resource::NICE`] (see below)
-- **`-f`** (**`--fsize`**): [`Resource::FSIZE`] (512-byte blocks)
-- **`-i`** (**`--sigpending`**): [`Resource::SIGPENDING`]
-- **`-k`** (**`--kqueues`**): [`Resource::KQUEUES`]
-- **`-l`** (**`--memlock`**): [`Resource::MEMLOCK`] (kilobytes)
-- **`-m`** (**`--rss`**): [`Resource::RSS`] (kilobytes)
-- **`-n`** (**`--nofile`**): [`Resource::NOFILE`]
-- **`-q`** (**`--msgqueue`**): [`Resource::MSGQUEUE`]
-- **`-R`** (**`--rttime`**): [`Resource::RTTIME`] (microseconds)
-- **`-r`** (**`--rtprio`**): [`Resource::RTPRIO`]
-- **`-s`** (**`--stack`**): [`Resource::STACK`] (kilobytes)
-- **`-t`** (**`--cpu`**): [`Resource::CPU`] (seconds)
-- **`-u`** (**`--nproc`**): [`Resource::NPROC`]
-- **`-v`** (**`--as`**): [`Resource::AS`] (kilobytes)
-- **`-w`** (**`--swap`**): [`Resource::SWAP`]
-- **`-x`** (**`--locks`**): [`Resource::LOCKS`]
+Specify a resource to set or display using one of the following options. Supported resources may vary by platform, so not all options are available everywhere:
 
-Limits that are specified as the *limit* operand and are shown in the output
-are in the unit specified in the parentheses above. For [`Resource::NICE`],
-The limit value defines the lower bound for the nice value by the formula
-`nice = 20 - limit`. Note that lower nice values represent higher
-priorities.
+- **`-b`** (**`--sbsize`**): maximum size of the socket buffer (bytes)
+- **`-c`** (**`--core`**): maximum size of a core file created by a terminated process (512-byte blocks)
+- **`-d`** (**`--data`**): maximum size of a data segment of the process (kilobytes)
+- **`-e`** (**`--nice`**): maximum process priority (see below)
+- **`-f`** (**`--fsize`**): maximum size of a file the process can create (512-byte blocks)
+- **`-i`** (**`--sigpending`**): maximum number of signals that can be queued to the process
+- **`-k`** (**`--kqueues`**): maximum number of kernel event queues
+- **`-l`** (**`--memlock`**): maximum size of memory locked into RAM (kilobytes)
+- **`-m`** (**`--rss`**): maximum physical memory size of the process (kilobytes)
+- **`-n`** (**`--nofile`**): maximum number of open files in the process
+- **`-q`** (**`--msgqueue`**): maximum total size of POSIX message queues
+- **`-R`** (**`--rttime`**): maximum amount of CPU time the process can consume in real-time scheduling mode without a blocking system call (microseconds)
+- **`-r`** (**`--rtprio`**): maximum real-time priority
+- **`-s`** (**`--stack`**): maximum size of the process's stack (kilobytes)
+- **`-t`** (**`--cpu`**): maximum amount of CPU time the process can consume (seconds)
+- **`-u`** (**`--nproc`**): maximum number of processes the user can run
+- **`-v`** (**`--as`**): maximum total memory size of the process (kilobytes)
+- **`-w`** (**`--swap`**): maximum size of the swap space the user can occupy (kilobytes)
+- **`-x`** (**`--locks`**): maximum number of file locks the process can hold
 
-To show the limits for all resources, use the **`-a`** (**`--all`**) option.
-This option cannot be used with the *limit* operand.
+The *limit* operand and output values use the units shown in parentheses above.
+
+If no resource option is specified, `ulimit` defaults to `-f` (`--fsize`).
+
+For `-e` (`--nice`), the limit value sets the lowest nice value allowed, using the formula: `nice = 20 - limit`. Lower nice values mean higher priority. For example, `ulimit -e 25` allows the nice value to be lowered to -5.
+
+To display all resource limits, use **`-a`** (**`--all`**). This cannot be combined with a *limit* operand.
 
 ## Operands
 
-The *limit* operand specifies the new limit to set. The value is interpreted
-as follows:
+The *limit* operand sets a new value for the selected resource. It is interpreted as follows:
 
-- If the value is a non-negative integer, the limit is set to that value.
-- If the value is `unlimited`, the limit is set to the maximum value.
-- If the value is `hard`, the limit is set to the current hard limit.
-- If the value is `soft`, the limit is set to the current soft limit.
+- A non-negative integer sets the limit to that value.
+- `unlimited` sets the limit to the maximum allowed.
+- `hard` sets the limit to the current hard limit.
+- `soft` sets the limit to the current soft limit.
 
 ## Standard output
 
-If the *limit* operand is omitted, the built-in prints the current limit for
-the specified resource. If the **`-a`** option is effective, the built-in
-prints the current limits for all resources in a table.
+If *limit* is omitted, the built-in prints the current value for the selected resource. With `-a`, it prints all resource limits in a table.
 
 ## Errors
 
-The built-in may fail when:
+The built-in fails if:
 
-- The specified resource is not supported on the current platform.
-- The specified soft limit is greater than the hard limit.
-- The new hard limit is greater than the current hard limit and the user does
-  not have permission to raise the hard limit.
-- The specified *limit* operand is out of range.
+- The specified resource is unsupported on the current platform.
+- The soft limit is set higher than the hard limit.
+- The hard limit is set above the current hard limit without sufficient privileges.
+- The *limit* operand is out of range.
+- Both `-S` and `-H` are specified without a *limit* operand.
+- More than one resource option is specified.
 
 ## Exit status
 
-The built-in exits with a non-zero status when an error occurs. Otherwise, it
-exits with zero.
+Zero if successful; non-zero if an error occurs.
 
 ## Examples
 
-```sh
-ulimit -n 1024
-ulimit -t unlimited
-ulimit -v hard
-ulimit -m soft
-ulimit -a
+Setting resource limits:
+
+```shell,hidelines=#
+$ ulimit -n 64
+$ ulimit -t unlimited
+$ ulimit -S -v hard
+#$ ulimit -d hard
+$ ulimit -H -d soft
+```
+
+Showing resource limits:
+
+```shell,hidelines=#
+#$ ulimit -n 64
+#$ ulimit -S -n 32
+$ ulimit -H -n
+64
+$ ulimit -S -n
+32
+$ ulimit -n
+32
+```
+
+Showing all resource limits:
+
+```shell,no_run
+$ ulimit -a
+-v: virtual address space size (KiB) unlimited
+-c: core dump size (512-byte blocks) 0
+-t: CPU time (seconds)               unlimited
+-d: data segment size (KiB)          unlimited
+-f: file size (512-byte blocks)      unlimited
+-x: number of file locks             unlimited
+-l: locked memory size (KiB)         65536
+-q: message queue size (bytes)       819200
+-e: process priority (20 - nice)     0
+-n: number of open files             1024
+-u: number of processes              62113
+-m: resident set size (KiB)          unlimited
+-r: real-time priority               0
+-R: real-time timeout (microseconds) unlimited
+-i: number of pending signals        62113
+-s: stack size (KiB)                 8192
 ```
 
 ## Compatibility
 
-The `ulimit` built-in is defined in POSIX, but only the `-f` option is
-required. All the other options are extensions. However, many options
-including `-H`, `-S`, `-a`, `-c`, `-d`, `-n`, `-s`, and `-t` are widely
-supported in other shells.
+The `ulimit` built-in is specified by POSIX.1-2024, but some behaviors are implementation-defined.
 
-See the source code for [`Resource::as_raw_type`] to see which resources are
-supported on which platforms.
+Only these options are required by POSIX: `-H`, `-S`, `-a`, `-c`, `-d`, `-f`, `-n`, `-s`, `-t`, and `-v`. Other options are extensions.
 
-The behavior differs between shells when both the `-H` and `-S` options are
-specified. This implementation sets both limits, but the previous versions
-of yash honored only the last specified option.
+Some shells do not allow combining options (e.g., `ulimit -fH`). For portability, specify options separately (e.g., `ulimit -f -H`).
 
-The `hard` and `soft` values for the *limit* operand are not defined in
-POSIX.
+Shells differ in behavior when both `-H` and `-S` are given. Yash-rs sets or displays both limits; older versions of yash only honored the last one.
+
+Specifying multiple resource options is an error in yash-rs, but some shells
+allow operating on multiple resources at once.
+
+The `hard` and `soft` values for the *limit* operand are not defined by POSIX.
