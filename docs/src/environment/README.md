@@ -4,7 +4,7 @@ The **shell execution environment** is the set of state the shell maintains to c
 
 - [File descriptors](../language/redirections/index.html#what-are-file-descriptors)
 - Working directory
-- File creation mask <!-- TODO: link to umask -->
+- [File creation mask](../builtins/umask.md)
 - [Resource limits](../builtins/ulimit.md)
 - [Variables](../language/parameters/variables.md)
 - [Positional parameters](../language/parameters/positional.md)
