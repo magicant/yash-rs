@@ -38,13 +38,11 @@ The last column is the command line of the job.
 
 ## Options
 
-### Format
+### Formatting
 
 You can use two options to change the output.
 
-The **`-l`** (**`--verbose`**) option uses the alternate format, which
-inserts the process ID before each job state. The **`-p`**
-(**`--pgid-only`**) option only prints the process ID of each job.
+The **`-l`** (**`--verbose`**) option displays additional details by inserting the process ID before each job state. The **`-p`** (**`--pgid-only`**) option outputs only the process ID of each job. In both cases, the process ID shown is that of the main process in the job, which is also the process group ID if the job is under job control.
 
 ### Filtering
 
