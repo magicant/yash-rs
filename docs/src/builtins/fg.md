@@ -41,7 +41,7 @@ It is an error if:
 
 ## Exit status
 
-The built-in returns with the exit status of the resumed job. If the job is suspended, the exit status is as if the job had been terminated with the signal that suspended it.
+The built-in returns with the exit status of the resumed job. If the job is suspended, the exit status is as if the job had been terminated with the signal that suspended it. (See also [Suspending foreground jobs](../interactive/job_control.md#suspending-foreground-jobs).)
 
 On error, it returns a non-zero exit status.
 
