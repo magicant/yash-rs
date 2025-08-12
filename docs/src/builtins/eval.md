@@ -41,6 +41,10 @@ In case of a syntax error, the exit status is 2.
 
 See [Evaluating command strings](../dynamic_evaluation.md#evaluating-command-strings).
 
+## Security considerations
+
+The `eval` built-in can be dangerous if used with untrusted input, as it can execute arbitrary commands. It is recommended to avoid using `eval` with user input or to sanitize the input before passing it to `eval`.
+
 ## Compatibility
 
 POSIX does not require the eval built-in to conform to the Utility Syntax
