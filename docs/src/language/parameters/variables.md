@@ -136,7 +136,7 @@ In this example, `inner` called from `outer` accesses the local variable `user` 
 
 ## Removing variables
 
-The `unset` built-in removes a variable.
+The [`unset` built-in](../../builtins/unset.md) removes a variable.
 
 ```shell
 $ user=Alice
@@ -147,7 +147,7 @@ $ echo user=$user
 user=
 ```
 
-Undefined variables by default expand to an empty string. Use the `-u` shell option to make the shell treat undefined variables as an error.
+Undefined variables by default expand to an empty string. Use the `-u` [shell option](../../environment/options.md) to make the shell treat undefined variables as an error.
 
 ## Reserved variable names
 

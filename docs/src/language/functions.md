@@ -58,20 +58,22 @@ error: cannot execute external utility "greet"
 
 Redirections in a function definition apply when the function is called, not when it is defined:
 
+<!-- markdownlint-disable MD014 -->
 ```shell
 $ dumb() { echo "Hello, $1!"; } > /dev/null
 $ dumb Alice
 ```
+<!-- markdownlint-enable MD014 -->
 
 You can redefine a function by defining it again with the same name. The new definition replaces the old one.
 
-The [exit status](commands/exit_status.md#exit-status) of a function definition is 0 if successful. It is nonzero if the function name expansion fails or if a readonly function with the same name exists.
+The [exit status](commands/exit_status.md#exit-status) of a function definition is 0 if successful. It is nonzero if the function name expansion fails or if a read-only function with the same name exists.
 
 Defining functions with the `function` [reserved word](words/keywords.md) is not POSIX and is not yet implemented in yash-rs.
 
-### Readonly functions
+### Read-only functions
 
-Make a function readonly with the `typeset` built-in. Readonly functions cannot be redefined or removed.
+Make a function read-only with the `typeset` built-in. Read-only functions cannot be redefined or removed.
 
 ```shell
 $ greet() { echo "Hello, World!"; }
@@ -95,7 +97,19 @@ error: cannot redefine read-only function `greet`
   |
 ```
 
-The `readonly` built-in does not yet support making functions readonly in yash-rs.
+The `readonly` built-in does not yet support making functions read-only in yash-rs.
+
+### Showing function definitions
+
+To display the definition of a function, use the [`typeset` built-in](../builtins/typeset.md) with the `-f` and `-p` options:
+
+```shell
+$ greet() {
+>     echo "Hello, World!"
+> }
+$ typeset -fp greet
+greet() { echo "Hello, World!"; }
+```
 
 ## Executing functions
 
@@ -129,7 +143,7 @@ Positional parameters after calling foo: alice bob charlie
 
 ### Returning from functions
 
-A function runs until the end of its body or until the `return` built-in is called. `return` can exit the function early and set the exit status.
+A function runs until the end of its body or until the [`return` built-in](../builtins/return.md) is called. `return` can exit the function early and set the exit status.
 
 ```shell
 $ is_positive() {
@@ -152,7 +166,7 @@ Exit status: 1
 
 ## Removing functions
 
-Remove a function with the `unset` built-in and the `-f` option:
+Remove a function with the [`unset` built-in](../builtins/unset.md) and the `-f` option:
 
 ```shell
 $ greet() { echo "Hello, World!"; }
@@ -168,7 +182,7 @@ error: cannot execute external utility "greet"
 
 ## Replacing existing utilities
 
-You can override existing utilities (except special built-ins) by defining a function with the same name. This is useful for customizing or extending utility behavior. To run the original utility from within your function, use the `command` built-in:
+You can override existing utilities (except special built-ins) by defining a function with the same name. This is useful for customizing or extending utility behavior. To run the original utility from within your function, use the [`command` built-in](../builtins/command.md):
 
 ```shell,no_run
 $ ls() {

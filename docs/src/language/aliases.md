@@ -114,7 +114,7 @@ To prevent alias substitution for a word, [quote](words/quoting.md) it.
 
 Aliases become effective after the defining command is executed. Since commands are parsed and executed line by line, aliases defined in the current line are not available in the same line.
 
-Remove an alias with the `unalias` built-in.
+Remove an alias with the [`unalias` built-in](../builtins/unalias.md).
 
 ## Aliases and functions
 

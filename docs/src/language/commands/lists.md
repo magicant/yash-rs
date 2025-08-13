@@ -64,7 +64,7 @@ The `!` [special parameter](../parameters/special.md) gives the process ID of th
 
 ### The `wait` utility
 
-The `wait` utility waits for asynchronous commands to finish. With no operands, it waits for all asynchronous commands started in the current shell. With operands, it waits for the specified process IDs.
+The [`wait` utility](../../builtins/wait.md) waits for asynchronous commands to finish. With no operands, it waits for all asynchronous commands started in the current shell. With operands, it waits for the specified process IDs.
 
 ```shell,hidelines=#
 #$ mkdir $$ && cd $$ || exit

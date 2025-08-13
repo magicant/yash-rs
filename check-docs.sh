@@ -1,5 +1,8 @@
 set -Ceux
 
 mdbook build docs
-mdbook test docs
+
+# Skip Rust doctest since we have no Rust code examples
+# mdbook test docs
+
 docs/doctest.sh

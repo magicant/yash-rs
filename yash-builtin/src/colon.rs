@@ -16,30 +16,9 @@
 
 //! Colon (`:`) built-in
 //!
-//! The colon (**`:`**) built-in does nothing.
+//! This module implements the [`:` built-in], which does nothing.
 //!
-//! # Synopsis
-//!
-//! ```sh
-//! : […]
-//! ```
-//!
-//! # Description
-//!
-//! The colon built-in is a dummy command that does nothing.
-//! Any arguments are ignored.
-//!
-//! # Errors
-//!
-//! None.
-//!
-//! # Exit status
-//!
-//! Zero.
-//!
-//! # Portability
-//!
-//! The colon built-in is specified in the POSIX standard.
+//! [`:` built-in]: https://magicant.github.io/yash-rs/builtins/colon.html
 
 use crate::Result;
 use yash_env::Env;

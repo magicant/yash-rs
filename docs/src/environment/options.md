@@ -1,10 +1,10 @@
 # Shell options
 
-**Shell options** control the behavior of the shell. You can enable (set) or disable (unset) them using command line arguments at startup or with the `set` built-in during a shell session.
+**Shell options** control the behavior of the shell. You can enable (set) or disable (unset) them using command line arguments at startup or with the [`set` built-in](../builtins/set.md) during a shell session.
 
 ## Enabling and disabling options
 
-You can specify shell options as command line arguments when starting the shell, or with the `set` built-in. In yash, all options have a long name, and some also have a short name.
+You can specify shell options as command line arguments when starting the shell, or with the [`set` built-in](../builtins/set.md). In yash, all options have a long name, and some also have a short name.
 
 Options set at startup take effect before the shell reads and executes commands. Options set with `set` affect the current shell session. Some options are only available at startup; others can be changed at any time. The syntax is the same in both cases.
 
