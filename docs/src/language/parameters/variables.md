@@ -153,7 +153,7 @@ Undefined variables by default expand to an empty string. Use the `-u` [shell op
 
 Some variable names are reserved for special purposes. These variables may affect or be affected by the shell's behavior.
 
-- **`CDPATH`**: A colon-separated list of directories to search in the `cd` built-in
+- **`CDPATH`**: A colon-separated list of directories to search in the [`cd` built-in]
 
 - **`ENV`**: The name of a file to be sourced when starting an interactive shell
 
@@ -166,7 +166,7 @@ Some variable names are reserved for special purposes. These variables may affec
     - This variable is automatically updated as the shell executes commands.
     - Currently, yash-rs does not support exporting this variable.
 
-- **`OLDPWD`**: The previous working directory, updated by the `cd` built-in
+- **`OLDPWD`**: The previous [working directory], updated by the [`cd` built-in]
 
 - **`OPTARG`**: The value of the last option argument processed by the `getopts` built-in
 
@@ -187,7 +187,7 @@ Some variable names are reserved for special purposes. These variables may affec
     - The default value is `+ ` (a plus sign followed by a space). <!-- markdownlint-disable-line MD038 -->
 
 - **`PWD`**: The current working directory
-    - This variable is initialized to the working directory when the shell starts and updated by the `cd` built-in when changing directories.
+    - This variable is initialized to the [working directory] when the shell starts and updated by the [`cd` built-in] when changing directories.
 
 ## Arrays
 
@@ -245,3 +245,6 @@ $ fruits+=(date)
 $ echo "${fruits[@]}"
 apple banana cherry date
 -->
+
+[`cd` built-in]: ../../builtins/cd.md
+[working directory]: ../../environment/working_directory.md

@@ -160,7 +160,7 @@ $ cd /dev
 
 ### Options
 
-**Options** are supplementary arguments that modify the behavior of the built-in. They start with a hyphen (`-`) followed by one or more characters. Short options are named with a single character (e.g., `-P`), while long options are more descriptive and start with two hyphens (e.g., `--physical`). For example, the `cd` built-in uses `-P` or `--physical` to force the shell to use the physical directory structure instead of maintaining symbolic links:
+**Options** are supplementary arguments that modify the behavior of the built-in. They start with a hyphen (`-`) followed by one or more characters. Short options are named with a single character (e.g., `-P`), while long options are more descriptive and start with two hyphens (e.g., `--physical`). For example, the `cd` built-in uses `-P` or `--physical` to force the shell to use the physical directory structure instead of preserving symbolic links:
 
 ```shell
 $ cd -P /dev

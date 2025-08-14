@@ -3,7 +3,7 @@
 The **shell execution environment** is the set of state the shell maintains to control its behavior. It consists of:
 
 - [File descriptors](../language/redirections/index.html#what-are-file-descriptors)
-- Working directory
+- [Working directory](working_directory.md)
 - [File creation mask](../builtins/umask.md)
 - [Resource limits](../builtins/ulimit.md)
 - [Variables](../language/parameters/variables.md)
