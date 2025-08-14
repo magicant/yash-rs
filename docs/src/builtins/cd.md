@@ -45,6 +45,7 @@ The built-in changes the working directory to the specified directory. The new w
 1. If the operand is omitted, the value of the `HOME` [variable] is used for the operand. If the operand is a single hyphen (`-`), the value of the `OLDPWD` [variable] is used for the operand. If the variable is not set or empty, it is an error. Otherwise, the operand is used as is.
 2. If the operand does not start with a slash (`/`) and the first pathname component in the operand is neither dot (`.`) nor dot-dot (`..`), the built-in searches the directories specified by the `CDPATH` [variable] for a first directory that contains the operand as a subdirectory. If such a directory is found, the operand is replaced with the path to the subdirectory, that is, the concatenation of the pathname contained in `CDPATH` and the previous operand. If no such directory is found, the operand is used as is.
     - The value of `CDPATH` is a colon-separated list of directories, searched in order. If it includes an empty item, it is treated as the current working directory. It is similar to including `.` in the list, but it suppresses [printing the new working directory](#standard-output).
+    - Directories listed in `CDPATH` may be relative, in which case they are resolved against the current working directory. This behavior may be confusing, so use with caution.
     - Note the [security implications of `CDPATH`](#security-considerations).
 3. If the `-L` option is effective, the operand is canonicalized as follows:
     1. If the operand does not start with a slash (`/`), the value of the `PWD` [variable] is prepended to the operand.
@@ -97,7 +98,7 @@ If the `-P` option is effective, the built-in may fail to determine the new work
 - Some ancestor directories of the new working directory are not accessible.
 - The new working directory does not belong to the filesystem tree.
 
-In these cases, the working directory remains changed, the `PWD` variable is left empty, and the exit status depends on the `-e` option.
+In these cases, the working directory remains changed, `OLDPWD` is updated to the previous value of `PWD`, `PWD` is left empty, and the exit status depends on the `-e` option.
 
 The built-in may also fail if `PWD` or `OLDPWD` is [read-only]. In this case, the working directory remains changed, but the variable is not updated.
 
@@ -163,7 +164,7 @@ $ cd bin # no "bin" in the new working directory, so picks /usr/bin
 
 Although `CDPATH` can be helpful if used correctly, it can catch unwary users off guard, leading to unintended changes in the behavior of shell scripts. If a shell script is executed with the `CDPATH` environment variable set to a directory crafted by an attacker, the script may change the working directory to an unexpected one. To ensure that the `cd` built-in behaves as intended, shell script writers should unset the variable at the beginning of the script. Users can configure `CDPATH` in their shell sessions, but should avoid [exporting the variable to the environment](../language/parameters/variables.md#environment-variables). Users are advised to include an empty item as the first item in `CDPATH` to ensure that the current working directory is searched before other `CDPATH` directories are considered.
 
-Because the built-in treats `-` as a special operand, running `cd -` does not necessarily change the working directory to a directory literally named `-`. This can produce unexpected results, especially when the operand is supplied via a [parameter](../language/parameters/index.html). For more information, see the [Application usage](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cd.html#tag_20_14_16) section for the `cd` utility in POSIX.
+Because the built-in treats `-` as a special operand, running `cd -` does not necessarily change the working directory to a directory literally named `-`. This can produce unexpected results, especially when the operand is supplied via a [parameter](../language/parameters/index.html). For more information, see the [Application usage](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cd.html#tag_20_14_16) section for the `cd` utility in POSIX. You can also use `cd ./-` to change to a directory literally named `-`.
 
 By default, the built-in resolves pathnames logically (`-L`), while many other utilities resolve pathnames physically (as with `cd -P`). If you intend to use a pathname with both `cd` and other utilities, use the `-P` option to ensure consistent resolution.
 
