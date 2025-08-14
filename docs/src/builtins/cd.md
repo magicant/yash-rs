@@ -68,8 +68,7 @@ With the **`-P`** (**`--physical`**) option, the operand is resolved physically;
 
 These two options are mutually exclusive. The last specified one applies if given both. The default is `-L`.
 
-When `-P` is effective, the built-in may fail to determine the new working directory pathname to assign to `PWD`. By default, the exit status does not indicate the failure. If the **`-e`** (**`--ensure-pwd`**) option is given together with `-P`, the built-in returns exit status 1 in this case. This helps ensure that `PWD` is always updated correctly.
-
+When `-P` is effective, the built-in may fail to determine the new working directory pathname to assign to `PWD`. By default, the exit status does not indicate the failure. If the **`-e`** (**`--ensure-pwd`**) option is given together with `-P`, the built-in returns exit status 1 in this case. This allows callers to detect that `PWD` could not be determined and handle the condition.
 <!-- TODO: The **`--default-directory=directory`** option is not implemented. -->
 <!-- TODO: The **`--print={always,auto,never}`** option is not implemented. -->
 
