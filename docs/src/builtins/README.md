@@ -88,7 +88,7 @@ More may be added in the future.
 
 ### Compatibility
 
-POSIX.1-2024 reserves many names for shell built-ins. Yash-rs implements some of them; others may not be implemented or may differ in other shells.
+POSIX.1-2024 reserves many names for shell-specific built-ins. Yash-rs implements some of these, and may add more in the future. Other shells may implement these differently:
 
 - `alloc`
 - `autoload`
