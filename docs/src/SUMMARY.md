@@ -9,7 +9,7 @@
 
 - [Installation](installation.md)
 - [Getting started](getting_started.md)
-- [Versioning and compatibility]() <!-- POSIX conformance -->
+- [Versioning and compatibility](versioning.md)
 - [Shell language](language/README.md)
     - [Words, tokens, and fields](language/words/README.md)
         - [Quoting and escaping](language/words/quoting.md)
