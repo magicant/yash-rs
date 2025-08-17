@@ -1,6 +1,6 @@
 # Interactive shell
 
-When the `interactive` [shell option](../environment/options.md) is enabled, the shell behaves in a way that is more suitable for interactive use. Currently, only the essential features are implemented, but more will be added in the future.
+When the `interactive` [shell option](../environment/options.md) is enabled, the shell behaves in a way that is more suitable for interactive use. Such a shell is called an **interactive shell**. Currently, only the essential features are implemented, but more will be added in the future.
 
 ## Enabling interactive mode
 
