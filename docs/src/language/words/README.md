@@ -11,7 +11,7 @@ Hello, world!
 
 The first word (`echo`) is the name of the utility to run. The other words are arguments passed to that utility.
 
-Before running the utility, the shell expands words. This means the shell processes certain characters and sequences in the words to produce the final command line. For example, `$` is used for [parameter expansion](parameters.md), letting you access variable values:
+Before running the utility, the shell expands words. This means the shell processes certain characters and sequences in the words to produce the final command line. For example, `$` is used for [parameter expansion](parameters.md), letting you access [variable](../parameters/variables.md) values:
 
 ```shell
 $ name="Alice"
@@ -34,31 +34,31 @@ A **token** is a sequence of characters processed as a single unit in shell synt
 
 The shell recognizes these **operators**:
 
-- Newline – Command separator
-- `;` – Command separator
-- `&` – Asynchronous command
-- `&&` – Logical and
-- `||` – Logical or
-- `|` – Pipeline
-- `(` – Start of a subshell
-- `)` – End of a subshell
-- `;;` – End of a case item
-- `;&` – End of a case item
-- `;;&` – End of a case item
-- `;|` – End of a case item
-- `<` – Input redirection
-- `<&` – Input redirection
-- `<(` – Process redirection
-- `<<` – Here document
-- `<<-` – Here document
+- Newline – [Command separator](../commands/lists.md#synchronous-commands)
+- `;` – [Command separator](../commands/lists.md#synchronous-commands)
+- `&` – [Asynchronous command](../commands/lists.md#asynchronous-commands)
+- `&&` – [Logical and](../commands/exit_status.md#and-or-lists)
+- `||` – [Logical or](../commands/exit_status.md#and-or-lists)
+- `|` – [Pipeline](../commands/pipelines.md)
+- `(` – Start of a [subshell](../commands/grouping.md#subshells)
+- `)` – End of a [subshell](../commands/grouping.md#subshells)
+- `;;` – End of a [case item](../commands/case.md)
+- `;&` – End of a [case item](../commands/case.md)
+- `;;&` – End of a [case item](../commands/case.md)
+- `;|` – End of a [case item](../commands/case.md)
+- `<` – Input [redirection](../redirections/index.html#redirection-operators)
+- `<&` – Input [redirection](../redirections/index.html#redirection-operators)
+- `<(` – Process [redirection](../redirections/index.html#redirection-operators)
+- `<<` – [Here document](../redirections/here_documents.md)
+- `<<-` – [Here document](../redirections/here_documents.md)
 - `<<<` – Here string
-- `<>` – Input and output redirection
-- `>` – Output redirection
-- `>&` – Output redirection
-- `>|` – Output redirection
-- `>(` – Process redirection
-- `>>` – Output redirection
-- `>>|` – Pipeline redirection
+- `<>` – Input and output [redirection](../redirections/index.html#redirection-operators)
+- `>` – Output [redirection](../redirections/index.html#redirection-operators)
+- `>&` – Output [redirection](../redirections/index.html#redirection-operators)
+- `>|` – Output [redirection](../redirections/index.html#redirection-operators)
+- `>(` – Process [redirection](../redirections/index.html#redirection-operators)
+- `>>` – Output [redirection](../redirections/index.html#redirection-operators)
+- `>>|` – Pipeline [redirection](../redirections/index.html#redirection-operators)
 
 When recognizing operators, the shell matches the longest possible sequence first. For example, `&&` is a single operator, not two `&` operators, and `<<<<` is recognized as `<<<` and `<`, not two `<<` operators.
 
@@ -73,7 +73,7 @@ $ ( ( echo hello ) )
 hello
 ```
 
-However, you cannot omit the space between `;` and `;;` in a case command:
+However, you cannot omit the space between `;` and `;;` in a [case command](../commands/case.md):
 
 ```shell
 $ case foo in (foo) echo foo; ;; esac
@@ -107,4 +107,4 @@ After these, the shell performs these steps in order:
 
 The result is a list of words passed to the utility. Each word resulting from these expansions is called a **field**.
 
-A subset of these expansions are performed depending on the context. For example, when assigning a variable, the shell performs tilde expansion, parameter expansion, command substitution, arithmetic expansion, and quote removal before the assignment. However, field splitting and pathname expansion do not occur during variable assignment, since the value of a variable cannot be split into multiple fields.
+A subset of these expansions are performed depending on the context. For example, when [assigning a variable](../parameters/variables.md#defining-variables), the shell performs tilde expansion, parameter expansion, command substitution, arithmetic expansion, and quote removal before the assignment. However, field splitting and pathname expansion do not occur during variable assignment, since the value of a variable cannot be split into multiple fields.
