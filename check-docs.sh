@@ -6,3 +6,4 @@ mdbook build docs
 # mdbook test docs
 
 docs/doctest.sh
+docs/indexsort.sh
