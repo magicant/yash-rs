@@ -27,6 +27,7 @@ Semantic versioning applies to the observable behavior of yash-rs as documented 
 We strive to minimize breaking changes by carefully defining the scope of behavior covered by semantic versioning. In this manual, we may declare certain behaviors as "subject to change", "may change in the future", and similar phrases to reserve the right to make changes without incrementing the major version. Additionally, the following changes are not considered breaking:
 
 - Changes to undocumented or internal behavior
+- New features that were previously documented as "not yet implemented/supported"
 - New features that allow commands which previously resulted in errors to succeed
 - Changes that make non-conforming behavior compliant with POSIX
 
