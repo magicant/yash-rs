@@ -1,6 +1,6 @@
 # Field splitting
 
-**Field splitting** breaks a word into fields at delimiters. This happens after [parameter expansion], [command substitution], and [arithmetic expansion], but before [pathname expansion] and quote removal.
+**Field splitting** breaks a word into [fields](../commands/simple.md#semantics) at delimiters. This happens after [parameter expansion], [command substitution], and [arithmetic expansion], but before [pathname expansion] and [quote removal].
 
 In this example, `$flags` is split at the space, so `ls` receives two arguments:
 
@@ -37,7 +37,7 @@ ls: cannot access '/home/user/My': No such file or directory
 ls: cannot access 'Documents': No such file or directory
 ```
 
-Field splitting only happens where words are expected, such as simple command words, for loop words, and array assignments. It does not occur in contexts expecting a single word, like scalar assignments or case patterns.
+Field splitting only happens where words are expected, such as [simple command](../commands/simple.md) words, [for loop](../commands/loops.md#for-loops) words, and [array assignments](../parameters/variables.md#defining-arrays). It does not occur in contexts expecting a single word, like [scalar assignments](../parameters/variables.md#defining-variables) or [case](../commands/case.md) patterns.
 
 ```shell,no_run
 $ flags='-a -l'
@@ -52,7 +52,7 @@ Restored flags: -a -l
 
 ## IFS
 
-Field splitting is controlled by the `IFS` (Internal Field Separator) variable, which lists delimiter characters. By default, `IFS` contains a space, tab, and newline. You can change `IFS` to use different delimiters.
+Field splitting is controlled by the `IFS` (Internal Field Separator) [variable](../parameters/variables.md), which lists delimiter characters. By default, `IFS` contains a space, tab, and newline. You can change `IFS` to use different delimiters.
 
 If `IFS` is unset, the default value is used:
 
@@ -153,7 +153,7 @@ $ for value in $space; do echo "[$value]"; done # prints one field containing a 
 [ ]
 ```
 
-To retain empty fields, quote the word to prevent field splitting:
+To retain empty fields, [quote](quoting.md) the word to prevent field splitting:
 
 ```shell
 $ empty='' space=' '
@@ -167,3 +167,4 @@ $ for value in "$space"; do echo "[$value]"; done
 [command substitution]: command_substitution.md
 [arithmetic expansion]: arithmetic.md
 [pathname expansion]: globbing.md
+[quote removal]: quoting.md#quote-removal
