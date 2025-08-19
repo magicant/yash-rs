@@ -1,12 +1,12 @@
 # Variables
 
-**Variables** are parameters with alphanumeric names that can be assigned values. Use variable assignment to define a variable by specifying a name and value.
+**Variables** are [parameters](index.html) with alphanumeric names that can be assigned values. Use variable assignment to define a variable by specifying a name and value.
 
 ## Variable names
 
 Variable names can contain letters, digits, and underscores, but cannot start with a digit. Variable names are case-sensitive, so `VAR` and `var` are different variables.
 
-It is common to use uppercase letters for exported (environment) variables and lowercase for local variables. This avoids accidentally overwriting environment variables.
+It is common to use uppercase letters for [environment variables](#environment-variables) and lowercase for local variables. This avoids accidentally overwriting environment variables.
 
 According to POSIX.1-2024, only ASCII letters, digits, and underscores are portably accepted in variable names. Many shells allow additional characters. Yash-rs currently accepts Unicode letters and digits in variable names, but this may change in the future.
 
@@ -55,7 +55,7 @@ See [Simple commands](../commands/simple.md) for more on assignment behavior.
 
 ## Environment variables
 
-**Environment variables** are variables exported to child processes. To export a variable, use the `export` built-in:
+**Environment variables** are variables exported to child processes. To export a variable, use the [`export` built-in](../../builtins/export.md):
 
 ```shell
 $ export user=Alice
@@ -67,7 +67,7 @@ When the shell starts, it inherits environment variables from its parent. These 
 
 ## Read-only variables
 
-The `readonly` built-in makes a variable read-only, preventing it from being modified or unset. This is useful for defining constants.
+The [`readonly` built-in](../../builtins/readonly.md) makes a variable **read-only**, preventing it from being modified or unset. This is useful for defining constants.
 
 ```shell
 $ readonly pi=3.14
@@ -85,11 +85,11 @@ error: error assigning to variable
   |
 ```
 
-Variables are read-only only in the current shell session. Exported environment variables are not read-only in child processes.
+Variables are read-only only in the current shell session. Exported [environment variables](#environment-variables) are not read-only in child processes.
 
 ## Local variables
 
-Variables defined by the `typeset` built-in (without `--global`) are **local** to the current shell [function](../functions.md). Local variables are removed when the function returns. This helps avoid name conflicts and keeps temporary variables out of the global namespace.
+Variables defined by the [`typeset` built-in](../../builtins/typeset.md) (without `--global`) are **local** to the current [function](../functions.md). Local variables are removed when the function returns. This helps avoid name conflicts and keeps temporary variables out of the global namespace.
 
 ```shell
 $ i=0
@@ -155,7 +155,7 @@ Some variable names are reserved for special purposes. These variables may affec
 
 - **`CDPATH`**: A colon-separated list of directories to search in the [`cd` built-in]
 
-- **`ENV`**: The name of a file to be sourced when starting an interactive shell
+- **`ENV`**: The name of a file to be sourced when [starting](../../startup.md) an [interactive shell](../../interactive/index.html)
 
 - **`HOME`**: The user's home directory, used in [tilde expansion](../words/tilde.md)
 
@@ -168,25 +168,26 @@ Some variable names are reserved for special purposes. These variables may affec
 
 - **`OLDPWD`**: The previous [working directory], updated by the [`cd` built-in]
 
-- **`OPTARG`**: The value of the last option argument processed by the `getopts` built-in
+- **`OPTARG`**: The value of the last option argument processed by the [`getopts` built-in]
 
-- **`OPTIND`**: The index of the next option to be processed by the `getopts` built-in
+- **`OPTIND`**: The index of the next option to be processed by the [`getopts` built-in]
 
-- **`PATH`**: A colon-separated list of directories to search for executable files when running external utilities
+- **`PATH`**: A colon-separated list of directories to search for executable files in [command search](../commands/simple.md#command-search)
 
 - **`PPID`**: The process ID of the parent process of the shell
     - This variable is initialized when the shell starts.
 
-- **`PS1`**: The primary prompt string, displayed before each command in interactive mode
+- **`PS1`**: The primary [prompt] string, displayed before each command in [interactive](../../interactive/index.html) mode
     - The default value is `$ ` (a dollar sign followed by a space). <!-- TODO: The default value should be `# ` for the root user. --> <!-- markdownlint-disable-line MD038 -->
+    - Many shells set the default value to `# ` (a hash sign followed by a space) for the root user. This is not yet implemented in yash-rs. <!-- markdownlint-disable-line MD038 -->
 
-- **`PS2`**: The secondary prompt string, displayed when a command is continued on the next line
+- **`PS2`**: The secondary [prompt] string, displayed when a command is continued on the next line
     - The default value is `> ` (a greater-than sign followed by a space). <!-- markdownlint-disable-line MD038 -->
 
 - **`PS4`**: The pseudo-prompt string, used for [command execution tracing](../../debugging.md#tracing-command-execution)
     - The default value is `+ ` (a plus sign followed by a space). <!-- markdownlint-disable-line MD038 -->
 
-- **`PWD`**: The current working directory
+- **`PWD`**: The current [working directory]
     - This variable is initialized to the [working directory] when the shell starts and updated by the [`cd` built-in] when changing directories.
 
 ## Arrays
@@ -247,4 +248,6 @@ apple banana cherry date
 -->
 
 [`cd` built-in]: ../../builtins/cd.md
+[`getopts` built-in]: ../../builtins/getopts.md
+[prompt]: ../../interactive/prompt.md
 [working directory]: ../../environment/working_directory.md
