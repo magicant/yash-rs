@@ -187,6 +187,7 @@
 - [`unalias` built-in](builtins/unalias.md)
 - [`unset` built-in](builtins/unset.md)
 - [`unset` shell option](environment/options.md#option-list)
+- [utility](language/commands/simple.md#outline)
 - [variable](language/parameters/variables.md)
 - [`verbose` shell option](environment/options.md#option-list)
 - [`vi` shell option](environment/options.md#option-list)
