@@ -42,9 +42,9 @@ $ ls \
 2
 ```
 
-If a pipeline contains only one command, the shell runs that command directly. For multiple commands, the shell creates a subshell for each and connects them with pipes. Each command's standard output is connected to the next command's standard input. The first command's input and the last command's output are not changed. All commands in the pipeline run concurrently. (See [What are file descriptors?](../redirections/index.html#what-are-file-descriptors) for more on standard input and output.)
+If a pipeline contains only one command, the shell runs that command directly. For multiple commands, the shell creates a [subshell](../../environment/index.html#subshells) for each and connects them with pipes. Each command's [standard output](../redirections/index.html#what-are-file-descriptors) is connected to the next command's [standard input](../redirections/index.html#what-are-file-descriptors). The first command's input and the last command's output are not changed. All commands in the pipeline run concurrently.
 
-The shell waits for all commands in the pipeline to finish before proceeding. The exit status of the pipeline is the exit status of the last command in the pipeline. (In the future, yash-rs may only wait for the last command to finish.)
+The shell waits for all commands in the pipeline to finish before proceeding. The [exit status](exit_status.md#exit-status) of the pipeline is the exit status of the last command in the pipeline. (In the future, yash-rs may only wait for the last command to finish.)
 
 <!-- TODO: ## Pipefail -->
 <!-- TODO: Description and example of `pipefail`. -->
@@ -86,7 +86,7 @@ error: cannot execute external utility "!ls"
 
 POSIX requires that a pipeline waits for the last command to finish before returning an exit status, and it is unspecified whether the shell waits for all commands in the pipeline to finish. yash-rs currently waits for all commands, but this may change in the future.
 
-POSIX allows commands in a multi-command pipeline to be run in the current shell environment rather than in subshells. Korn shell and zsh run the last command in the current shell environment, while yash-rs runs all commands in subshells.
+POSIX allows commands in a multi-command pipeline to be run in the current [shell environment](../../environment/index.html) rather than in subshells. Korn shell and zsh run the last command in the current shell environment, while yash-rs runs all commands in subshells.
 
 Some shells like Korn shell and mksh assign special meanings to the `!` reserved word immediately followed by the `(` operator. For maximum compatibility, `!` and `(` should be separated by a space.
 

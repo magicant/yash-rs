@@ -36,11 +36,11 @@ The following exit statuses are used by the shell to indicate specific condition
 
 POSIX specifies exit statuses for certain conditions, but there are still many conditions for which POSIX does not define exact exit statuses. Different shells and commands may use different exit statuses for the same conditions, so it's important to check the documentation of the specific command you are using. Specifically, the exit status of a command terminated by a signal may vary between shells as POSIX only specifies that the exit status must be greater than 128.
 
-Yash-rs internally handles exit statuses as 32-bit signed integers, but receives only the lower 8 bits from child processes running a subshell or external utility. This means that exit statuses that are not in the range of 0 to 255 are truncated to fit into this range. For example, an exit status of 256 becomes 0, and an exit status of 1000 becomes 232.
+Yash-rs internally handles exit statuses as 32-bit signed integers, but receives only the lower 8 bits from child processes running a [subshell](../../environment/index.html#subshells) or [external utility](simple.md#command-search). This means that exit statuses that are not in the range of 0 to 255 are truncated to fit into this range. For example, an exit status of 256 becomes 0, and an exit status of 1000 becomes 232.
 
 ### Exit status of the shell
 
-When exiting a shell, the exit status of the shell itself is determined by the exit status of the last command executed in the shell. If no commands have been executed, the exit status is 0.
+When [exiting a shell](../../termination.md), the exit status of the shell itself is determined by the exit status of the last command executed in the shell. If no commands have been executed, the exit status is 0.
 
 If the exit status of the last command indicates that the command was terminated by a signal, the shell sends the same signal to itself to terminate. The parent process (which may or may not be a shell) will observe that the shell process was terminated by a signal, allowing it to handle the termination appropriately. Specifically, if the parent process is also yash, the value of the [special parameter] `?` in the child shell process is reproduced in the parent shell process without modification.
 
@@ -48,7 +48,7 @@ This signal-passing behavior is not supported by all shells; in shells that do n
 
 ## The `true` and `false` utilities
 
-The `true` and `false` utilities simply return an exit status of 0 and 1, respectively. They are often used as placeholders in conditional statements or loops. See the examples in the [And-or lists](#and-or-lists) section below.
+The [`true`](../../builtins/true.md) and [`false`](../../builtins/false.md) utilities simply return an exit status of 0 and 1, respectively. They are often used as placeholders in conditional statements or loops. See the examples in the [And-or lists](#and-or-lists) section below.
 
 <!-- TODO: ## The `test` utility -->
 <!-- TODO: ## The double bracket command -->

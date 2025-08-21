@@ -33,7 +33,7 @@ First async command
 
 Here, the commands run in parallel, so their output may appear in any order.
 
-In an interactive shell, starting an asynchronous command prints its job number and process ID:
+Each asynchronous command runs in a [subshell](../../environment/index.html#subshells). Changes to the shell environment (like variable assignments) made in an asynchronous command do not affect the parent shell. In an [interactive shell](../../interactive/index.html), starting an asynchronous command prints its [job number](../../interactive/job_control.md#job-numbers) and process ID:
 
 ```shell,no_run
 $ echo "Async command" &
@@ -41,11 +41,11 @@ $ echo "Async command" &
 Async command
 ```
 
-Because the shell does not wait for asynchronous commands, they may keep running while the shell reads new commands or even after the shell exits. To wait for them to finish, use the `wait` utility (see below).
+Because the shell does not wait for asynchronous commands, they may keep running while the shell reads new commands or even after the shell exits. To wait for them to finish, use the `wait` utility ([see below](#the-wait-utility)).
 
 ### Input redirection
 
-By default, an asynchronous command's standard input is redirected to `/dev/null` to prevent it from interfering with synchronous commands that read from standard input. This does not apply in job-controlling shells.
+By default, an asynchronous command's [standard input](../redirections/index.html#what-are-file-descriptors) is redirected to `/dev/null` to prevent it from interfering with synchronous commands that read from standard input. This does not apply in [job-controlling](../../interactive/job_control.md) shells.
 
 ```shell
 $ echo Input | {
@@ -80,4 +80,4 @@ Here, the shell starts an asynchronous command that writes to a file. `wait $!` 
 
 ### Job control
 
-In yash-rs, all asynchronous commands start as background jobs. If the `monitor` shell option is enabled, you can use job control commands to manage these jobs. See the [job control documentation](../../interactive/job_control.md) for details.
+In yash-rs, all asynchronous commands start as background jobs. If the [`monitor` shell option](../../environment/options.md#option-list) is enabled, you can use job control commands to manage these jobs. See the [job control documentation](../../interactive/job_control.md) for details.
