@@ -67,13 +67,13 @@ $ dumb Alice
 
 You can redefine a function by defining it again with the same name. The new definition replaces the old one.
 
-The [exit status](commands/exit_status.md#exit-status) of a function definition is 0 if successful. It is nonzero if the function name expansion fails or if a read-only function with the same name exists.
+The [exit status](commands/exit_status.md#exit-status) of a function definition is 0 if successful. It is non-zero if the function name expansion fails or if a [read-only function](#read-only-functions) with the same name exists.
 
 Defining functions with the `function` [reserved word](words/keywords.md) is not POSIX and is not yet implemented in yash-rs.
 
 ### Read-only functions
 
-Make a function read-only with the `typeset` built-in. Read-only functions cannot be redefined or removed.
+Make a function read-only with the [`typeset` built-in](../builtins/typeset.md). Read-only functions cannot be redefined or removed.
 
 ```shell
 $ greet() { echo "Hello, World!"; }
@@ -97,7 +97,7 @@ error: cannot redefine read-only function `greet`
   |
 ```
 
-The `readonly` built-in does not yet support making functions read-only in yash-rs.
+The [`readonly` built-in](../builtins/readonly.md) does not yet support making functions read-only in yash-rs.
 
 ### Showing function definitions
 
@@ -121,7 +121,7 @@ $ greet
 Hello, World!
 ```
 
-A function cannot be executed as a simple command if its name matches a special built-in or contains a slash. (See [command search](commands/simple.md#command-search).)
+A function cannot be executed as a simple command if its name matches a [special built-in](../builtins/index.html#special-built-ins) or contains a slash. (See [command search](commands/simple.md#command-search).)
 <!-- TODO: Use the command built-in to call such functions -->
 
 ### Function parameters
@@ -182,7 +182,7 @@ error: cannot execute external utility "greet"
 
 ## Replacing existing utilities
 
-You can override existing utilities (except special built-ins) by defining a function with the same name. This is useful for customizing or extending utility behavior. To run the original utility from within your function, use the [`command` built-in](../builtins/command.md):
+You can override existing utilities (except [special built-ins](../builtins/index.html#special-built-ins)) by defining a function with the same name. This is useful for customizing or extending utility behavior. To run the original utility from within your function, use the [`command` built-in](../builtins/command.md):
 
 ```shell,no_run
 $ ls() {
