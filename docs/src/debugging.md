@@ -25,7 +25,7 @@ This option also detects [unset variables in arithmetic expressions](arithmetic.
 
 ## Reviewing command input
 
-When the `verbose` [shell option] is enabled, the shell prints each command to standard error as it reads it, before executing. This is useful for reviewing commands being executed, especially in scripts.
+When the `verbose` [shell option] is enabled, the shell prints each command to [standard error] as it reads it, before executing. This is useful for reviewing commands being executed, especially in scripts.
 
 ```shell
 $ set -o verbose
@@ -49,7 +49,7 @@ Hello, world!
 
 ## Tracing command execution
 
-If you enable the `xtrace` [shell option], the shell prints expanded fields in each command to standard error before executing it. This is useful for reviewing actual commands being executed.
+If you enable the `xtrace` [shell option], the shell prints [expanded fields](language/words/index.html#word-expansion) in each command to [standard error] before executing it. This is useful for reviewing actual commands being executed.
 
 ```shell,hidelines=#
 #$ mkdir $$ && cd $$
@@ -111,3 +111,4 @@ yash3 +o exec my_script.sh
 <!-- TODO: ## DEBUG trap: Run a command before every simple command (advanced debugging). -->
 
 [shell option]: environment/options.md
+[standard error]: language/redirections/index.html#what-are-file-descriptors
