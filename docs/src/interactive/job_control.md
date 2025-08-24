@@ -26,27 +26,27 @@ $ rm -rf ~/.my_cache_files
 ```
 <!-- markdownlint-enable MD014 -->
 
-If the command is taking too long, you might wish you had started it as an [asynchronous command] so you could run other commands at the same time. With job control, you can turn this running command into an asynchronous one without stopping and restarting it. First, press `Ctrl-Z` to suspend the command and return to the shell prompt. The shell displays a message indicating the command has been stopped:
+If the command is taking too long, you might wish you had started it as an [asynchronous command] so you could run other commands at the same time. With job control, you can turn this running command into an asynchronous one without stopping and restarting it. First, press `Ctrl-Z` to suspend the command and return to the [prompt]. The shell displays a message indicating the command has been stopped:
 
 ```shell,no_run
 ^Z[1] + Stopped(SIGTSTP)     rm -rf ~/.my_cache_files
 ```
 
-You can then resume the command in the background by typing:
+You can then resume the command in the background with the [`bg` built-in]:
 
 ```shell,no_run
 $ bg
 [1] rm -rf ~/.my_cache_files
 ```
 
-Now the command runs asynchronously, and you can continue using the shell for other tasks. If you want to bring the command back to the foreground (synchronous execution), use the `fg` built-in:
+Now the command runs asynchronously, and you can continue using the shell for other tasks. If you want to bring the command back to the foreground (synchronous execution), use the [`fg` built-in]:
 
 ```shell,no_run
 $ fg
 rm -rf ~/.my_cache_files
 ```
 
-Another common scenario is when you use an editor to work on source code and want to build and test your code while keeping the editor open. You can suspend the editor with `Ctrl-Z`, run your build command, and then return to the editor with `fg`:
+Another common scenario is when you use an editor to work on source code and want to build and test your code while keeping the editor open. You can suspend the editor with `Ctrl-Z`, run your build command, and then return to the editor with [`fg`]:
 
 ```shell,no_run
 $ vi main.rs
@@ -66,7 +66,7 @@ When the shell starts a [subshell], it runs the subshell in a separate process. 
 
 If the subshell runs synchronously (in the foreground), the shell sets its process group as the terminal's foreground process group. This lets you interact with the subshell's processes while they're running. When you press `Ctrl-C` or `Ctrl-Z`, the terminal sends a `SIGINT` or `SIGTSTP` signal to the foreground process group. Typically, `SIGINT` terminates a process, and `SIGTSTP` suspends it.
 
-When a foreground process is suspended, the shell displays a message and returns to the prompt. The shell keeps a list of remaining subshells (jobs) so you can manage them later. When you use the `fg` built-in, the shell makes the specified job the foreground process group again and sends it a `SIGCONT` signal to resume execution. If you use `bg`, the shell sends `SIGCONT` but leaves the job running in the background.
+When a foreground process is suspended, the shell displays a message and returns to the [command prompt]. The shell keeps a list of remaining subshells (jobs) so you can manage them later. When you use the [`fg` built-in], the shell makes the specified job the foreground process group again and sends it a `SIGCONT` signal to resume execution. If you use [`bg`], the shell sends `SIGCONT` but leaves the job running in the background.
 
 All commands in a [pipeline] run in the same process group, so you can manage the entire pipeline as a single job.
 
@@ -96,7 +96,7 @@ For this document, we assume all terminals are controlling terminals, since non-
 
 A **job** is a [subshell] implemented as a child process of the shell. (⚠️This differs from POSIX, which uses "job" for a broader set of commands, including [lists](../language/commands/lists.md).) Each job has a unique **job number**, a positive integer assigned by the shell when the job is created. The shell maintains a **job list** with information about each job's number, status, etc.
 
-A **job ID** starts with `%` and is used to specify jobs in built-ins like `fg`, `bg`, and `jobs`. For example, `%1` refers to job number 1.
+A **job ID** starts with `%` and is used to specify jobs in built-ins like [`fg`], [`bg`], and [`jobs`]. For example, `%1` refers to job number 1.
 
 ### Subshells and process groups
 
@@ -146,7 +146,7 @@ $ sleep 60&
 $ 
 ```
 
-Background jobs are not affected by `Ctrl-C` or `Ctrl-Z`. To send signals to background jobs, use the `kill` built-in (see [Signaling jobs](#signaling-jobs)). You can also bring a background job to the foreground with `fg` and then use `Ctrl-C` or `Ctrl-Z`.
+Background jobs are not affected by `Ctrl-C` or `Ctrl-Z`. To send signals to background jobs, use the `kill` built-in (see [Signaling jobs](#signaling-jobs)). You can also bring a background job to the foreground with [`fg`] and then use `Ctrl-C` or `Ctrl-Z`.
 
 ### Suspending foreground jobs
 
@@ -183,7 +183,7 @@ Exit status 404 corresponds to SIGTSTP
 
 ### Resuming jobs
 
-The `fg` built-in brings a job to the foreground and sends it a `SIGCONT` signal to resume execution. The job continues as the terminal's foreground process group, letting you interact with it again:
+The [`fg` built-in] brings a job to the foreground and sends it a `SIGCONT` signal to resume execution. The job continues as the terminal's foreground process group, letting you interact with it again:
 
 ```shell,no_run
 $ sleep 60 && echo "1 minute elapsed!"&
@@ -196,7 +196,7 @@ sleep 60 && echo "1 minute elapsed!"
 1 minute elapsed!
 ```
 
-The `bg` built-in sends `SIGCONT` to a job without bringing it to the foreground, letting it continue in the background while you use the shell for other tasks.
+The [`bg` built-in] sends `SIGCONT` to a job without bringing it to the foreground, letting it continue in the background while you use the shell for other tasks.
 
 For example, `echo` prints a message while the shell is in the foreground:
 
@@ -212,7 +212,7 @@ $ 1 minute elapsed!
 
 ### Signaling jobs
 
-The `kill` built-in sends a signal to a process or process group. It accepts job IDs ([see below](#job-ids)) to specify jobs as targets. This allows you to control jobs at a low level, such as suspending or terminating them. For example, use `kill -STOP %1` to suspend job 1, or `kill -KILL %2` to terminate job 2:
+The [`kill` built-in] sends a signal to a process or process group. It accepts job IDs ([see below](#job-ids)) to specify jobs as targets. This allows you to control jobs at a low level, such as suspending or terminating them. For example, use `kill -s STOP %1` to suspend job 1, or `kill -s KILL %2` to terminate job 2:
 
 ```shell,no_run
 $ sleep 60 && echo "1 minute elapsed!"&
@@ -232,7 +232,7 @@ TODO: disown
 
 The job list includes each job's number, process (group) ID, status, and command string. The shell updates this list as jobs are created, suspended, resumed, or terminated. The process group ID of a job equals the process ID of its main process, so they are not distinguished in the job list.
 
-Use the [`jobs` built-in](../builtins/jobs.md) to display the current job list:
+Use the [`jobs` built-in] to display the current job list:
 
 ```shell,no_run
 $ rm -r foo& rm -r bar& rm -r baz&
@@ -255,9 +255,9 @@ When a job is created, the shell assigns it a unique job number, regardless of w
 
 The shell automatically selects two jobs as the **current job** and **previous job** from the job list. These can be referred to with special job IDs ([see below](#job-ids)). Some built-ins operate on the current job by default, making it easy to specify jobs without typing a job number or command string.
 
-In job IDs and `jobs` output, the current job is marked with `+`, and the previous job with `-`.
+In job IDs and [`jobs`] output, the current job is marked with `+`, and the previous job with `-`.
 
-The current job is usually the most recently suspended job, or another job if none are suspended. When a job is suspended, it becomes the current job, and the previous current job becomes the previous job. When a suspended job is resumed or removed, the current and previous jobs are updated so the current job is always a suspended job if any exist, and the previous job is another suspended job if possible. If there is only one job, there is no previous job. These rules ensure built-ins like `fg` and `bg` operate on the most relevant jobs by default.
+The current job is usually the most recently suspended job, or another job if none are suspended. When a job is suspended, it becomes the current job, and the previous current job becomes the previous job. When a suspended job is resumed or removed, the current and previous jobs are updated so the current job is always a suspended job if any exist, and the previous job is another suspended job if possible. If there is only one job, there is no previous job. These rules ensure built-ins like [`fg`] and [`bg`] operate on the most relevant jobs by default.
 
 ### Job IDs
 
@@ -271,7 +271,7 @@ The current job is usually the most recently suspended job, or another job if no
 
 ### Job status change notifications
 
-When a background job's status changes (suspended, resumed, or terminated), the shell automatically notifies you before the next [command prompt](prompt.md), so you can see job status changes without checking manually. The notification format matches the `jobs` built-in output.
+When a background job's status changes (suspended, resumed, or terminated), the shell automatically notifies you before the next [command prompt], so you can see job status changes without checking manually. The notification format matches the [`jobs` built-in] output.
 
 ```shell,no_run
 $ rm -r foo& # remove a directory in the background
@@ -283,13 +283,15 @@ $
 
 In this example, the `rm -r foo` job finishes while `rm -r bar` runs in the foreground. The background job's status change is automatically shown before the next prompt.
 
+Note that automatic notifications do not remove the reported job from the job list; jobs are only removed after their status is retrieved using the [`jobs`] or [`wait`] built-ins.
+
 ## Additional details
 
 The following sections cover special cases and extra features of job control you may not need in everyday use.
 
 ### Terminal setting management
 
-⚠️Not yet implemented in yash-rs: Some utilities, like `less` and `vi`, change terminal settings for interactive use and complex UI. If suspended, they may leave the terminal in an unsuitable state. To prevent this, the shell should restore the terminal settings when a foreground job is suspended, and again when the job is resumed in the foreground.
+⚠️Not yet implemented in yash-rs: Some utilities, like `less` and `vi`, change terminal settings for interactive use and complex UI. If suspended, they may leave the terminal in a state unsuitable for other utilities to run. To prevent this, the shell should restore the terminal settings when a foreground job is suspended, and again when the job is resumed in the foreground.
 
 ### Job control in non-interactive shells
 
@@ -298,7 +300,7 @@ You can enable job control in non-[interactive] shells, but it's rarely useful. 
 When job control is enabled in a non-interactive shell:
 
 - The shell does not ignore `SIGINT`, `SIGTSTP`, or other job control signals by default. The shell itself may be interrupted or suspended with `Ctrl-C` or `Ctrl-Z`.
-- The shell does not automatically notify you of job status changes. You must use the `jobs` built-in to check status.
+- The shell does not automatically notify you of job status changes. You must use the [`jobs` built-in] to check status.
 
 ### Jobs without job control
 
@@ -308,7 +310,7 @@ Each [asynchronous command] started when job control is disabled is also managed
 
 When a shell starts job control in the background, it suspends itself until brought to the foreground by another process. This prevents the shell from interfering with the current foreground process group. (⚠️POSIX.1-2024 requires using `SIGTTIN` for this, but yash-rs uses `SIGTTOU` instead. See [Issue #421](https://github.com/magicant/yash-rs/issues/421#issuecomment-2717123069) for details.)
 
-⚠️POSIX.1-2024 requires the shell to become a process group leader — the initial process in a process group — when starting job control. Yash-rs does not currently implement this. See [Issue #483](https://github.com/magicant/yash-rs/issues/483) for why this is not straightforward.
+⚠️POSIX.1-2024 requires the shell to become a process group leader—the initial process in a process group—when starting job control. Yash-rs does not currently implement this. See [Issue #483](https://github.com/magicant/yash-rs/issues/483) for why this is not straightforward.
 
 ### Configuring key sequences for signals
 
@@ -338,9 +340,21 @@ POSIX.1-2024 defines job control but allows for implementation-defined behavior 
 
 The job ID `%` is a common extension to POSIX.1-2024. The strictly portable way to refer to the current job is `%%` or `%+`.
 
+In yash-rs, jobs are currently defined as subshells, whereas POSIX.1-2024 treats a wider range of commands as jobs. At present, yash-rs does not support suspending [built-ins](../builtins/index.html), since they run within the current shell environment rather than in a subshell. Future versions of yash-rs may expand the definition of jobs to include this capability.
+
 [asynchronous command]: ../language/commands/lists.md#asynchronous-commands
+[`bg`]: ../builtins/bg.md
+[`bg` built-in]: ../builtins/bg.md
+[command prompt]: prompt.md
 [exit status]: ../language/commands/exit_status.md
+[`fg`]: ../builtins/fg.md
+[`fg` built-in]: ../builtins/fg.md
 [interactive]: index.html
+[`jobs`]: ../builtins/jobs.md
+[`jobs` built-in]: ../builtins/jobs.md
+[`kill` built-in]: ../builtins/kill.md
 [pipeline]: ../language/commands/pipelines.md
+[prompt]: prompt.md
 [special parameter]: ../language/parameters/special.md
 [subshell]: ../environment/index.html#subshells
+[`wait`]: ../builtins/wait.md
