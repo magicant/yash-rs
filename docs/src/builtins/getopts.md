@@ -10,15 +10,9 @@ getopts option_spec variable_name [argument…]
 
 ## Description
 
-The getopts built-in parses single-character options in the specified
-arguments according to the specified option specification, and assigns the
-parsed options to the specified variable. This built-in is meant to be used
-in the condition of a `while` loop to iterate over the options in the
-arguments. Every invocation of the built-in parses the next option in the
-arguments. The built-in returns a non-zero exit status when there are no more
-options to parse.
+The `getopts` built-in parses [single-character options](index.html#options) in the specified arguments according to the specified option specification, and assigns the parsed options to the specified variable. This built-in is meant to be used in the condition of a [`while` loop](../language/commands/loops.md#while-and-until-loops) to iterate over the options in the arguments. Every invocation of the built-in parses the next option in the arguments. The built-in returns a non-zero exit status when there are no more options to parse.
 
-The shell uses the `OPTIND` variable to keep track of the current position
+The shell uses the `OPTIND` [variable] to keep track of the current position
 in the arguments. When the shell starts, the variable is initialized to `1`.
 The built-in updates the variable to the index of the next argument to parse.
 When all arguments are parsed, the built-in sets the variable to the index of
@@ -71,17 +65,14 @@ missing an argument.
 The second operand (***variable_name***) is the name of the variable to
 which the built-in assigns the parsed option. In case of an invalid option
 or an option that is missing an argument, the built-in assigns `?` or `:` to
-the variable (see above).
+the variable ([see above](#description)).
 
 The remaining operands (***argument…***) are the arguments to parse.
 If there are no operands, the built-in parses the [positional parameters](../language/parameters/positional.md).
 
 ## Errors
 
-The built-in may print an error message to the standard error when it
-encounters an invalid option or an option that is missing an argument (see
-the description above). However, this is not considered an error of the
-built-in itself.
+The built-in may print an error message to the standard error when it encounters an invalid option or an option that is missing an argument ([see the description above](#description)). However, this is not considered an error of the built-in itself.
 
 The following conditions are considered errors of the built-in:
 
@@ -103,7 +94,7 @@ The exit status is two on error.
 
 ## Examples
 
-In the following example, the getopts built-in parses three kinds of options
+In the following example, the `getopts` built-in parses three kinds of options
 (`-a`, `-b`, and `-c`), of which only `-b` takes an argument. In case of an
 error, the built-in prints an error message to the standard error, so the
 script just exits with a non-zero exit status when `$opt` is set to `?`.
@@ -143,7 +134,7 @@ done
 
 ## Compatibility
 
-The getopts built-in is specified by POSIX. Only ASCII alphanumeric
+The `getopts` built-in is specified by POSIX. Only ASCII alphanumeric
 characters are allowed for option names, though this implementation allows
 any characters but `:`.
 
@@ -152,10 +143,7 @@ invalid names. However, more names many be considered invalid in the future.
 For best forward-compatibility and portability, only use portable name
 characters (ASCII alphanumerics and underscore).
 
-Although POSIX requires the built-in to support the Utility Syntax
-Guidelines 3 to 10, some implementations do not support the `--` separator
-placed before operands to the built-in itself, that is, between the built-in
-name `getopts` and the first operand *option_spec*.
+Although POSIX requires the built-in to support the [Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02) 3 to 10, some implementations do not support the `--` separator placed before operands to the built-in itself, that is, between the built-in name `getopts` and the first operand *option_spec*.
 
 The value of the `OPTIND` variable is not portable until the built-in
 finishes parsing all options. In this implementation, the value may
@@ -169,3 +157,5 @@ The behavior is unspecified if you modify the `OPTIND` variable between
 invocations of the built-in or to a value other than `1`.
 
 In other implementations, the exit status may be greater than two on error.
+
+[variable]: ../language/parameters/variables.md

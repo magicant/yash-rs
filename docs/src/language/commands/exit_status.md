@@ -30,11 +30,11 @@ The following exit statuses are used by the shell to indicate specific condition
 - Exit status 126 indicates that a command was found but could not be executed.
 - Exit status 127 indicates that a command was not found.
 - Exit status 128 indicates that the shell encountered an unrecoverable error reading a command.
-- When a command is terminated by a signal, the exit status is 384 plus the signal number. For example, if a command is terminated by `SIGINT` (signal number 2), the exit status will be 386.
+- When a command is terminated by a [signal], the exit status is 384 plus the signal number. For example, if a command is terminated by `SIGINT` (signal number 2), the exit status will be 386.
 
 ### Compatibility of exit statuses
 
-POSIX specifies exit statuses for certain conditions, but there are still many conditions for which POSIX does not define exact exit statuses. Different shells and commands may use different exit statuses for the same conditions, so it's important to check the documentation of the specific command you are using. Specifically, the exit status of a command terminated by a signal may vary between shells as POSIX only specifies that the exit status must be greater than 128.
+POSIX specifies exit statuses for certain conditions, but there are still many conditions for which POSIX does not define exact exit statuses. Different shells and commands may use different exit statuses for the same conditions, so it's important to check the documentation of the specific command you are using. Specifically, the exit status of a command terminated by a [signal] may vary between shells as POSIX only specifies that the exit status must be greater than 128.
 
 Yash-rs internally handles exit statuses as 32-bit signed integers, but receives only the lower 8 bits from child processes running a [subshell](../../environment/index.html#subshells) or [external utility](simple.md#command-search). This means that exit statuses that are not in the range of 0 to 255 are truncated to fit into this range. For example, an exit status of 256 becomes 0, and an exit status of 1000 becomes 232.
 
@@ -42,7 +42,7 @@ Yash-rs internally handles exit statuses as 32-bit signed integers, but receives
 
 When [exiting a shell](../../termination.md), the exit status of the shell itself is determined by the exit status of the last command executed in the shell. If no commands have been executed, the exit status is 0.
 
-If the exit status of the last command indicates that the command was terminated by a signal, the shell sends the same signal to itself to terminate. The parent process (which may or may not be a shell) will observe that the shell process was terminated by a signal, allowing it to handle the termination appropriately. Specifically, if the parent process is also yash, the value of the [special parameter] `?` in the child shell process is reproduced in the parent shell process without modification.
+If the exit status of the last command indicates that the command was terminated by a [signal], the shell sends the same signal to itself to terminate. The parent process (which may or may not be a shell) will observe that the shell process was terminated by a signal, allowing it to handle the termination appropriately. Specifically, if the parent process is also yash, the value of the [special parameter] `?` in the child shell process is reproduced in the parent shell process without modification.
 
 This signal-passing behavior is not supported by all shells; in shells that do not support it, the lower 8 bits of the exit status are passed to the parent process instead. The parent process is likely to interpret this as an ordinary exit status, which may not accurately reflect the original command's termination by a signal.
 
@@ -205,4 +205,5 @@ The exit status was 1
 [reserved word]: ../words/keywords.md
 [reserved words]: ../words/keywords.md
 [shell option]: ../../environment/options.md
+[signal]: ../../environment/traps.md#what-are-signals
 [special parameter]: ../parameters/special.md

@@ -51,5 +51,7 @@ an error.
 
 POSIX allows the built-in to restart a loop running in the current [execution environment] that does not lexically enclose the continue command. Our implementation declines to do that.
 
+POSIX does not require the `continue` built-in to conform to the [Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02), which means portable scripts cannot use any options or the `--` separator for the built-in.
+
 [execution environment]: ../environment/index.html
 [loop]: ../language/commands/loops.md
