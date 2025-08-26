@@ -19,6 +19,10 @@ It is an error if there is no loop enclosing the continue command.
 If *n* is greater than the number of enclosing loops, the built-in affects
 the outermost one.
 
+If the affected loop is a `for` loop, the loop variable is updated to the next value in the list. The loop ends if there are no more values to iterate over.
+
+If the affected loop is a `while` or `until` loop, the condition is re-evaluated.
+
 ## Options
 
 None.
