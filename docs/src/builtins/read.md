@@ -27,7 +27,7 @@ The `-r` option disables this behavior.
 By default, the built-in does not display a prompt before reading a
 line. (TODO: Options to display a prompt)
 
-When reading lines after the first line, the built-in displays the value of the `PS2` [variable](../language/parameters/variables.md) as a prompt if the shell is [interactive](../interactive/index.html) and the input is from a terminal.
+When reading lines after the first line, the built-in displays the value of the `PS2` [variable](../language/parameters/variables.md) as a prompt if the shell is [interactive](../interactive/index.html) and the input is from a terminal. See [Command prompt](../interactive/prompt.md) for details.
 
 ## Options
 
@@ -52,7 +52,7 @@ This built-in fails if:
 - The delimiter is not a single-byte character.
 - The delimiter is not a nul byte and the input contains a nul byte.
 - A variable name is not valid.
-- A variable to be assigned is read-only.
+- A variable to be assigned is [read-only](../language/parameters/variables.md#read-only-variables).
 
 ## Exit status
 

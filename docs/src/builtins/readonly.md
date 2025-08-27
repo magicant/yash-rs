@@ -27,7 +27,7 @@ None.
 
 Operands specify the names and values of the [variables] to be made read-only. If an operand contains an equal sign (`=`), the operand is split into the name and value at the first equal sign. The value is assigned to the variable named by the name. Otherwise, the variable named by the operand is created without a value unless it is already defined, in which case the existing value is retained.
 
-If no operands are given, the built-in prints variables (see below).
+If no operands are given, the built-in prints variables ([see below](#printing-read-only-variables)).
 
 ### Standard output
 
@@ -61,7 +61,7 @@ A command string that invokes the `readonly` built-in to recreate the variable i
 
 Also note that evaluating the printed commands in the current shell session will fail (unless the variable is declared without a value) because the variable is already defined and read-only.
 
-For array variables, the built-in invocation is preceded by a separate assignment command since the built-in does not support assigning values to array variables.
+For [array variables](../language/parameters/variables.md#arrays), the built-in invocation is preceded by a separate assignment command since the built-in does not support assigning values to array variables.
 
 <!-- TODO
 ## Making functions read-only

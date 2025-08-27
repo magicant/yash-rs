@@ -169,9 +169,9 @@ By default, the built-in resolves pathnames logically (`-L`), while many other u
 
 ## Compatibility
 
-The `-L`, `-P`, and `-e` options are defined in POSIX. <!-- TODO: The other options are non-standard. -->
+POSIX-1.2024 defines the `cd` utility with the `-L`, `-P`, and `-e` options. <!-- TODO: The other options are non-standard. -->
 
-The shell sets `PWD` on the startup and modifies it in the `cd` built-in. If `PWD` is modified or unset otherwise, the behavior of the `cd` and [`pwd`](pwd.md) built-ins is unspecified.
+The shell sets `PWD` on the startup and modifies it in the `cd` built-in. If `PWD` is modified or unset otherwise, the behavior of `cd` and [`pwd`](pwd.md) is unspecified.
 
 The error handling behavior and the exit status do not agree between existing implementations when the built-in fails because of a write error or a [read-only] variable error.
 

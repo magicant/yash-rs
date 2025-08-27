@@ -8,7 +8,7 @@ The built-in behaves differently depending on the invocation syntax.
 
 ### Printing variables
 
-When executed without any arguments, the built-in prints a list of [variables](../language/parameters/variables.md) visible in the current execution environment. The list is formatted as a sequence of simple commands performing an assignment that would restore the present variables if executed (unless the assignment fails because of a read-only variable). The list is ordered alphabetically.
+When executed without any arguments, the built-in prints a list of [variables](../language/parameters/variables.md) visible in the current [execution environment](../environment/index.html). The list is formatted as a sequence of simple commands performing an assignment that would restore the present variables if executed (unless the assignment fails because of a [read-only variable](../language/parameters/variables.md#read-only-variables)). The list is ordered alphabetically.
 
 ```shell,no_run
 $ set
@@ -72,9 +72,7 @@ See [Modifying positional parameters](../language/parameters/positional.md#modif
 
 ### Option-operand separator
 
-As with other utilities conforming to POSIX XBD Utility Syntax Guidelines,
-the set built-in accepts `--` as a separator between options and operands.
-Additionally, you can separate them with `-` instead of `--`.
+As with other utilities conforming to [POSIX XBD Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02), the set built-in accepts `--` as a separator between options and operands.  Additionally, you can separate them with `-` instead of `--`.
 
 ```shell
 $ set -o errexit -- foo bar
@@ -99,7 +97,7 @@ $ echo $#
 
 ## Compatibility
 
-See [Compatibility](../environment/options.md#compatibility) for the compatibility of the option syntax and available options.
+The `set` built-in is specified by POSIX.1-2024. See [Compatibility](../environment/options.md#compatibility) for the compatibility of the option syntax and available options.
 
 The output format of `set -o` and `set +o` depends on the shell.
 

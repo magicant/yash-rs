@@ -56,6 +56,8 @@ $ exit 42
 
 ## Compatibility
 
+The `exit` built-in is specified by POSIX.1-2024.
+
 The behavior is undefined in POSIX if *exit_status* is greater than 255.
 The current implementation passes such a value as is in the result, but this
 behavior may change in the future.

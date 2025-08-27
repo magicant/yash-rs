@@ -37,7 +37,8 @@ See [And-or lists](../language/commands/exit_status.md#and-or-lists) for example
 
 ## Compatibility
 
-POSIX allows the `false` built-in to return any non-zero exit status, but
-most implementations return 1.
+The `false` utility is specified by POSIX.1-2024.
+
+POSIX allows `false` to return any non-zero exit status, but most implementations return 1.
 
 Most implementations ignore any arguments, but some implementations may respond to them. For example, the GNU coreutils implementation accepts the `--help` and `--version` options. For maximum portability, avoid passing arguments to `false`.

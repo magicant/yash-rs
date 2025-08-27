@@ -50,6 +50,10 @@ env: external utility at /usr/bin/env
 
 ## Compatibility
 
+The `type` built-in is specified by POSIX.1-2024.
+
+POSIX does not require the `type` built-in to conform to the [Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02), which means portable scripts cannot use any options or the `--` separator for the built-in.
+
 POSIX requires that the *name* operand be specified, but many implementations allow it to be omitted, in which case the built-in does nothing.
 
 The format of the output is unspecified by POSIX. In this implementation, the `type` built-in is equivalent to the [`command` built-in](command.md) with the `-V` option.

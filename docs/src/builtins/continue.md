@@ -45,9 +45,9 @@ See [Break and continue](../language/commands/loops.md#break-and-continue).
 
 ## Compatibility
 
-The behavior is unspecified in POSIX when the continue built-in is used
-without an enclosing loop, in which case the current implementation returns
-an error.
+The `continue` built-in is specified by POSIX.1-2024.
+
+The behavior is unspecified in POSIX when the `continue` built-in is used without an enclosing loop, in which case the current implementation returns an error.
 
 POSIX allows the built-in to restart a loop running in the current [execution environment] that does not lexically enclose the continue command. Our implementation declines to do that.
 
