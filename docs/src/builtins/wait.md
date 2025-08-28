@@ -13,8 +13,8 @@ wait [job_id_or_process_id…]
 See [Job control](../interactive/job_control.md) for an overview of job control in yash-rs, though this built-in can also be used for [asynchronous commands](../language/commands/lists.md#asynchronous-commands) without job control. If you specify one or more operands, the built-in waits for the specified jobs to finish. Otherwise, the built-in waits for all existing jobs. If the jobs are already finished, the built-in returns without waiting.
 
 If you attempt to wait for a suspended job, the built-in will wait indefinitely until the job is resumed and completes. Currently, there is no way to cancel a wait in progress. When job control is enabled, it is often preferable to use [`fg`](fg.md) instead of `wait`, as `fg` allows you to interact with the job—including suspending or interrupting it.
-<!-- TODO: Add a way to cancel the wait -->
-<!-- TODO: Add a way to treat a suspended job as if it were finished -->
+
+In the future, the shell may provide a way to cancel a wait in progress or treat a suspended job as if it were finished.
 
 ## Options
 
@@ -72,7 +72,9 @@ In the above example, `wait` treats the job `%` as an unknown job and returns ex
 
 ## Compatibility
 
-The wait built-in is specified in POSIX.1-2024.
+The `wait` built-in is specified in POSIX.1-2024.
+
+POSIX does not require the `wait` built-in to conform to the [Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02), which means portable scripts cannot use any options or the `--` separator for the built-in.
 
 Many existing shells behave differently on various errors. POSIX requires that an unknown process ID be treated as a process that has already exited with exit status 127, but the behavior for other errors should not be considered portable.
 

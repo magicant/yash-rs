@@ -50,6 +50,6 @@ error: cannot execute external utility "greet"
 
 ## Compatibility
 
-The unalias built-in is specified in POSIX.
+The `unalias` built-in is specified in POSIX.
 
 Some shells implement some built-in utilities as predefined aliases. Using `unalias -a` may make such built-ins unavailable.

@@ -102,7 +102,7 @@ Operands specify the names of the variables to print. If no operands are given, 
 
 ### Standard output
 
-For each variable, a command string that invokes the `typeset` built-in to recreate the variable is printed. For array variables, a separate assignment command precedes the `typeset` command, since the built-in does not support assigning values to arrays. In this case, the `typeset` command is omitted if no options are applied to the variable.
+For each variable, a command string that invokes the `typeset` built-in to recreate the variable is printed. For [array variables](../language/parameters/variables.md#arrays), a separate assignment command precedes the `typeset` command, since the built-in does not support assigning values to arrays. In this case, the `typeset` command is omitted if no options are applied to the variable.
 
 Note: Evaluating the printed commands in the current context may fail if variables are read-only, since read-only variables cannot be assigned values.
 
