@@ -2,11 +2,11 @@
 
 **Command substitution** expands to the output of a command. It has two forms: the preferred `$(command)` form and the deprecated backquote form `` `command` ``.
 
-For example, this runs `dirname -- "$0"` and passes its output to `cd`:
+For example, this runs `dirname "$0"` and passes its output to `cd`:
 
 <!-- markdownlint-disable MD014 -->
 ```shell
-$ cd -P -- "$(dirname -- "$0")"
+$ cd -P -- "$(dirname "$0")"
 ```
 <!-- markdownlint-enable MD014 -->
 
