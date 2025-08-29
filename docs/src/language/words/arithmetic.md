@@ -32,6 +32,8 @@ $ echo $((${var}en)) # expands to $((6 * seven))
 42
 ```
 
+Note the difference between such parameters, which are expanded before the arithmetic expansion is evaluated, and [variables that are part of the expression](../../arithmetic.md#variables):
+
 ```shell
 $ seven='3 + 4'
 $ echo $((2 * $seven)) # expands to $((2 * 3 + 4)), mind the precedence

@@ -128,6 +128,7 @@
 - [parent process](interactive/job_control.md#job-control-concepts)
 - [`PATH` variable](language/parameters/variables.md#reserved-variable-names)
 - [pathname expansion](language/words/globbing.md)
+- [pattern matching notation](patterns.md)
 - [`pipefail` shell option](environment/options.md#option-list)
 - [pipeline](language/commands/pipelines.md)
 - [positional parameter](language/parameters/positional.md)

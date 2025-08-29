@@ -1,6 +1,6 @@
 # Pattern matching
 
-This section describes the pattern matching notation used in the shell. Patterns are used in [pathname expansion](language/words/globbing.md), `case` commands, and [parameter expansion modifiers](language/words/parameters.md#modifiers).
+This section describes the **pattern matching notation** used in the shell. Patterns are used in [pathname expansion](language/words/globbing.md), `case` commands, and [parameter expansion modifiers](language/words/parameters.md#modifiers).
 
 ## Literals
 
@@ -8,7 +8,7 @@ A **literal** is a character that matches itself. For example, the pattern `a` m
 
 ## Quoting
 
-Quoting makes a special character behave as a literal. See the [Quoting](language/words/quoting.md) section for details. Additionally, for unquoted parts of a pattern produced by [parameter expansion](language/words/parameters.md), [command substitution](language/words/command_substitution.md), or [arithmetic expansion](language/words/arithmetic.md), backslashes escape the following character, but such backslashes are not subject to quote removal.
+[Quoting](language/words/quoting.md) makes a special character behave as a literal. Additionally, for unquoted parts of a pattern produced by [parameter expansion](language/words/parameters.md), [command substitution](language/words/command_substitution.md), or [arithmetic expansion](language/words/arithmetic.md), backslashes escape the following character, but such backslashes are not subject to [quote removal](language/words/quoting.md#quote-removal).
 
 In this example, no pathname expansion occurs because the special characters are quoted:
 
