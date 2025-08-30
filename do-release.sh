@@ -1,4 +1,5 @@
 set -Ceu
+unset CDPATH
 cd -P -- "$(dirname "$0")"
 
 if [ $# -eq 0 ]; then

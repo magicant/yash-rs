@@ -44,6 +44,7 @@
 #    accordingly.
 
 set -Ceu
+unset CDPATH
 
 while getopts '' option; do
   case $option in

@@ -9,6 +9,7 @@
 # 5. Checks if the extracted words are sorted in dictionary order
 
 set -Ceu
+unset CDPATH
 cd -P -- "$(dirname "$0")"
 export LC_ALL=C
 
