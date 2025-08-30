@@ -51,7 +51,7 @@ The shell recognizes these **operators**:
 - `<(` – Process [redirection](../redirections/index.html#redirection-operators)
 - `<<` – [Here document](../redirections/here_documents.md)
 - `<<-` – [Here document](../redirections/here_documents.md)
-- `<<<` – Here string
+- `<<<` – Here string (not implemented yet)
 - `<>` – Input and output [redirection](../redirections/index.html#redirection-operators)
 - `>` – Output [redirection](../redirections/index.html#redirection-operators)
 - `>&` – Output [redirection](../redirections/index.html#redirection-operators)

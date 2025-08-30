@@ -45,7 +45,7 @@ Because the shell does not wait for asynchronous commands, they may keep running
 
 ### Input redirection
 
-By default, an asynchronous command's [standard input](../redirections/index.html#what-are-file-descriptors) is redirected to `/dev/null` to prevent it from interfering with synchronous commands that read from standard input. This does not apply in [job-controlling](../../interactive/job_control.md) shells.
+By default, an asynchronous command's [standard input](../redirections/index.html#what-are-file-descriptors) is redirected to `/dev/null` to prevent it from interfering with synchronous commands that read from standard input. This does not apply in [job-controlling](../../interactive/job_control.md) shells, where background reads from the terminal typically cause the job to be stopped by `SIGTTIN`.
 
 ```shell
 $ echo Input | {

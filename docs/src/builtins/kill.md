@@ -36,7 +36,7 @@ directly after the hyphen like `-TERM` and `-15` instead of `-s TERM` and
 The **`-l`** option lists signal names. The names are printed one per line,
 without the `SIG` prefix.
 
-The **`-v`** option lists signal descriptions. This works like the `-l` option, but prints the signal number before the name. The `-v` option may be used with the `-l` option, in which case the `-l` option is ignored. The output format for `-v` is subject to change. <!-- TODO: Make the `-v` option print signal descriptions as well -->
+The **`-v`** option implies and extends the `-l` option by displaying the signal number before each name. The output format for `-v` may be changed in the future to include signal descriptions as well.
 
 ## Operands
 

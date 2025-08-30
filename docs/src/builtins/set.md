@@ -72,7 +72,7 @@ See [Modifying positional parameters](../language/parameters/positional.md#modif
 
 ### Option-operand separator
 
-As with other utilities conforming to [POSIX XBD Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02), the set built-in accepts `--` as a separator between options and operands.  Additionally, you can separate them with `-` instead of `--`.
+As with other utilities conforming to [POSIX XBD Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02), the set built-in accepts `--` as a separator between options and operands. Additionally, yash-rs also accepts `-` as a separator.
 
 ```shell
 $ set -o errexit -- foo bar
@@ -101,7 +101,7 @@ The `set` built-in is specified by POSIX.1-2024. See [Compatibility](../environm
 
 The output format of `set -o` and `set +o` depends on the shell.
 
-The semantics of `-` as an option-operand separator is unspecified in POSIX. You should prefer `--`.
+The semantics of `-` as an option-operand separator is unspecified in POSIX. You should prefer `--`. Older versions of yash treated `-` simply as an operand.
 
 Many (but not all) shells specially treat `+`, especially when it appears in
 place of an option-operand separator. Yash does not treat `+` specially, so it can be used as an operand without another separator.
