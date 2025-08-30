@@ -15,6 +15,11 @@ export LC_ALL=C
 
 index_file="src/topic_index.md"
 
+if ! [ -f "$index_file" ]; then
+    printf 'error: missing index file: %s\n' "$index_file" >&2
+    exit 1
+fi
+
 awk '
     /^# Index$/ { in_index = 1; next }
     /^## Symbols$/ { in_index = 0; exit }
