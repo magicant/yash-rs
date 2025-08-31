@@ -1,5 +1,6 @@
 set -Ceu
-cd -P -- "$(dirname -- "$0")"
+unset CDPATH
+cd -P -- "$(dirname "$0")"
 
 if [ $# -eq 0 ]; then
     printf 'error: specify at least one package to release\n' >&2

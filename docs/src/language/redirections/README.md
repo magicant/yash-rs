@@ -49,8 +49,8 @@ Yash-rs supports these redirection operators:
 - **`<`** (file): Redirects standard input from a file.
 
 - **`>`** (file): Redirects standard output to a file.
-    - If the `clobber` shell option is set (default), `>` behaves like `>|`.
-    - If `clobber` is not set, `>` fails if the file exists and is a regular file or a symlink to a non-existent file. Otherwise, it creates a new file or opens the existing one. This is useful for preventing accidental overwriting of files.
+    - If the `clobber` [shell option](../../environment/options.md) is set (default), `>` behaves like `>|`.
+    - If `clobber` is not set, `>` fails if the file exists and is a regular file or a symlink to a non-existent file. Otherwise, it creates a new regular file or opens the existing non-regular one. This is useful for preventing accidental overwriting of files.
 
     ```shell,hidelines=#
     #$ mkdir $$ && cd $$ || exit
@@ -127,9 +127,11 @@ Redirection operators starting with `<` default to standard input; those startin
 
 For example, to redirect standard error to a file:
 
+<!-- markdownlint-disable MD014 -->
 ```shell,no_run
 $ grep "pattern" input.txt 2> error.log
 ```
+<!-- markdownlint-enable MD014 -->
 
 If you insert a space, the number is treated as a command argument, not a file descriptor:
 
@@ -155,7 +157,7 @@ Hello, World!
 
 ## Target word expansion
 
-Except for here-documents, the word after a redirection operator is expanded before use. The following expansions are performed:
+Except for here-documents, the word after a redirection operator is [expanded](../words/index.html#word-expansion) before use. The following expansions are performed:
 
 - [Tilde expansion](../words/tilde.md)
 - [Parameter expansion](../words/parameters.md)
@@ -175,7 +177,7 @@ Hello, World!
 
 ## Persistent redirections
 
-By default, redirections only apply to the command they are attached to. To make a redirection persist across multiple commands, use the `exec` built-in without arguments:
+By default, redirections only apply to the command they are attached to. To make a redirection persist across multiple commands, use the [`exec` built-in](../../builtins/exec.md) without arguments:
 
 ```shell,hidelines=#
 #$ mkdir $$ && cd $$ || exit
@@ -204,7 +206,7 @@ Hello, World!
 
 ## Semantic details
 
-Applying a redirection to a compound command is different from applying it to a simple command inside the compound command. Each use of `<` opens a new file descriptor at the start of the file. If the redirection is inside a loop, the file descriptor is reset to the beginning on each iteration:
+Applying a redirection to a [compound command](../commands/index.html#commands-1) is different from applying it to a [simple command](../commands/simple.md) inside the compound command. Each use of `<` opens a new file descriptor at the start of the file. If the redirection is inside a loop, the file descriptor is reset to the beginning on each iteration:
 
 ```shell,no_run
 $ printf 'One\nTwo\nThree\n' > input.txt

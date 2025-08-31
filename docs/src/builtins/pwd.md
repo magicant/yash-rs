@@ -38,11 +38,11 @@ Zero if the path was successfully printed; non-zero otherwise.
 
 ## Compatibility
 
-The `-L` and `-P` options are defined in POSIX.
+POSIX-1.2024 defines the `pwd` utility with the `-L` and `-P` options.
 
-POSIX allows the built-in to apply the `-P` option if the `-L` option is specified and `PWD` is longer than `PATH_MAX`.
+POSIX allows `pwd` to apply the `-P` option if the `-L` option is specified and `PWD` is longer than `PATH_MAX`.
 
-The shell sets `PWD` on the [startup](../startup.md) and modifies it in the [`cd` built-in](cd.md). If `PWD` is modified or unset otherwise, the behavior of the `cd` and `pwd` built-ins is unspecified.
+The shell sets `PWD` on the [startup](../startup.md) and modifies it in the [`cd` built-in](cd.md). If `PWD` is modified or unset otherwise, the behavior of `cd` and `pwd` is unspecified.
 
 [variable]: ../language/parameters/variables.md
 [working directory]: ../environment/working_directory.md

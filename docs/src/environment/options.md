@@ -1,10 +1,10 @@
 # Shell options
 
-**Shell options** control the behavior of the shell. You can enable (set) or disable (unset) them using command line arguments at startup or with the [`set` built-in](../builtins/set.md) during a shell session.
+**Shell options** control the behavior of the shell. You can enable (set) or disable (unset) them using command line arguments at [startup](../startup.md) or with the [`set` built-in](../builtins/set.md) during a shell session.
 
 ## Enabling and disabling options
 
-You can specify shell options as command line arguments when starting the shell, or with the [`set` built-in](../builtins/set.md). In yash, all options have a long name, and some also have a short name.
+You can specify shell options as command line arguments when [starting the shell](../startup.md), or with the [`set` built-in](../builtins/set.md). In yash, all options have a long name, and some also have a short name.
 
 Options set at startup take effect before the shell reads and executes commands. Options set with `set` affect the current shell session. Some options are only available at startup; others can be changed at any time. The syntax is the same in both cases.
 
@@ -89,7 +89,7 @@ Some short options negate long options. For example, `-C` is the same as `--nocl
 
 ## Viewing current options
 
-To see current shell options, use `set -o` with no arguments:
+To see current shell options, use [`set -o`](../builtins/set.md) with no arguments:
 
 ```shell
 $ set -o
@@ -114,7 +114,7 @@ vi               off
 xtrace           off
 ```
 
-`set +o` prints options in a format that can be used to restore them:
+[`set +o`](../builtins/set.md) prints options in a format that can be used to restore them:
 
 ```shell
 $ set +o
@@ -184,7 +184,7 @@ Below is a list of all shell options in yash-rs, with their long and short names
     - Only takes effect if the shell is [interactive] and input is a terminal.
 
 - **`interactive`** (**`-i`**): If set, the shell is [interactive].
-    - Enabled on startup if `stdin` is enabled and standard input and error are terminals.
+    - Enabled on startup if `stdin` is enabled and [standard input and error](../language/redirections/index.html#what-are-file-descriptors) are terminals.
 
 - **`log`**: Deprecated and has no effect. Remains for compatibility.
 
@@ -192,9 +192,9 @@ Below is a list of all shell options in yash-rs, with their long and short names
     - ⚠️ Currently has no effect in yash-rs. In the future, login shells will read extra initialization files.
 
 - **`monitor`** (**`-m`**): If set, the shell performs [job control] (allows managing background and foreground jobs).
-    - Enabled by default in [interactive] shells.
+    - Enabled by default in [interactive shells].
 
-- **`notify`** (**`-b`**): If set, the shell notifies you of background job completions and suspensions as soon as they occur. If unset, notifications are delayed until the next prompt.
+- **`notify`** (**`-b`**): If set, the shell notifies you of background job completions and suspensions as soon as they occur. If unset, notifications are delayed until the next prompt. See [Job status change notifications](../interactive/job_control.md#job-status-change-notifications) for details.
     - ⚠️ Currently has no effect in yash-rs. In the future, it will enable immediate notifications for background jobs.
     - Only takes effect if `interactive` and `monitor` are enabled.
 
@@ -205,7 +205,7 @@ Below is a list of all shell options in yash-rs, with their long and short names
     - Enabled on startup if the shell is started as `sh`.
     - When unset, yash-rs may deviate from POSIX in some areas.
 
-- **`stdin`** (**`-s`**): If set, the shell reads commands from standard input. Mutually exclusive with `cmdline`, and only settable at [startup](../startup.md).
+- **`stdin`** (**`-s`**): If set, the shell reads commands from [standard input](../language/redirections/index.html#what-are-file-descriptors). Mutually exclusive with `cmdline`, and only settable at [startup](../startup.md).
     - Enabled if `cmdline` is not set and the shell is started with no operands.
 
 - **`unset`** (**`+u`**): If set (default), the shell [expands](../language/words/parameters.md) unset [variables] to an empty string. If unset, expanding an unset variable raises an error. See [Unset parameters](../language/words/parameters.md#unset-parameters) (in parameter expansion) and [Variables](../arithmetic.md#variables) (in arithmetic expression) for details.

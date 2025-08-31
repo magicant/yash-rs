@@ -13,8 +13,7 @@ exit [exit_status]
 `exit exit_status` makes the shell exit from the currently executing
 environment with the specified exit status.
 
-The shell executes the EXIT trap, if any, before exiting, except when the
-built-in is invoked in the trap itself.
+The shell executes the [EXIT trap](../termination.md#exit-trap), if any, before exiting, except when the built-in is invoked in the trap itself.
 
 ## Options
 
@@ -57,6 +56,10 @@ $ exit 42
 
 ## Compatibility
 
+The `exit` built-in is specified by POSIX.1-2024.
+
 The behavior is undefined in POSIX if *exit_status* is greater than 255.
 The current implementation passes such a value as is in the result, but this
 behavior may change in the future.
+
+POSIX does not require the `exit` built-in to conform to the [Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02), which means portable scripts cannot use any options or the `--` separator for the built-in.

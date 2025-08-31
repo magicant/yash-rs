@@ -1,6 +1,6 @@
 # Quoting and escaping
 
-Some characters have special meanings in the shell. For example, the dollar sign (`$`) is used for parameter expansion, and the asterisk (`*`) is used for pathname expansion. To include these characters literally in a command, you need to quote or escape them.
+Some characters have special meanings in the shell. For example, the dollar sign (`$`) is used for [parameter expansion](parameters.md), and the asterisk (`*`) is used for [pathname expansion](globbing.md). To include these characters literally in a command, you need to quote or escape them.
 
 ## What characters need quoting?
 
@@ -27,7 +27,7 @@ The following subsections explain methods for quoting and escaping characters in
 
 **Single quotes** enclose a string and prevent the shell from interpreting special characters. Everything inside single quotes is treated literally, including spaces and special characters.
 
-For example, the following command prints the string `"$foo"` without interpreting the `$` as a parameter expansion or the `"` as a double quote:
+For example, the following command prints the string `"$foo"` without interpreting the `$` as a [parameter expansion](parameters.md) or the `"` as a [double quote](#double-quotes):
 
 ```shell
 $ echo '"$foo"'
@@ -58,9 +58,9 @@ $ echo \'
 
 **Double quotes** enclose a string. Most characters inside double quotes are treated literally, but some characters are still interpreted by the shell:
 
-- `$`: Parameter expansion, command substitution, and arithmetic expansion
-- `` ` ``: Command substitution
-- `\`: Character escape, only before `"`, `$`, `` ` ``, `\`, and newline
+- `$`: [Parameter expansion](parameters.md), [command substitution](command_substitution.md), and [arithmetic expansion](arithmetic.md)
+- `` ` ``: [Command substitution](command_substitution.md)
+- `\`: [Character escape](#backslash), only before `"`, `$`, `` ` ``, `\`, and newline
 
 For example, single quote characters are treated literally and parameter expansion is performed inside double quotes:
 
@@ -70,13 +70,13 @@ $ echo "foo='$foo'"
 foo='*  *'
 ```
 
-Double quotes prevent field splitting and pathname expansion on the result of expansions. If the argument to the echo utility were not double-quoted in the above example, the output might have been different depending on the result of field splitting and pathname expansion.
+Double quotes prevent [field splitting](field_splitting.md) and [pathname expansion](globbing.md) on the result of expansions. If the argument to the `echo` utility were not double-quoted in the above example, the output might have been different depending on the result of field splitting and pathname expansion.
 
 ## Backslash
 
 The **backslash** escapes special characters, allowing you to include them in a string without interpretation.
 
-Outside double quotes, a backslash can escape any character except newline. For example:
+Outside [double quotes](#double-quotes), a backslash can escape any character except newline. For example:
 
 ```sh
 cat My\ Diary.txt
@@ -100,7 +100,7 @@ $ echo "${var#*\}}"
 bar
 ```
 
-Within backquotes, arithmetic expansions, and unquoted [here-document](../redirections/here_documents.md) contents, backslashes only escape `$`, `` ` ``, and `\`. If backquotes appear inside double quotes, backslashes also escape `"`. See examples in the [Command substitution](command_substitution.md#syntax) and [Arithmetic expansion](arithmetic.md#quoting) sections.
+Within [backquotes](command_substitution.md), [arithmetic expansions](arithmetic.md), and unquoted [here-document](../redirections/here_documents.md) contents, backslashes only escape `$`, `` ` ``, and `\`. If backquotes appear inside double quotes, backslashes also escape `"`. See examples in [Command substitution](command_substitution.md#syntax) and [Arithmetic expansion](arithmetic.md#quoting).
 
 ### Line continuation
 
@@ -112,7 +112,7 @@ $ echo "This is a long command that \
 This is a long command that continues on the next line
 ```
 
-To treat a newline literally rather than as a line continuation, use single or double quotes.
+To treat a newline literally rather than as a line continuation, use [single](#single-quotes) or [double quotes](#double-quotes).
 
 ## Dollar single quotes
 
@@ -148,7 +148,7 @@ The following escape sequences are recognized inside dollar single quotes:
 
 Unrecognized or incomplete escape sequences cause an error.
 
-A backslash followed by a newline is not treated as a line continuation inside dollar single quotes; they are rejected as an error.
+A backslash followed by a newline is not treated as a [line continuation](#line-continuation) inside dollar single quotes; they are rejected as an error.
 
 Example with Unicode:
 

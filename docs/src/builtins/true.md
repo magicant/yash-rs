@@ -1,6 +1,6 @@
 # True built-in
 
-The **`true`** built-in command does nothing, successfully.
+The **`true`** built-in does nothing, successfully.
 
 ## Synopsis
 
@@ -36,4 +36,6 @@ See [And-or lists](../language/commands/exit_status.md#and-or-lists) for example
 
 ## Compatibility
 
-Most implementations ignore any arguments, but some implementations respond to them. For example, the GNU coreutils implementation accepts the `--help` and `--version` options. For maximum portability, avoid passing arguments to `true`.
+The `true` utility is specified by POSIX.1-2024.
+
+Most implementations ignore any arguments, but some implementations respond to them. For example, the GNU coreutils implementation accepts the `--help` and `--version` options. For maximum portability, avoid passing arguments to `true`. To pass and ignore arguments, use the [`:` (colon) built-in](colon.md) instead.

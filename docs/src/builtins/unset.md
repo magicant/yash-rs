@@ -43,6 +43,8 @@ See [Removing variables](../language/parameters/variables.md#removing-variables)
 
 ## Compatibility
 
+The `unset` built-in is specified by POSIX.1-2024.
+
 The behavior is not portable when both `-f` and `-v` are specified. Earlier versions of yash used to honor the last specified option, but this version errors out.
 
 If neither `-f` nor `-v` is specified and the variable named by an operand is not set, POSIX allows the built-in to unset the same-named function if it exists. Yash does not do this.

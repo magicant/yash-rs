@@ -1,9 +1,7 @@
 # Command built-in
 
-The **`command`** built-in executes a utility bypassing shell functions.
-This is useful when you want to execute a utility that has the same name as
-a shell function. The built-in also has options to search for the location
-of the utility.
+The **`command`** built-in executes a utility bypassing [functions].
+This is useful when you want to execute a utility that has the same name as a function. The built-in also has options to search for the location of the utility.
 
 ## Synopsis
 
@@ -17,10 +15,7 @@ command -v|-V [-p] name
 
 ## Description
 
-Without the `-v` or `-V` option, the `command` built-in executes the utility
-specified by the *name* with the given *arguments*. This is similar to the
-execution of a simple command, but the shell functions are not searched for
-the *name*.
+Without the `-v` or `-V` option, the `command` built-in executes the utility specified by the *name* with the given *arguments*. This is similar to the execution of a [simple command](../language/commands/simple.md), but the functions are not searched for the *name*.
 
 With the `-v` or `-V` option, the built-in identifies the type of the *name*
 and, optionally, the location of the utility. The `-v` option prints the
@@ -30,7 +25,7 @@ detailed description of the utility.
 ## Options
 
 The **`-p`** (**`--path`**) option causes the built-in to search for the utility in the
-standard search path instead of the current `$PATH`.
+standard search path instead of the current [`PATH`](../language/parameters/variables.md#reserved-variable-names).
 
 The **`-v`** (**`--identify`**) option identifies the type of the command name and prints the
 pathname of the utility, if found.
@@ -48,9 +43,9 @@ identify. The ***arguments*** are passed to the utility when executing it.
 When the `-v` option is given, the built-in prints the following:
 
 - The absolute pathname of the utility, if found in the search path.
-- The utility name itself, if it is a non-substitutive built-in, function,
-  or shell reserved word, hence not subject to search.
-- A command line that would redefine the alias, if the name is an alias.
+- The utility name itself, if it is a non-[substitutive](index.html#substitutive-built-ins) built-in, [function],
+  or [reserved word](../language/words/keywords.md), hence not subject to search.
+- A command line that would redefine the [alias](../language/aliases.md), if the name is an alias.
 
 When the `-V` option is given, the built-in describes the utility in a more
 descriptive, human-readable format. The exact format is not specified here
@@ -79,7 +74,7 @@ See [Replacing existing utilities](../language/functions.md#replacing-existing-u
 
 ## Compatibility
 
-POSIX requires that the `name` operand be specified, but many
+POSIX requires that the *name* operand be specified, but many
 implementations allow it to be omitted, in which case the built-in does
 nothing.
 
@@ -89,3 +84,6 @@ implementations return a non-zero exit status other than 1, especially 127.
 When the utility is not found with the `-V` option, some implementations
 print an error message to the standard output while others to the standard
 error.
+
+[function]: ../language/functions.md
+[functions]: ../language/functions.md

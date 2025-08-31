@@ -18,11 +18,11 @@ The `trap` built-in can be used to either set or print traps. To set traps, pass
 
 ### Setting traps
 
-When setting traps, the built-in sets the *action* for each *condition* in the current shell environment. To set different actions for multiple conditions, invoke the built-in for each *action*.
+When setting traps, the built-in sets the *action* for each *condition* in the current [shell environment]. To set different actions for multiple conditions, invoke the built-in for each *action*.
 
 ### Printing traps
 
-When the built-in is invoked with no operands, it prints the currently configured traps in the format `trap -- action condition` where *action* and *condition* are properly quoted so that the output can be read by the shell to restore the traps. By default, the built-in prints traps that have non-default actions. To print all traps, use the `-p` option with no operands.
+When the built-in is invoked with no operands, it prints the currently configured traps in the format `trap -- action condition` where *action* and *condition* are properly [quoted](../language/words/quoting.md) so that the output can be [read](eval.md) by the shell to restore the traps. By default, the built-in prints traps that have non-default actions. To print all traps, use the `-p` option with no operands.
 
 When the `-p` option is used with one or more *condition*s, the built-in prints the traps for the specified *condition*s.
 
@@ -30,7 +30,7 @@ When a [subshell](../environment/index.html#subshells) is entered, traps with a 
 
 ## Options
 
-The **`-p`** (**`--print`**) option prints the traps configured in the shell environment.
+The **`-p`** (**`--print`**) option prints the traps configured in the [shell environment].
 
 ## Operands
 
@@ -44,11 +44,10 @@ The *action* may be omitted if the first *condition* is a non-negative decimal i
 
 A ***condition*** specifies when the action is triggered. It may be one of the following:
 
-- A symbolic name of a signal without the `SIG` prefix (e.g. `INT`, `QUIT`, `TERM`)
+- A symbolic name of a [signal](../environment/traps.md#what-are-signals) without the `SIG` prefix (e.g. `INT`, `QUIT`, `TERM`)
     - Signal names must be specified in uppercase. Lowercase names and the `SIG` prefix may be supported in the future.
 - A positive decimal integer representing a signal number
-- The number `0` or the symbolic name `EXIT` representing the termination of
-  the main shell process
+- The number `0` or the symbolic name `EXIT` representing the [termination](../termination.md) of the main shell process
     - This condition is not triggered when the shell exits due to a signal.
 
 ## Errors
@@ -96,6 +95,8 @@ trap -- '' INT
 
 ## Compatibility
 
+The `trap` built-in is specified by POSIX.1-2024.
+
 Portable scripts should specify signals in uppercase letters without the `SIG` prefix. Specifying signals by numbers is discouraged as signal numbers vary among systems.
 
 The result of setting a trap to `SIGKILL` or `SIGSTOP` is undefined by POSIX.
@@ -103,3 +104,5 @@ The result of setting a trap to `SIGKILL` or `SIGSTOP` is undefined by POSIX.
 The mechanism for the built-in to print traps configured in the parent shell may vary among shells. This implementation remembers the old traps internally when starting a subshell and prints them when the built-in is invoked in the subshell. POSIX allows another scheme: When starting a subshell, the shell checks if the subshell command contains only a single invocation of the `trap` built-in, in which case the shell skips resetting traps on the subshell entry so that the built-in can print the traps configured in the parent shell. The check may be done by a simple literal comparison, so you should not expect the shell to recognize complex expressions such as `cmd=trap; traps=$($cmd)`.
 
 In other shells, the `EXIT` condition may be triggered when the shell is terminated by a signal.
+
+[shell environment]: ../environment/index.html

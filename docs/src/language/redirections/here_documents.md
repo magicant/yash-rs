@@ -37,7 +37,7 @@ World!
 
 ### Here-documents in command substitution
 
-When using a here-document inside command substitution, the content must be included within the substitution syntax:
+When using a here-document inside [command substitution](../words/command_substitution.md), the content must be included within the substitution syntax:
 
 ```shell
 $ echo $(cat <<EOF
@@ -76,7 +76,7 @@ Note: Only leading tabs are removed, not spaces.
 
 ## Quoting the delimiter and expanding the content
 
-If the delimiter after the redirection operator is [quoted](../words/quoting.md), [quote removal](../words/quoting.md#quote-removal) is performed on the delimiter, and the result is used to find the end of the here-document. In this case, the content is not subject to any expansions and is treated literally.
+If the delimiter after the redirection operator is [quoted](../words/quoting.md), [quote removal](../words/quoting.md#quote-removal) is performed on the delimiter, and the result is used to find the end of the here-document. In this case, the content is not subject to any [expansions](../words/index.html#word-expansion) and is treated literally.
 
 ```shell
 $ user="Alice"
@@ -94,8 +94,6 @@ If the delimiter is not quoted, the following are handled in the here-document c
 - [Line continuations](../words/quoting.md#line-continuation) are removed.
 - [Parameter expansion](../words/parameters.md), [command substitution](../words/command_substitution.md), and [arithmetic expansion](../words/arithmetic.md) are performed.
 
-Single and double quotes in the here-document content are treated literally.
-
 ```shell
 $ user="Alice"
 $ cat <<EOF
@@ -104,4 +102,14 @@ $ cat <<EOF
 > EOF
 Hello, Alice!
 1 + 1 = 2.
+```
+
+[Single](../words/quoting.md#single-quotes) and [double quotes](../words/quoting.md#double-quotes) in the here-document content are treated literally.
+
+```shell
+$ user="Alice"
+$ cat <<EOF
+> Hello, '$user'!
+> EOF
+Hello, 'Alice'!
 ```

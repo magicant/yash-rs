@@ -69,7 +69,7 @@ Matched pattern
 
 The value is always expanded first. Patterns are expanded only when the shell needs to match them. Once a pattern matches, remaining patterns are not expanded.
 
-Quote special characters in values or patterns to avoid unwanted expansion or matching:
+[Quote](../words/quoting.md) special characters in values or patterns to avoid unwanted expansion or matching:
 
 ```shell
 $ case ? in
@@ -191,7 +191,7 @@ Matched foo
 
 ## Exit status
 
-The exit status of `case` is that of the last command executed in the last executed branch. If the last executed branch has no commands, or no pattern matches, the exit status is 0.
+The [exit status](exit_status.md#exit-status) of `case` is that of the last command executed in the last executed branch. If the last executed branch has no commands, or no pattern matches, the exit status is 0.
 
 ## Formal syntax
 

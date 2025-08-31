@@ -2,7 +2,7 @@
 
 **Pathname expansion**—also known as **globbing**—lets you use special patterns to match filenames and directories. The shell expands these patterns into a list of matching pathnames.
 
-For example, `*.txt` matches all files in the current directory ending with `.txt`:
+For example, `*.txt` matches all files in the [current directory](../../environment/working_directory.md) ending with `.txt`:
 
 ```shell,no_run
 $ echo *.txt
@@ -11,7 +11,7 @@ notes.txt todo.txt
 
 ## When does pathname expansion happen?
 
-Pathname expansion occurs after [field splitting](field_splitting.md) and before quote removal. It only applies to unquoted words containing globbing characters.
+Pathname expansion occurs after [field splitting](field_splitting.md) and before [quote removal](quoting.md#quote-removal). It only applies to unquoted words containing non-literal [pattern](../../patterns.md) characters.
 
 If the `noglob` shell option is set, pathname expansion is skipped.
 
@@ -65,10 +65,3 @@ $ echo .*
 
 If a pattern does not match any files, it is left unchanged. If the shell does not have permission to read the directory, the pattern is also left unchanged.
 <!-- TODO: nullglob option -->
-
-## Summary
-
-- Globbing expands patterns to matching pathnames.
-- See [Pattern matching](../../patterns.md) for pattern syntax and details.
-- Quote or escape glob characters to use them literally.
-- Patterns that match nothing are left unchanged.

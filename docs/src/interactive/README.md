@@ -1,6 +1,6 @@
 # Interactive shell
 
-When the `interactive` [shell option](../environment/options.md) is enabled, the shell behaves in a way that is more suitable for interactive use. Currently, only the essential features are implemented, but more will be added in the future.
+When the `interactive` [shell option](../environment/options.md) is enabled, the shell behaves in a way that is more suitable for interactive use. Such a shell is called an **interactive shell**. Currently, only the essential features are implemented, but more will be added in the future.
 
 ## Enabling interactive mode
 
@@ -37,6 +37,8 @@ esac
 
 See [Viewing current options](../environment/options.md#viewing-current-options) for additional methods.
 
+Note that [subshells](../environment/index.html#subshells) of an interactive shell are not interactive, even if the `interactive` option is set.
+
 ## What happens in interactive mode
 
 When the shell is interactive:
@@ -50,7 +52,7 @@ When the shell is interactive:
 - [Some signals are automatically ignored](../environment/traps.md#auto-ignored-signals).
 - [Signals ignored on entry can be trapped](../environment/traps.md#restrictions).
 - [Command prompts](prompt.md) are displayed when reading input.
-- Job status changes are reported before prompting for input if job control is enabled.
-- The `read` built-in displays a prompt when reading a second or subsequent line of input.
+- [Job status changes are reported before prompting for input if job control is enabled](job_control.md#job-status-change-notifications).
+- The [`read` built-in](../builtins/read.md) displays a prompt when reading a second or subsequent line of input.
 
 [special parameter]: ../language/parameters/special.md

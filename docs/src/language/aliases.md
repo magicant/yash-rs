@@ -6,36 +6,37 @@
 
 Define an alias with the [`alias` built-in](../builtins/alias.md). When the first word in a [simple command](commands/simple.md) matches an alias, the shell replaces it with the alias definition before parsing the rest of the command.
 
-```shell,no_run
-$ alias ll='ls -l'
-$ ll
-total 40
-drwxr-xr-x 6 alice users  4096 Jun 21 12:57 book
--rw-r--r-- 1 alice users   397 May 14 21:57 book.toml
--rwxr-xr-x 1 alice users  4801 Jun 16 22:22 doctest.sh
--rw-r--r-- 1 alice users 20138 May 28 00:04 LICENSE
-drwxr-xr-x 3 alice users  4096 May 31 02:11 src
+```shell,hidelines=#
+#$ mkdir $$ && cd $$ || exit
+$ echo "Hello, world!" > greet.txt
+$ alias list=ls
+$ list
+greet.txt
 ```
 
 Aliases can include multiple words, redirections, and delimiters. They can reference other aliases, which are expanded recursively.
 
+<!-- markdownlint-disable MD014 -->
 ```shell
 $ alias dumb='> /dev/null'
 $ dumb echo "Hello, World!"
 ```
+<!-- markdownlint-enable MD014 -->
 
 Here, the second line becomes `> /dev/null echo "Hello, World!"`, so nothing is printed.
 
+<!-- markdownlint-disable MD014 -->
 ```shell
 $ alias 2001='test "$(date +%Y)" = 2001 &&'
 $ 2001 echo "Happy millennium!"
 ```
+<!-- markdownlint-enable MD014 -->
 
 This expands to `test "$(date +%Y)" = 2001 && echo "Happy millennium!"`, printing the message if the year is 2001.
 
 ## Alias names
 
-By POSIX.1-2024, alias names can use ASCII letters, digits, and `!`, `%`, `,`, `-`, `@`, `_`. Yash-rs allows any literal word as an alias name (no quotes or expansions). Alias names are case-sensitive.
+By POSIX.1-2024, alias names can use ASCII letters, digits, and `!`, `%`, `,`, `-`, `@`, `_`. Yash-rs allows any literal word as an alias name (no [quotes](words/quoting.md) or [expansions](words/index.html#word-expansion)). Alias names are case-sensitive.
 
 ## Recursion
 

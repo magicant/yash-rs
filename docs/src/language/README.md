@@ -39,8 +39,8 @@ Other command types construct more complex behavior by combining commands. See [
 
 ## Redirections
 
-Redirections control where command input and output go. Use them to save output to files or read input from files. See the File descriptors and redirections section for more.
+[Redirections](redirections/index.html) control where command input and output go. Use them to save output to files or read input from files.
 
 ## Aliases
 
-Aliases are shortcuts for longer commands or command sequences. They let you create custom names for commands you use often. See the Aliases section for details.
+[Aliases](aliases.md) are shortcuts for longer commands or command sequences. They let you create custom names for commands you use often.

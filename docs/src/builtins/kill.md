@@ -36,7 +36,7 @@ directly after the hyphen like `-TERM` and `-15` instead of `-s TERM` and
 The **`-l`** option lists signal names. The names are printed one per line,
 without the `SIG` prefix.
 
-The **`-v`** option lists signal descriptions. This works like the `-l` option, but prints the signal number before the name. The `-v` option may be used with the `-l` option, in which case the `-l` option is ignored. (TODO: Make the `-v` option print signal descriptions as well)
+The **`-v`** option implies and extends the `-l` option by displaying the signal number before each name. The output format for `-v` may be changed in the future to include signal descriptions as well.
 
 ## Operands
 
@@ -52,7 +52,7 @@ that specify the target processes. Each operand is one of the following:
 With the `-l` or `-v` option, the built-in may take operands that limit the
 output to the specified signals. Each operand is one of the following:
 
-- The exit status of a process that was terminated by a signal
+- The [exit status](../language/commands/exit_status.md#exit-status) of a process that was terminated by a signal
 - A signal number
 - A signal name without the `SIG` prefix
 
@@ -131,6 +131,8 @@ Exit status 399 corresponds to SIGTERM
 ```
 
 ## Compatibility
+
+The `kill` built-in is specified by POSIX.1-2024.
 
 Specifying a signal number other than `0` to the `-s` option is a
 non-standard extension.

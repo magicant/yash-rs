@@ -13,7 +13,7 @@ $ echo $((2 * (3 + 4)))
 14
 ```
 
-Arithmetic expansion works in two steps. First, the expression is processed for [parameter expansion](parameters.md), nested arithmetic expansion, [command substitution](command_substitution.md), and quote removal. Then, the resulting string is parsed as an [arithmetic expression], and the result replaces the expansion.
+Arithmetic expansion works in two steps. First, the expression is processed for [parameter expansion](parameters.md), nested arithmetic expansion, [command substitution](command_substitution.md), and [quote removal](quoting.md#quote-removal). Then, the resulting string is parsed as an [arithmetic expression], and the result replaces the expansion.
 
 ```shell
 $ x=2
@@ -31,6 +31,8 @@ $ var='6 * sev'
 $ echo $((${var}en)) # expands to $((6 * seven))
 42
 ```
+
+Note the difference between such parameters, which are expanded before the arithmetic expansion is evaluated, and [variables that are part of the expression](../../arithmetic.md#variables):
 
 ```shell
 $ seven='3 + 4'
@@ -52,7 +54,7 @@ error: error evaluating the arithmetic expansion
 
 ## Quoting
 
-[Backslash escaping](quoting.md#backslash) is the only supported quoting mechanism in arithmetic expansion. It can escape `$`, `` ` ``, and `\`. However, escaped characters would never produce a valid [arithmetic expression] after quote removal, so they are not useful in practice.
+[Backslash escaping](quoting.md#backslash) is the only supported quoting mechanism in arithmetic expansion. It can escape `$`, `` ` ``, and `\`. However, escaped characters would never produce a valid [arithmetic expression] after [quote removal](quoting.md#quote-removal), so they are not useful in practice.
 
 ```shell
 $ echo $((\$x))

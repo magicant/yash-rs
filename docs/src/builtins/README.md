@@ -12,63 +12,63 @@ Yash provides several types of built-in utilities.
 
 - [Command search](../language/commands/simple.md#command-search) always finds special built-ins first, regardless of `PATH`.
 - [Functions](../language/functions.md) cannot override special built-ins.
-- Assignments in a simple command running a special built-in persist after the command.
-- Errors in special built-ins cause the shell to exit if non-interactive.
+- Assignments in a [simple command](../language/commands/simple.md) running a special built-in persist after the command.
+- Errors in special built-ins cause the shell to exit if non-interactive. (See [Shell errors](../termination.md#shell-errors))
 
 POSIX.1-2024 defines these special built-ins:
 
-- `.` (dot)
-- `:` (colon)
-- `break`
-- `continue`
-- `eval`
-- `exec`
-- `exit`
-- `export`
-- `readonly`
-- `return`
-- `set`
-- `shift`
-- `times`
-- `trap`
-- `unset`
+- [`.` (dot)](source.md)
+- [`:` (colon)](colon.md)
+- [`break`](break.md)
+- [`continue`](continue.md)
+- [`eval`](eval.md)
+- [`exec`](exec.md)
+- [`exit`](exit.md)
+- [`export`](export.md)
+- [`readonly`](readonly.md)
+- [`return`](return.md)
+- [`set`](set.md)
+- [`shift`](shift.md)
+- [`times`](times.md)
+- [`trap`](trap.md)
+- [`unset`](unset.md)
 
-As an extension, yash-rs also supports `source` as an alias for `.` (dot).
+As an extension, yash-rs also supports [`source`](source.md) as an alias for `.` (dot).
 
 ### Mandatory built-ins
 
 **Mandatory built-ins** must be implemented by all POSIX-compliant shells. They provide essential scripting and command features.
 
-Like special built-ins, they are found regardless of `PATH` in [command search](../language/commands/simple.md#command-search), but they can be overridden by functions.
+Like [special built-ins](#special-built-ins), they are found regardless of `PATH` in [command search](../language/commands/simple.md#command-search), but they can be overridden by [functions].
 
 POSIX.1-2024 defines these mandatory built-ins:
 
-- `alias`
-- `bg`
-- `cd`
-- `command`
+- [`alias`](alias.md)
+- [`bg`](bg.md)
+- [`cd`](cd.md)
+- [`command`](command.md)
 - `fc` (not yet implemented)
-- `fg`
-- `getopts`
+- [`fg`](fg.md)
+- [`getopts`](getopts.md)
 - `hash` (not yet implemented)
-- `jobs`
-- `kill`
-- `read`
-- `type`
-- `ulimit`
-- `umask`
-- `unalias`
-- `wait`
+- [`jobs`](jobs.md)
+- [`kill`](kill.md)
+- [`read`](read.md)
+- [`type`](type.md)
+- [`ulimit`](ulimit.md)
+- [`umask`](umask.md)
+- [`unalias`](unalias.md)
+- [`wait`](wait.md)
 
 ### Elective built-ins
 
-**Elective built-ins** work like mandatory built-ins but are not required by POSIX.1-2024. They provide extra features for scripting or interactive use.
+**Elective built-ins** work like [mandatory built-ins](#mandatory-built-ins) but are not required by POSIX.1-2024. They provide extra features for scripting or interactive use.
 
-Elective built-ins can be overridden by functions and are found in [command search](../language/commands/simple.md#command-search) regardless of `PATH`.
+Elective built-ins can be overridden by [functions] and are found in [command search](../language/commands/simple.md#command-search) regardless of `PATH`.
 
 In yash-rs, the following elective built-in is implemented:
 
-- `typeset`
+- [`typeset`](typeset.md)
 
 More may be added in the future.
 
@@ -76,13 +76,13 @@ More may be added in the future.
 
 **Substitutive built-ins** replace external utilities to avoid process creation overhead for common tasks.
 
-Substitutive built-ins behave like external utilities: they are located during [command search](../language/commands/simple.md#command-search) and can be overridden by [functions](../language/functions.md). However, the built-in is only available if the corresponding external utility exists in `PATH`. If the external utility is missing from `PATH`, the built-in is also unavailable, ensuring consistent behavior with the absence of the utility.
+Substitutive built-ins behave like external utilities: they are located during [command search](../language/commands/simple.md#command-search) and can be overridden by [functions]. However, the built-in is only available if the corresponding external utility exists in `PATH`. If the external utility is missing from `PATH`, the built-in is also unavailable, ensuring consistent behavior with the absence of the utility.
 
 Yash-rs implements these substitutive built-ins:
 
-- `false`
-- `pwd`
-- `true`
+- [`false`](false.md)
+- [`pwd`](pwd.md)
+- [`true`](true.md)
 
 More may be added in the future.
 
@@ -140,51 +140,61 @@ POSIX.1-2024 reserves many names for shell-specific built-ins. Yash-rs implement
 - `repeat`
 - `savehistory`
 - `shopt`
-- `source`
+- [`source`](source.md)
 - `stop`
 - `suspend`
-- `typeset`
+- [`typeset`](typeset.md)
 - `whence`
 
 ## Command line argument syntax conventions
 
-**Arguments** are string parameters passed to built-in utilities. The syntax varies between built-ins, but most follow common conventions.
+**Arguments** are string parameters passed to built-in utilities. The syntax varies between built-ins, but most follow common conventions. The description below applies to yash-rs built-ins unless otherwise noted.
 
 ### Operands
 
-**Operands** are main arguments specifying objects or values for the built-in. For example, in `cd`, the operand is the directory:
+**Operands** are main arguments specifying objects or values for the built-in. For example, in [`cd`](cd.md), the operand is the directory:
 
+<!-- markdownlint-disable MD014 -->
 ```shell
 $ cd /dev
 ```
+<!-- markdownlint-enable MD014 -->
 
 ### Options
 
-**Options** are supplementary arguments that modify the behavior of the built-in. They start with a hyphen (`-`) followed by one or more characters. Short options are named with a single character (e.g., `-P`), while long options are more descriptive and start with two hyphens (e.g., `--physical`). For example, the `cd` built-in uses `-P` or `--physical` to force the shell to use the physical directory structure instead of preserving symbolic links:
+**Options** are supplementary arguments that modify the behavior of the built-in. They start with a hyphen (`-`) followed by one or more characters. Short options are named with a single character (e.g., `-P`), while long options are more descriptive and start with two hyphens (e.g., `--physical`). For example, the [`cd` built-in](cd.md) uses `-P` or `--physical` to force the shell to use the physical directory structure instead of preserving symbolic links:
 
+<!-- markdownlint-disable MD014 -->
 ```shell
 $ cd -P /dev
 ```
+<!-- markdownlint-enable MD014 -->
 
 With a long option:
 
+<!-- markdownlint-disable MD014 -->
 ```shell
 $ cd --physical /dev
 ```
+<!-- markdownlint-enable MD014 -->
 
 Multiple short options can be combined. For example, `cd -P -e /dev` can be written as:
 
+<!-- markdownlint-disable MD014 -->
 ```shell
 $ cd -Pe /dev
 ```
+<!-- markdownlint-enable MD014 -->
 
 Long options must be specified separately.
 
 Long option names can be abbreviated if unambiguous. For example, `--p` is enough for `--physical` in `cd`:
 
+<!-- markdownlint-disable MD014 -->
 ```shell
 $ cd --p /dev
 ```
+<!-- markdownlint-enable MD014 -->
 
 However, future additions may make abbreviations ambiguous, so use the full name in scripts.
 
@@ -192,7 +202,7 @@ POSIX.1-2024 only specifies short option syntax. Long options are a yash-rs exte
 
 ### Option arguments
 
-Some options require an argument. For short options, the argument can follow immediately or as a separate argument. For example, `-d` in `read` takes a delimiter argument:
+Some options require an argument. For short options, the argument can follow immediately or as a separate argument. For example, `-d` in [`read`](read.md) takes a delimiter argument:
 
 ```shell,hidelines=#
 #$ mkdir $$ && cd $$ || exit
@@ -263,3 +273,5 @@ error: unexpected operand
 ```
 
 Specifying options after operands may be supported in the future.
+
+[functions]: ../language/functions.md

@@ -18,7 +18,7 @@ $ echo "Hello, ${user}!"
 Hello, !
 ```
 
-If the `nounset` [shell option](../../environment/options.md) is enabled, expanding an unset parameter is an error:
+If the [`nounset` shell option](../../environment/options.md#option-list) is enabled, expanding an unset parameter is an error:
 
 ```shell
 $ set -o nounset
@@ -38,9 +38,9 @@ Using `nounset` is recommended to catch typos in variable names.
 
 Braces are optional if the parameter is:
 
-- a variable name with only ASCII letters, digits, and underscores (e.g., `$HOME`, `$user`)
-- a special parameter (e.g., `$?`, `$#`)
-- a single-digit positional parameter (e.g., `$1`, `$2`)
+- a [variable](../parameters/variables.md) name with only ASCII letters, digits, and underscores (e.g., `$HOME`, `$user`)
+- a [special parameter] (e.g., `$?`, `$#`)
+- a single-digit [positional parameter](../parameters/positional.md) (e.g., `$1`, `$2`)
 
 For variable names, the shell uses the longest possible name after `$`, regardless of whether the variable exists:
 
@@ -73,7 +73,7 @@ $ echo "Length of user: ${#user}"
 Length of user: 5
 ```
 
-As an extension, the length modifier can be used with arrays or special parameters `*` or `@`, applying the modifier to each element:
+As an extension, the length modifier can be used with arrays or [special parameters](../parameters/special.md) `*` or `@`, applying the modifier to each element:
 
 ```shell
 $ users=(Alice Bob Charlie)
@@ -151,7 +151,7 @@ For the `=` and `:=` forms, [quote removal](quoting.md#quote-removal) is also pe
 
 If `word` is empty in the `?` and `:?` forms, a default error message is used.
 
-The `nounset` option does not apply to expansions with a switch modifier.
+The [`nounset` option](../../environment/options.md#option-list) does not apply to expansions with a switch modifier.
 
 ### Trim
 
@@ -197,9 +197,11 @@ $ echo "${asterisks##'**'}" # removes the first two *
 
 ### Compatibility
 
-Some modifiers are ambiguous when used with a certain special parameter. Yash and many other shells interpret `${##}`, `${#-}`, and `${#?}` as length modifiers applied to special parameters `#`, `-`, and `?`, not as switch or trim modifiers applied to `#`. The POSIX standard is unclear on this point.
+Some modifiers are ambiguous when used with a certain [special parameter]. Yash and many other shells interpret `${##}`, `${#-}`, and `${#?}` as length modifiers applied to special parameters `#`, `-`, and `?`, not as switch or trim modifiers applied to `#`. The POSIX standard is unclear on this point.
 
 The result is unspecified in POSIX for:
 
 - a length or switch modifier applied to special parameter `*` or `@`
 - a trim modifier applied to special parameter `#`, `*`, or `@`
+
+[special parameter]: ../parameters/special.md

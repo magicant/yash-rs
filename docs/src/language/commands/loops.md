@@ -43,10 +43,15 @@ Hello, charlie!
 
 [Word expansion](../words/index.html#word-expansion) is performed on the list:
 
-```shell,no_run
+```shell,hidelines=#
+#$ mkdir $$ && cd $$ || exit
+#$ printf 'This is the first line of file1.\n' > file1.txt
+#$ printf 'This is the first line of file2.\n' > file2.txt
+#$ printf '\n\n\n\n\n\n\n\n\n' >> file1.txt
+#$ printf '\n\n\n\n' >> file2.txt
 $ for file in *.txt; do
->     echo "$file contains $(wc -l -- "$file") lines"
->     echo "First line: $(head -n 1 -- "$file")"
+>     echo "$file contains $(wc -l < "$file") lines"
+>     echo "First line: $(head -n 1 < "$file")"
 > done
 file1.txt contains 10 lines
 First line: This is the first line of file1.
@@ -110,7 +115,7 @@ The [exit status] of a `while` or `until` loop is that of the last command run i
 
 ## Break and continue
 
-The `break` utility exits the current loop. The `continue` utility skips to the next iteration.
+The [`break` utility](../../builtins/break.md) exits the current loop. The [`continue` utility](../../builtins/continue.md) skips to the next iteration.
 
 ```shell
 $ for i in 1 2 3 4 5; do

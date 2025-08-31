@@ -85,4 +85,4 @@
 - [Pattern matching](patterns.md)
 - [Arithmetic expressions](arithmetic.md)
 - [FAQ and troubleshooting]()
-- [Index]()
+- [Index](topic_index.md)

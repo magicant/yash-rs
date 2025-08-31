@@ -27,7 +27,7 @@ Hello, world!
 
 In this example, `$` is the shell prompt, and `echo "Hello, world!"` is the command you entered. The shell executed the `echo` utility, which printed "Hello, world!" to the terminal.
 
-You can also run other utilities, such as `ls`, which lists the files in the working directory:
+You can also run other utilities, such as `ls`, which lists the files in the [working directory](environment/working_directory.md):
 
 ```shell,no_run
 $ ls
@@ -50,7 +50,7 @@ Note: Some utilities may not respond to `Ctrl+C` if they are designed to ignore 
 
 ## Exiting the shell
 
-To exit the shell, use the `exit` command:
+To exit the shell, use the [`exit`](builtins/exit.md) command:
 
 ```shell
 $ exit
@@ -69,7 +69,7 @@ echo "This is a script"
 echo "Running in the shell"
 ```
 
-Run this script in the shell by using the `.` utility:
+Run this script in the shell by using the [`.` built-in utility](builtins/source.md):
 
 ```shell,no_run
 $ . ./script.sh
@@ -98,4 +98,4 @@ Running in the shell
 
 The `chmod` utility makes the script file executable. This allows you to run the script directly, without specifying the shell explicitly, as in the previous example.
 
-Note the `./` in the commands above. This indicates that the script is in the current directory. If you omit `./`, the shell searches for the script in the directories listed in the `PATH` environment variable. If the script is not in one of those directories, you will get a "utility not found" error.
+Note the `./` in the commands above. This indicates that the script is in the [current directory](environment/working_directory.md). If you omit `./`, the shell searches for the script in the directories listed in the [`PATH` environment variable](language/parameters/variables.md#reserved-variable-names). If the script is not in one of those directories, you will get a "utility not found" error.

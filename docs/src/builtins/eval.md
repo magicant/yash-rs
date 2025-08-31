@@ -10,8 +10,7 @@ eval [command…]
 
 ## Description
 
-This built-in parses and executes the argument as a shell script in
-the current shell environment.
+This built-in parses and executes the argument as a shell script in the current [shell environment](../environment/index.html).
 
 ## Options
 
@@ -47,6 +46,6 @@ The `eval` built-in can be dangerous if used with untrusted input, as it can exe
 
 ## Compatibility
 
-POSIX does not require the eval built-in to conform to the Utility Syntax
-Guidelines, which means portable scripts cannot use any options or the `--`
-separator for the built-in.
+The `eval` built-in is specified by POSIX.1-2024.
+
+POSIX does not require the `eval` built-in to conform to the [Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02), which means portable scripts cannot use any options or the `--` separator for the built-in.
