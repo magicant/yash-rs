@@ -10,7 +10,7 @@
 
 set -Ceu
 unset CDPATH
-cd -P -- "$(dirname "$0")"
+cd -P -- "$(dirname -- "$0")"
 export LC_ALL=C
 
 index_file="src/topic_index.md"

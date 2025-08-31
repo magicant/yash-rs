@@ -72,9 +72,9 @@ if [ $# -eq 0 ]; then
     nproc="$({ nproc || sysctl -n hw.logicalcpu; } 2>/dev/null || echo 1)"
     # if xargs supports -P, use it
     if [ "$nproc" -gt 1 ] && echo true | xargs -0 -L 1 -P "$nproc" sh -c 2>/dev/null; then
-        find "$(dirname "$0")" -type f -name '*.md' -print0 | xargs -0 -L 1 -P "$nproc" "$0"
+        find "$(dirname -- "$0")" -type f -name '*.md' -print0 | xargs -0 -L 1 -P "$nproc" "$0"
     else
-        exec find "$(dirname "$0")" -type f -name '*.md' -exec "$0" {} +
+        exec find "$(dirname -- "$0")" -type f -name '*.md' -exec "$0" {} +
     fi
     exit
 fi
