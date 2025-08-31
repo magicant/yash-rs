@@ -39,3 +39,7 @@ The `$(…)` form can be confused with [arithmetic expansion](arithmetic.md). Co
 The command runs in a subshell, and its [standard output](../redirections/index.html#what-are-file-descriptors) is captured. [Standard error](../redirections/index.html#what-are-file-descriptors) is not captured unless redirected. Trailing newlines are removed, and the result replaces the command substitution in the command line.
 
 Currently, yash-rs parses the command when the substitution is executed, not when it is parsed. This may change in the future, affecting when syntax errors are detected and when [aliases](../aliases.md) are substituted.
+
+## Compatibility
+
+When a command substitution only contains [redirections](../redirections/index.html), some shells treat it specially. For example, `$(<file)` is equivalent to `$(cat file)` in bash and zsh, but yash-rs does not support this yet.

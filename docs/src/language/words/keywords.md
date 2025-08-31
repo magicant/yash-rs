@@ -29,8 +29,9 @@ Additionally, the POSIX standard allows for the following optional reserved word
 - `namespace` – Namespace declaration
 - `select` – Select command
 - `time` – Time command
+- Any words that end with a colon (`:`)
 
-These four words are not reserved in yash-rs now, but may be in the future.
+These words are not reserved in yash-rs now, but may be in the future.
 
 ## Where are reserved words recognized?
 

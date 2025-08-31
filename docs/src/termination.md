@@ -38,7 +38,7 @@ $ exit
 Temporary file removed.
 ```
 
-The `EXIT` trap is run at most once per shell session. Modifying the `EXIT` trap while it is running does not have any effect on trap execution.
+The `EXIT` trap is run at most once per shell session. Modifying the `EXIT` trap while it is running does not have any effect on trap execution. (However, POSIX allows the shell to execute the new trap if the `EXIT` trap is redefined while it is running.)
 
 ## Exit status
 
