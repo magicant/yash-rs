@@ -72,7 +72,9 @@ The *limit* operand sets a new value for the selected resource. It is interprete
 
 ## Standard output
 
-If *limit* is omitted, the built-in prints the current value for the selected resource. With `-a`, it prints all resource limits in a table.
+If *limit* is omitted, the built-in prints the current value for the selected resource. It is either a non-negative integer or `unlimited`.
+
+With `-a`, it prints all resource limits in a table that includes the short option name, the resource name, and the current limit value for each resource.
 
 ## Errors
 
@@ -146,7 +148,8 @@ Some shells do not allow combining options (e.g., `ulimit -fH`). For portability
 
 Shells differ in behavior when both `-H` and `-S` are given. Yash-rs sets or displays both limits; older versions of yash only honored the last one.
 
-Specifying multiple resource options is an error in yash-rs, but some shells
-allow operating on multiple resources at once.
+Specifying multiple resource options is an error in yash-rs, but some shells allow operating on multiple resources at once.
 
 The `hard` and `soft` values for the *limit* operand are not defined by POSIX.
+
+The output format for `ulimit -a` is implementation-defined and subject to change.

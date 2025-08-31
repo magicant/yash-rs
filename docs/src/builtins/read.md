@@ -147,4 +147,6 @@ When a backslash is specified as the delimiter, no escape sequences are recogniz
 
 In this implementation, the value of the `PS2` variable is subject to [parameter expansion](../language/words/parameters.md), [command substitution](../language/words/command_substitution.md), and [arithmetic expansion](../language/words/arithmetic.md). Other implementations may not perform these expansions.
 
-The current implementation considers variable names containing a `=` as invalid names. However, more names many be considered invalid in the future. For best forward-compatibility and portability, only use portable name characters (ASCII alphanumerics and underscore).
+The current implementation considers variable names containing a `=` as invalid names. However, more names may be considered invalid in the future. For best forward-compatibility and portability, only use portable name characters (ASCII alphanumerics and underscore).
+
+In yash-rs and many other implementations, the `read` built-in does not read more than needed to find a delimiter, so that a next command can read the remaining input without loss. POSIX.1-2024 requires this behavior only when the built-in is reading from a seekable input.

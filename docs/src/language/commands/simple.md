@@ -130,6 +130,8 @@ Redirections are canceled unless the target was the [`exec` special built-in](..
 
 An executable file target is called an **external utility**.
 
+POSIX allows caching pathnames found during command search, but yash-rs does not implement this yet.
+
 ### Exit status
 
 - If a target was executed, the [exit status](../commands/exit_status.md#exit-status) of the simple command is the exit status of the target.

@@ -108,3 +108,9 @@ After these, the shell performs these steps in order:
 The result is a list of words passed to the utility. Each word resulting from these expansions is called a **field**.
 
 A subset of these expansions are performed depending on the context. For example, when [assigning a variable](../parameters/variables.md#defining-variables), the shell performs tilde expansion, parameter expansion, command substitution, arithmetic expansion, and quote removal before the assignment. However, field splitting and pathname expansion do not occur during variable assignment, since the value of a variable cannot be split into multiple fields.
+
+## Dollar signs
+
+A dollar sign (`$`) may introduce a [dollar single quote](quoting.md#dollar-single-quotes), [parameter expansion](parameters.md), [command substitution](command_substitution.md), or [arithmetic expansion](arithmetic.md), depending on the following characters. If the dollar sign is not followed by a valid sequence for any of these expansions, it is treated as a literal character.
+
+Dollar signs that are immediately followed by a non-whitespace character and do not form a valid expansion sequence are currently treated as literal characters, but this usage may change in future versions of the shell. For example, `$%` and `$+` may be interpreted as special parameters in the future.
