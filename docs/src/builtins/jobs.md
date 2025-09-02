@@ -5,7 +5,7 @@ The **`jobs`** built-in reports job status.
 ## Synopsis
 
 ```sh
-jobs [-lp] [job_id…]
+jobs [-l|-p] [job_id…]
 ```
 
 ## Description
@@ -113,8 +113,6 @@ When the built-in is used in a [subshell](../environment/index.html#subshells), 
 
 The POSIX standard only defines the `-l` and `-p` options. <!-- TODO: Other options are non-portable extensions. --> Previous versions of yash supported additional options, which are not yet implemented in yash-rs.
 
-According to POSIX, the `-p` option takes precedence over the `-l` option.
-In many other shells, however, the last specified one is effective.
+POSIX does not define the behavior when both `-l` and `-p` options are used together. In most other shells, the option specified last takes effect. In yash-rs, the `-p` option takes precedence over `-l`, but this may change in future versions. Later releases of yash-rs might instead reject conflicting options.
 
-A portable job ID must start with a `%`. If an operand does not have a
-leading `%`, the built-in assumes one silently, which is not portable.
+A portable job ID must start with a `%`. If an operand does not have a leading `%`, the built-in assumes one silently, which is not portable.
