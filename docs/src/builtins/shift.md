@@ -40,4 +40,4 @@ Zero if successful, non-zero if an error occurred.
 
 The `shift` built-in is part of POSIX.1-2024.
 
-POSIX does not require the `shift` built-in to conform to the [Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02), which means portable scripts cannot use any options or the `--` separator for the built-in.
+In some shells, the `shift` built-in lacks support for the [`--` separator](index.html#separators).

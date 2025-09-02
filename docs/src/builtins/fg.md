@@ -49,5 +49,3 @@ See [Job control](../interactive/job_control.md).
 ## Compatibility
 
 Many implementations allow omitting the leading `%` from job IDs and specifying multiple job IDs at once, though this is not required by POSIX and not yet supported in yash-rs.
-
-POSIX does not require the `fg` built-in to conform to the [Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02), which means portable scripts cannot use any options or the `--` separator for the built-in.

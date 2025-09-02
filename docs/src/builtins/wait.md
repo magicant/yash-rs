@@ -74,8 +74,6 @@ In the above example, `wait` treats the job `%` as an unknown job and returns ex
 
 The `wait` built-in is specified in POSIX.1-2024.
 
-POSIX does not require the `wait` built-in to conform to the [Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02), which means portable scripts cannot use any options or the `--` separator for the built-in.
-
 Many existing shells behave differently on various errors. POSIX requires that an unknown process ID be treated as a process that has already exited with exit status 127, but the behavior for other errors should not be considered portable.
 
 [Job ID]: ../interactive/job_control.md#job-ids

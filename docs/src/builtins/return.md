@@ -53,7 +53,9 @@ The `return` built-in is specified by POSIX.1-2024.
 POSIX only requires the `return` built-in to quit a function or [sourced](source.md) script.
 The behavior for other kinds of scripts is a non-standard extension.
 
-The `-n` (`--no-return`) option is a non-standard extension. POSIX does not require the `return` built-in to conform to the [Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02), which means portable scripts cannot use any options or the `--` separator for the built-in.
+In some shells, the `return` built-in lacks support for the [`--` separator](index.html#separators).
+
+The `-n` (`--no-return`) option is a non-standard extension.
 
 The behavior is unspecified in POSIX if *exit_status* is greater than 255.
 The current implementation passes such a value as is in the result, but this

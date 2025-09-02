@@ -58,8 +58,8 @@ $ exit 42
 
 The `exit` built-in is specified by POSIX.1-2024.
 
+In some shells, the `exit` built-in lacks support for the [`--` separator](index.html#separators).
+
 The behavior is undefined in POSIX if *exit_status* is greater than 255.
 The current implementation passes such a value as is in the result, but this
 behavior may change in the future.
-
-POSIX does not require the `exit` built-in to conform to the [Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02), which means portable scripts cannot use any options or the `--` separator for the built-in.
