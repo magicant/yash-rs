@@ -25,7 +25,7 @@ None.
 
 None.
 
-(TODO: In the future, the built-in may detect unexpected options or operands.)
+In the future, the built-in may detect unexpected options or operands.
 
 ## Exit Status
 

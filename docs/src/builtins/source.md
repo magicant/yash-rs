@@ -30,7 +30,7 @@ If there are no operands, the positional parameters are not changed and the scri
 
 None.
 
-(TODO: non-portable options)
+<!-- TODO: non-portable options -->
 
 ## Operands
 
@@ -60,6 +60,8 @@ See [Reading and executing files](../dynamic_evaluation.md#reading-and-executing
 ## Compatibility
 
 The `.` built-in is specified in the POSIX standard. The built-in name `source` is a non-standard extension that is also available in some other shells.
+
+POSIX defines no options for the `.` built-in, but previous versions of yash supported additional options, which are not yet implemented in yash-rs.
 
 POSIX does not require the `.` built-in to conform to the [Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02), which means portable scripts cannot use any options or the `--` separator for the built-in.
 

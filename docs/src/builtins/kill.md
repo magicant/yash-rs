@@ -21,9 +21,7 @@ descriptions.
 
 ## Options
 
-The **`-s`** or **`-n`** option specifies the signal to send. The signal
-name is case-insensitive, but must be specified without the `SIG` prefix.
-The default signal is `SIGTERM`. (TODO: Allow the `SIG` prefix)
+The **`-s`** or **`-n`** option specifies the signal to send. The signal name is case-insensitive, but must be specified without the `SIG` prefix. The default signal is `SIGTERM`. (Specifying a signal name with the `SIG` prefix may be allowed in the future.)
 
 The signal may be specified as a number instead of a name. If the number
 is zero, the built-in does not send a signal, but instead checks whether

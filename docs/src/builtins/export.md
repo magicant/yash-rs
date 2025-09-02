@@ -19,8 +19,6 @@ values of all exported variables in a format that can be reused as input to
 restore the state of these variables. When used with operands, the option
 limits the output to the specified variables.
 
-(TODO: Other non-portable options)
-
 ## Operands
 
 The operands are the names of variables to be exported or printed. When exporting, each name may optionally be followed by `=` and a *value* to assign to the variable.
@@ -51,5 +49,7 @@ See [Environment variables](../language/parameters/variables.md#environment-vari
 
 This built-in is part of the POSIX standard. Printing variables is portable
 only when the `-p` option is used without operands.
+
+Previous versions of yash supported the non-standard `-r` and `-X` options, but these are not yet supported in yash-rs.
 
 [read-only]: ../language/parameters/variables.md#read-only-variables

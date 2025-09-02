@@ -24,8 +24,7 @@ The `-r` option disables this behavior.
 
 ### Prompting
 
-By default, the built-in does not display a prompt before reading a
-line. (TODO: Options to display a prompt)
+By default, the built-in does not display a prompt before reading a line. <!-- TODO: Options to display a prompt -->
 
 When reading lines after the first line, the built-in displays the value of the `PS2` [variable](../language/parameters/variables.md) as a prompt if the shell is [interactive](../interactive/index.html) and the input is from a terminal. See [Command prompt](../interactive/prompt.md) for details.
 
@@ -139,7 +138,7 @@ $ printf '[%s]\n' "$line"
 
 ## Compatibility
 
-POSIX.1-2024 defines the `read` built-in with the `-d` and `-r` options.
+POSIX.1-2024 defines the `read` built-in with the `-d` and `-r` options. Previous versions of yash supported additional options, which are not yet implemented in yash-rs.
 
 In this implementation, a line continuation is always a backslash followed by a newline. Other implementations may allow a backslash followed by a delimiter to be a line continuation if the delimiter is not a newline.
 

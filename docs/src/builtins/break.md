@@ -23,8 +23,6 @@ outermost one.
 
 None.
 
-(TODO: the `-i` option)
-
 ## Operands
 
 Operand ***n*** specifies the nest level of the loop to exit.
@@ -48,6 +46,8 @@ The behavior is unspecified in POSIX when the `break` built-in is used without a
 POSIX allows the built-in to break a loop running in the current [execution environment] that does not lexically enclose the break command. Our implementation does not do that.
 
 POSIX does not require the `break` built-in to conform to the [Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02), which means portable scripts cannot use any options or the `--` separator for the built-in.
+
+Previous versions of yash supported the non-standard `-i` option, but this is not yet supported in yash-rs.
 
 [execution environment]: ../environment/index.html
 [loop]: ../language/commands/loops.md
