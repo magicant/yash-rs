@@ -16,8 +16,6 @@ This built-in parses and executes the argument as a shell script in the current 
 
 None.
 
-(TODO: non-portable options)
-
 ## Operands
 
 The operand is a command string to be evaluated.
@@ -48,4 +46,6 @@ The `eval` built-in can be dangerous if used with untrusted input, as it can exe
 
 The `eval` built-in is specified by POSIX.1-2024.
 
-POSIX does not require the `eval` built-in to conform to the [Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02), which means portable scripts cannot use any options or the `--` separator for the built-in.
+In some shells, the `eval` built-in lacks support for the [`--` separator](index.html#separators), treating it as an operand.
+
+Previous versions of yash supported the non-standard `-i` option, but this is not yet supported in yash-rs.

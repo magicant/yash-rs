@@ -5,7 +5,7 @@ The **`jobs`** built-in reports job status.
 ## Synopsis
 
 ```sh
-jobs [-lp] [job_id…]
+jobs [-l|-p] [job_id…]
 ```
 
 ## Description
@@ -38,15 +38,20 @@ The last column is the command line of the job.
 
 ## Options
 
+<!--
+TODO: Uncomment when adding filtering options below
 ### Formatting
+-->
 
 You can use two options to change the output.
 
 The **`-l`** (**`--verbose`**) option displays additional details by inserting the process ID before each job state. The **`-p`** (**`--pgid-only`**) option outputs only the process ID of each job. In both cases, the process ID shown is that of the main process in the job, which is also the process group ID if the job is under job control.
 
+<!--
 ### Filtering
 
 TODO `-n`, `-r`, `-s`, `-t`
+-->
 
 ## Operands
 
@@ -106,11 +111,8 @@ $ jobs %sleep %sleep
 
 When the built-in is used in a [subshell](../environment/index.html#subshells), the built-in reports not only jobs that were started in the subshell but also jobs that were started in the parent shell. This behavior is not portable and is subject to change.
 
-The POSIX standard only defines the `-l` and `-p` options. Other options are
-non-portable extensions.
+The POSIX standard only defines the `-l` and `-p` options. <!-- TODO: Other options are non-portable extensions. --> Previous versions of yash supported additional options, which are not yet implemented in yash-rs.
 
-According to POSIX, the `-p` option takes precedence over the `-l` option.
-In many other shells, however, the last specified one is effective.
+POSIX does not define the behavior when both `-l` and `-p` options are used together. In most other shells, the option specified last takes effect. In yash-rs, the `-p` option takes precedence over `-l`, but this may change in future versions. Later releases of yash-rs might instead reject conflicting options.
 
-A portable job ID must start with a `%`. If an operand does not have a
-leading `%`, the built-in assumes one silently, which is not portable.
+A portable job ID must start with a `%`. If an operand does not have a leading `%`, the built-in assumes one silently, which is not portable.

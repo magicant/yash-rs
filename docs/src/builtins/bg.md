@@ -22,8 +22,6 @@ None.
 
 Operands specify jobs to resume as [job IDs](../interactive/job_control.md#job-ids). If omitted, the built-in resumes the [current job](../interactive/job_control.md#current-and-previous-jobs).
 
-(TODO: allow omitting the leading `%`)
-
 ## Standard output
 
 The built-in writes the job number and name of each resumed job to the standard output.
@@ -47,5 +45,6 @@ See [Job control](../interactive/job_control.md).
 ## Compatibility
 
 Many implementations allow omitting the leading `%` from job IDs, though it is not required by POSIX.
+Previous versions of yash allowed it, but this is not yet supported in yash-rs.
 
 Some implementations (including the previous version of yash, but not this version) regard it is an error to resume a job that has already terminated.

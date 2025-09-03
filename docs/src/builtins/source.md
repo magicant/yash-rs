@@ -30,7 +30,7 @@ If there are no operands, the positional parameters are not changed and the scri
 
 None.
 
-(TODO: non-portable options)
+<!-- TODO: non-portable options -->
 
 ## Operands
 
@@ -61,7 +61,7 @@ See [Reading and executing files](../dynamic_evaluation.md#reading-and-executing
 
 The `.` built-in is specified in the POSIX standard. The built-in name `source` is a non-standard extension that is also available in some other shells.
 
-POSIX does not require the `.` built-in to conform to the [Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02), which means portable scripts cannot use any options or the `--` separator for the built-in.
+POSIX defines no options for the `.` built-in, but previous versions of yash supported additional options, which are not yet implemented in yash-rs.
 
 If the pathname of the file does not contain a slash and the file is not found in the command search, some shells may fall back to the file in the current working directory. This is a non-portable extension that is not specified in POSIX. The portable way to specify a file in the current working directory is to prefix the filename with `./` as in `. ./foo.sh`.
 
