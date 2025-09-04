@@ -14,7 +14,7 @@ futures-executor = "0.3.31"
 futures-util = "0.3.31"
 fuzed-iterator = "1.0.0"
 itertools = "0.14.0"
-libc = { version = "0.2.169", default-features = false }
+libc = { version = "0.2.171", default-features = false }
 nix = "0.30.1"
 regex = "1.9.4"
 regex-syntax = "0.8.2"
