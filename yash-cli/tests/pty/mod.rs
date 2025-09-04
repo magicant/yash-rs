@@ -29,7 +29,7 @@ use nix::sys::stat::Mode;
 use nix::sys::termios::tcgetsid;
 use nix::unistd::{close, getpid, setsid};
 use std::ffi::c_int;
-use std::os::fd::{AsRawFd as _, BorrowedFd, FromRawFd as _, OwnedFd};
+use std::os::fd::{AsRawFd as _, OwnedFd};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -70,8 +70,7 @@ fn pty_slave_path(master: &PtyMaster) -> PathBuf {
 
 /// Opens the slave side of a pseudo-terminal.
 fn open_pty_slave(path: &Path) -> OwnedFd {
-    let raw_fd = open(path, OFlag::O_RDWR | OFlag::O_NOCTTY, Mode::empty()).expect("open failed");
-    unsafe { OwnedFd::from_raw_fd(raw_fd) }
+    open(path, OFlag::O_RDWR | OFlag::O_NOCTTY, Mode::empty()).expect("open failed")
 }
 
 /// Prepares the slave side of a pseudo-terminal.
@@ -89,12 +88,11 @@ fn prepare_as_slave(slave_path: &Path) -> nix::Result<()> {
     // There is a race condition in both schemes: an unrelated process could
     // become the controlling process before we do, in which case the slave is
     // not our controlling terminal and therefore we should abort.
-    let raw_fd = open(slave_path, OFlag::O_RDWR, Mode::empty())?;
+    let fd = open(slave_path, OFlag::O_RDWR, Mode::empty())?;
     // Although TIOCSCTTY is available in many Unix-like systems, it may not be
     // available in some systems. Please report if you encounter such a system.
-    unsafe { libc::ioctl(raw_fd, libc::TIOCSCTTY as _, 0 as c_int) };
+    unsafe { libc::ioctl(fd.as_raw_fd(), libc::TIOCSCTTY as _, 0 as c_int) };
 
-    let fd = unsafe { BorrowedFd::borrow_raw(raw_fd) };
     if tcgetsid(fd) == Ok(getpid()) {
         Ok(())
     } else {
