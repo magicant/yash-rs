@@ -16,6 +16,8 @@ jobs:
     env:
       RUSTFLAGS: -D warnings
       RUSTDOCFLAGS: -D warnings
+    permissions:
+      contents: read
     steps:
     - uses: actions/checkout@v5
     - uses: dtolnay/rust-toolchain@stable
@@ -38,6 +40,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: -D warnings
+    permissions:
+      contents: read
     steps:
     - uses: actions/checkout@v5
     - uses: dtolnay/rust-toolchain@stable
@@ -52,6 +56,8 @@ jobs:
         os: [ubuntu-latest, macos-latest]
       fail-fast: false
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     steps:
     - uses: actions/checkout@v5
     - uses: dtolnay/rust-toolchain@nightly
@@ -62,6 +68,8 @@ jobs:
       run: ./check-msrv.sh -v
   windows:
     runs-on: windows-latest
+    permissions:
+      contents: read
     steps:
     - uses: actions/checkout@v5
     - uses: dtolnay/rust-toolchain@stable
@@ -88,6 +96,8 @@ jobs:
       run: cargo test --all-features --package yash-builtin
   docs:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
     - uses: actions/checkout@v5
     - uses: dtolnay/rust-toolchain@stable
