@@ -5,6 +5,20 @@ All notable changes to `yash-syntax` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.1] - Unreleased
+
+### Added
+
+- Added the `Location::byte_range` method to obtain the byte range corresponding
+  to a character range in source code locations.
+
+### Fixed
+
+- The implementation of
+  `From<&'a source::pretty::Message<'a>> for annotate_snippets::Message<'a>` was
+  incorrectly using character ranges instead of byte ranges for source
+  annotations, which could lead to incorrect highlighting in messages.
+
 ## [0.15.0] - 2025-05-11
 
 ### Added
@@ -476,6 +490,7 @@ command.
 - Functionalities to parse POSIX shell scripts
 - Alias substitution support
 
+[0.15.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.15.1
 [0.15.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.15.0
 [0.14.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.14.1
 [0.14.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.14.0

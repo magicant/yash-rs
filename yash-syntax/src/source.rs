@@ -298,6 +298,25 @@ impl Location {
         }
         with_line(value.into())
     }
+
+    /// Returns the byte range corresponding to this location's character range.
+    pub fn byte_range(&self) -> Range<usize> {
+        let s = self.code.value.borrow();
+        let mut chars = s.char_indices();
+        let start = chars
+            .nth(self.range.start)
+            .map(|(i, _)| i)
+            .unwrap_or(s.len());
+        let end = if self.range.is_empty() {
+            start
+        } else {
+            chars
+                .nth(self.range.end - self.range.start - 1)
+                .map(|(i, _)| i)
+                .unwrap_or(s.len())
+        };
+        start..end
+    }
 }
 
 /// Character with source description
@@ -343,5 +362,73 @@ mod tests {
         assert_eq!(code.line_number(6).get(), 5);
         assert_eq!(code.line_number(7).get(), 5);
         assert_eq!(code.line_number(usize::MAX).get(), 5);
+    }
+
+    #[test]
+    fn byte_range() {
+        // Test with multi-byte UTF-8 characters
+        // "aℝ🦀bc" = 'a' (1 byte) + 'ℝ' (3 bytes) + '🦀' (4 bytes) +
+        //             'b' (1 byte) + 'c' (1 byte)
+        let code = Rc::new(Code {
+            value: RefCell::new("aℝ🦀bc".to_string()),
+            start_line_number: NonZeroU64::new(1).unwrap(),
+            source: Rc::new(Source::Unknown),
+        });
+
+        // Test range at start (ASCII character)
+        let location = Location {
+            code: Rc::clone(&code),
+            range: 0..1, // 'a'
+        };
+        assert_eq!(location.byte_range(), 0..1);
+
+        // Test range covering multi-byte character
+        let location = Location {
+            code: Rc::clone(&code),
+            range: 1..2, // 'ℝ' (3 bytes)
+        };
+        assert_eq!(location.byte_range(), 1..4);
+
+        // Test range covering 4-byte character
+        let location = Location {
+            code: Rc::clone(&code),
+            range: 2..3, // '🦀' (4 bytes)
+        };
+        assert_eq!(location.byte_range(), 4..8);
+
+        // Test range covering multiple characters including multi-byte
+        let location = Location {
+            code: Rc::clone(&code),
+            range: 1..4, // 'ℝ🦀b'
+        };
+        assert_eq!(location.byte_range(), 1..9);
+
+        // Test empty range
+        let location = Location {
+            code: Rc::clone(&code),
+            range: 2..2, // empty at '🦀' position
+        };
+        assert_eq!(location.byte_range(), 4..4);
+
+        // Test range at end
+        let location = Location {
+            code: Rc::clone(&code),
+            range: 4..5, // 'c'
+        };
+        assert_eq!(location.byte_range(), 9..10);
+
+        // Test range beyond end
+        let location = Location {
+            code: Rc::clone(&code),
+            range: 5..6, // beyond end
+        };
+        assert_eq!(location.byte_range(), 10..10);
+
+        // Test full range
+        let location = Location {
+            code: Rc::clone(&code),
+            range: 0..5, // entire string
+        };
+        assert_eq!(location.byte_range(), 0..10);
     }
 }

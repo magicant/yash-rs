@@ -302,7 +302,7 @@ mod annotate_snippets_support {
             // into a temporary vector, and then merge annotations with the same code into a single
             // snippet.
             for annotation in &message.annotations {
-                let range = annotation.location.range.clone();
+                let range = annotation.location.byte_range();
                 let level = annotate_snippets::Level::from(annotation.r#type);
                 let as_annotation = level.span(range).label(&annotation.label);
                 let code = &*annotation.location.code;

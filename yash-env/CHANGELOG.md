@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- External dependency versions:
+    - yash-syntax 0.15.0 → 0.15.1
 - Internal dependency versions:
     - libc 0.2.169 → 0.2.171
 
