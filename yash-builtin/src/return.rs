@@ -57,10 +57,6 @@ async fn operand_parse_error(env: &mut Env, location: &Location, error: ParseInt
 ///
 /// See the [module-level documentation](self) for details.
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
-    // TODO: POSIX does not require the return built-in to support XBD Utility
-    // Syntax Guidelines. That means the built-in does not have to recognize the
-    // "--" separator. We should reject the separator in the POSIXly-correct
-    // mode.
     // TODO Reject returning from an interactive session
 
     let mut i = args.iter().peekable();

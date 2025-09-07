@@ -63,11 +63,6 @@ async fn operand_parse_error(env: &mut Env, location: &Location, error: ParseInt
 ///
 /// See the [module-level documentation](self) for details.
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
-    // TODO: POSIX does not require the exit built-in to support XBD Utility
-    // Syntax Guidelines. That means the built-in does not have to recognize the
-    // "--" separator. We should reject the separator in the POSIXly-correct
-    // mode.
-
     if let Some(arg) = args.get(1) {
         return syntax_error(env, "too many operands", &arg.origin).await;
     }
