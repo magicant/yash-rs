@@ -338,6 +338,13 @@ f() { :; }
 typeset -fr f
 __OUT__
 
+test_oE -e 0 'separator preceding operand starting with -' -e
+typeset -g -- -a=1
+typeset -p -- -a
+__IN__
+typeset -a=1
+__OUT__
+
 test_O -d -e 2 'invalid option -z'
 typeset -z
 __IN__
