@@ -11,11 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.3] - Unreleased
 
+### Added
+
+- The `return` built-in now supports the `--no-return` option as a synonym of
+  `-n`, which returns the specified exit status without actually returning from
+  the current function or script.
+
 ### Fixed
 
 - Error messages now accurately highlight the relevant source code fragment.
   Previously, the shell could highlight the wrong section or crash when the
   source contained multi-byte characters.
+- The `eval`, `exit`, `return`, and `shift` built-ins now correctly handle the
+  `--` separator between options and operands.
 - The `jobs` built-in no longer crashes when reporting the same finished job more
   than once in a single invocation.
 

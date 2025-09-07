@@ -37,7 +37,8 @@
 //!   built-in is invoked in a trap executed in the function or script, the
 //!   caller should use the value of `$?` before entering trap.
 
-use crate::common::syntax_error;
+use crate::common::syntax::{Mode, OptionSpec, parse_arguments};
+use crate::common::{report_error, syntax_error};
 use std::num::ParseIntError;
 use std::ops::ControlFlow::Break;
 use yash_env::Env;
@@ -49,6 +50,8 @@ use yash_syntax::source::Location;
 
 // TODO Split into syntax and semantics submodules
 
+const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('n').long("no-return")];
+
 async fn operand_parse_error(env: &mut Env, location: &Location, error: ParseIntError) -> Result {
     syntax_error(env, &error.to_string(), location).await
 }
@@ -57,13 +60,27 @@ async fn operand_parse_error(env: &mut Env, location: &Location, error: ParseInt
 ///
 /// See the [module-level documentation](self) for details.
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
+    let (options, operands) = match parse_arguments(OPTION_SPECS, Mode::with_env(env), args) {
+        Ok(result) => result,
+        Err(error) => return report_error(env, &error).await,
+    };
+
     // TODO Reject returning from an interactive session
 
-    let mut i = args.iter().peekable();
+    // Parse options
+    let mut no_return = false;
+    for option in options {
+        match option.spec.get_short() {
+            Some('n') => no_return = true,
+            _ => unreachable!("parse_arguments() returned an unknown option"),
+        }
+    }
 
-    let no_return = i.next_if(|field| field.value == "-n").is_some();
-
-    let exit_status = match i.next() {
+    // Parse operands
+    if let Some(arg) = operands.get(1) {
+        return syntax_error(env, "too many operands", &arg.origin).await;
+    }
+    let exit_status = match operands.first() {
         None => None,
         Some(arg) => match arg.value.parse() {
             Ok(exit_status) if exit_status >= 0 => Some(ExitStatus(exit_status)),
@@ -71,11 +88,6 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             Err(e) => return operand_parse_error(env, &arg.origin, e).await,
         },
     };
-
-    // `i` is fused, so it's safe to call next() again
-    if let Some(arg) = i.next() {
-        return syntax_error(env, "too many operands", &arg.origin).await;
-    }
 
     if no_return {
         Result::new(exit_status.unwrap_or(env.exit_status))
@@ -216,6 +228,14 @@ mod tests {
     }
 
     #[test]
+    fn option_operand_separator() {
+        let mut env = Env::new_virtual();
+        let args = Field::dummies(["-n", "--", "12"]);
+        let result = main(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, Result::new(ExitStatus(12)));
+    }
+
+    #[test]
     fn return_with_too_many_operands() {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
@@ -235,6 +255,26 @@ mod tests {
         });
     }
 
-    // TODO return_with_invalid_option
+    #[test]
+    fn return_with_invalid_option() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
+            name: Field::dummy("return"),
+            is_special: true,
+        }));
+        let args = Field::dummies(["--invalid-option"]);
+
+        let actual_result = main(&mut env, args).now_or_never().unwrap();
+        let expected_result =
+            Result::with_exit_status_and_divert(ExitStatus::ERROR, Break(Divert::Interrupt(None)));
+        assert_eq!(actual_result, expected_result);
+        assert_stderr(&state, |stderr| {
+            assert!(stderr.contains("unknown option"), "stderr = {stderr:?}");
+            assert!(stderr.contains("--invalid-option"), "stderr = {stderr:?}");
+        });
+    }
+
     // TODO return used outside a function or script
 }

@@ -22,6 +22,8 @@
 //! [`eval` built-in]: https://magicant.github.io/yash-rs/builtins/eval.html
 
 use crate::Result;
+use crate::common::report_error;
+use crate::common::syntax::{Mode, parse_arguments};
 use std::cell::RefCell;
 use std::rc::Rc;
 use yash_env::Env;
@@ -35,6 +37,12 @@ use yash_syntax::source::Source;
 
 /// Entry point of the `eval` built-in execution
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
+    // TODO Support non-POSIX options
+    let args = match parse_arguments(&[], Mode::with_env(env), args) {
+        Ok((_options, operands)) => operands,
+        Err(error) => return report_error(env, &error).await,
+    };
+
     let command = match join(args) {
         Some(command) => command,
         None => return Result::default(),
