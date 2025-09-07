@@ -1,6 +1,6 @@
 [package]
 name = "yash-syntax"
-version = "0.15.0"
+version = "0.15.1"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2024"
 rust-version = "1.85.0"
@@ -12,6 +12,7 @@ repository = "https://github.com/magicant/yash-rs"
 license = "GPL-3.0-or-later"
 keywords = ["posix", "shell"]
 categories = ["command-line-utilities", "parser-implementations"]
+publish = false
 
 [dependencies]
 annotate-snippets = { workspace = true, optional = true }
