@@ -459,6 +459,24 @@ mod tests {
     }
 
     #[test]
+    fn parse_many_short_options() {
+        let args = Field::dummies(["-p", "+xr"]);
+        let result = parse(ALL_OPTIONS, args.clone()).unwrap();
+        assert_matches!(&result.0[..], [option1, option2, option3] => {
+            assert_eq!(option1.spec, &PRINT_OPTION);
+            assert_eq!(option1.state, State::On);
+            assert_eq!(option1.location, Location::dummy("-p"));
+            assert_eq!(option2.spec, &EXPORT_OPTION);
+            assert_eq!(option2.state, State::Off);
+            assert_eq!(option2.location, Location::dummy("+xr"));
+            assert_eq!(option3.spec, &READONLY_OPTION);
+            assert_eq!(option3.state, State::Off);
+            assert_eq!(option3.location, Location::dummy("+xr"));
+        });
+        assert_eq!(result.1, []);
+    }
+
+    #[test]
     fn parse_long_print_option_without_operands() {
         let result = parse(ALL_OPTIONS, Field::dummies(["--print"])).unwrap();
         assert_matches!(&result.0[..], [option] => {
