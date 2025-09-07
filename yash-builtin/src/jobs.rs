@@ -102,13 +102,16 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
 
     let result = output(env, &accumulator.print).await;
 
+    // Remove finished jobs and mark reported jobs as reported
+    // only if there was no error
     if result.exit_status().is_successful() {
         for index in accumulator.indices_reported {
-            let mut job = env.jobs.get_mut(index).unwrap();
-            if job.state.is_alive() {
-                job.state_reported();
-            } else {
-                env.jobs.remove(index);
+            if let Some(mut job) = env.jobs.get_mut(index) {
+                if job.state.is_alive() {
+                    job.state_reported();
+                } else {
+                    env.jobs.remove(index);
+                }
             }
         }
     }
@@ -271,6 +274,23 @@ mod tests {
         assert!(env.jobs.get(i42).is_some());
         assert!(env.jobs.get(i72).is_none());
         assert!(env.jobs.get(i102).is_some());
+    }
+
+    #[test]
+    fn finished_jobs_are_removed_with_same_job_id_specified_twice() {
+        let mut env = Env::new_virtual();
+
+        // job that will be removed because it's finished
+        let mut job = Job::new(Pid(10));
+        job.state = ProcessState::exited(0);
+        job.name = "echo".to_string();
+        let i10 = env.jobs.add(job);
+
+        let args = Field::dummies(["%1", "%1"]);
+        let result = main(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
+
+        assert!(env.jobs.get(i10).is_none());
     }
 
     #[test]

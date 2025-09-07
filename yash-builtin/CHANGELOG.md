@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - External dependency versions:
     - yash-syntax 0.15.0 → 0.15.1
 
+### Fixed
+
+- The `jobs` built-in no longer panics when reporting the same finished job more
+  than once in a single invocation.
+
 ## [0.9.0] - 2025-05-11
 
 ### Added
