@@ -338,11 +338,36 @@ f() { :; }
 typeset -fr f
 __OUT__
 
-test_oE -e 0 'separator preceding operand starting with -' -e
+test_oE -e 0 'separator preceding value-less variable name starting with -' -e
+typeset -g -- -a
+typeset -p -- -a
+__IN__
+typeset -- -a
+__OUT__
+
+test_oE -e 0 'separator preceding scalar variable name starting with -' -e
 typeset -g -- -a=1
 typeset -p -- -a
 __IN__
-typeset -a=1
+typeset -- -a=1
+__OUT__
+
+test_oE -e 0 'separator preceding array variable name starting with -' -e
+-a=(1 2 3)
+typeset -x -- -a
+typeset -p -- -a
+__IN__
+-a=(1 2 3)
+typeset -x -- -a
+__OUT__
+
+test_oE -e 0 'separator preceding function name starting with -' -e
+-n() { :; }
+typeset -fr -- -n
+typeset -fp -- -n
+__IN__
+-n() { :; }
+typeset -fr -- -n
 __OUT__
 
 test_O -d -e 2 'invalid option -z'

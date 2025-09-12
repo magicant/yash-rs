@@ -87,10 +87,16 @@ fn print_one(
         }
     }
     if !options_to_print.is_empty() || context.builtin_is_significant {
+        let separator = if function.name.starts_with('-') {
+            "-- "
+        } else {
+            ""
+        };
+
         writeln!(
             output,
-            "{} -f{} {}",
-            context.builtin_name, options_to_print, name
+            "{} -f{} {}{}",
+            context.builtin_name, options_to_print, separator, name
         )
         .unwrap();
     }
@@ -213,6 +219,25 @@ mod tests {
 
         let result = pf.execute(&functions, &PRINT_CONTEXT).unwrap();
         assert_eq!(result, "foo() { echo; }\ntypeset -fr foo\n");
+    }
+
+    #[test]
+    fn printing_function_name_starting_with_hyphen() {
+        let mut functions = FunctionSet::new();
+        let foo = Function::new(
+            "-n",
+            "{ :; }".parse::<FullCompoundCommand>().unwrap(),
+            Location::dummy("definition location"),
+        )
+        .make_read_only(Location::dummy("readonly location"));
+        functions.define(foo).unwrap();
+        let pf = PrintFunctions {
+            functions: Field::dummies(["-n"]),
+            attrs: vec![],
+        };
+
+        let result = pf.execute(&functions, &PRINT_CONTEXT).unwrap();
+        assert_eq!(result, "-n() { :; }\ntypeset -fr -- -n\n");
     }
 
     #[test]

@@ -80,13 +80,15 @@ fn print_one(
         var,
         options_allowed: context.options_allowed,
     };
+    let separator = if name.starts_with('-') { "-- " } else { "" };
     let quoted_name = yash_quote::quoted(name);
     match &var.value {
         Some(value @ Value::Scalar(_)) => writeln!(
             output,
-            "{} {}{}={}",
+            "{} {}{}{}={}",
             context.builtin_name,
             options,
+            separator,
             quoted_name,
             value.quote()
         )
@@ -99,8 +101,8 @@ fn print_one(
             if !options.is_empty() || context.builtin_is_significant {
                 writeln!(
                     output,
-                    "{} {}{}",
-                    context.builtin_name, options, quoted_name
+                    "{} {}{}{}",
+                    context.builtin_name, options, separator, quoted_name
                 )
                 .unwrap();
             }
@@ -108,8 +110,8 @@ fn print_one(
 
         None => writeln!(
             output,
-            "{} {}{}",
-            context.builtin_name, options, quoted_name
+            "{} {}{}{}",
+            context.builtin_name, options, separator, quoted_name
         )
         .unwrap(),
     }
@@ -439,6 +441,53 @@ mod tests {
              z=(Z)\n\
              typeset -r -x z\n",
         );
+    }
+
+    #[test]
+    fn printing_valueless_variable_name_starting_with_hyphen() {
+        let mut vars = VariableSet::new();
+        let mut var = vars.get_or_new("-v", Scope::Global.into());
+        var.export(true);
+        let pv = PrintVariables {
+            variables: Field::dummies(["-v"]),
+            attrs: vec![],
+            scope: Scope::Global,
+        };
+
+        let output = pv.execute(&vars, &PRINT_CONTEXT).unwrap();
+        assert_eq!(output, "typeset -x -- -v\n");
+    }
+
+    #[test]
+    fn printing_scalar_variable_name_starting_with_hyphen() {
+        let mut vars = VariableSet::new();
+        let mut var = vars.get_or_new("-v", Scope::Global.into());
+        var.assign("value", None).unwrap();
+        var.export(true);
+        let pv = PrintVariables {
+            variables: Field::dummies(["-v"]),
+            attrs: vec![],
+            scope: Scope::Global,
+        };
+
+        let output = pv.execute(&vars, &PRINT_CONTEXT).unwrap();
+        assert_eq!(output, "typeset -x -- -v=value\n");
+    }
+
+    #[test]
+    fn printing_array_variable_name_starting_with_hyphen() {
+        let mut vars = VariableSet::new();
+        let mut var = vars.get_or_new("-v", Scope::Global.into());
+        var.assign(Value::array(["1", "2"]), None).unwrap();
+        var.export(true);
+        let pv = PrintVariables {
+            variables: Field::dummies(["-v"]),
+            attrs: vec![],
+            scope: Scope::Global,
+        };
+
+        let output = pv.execute(&vars, &PRINT_CONTEXT).unwrap();
+        assert_eq!(output, "-v=(1 2)\ntypeset -x -- -v\n");
     }
 
     fn variables_with_different_attributes() -> VariableSet {
