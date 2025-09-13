@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.1] - Unreleased
 
+### Added
+
+- The `return` built-in now supports the `--no-return` option as a synonym of
+  `-n`, which returns the specified exit status without actually returning from
+  the current function or script.
+
 ### Changed
 
 - External dependency versions:
@@ -14,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The `eval`, `exit`, `export`, `readonly`, `return`, `shift`, and `typeset`
+  built-ins now correctly handle the `--` separator between options and
+  operands.
+- The `export`, `readonly`, and `typeset` built-ins now correctly print the `--`
+  separator when the name of a variable or function starts with `-`.
 - The `jobs` built-in no longer panics when reporting the same finished job more
   than once in a single invocation.
 

@@ -43,7 +43,8 @@
 //! In case of an error, the result will have a [`Divert::Interrupt`] value
 //! instead, in which case the shell will not exit if it is interactive.
 
-use crate::common::syntax_error;
+use crate::common::syntax::{Mode, parse_arguments};
+use crate::common::{report_error, syntax_error};
 use std::num::ParseIntError;
 use std::ops::ControlFlow::Break;
 use yash_env::Env;
@@ -63,10 +64,11 @@ async fn operand_parse_error(env: &mut Env, location: &Location, error: ParseInt
 ///
 /// See the [module-level documentation](self) for details.
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
-    // TODO: POSIX does not require the exit built-in to support XBD Utility
-    // Syntax Guidelines. That means the built-in does not have to recognize the
-    // "--" separator. We should reject the separator in the POSIXly-correct
-    // mode.
+    // TODO Support non-POSIX options
+    let args = match parse_arguments(&[], Mode::with_env(env), args) {
+        Ok((_options, operands)) => operands,
+        Err(error) => return report_error(env, &error).await,
+    };
 
     if let Some(arg) = args.get(1) {
         return syntax_error(env, "too many operands", &arg.origin).await;

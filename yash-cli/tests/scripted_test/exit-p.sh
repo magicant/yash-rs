@@ -203,3 +203,7 @@ TERM
 __OUT__
 
 )
+
+test_OE -e 56 'separator preceding operand'
+exit -- 56
+__IN__

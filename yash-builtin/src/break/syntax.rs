@@ -75,11 +75,6 @@ pub type Result = std::result::Result<NonZeroUsize, Error>;
 
 /// Parses command line arguments for the break/continue built-in.
 pub fn parse(env: &Env, args: Vec<Field>) -> Result {
-    // TODO: POSIX does not require the break/continue built-in to support XBD
-    // Utility Syntax Guidelines. That means the built-in does not have to
-    // recognize the "--" separator. We should reject the separator in the
-    // POSIXly-correct mode.
-
     let (_options, mut operands) = parse_arguments(&[], Mode::with_env(env), args)?;
 
     if operands.len() > 1 {

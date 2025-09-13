@@ -22,6 +22,8 @@
 //! [`shift` built-in]: https://magicant.github.io/yash-rs/builtins/shift.html
 
 use crate::common::arrange_message_and_divert;
+use crate::common::report_error;
+use crate::common::syntax::{Mode, parse_arguments};
 use crate::common::syntax_error;
 use std::borrow::Cow;
 use yash_env::Env;
@@ -34,10 +36,11 @@ use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
 
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
-    // TODO: POSIX does not require the shift built-in to support XBD Utility
-    // Syntax Guidelines. That means the built-in does not have to recognize the
-    // "--" separator. We should reject the separator in the POSIXly-correct
-    // mode.
+    // TODO Support non-POSIX options
+    let args = match parse_arguments(&[], Mode::with_env(env), args) {
+        Ok((_options, operands)) => operands,
+        Err(error) => return report_error(env, &error).await,
+    };
 
     if let Some(arg) = args.get(1) {
         return syntax_error(env, "too many operands", &arg.origin).await;

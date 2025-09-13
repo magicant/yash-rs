@@ -293,3 +293,11 @@ fn() {
 }
 fn
 __IN__
+
+test_OE -e 56 'separator preceding operand'
+fn() {
+    return -- 56
+    echo not reached
+}
+fn
+__IN__
