@@ -272,29 +272,29 @@ mod annotate_snippets_support {
     ///
     /// This implementation is only available when the `yash_syntax` crate is
     /// built with the `annotate-snippets` feature enabled.
-    impl From<AnnotationType> for annotate_snippets::Level {
+    impl<'a> From<AnnotationType> for annotate_snippets::Level<'a> {
         fn from(r#type: AnnotationType) -> Self {
             use AnnotationType::*;
             match r#type {
-                Error => Self::Error,
-                Warning => Self::Warning,
-                Info => Self::Info,
-                Note => Self::Note,
-                Help => Self::Help,
+                Error => Self::ERROR,
+                Warning => Self::WARNING,
+                Info => Self::INFO,
+                Note => Self::NOTE,
+                Help => Self::HELP,
             }
         }
     }
 
     /// Converts `yash_syntax::source::pretty::Message` into
-    /// `annotate_snippets::Message`.
+    /// `annotate_snippets::Group`.
     ///
     /// This implementation is only available when the `yash_syntax` crate is
     /// built with the `annotate-snippets` feature enabled.
-    impl<'a> From<&'a Message<'a>> for annotate_snippets::Message<'a> {
+    impl<'a> From<&'a Message<'a>> for annotate_snippets::Group<'a> {
         fn from(message: &'a Message<'a>) -> Self {
             let mut snippets: Vec<(
                 &super::super::Code,
-                annotate_snippets::Snippet,
+                annotate_snippets::Snippet<'a, annotate_snippets::Annotation<'a>>,
                 Vec<annotate_snippets::Annotation>,
             )> = Vec::new();
             // We basically convert each annotation into a snippet, but want to merge annotations
@@ -316,24 +316,22 @@ mod annotate_snippets_support {
                         .get()
                         .try_into()
                         .unwrap_or(usize::MAX);
-                    let snippet = annotate_snippets::Snippet::source(&annotation.code)
+                    let snippet = annotate_snippets::Snippet::source(&**annotation.code)
                         .line_start(line_start)
-                        .origin(code.source.label())
-                        .fold(true);
+                        .path(code.source.label());
                     snippets.push((code, snippet, vec![as_annotation]));
                 }
             }
 
             annotate_snippets::Level::from(message.r#type)
-                .title(&message.title)
-                .snippets(
+                .primary_title(message.title)
+                .elements(
                     snippets
                         .into_iter()
                         .map(|(_, snippet, annotations)| snippet.annotations(annotations)),
                 )
-                .footers(message.footers.iter().map(|footer| {
-                    let level = annotate_snippets::Level::from(footer.r#type);
-                    level.title(&footer.label)
+                .elements(message.footers.iter().map(|footer| {
+                    annotate_snippets::Level::from(footer.r#type).message(&*footer.label)
                 }))
         }
     }
