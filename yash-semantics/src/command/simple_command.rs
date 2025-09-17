@@ -26,7 +26,6 @@ use crate::command::Command;
 use crate::command_search::search;
 use crate::expansion::expand_word_with_mode;
 use crate::xtrace::XTrace;
-use std::ffi::CString;
 use std::ops::ControlFlow::Continue;
 use yash_env::Env;
 #[cfg(doc)]
@@ -177,13 +176,10 @@ impl Command for syntax::SimpleCommand {
                 Some(Function(function)) => {
                     execute_function(env, function, &self.assigns, fields, &self.redirs).await
                 }
-                Some(External { path }) => {
-                    execute_external_utility(env, path, &self.assigns, fields, &self.redirs).await
+                Some(External { path: _ }) => {
+                    execute_external_utility(env, &self.assigns, fields, &self.redirs).await
                 }
-                None => {
-                    let path = CString::default();
-                    execute_external_utility(env, path, &self.assigns, fields, &self.redirs).await
-                }
+                None => execute_external_utility(env, &self.assigns, fields, &self.redirs).await,
             }
         } else {
             let exit_status = exit_status.unwrap_or_default();

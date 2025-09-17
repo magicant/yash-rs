@@ -198,6 +198,12 @@ PATH=./dir3
 ext_cmd
 __IN__
 
+test_O -d -e 127 'PATH is searched after assignments'
+# If PATH is searched before assignments,
+# this would find ls in somewhere like /bin.
+PATH=./dir3 ls
+__IN__
+
 test_o 'command name with slash'
 dir2/ext_cmd foo bar baz
 __IN__

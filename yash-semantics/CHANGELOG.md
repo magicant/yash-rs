@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - External dependency versions:
     - yash-syntax 0.15.0 → 0.15.1
 
+### Fixed
+
+- The execution of a simple command
+  (`impl command::Command for yash_syntax::syntax::SimpleCommand`)
+  now searches for the external utility in the `PATH` after performing variable
+  assignments, as specified in POSIX.1-2024. Previously, it would search for the
+  utility before performing the redirections and assignments, which could lead
+  to incorrect behavior if the assignments modified the `PATH` variable.
+
 ## [0.8.0] - 2025-05-11
 
 ### Changed

@@ -18,6 +18,7 @@
 
 use super::perform_assignments;
 use crate::Handle;
+use crate::command_search::search_path;
 use crate::job::add_job_if_suspended;
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
@@ -42,7 +43,6 @@ use yash_syntax::syntax::Redir;
 
 pub async fn execute_external_utility(
     env: &mut Env,
-    path: CString,
     assigns: &[Assign],
     fields: Vec<Field>,
     redirs: &[Redir],
@@ -60,8 +60,17 @@ pub async fn execute_external_utility(
     trace_fields(xtrace.as_mut(), &fields);
     print(&mut env, xtrace).await;
 
-    if path.to_bytes().is_empty() {
-        let name = &fields[0];
+    let name = &fields[0];
+    let path = if name.value.contains('/') {
+        CString::new(&*name.value).ok()
+    } else {
+        search_path(&mut *env, &name.value)
+    };
+
+    if let Some(path) = path {
+        env.exit_status =
+            start_external_utility_in_subshell_and_wait(&mut env, path, fields).await?;
+    } else {
         print_error(
             &mut env,
             format!("cannot execute external utility {:?}", name.value).into(),
@@ -70,10 +79,7 @@ pub async fn execute_external_utility(
         )
         .await;
         env.exit_status = ExitStatus::NOT_FOUND;
-        return Continue(());
     }
-
-    env.exit_status = start_external_utility_in_subshell_and_wait(&mut env, path, fields).await?;
 
     Continue(())
 }
@@ -401,6 +407,38 @@ mod tests {
                 assert_eq!(from_utf8(content), Ok(""));
             });
         });
+    }
+
+    #[test]
+    fn simple_command_performs_command_search_after_assignment() {
+        in_virtual_system(|mut env, state| async move {
+            // Start with an unset PATH
+            let mut content = Inode::default();
+            content.body = FileBody::Regular {
+                content: Vec::new(),
+                is_native_executable: true,
+            };
+            content.permissions.set(Mode::USER_EXEC, true);
+            let content = Rc::new(RefCell::new(content));
+            state
+                .borrow_mut()
+                .file_system
+                .save("/foo/bar/tool", content)
+                .unwrap();
+
+            // In the simple command, PATH is set before command search is
+            // performed, so the utility is found.
+            let command: syntax::SimpleCommand = "PATH=/usr:/foo/bar:/tmp tool".parse().unwrap();
+
+            let result = command.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+
+            let state = state.borrow();
+            let process = state.processes.values().last().unwrap();
+            let arguments = process.last_exec().as_ref().unwrap();
+            assert_eq!(&*arguments.0, c"/foo/bar/tool");
+            assert_eq!(arguments.1, [c"tool".to_owned()]);
+        })
     }
 
     #[test]
