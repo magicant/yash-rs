@@ -9,6 +9,16 @@ used by other programs.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.4] - Unreleased
+
+### Fixed
+
+- The execution of a simple command now searches for the external utility in the
+  `PATH` after performing variable assignments, as specified in POSIX-1.2024.
+  Previously, it would search for the utility before performing the redirections
+  and assignments, which could lead to incorrect behavior if the assignments
+  modified the `PATH` variable.
+
 ## [0.4.3] - 2025-09-14
 
 ### Added
@@ -219,6 +229,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release of the shell
 
+[0.4.4]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.4.4
 [0.4.3]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.4.3
 [0.4.2]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.4.2
 [0.4.1]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.4.1
