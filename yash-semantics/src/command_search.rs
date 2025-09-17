@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Command search.
+//! Command search
 //!
 //! The [command search](search) is part of the execution of a [simple
 //! command](yash_syntax::syntax::SimpleCommand). It determines a command target
@@ -113,7 +113,7 @@ impl From<Function> for Target {
 // not implemented because of ambiguity between substitutive built-ins and
 // external utilities
 
-/// Part of the shell execution environment command path search depends on.
+/// Part of the shell execution environment command path search depends on
 pub trait PathEnv {
     /// Accesses the `$PATH` variable in the environment.
     ///
@@ -129,7 +129,19 @@ pub trait PathEnv {
     // TODO Cache the results of external utility search
 }
 
-/// Part of the shell execution environment command search depends on.
+/// Part of the shell execution environment command classification depends on
+pub trait ClassifyEnv {
+    /// Retrieves the built-in by name.
+    #[must_use]
+    fn builtin(&self, name: &str) -> Option<Builtin>;
+
+    /// Retrieves the function by name.
+    #[must_use]
+    fn function(&self, name: &str) -> Option<&Rc<Function>>;
+}
+
+// TODO Remove in favor of ClassifyEnv
+/// Part of the shell execution environment command search depends on
 pub trait SearchEnv: PathEnv {
     /// Retrieves the built-in by name.
     #[must_use]
@@ -220,6 +232,14 @@ pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
     }
 
     None
+}
+
+/// Determines the type of a command target.
+///
+/// TODO Elaborate
+pub fn classify<E: ClassifyEnv>(env: &mut E, name: &str) -> Target {
+    _ = env;
+    todo!("Implement command classification: {name}");
 }
 
 /// Searches the `$PATH` for an executable file.
