@@ -22,6 +22,7 @@ use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;
 use crate::xtrace::trace_fields;
+use either::Either;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
 use yash_env::builtin::Builtin;
@@ -58,19 +59,23 @@ pub async fn execute_builtin(
         };
     };
 
-    let result = match builtin.r#type {
-        Special => {
-            perform_assignments(env, assigns, false, xtrace.as_mut()).await?;
-            print(env, xtrace).await;
-            (builtin.execute)(env, fields).await
-        }
+    let result = {
         // TODO Reject elective and extension built-ins in POSIX mode
-        Mandatory | Elective | Extension | Substitutive => {
-            let mut env = env.push_context(Context::Volatile);
-            perform_assignments(&mut env, assigns, true, xtrace.as_mut()).await?;
-            print(&mut env, xtrace).await;
-            (builtin.execute)(&mut env, fields).await
-        }
+
+        let (mut env, export) = if is_special {
+            (Either::Left(&mut *env), false)
+        } else {
+            (Either::Right(env.push_context(Context::Volatile)), true)
+        };
+        let env = match &mut env {
+            Either::Left(e) => &mut ***e,
+            Either::Right(e) => &mut **e,
+        };
+        perform_assignments(env, assigns, export, xtrace.as_mut()).await?;
+
+        print(env, xtrace).await;
+
+        (builtin.execute)(env, fields).await
     };
 
     if result.should_retain_redirs() {
