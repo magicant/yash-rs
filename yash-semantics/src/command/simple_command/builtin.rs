@@ -46,10 +46,6 @@ pub async fn execute_builtin(
     let mut xtrace = XTrace::from_options(&env.options);
     trace_fields(xtrace.as_mut(), &fields);
 
-    let name = fields.remove(0);
-    let is_special = builtin.r#type == Special;
-    let env = &mut env.push_frame(FrameBuiltin { name, is_special }.into());
-
     let env = &mut RedirGuard::new(env);
     if let Err(e) = env.perform_redirs(redirs, xtrace.as_mut()).await {
         e.handle(env).await?;
@@ -62,6 +58,7 @@ pub async fn execute_builtin(
     let result = {
         // TODO Reject elective and extension built-ins in POSIX mode
 
+        let is_special = builtin.r#type == Special;
         let (mut env, export) = if is_special {
             (Either::Left(&mut *env), false)
         } else {
@@ -74,6 +71,9 @@ pub async fn execute_builtin(
         perform_assignments(env, assigns, export, xtrace.as_mut()).await?;
 
         print(env, xtrace).await;
+
+        let name = fields.remove(0);
+        let env = &mut env.push_frame(FrameBuiltin { name, is_special }.into());
 
         (builtin.execute)(env, fields).await
     };
