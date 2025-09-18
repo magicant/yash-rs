@@ -18,6 +18,7 @@
 
 use super::perform_assignments;
 use crate::Handle;
+use crate::command_search::search_path;
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;
@@ -26,7 +27,9 @@ use either::Either;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
 use yash_env::builtin::Builtin;
+use yash_env::io::print_error;
 use yash_env::semantics::Divert;
+use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::stack::Builtin as FrameBuiltin;
@@ -55,7 +58,7 @@ pub async fn execute_builtin(
         };
     };
 
-    let result = {
+    let result = 'result: {
         // TODO Reject elective and extension built-ins in POSIX mode
 
         let is_special = builtin.r#type == Special;
@@ -73,6 +76,17 @@ pub async fn execute_builtin(
         print(env, xtrace).await;
 
         let name = fields.remove(0);
+        if builtin.r#type == Substitutive && search_path(env, &name.value).is_none() {
+            print_error(
+                env,
+                format!("cannot execute built-in utility {:?}", name.value).into(),
+                "utility not found in $PATH, so the built-in is ignored".into(),
+                &name.origin,
+            )
+            .await;
+            break 'result ExitStatus::NOT_FOUND.into();
+        }
+
         let env = &mut env.push_frame(FrameBuiltin { name, is_special }.into());
 
         (builtin.execute)(env, fields).await
@@ -94,15 +108,20 @@ mod tests {
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
+    use std::cell::RefCell;
     use std::pin::Pin;
     use std::rc::Rc;
     use std::str::from_utf8;
     use yash_env::VirtualSystem;
+    use yash_env::builtin::Type::{Elective, Extension, Mandatory, Special, Substitutive};
     use yash_env::option::State::On;
     use yash_env::semantics::ExitStatus;
     use yash_env::stack::Frame;
     use yash_env::system::Errno;
+    use yash_env::system::Mode;
     use yash_env::system::r#virtual::FileBody;
+    use yash_env::system::r#virtual::Inode;
+    use yash_env::variable::Scope::Global;
     use yash_env::variable::Value;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
@@ -123,7 +142,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert(
             "foo",
-            Builtin::new(yash_env::builtin::Type::Special, |_env, _args| {
+            Builtin::new(Special, |_env, _args| {
                 Box::pin(std::future::ready({
                     yash_env::builtin::Result::with_exit_status_and_divert(
                         ExitStatus(37),
@@ -176,7 +195,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert(
             "exec",
-            Builtin::new(yash_env::builtin::Type::Mandatory, |_env, _args| {
+            Builtin::new(Mandatory, |_env, _args| {
                 Box::pin(async {
                     let mut result = yash_env::builtin::Result::default();
                     result.retain_redirs();
@@ -238,6 +257,65 @@ mod tests {
     }
 
     #[test]
+    fn substitutive_builtin_must_be_found_in_path_after_assignments() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        // Register `echo` as a substitutive built-in
+        let mut echo_builtin = echo_builtin();
+        echo_builtin.r#type = Substitutive;
+        env.builtins.insert("echo", echo_builtin);
+        // Prepare `/usr/bin/echo` as an external utility
+        let mut content = Inode::default();
+        content.body = FileBody::Regular {
+            content: Vec::new(),
+            is_native_executable: true,
+        };
+        content.permissions.set(Mode::USER_EXEC, true);
+        let content = Rc::new(RefCell::new(content));
+        state
+            .borrow_mut()
+            .file_system
+            .save("/usr/bin/echo", content)
+            .unwrap();
+        // Set PATH to find external utilities
+        env.variables
+            .get_or_new("PATH", Global)
+            .assign("/bin:/usr/bin:/usr/local/bin", None)
+            .unwrap();
+
+        // `echo` is found in PATH
+        let command: syntax::SimpleCommand = "echo hello".parse().unwrap();
+        _ = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+
+        // The assignment modifies PATH so that `echo` is not found
+        let command: syntax::SimpleCommand = "PATH=/no/such/dir echo hello".parse().unwrap();
+        _ = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(env.exit_status, ExitStatus::NOT_FOUND);
+        assert_stderr(&state, |stderr| {
+            assert!(
+                stderr.contains("cannot execute built-in utility \"echo\""),
+                "stderr={stderr:?}"
+            );
+        });
+    }
+
+    #[test]
+    fn non_substitutive_builtins_must_be_run_regardless_of_path() {
+        for r#type in [Special, Mandatory, Elective, Extension] {
+            let mut env = Env::new_virtual();
+            let mut echo_builtin = echo_builtin();
+            echo_builtin.r#type = r#type;
+            env.builtins.insert("echo", echo_builtin);
+
+            let command: syntax::SimpleCommand = "echo hello".parse().unwrap();
+            _ = command.execute(&mut env).now_or_never().unwrap();
+            assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        }
+    }
+
+    #[test]
     fn simple_command_assigns_temporarily_for_regular_builtin() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -277,14 +355,10 @@ mod tests {
         }
 
         let mut env = Env::new_virtual();
-        env.builtins.insert(
-            "builtin",
-            Builtin::new(yash_env::builtin::Type::Mandatory, builtin_main),
-        );
-        env.builtins.insert(
-            "special",
-            Builtin::new(yash_env::builtin::Type::Special, special_main),
-        );
+        env.builtins
+            .insert("builtin", Builtin::new(Mandatory, builtin_main));
+        env.builtins
+            .insert("special", Builtin::new(Special, special_main));
         let command: syntax::SimpleCommand = "builtin".parse().unwrap();
         _ = command.execute(&mut env).now_or_never().unwrap();
         let command: syntax::SimpleCommand = "special".parse().unwrap();
