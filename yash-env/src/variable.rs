@@ -1338,7 +1338,7 @@ mod tests {
     #[test]
     fn env_c_strings() {
         let mut variables = VariableSet::new();
-        assert_eq!(&variables.env_c_strings(), &[]);
+        assert_eq!(variables.env_c_strings(), [] as [CString; 0]);
 
         let mut var = variables.get_or_new("foo", Scope::Global);
         var.assign("FOO", None).unwrap();
