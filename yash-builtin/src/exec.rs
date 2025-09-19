@@ -227,7 +227,7 @@ mod tests {
         let arguments = process.last_exec().as_ref().unwrap();
         assert_eq!(arguments.0, c"/bin/echo".to_owned());
         assert_eq!(arguments.1, [c"/bin/echo".to_owned()]);
-        assert_eq!(arguments.2, []);
+        assert_eq!(arguments.2, [] as [CString; 0]);
     }
 
     #[test]
