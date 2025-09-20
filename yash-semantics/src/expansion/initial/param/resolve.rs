@@ -17,6 +17,7 @@
 //! Resolving parameter names to values
 
 use yash_env::Env;
+use yash_env::job::Pid;
 use yash_env::variable::Expansion;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::Param;
@@ -41,6 +42,13 @@ pub fn resolve<'a>(env: &'a Env, param: &Param, location: &Location) -> Expansio
         }
         value.into()
     }
+    fn non_zero_pid_or_unset(pid: Pid) -> Expansion<'static> {
+        if pid.0 != 0 {
+            pid.to_string().into()
+        } else {
+            Expansion::Unset
+        }
+    }
     fn positional(env: &Env) -> &[String] {
         &env.variables.positional_params().values
     }
@@ -52,7 +60,7 @@ pub fn resolve<'a>(env: &'a Env, param: &Param, location: &Location) -> Expansio
         Special(Question) => env.exit_status.to_string().into(),
         Special(Hyphen) => options(env),
         Special(Dollar) => env.main_pid.to_string().into(),
-        Special(Exclamation) => env.jobs.last_async_pid().to_string().into(),
+        Special(Exclamation) => non_zero_pid_or_unset(env.jobs.last_async_pid()),
         Special(Zero) => env.arg0.as_str().into(),
         Positional(0) => Expansion::Unset,
         Positional(index) => positional(env).get(index - 1).into(),
@@ -221,7 +229,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let loc = Location::dummy("");
         let result = resolve(&env, &Param::from(SpecialParam::Exclamation), &loc);
-        assert_eq!(result, Expansion::Scalar("0".into()));
+        assert_eq!(result, Expansion::Unset);
 
         env.jobs.set_last_async_pid(Pid(72));
         let result = resolve(&env, &Param::from(SpecialParam::Exclamation), &loc);
