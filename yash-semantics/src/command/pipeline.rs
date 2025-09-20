@@ -153,11 +153,11 @@ fn to_job_name(commands: &[Rc<syntax::Command>]) -> String {
 
 async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Command>]) -> Result {
     // Start commands
-    let mut commands = commands.iter().cloned().peekable();
+    let mut commands = commands.iter().cloned();
     let mut pipes = PipeSet::new();
     let mut pids = Vec::new();
     while let Some(command) = commands.next() {
-        let has_next = commands.peek().is_some();
+        let has_next = commands.len() > 0; // TODO ExactSizeIterator::is_empty
         shift_or_fail(env, &mut pipes, has_next).await?;
 
         let pipes = pipes;
