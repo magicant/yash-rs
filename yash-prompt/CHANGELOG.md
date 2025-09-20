@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - External dependency versions:
     - yash-syntax 0.15.0 → 0.15.1
+- Internal dependency versions:
+    - yash-semantics 0.8.0 → 0.8.1
 
 ## [0.6.0] - 2025-05-11
 
