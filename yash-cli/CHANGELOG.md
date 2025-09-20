@@ -9,6 +9,23 @@ used by other programs.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.5] - 2025-09-20
+
+### Added
+
+- The `return` built-in now supports the `--no-return` option as a synonym of
+  `-n`, which returns the specified exit status without actually returning from
+  the current function or script.
+
+### Fixed
+
+- The `eval`, `exit`, `return`, `shift`, and `typeset` built-ins now correctly
+  handle the `--` separator between options and operands.
+- The `export`, `readonly`, and `typeset` built-ins now correctly print the `--`
+  separator when the name of a variable or function starts with `-`.
+- The `jobs` built-in no longer crashes when reporting the same finished job more
+  than once in a single invocation.
+
 ## [0.4.4] - 2025-09-20
 
 ### Fixed
@@ -21,23 +38,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.3] - 2025-09-14
 
+**Update:** This version was accidentally published without updating the
+necessary dependencies for the advertised behavior. Please use version 0.4.5 or
+later.
+
 ### Added
 
-- The `return` built-in now supports the `--no-return` option as a synonym of
+- ~~The `return` built-in now supports the `--no-return` option as a synonym of
   `-n`, which returns the specified exit status without actually returning from
-  the current function or script.
+  the current function or script.~~
 
 ### Fixed
 
 - Error messages now accurately highlight the relevant source code fragment.
   Previously, the shell could highlight the wrong section or crash when the
   source contained multi-byte characters.
-- The `eval`, `exit`, `return`, `shift`, and `typeset` built-ins now correctly
-  handle the `--` separator between options and operands.
-- The `export`, `readonly`, and `typeset` built-ins now correctly print the `--`
-  separator when the name of a variable or function starts with `-`.
-- The `jobs` built-in no longer crashes when reporting the same finished job more
-  than once in a single invocation.
+- ~~The `eval`, `exit`, `return`, `shift`, and `typeset` built-ins now correctly
+  handle the `--` separator between options and operands.~~
+- ~~The `export`, `readonly`, and `typeset` built-ins now correctly print the `--`
+  separator when the name of a variable or function starts with `-`.~~
+- ~~The `jobs` built-in no longer crashes when reporting the same finished job more
+  than once in a single invocation.~~
 
 ## [0.4.2] - 2025-05-11
 
@@ -229,6 +250,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release of the shell
 
+[0.4.5]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.4.5
 [0.4.4]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.4.4
 [0.4.3]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.4.3
 [0.4.2]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-0.4.2
