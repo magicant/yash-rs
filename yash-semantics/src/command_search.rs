@@ -226,6 +226,11 @@ pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
 ///
 /// Returns the path to the executable if found. Note that the returned path may
 /// not be absolute if the `$PATH` contains a relative path.
+///
+/// This function requires a mutable reference to the environment because it may
+/// need to update a cache of the results of external utility search (TODO:
+/// which is not yet implemented). The function does not otherwise modify the
+/// environment.
 pub fn search_path<E: PathEnv>(env: &mut E, name: &str) -> Option<CString> {
     env.path()
         .split()
