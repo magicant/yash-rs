@@ -124,6 +124,8 @@ pub enum Option {
     Monitor,
     /// Automatically reports the results of asynchronous jobs.
     Notify,
+    /// Makes a pipeline reflect the exit status of the last failed component.
+    PipeFail,
     /// Disables most non-POSIX extensions.
     PosixlyCorrect,
     /// Reads commands from the standard input.
@@ -172,6 +174,7 @@ impl Option {
             Login => Some(('l', On)),
             Monitor => Some(('m', On)),
             Notify => Some(('b', On)),
+            PipeFail => None,
             PosixlyCorrect => None,
             Stdin => Some(('s', On)),
             Unset => Some(('u', Off)),
@@ -201,6 +204,7 @@ impl Option {
             Login => "login",
             Monitor => "monitor",
             Notify => "notify",
+            PipeFail => "pipefail",
             PosixlyCorrect => "posixlycorrect",
             Stdin => "stdin",
             Unset => "unset",
@@ -265,6 +269,7 @@ impl FromStr for Option {
             ("login", Login),
             ("monitor", Monitor),
             ("notify", Notify),
+            ("pipefail", PipeFail),
             ("posixlycorrect", PosixlyCorrect),
             ("stdin", Stdin),
             ("unset", Unset),

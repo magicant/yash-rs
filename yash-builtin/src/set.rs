@@ -247,6 +247,7 @@ log              on
 login            off
 monitor          off
 notify           off
+pipefail         off
 posixlycorrect   off
 stdin            off
 unset            off

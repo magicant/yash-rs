@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.0] - Unreleased
 
 - External dependency versions:
+    - yash-env 0.8.0 → 0.8.1
     - yash-semantics (optional) 0.8.1 → 0.9.0
 
 ## [0.9.1] - 2025-09-20
@@ -45,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - External dependency versions:
-    - yash-env 0.8.0 → 0.9.0
+    - yash-env 0.7.1 → 0.8.0
     - yash-semantics (optional) 0.7.1 → 0.8.0
     - yash-syntax 0.14.1 → 0.15.0
 - Internal dependency versions:

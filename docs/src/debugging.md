@@ -10,12 +10,7 @@ Many utilities return a non-zero exit status when they fail, but by default the 
 
 By default, the exit status of a pipeline reflects only the last command, ignoring failures in earlier commands. To make the pipeline fail if any command fails, enable the `pipefail` [shell option]. With `pipefail`, the pipeline's exit status is that of the last command that returned a non-zero status, or zero if all returned zero. This helps catch errors in pipelines.
 
-<!-- markdownlint-disable-next-line MD033 -->
-<p class="warning">
-The `pipefail` option is not yet implemented in yash-rs.
-</p>
-
-<!-- TODO: Move the description and add examples to pipelines.md, and leave a link here -->
+See the [pipeline documentation](language/commands/pipelines.md#catching-errors-across-pipeline-components) for details.
 
 ## Blocking unset parameters
 

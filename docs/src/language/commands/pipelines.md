@@ -44,10 +44,27 @@ $ ls \
 
 If a pipeline contains only one command, the shell runs that command directly. For multiple commands, the shell creates a [subshell](../../environment/index.html#subshells) for each and connects them with pipes. Each command's [standard output](../redirections/index.html#what-are-file-descriptors) is connected to the next command's [standard input](../redirections/index.html#what-are-file-descriptors). The first command's input and the last command's output are not changed. All commands in the pipeline run concurrently.
 
-The shell waits for all commands in the pipeline to finish before proceeding. The [exit status](exit_status.md#exit-status) of the pipeline is the exit status of the last command in the pipeline. (In the future, yash-rs may only wait for the last command to finish.)
+The shell waits for all commands in the pipeline to finish before proceeding. In the future, yash-rs may only wait for commands needed to determine the pipeline's exit status. By default, the [exit status](exit_status.md#exit-status) of the pipeline is the exit status of the last command in the pipeline, but see the next section for how to change this behavior.
 
-<!-- TODO: ## Pipefail -->
-<!-- TODO: Description and example of `pipefail`. -->
+## Catching errors across pipeline components
+
+By default, the exit status of a pipeline reflects only the last command, ignoring failures in earlier commands. To make the pipeline fail if any command fails, enable the `pipefail` [shell option](../../environment/options.md). With `pipefail`, the pipeline's exit status is that of the last command that returned a non-zero status, or zero if all returned zero. This helps catch errors in pipelines.
+
+```shell
+$ set +o pipefail
+$ echo foo | ( cat; exit 42 ) | grep foo
+foo
+$ echo $?
+0
+```
+
+```shell
+$ set -o pipefail
+$ echo foo | ( cat; exit 42 ) | grep foo
+foo
+$ echo $?
+42
+```
 
 ## Negation
 
