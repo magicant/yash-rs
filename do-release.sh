@@ -8,7 +8,7 @@ if [ $# -eq 0 ]; then
 fi
 
 # Ensure that the working directory is clean
-if ! git diff --quiet HEAD; then
+if ! git diff --quiet; then
     printf 'error: working directory is not clean\n' >&2
     exit 1
 fi
