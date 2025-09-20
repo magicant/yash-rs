@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Command search.
+//! Command search
 //!
 //! The [command search](search) is part of the execution of a [simple
 //! command](yash_syntax::syntax::SimpleCommand). It determines a command target
@@ -34,7 +34,6 @@
 //! as a target, a corresponding executable file must be present in a directory
 //! specified in the `$PATH` variable.
 
-use assert_matches::assert_matches;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::rc::Rc;
@@ -65,6 +64,8 @@ pub enum Target {
     Builtin {
         /// Definition of the built-in
         builtin: Builtin,
+
+        // TODO Change the type of this field to `CString`
         /// Path to the external utility that is shadowed by the substitutive
         /// built-in
         ///
@@ -113,7 +114,18 @@ impl From<Function> for Target {
 // not implemented because of ambiguity between substitutive built-ins and
 // external utilities
 
-/// Part of the shell execution environment command path search depends on.
+/// Collection of data used in [classifying](classify) command names
+pub trait ClassifyEnv {
+    /// Retrieves the built-in by name.
+    #[must_use]
+    fn builtin(&self, name: &str) -> Option<Builtin>;
+
+    /// Retrieves the function by name.
+    #[must_use]
+    fn function(&self, name: &str) -> Option<&Rc<Function>>;
+}
+
+/// Part of the shell execution environment command path search depends on
 pub trait PathEnv {
     /// Accesses the `$PATH` variable in the environment.
     ///
@@ -129,7 +141,10 @@ pub trait PathEnv {
     // TODO Cache the results of external utility search
 }
 
-/// Part of the shell execution environment command search depends on.
+// TODO Remove in favor of ClassifyEnv
+/// Part of the shell execution environment command search depends on
+///
+/// **This trait will be removed in the future.**
 pub trait SearchEnv: PathEnv {
     /// Retrieves the built-in by name.
     #[must_use]
@@ -138,6 +153,18 @@ pub trait SearchEnv: PathEnv {
     /// Retrieves the function by name.
     #[must_use]
     fn function(&self, name: &str) -> Option<&Rc<Function>>;
+}
+
+impl<E: SearchEnv> ClassifyEnv for E {
+    #[inline]
+    fn builtin(&self, name: &str) -> Option<Builtin> {
+        SearchEnv::builtin(self, name)
+    }
+
+    #[inline]
+    fn function(&self, name: &str) -> Option<&Rc<Function>> {
+        SearchEnv::function(self, name)
+    }
 }
 
 impl PathEnv for Env {
@@ -173,20 +200,71 @@ impl SearchEnv for Env {
 
 /// Performs command search.
 ///
-/// This function requires a mutable reference to the environment because it may
-/// need to update a cache of the results of external utility search (TODO:
-/// which is not yet implemented). The function does not otherwise modify the
-/// environment.
+/// This function effectively combines the [`classify`] and [`search_path`]
+/// functions into a single operation performing full command search.
 ///
-/// If the given name contains a slash, the function immediately returns an
-/// external utility target, regardless of whether the named external utility
-/// actually exists.
+/// See [`search_path`] for why this function requires a mutable reference to
+/// the environment.
+///
+/// See the [module documentation](self) for details of the command search
+/// process.
+///
+/// **`SearchEnv` will be removed in the future, and this function will require
+/// `ClassifyEnv + PathEnv` instead.**
 pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
+    let mut target = classify(env, name);
+
+    match &mut target {
+        Target::Builtin {
+            builtin,
+            path: Some(path),
+        } => {
+            assert_eq!(builtin.r#type, Substitutive);
+            // Must verify the external counterpart exists.
+            if let Some(real_path) = search_path(env, name) {
+                *path = real_path;
+            } else {
+                return None;
+            }
+        }
+
+        Target::External { path } => {
+            let real_path = if name.contains('/') {
+                // Just access the given path.
+                CString::new(name).ok()
+            } else {
+                // Need to actually find it in PATH.
+                search_path(env, name)
+            };
+            if let Some(real_path) = real_path {
+                *path = real_path;
+            } else {
+                return None;
+            }
+        }
+        // TODO Deduplicate the above two search_path calls
+        Target::Builtin { .. } | Target::Function(_) => {
+            // Nothing to do.
+        }
+    }
+
+    Some(target)
+}
+
+/// Determines the type of command target without performing a full search.
+///
+/// This function is a simplified version of [`search`] that only classifies the
+/// command name into one of the target types. It does not return the actual
+/// target path, so it is more efficient than `search` if the caller only needs
+/// to know the type of target. However, since the function does not search for
+/// external utilities, it cannot determine whether a substitutive built-in or
+/// an external utility is the actual target. This function always assumes that
+/// searching for an external utility would succeed and returns a target with
+/// an empty path in such cases.
+pub fn classify<E: ClassifyEnv>(env: &E, name: &str) -> Target {
     if name.contains('/') {
-        return if let Ok(path) = CString::new(name) {
-            Some(Target::External { path })
-        } else {
-            None
+        return Target::External {
+            path: CString::default(),
         };
     }
 
@@ -194,38 +272,37 @@ pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
     if let Some(builtin) = builtin {
         if builtin.r#type == Special {
             let path = None;
-            return Some(Target::Builtin { builtin, path });
+            return Target::Builtin { builtin, path };
         }
     }
 
     if let Some(function) = env.function(name) {
-        return Some(Rc::clone(function).into());
+        return Rc::clone(function).into();
     }
 
     if let Some(builtin) = builtin {
-        if builtin.r#type != Substitutive {
-            assert_matches!(builtin.r#type, Mandatory | Elective | Extension);
-            let path = None;
-            return Some(Target::Builtin { builtin, path });
-        }
+        let path = match builtin.r#type {
+            Special => unreachable!(),
+            Mandatory | Elective | Extension => None,
+            Substitutive => Some(CString::default()),
+        };
+        return Target::Builtin { builtin, path };
     }
 
-    if let Some(path) = search_path(env, name) {
-        if let Some(builtin) = builtin {
-            assert_eq!(builtin.r#type, Substitutive);
-            let path = Some(path);
-            return Some(Target::Builtin { builtin, path });
-        }
-        return Some(Target::External { path });
+    Target::External {
+        path: CString::default(),
     }
-
-    None
 }
 
 /// Searches the `$PATH` for an executable file.
 ///
 /// Returns the path to the executable if found. Note that the returned path may
 /// not be absolute if the `$PATH` contains a relative path.
+///
+/// This function requires a mutable reference to the environment because it may
+/// need to update a cache of the results of external utility search (TODO:
+/// which is not yet implemented). The function does not otherwise modify the
+/// environment.
 pub fn search_path<E: PathEnv>(env: &mut E, name: &str) -> Option<CString> {
     env.path()
         .split()
@@ -308,6 +385,20 @@ mod tests {
     }
 
     #[test]
+    fn classify_defaults_to_external() {
+        // In an empty environment, any name is not a built-in or function, so it
+        // is classified as an external utility.
+        let env = DummyEnv::default();
+        let target = classify(&env, "foo");
+        assert_eq!(
+            target,
+            Target::External {
+                path: CString::default()
+            }
+        );
+    }
+
+    #[test]
     fn special_builtin_is_found() {
         let mut env = DummyEnv::default();
         let builtin = Builtin::new(Special, |_, _| unreachable!());
@@ -316,6 +407,12 @@ mod tests {
         assert_matches!(
             search(&mut env, "foo"),
             Some(Target::Builtin { builtin: result, path: None }) => {
+                assert_eq!(result.r#type, builtin.r#type);
+            }
+        );
+        assert_matches!(
+            classify(&env, "foo"),
+            Target::Builtin { builtin: result, path: None } => {
                 assert_eq!(result.r#type, builtin.r#type);
             }
         );
@@ -332,6 +429,9 @@ mod tests {
         env.functions.define(function.clone()).unwrap();
 
         assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
+            assert_eq!(result, function);
+        });
+        assert_matches!(classify(&env, "foo"), Target::Function(result) => {
             assert_eq!(result, function);
         });
     }
@@ -354,6 +454,12 @@ mod tests {
                 assert_eq!(result.r#type, builtin.r#type);
             }
         );
+        assert_matches!(
+            classify(&env, "foo"),
+            Target::Builtin { builtin: result, path: None } => {
+                assert_eq!(result.r#type, builtin.r#type);
+            }
+        );
     }
 
     #[test]
@@ -365,6 +471,12 @@ mod tests {
         assert_matches!(
             search(&mut env, "foo"),
             Some(Target::Builtin { builtin: result, path: None }) => {
+                assert_eq!(result.r#type, builtin.r#type);
+            }
+        );
+        assert_matches!(
+            classify(&env, "foo"),
+            Target::Builtin { builtin: result, path: None } => {
                 assert_eq!(result.r#type, builtin.r#type);
             }
         );
@@ -382,6 +494,12 @@ mod tests {
                 assert_eq!(result.r#type, builtin.r#type);
             }
         );
+        assert_matches!(
+            classify(&env, "foo"),
+            Target::Builtin { builtin: result, path: None } => {
+                assert_eq!(result.r#type, builtin.r#type);
+            }
+        );
     }
 
     #[test]
@@ -393,6 +511,12 @@ mod tests {
         assert_matches!(
             search(&mut env, "foo"),
             Some(Target::Builtin { builtin: result, path: None }) => {
+                assert_eq!(result.r#type, builtin.r#type);
+            }
+        );
+        assert_matches!(
+            classify(&env, "foo"),
+            Target::Builtin { builtin: result, path: None } => {
                 assert_eq!(result.r#type, builtin.r#type);
             }
         );
@@ -414,6 +538,9 @@ mod tests {
         assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
             assert_eq!(result, function);
         });
+        assert_matches!(classify(&env, "foo"), Target::Function(result) => {
+            assert_eq!(result, function);
+        });
     }
 
     #[test]
@@ -430,6 +557,9 @@ mod tests {
         env.functions.define(function.clone()).unwrap();
 
         assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
+            assert_eq!(result, function);
+        });
+        assert_matches!(classify(&env, "foo"), Target::Function(result) => {
             assert_eq!(result, function);
         });
     }
@@ -450,6 +580,9 @@ mod tests {
         assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
             assert_eq!(result, function);
         });
+        assert_matches!(classify(&env, "foo"), Target::Function(result) => {
+            assert_eq!(result, function);
+        });
     }
 
     #[test]
@@ -467,6 +600,13 @@ mod tests {
                 assert_eq!(path.to_bytes(), b"/bin/foo");
             }
         );
+        assert_matches!(
+            classify(&env, "foo"),
+            Target::Builtin { builtin: result, path: Some(path) } => {
+                assert_eq!(result.r#type, builtin.r#type);
+                assert_eq!(path.to_bytes(), b"");
+            }
+        );
     }
 
     #[test]
@@ -477,6 +617,21 @@ mod tests {
 
         let target = search(&mut env, "foo");
         assert!(target.is_none(), "target = {target:?}");
+    }
+
+    #[test]
+    fn substitutive_builtin_is_classified_even_without_external_executable() {
+        let mut env = DummyEnv::default();
+        let builtin = Builtin::new(Substitutive, |_, _| unreachable!());
+        env.builtins.insert("foo", builtin);
+
+        assert_matches!(
+            classify(&env, "foo"),
+            Target::Builtin { builtin: result, path: Some(path) } => {
+                assert_eq!(result.r#type, builtin.r#type);
+                assert_eq!(path.to_bytes(), b"");
+            }
+        );
     }
 
     #[test]
@@ -497,6 +652,9 @@ mod tests {
         assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
             assert_eq!(result, function);
         });
+        assert_matches!(classify(&env, "foo"), Target::Function(result) => {
+            assert_eq!(result, function);
+        });
     }
 
     #[test]
@@ -508,14 +666,25 @@ mod tests {
         assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
             assert_eq!(path.to_bytes(), "/bin/foo".as_bytes());
         });
+        assert_matches!(classify(&env, "foo"), Target::External { path } => {
+            assert_eq!(path.to_bytes(), b"");
+        });
     }
 
     #[test]
     fn returns_external_utility_if_name_contains_slash() {
         // In this case, the external utility file does not have to exist.
         let mut env = DummyEnv::default();
+        // The special built-in should be ignored because the command name
+        // contains a slash.
+        let builtin = Builtin::new(Special, |_, _| unreachable!());
+        env.builtins.insert("bar/baz", builtin);
+
         assert_matches!(search(&mut env, "bar/baz"), Some(Target::External { path }) => {
             assert_eq!(path.to_bytes(), "bar/baz".as_bytes());
+        });
+        assert_matches!(classify(&env, "bar/baz"), Target::External { path } => {
+            assert_eq!(path.to_bytes(), b"");
         });
     }
 

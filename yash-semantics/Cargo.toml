@@ -15,7 +15,7 @@ categories = ["command-line-utilities"]
 publish = false
 
 [dependencies]
-assert_matches = { workspace = true }
+either = { workspace = true }
 enumset = { workspace = true }
 itertools = { workspace = true }
 thiserror = { workspace = true }
@@ -26,6 +26,7 @@ yash-quote = { workspace = true }
 yash-syntax = { workspace = true }
 
 [dev-dependencies]
+assert_matches = { workspace = true }
 futures-executor = { workspace = true }
 futures-util = { workspace = true, features = ["channel"] }
 yash-env-test-helper = { workspace = true }

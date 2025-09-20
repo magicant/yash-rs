@@ -575,7 +575,7 @@ dependencies = [
 
 [[package]]
 name = "yash-cli"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "assert_matches",
  "futures-util",
@@ -661,6 +661,7 @@ name = "yash-semantics"
 version = "0.8.1"
 dependencies = [
  "assert_matches",
+ "either",
  "enumset",
  "futures-executor",
  "futures-util",
