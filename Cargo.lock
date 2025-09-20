@@ -619,7 +619,7 @@ dependencies = [
 
 [[package]]
 name = "yash-env-test-helper"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "assert_matches",
  "futures-executor",
