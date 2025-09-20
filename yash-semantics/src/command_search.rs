@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Command search.
+//! Command search
 //!
 //! The [command search](search) is part of the execution of a [simple
 //! command](yash_syntax::syntax::SimpleCommand). It determines a command target
@@ -113,7 +113,7 @@ impl From<Function> for Target {
 // not implemented because of ambiguity between substitutive built-ins and
 // external utilities
 
-/// Part of the shell execution environment command path search depends on.
+/// Part of the shell execution environment command path search depends on
 pub trait PathEnv {
     /// Accesses the `$PATH` variable in the environment.
     ///
@@ -129,7 +129,7 @@ pub trait PathEnv {
     // TODO Cache the results of external utility search
 }
 
-/// Part of the shell execution environment command search depends on.
+/// Part of the shell execution environment command search depends on
 pub trait SearchEnv: PathEnv {
     /// Retrieves the built-in by name.
     #[must_use]
