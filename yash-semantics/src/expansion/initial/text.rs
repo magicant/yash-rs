@@ -55,7 +55,9 @@ use yash_syntax::syntax::Unquote;
 ///
 /// - `?` expands to the [last exit status](yash_env::Env::exit_status).
 /// - `!` expands to the [process ID of the last asynchronous
-///   command](yash_env::job::JobList::last_async_pid).
+///   command](yash_env::job::JobList::last_async_pid). If no asynchronous
+///   command has been executed (that is, if the value is zero), the parameter
+///   is considered unset.
 /// - `@` expands to all positional parameters. When expanded in double-quotes
 ///   as in `"${@}"`, it produces the correct number of fields exactly matching
 ///   the current positional parameters. Especially if there are zero positional
