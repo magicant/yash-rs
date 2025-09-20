@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       (`impl command::Command for yash_syntax::syntax::SimpleCommand`) to classify
       the command name before performing redirections and variable assignments
       without redundant searching for an external utility.
+- The `command_search::ClassifyEnv` trait has been added to provide the
+  environment required by the `command_search::classify` function.
+    - This trait is a subset of the `command_search::SearchEnv` trait.
 - Internal dependencies:
     - either 1.9.0
 

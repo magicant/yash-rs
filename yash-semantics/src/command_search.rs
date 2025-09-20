@@ -114,6 +114,17 @@ impl From<Function> for Target {
 // not implemented because of ambiguity between substitutive built-ins and
 // external utilities
 
+/// Collection of data used in [classifying](classify) command names
+pub trait ClassifyEnv {
+    /// Retrieves the built-in by name.
+    #[must_use]
+    fn builtin(&self, name: &str) -> Option<Builtin>;
+
+    /// Retrieves the function by name.
+    #[must_use]
+    fn function(&self, name: &str) -> Option<&Rc<Function>>;
+}
+
 /// Part of the shell execution environment command path search depends on
 pub trait PathEnv {
     /// Accesses the `$PATH` variable in the environment.
@@ -130,7 +141,10 @@ pub trait PathEnv {
     // TODO Cache the results of external utility search
 }
 
+// TODO Remove in favor of ClassifyEnv
 /// Part of the shell execution environment command search depends on
+///
+/// **This trait will be removed in the future.**
 pub trait SearchEnv: PathEnv {
     /// Retrieves the built-in by name.
     #[must_use]
@@ -139,6 +153,18 @@ pub trait SearchEnv: PathEnv {
     /// Retrieves the function by name.
     #[must_use]
     fn function(&self, name: &str) -> Option<&Rc<Function>>;
+}
+
+impl<E: SearchEnv> ClassifyEnv for E {
+    #[inline]
+    fn builtin(&self, name: &str) -> Option<Builtin> {
+        SearchEnv::builtin(self, name)
+    }
+
+    #[inline]
+    fn function(&self, name: &str) -> Option<&Rc<Function>> {
+        SearchEnv::function(self, name)
+    }
 }
 
 impl PathEnv for Env {
@@ -182,6 +208,9 @@ impl SearchEnv for Env {
 ///
 /// See the [module documentation](self) for details of the command search
 /// process.
+///
+/// **`SearchEnv` will be removed in the future, and this function will require
+/// `ClassifyEnv + PathEnv` instead.**
 pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
     let mut target = classify(env, name);
 
@@ -222,7 +251,6 @@ pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
     Some(target)
 }
 
-// TODO Require ClassifyEnv instead of SearchEnv
 /// Determines the type of command target without performing a full search.
 ///
 /// This function is a simplified version of [`search`] that only classifies the
@@ -233,7 +261,7 @@ pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
 /// an external utility is the actual target. This function always assumes that
 /// searching for an external utility would succeed and returns a target with
 /// an empty path in such cases.
-pub fn classify<E: SearchEnv>(env: &E, name: &str) -> Target {
+pub fn classify<E: ClassifyEnv>(env: &E, name: &str) -> Target {
     if name.contains('/') {
         return Target::External {
             path: CString::default(),
