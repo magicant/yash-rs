@@ -34,7 +34,6 @@
 //! as a target, a corresponding executable file must be present in a directory
 //! specified in the `$PATH` variable.
 
-use assert_matches::assert_matches;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::rc::Rc;
@@ -175,53 +174,52 @@ impl SearchEnv for Env {
 
 /// Performs command search.
 ///
-/// This function requires a mutable reference to the environment because it may
-/// need to update a cache of the results of external utility search (TODO:
-/// which is not yet implemented). The function does not otherwise modify the
-/// environment.
+/// This function effectively combines the [`classify`] and [`search_path`]
+/// functions into a single operation performing full command search.
 ///
-/// If the given name contains a slash, the function immediately returns an
-/// external utility target, regardless of whether the named external utility
-/// actually exists.
+/// See [`search_path`] for why this function requires a mutable reference to
+/// the environment.
+///
+/// See the [module documentation](self) for details of the command search
+/// process.
 pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
-    if name.contains('/') {
-        return if let Ok(path) = CString::new(name) {
-            Some(Target::External { path })
-        } else {
-            None
-        };
-    }
+    let mut target = classify(env, name);
 
-    let builtin = env.builtin(name);
-    if let Some(builtin) = builtin {
-        if builtin.r#type == Special {
-            let path = None;
-            return Some(Target::Builtin { builtin, path });
-        }
-    }
-
-    if let Some(function) = env.function(name) {
-        return Some(Rc::clone(function).into());
-    }
-
-    if let Some(builtin) = builtin {
-        if builtin.r#type != Substitutive {
-            assert_matches!(builtin.r#type, Mandatory | Elective | Extension);
-            let path = None;
-            return Some(Target::Builtin { builtin, path });
-        }
-    }
-
-    if let Some(path) = search_path(env, name) {
-        if let Some(builtin) = builtin {
+    match &mut target {
+        Target::Builtin {
+            builtin,
+            path: Some(path),
+        } => {
             assert_eq!(builtin.r#type, Substitutive);
-            let path = Some(path);
-            return Some(Target::Builtin { builtin, path });
+            // Must verify the external counterpart exists.
+            if let Some(real_path) = search_path(env, name) {
+                *path = real_path;
+            } else {
+                return None;
+            }
         }
-        return Some(Target::External { path });
+
+        Target::External { path } => {
+            let real_path = if name.contains('/') {
+                // Just access the given path.
+                CString::new(name).ok()
+            } else {
+                // Need to actually find it in PATH.
+                search_path(env, name)
+            };
+            if let Some(real_path) = real_path {
+                *path = real_path;
+            } else {
+                return None;
+            }
+        }
+        // TODO Deduplicate the above two search_path calls
+        Target::Builtin { .. } | Target::Function(_) => {
+            // Nothing to do.
+        }
     }
 
-    None
+    Some(target)
 }
 
 // TODO Require ClassifyEnv instead of SearchEnv
