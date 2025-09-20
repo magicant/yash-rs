@@ -23,7 +23,7 @@
 
 use crate::Handle;
 use crate::command::Command;
-use crate::command_search::search;
+use crate::command_search::classify;
 use crate::expansion::expand_word_with_mode;
 use crate::xtrace::XTrace;
 use std::ops::ControlFlow::Continue;
@@ -169,17 +169,16 @@ impl Command for syntax::SimpleCommand {
 
         use crate::command_search::Target::{Builtin, External, Function};
         if let Some(name) = fields.first() {
-            match search(env, &name.value) {
-                Some(Builtin { builtin, .. }) => {
+            match classify(env, &name.value) {
+                Builtin { builtin, path: _ } => {
                     execute_builtin(env, builtin, &self.assigns, fields, &self.redirs).await
                 }
-                Some(Function(function)) => {
+                Function(function) => {
                     execute_function(env, function, &self.assigns, fields, &self.redirs).await
                 }
-                Some(External { path: _ }) => {
+                External { path: _ } => {
                     execute_external_utility(env, &self.assigns, fields, &self.redirs).await
                 }
-                None => execute_external_utility(env, &self.assigns, fields, &self.redirs).await,
             }
         } else {
             let exit_status = exit_status.unwrap_or_default();

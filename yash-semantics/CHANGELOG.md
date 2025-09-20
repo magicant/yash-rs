@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The `command_search::classify` function has been added to classify a command
+  name without searching for an external utility.
+    - This function is used in the execution of a simple command
+      (`impl command::Command for yash_syntax::syntax::SimpleCommand`) to classify
+      the command name before performing redirections and variable assignments
+      without redundant searching for an external utility.
 - Internal dependencies:
     - either 1.9.0
 
