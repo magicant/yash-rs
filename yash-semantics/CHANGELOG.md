@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - External dependency versions:
     - yash-syntax 0.15.0 → 0.15.1
 
+### Removed
+
+- Internal dependencies:
+    - assert_matches 1.5.0
+
 ### Fixed
 
 - The execution of a simple command
