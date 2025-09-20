@@ -141,32 +141,6 @@ pub trait PathEnv {
     // TODO Cache the results of external utility search
 }
 
-// TODO Remove in favor of ClassifyEnv
-/// Part of the shell execution environment command search depends on
-///
-/// **This trait will be removed in the future.**
-pub trait SearchEnv: PathEnv {
-    /// Retrieves the built-in by name.
-    #[must_use]
-    fn builtin(&self, name: &str) -> Option<Builtin>;
-
-    /// Retrieves the function by name.
-    #[must_use]
-    fn function(&self, name: &str) -> Option<&Rc<Function>>;
-}
-
-impl<E: SearchEnv> ClassifyEnv for E {
-    #[inline]
-    fn builtin(&self, name: &str) -> Option<Builtin> {
-        SearchEnv::builtin(self, name)
-    }
-
-    #[inline]
-    fn function(&self, name: &str) -> Option<&Rc<Function>> {
-        SearchEnv::function(self, name)
-    }
-}
-
 impl PathEnv for Env {
     /// Returns the value of the `$PATH` variable.
     ///
@@ -187,7 +161,7 @@ impl PathEnv for Env {
     }
 }
 
-impl SearchEnv for Env {
+impl ClassifyEnv for Env {
     fn builtin(&self, name: &str) -> Option<Builtin> {
         self.builtins.get(name).copied()
     }
@@ -208,10 +182,7 @@ impl SearchEnv for Env {
 ///
 /// See the [module documentation](self) for details of the command search
 /// process.
-///
-/// **`SearchEnv` will be removed in the future, and this function will require
-/// `ClassifyEnv + PathEnv` instead.**
-pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
+pub fn search<E: ClassifyEnv + PathEnv>(env: &mut E, name: &str) -> Option<Target> {
     let mut target = classify(env, name);
 
     match &mut target {
@@ -349,7 +320,7 @@ mod tests {
         }
     }
 
-    impl SearchEnv for DummyEnv {
+    impl ClassifyEnv for DummyEnv {
         fn builtin(&self, name: &str) -> Option<Builtin> {
             self.builtins.get(name).copied()
         }
