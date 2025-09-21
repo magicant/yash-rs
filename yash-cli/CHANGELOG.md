@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.6] - Unreleased
 
+### Added
+
+- The `pipefail` shell option is now supported.
+    - When this option is enabled, the exit status of a pipeline reflects the
+      failure of any command in the pipeline, not just the last command.
+
 ### Changed
 
 - The special parameter `!` is now considered unset if no asynchronous command

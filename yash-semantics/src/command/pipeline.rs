@@ -27,8 +27,8 @@ use yash_env::Env;
 use yash_env::System;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
-use yash_env::option::Option::{Exec, Interactive};
-use yash_env::option::State::Off;
+use yash_env::option::Option::{Exec, Interactive, PipeFail};
+use yash_env::option::State::{Off, On};
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
@@ -153,11 +153,11 @@ fn to_job_name(commands: &[Rc<syntax::Command>]) -> String {
 
 async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Command>]) -> Result {
     // Start commands
-    let mut commands = commands.iter().cloned().peekable();
+    let mut commands = commands.iter().cloned();
     let mut pipes = PipeSet::new();
     let mut pids = Vec::new();
     while let Some(command) = commands.next() {
-        let has_next = commands.peek().is_some();
+        let has_next = commands.len() > 0; // TODO ExactSizeIterator::is_empty
         shift_or_fail(env, &mut pipes, has_next).await?;
 
         let pipes = pipes;
@@ -174,15 +174,21 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
 
     shift_or_fail(env, &mut pipes, false).await?;
 
-    // Await the last command
+    // Wait for all commands to finish, collecting the exit statuses
+    let mut final_exit_status = ExitStatus::SUCCESS;
+    let pipefail = env.options.get(PipeFail) == On;
     for pid in pids {
-        // TODO Report if the child was signaled and the shell is interactive
-        env.exit_status = env
+        let exit_status = env
             .wait_for_subshell_to_finish(pid)
             .await
             .expect("cannot receive exit status of child process")
             .1;
+        if !exit_status.is_successful() || !pipefail {
+            final_exit_status = exit_status;
+        }
     }
+    env.exit_status = final_exit_status;
+
     Continue(())
 }
 
@@ -317,9 +323,7 @@ mod tests {
     use yash_env::builtin::Type::Special;
     use yash_env::job::ProcessResult;
     use yash_env::job::ProcessState;
-    use yash_env::option::Option::ErrExit;
-    use yash_env::option::Option::Monitor;
-    use yash_env::option::State::On;
+    use yash_env::option::Option::{ErrExit, Monitor};
     use yash_env::semantics::Field;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::SIGSTOP;
@@ -361,13 +365,54 @@ mod tests {
     }
 
     #[test]
-    fn multi_command_pipeline_returns_last_command_exit_status() {
+    fn multi_command_pipeline_without_pipefail_returns_last_command_exit_status() {
         in_virtual_system(|mut env, _state| async move {
             env.builtins.insert("return", return_builtin());
+            env.options.set(PipeFail, Off);
+
+            let pipeline: syntax::Pipeline = "return -n 0 | return -n 0".parse().unwrap();
+            let result = pipeline.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus(0));
+
             let pipeline: syntax::Pipeline = "return -n 10 | return -n 20".parse().unwrap();
             let result = pipeline.execute(&mut env).await;
             assert_eq!(result, Continue(()));
             assert_eq!(env.exit_status, ExitStatus(20));
+
+            let pipeline: syntax::Pipeline = "return -n 0 | return -n 20 | return -n 0 |\
+                return -n 30 | return -n 0 | return -n 0"
+                .parse()
+                .unwrap();
+            let result = pipeline.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus(0));
+        });
+    }
+
+    #[test]
+    fn multi_command_pipeline_with_pipefail_returns_last_failed_command_exit_status() {
+        in_virtual_system(|mut env, _state| async move {
+            env.builtins.insert("return", return_builtin());
+            env.options.set(PipeFail, On);
+
+            let pipeline: syntax::Pipeline = "return -n 0 | return -n 0".parse().unwrap();
+            let result = pipeline.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus(0));
+
+            let pipeline: syntax::Pipeline = "return -n 10 | return -n 20".parse().unwrap();
+            let result = pipeline.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus(20));
+
+            let pipeline: syntax::Pipeline = "return -n 0 | return -n 20 | return -n 0 |\
+                return -n 30 | return -n 0 | return -n 0"
+                .parse()
+                .unwrap();
+            let result = pipeline.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus(30));
         });
     }
 

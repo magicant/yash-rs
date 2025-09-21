@@ -106,6 +106,7 @@ log              on
 login            off
 monitor          off
 notify           off
+pipefail         off
 posixlycorrect   off
 stdin            on
 unset            on
@@ -131,6 +132,7 @@ set -o log
 set +o login
 set +o monitor
 set +o notify
+set +o pipefail
 set +o posixlycorrect
 #set -o stdin
 set -o unset
@@ -198,8 +200,7 @@ Below is a list of all shell options in yash-rs, with their long and short names
     - ⚠️ Currently has no effect in yash-rs. In the future, it will enable immediate notifications for background jobs.
     - Only takes effect if `interactive` and `monitor` are enabled.
 
-- **`pipefail`**: If set, the shell returns the [exit status](../language/commands/exit_status.md) of the last command in a [pipeline](../language/commands/pipelines.md) that failed, instead of the last command's exit status. See [Catching errors across pipeline components](../debugging.md#catching-errors-across-pipeline-components) for details.
-    - ⚠️ Not yet implemented in yash-rs.
+- **`pipefail`**: (Since 0.4.6) If set, the shell returns the [exit status](../language/commands/exit_status.md) of the last command in a [pipeline](../language/commands/pipelines.md) that failed, instead of the last command's exit status. See [Catching errors across pipeline components](../language/commands/pipelines.md#catching-errors-across-pipeline-components) for details.
 
 - **`posixlycorrect`**: If set, the shell behaves as POSIX-compliant as possible. Useful for portable scripts. <!-- TODO: link to POSIX compliance -->
     - Enabled on startup if the shell is started as `sh`.
