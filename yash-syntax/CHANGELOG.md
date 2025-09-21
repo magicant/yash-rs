@@ -5,6 +5,22 @@ All notable changes to `yash-syntax` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.2] - Unreleased
+
+### Added
+
+- New error variants in `parser::SyntaxError`:
+    - `UnsupportedFunctionDefinitionSyntax`
+    - `UnsupportedDoubleBracketCommand`
+
+### Changed
+
+- The command parser (`parser::Parser::command`) now raises
+  `SyntaxError::UnsupportedFunctionDefinitionSyntax` and
+  `SyntaxError::UnsupportedDoubleBracketCommand` when it encounters the
+  `function` and `[[` reserved words, respectively. These syntaxes are not yet
+  supported.
+
 ## [0.15.1] - 2025-09-14
 
 ### Added
@@ -490,6 +506,7 @@ command.
 - Functionalities to parse POSIX shell scripts
 - Alias substitution support
 
+[0.15.2]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.15.2
 [0.15.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.15.1
 [0.15.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.15.0
 [0.14.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.14.1

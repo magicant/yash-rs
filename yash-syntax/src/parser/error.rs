@@ -185,6 +185,10 @@ pub enum SyntaxError {
     IncompleteLongUnicodeEscape,
     /// A Unicode escape (`\u...` or `\U...`) is out of range in a dollar-single-quoted string.
     UnicodeEscapeOutOfRange,
+    /// The unsupported version of function definition syntax is used.
+    UnsupportedFunctionDefinitionSyntax,
+    /// A `[[ ... ]]` command is used.
+    UnsupportedDoubleBracketCommand,
 }
 
 impl SyntaxError {
@@ -270,6 +274,9 @@ impl SyntaxError {
                 "the Unicode escape is incomplete"
             }
             UnicodeEscapeOutOfRange => "the Unicode escape is out of range",
+            UnsupportedFunctionDefinitionSyntax | UnsupportedDoubleBracketCommand => {
+                "unsupported syntax"
+            }
         }
     }
 
@@ -349,6 +356,8 @@ impl SyntaxError {
             IncompleteShortUnicodeEscape => r"expected a hexadecimal digit after `\u`",
             IncompleteLongUnicodeEscape => r"expected a hexadecimal digit after `\U`",
             UnicodeEscapeOutOfRange => "not a valid Unicode scalar value",
+            UnsupportedFunctionDefinitionSyntax => "the `function` keyword is not yet supported",
+            UnsupportedDoubleBracketCommand => "the `[[ ... ]]` command is not yet supported",
         }
     }
 

@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       `impl expansion::initial::Expand for yash_syntax::syntax::TextUnit`.
 - External dependency versions:
     - yash-env 0.8.0 → 0.8.1
+    - yash-syntax 0.15.1 → 0.15.2
 
 ## [0.8.1] - 2025-09-20
 
