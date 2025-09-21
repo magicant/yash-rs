@@ -106,6 +106,7 @@ log              on
 login            off
 monitor          off
 notify           off
+pipefail         off
 posixlycorrect   off
 stdin            on
 unset            on
@@ -131,6 +132,7 @@ set -o log
 set +o login
 set +o monitor
 set +o notify
+set +o pipefail
 set +o posixlycorrect
 #set -o stdin
 set -o unset
