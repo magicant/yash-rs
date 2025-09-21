@@ -165,26 +165,7 @@ __IN__
 
 }
 
-test_OE -e 0 'pipefail on: single command successful pipe' -o pipefail
-true
-__IN__
-
-test_OE -e 13 'pipefail on: single command unsuccessful pipe' -o pipefail
-(exit 13)
-__IN__
-
-test_OE -e 0 'pipefail on: multi-command successful pipe' -o pipefail
-true | true | true | true
-__IN__
-
-test_OE -e 7 'pipefail on: multi-command unsuccessful pipe' -o pipefail
-true | exit 2 | true | exit 7 | true | true
-__IN__
-
-test_OE -e 7 'pipefail on: multi-command unsuccessful pipe in subshell' \
-    -o pipefail
-(true | exit 2 | true | exit 7 | true | true)
-__IN__
+# See pipeline-p.sh for the pipefail option tests.
 
 test_x -e 0 'nounset (short) on: $-' -u
 printf '%s\n' "$-" | grep -q u
