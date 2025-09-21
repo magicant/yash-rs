@@ -177,13 +177,11 @@ test_OE -e 0 'pipefail on: multi-command successful pipe' -o pipefail
 true | true | true | true
 __IN__
 
-# TODO not yet implemented
-test_OE -e 7 -f 'pipefail on: multi-command unsuccessful pipe' -o pipefail
+test_OE -e 7 'pipefail on: multi-command unsuccessful pipe' -o pipefail
 true | exit 2 | true | exit 7 | true | true
 __IN__
 
-# TODO not yet implemented
-test_OE -e 7 -f 'pipefail on: multi-command unsuccessful pipe in subshell' \
+test_OE -e 7 'pipefail on: multi-command unsuccessful pipe in subshell' \
     -o pipefail
 (true | exit 2 | true | exit 7 | true | true)
 __IN__
