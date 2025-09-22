@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New error variants in `parser::SyntaxError`:
     - `UnsupportedFunctionDefinitionSyntax`
     - `UnsupportedDoubleBracketCommand`
+    - `UnsupportedProcessRedirection`
 
 ### Changed
 
@@ -20,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `SyntaxError::UnsupportedDoubleBracketCommand` when it encounters the
   `function` and `[[` reserved words, respectively. These syntaxes are not yet
   supported.
+- The redirection parser (`parser::Parser::redirection`) now raises
+  `SyntaxError::UnsupportedProcessRedirection` when it encounters process
+  redirections (`>(...)` and `<(...)`). This syntax is not yet supported.
 
 ## [0.15.1] - 2025-09-14
 

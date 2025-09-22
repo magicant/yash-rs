@@ -189,6 +189,8 @@ pub enum SyntaxError {
     UnsupportedFunctionDefinitionSyntax,
     /// A `[[ ... ]]` command is used.
     UnsupportedDoubleBracketCommand,
+    /// A process redirection (`>(...)` or `<(...)`) is used.
+    UnsupportedProcessRedirection,
 }
 
 impl SyntaxError {
@@ -274,9 +276,9 @@ impl SyntaxError {
                 "the Unicode escape is incomplete"
             }
             UnicodeEscapeOutOfRange => "the Unicode escape is out of range",
-            UnsupportedFunctionDefinitionSyntax | UnsupportedDoubleBracketCommand => {
-                "unsupported syntax"
-            }
+            UnsupportedFunctionDefinitionSyntax
+            | UnsupportedDoubleBracketCommand
+            | UnsupportedProcessRedirection => "unsupported syntax",
         }
     }
 
@@ -358,6 +360,7 @@ impl SyntaxError {
             UnicodeEscapeOutOfRange => "not a valid Unicode scalar value",
             UnsupportedFunctionDefinitionSyntax => "the `function` keyword is not yet supported",
             UnsupportedDoubleBracketCommand => "the `[[ ... ]]` command is not yet supported",
+            UnsupportedProcessRedirection => "process redirection is not yet supported",
         }
     }
 
