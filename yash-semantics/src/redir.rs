@@ -41,9 +41,10 @@
 //! - `Pipe`: Opens a pipe, regarding the expanded field as a
 //!   non-negative decimal integer denoting a file descriptor to become the
 //!   reading end of the pipe. The target file descriptor will be the writing
-//!   end.
+//!   end. (TODO: `Pipe` is not yet implemented.)
 //! - `String`: Opens a readable file descriptor from which you can read the
-//!   expanded field followed by a newline character.
+//!   expanded field followed by a newline character. (TODO: `String` is not yet
+//!   implemented.)
 //!
 //! If the `Clobber` [shell option](yash_env::option::Option) is off and a
 //! regular file exists at the target pathname, then `FileOut` will fail.
@@ -126,6 +127,7 @@ struct SavedFd {
 
 /// Types of errors that may occur in the redirection.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[non_exhaustive]
 pub enum ErrorCause {
     /// Expansion error.
     #[error(transparent)]
@@ -167,6 +169,14 @@ pub enum ErrorCause {
     /// Error preparing a temporary file to save here-document content
     #[error("cannot prepare temporary file for here-document: {0}")]
     TemporaryFileUnavailable(Errno),
+
+    /// Pipe redirection is used, which is not yet implemented.
+    #[error("pipe redirection is not yet implemented")]
+    UnsupportedPipeRedirection,
+
+    /// Here-string redirection is used, which is not yet implemented.
+    #[error("here-string redirection is not yet implemented")]
+    UnsupportedHereString,
 }
 
 impl ErrorCause {
@@ -183,6 +193,7 @@ impl ErrorCause {
             MalformedFd(_, _) => "not a valid file descriptor",
             UnreadableFd(_) | UnwritableFd(_) => "cannot copy file descriptor",
             TemporaryFileUnavailable(_) => "cannot prepare here-document",
+            UnsupportedPipeRedirection | UnsupportedHereString => "unsupported redirection",
         }
     }
 
@@ -201,6 +212,8 @@ impl ErrorCause {
             UnreadableFd(fd) => format!("{fd}: not a readable file descriptor").into(),
             UnwritableFd(fd) => format!("{fd}: not a writable file descriptor").into(),
             TemporaryFileUnavailable(errno) => errno.to_string().into(),
+            UnsupportedPipeRedirection => "pipe redirection is not yet implemented".into(),
+            UnsupportedHereString => "here-string redirection is not yet implemented".into(),
         }
     }
 }
@@ -431,8 +444,14 @@ async fn open_normal(
         FileInOut => open_file(env, OfdAccess::ReadWrite, OpenFlag::Create.into(), operand),
         FdIn => copy_fd(env, operand, OfdAccess::ReadOnly),
         FdOut => copy_fd(env, operand, OfdAccess::WriteOnly),
-        Pipe => todo!("pipe redirection: {:?}", operand.value),
-        String => todo!("here-string: {:?}", operand.value),
+        Pipe => Err(Error {
+            cause: ErrorCause::UnsupportedPipeRedirection,
+            location: operand.origin,
+        }),
+        String => Err(Error {
+            cause: ErrorCause::UnsupportedHereString,
+            location: operand.origin,
+        }),
     }
 }
 
@@ -1567,5 +1586,35 @@ mod tests {
         assert_eq!(e.location, redir.body.operand().location);
         let write_count = env.system.write(Fd(1), &[0x20]).unwrap();
         assert_eq!(write_count, 1);
+    }
+
+    #[test]
+    fn pipe_redirection_not_yet_implemented() {
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "3>>|4".parse().unwrap();
+        let e = env
+            .perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+
+        assert_eq!(e.cause, ErrorCause::UnsupportedPipeRedirection);
+        assert_eq!(e.location, redir.body.operand().location);
+    }
+
+    #[test]
+    fn here_string_not_yet_implemented() {
+        let mut env = Env::with_system(Box::new(system_with_nofile_limit()));
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "3<<< here".parse().unwrap();
+        let e = env
+            .perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+
+        assert_eq!(e.cause, ErrorCause::UnsupportedHereString);
+        assert_eq!(e.location, redir.body.operand().location);
     }
 }

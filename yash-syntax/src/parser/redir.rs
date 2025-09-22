@@ -20,7 +20,7 @@ use super::core::Parser;
 use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
-use super::lex::Operator::{LessLess, LessLessDash};
+use super::lex::Operator::{GreaterOpenParen, LessLess, LessLessDash, LessOpenParen};
 use super::lex::TokenId::{EndOfInput, IoLocation, IoNumber, Operator, Token};
 use crate::source::Location;
 use crate::syntax::Fd;
@@ -91,7 +91,11 @@ impl Parser<'_, '_> {
         match operator {
             LessLess => Ok(Some(self.here_doc_redirection_body(false).await?)),
             LessLessDash => Ok(Some(self.here_doc_redirection_body(true).await?)),
-            // TODO <() >()
+            LessOpenParen | GreaterOpenParen => {
+                let cause = SyntaxError::UnsupportedProcessRedirection.into();
+                let location = self.peek_token().await?.word.location.clone();
+                Err(Error { cause, location })
+            }
             _ => Ok(None),
         }
     }
@@ -267,6 +271,38 @@ mod tests {
             assert_eq!(operator, RedirOp::Pipe);
             assert_eq!(operand.to_string(), "3")
         });
+    }
+
+    #[test]
+    fn parser_redirection_less_paren() {
+        let mut lexer = Lexer::with_code("<(foo)\n");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.redirection().now_or_never().unwrap().unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::UnsupportedProcessRedirection)
+        );
+        assert_eq!(*e.location.code.value.borrow(), "<(foo)\n");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(*e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.range, 0..2);
+    }
+
+    #[test]
+    fn parser_redirection_greater_paren() {
+        let mut lexer = Lexer::with_code(">(foo)\n");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.redirection().now_or_never().unwrap().unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::UnsupportedProcessRedirection)
+        );
+        assert_eq!(*e.location.code.value.borrow(), ">(foo)\n");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(*e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.range, 0..2);
     }
 
     #[test]

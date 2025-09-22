@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       failure of any command in the pipeline, not just the last command.
     - This is implemented in
       `impl command::Command for yash_syntax::syntax::Pipeline`.
+- The `redir::ErrorCause` enum now has the `UnsupportedPipeRedirection` and
+  `UnsupportedHereString` variants to indicate the use of unsupported pipe
+  redirections (`>>|`) and here-string redirections (`<<<`), respectively.
+    - These variants are returned by `redir::RedirGuard::perform_redir`
+      when such redirections are encountered.
 
 ### Changed
 
@@ -21,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   has been executed, that is, if `JobList::last_async_pid()` is zero.
     - This change is observed in the results of the `expand` method of
       `impl expansion::initial::Expand for yash_syntax::syntax::TextUnit`.
+- `redir::ErrorCause` is now marked as `non_exhaustive`.
 - External dependency versions:
     - yash-env 0.8.0 → 0.8.1
     - yash-syntax 0.15.1 → 0.15.2

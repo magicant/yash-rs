@@ -114,12 +114,17 @@ Yash-rs supports these redirection operators:
       error: please specify a user
       ```
 
-<!-- TODO: pipe redirection -->
-<!-- TODO: here-string -->
+- **`>>|`**: This operator is reserved for future use, but is not currently implemented in yash-rs.
+
+- **`<(`**: This operator is reserved for future use, but is not currently implemented in yash-rs.
+
+- **`>(`**: This operator is reserved for future use, but is not currently implemented in yash-rs.
 
 - **`<<`** (delimiter): Opens a [here-document](here_documents.md).
 
 - **`<<-`** (delimiter): Opens a [here-document](here_documents.md) with automatic removal of leading tabs.
+
+- **`<<<`** (string): This operator is reserved for future use, but is not currently implemented in yash-rs.
 
 ## Specifying file descriptors
 

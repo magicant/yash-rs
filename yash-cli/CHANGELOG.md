@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The shell now displays a more informative error message when the `function`
   or `[[` reserved word is used, indicating that these syntaxes are not yet
   supported.
+- The shell now displays a more informative error message when process
+  redirections (`>(...)` or `<(...)`), pipe redirections (`>>|`), or
+  here-strings (`<<<`) are used, indicating that these redirections are not yet
+  supported.
 
 ## [0.4.5] - 2025-09-20
 
