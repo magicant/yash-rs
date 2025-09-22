@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The special parameter `!` is now considered unset if no asynchronous command
   has been executed.
+- The shell now displays a more informative error message when the `function`
+  or `[[` reserved word is used, indicating that these syntaxes are not yet
+  supported.
 
 ## [0.4.5] - 2025-09-20
 
