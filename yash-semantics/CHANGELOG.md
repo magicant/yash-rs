@@ -32,7 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The type of `command_search::Target::BuiltIn::path` has been changed from
   `Option<CString>` to `CString`. This field is now an empty string for
   built-in types other than `Substitutive`.
-- `redir::ErrorCause` is now marked as `non_exhaustive`.
+- The `classify`, `search`, and `search_path` functions in the `command_search`
+  module are now `must_use`.
+- `redir::ErrorCause` is now `non_exhaustive`.
 - External dependency versions:
     - yash-env 0.8.0 → 0.8.1
     - yash-syntax 0.15.1 → 0.15.2

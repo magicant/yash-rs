@@ -182,6 +182,7 @@ impl ClassifyEnv for Env {
 ///
 /// See the [module documentation](self) for details of the command search
 /// process.
+#[must_use]
 pub fn search<E: ClassifyEnv + PathEnv>(env: &mut E, name: &str) -> Option<Target> {
     let mut target = classify(env, name);
 
@@ -229,6 +230,7 @@ pub fn search<E: ClassifyEnv + PathEnv>(env: &mut E, name: &str) -> Option<Targe
 /// an external utility is the actual target. This function always assumes that
 /// searching for an external utility would succeed and returns a target with
 /// an empty path in such cases.
+#[must_use]
 pub fn classify<E: ClassifyEnv>(env: &E, name: &str) -> Target {
     if name.contains('/') {
         return Target::External {
@@ -267,6 +269,7 @@ pub fn classify<E: ClassifyEnv>(env: &E, name: &str) -> Target {
 /// need to update a cache of the results of external utility search (TODO:
 /// which is not yet implemented). The function does not otherwise modify the
 /// environment.
+#[must_use]
 pub fn search_path<E: PathEnv>(env: &mut E, name: &str) -> Option<CString> {
     env.path()
         .split()
