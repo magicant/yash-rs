@@ -7,10 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.10.0] - Unreleased
 
+### Added
+
+- `impl yash_semantics::command_search::ClassifyEnv for command::search::SearchEnv<'_>`
+
+### Changed
+
 - External dependency versions:
     - yash-env 0.8.0 → 0.8.1
     - yash-semantics (optional) 0.8.1 → 0.9.0
     - yash-syntax 0.15.1 → 0.15.2
+
+### Removed
+
+- `impl yash_semantics::command_search::SearchEnv for command::search::SearchEnv<'_>`
 
 ## [0.9.1] - 2025-09-20
 

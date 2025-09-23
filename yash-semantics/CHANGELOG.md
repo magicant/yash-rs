@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   redirections (`>>|`) and here-string redirections (`<<<`), respectively.
     - These variants are returned by `redir::RedirGuard::perform_redir`
       when such redirections are encountered.
+- `impl command_search::ClassifyEnv for yash_env::Env`
 
 ### Changed
 
@@ -26,10 +27,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   has been executed, that is, if `JobList::last_async_pid()` is zero.
     - This change is observed in the results of the `expand` method of
       `impl expansion::initial::Expand for yash_syntax::syntax::TextUnit`.
-- `redir::ErrorCause` is now marked as `non_exhaustive`.
+- The `command_search::search` function now requires both the `ClassifyEnv` and
+  `PathEnv` traits instead of the `SearchEnv` trait for the `env` argument.
+- The type of `command_search::Target::Builtin::path` has been changed from
+  `Option<CString>` to `CString`. This field is now an empty string for
+  built-in types other than `Substitutive`.
+- The `classify`, `search`, and `search_path` functions in the `command_search`
+  module are now `must_use`.
+- `redir::ErrorCause` is now `non_exhaustive`.
 - External dependency versions:
     - yash-env 0.8.0 → 0.8.1
     - yash-syntax 0.15.1 → 0.15.2
+
+### Removed
+
+- The `command_search::SearchEnv` trait has been removed. The `ClassifyEnv` and
+  `PathEnv` traits should be used instead.
+    - `impl SearchEnv for yash_env::Env` has been replaced with
+      `impl ClassifyEnv for yash_env::Env`.
+    - `impl<E: SearchEnv> ClassifyEnv for E` has been removed. Implementations
+      of `SearchEnv` should be changed to implement `ClassifyEnv` instead.
 
 ## [0.8.1] - 2025-09-20
 

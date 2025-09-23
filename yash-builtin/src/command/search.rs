@@ -32,9 +32,10 @@ use yash_env::variable::Expansion;
 
 /// Environment adapter for applying the search parameters
 ///
-/// This type implements the [`yash_semantics::command_search::SearchEnv`] trait
-/// by extracting results from the environment filtered by the search
-/// parameters.
+/// This type implements the [`yash_semantics::command_search::ClassifyEnv`]
+/// and [`yash_semantics::command_search::PathEnv`] traits by filtering the
+/// results from an underlying [`yash_env::Env`] according to the
+/// [`Search`] parameters.
 #[derive(Debug)]
 pub struct SearchEnv<'a> {
     pub env: &'a mut Env,
@@ -67,7 +68,7 @@ impl yash_semantics::command_search::PathEnv for SearchEnv<'_> {
     }
 }
 
-impl yash_semantics::command_search::SearchEnv for SearchEnv<'_> {
+impl yash_semantics::command_search::ClassifyEnv for SearchEnv<'_> {
     fn builtin(&self, name: &str) -> Option<Builtin> {
         if self.params.categories.contains(Category::Builtin) {
             self.env.builtin(name)
@@ -94,8 +95,8 @@ mod tests {
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::variable::PATH;
     use yash_env::variable::Scope;
+    use yash_semantics::command_search::ClassifyEnv as _;
     use yash_semantics::command_search::PathEnv as _;
-    use yash_semantics::command_search::SearchEnv as _;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::FullCompoundCommand;
 
