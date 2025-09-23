@@ -23,8 +23,9 @@ The full license text can be found at <https://github.com/magicant/yash-rs/blob/
 Navigate the documentation using the left sidebar.
 If the sidebar is not visible, you can toggle it by clicking the "hamburger" icon in the top-left corner.
 
-Currently, the documentation is a work in progress and may not cover all features or usage scenarios.
-Contributions are welcome via issues or pull requests to enhance the documentation.
-
-This documentation, hosted at <https://magicant.github.io/yash-rs/>, is licensed under the Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0).
+This documentation is licensed under the Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0).
 The full license text can be found at <https://github.com/magicant/yash-rs/blob/master/docs/LICENSE>.
+
+The documentation hosted at <https://magicant.github.io/yash-rs/> is automatically deployed from the `master` branch of the repository, which may include unreleased changes. See the [changelog](https://github.com/magicant/yash-rs/blob/master/yash-cli/CHANGELOG.md) for a detailed list of past and future changes.
+
+Contributions are welcome via [issues](https://github.com/magicant/yash-rs/issues), [pull requests](https://github.com/magicant/yash-rs/pulls), or [discussions](https://github.com/magicant/yash-rs/discussions).

@@ -91,9 +91,16 @@ done
 
 # Confirm the release
 {
-printf 'Are you sure you want to release the following packages?\n'
-printf '  %s\n' "$@"
-printf 'This will publish the packages to crates.io.\n'
+printf '\n'
+if grep '^##.*Unreleased' -- */CHANGELOG.md; then
+    printf '^^^ Note that the above changes will NOT be released. ^^^\n'
+fi
+printf 'Are you sure you want to publish the following packages?\n'
+for package do
+    version=$(cargo metadata --format-version=1 --no-deps --all-features |
+        jq -r '.packages[] | select(.name == "'"$package"'") | .version')
+    printf '  %s %s\n' "$package" "$version"
+done
 printf 'Type "release" to proceed: '
 } >&2
 read -r confirm

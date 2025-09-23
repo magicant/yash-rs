@@ -54,7 +54,7 @@ Below are the special parameters and their meanings:
 
 - **`!`**: Process ID of the last [asynchronous command](../commands/lists.md#asynchronous-commands).
     - Updated when an asynchronous command is started or [resumed in the background](../../builtins/bg.md).
-    - Since 0.4.6, this parameter is unset if no asynchronous command has been started in the current [shell environment]. Previously, it was set to `0` in such cases.
+    - Since 3.0.0, this parameter is unset if no asynchronous command has been started in the current [shell environment]. Previously, it was set to `0` in such cases.
 
 - **`0`**: Name of the shell or script being executed.
     - Set at shell [startup](../../startup.md) and remains constant.
