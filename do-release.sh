@@ -109,6 +109,8 @@ if [ "$confirm" != "release" ]; then
     exit 1
 fi
 
+released_cli=
+
 # Release the packages
 # (We need to do this in topological order of dependencies)
 while [ $# -gt 0 ]; do
@@ -137,4 +139,12 @@ while [ $# -gt 0 ]; do
         jq -r '.packages[] | select(.name == "'"$package"'") | .version')
     git tag --sign --message "Release $package $version" "$package-$version"
     git push origin "tags/$package-$version"
+
+    if [ "$package" = "yash-cli" ]; then
+        released_cli="$package-$version"
+    fi
 done
+
+if [ "$released_cli" ]; then
+    printf 'Make a release at: https://github.com/magicant/yash-rs/releases/tag/%s\n' "$released_cli"
+fi
