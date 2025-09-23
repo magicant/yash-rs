@@ -38,3 +38,6 @@ yash-executor = { workspace = true }
 assert_matches = { workspace = true }
 futures-executor = { workspace = true }
 futures-util = { workspace = true, features = ["channel"] }
+
+[lints]
+workspace = true

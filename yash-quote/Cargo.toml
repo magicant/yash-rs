@@ -12,3 +12,6 @@ repository = "https://github.com/magicant/yash-rs"
 license = "MIT OR Apache-2.0"
 keywords = ["posix", "shell"]
 categories = ["command-line-interface"]
+
+[lints]
+workspace = true

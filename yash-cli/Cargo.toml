@@ -35,3 +35,6 @@ futures-util = { workspace = true, features = ["channel"] }
 fuzed-iterator = { workspace = true }
 nix = { workspace = true, features = ["fs", "process", "term"] }
 tempfile = { workspace = true }
+
+[lints]
+workspace = true

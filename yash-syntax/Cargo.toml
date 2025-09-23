@@ -23,3 +23,6 @@ thiserror = { workspace = true }
 annotate-snippets = { workspace = true }
 assert_matches = { workspace = true }
 futures-executor = { workspace = true }
+
+[lints]
+workspace = true

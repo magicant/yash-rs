@@ -21,3 +21,6 @@ yash-syntax = { workspace = true }
 
 [dev-dependencies]
 yash-env-test-helper = { workspace = true }
+
+[lints]
+workspace = true

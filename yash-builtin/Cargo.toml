@@ -36,3 +36,6 @@ futures-executor = { workspace = true }
 futures-util = { workspace = true, features = ["channel"] }
 yash-env-test-helper = { workspace = true }
 yash-semantics = { workspace = true }
+
+[lints]
+workspace = true
