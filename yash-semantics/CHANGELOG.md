@@ -29,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       `impl expansion::initial::Expand for yash_syntax::syntax::TextUnit`.
 - The `command_search::search` function now requires both the `ClassifyEnv` and
   `PathEnv` traits instead of the `SearchEnv` trait for the `env` argument.
+- The type of `command_search::Target::BuiltIn::path` has been changed from
+  `Option<CString>` to `CString`. This field is now an empty string for
+  built-in types other than `Substitutive`.
 - `redir::ErrorCause` is now marked as `non_exhaustive`.
 - External dependency versions:
     - yash-env 0.8.0 → 0.8.1

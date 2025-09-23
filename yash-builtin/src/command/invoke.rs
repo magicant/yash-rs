@@ -88,6 +88,7 @@ mod tests {
     use assert_matches::assert_matches;
     use enumset::EnumSet;
     use futures_util::FutureExt as _;
+    use std::ffi::CString;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
     use yash_env::VirtualSystem;
@@ -150,7 +151,7 @@ mod tests {
                     make_result()
                 })
             }),
-            path: None,
+            path: CString::default(),
         };
 
         let result = invoke_target(&mut env, target, Field::dummies(["foo", "bar", "baz"]))

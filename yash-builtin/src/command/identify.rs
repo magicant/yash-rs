@@ -26,7 +26,7 @@ use std::ffi::CString;
 use std::rc::Rc;
 use yash_env::Env;
 use yash_env::System;
-use yash_env::builtin::Type;
+use yash_env::builtin::{Builtin, Type};
 use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -128,11 +128,14 @@ impl NormalizeEnv for Env {
 /// that the target is not found.
 fn normalize_target<E: NormalizeEnv>(env: &E, target: &mut Target) -> Result<(), ()> {
     match target {
-        Target::Function(_) | Target::Builtin { path: None, .. } => Ok(()),
-
         Target::External { path }
         | Target::Builtin {
-            path: Some(path), ..
+            builtin:
+                Builtin {
+                    r#type: Type::Substitutive,
+                    ..
+                },
+            path,
         } => {
             if !env.is_executable_file(path) {
                 return Err(());
@@ -144,6 +147,8 @@ fn normalize_target<E: NormalizeEnv>(env: &E, target: &mut Target) -> Result<(),
             }
             Ok(())
         }
+
+        Target::Function(_) | Target::Builtin { .. } => Ok(()),
     }
 }
 
@@ -183,7 +188,7 @@ where
 {
     match target {
         Target::Builtin { builtin, path } => {
-            let path = path.as_ref().map(|p| p.to_string_lossy());
+            let path = path.to_string_lossy();
             if verbose {
                 let desc = match builtin.r#type {
                     Type::Special => "special built-in",
@@ -193,12 +198,16 @@ where
                     Type::Substitutive => "substitutive built-in",
                 };
                 write!(result, "{}: {}", name.value, desc)?;
-                if let Some(path) = path {
+                if !path.is_empty() {
                     write!(result, " at {}", quoted(&path))?;
                 }
                 writeln!(result)?;
             } else {
-                let output = path.as_deref().unwrap_or(&name.value);
+                let output = if path.is_empty() {
+                    &*name.value
+                } else {
+                    &*path
+                };
                 writeln!(result, "{output}")?;
             }
             Ok(())
@@ -352,7 +361,7 @@ mod tests {
         let builtin = Builtin::new(Type::Substitutive, |_, _| unreachable!());
         let mut builtin_target = Target::Builtin {
             builtin,
-            path: Some(c"/usr/bin/echo".to_owned()),
+            path: c"/usr/bin/echo".to_owned(),
         };
         let result = normalize_target(&TestEnv, &mut builtin_target);
         assert_eq!(result, Ok(()));
@@ -360,7 +369,7 @@ mod tests {
             builtin_target,
             Target::Builtin {
                 builtin,
-                path: Some(c"/usr/bin/echo".to_owned()),
+                path: c"/usr/bin/echo".to_owned(),
             }
         );
     }
@@ -496,7 +505,7 @@ mod tests {
         let name = &Field::dummy(":");
         let target = &Target::Builtin {
             builtin: Builtin::new(Type::Special, |_, _| unreachable!()),
-            path: None,
+            path: CString::default(),
         };
 
         let mut output = String::new();
@@ -513,7 +522,7 @@ mod tests {
         let name = &Field::dummy("echo");
         let target = &Target::Builtin {
             builtin: Builtin::new(Type::Substitutive, |_, _| unreachable!()),
-            path: Some(c"/bin/echo".to_owned()),
+            path: c"/bin/echo".to_owned(),
         };
 
         let mut output = String::new();
