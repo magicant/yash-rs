@@ -12,6 +12,7 @@ repository = "https://github.com/magicant/yash-rs"
 license = "MIT OR Apache-2.0"
 keywords = ["posix", "shell", "glob"]
 categories = ["command-line-utilities"]
+publish = false
 
 [dependencies]
 regex = { workspace = true }

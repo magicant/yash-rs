@@ -70,9 +70,9 @@ for package do
     mv "$package/CHANGELOG.md.tmp" "$package/CHANGELOG.md"
 done
 
-# Remove the `publish = false` line from Cargo.toml
+# Allow publishing the packages
 for package do
-    sed '/^publish = false$/d' "$package/Cargo.toml" > "$package/Cargo.toml.tmp"
+    sed '/^publish = false$/s/false/true/' "$package/Cargo.toml" > "$package/Cargo.toml.tmp"
     mv "$package/Cargo.toml.tmp" "$package/Cargo.toml"
 done
 
@@ -145,6 +145,16 @@ while [ $# -gt 0 ]; do
     fi
 done
 
+# Prevent accidental publishing
+for cargofile in $(grep -Flx 'publish = true' -- */Cargo.toml); do
+    sed '/^publish = true$/s/true/false/' "$cargofile" > "$cargofile.tmp"
+    mv "$cargofile.tmp" "$cargofile"
+    git add "$cargofile"
+done
+git status --short
+printf 'confirm and commit the changes to the above files:\n'
+printf 'git commit --message "Prevent accidental publishing"\n'
+
 if [ "$released_cli" ]; then
-    printf 'Make a release at: https://github.com/magicant/yash-rs/releases/tag/%s\n' "$released_cli"
+    printf 'make a release at: https://github.com/magicant/yash-rs/releases/tag/%s\n' "$released_cli"
 fi
