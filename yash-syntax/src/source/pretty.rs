@@ -24,7 +24,7 @@
 //! diagnostic message string.
 //!
 //! When the `yash_syntax` crate is built with the `annotate-snippets` feature
-//! enabled, it supports conversion from `Message` to `Snippet`. If you would
+//! enabled, it supports conversion from `Message` to `Group`. If you would
 //! like to use another formatter instead, you can provide your own conversion
 //! for yourself.
 //!
@@ -45,8 +45,8 @@
 //! // The lines below require the `annotate-snippets` feature.
 //! # #[cfg(feature = "annotate-snippets")]
 //! # {
-//! let message = annotate_snippets::Message::from(&message);
-//! eprint!("{}", annotate_snippets::Renderer::plain().render(message));
+//! let group = annotate_snippets::Group::from(&message);
+//! eprint!("{}", annotate_snippets::Renderer::plain().render(&[group]));
 //! # }
 //! ```
 //!
@@ -303,8 +303,10 @@ mod annotate_snippets_support {
             // snippet.
             for annotation in &message.annotations {
                 let range = annotation.location.byte_range();
-                let level = annotate_snippets::Level::from(annotation.r#type);
-                let as_annotation = level.span(range).label(&annotation.label);
+                // TODO Honor annotation.r#type
+                let as_annotation = annotate_snippets::AnnotationKind::Primary
+                    .span(range)
+                    .label(&annotation.label);
                 let code = &*annotation.location.code;
                 if let Some((_, _, annotations)) =
                     snippets.iter_mut().find(|&&mut (c, _, _)| c == code)
@@ -324,7 +326,7 @@ mod annotate_snippets_support {
             }
 
             annotate_snippets::Level::from(message.r#type)
-                .primary_title(message.title)
+                .primary_title(&*message.title)
                 .elements(
                     snippets
                         .into_iter()
