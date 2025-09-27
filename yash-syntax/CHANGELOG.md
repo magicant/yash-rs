@@ -5,6 +5,19 @@ All notable changes to `yash-syntax` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - Unreleased
+
+### Changed
+
+- Updated the optional external dependency annotate-snippets from 0.11.4 to
+  0.12.4. Items provided by this crate have been redefined to reflect the
+  changes in the new version of annotate-snippets:
+    - `impl From<AnnotationType> for annotate_snippets::Level` →
+      `impl<'a> From<AnnotationType> for annotate_snippets::Level<'a>`
+    - Added `impl From<AnnotationType> for annotate_snippets::AnnotationKind`
+    - `impl<'a> From<&'a Message<'a>> for annotate_snippets::Message<'a>` →
+      `impl<'a> From<&'a Message<'a>> for annotate_snippets::Group<'a>`
+
 ## [0.15.2] - 2025-09-23
 
 ### Added
@@ -510,6 +523,7 @@ command.
 - Functionalities to parse POSIX shell scripts
 - Alias substitution support
 
+[0.16.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.16.0
 [0.15.2]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.15.2
 [0.15.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.15.1
 [0.15.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.15.0

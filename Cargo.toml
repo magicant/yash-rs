@@ -3,7 +3,7 @@ members = ["yash-*"]
 resolver = "2"
 
 [workspace.dependencies]
-annotate-snippets = "0.11.4"
+annotate-snippets = "0.12.4"
 assert_matches = "1.5.0"
 bitflags = "2.6.0"
 dyn-clone = "1.0.19"
