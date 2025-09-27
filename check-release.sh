@@ -6,12 +6,6 @@ version=$(cargo metadata --format-version=1 --no-deps --all-features |
 today=$(date +%Y-%m-%d)
 success=true
 
-if [ "$package" == "yash-cli" ]; then
-    : # yash-cli's versioning is not based on the library crate API
-else
-    cargo semver-checks -p "$package" || success=false
-fi
-
 grep -Fiq "$package" "$package/README.md" || {
     success=false
     printf 'error: README.md does not mention the package name\n' >&2

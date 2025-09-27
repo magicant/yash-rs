@@ -51,3 +51,15 @@ cargo test --package 'yash-builtin' --no-default-features -- $quiet
 #cargo test --package 'yash-semantics' -- $quiet
 #cargo test --package 'yash-syntax' -- $quiet
 cargo test --package 'yash-syntax' --features annotate-snippets -- $quiet
+
+# Make sure next releases have correct semantic versions.
+cargo semver-checks --package 'yash-arith'
+cargo semver-checks --package 'yash-builtin'
+cargo semver-checks --package 'yash-env'
+cargo semver-checks --package 'yash-env-test-helper'
+cargo semver-checks --package 'yash-executor'
+cargo semver-checks --package 'yash-fnmatch'
+cargo semver-checks --package 'yash-prompt'
+cargo semver-checks --package 'yash-quote'
+cargo semver-checks --package 'yash-semantics'
+cargo semver-checks --package 'yash-syntax'
