@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - External dependency versions:
     - yash-syntax 0.15.0 → 0.16.0
 - Internal dependency versions:
-    - annotate-snippets 0.11.4 → 0.12.3
+    - annotate-snippets 0.11.4 → 0.12.4
 
 ## [0.8.1] - 2025-09-23
 

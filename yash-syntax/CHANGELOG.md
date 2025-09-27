@@ -9,9 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Updated the external dependency annotate-snippets from 0.11.4 to 0.12.3.
-  Items provided by this crate have been redefined to reflect the changes in the
-  new version of annotate-snippets:
+- Updated the optional external dependency annotate-snippets from 0.11.4 to
+  0.12.4. Items provided by this crate have been redefined to reflect the
+  changes in the new version of annotate-snippets:
     - `impl From<AnnotationType> for annotate_snippets::Level` →
       `impl<'a> From<AnnotationType> for annotate_snippets::Level<'a>`
     - `impl<'a> From<&'a Message<'a>> for annotate_snippets::Message<'a>` →
