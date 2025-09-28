@@ -64,7 +64,6 @@ Yash-rs supports these redirection operators:
       |
     5 | echo "Another redirection" > file.txt
       |                              ^^^^^^^^ file.txt: File exists (os error 17)
-      |
     ```
 
 - **`>|`** (file): Redirects standard output to a file, overwriting it if it exists.

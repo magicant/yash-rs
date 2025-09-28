@@ -84,7 +84,6 @@ error: the pattern is not a valid word token
   |
 2 | case foo in (foo) echo foo;;; esac
   |                             ^ expected a word
-  |
 ```
 
 ## Word expansion

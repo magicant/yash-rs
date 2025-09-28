@@ -69,7 +69,6 @@ error: cannot execute external utility "{echo"
   |
 1 | {echo Hello}
   | ^^^^^ utility not found
-  |
 ```
 
 To use `{` and `}` as reserved words, write them as separate words:

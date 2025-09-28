@@ -81,8 +81,7 @@ error: error assigning to variable
  ::: <stdin>:1:10
   |
 1 | readonly pi=3.14
-  |          ------- info: the variable was made read-only here
-  |
+  |          ------- the variable was made read-only here
 ```
 
 Variables are read-only only in the current shell session. Exported [environment variables](#environment-variables) are not read-only in child processes.
