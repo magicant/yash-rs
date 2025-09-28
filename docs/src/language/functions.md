@@ -53,7 +53,6 @@ error: cannot execute external utility "greet"
   |
 4 | greet
   | ^^^^^ utility not found
-  |
 ```
 
 Redirections in a function definition apply when the function is called, not when it is defined:
@@ -88,13 +87,12 @@ error: cannot redefine read-only function `greet`
  ::: <stdin>:1:1
   |
 1 | greet() { echo "Hello, World!"; }
-  | ----- info: existing function was defined here
+  | ----- existing function was defined here
   |
  ::: <stdin>:2:13
   |
 2 | typeset -fr greet
-  |             ----- info: existing function was made read-only here
-  |
+  |             ----- existing function was made read-only here
 ```
 
 The [`readonly` built-in](../builtins/readonly.md) does not yet support making functions read-only in yash-rs.
@@ -177,7 +175,6 @@ error: cannot execute external utility "greet"
   |
 3 | greet
   | ^^^^^ utility not found
-  |
 ```
 
 ## Replacing existing utilities

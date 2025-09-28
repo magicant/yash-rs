@@ -48,8 +48,7 @@ error: error evaluating the arithmetic expansion
  ::: <stdin>:3:6
   |
 3 | echo $((2 * seven))
-  |      -------------- info: arithmetic expansion appeared here
-  |
+  |      -------------- arithmetic expansion appeared here
 ```
 
 ## Quoting
@@ -67,6 +66,5 @@ error: error evaluating the arithmetic expansion
  ::: <stdin>:1:6
   |
 1 | echo $((\$x))
-  |      -------- info: arithmetic expansion appeared here
-  |
+  |      -------- arithmetic expansion appeared here
 ```

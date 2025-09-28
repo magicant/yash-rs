@@ -94,7 +94,6 @@ error: the compound command delimiter is unmatched
   |
 3 | echo "Oops, a syntax error";;
   |                            ^^ not in a `case` command
-  |
 ```
 <!-- markdownlint-enable MD014 -->
 

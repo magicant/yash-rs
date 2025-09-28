@@ -35,8 +35,7 @@ error: ambiguous option name "--c"
 2 | set --c
   | --- ^^^ --c
   | |
-  | info: executing the set built-in
-  |
+  | executing the set built-in
 ```
 
 Note: Future versions may add more options, so abbreviations that work now may become ambiguous later. For forward compatibility, use full option names.

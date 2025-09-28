@@ -50,13 +50,13 @@ pub const MIN_INTERNAL_FD: Fd = Fd(10);
 /// [`SharedSystem::print_error`].
 #[must_use]
 pub fn message_to_string(env: &Env, message: &Message<'_>) -> String {
-    let m = annotate_snippets::Message::from(message);
-    let r = if env.should_print_error_in_color() {
+    let group = annotate_snippets::Group::from(message);
+    let renderer = if env.should_print_error_in_color() {
         Renderer::styled()
     } else {
         Renderer::plain()
     };
-    format!("{}\n", r.render(m))
+    format!("{}\n", renderer.render(&[group]))
 }
 
 /// Convenience function for printing an error message.

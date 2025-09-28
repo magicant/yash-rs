@@ -45,7 +45,6 @@ error: cannot execute external utility "greet"
   |
 4 | greet world
   | ^^^^^ utility not found
-  |
 ```
 
 ## Compatibility

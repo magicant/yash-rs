@@ -57,7 +57,7 @@ error: cannot expand unset parameter
  ::: <stdin>:2:6
   |
 2 | echo $((x + 3))
-  |      ---------- info: arithmetic expansion appeared here
+  |      ---------- arithmetic expansion appeared here
   |
   = info: unset parameters are disallowed by the nounset option
 ```
@@ -76,8 +76,7 @@ error: error evaluating the arithmetic expansion
  ::: <stdin>:2:6
   |
 2 | echo $((x + 3))
-  |      ---------- info: arithmetic expansion appeared here
-  |
+  |      ---------- arithmetic expansion appeared here
 ```
 
 Currently, variables in arithmetic expressions must have a single numeric value. In the future, more complex values may be supported.

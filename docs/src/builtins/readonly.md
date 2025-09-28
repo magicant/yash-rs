@@ -146,8 +146,7 @@ error: error assigning to variable
  ::: <stdin>:1:10
   |
 1 | readonly foo='Hello, world!'
-  |          ------------------- info: the variable was made read-only here
-  |
+  |          ------------------- the variable was made read-only here
 ```
 
 ## Compatibility
