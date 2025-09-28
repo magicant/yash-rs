@@ -5,27 +5,31 @@ All notable changes to `yash-fnmatch` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+Terminology: A _public dependency_ is one that’s exposed through this crate’s
+public API (e.g., re-exported types).
+A _private dependency_ is used internally and not visible to downstream users.
+
 ## [1.1.3] - Unreleased
 
 ### Changed
 
-- External dependency versions
+- Public dependency versions
     - Rust 1.65.0 → 1.85.0
 
 ## [1.1.2] - 2024-12-14
 
 ### Changed
 
-- Internal dependency versions
+- Private dependency versions
     - thiserror 1.0.47 → 2.0.4
 
 ## [1.1.1] - 2024-04-10
 
 ### Changed
 
-- External dependency versions
+- Public dependency versions
     - Rust 1.58.0 → 1.65.0
-- Internal dependency versions
+- Private dependency versions
     - regex 1.5.6 → 1.9.4
     - regex-syntax 0.6.26 → 0.8.2
     - thiserror 1.0.31 → 1.0.47

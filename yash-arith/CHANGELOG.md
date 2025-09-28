@@ -5,20 +5,24 @@ All notable changes to `yash-arith` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+Terminology: A _public dependency_ is one that’s exposed through this crate’s
+public API (e.g., re-exported types).
+A _private dependency_ is used internally and not visible to downstream users.
+
 ## [0.2.3] - Unreleased
 
 ### Changed
 
-- External dependency versions
+- Public dependency versions
     - Rust 1.65.0 → 1.85.0
 
 ## [0.2.2] - 2024-12-14
 
 ### Changed
 
-- External dependency versions
+- Public dependency versions
     - Rust 1.58.0 → 1.65.0
-- Internal dependency versions
+- Private dependency versions
     - thiserror 1.0.47 → 2.0.4
 
 ## [0.2.1] - 2023-11-12
@@ -45,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Changed the return type of `eval` from
       `Result<Value, Error<E::AssignVariableError>>` to
       `Result<Value, Error<E::GetVariableError, E::AssignVariableError>>`.
-- Internal dependency versions
+- Private dependency versions
     - thiserror 1.0.43 → 1.0.47
 
 ## [0.1.0] - 2022-10-01

@@ -5,11 +5,15 @@ All notable changes to `yash-semantics` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+Terminology: A _public dependency_ is one that’s exposed through this crate’s
+public API (e.g., re-exported types).
+A _private dependency_ is used internally and not visible to downstream users.
+
 ## [0.10.0] - Unreleased
 
 ### Changed
 
-- External dependency versions:
+- Public dependency versions:
     - yash-env 0.8.1 → 0.9.0
     - yash-syntax 0.15.2 → 0.16.0
 
@@ -43,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `classify`, `search`, and `search_path` functions in the `command_search`
   module are now `must_use`.
 - `redir::ErrorCause` is now `non_exhaustive`.
-- External dependency versions:
+- Public dependency versions:
     - yash-env 0.8.0 → 0.8.1
     - yash-syntax 0.15.1 → 0.15.2
 
@@ -69,17 +73,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `command_search::ClassifyEnv` trait has been added to provide the
   environment required by the `command_search::classify` function.
     - This trait is a subset of the `command_search::SearchEnv` trait.
-- Internal dependencies:
+- Private dependencies:
     - either 1.9.0
 
 ### Changed
 
-- External dependency versions:
+- Public dependency versions:
     - yash-syntax 0.15.0 → 0.15.1
 
 ### Removed
 
-- Internal dependencies:
+- Private dependencies:
     - assert_matches 1.5.0
 
 ### Fixed
@@ -102,7 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       `impl expansion::initial::Expand for WordUnit`. This is done only if the
       `followed_by_slash` flag is set to `true` in the tilde expansion
       (`WordUnit::Tilde`).
-- External dependency versions:
+- Public dependency versions:
     - yash-env 0.7.1 → 0.8.0
     - yash-syntax 0.14.1 → 0.15.0
 
@@ -114,7 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   string, the expanded field is no longer removed from the command line.
     - This is done by producing a dummy quote in the tilde expansion
       (`impl expansion::initial::Expand for WordUnit`).
-- External dependency versions:
+- Public dependency versions:
     - yash-env 0.7.0 → 0.7.1
     - yash-syntax 0.14.0 → 0.14.1
 
@@ -155,7 +159,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       `yash_env::semantics::ExitStatus::ERROR` if the error cause is an I/O
       error and the error location is not
       `yash_syntax::source::Source::DotScript`.
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.85.0 → 1.86.0
     - yash-env 0.6.0 → 0.7.0
 
@@ -178,11 +182,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - When a foreground job is suspended in an interactive shell, the shell now
   discards any remaining commands in the current command line and prompts for
   the next command line.
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.82.0 → 1.85.0
     - yash-env 0.5.0 → 0.6.0
     - yash-syntax 0.13.0 → 0.14.0
-- Internal dependency versions:
+- Private dependency versions:
     - itertools 0.13.0 → 0.14.0
 
 ## [0.5.0] - 2024-12-14
@@ -193,11 +197,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   honors the `CaseContinuation` specified for the executed case item.
 - `<yash_syntax::syntax::WordUnit as expansion::Expand>::expand` now supports
   expanding dollar-single-quotes.
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.79.0 → 1.82.0
     - yash-env 0.4.0 → 0.5.0
     - yash-syntax 0.12.0 → 0.13.0
-- Internal dependency versions
+- Private dependency versions:
     - thiserror 1.0.47 → 2.0.4
 
 ### Fixed
@@ -244,7 +248,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       command::Command>::execute` method skipped the execution of the pipeline
       if the `Exec` shell option was off. Now, it skips the execution only if
       the `Exec` and `Interactive` shell options are both off.
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.77.0 → 1.79.0
     - yash-env 0.2.0 → 0.4.0
     - yash-syntax 0.10.0 → 0.12.0
@@ -261,7 +265,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.75.0 → 1.77.0
     - yash-syntax 0.9.0 → 0.10.0
 
@@ -271,7 +275,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- Internal dependencies:
+- Private dependencies:
     - futures-util 0.3.28
 
 ### Fixed
@@ -286,7 +290,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- External dependency versions
+- Public dependency versions
     - yash-env 0.1.0 → 0.2.0
     - yash-syntax 0.8.0 → 0.9.0
 - In the `expansion::initial` module:

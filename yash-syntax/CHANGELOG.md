@@ -5,11 +5,15 @@ All notable changes to `yash-syntax` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+Terminology: A _public dependency_ is one that’s exposed through this crate’s
+public API (e.g., re-exported types).
+A _private dependency_ is used internally and not visible to downstream users.
+
 ## [0.16.0] - Unreleased
 
 ### Changed
 
-- Updated the optional external dependency annotate-snippets from 0.11.4 to
+- Updated the optional public dependency annotate-snippets from 0.11.4 to
   0.12.4. Items provided by this crate have been redefined to reflect the
   changes in the new version of annotate-snippets:
     - `impl From<AnnotationType> for annotate_snippets::Level` →
@@ -119,9 +123,9 @@ more flexible and readable configurations.
 - The `parser::lex::Lexer::new` method now only takes a `Box<dyn InputObject>`
   argument. The `start_line_number: NonZeroU64` and `source: Rc<Source>`
   arguments have been removed in favor of construction with a `Config` struct.
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.82.0 → 1.85.0
-- Internal dependency versions:
+- Private dependency versions:
     - itertools 0.13.0 → 0.14.0
 
 ## [0.13.0] - 2024-12-14
@@ -166,7 +170,7 @@ more flexible and readable configurations.
   the `syntax` module now return `Option<Error>` instead of `Error` for the
   error type. Previously, the `from_str` method was panicking when the input
   string was empty.
-- Internal dependency versions
+- Private dependency versions:
     - thiserror 1.0.47 → 2.0.4
 
 ### Removed
@@ -183,9 +187,9 @@ more flexible and readable configurations.
   token as a pattern after an opening parenthesis, as required by POSIX.1-2024.
   The previous version of POSIX did not allow `esac` as the first pattern, so
   the method was returning `SyntaxError::EsacAsPattern` in that case.
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.79.0 → 1.82.0
-- Internal dependency versions:
+- Private dependency versions:
     - futures-util 0.3.28 → 0.3.31
 
 ### Deprecated
@@ -210,7 +214,7 @@ more flexible and readable configurations.
 
 ### Removed
 
-- Internal dependencies:
+- Private dependencies:
     - async-trait 0.1.73
 
 ## [0.11.0] - 2024-08-22
@@ -243,7 +247,7 @@ more flexible and readable configurations.
 - The `parser::lex::WordLexer::braced_param` method now returns
   `parser::SyntaxError::InvalidParam` if the parameter starts with a digit but
   contains a non-digit character.
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.77.0 → 1.79.0
 
 ## [0.10.0] - 2024-07-12
@@ -267,7 +271,7 @@ more flexible and readable configurations.
 
 ### Changed
 
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.70.0 → 1.77.0
     - annotate-snippets 0.10.0 → 0.11.4
 - `source::Code::source` is now `Rc<Source>` instead of `Source`.
@@ -363,7 +367,7 @@ platforms, where `RawFd` falls back to `i32`.
 ### Changed
 
 - Type of `HereDoc::content` from `RefCell<Text>` to `OnceCell<Text>`
-- External dependency versions
+- Public dependency versions
     - Rust 1.67.0 → 1.70.0
 
 ## [0.6.1] - 2023-05-01
@@ -379,9 +383,9 @@ platforms, where `RawFd` falls back to `i32`.
 - `parser::Parser::command_line` to return the newly added variants of
   `SyntaxError` instead of `InvalidCommandToken` depending on the type of
   erroneous tokens.
-- External dependency versions
+- Public dependency versions
     - Rust 1.58.0 → 1.67.0
-- Internal dependency versions
+- Private dependency versions
     - async-trait 0.1.56 → 0.1.73
     - futures-util 0.3.23 → 0.3.28
     - itertools 0.10.3 → 0.11.0
@@ -397,7 +401,7 @@ platforms, where `RawFd` falls back to `i32`.
 
 - `syntax::CompoundCommand::Subshell` from a tuple variant `Subshell(List)`
   to a struct variant `Subshell { body: Rc<List>, location: Location }`.
-- Internal dependency versions
+- Private dependency versions
     - futures-util 0.3.21 → 0.3.23
 
 ## [0.5.0] - 2022-07-02
@@ -421,7 +425,7 @@ This version contains variety of fixes.
 - `parser::Error::UnexpectedToken` renamed to `InvalidCommandToken`
 - `parser::Parser::maybe_compound_list` now returning an `InvalidCommandToken`
 error if the list is delimited by a token that is not a clause delimiter.
-- Internal dependency versions
+- Private dependency versions
     - `async-trait` 0.1.52 → 0.1.56
 
 ### Removed
@@ -505,7 +509,7 @@ command.
     - `Context` now `non_exhaustive`
     - `Memory::new` no longer taking a `Source` parameter
 - `Lexer::new` now requiring the `start_line_number` and `source` parameters
-- Internal dependency versions
+- Private dependency versions
     - `async-trait` 0.1.50 → 0.1.52
     - `futures-util` 0.3.18 → 0.3.19
     - `itertools` 0.10.1 → 0.10.3

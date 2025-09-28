@@ -5,11 +5,15 @@ All notable changes to `yash-env` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+Terminology: A _public dependency_ is one that’s exposed through this crate’s
+public API (e.g., re-exported types).
+A _private dependency_ is used internally and not visible to downstream users.
+
 ## [0.9.0] - Unreleased
 
-- External dependency versions:
+- Public dependency versions:
     - yash-syntax 0.15.0 → 0.16.0
-- Internal dependency versions:
+- Private dependency versions:
     - annotate-snippets 0.11.4 → 0.12.4
 
 ## [0.8.1] - 2025-09-23
@@ -20,23 +24,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- External dependency versions:
+- Public dependency versions:
     - yash-syntax 0.15.0 → 0.15.2
-- Internal dependency versions:
+- Private dependency versions:
     - libc 0.2.169 → 0.2.171
 
 ## [0.8.0] - 2025-05-11
 
 ### Changed
 
-- External dependency versions:
+- Public dependency versions:
     - yash-syntax 0.14.1 → 0.15.0
 
 ## [0.7.1] - 2025-05-03
 
 ### Changed
 
-- External dependency versions:
+- Public dependency versions:
     - yash-syntax 0.14.0 → 0.14.1
 
 ### Fixed
@@ -70,7 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `system::FlexFuture` enum has been added.
     - This enum is returned by some `System` methods to allow optimizing
       the return value of the method.
-- Internal dependencies:
+- Private dependencies:
     - dyn-clone 1.0.19
 
 ### Changed
@@ -84,7 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `System::exit`
     - `System::kill`
     - `System::raise`
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.85.0 → 1.86.0
 
 ### Fixed
@@ -135,7 +139,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   type from the `errno` crate.
 - The `SystemEx` trait now has the `signal_number_from_exit_status` method.
     - This method converts an exit status to a signal number if applicable.
-- Internal dependencies:
+- Private dependencies:
     - errno 0.3.10
     - libc 0.2.169
 
@@ -154,10 +158,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `(&'a Condition, Option<&'a TrapState>, Option<&'a TrapState>)`.
   It now yields the current state even if the current action was not set by the
   user.
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.82.0 → 1.85.0
     - yash-syntax 0.13.0 → 0.14.0
-- Internal dependency versions:
+- Private dependency versions:
     - itertools 0.13.0 → 0.14.0
     - strum 0.26.2 → 0.27.0
 
@@ -168,7 +172,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `getopts_state` field from the `Env` struct
 - The `builtin::getopts` module and its contents
   (the `GetoptsState` struct and the `Origin` enum)
-- Internal dependencies:
+- Private dependencies:
     - futures-util 0.3.31
     - nix 0.29.0
 
@@ -176,10 +180,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.79.0 → 1.82.0
     - yash-syntax 0.12.0 → 0.13.0
-- Internal dependency versions:
+- Private dependency versions:
     - futures-util 0.3.28 → 0.3.31
     - thiserror 1.0.47 → 2.0.4
 
@@ -195,7 +199,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - This `Input` decorator implements the behavior of the `ignoreeof` shell option.
 - `system::virtual::FileBody::Terminal`
     - This is a new variant of `FileBody` that represents a terminal device.
-- Internal dependencies:
+- Private dependencies:
     - yash-executor 1.0.0
 
 ### Changed
@@ -213,7 +217,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `impl yash_syntax::input::Input` for `input::FdReader`, `input::Echo`,
   `input::IgnoreEof`, and `input::Reporter` now conforms to the new definition
   of the `next_line` method.
-- External dependency versions:
+- Public dependency versions:
     - yash-syntax 0.11.0 → 0.12.0
 
 ### Removed
@@ -223,7 +227,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The redundant lifetime constraint `T: 'a` is removed from the implementations
   of `yash_syntax::input::Input` for `input::Echo<'a, 'b, T>` and
   `input::Reporter<'a, 'b, T>`.
-- Internal dependencies:
+- Private dependencies:
     - async-trait 0.1.73
 
 ## [0.3.0] - 2024-08-22
@@ -249,11 +253,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `job::RawPid` type has been added to represent the contents of `job::Pid`.
 - The `stack::Frame` enum now has the `InitFile` variant.
 - The crate now re-exports `unix_path` as `path` and `unix_str` as `str`.
-- External dependencies:
-    - enumset 1.1.2 (previously an internal dependency)
+- Public dependencies:
+    - enumset 1.1.2 (previously a private dependency)
     - unix_path 1.0.1
     - unix_str 1.0.0
-- Internal dependencies:
+- Private dependencies:
     - bitflags 2.6.0
     - nix 0.29.0 (with the "fs", "signal", and "user" features enabled)
 
@@ -327,7 +331,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   descriptors that are contained in `readers` but not readable, or in `writers`
   but not writable. Previously, the method returned an `EBADF` error in these
   cases.
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.77.0 → 1.79.0
     - yash-syntax 0.10.0 → 0.11.0
 
@@ -351,8 +355,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `impl From<nix::unistd::Pid> for job::Pid`
 - `impl From<system::resource::LimitPair> for nix::libc::rlimit`
 - `impl From<nix::libc::rlimit> for system::resource::LimitPair`
-- External dependencies:
-    - nix 0.27.0 (now an internal dependency with the "fs", "signal" and "user"
+- Public dependencies:
+    - nix 0.27.0 (now a private dependency with the "fs", "signal" and "user"
       features enabled)
 
 ## [0.2.1] - 2024-07-12
@@ -377,10 +381,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.70.0 → 1.77.0
     - yash-syntax 0.9.0 → 0.10.0
-- Internal dependency versions:
+- Private dependency versions:
     - annotate-snippets 0.10.0 → 0.11.4
 - All inherent methods of `SharedSystem` now take `&self` instead of `&mut self`:
     - `SharedSystem::read_async`
@@ -421,7 +425,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- External dependency versions
+- Public dependency versions
     - yash-syntax 0.8.0 → 0.9.0
 - `stack::Frame` is now `non_exhaustive`.
 - `job::fmt::Report` has been totally rewritten.

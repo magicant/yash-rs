@@ -26,7 +26,7 @@
         - For library crates other than `yash-cli`, `CHANGELOG.md` should contain changes in public API
         - For the `yash-cli` binary crate, `CHANGELOG.md` should contain changes in observable behavior
     - [ ] If a dependency has been added, removed, or updated in `Cargo.toml`, it should be mentioned in the changelog
-        - Internal and external dependencies should be mentioned separately. Internal dependencies are crates whose items are not re-exported by the dependent crate. Bumping an internal dependency version does not require a version bump of the dependent crate.
+        - Private and public dependencies should be mentioned separately. Private dependencies are crates whose items are not re-exported by the dependent crate. Bumping a private dependency version does not require a version bump of the dependent crate.
         - For example, if you add a public function in `yash-syntax`, bumping its minor version, then `CHANGELOG.md` of `yash-syntax` should mention the new function, and `CHANGELOG.md` of all crates depending on `yash-syntax` should mention that `yash-syntax` has been updated to the new version.
 - Documentation
     - [ ] The documentation (`docs/src`) should be updated to reflect the new behavior

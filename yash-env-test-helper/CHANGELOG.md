@@ -5,19 +5,23 @@ All notable changes to `yash-env-test-helper` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+Terminology: A _public dependency_ is one that’s exposed through this crate’s
+public API (e.g., re-exported types).
+A _private dependency_ is used internally and not visible to downstream users.
+
 ## [0.7.0] - Unreleased
 
-- External dependency versions:
+- Public dependency versions:
     - yash-env 0.8.0 → 0.9.0
 
 ## [0.6.0] - 2025-05-11
 
-- External dependency versions:
+- Public dependency versions:
     - yash-env 0.7.0 → 0.8.0
 
 ## [0.5.0] - 2025-04-26
 
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.85.0 → 1.86.0
     - yash-env 0.6.0 → 0.7.0
 
@@ -25,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.82.0 → 1.85.0
     - yash-env 0.5.0 → 0.6.0
 
@@ -33,10 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.79.0 → 1.82.0
     - yash-env 0.4.0 → 0.5.0
-- Internal dependency versions:
+- Private dependency versions:
     - futures-executor 0.3.28 → 0.3.31
     - futures-util 0.3.28 → 0.3.31
 
@@ -44,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.77.0 → 1.79.0
     - yash-env 0.2.0 → 0.4.0
 

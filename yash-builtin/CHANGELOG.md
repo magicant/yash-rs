@@ -5,15 +5,19 @@ All notable changes to `yash-builtin` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+Terminology: A _public dependency_ is one that’s exposed through this crate’s
+public API (e.g., re-exported types).
+A _private dependency_ is used internally and not visible to downstream users.
+
 ## [0.11.0] - Unreleased
 
 ### Changed
 
-- External dependency versions:
+- Public dependency versions:
     - yash-env 0.8.1 → 0.9.0
     - yash-semantics (optional) 0.9.0 → 0.10.0
     - yash-syntax 0.15.2 → 0.16.0
-- Internal dependency versions:
+- Private dependency versions:
     - yash-prompt (optional) 0.6.0 → 0.7.0
 
 ## [0.10.0] - 2025-09-23
@@ -24,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- External dependency versions:
+- Public dependency versions:
     - yash-env 0.8.0 → 0.8.1
     - yash-semantics (optional) 0.8.1 → 0.9.0
     - yash-syntax 0.15.1 → 0.15.2
@@ -43,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- External dependency versions:
+- Public dependency versions:
     - yash-semantics (optional) 0.8.0 → 0.8.1
     - yash-syntax 0.15.0 → 0.15.1
 
@@ -67,11 +71,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- External dependency versions:
+- Public dependency versions:
     - yash-env 0.7.1 → 0.8.0
     - yash-semantics (optional) 0.7.1 → 0.8.0
     - yash-syntax 0.14.1 → 0.15.0
-- Internal dependency versions:
+- Private dependency versions:
     - yash-prompt (optional) 0.5.0 → 0.6.0
 
 ### Fixed
@@ -94,7 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `getopts::report::Error` enum now has the `InvalidVariableName` variant, which
   indicates that the variable name is invalid.
-- External dependency versions:
+- Public dependency versions:
     - yash-env 0.7.0 → 0.7.1
     - yash-semantics (optional) 0.7.0 → 0.7.1
     - yash-syntax 0.14.0 → 0.14.1
@@ -128,11 +132,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   uses `yash_env::system::System::tcsetpgrp` instead of
   `yash_env::system::SystemEx::tcsetpgrp_without_block` to bring jobs to the
   foreground.
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.85.0 → 1.86.0
     - yash-env 0.6.0 → 0.7.0
     - yash-semantics (optional) 0.6.0 → 0.7.0
-- Internal dependency versions:
+- Private dependency versions:
     - yash-prompt (optional) 0.4.0 → 0.5.0
 
 ## [0.6.0] - 2025-03-23
@@ -234,12 +238,12 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 - The `wait` built-in no longer treats suspended jobs as terminated jobs. When
   waiting for a suspended job, the built-in now waits indefinitely until the job
   is resumed and finished.
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.82.0 → 1.85.0
     - yash-env 0.5.0 → 0.6.0
     - yash-semantics (optional) 0.5.0 → 0.6.0
     - yash-syntax 0.13.0 → 0.14.0
-- Internal dependency versions:
+- Private dependency versions:
     - itertools 0.13.0 → 0.14.0
     - yash-prompt (optional) 0.3.0 → 0.4.0
 
@@ -247,11 +251,11 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 ### Changed
 
-- External dependency versions:
+- Public dependency versions:
     - yash-env 0.4.0 → 0.5.0
     - yash-semantics (optional) 0.4.0 → 0.5.0
     - yash-syntax 0.12.0 → 0.13.0
-- Internal dependency versions:
+- Private dependency versions:
     - yash-prompt (optional) 0.2.0 → 0.3.0
 
 ## [0.4.1] - 2024-12-14
@@ -263,9 +267,9 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
   job, as required by POSIX.1-2024.
 - The `exec` built-in no longer exits the shell when the specified command is
   not found in an interactive shell, as required by POSIX.1-2024.
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.79.0 → 1.82.0
-- Internal dependency versions
+- Private dependency versions
     - thiserror 1.0.47 → 2.0.4
 
 ## [0.4.0] - 2024-09-29
@@ -299,24 +303,24 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
   return an error of type `Errno` instead of a `std::io::Error`.
 - The `show_one` and `show_all` functions in the `ulimit::show` module now takes
   a function that returns an error of type `Errno` instead of `std::io::Error`.
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.77.0 → 1.79.0
     - yash-env 0.2.0 → 0.4.0
     - yash-semantics (optional) 0.3.0 → 0.4.0
     - yash-syntax 0.10.0 → 0.12.0
-- Internal dependency versions:
+- Private dependency versions:
     - yash-prompt (optional) 0.1.0 → 0.2.0
 
 ## [0.3.0] - 2024-07-13
 
 ### Added
 
-- Internal dependencies:
+- Private dependencies:
     - yash-prompt 0.1.0 (optional)
 
 ### Changed
 
-- External dependency versions:
+- Public dependency versions:
     - Rust 1.75.0 → 1.77.0
     - yash-semantics 0.2.0 → 0.3.0
     - yash-syntax 0.9.0 → 0.10.0
@@ -350,7 +354,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 ### Changed
 
-- External dependency versions
+- Public dependency versions
     - yash-env 0.1.0 → 0.2.0
     - yash-semantics 0.1.0 → 0.2.0
     - yash-syntax 0.8.0 → 0.9.0
