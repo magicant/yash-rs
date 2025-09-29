@@ -154,7 +154,7 @@ pub mod tests {
     use super::*;
     use futures_util::FutureExt;
     use yash_env::variable::{IFS, Scope};
-    use yash_syntax::syntax::{Switch, SwitchCondition, SwitchType};
+    use yash_syntax::syntax::{Switch, SwitchAction, SwitchCondition};
 
     pub fn env_with_positional_params_and_ifs() -> yash_env::Env {
         let mut env = yash_env::Env::new_virtual();
@@ -247,7 +247,7 @@ pub mod tests {
 
     #[test]
     fn alter_empty() {
-        use yash_syntax::syntax::{Switch, SwitchCondition, SwitchType};
+        use yash_syntax::syntax::{Switch, SwitchAction, SwitchCondition};
 
         let mut env = env_with_positional_params_and_ifs();
         env.variables
@@ -256,7 +256,7 @@ pub mod tests {
             .unwrap();
         let mut param = braced_variable("foo");
         param.modifier = Modifier::Switch(Switch {
-            r#type: SwitchType::Alter,
+            action: SwitchAction::Alter,
             condition: SwitchCondition::Unset,
             word: "bar".parse().unwrap(),
         });
@@ -338,7 +338,7 @@ pub mod tests {
         let mut env = Env::new(&mut env);
         let mut param = braced_variable("foo");
         param.modifier = Modifier::Switch(Switch {
-            r#type: SwitchType::Alter,
+            action: SwitchAction::Alter,
             condition: SwitchCondition::Unset,
             word: "".parse().unwrap(),
         });

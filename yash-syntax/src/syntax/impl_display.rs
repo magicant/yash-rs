@@ -31,9 +31,9 @@ impl fmt::Display for Param {
     }
 }
 
-impl fmt::Display for SwitchType {
+impl fmt::Display for SwitchAction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use SwitchType::*;
+        use SwitchAction::*;
         let c = match self {
             Alter => '+',
             Default => '-',
@@ -56,7 +56,7 @@ impl fmt::Display for SwitchCondition {
 
 impl fmt::Display for Switch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}{}{}", self.condition, self.r#type, self.word)
+        write!(f, "{}{}{}", self.condition, self.action, self.word)
     }
 }
 
@@ -427,28 +427,28 @@ mod tests {
     #[test]
     fn switch_display() {
         let switch = Switch {
-            r#type: SwitchType::Alter,
+            action: SwitchAction::Alter,
             condition: SwitchCondition::Unset,
             word: "".parse().unwrap(),
         };
         assert_eq!(switch.to_string(), "+");
 
         let switch = Switch {
-            r#type: SwitchType::Default,
+            action: SwitchAction::Default,
             condition: SwitchCondition::UnsetOrEmpty,
             word: "foo".parse().unwrap(),
         };
         assert_eq!(switch.to_string(), ":-foo");
 
         let switch = Switch {
-            r#type: SwitchType::Assign,
+            action: SwitchAction::Assign,
             condition: SwitchCondition::UnsetOrEmpty,
             word: "bar baz".parse().unwrap(),
         };
         assert_eq!(switch.to_string(), ":=bar baz");
 
         let switch = Switch {
-            r#type: SwitchType::Error,
+            action: SwitchAction::Error,
             condition: SwitchCondition::Unset,
             word: "?error".parse().unwrap(),
         };
@@ -502,7 +502,7 @@ mod tests {
         assert_eq!(param.to_string(), "${#foo}");
 
         let switch = Switch {
-            r#type: SwitchType::Assign,
+            action: SwitchAction::Assign,
             condition: SwitchCondition::UnsetOrEmpty,
             word: "bar baz".parse().unwrap(),
         };

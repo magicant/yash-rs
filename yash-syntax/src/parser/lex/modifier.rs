@@ -24,8 +24,8 @@ use crate::parser::error::Error;
 use crate::parser::error::SyntaxError;
 use crate::syntax::Modifier;
 use crate::syntax::Switch;
+use crate::syntax::SwitchAction;
 use crate::syntax::SwitchCondition;
-use crate::syntax::SwitchType;
 use crate::syntax::Trim;
 use crate::syntax::TrimLength;
 use crate::syntax::TrimSide;
@@ -93,11 +93,11 @@ impl WordLexer<'_, '_> {
     /// `symbol`.
     async fn switch(&mut self, colon: bool, symbol: char) -> Result<Modifier> {
         self.consume_char();
-        let r#type = match symbol {
-            '+' => SwitchType::Alter,
-            '-' => SwitchType::Default,
-            '=' => SwitchType::Assign,
-            '?' => SwitchType::Error,
+        let action = match symbol {
+            '+' => SwitchAction::Alter,
+            '-' => SwitchAction::Default,
+            '=' => SwitchAction::Assign,
+            '?' => SwitchAction::Error,
             _ => unreachable!(),
         };
 
@@ -115,7 +115,7 @@ impl WordLexer<'_, '_> {
         }
 
         Ok(Modifier::Switch(Switch {
-            r#type,
+            action,
             condition,
             word,
         }))
@@ -191,7 +191,7 @@ mod tests {
 
         let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
-            assert_eq!(switch.r#type, SwitchType::Alter);
+            assert_eq!(switch.action, SwitchAction::Alter);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.units, []);
             assert_eq!(*switch.word.location.code.value.borrow(), "+}");
@@ -211,7 +211,7 @@ mod tests {
 
         let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
-            assert_eq!(switch.r#type, SwitchType::Alter);
+            assert_eq!(switch.action, SwitchAction::Alter);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(
                 switch.word.units,
@@ -239,7 +239,7 @@ mod tests {
 
         let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
-            assert_eq!(switch.r#type, SwitchType::Alter);
+            assert_eq!(switch.action, SwitchAction::Alter);
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
             assert_eq!(switch.word.units, []);
             assert_eq!(*switch.word.location.code.value.borrow(), ":+}");
@@ -259,7 +259,7 @@ mod tests {
 
         let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
-            assert_eq!(switch.r#type, SwitchType::Default);
+            assert_eq!(switch.action, SwitchAction::Default);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.units, []);
             assert_eq!(*switch.word.location.code.value.borrow(), "-}");
@@ -279,7 +279,7 @@ mod tests {
 
         let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
-            assert_eq!(switch.r#type, SwitchType::Default);
+            assert_eq!(switch.action, SwitchAction::Default);
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
             assert_eq!(
                 switch.word.units,
@@ -307,7 +307,7 @@ mod tests {
 
         let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
-            assert_eq!(switch.r#type, SwitchType::Assign);
+            assert_eq!(switch.action, SwitchAction::Assign);
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
             assert_eq!(switch.word.units, []);
             assert_eq!(*switch.word.location.code.value.borrow(), ":=}");
@@ -327,7 +327,7 @@ mod tests {
 
         let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
-            assert_eq!(switch.r#type, SwitchType::Assign);
+            assert_eq!(switch.action, SwitchAction::Assign);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(
                 switch.word.units,
@@ -354,7 +354,7 @@ mod tests {
 
         let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
-            assert_eq!(switch.r#type, SwitchType::Error);
+            assert_eq!(switch.action, SwitchAction::Error);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.units, []);
             assert_eq!(*switch.word.location.code.value.borrow(), "?}");
@@ -374,7 +374,7 @@ mod tests {
 
         let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
-            assert_eq!(switch.r#type, SwitchType::Error);
+            assert_eq!(switch.action, SwitchAction::Error);
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
             assert_eq!(
                 switch.word.units,

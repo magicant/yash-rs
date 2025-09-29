@@ -205,8 +205,8 @@ mod tests {
     use crate::parser::lex::Lexer;
     use crate::parser::lex::WordContext;
     use crate::source::Source;
+    use crate::syntax::SwitchAction;
     use crate::syntax::SwitchCondition;
-    use crate::syntax::SwitchType;
     use crate::syntax::TrimLength;
     use crate::syntax::TrimSide;
     use assert_matches::assert_matches;
@@ -572,7 +572,7 @@ mod tests {
         let param = result.unwrap().unwrap();
         assert_eq!(param.param, Param::variable("x"));
         assert_matches!(param.modifier, Modifier::Switch(switch) => {
-            assert_eq!(switch.r#type, SwitchType::Alter);
+            assert_eq!(switch.action, SwitchAction::Alter);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.to_string(), "");
         });
@@ -599,7 +599,7 @@ mod tests {
         let param = result.unwrap().unwrap();
         assert_eq!(param.param, Param::variable("foo"));
         assert_matches!(param.modifier, Modifier::Switch(switch) => {
-            assert_eq!(switch.r#type, SwitchType::Error);
+            assert_eq!(switch.action, SwitchAction::Error);
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
             assert_eq!(switch.word.to_string(), "'!'");
         });
@@ -626,7 +626,7 @@ mod tests {
         let param = result.unwrap().unwrap();
         assert_eq!(param.param, Param::from(SpecialParam::Number));
         assert_matches!(param.modifier, Modifier::Switch(switch) => {
-            assert_eq!(switch.r#type, SwitchType::Alter);
+            assert_eq!(switch.action, SwitchAction::Alter);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.to_string(), "?");
         });
@@ -653,7 +653,7 @@ mod tests {
         let param = result.unwrap().unwrap();
         assert_eq!(param.param, Param::from(SpecialParam::Number));
         assert_matches!(param.modifier, Modifier::Switch(switch) => {
-            assert_eq!(switch.r#type, SwitchType::Default);
+            assert_eq!(switch.action, SwitchAction::Default);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.to_string(), "-");
         });
@@ -680,7 +680,7 @@ mod tests {
         let param = result.unwrap().unwrap();
         assert_eq!(param.param, Param::from(SpecialParam::Number));
         assert_matches!(param.modifier, Modifier::Switch(switch) => {
-            assert_eq!(switch.r#type, SwitchType::Assign);
+            assert_eq!(switch.action, SwitchAction::Assign);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.to_string(), "?");
         });
@@ -707,7 +707,7 @@ mod tests {
         let param = result.unwrap().unwrap();
         assert_eq!(param.param, Param::from(SpecialParam::Number));
         assert_matches!(param.modifier, Modifier::Switch(switch) => {
-            assert_eq!(switch.r#type, SwitchType::Error);
+            assert_eq!(switch.action, SwitchAction::Error);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.to_string(), "?");
         });
@@ -734,7 +734,7 @@ mod tests {
         let param = result.unwrap().unwrap();
         assert_eq!(param.param, Param::from(SpecialParam::Number));
         assert_matches!(param.modifier, Modifier::Switch(switch) => {
-            assert_eq!(switch.r#type, SwitchType::Default);
+            assert_eq!(switch.action, SwitchAction::Default);
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
             assert_eq!(switch.word.to_string(), "");
         });
