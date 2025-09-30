@@ -171,7 +171,7 @@ pub struct Param {
 
 /// Flag that specifies how the value is substituted in a [switch](Switch)
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SwitchType {
+pub enum SwitchAction {
     /// Alter an existing value, if any. (`+`)
     Alter,
     /// Substitute a missing value with a default. (`-`)
@@ -185,7 +185,7 @@ pub enum SwitchType {
 /// Condition that triggers a [switch](Switch)
 ///
 /// In the lexical grammar of the shell language, a switch condition is an
-/// optional colon that precedes a switch type.
+/// optional colon that precedes a switch action.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SwitchCondition {
     /// Without a colon, the switch is triggered if the parameter is unset.
@@ -200,12 +200,12 @@ pub enum SwitchCondition {
 ///
 /// Examples of switches include `+foo`, `:-bar` and `:=baz`.
 ///
-/// A switch is composed of a [condition](SwitchCondition) (an optional `:`), a
-/// [type](SwitchType) (one of `+`, `-`, `=` and `?`) and a [word](Word).
+/// A switch is composed of a [condition](SwitchCondition) (an optional `:`), an
+/// [action](SwitchAction) (one of `+`, `-`, `=` and `?`) and a [word](Word).
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Switch {
     /// How the value is substituted
-    pub r#type: SwitchType,
+    pub action: SwitchAction,
     /// Condition that determines whether the value is substituted or not
     pub condition: SwitchCondition,
     /// Word that substitutes the parameter value

@@ -33,8 +33,8 @@ use yash_syntax::source::Location;
 use yash_syntax::syntax::Param;
 use yash_syntax::syntax::ParamType;
 use yash_syntax::syntax::Switch;
+use yash_syntax::syntax::SwitchAction;
 use yash_syntax::syntax::SwitchCondition;
-use yash_syntax::syntax::SwitchType;
 use yash_syntax::syntax::Word;
 
 /// Subdivision of [value](Value) states that may be considered as "not set"
@@ -91,7 +91,7 @@ impl std::fmt::Display for Vacancy {
     }
 }
 
-/// Error caused by a [`Switch`] of [`SwitchType::Error`]
+/// Error caused by a [`Switch`] of [`SwitchAction::Error`]
 ///
 /// `VacantError` is an error that is returned when you apply an error switch to
 /// a [vacant](Vacancy) value.
@@ -274,10 +274,10 @@ pub async fn apply(
     value: Option<&Value>,
     location: &Location,
 ) -> Option<Result<Phrase, Error>> {
-    use SwitchType::*;
+    use SwitchAction::*;
     use ValueCondition::*;
     let cond = ValueCondition::with(switch.condition, Vacancy::of(value));
-    match (switch.r#type, cond) {
+    match (switch.action, cond) {
         (Alter, Vacant(_)) | (Default, Occupied) | (Assign, Occupied) | (Error, Occupied) => None,
 
         (Alter, Occupied) | (Default, Vacant(_)) => {
@@ -308,8 +308,8 @@ mod tests {
     use futures_util::FutureExt;
     use yash_env::variable::IFS;
     use yash_syntax::syntax::SpecialParam;
+    use yash_syntax::syntax::SwitchAction::*;
     use yash_syntax::syntax::SwitchCondition::*;
-    use yash_syntax::syntax::SwitchType::*;
 
     #[test]
     fn vacancy_of_values() {
@@ -383,7 +383,7 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
-            r#type: Alter,
+            action: Alter,
             condition: Unset,
             word: "foo".parse().unwrap(),
         };
@@ -400,7 +400,7 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
-            r#type: Alter,
+            action: Alter,
             condition: Unset,
             word: "foo".parse().unwrap(),
         };
@@ -418,7 +418,7 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
-            r#type: Default,
+            action: Default,
             condition: Unset,
             word: "foo".parse().unwrap(),
         };
@@ -435,7 +435,7 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
-            r#type: Default,
+            action: Default,
             condition: Unset,
             word: "foo".parse().unwrap(),
         };
@@ -453,7 +453,7 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
-            r#type: Assign,
+            action: Assign,
             condition: Unset,
             word: "foo".parse().unwrap(),
         };
@@ -483,7 +483,7 @@ mod tests {
             .unwrap();
         let mut env = Env::new(&mut env);
         let switch = Switch {
-            r#type: Assign,
+            action: Assign,
             condition: Unset,
             word: "\"$@\"".parse().unwrap(),
         };
@@ -530,7 +530,7 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
-            r#type: Assign,
+            action: Assign,
             condition: Unset,
             word: "foo".parse().unwrap(),
         };
@@ -552,7 +552,7 @@ mod tests {
         let save_var = var.clone();
         let mut env = Env::new(&mut env);
         let switch = Switch {
-            r#type: Assign,
+            action: Assign,
             condition: UnsetOrEmpty,
             word: "foo".parse().unwrap(),
         };
@@ -580,7 +580,7 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
-            r#type: Assign,
+            action: Assign,
             condition: UnsetOrEmpty,
             word: "foo".parse().unwrap(),
         };
@@ -607,7 +607,7 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
-            r#type: Error,
+            action: Error,
             condition: Unset,
             word: "foo".parse().unwrap(),
         };
@@ -629,7 +629,7 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
-            r#type: Error,
+            action: Error,
             condition: UnsetOrEmpty,
             word: "bar".parse().unwrap(),
         };
@@ -652,7 +652,7 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
-            r#type: Error,
+            action: Error,
             condition: UnsetOrEmpty,
             word: "".parse().unwrap(),
         };
@@ -676,7 +676,7 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
-            r#type: Error,
+            action: Error,
             condition: Unset,
             word: "foo".parse().unwrap(),
         };

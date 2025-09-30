@@ -13,6 +13,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- Renamed `syntax::SwitchType` to `syntax::SwitchAction` and
+  `syntax::Switch::type` to `syntax::Switch::action` to better reflect their
+  purpose.
 - Updated the optional public dependency annotate-snippets from 0.11.4 to
   0.12.4. Items provided by this crate have been redefined to reflect the
   changes in the new version of annotate-snippets:

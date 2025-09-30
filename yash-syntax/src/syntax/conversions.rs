@@ -215,7 +215,7 @@ impl From<usize> for Param {
 
 impl Unquote for Switch {
     fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
-        write!(w, "{}{}", self.condition, self.r#type)?;
+        write!(w, "{}{}", self.condition, self.action)?;
         self.word.write_unquoted(w)
     }
 }
@@ -650,7 +650,7 @@ mod tests {
     #[test]
     fn switch_unquote() {
         let switch = Switch {
-            r#type: SwitchType::Default,
+            action: SwitchAction::Default,
             condition: SwitchCondition::UnsetOrEmpty,
             word: "foo bar".parse().unwrap(),
         };
@@ -659,7 +659,7 @@ mod tests {
         assert_eq!(is_quoted, false);
 
         let switch = Switch {
-            r#type: SwitchType::Error,
+            action: SwitchAction::Error,
             condition: SwitchCondition::Unset,
             word: r"e\r\ror".parse().unwrap(),
         };
@@ -727,7 +727,7 @@ mod tests {
         assert_eq!(is_quoted, false);
 
         let switch = Switch {
-            r#type: SwitchType::Assign,
+            action: SwitchAction::Assign,
             condition: SwitchCondition::UnsetOrEmpty,
             word: "'bar'".parse().unwrap(),
         };
