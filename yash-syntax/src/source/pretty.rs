@@ -16,6 +16,8 @@
 
 //! Pretty-printing diagnostic messages containing references to source code
 //!
+//! TODO: Update the documentation for the new API
+//!
 //! This module defines some data types for constructing intermediate data
 //! structures for printing diagnostic messages referencing source code
 //! fragments.  When you have an [`Error`](crate::parser::Error), you can
@@ -59,8 +61,97 @@
 use super::Location;
 use std::borrow::Cow;
 use std::cell::Ref;
-use std::ops::Deref;
+use std::ops::{Deref, Range};
 use std::rc::Rc;
+
+/// Type of [`Report`]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum ReportType {
+    #[default]
+    None,
+    Error,
+    Warning,
+}
+
+/// Type and label annotating a [`Span`]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum SpanRole<'a> {
+    /// Primary span, usually indicating the main cause of a problem
+    Primary { label: Cow<'a, str> },
+    /// Secondary span, usually indicating related information
+    Supplementary { label: Cow<'a, str> },
+    // Patch { replacement: Cow<'a, str> },
+}
+
+/// Part of source code [`Snippet`] annotated with additional information
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Span<'a> {
+    /// Range of bytes in the source code
+    pub range: Range<usize>,
+    /// Type and label of this span
+    pub role: SpanRole<'a>,
+}
+
+/// Fragment of source code with annotated spans highlighting specific regions
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Snippet<'a> {
+    /// Source code to which the spans refer
+    pub code: Rc<super::Code>,
+    /// Spans describing parts of the code
+    pub spans: Vec<Span<'a>>,
+}
+
+/// Type of [`Footnote`]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum FootnoteType {
+    /// No specific type
+    #[default]
+    None,
+    // TODO Do we need both Info and Note?
+    Info,
+    Note,
+    /// For footnotes that provide suggestions
+    Suggestion,
+}
+
+/// Message without associated source code
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct Footnote<'a> {
+    /// Type of this footnote
+    pub r#type: FootnoteType,
+    /// Text of this footnote
+    pub label: Cow<'a, str>,
+}
+
+/// Entire report containing multiple snippets
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct Report<'a> {
+    /// Type of this report
+    pub r#type: ReportType,
+    /// Optional identifier of this report (e.g., error code)
+    pub id: Option<Cow<'a, str>>,
+    /// Main caption of this report
+    pub title: Cow<'a, str>,
+    /// Source code fragments annotated with additional information
+    pub snippets: Vec<Snippet<'a>>,
+    /// Additional message without associated source code
+    pub footnotes: Vec<Footnote<'a>>,
+}
+
+impl Report<'_> {
+    /// Creates a new, empty report.
+    #[inline]
+    #[must_use]
+    pub fn new() -> Self {
+        Report::default()
+    }
+}
+
+// TODO Deprecate old items
 
 /// Type of annotation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -116,7 +207,7 @@ impl<'a> Annotation<'a> {
     }
 }
 
-/// Additional text without associated source code
+/// Additional message without associated source code
 #[derive(Clone, Debug)]
 pub struct Footer<'a> {
     /// Type of this footer
@@ -285,6 +376,28 @@ mod annotate_snippets_support {
         }
     }
 
+    /// Converts `yash_syntax::source::pretty::FootnoteType` into
+    /// `annotate_snippets::Level`.
+    ///
+    /// This implementation is only available when the `yash_syntax` crate is
+    /// built with the `annotate-snippets` feature enabled.
+    impl From<FootnoteType> for annotate_snippets::Level<'_> {
+        fn from(r#type: FootnoteType) -> Self {
+            use FootnoteType::*;
+            match r#type {
+                None => Self::INFO.no_name(),
+                Info => Self::INFO,
+                Note => Self::NOTE,
+                Suggestion => Self::HELP,
+            }
+        }
+    }
+
+    /// Converts `yash_syntax::source::pretty::AnnotationType` into
+    /// `annotate_snippets::AnnotationKind`.
+    ///
+    /// This implementation is only available when the `yash_syntax` crate is
+    /// built with the `annotate-snippets` feature enabled.
     impl From<AnnotationType> for annotate_snippets::AnnotationKind {
         fn from(r#type: AnnotationType) -> Self {
             use AnnotationType::*;
