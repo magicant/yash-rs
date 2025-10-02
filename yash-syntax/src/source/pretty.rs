@@ -151,9 +151,8 @@ impl Report<'_> {
     }
 }
 
-// TODO Deprecate old items
-
 /// Type of annotation.
+#[deprecated(note = "Use `ReportType` or `FootnoteType` instead", since = "0.16.0")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AnnotationType {
     Error,
@@ -166,9 +165,11 @@ pub enum AnnotationType {
 /// Source code fragment annotated with a label
 ///
 /// Annotations are part of an entire [`Message`].
+#[deprecated(note = "Use `Snippet` and `Span` instead", since = "0.16.0")]
 #[derive(Clone)]
 pub struct Annotation<'a> {
     /// Type of annotation
+    #[allow(deprecated)]
     pub r#type: AnnotationType,
     /// String that describes the annotated part of the source code
     pub label: Cow<'a, str>,
@@ -181,6 +182,7 @@ pub struct Annotation<'a> {
     pub code: Rc<dyn Deref<Target = str> + 'a>,
 }
 
+#[allow(deprecated)]
 impl std::fmt::Debug for Annotation<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Annotation")
@@ -192,6 +194,7 @@ impl std::fmt::Debug for Annotation<'_> {
     }
 }
 
+#[allow(deprecated)]
 impl<'a> Annotation<'a> {
     /// Creates a new annotation.
     ///
@@ -208,15 +211,19 @@ impl<'a> Annotation<'a> {
 }
 
 /// Additional message without associated source code
+#[deprecated(note = "Use `Footnote` instead", since = "0.16.0")]
 #[derive(Clone, Debug)]
 pub struct Footer<'a> {
     /// Type of this footer
+    #[allow(deprecated)]
     pub r#type: AnnotationType,
     /// Text of this footer
     pub label: Cow<'a, str>,
 }
 
 /// Entire diagnostic message
+#[allow(deprecated)]
+#[deprecated(note = "Use `Report` instead", since = "0.16.0")]
 #[derive(Clone, Debug)]
 pub struct Message<'a> {
     /// Type of this message
@@ -230,7 +237,9 @@ pub struct Message<'a> {
 }
 
 impl super::Source {
+    // TODO Deprecate
     /// Appends complementary annotations describing this source.
+    #[allow(deprecated)]
     pub fn complement_annotations<'a, 's: 'a, T: Extend<Annotation<'a>>>(&'s self, result: &mut T) {
         use super::Source::*;
         match self {
@@ -301,11 +310,13 @@ impl super::Source {
     }
 }
 
+// TODO Deprecate
 /// Helper for constructing a [`Message`]
 ///
 /// Thanks to the blanket implementation `impl<'a, T: MessageBase> From<&'a T>
 /// for Message<'a>`, implementors of this trait can be converted to a message
 /// for free.
+#[allow(deprecated)]
 pub trait MessageBase {
     /// Returns the type of the entire message.
     ///
@@ -336,6 +347,7 @@ pub trait MessageBase {
 }
 
 /// Constructs a message based on the message base.
+#[allow(deprecated)]
 impl<'a, T: MessageBase> From<&'a T> for Message<'a> {
     fn from(base: &'a T) -> Self {
         let main_annotation = base.main_annotation();
@@ -363,6 +375,7 @@ mod annotate_snippets_support {
     ///
     /// This implementation is only available when the `yash_syntax` crate is
     /// built with the `annotate-snippets` feature enabled.
+    #[allow(deprecated)]
     impl<'a> From<AnnotationType> for annotate_snippets::Level<'a> {
         fn from(r#type: AnnotationType) -> Self {
             use AnnotationType::*;
@@ -398,6 +411,7 @@ mod annotate_snippets_support {
     ///
     /// This implementation is only available when the `yash_syntax` crate is
     /// built with the `annotate-snippets` feature enabled.
+    #[allow(deprecated)]
     impl From<AnnotationType> for annotate_snippets::AnnotationKind {
         fn from(r#type: AnnotationType) -> Self {
             use AnnotationType::*;
@@ -413,6 +427,7 @@ mod annotate_snippets_support {
     ///
     /// This implementation is only available when the `yash_syntax` crate is
     /// built with the `annotate-snippets` feature enabled.
+    #[allow(deprecated)]
     impl<'a> From<&'a Message<'a>> for annotate_snippets::Group<'a> {
         fn from(message: &'a Message<'a>) -> Self {
             let mut snippets: Vec<(
