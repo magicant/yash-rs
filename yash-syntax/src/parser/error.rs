@@ -17,9 +17,8 @@
 //! Definition of errors that happen in the parser
 
 use crate::source::Location;
-use crate::source::pretty::Annotation;
-use crate::source::pretty::AnnotationType;
-use crate::source::pretty::MessageBase;
+#[allow(deprecated)]
+use crate::source::pretty::{Annotation, AnnotationType, MessageBase};
 use crate::syntax::AndOr;
 use std::borrow::Cow;
 use std::rc::Rc;
@@ -491,6 +490,7 @@ pub struct Error {
     pub location: Location,
 }
 
+#[allow(deprecated)]
 impl MessageBase for Error {
     fn message_title(&self) -> Cow<'_, str> {
         self.cause.message()
@@ -523,6 +523,7 @@ impl MessageBase for Error {
     }
 }
 
+#[allow(deprecated)]
 #[cfg(test)]
 mod tests {
     use super::*;
