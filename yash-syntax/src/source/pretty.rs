@@ -185,6 +185,11 @@ pub struct Footnote<'a> {
 }
 
 /// Entire report containing multiple snippets
+///
+/// `Report` is an intermediate data structure for constructing a diagnostic
+/// message. It contains multiple [`Snippet`]s, each of which corresponds to a
+/// specific part of the source code being analyzed.
+/// See the [module documentation](self) for more details.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct Report<'a> {

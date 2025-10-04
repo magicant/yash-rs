@@ -40,6 +40,8 @@ items are deprecated.
     - `impl<'a> From<Footnote<'a>> for annotate_snippets::Message<'a>`
     - `impl<'a> From<&'a Footnote<'a>> for annotate_snippets::Message<'a>`
     - `impl From<FootnoteType> for annotate_snippets::Level`
+- The `parser::Error::to_report` method is added to convert a parser error
+  to a `source::pretty::Report`.
 
 ### Changed
 

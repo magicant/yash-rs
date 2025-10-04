@@ -19,6 +19,9 @@
 use crate::source::Location;
 #[allow(deprecated)]
 use crate::source::pretty::{Annotation, AnnotationType, MessageBase};
+use crate::source::pretty::{
+    Footnote, FootnoteType, Report, ReportType, Snippet, Span, SpanRole, add_span,
+};
 use crate::syntax::AndOr;
 use std::borrow::Cow;
 use std::rc::Rc;
@@ -488,6 +491,43 @@ impl From<std::io::Error> for ErrorCause {
 pub struct Error {
     pub cause: ErrorCause,
     pub location: Location,
+}
+
+impl Error {
+    /// Returns a report for the error.
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = self.cause.message();
+
+        let label = self.cause.label().into();
+        let span = Span {
+            range: self.location.byte_range(),
+            role: SpanRole::Primary { label },
+        };
+        let snippet = Snippet::with_code_and_spans(&self.location.code, vec![span]);
+        report.snippets.push(snippet);
+
+        if let Some((location, label)) = self.cause.related_location() {
+            let label = label.into();
+            let span = Span {
+                range: location.byte_range(),
+                role: SpanRole::Supplementary { label },
+            };
+            add_span(&location.code, span, &mut report.snippets);
+        }
+
+        if let ErrorCause::Syntax(SyntaxError::BangAfterBar) = &self.cause {
+            // TODO Suggest the change with SpanRole::Patch
+            report.footnotes.push(Footnote {
+                r#type: FootnoteType::Suggestion,
+                label: "surround the pipeline component in a grouping: `{ ! ...; }`".into(),
+            });
+        }
+
+        report
+    }
 }
 
 #[allow(deprecated)]
