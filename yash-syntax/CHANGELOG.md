@@ -11,6 +11,25 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.16.0] - Unreleased
 
+The most changes in this version are related to the version bump of the
+`annotate-snippets` dependency from 0.11 to 0.12, which introduces breaking
+changes in its API. To accommodate these changes and prepare for future
+updates, new items are added to the `source::pretty` module, and the existing
+items are deprecated.
+
+### Added
+
+- New items in the `source::pretty` module for pretty-printing diagnostic
+  messages:
+    - `Report` represents a complete diagnostic report, which may contain
+      multiple messages.
+    - `ReportType` defines the type of a report.
+    - `Snippet` represents a code snippet with annotations.
+    - `Span` represents a span of source code with an annotation.
+    - `SpanRole` defines the content of a span.
+    - `Footnote` represents a footnote attached to a report.
+    - `FootnoteType` represents the type of a footnote.
+
 ### Changed
 
 - Renamed `syntax::SwitchType` to `syntax::SwitchAction` and
@@ -24,6 +43,17 @@ A _private dependency_ is used internally and not visible to downstream users.
     - Added `impl From<AnnotationType> for annotate_snippets::AnnotationKind`
     - `impl<'a> From<&'a Message<'a>> for annotate_snippets::Message<'a>` →
       `impl<'a> From<&'a Message<'a>> for annotate_snippets::Group<'a>`
+
+## Deprecated
+
+- The existing items in the `source::pretty` module for pretty-printing diagnostic
+  messages are deprecated in favor of the new items added in this version:
+    - `Message`
+    - `MessageBase`
+    - `Annotation`
+    - `AnnotationType`
+    - `Footer`
+    - `source::Source::complement_annotations`
 
 ## [0.15.2] - 2025-09-23
 
