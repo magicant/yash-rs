@@ -95,13 +95,71 @@ pub struct Span<'a> {
 }
 
 /// Fragment of source code with annotated spans highlighting specific regions
-#[derive(Clone, Debug, Eq, PartialEq)]
+///
+/// A snippet corresponds to a single source [`Code`](super::Code). It contains
+/// zero or more [`Span`]s that annotate specific parts of the code.
+///
+/// `Snippet` holds a [`Ref`] to the string held in `self.code.value`, which
+/// provides an access to the string without making a new borrow
+/// ([`code_string`](Self::code_string)). This allows creating another
+/// message builder such as `annotate_snippets::Snippet` without the need to
+/// retain a borrow of `self.code.value`.
+#[derive(Debug)]
 pub struct Snippet<'a> {
     /// Source code to which the spans refer
-    pub code: Rc<super::Code>,
+    pub code: &'a super::Code,
+    /// Reference to the string held in `self.code.value`
+    code_string: Ref<'a, str>,
     /// Spans describing parts of the code
     pub spans: Vec<Span<'a>>,
 }
+
+impl Snippet<'_> {
+    /// Creates a new snippet for the given code without any spans.
+    #[must_use]
+    pub fn with_code(code: &super::Code) -> Snippet<'_> {
+        Self::with_code_and_spans(code, Vec::new())
+    }
+
+    /// Creates a new snippet for the given code with the given spans.
+    #[must_use]
+    pub fn with_code_and_spans<'a>(code: &'a super::Code, spans: Vec<Span<'a>>) -> Snippet<'a> {
+        Snippet {
+            code,
+            code_string: Ref::map(code.value.borrow(), String::as_str),
+            spans,
+        }
+    }
+
+    /// Returns the string held in `self.code.value`.
+    ///
+    /// This method returns a reference to the string held in `self.code.value`.
+    /// `Snippet` internally holds a `Ref` to the string, which provides an
+    /// access to the string without making a new borrow.
+    #[inline(always)]
+    #[must_use]
+    pub fn code_string(&self) -> &str {
+        &self.code_string
+    }
+}
+
+impl Clone for Snippet<'_> {
+    fn clone(&self) -> Self {
+        Snippet {
+            code: &self.code,
+            code_string: Ref::clone(&self.code_string),
+            spans: self.spans.clone(),
+        }
+    }
+}
+
+impl PartialEq<Snippet<'_>> for Snippet<'_> {
+    fn eq(&self, other: &Snippet<'_>) -> bool {
+        self.code == other.code && self.spans == other.spans
+    }
+}
+
+impl Eq for Snippet<'_> {}
 
 /// Type of [`Footnote`]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -244,14 +302,11 @@ pub struct Message<'a> {
 /// If a snippet for the given code already exists in the vector, this function
 /// adds the span to that snippet. Otherwise, it creates a new snippet with the
 /// given code and span, and appends it to the vector.
-pub fn add_span<'a>(code: &Rc<super::Code>, span: Span<'a>, snippets: &mut Vec<Snippet<'a>>) {
-    if let Some(snippet) = snippets.iter_mut().find(|s| Rc::ptr_eq(&s.code, code)) {
+pub fn add_span<'a>(code: &'a super::Code, span: Span<'a>, snippets: &mut Vec<Snippet<'a>>) {
+    if let Some(snippet) = snippets.iter_mut().find(|s| std::ptr::eq(s.code, code)) {
         snippet.spans.push(span);
     } else {
-        snippets.push(Snippet {
-            code: Rc::clone(code),
-            spans: vec![span],
-        });
+        snippets.push(Snippet::with_code_and_spans(code, vec![span]));
     }
 }
 
@@ -268,10 +323,7 @@ fn test_add_span_with_matching_code() {
             label: "greeting".into(),
         },
     };
-    let mut snippets = vec![Snippet {
-        code: Rc::clone(&code),
-        spans: vec![],
-    }];
+    let mut snippets = vec![Snippet::with_code(&code)];
 
     add_span(&code, span, &mut snippets);
 
@@ -304,10 +356,7 @@ fn test_add_span_without_matching_code() {
             label: "list".into(),
         },
     };
-    let mut snippets = vec![Snippet {
-        code: code1,
-        spans: vec![],
-    }];
+    let mut snippets = vec![Snippet::with_code(&code1)];
 
     add_span(&code2, span, &mut snippets);
 
@@ -581,8 +630,7 @@ mod annotate_snippets_support {
     fn snippet_to_annotation_snippet<'a>(
         snippet: &'a Snippet<'a>,
     ) -> annotate_snippets::Snippet<'a, annotate_snippets::Annotation<'a>> {
-        // TODO: Avoid cloning the source string
-        annotate_snippets::Snippet::source(snippet.code.value.borrow().to_owned())
+        annotate_snippets::Snippet::source(snippet.code_string())
             .line_start(
                 snippet
                     .code
