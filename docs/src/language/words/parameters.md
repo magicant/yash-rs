@@ -29,7 +29,7 @@ error: cannot expand unset parameter
 2 | echo "Hello, ${user}!"
   |              ^^^^^^^ parameter `user` is not set
   |
-  = info: unset parameters are disallowed by the nounset option
+  = note: unset parameters are disallowed by the nounset option
 ```
 
 Using `nounset` is recommended to catch typos in variable names.
