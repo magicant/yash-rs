@@ -236,10 +236,180 @@ pub struct Message<'a> {
     pub footers: Vec<Footer<'a>>,
 }
 
+/// Adds a span to the appropriate snippet in the given vector.
+///
+/// This is a utility function used in constructing a vector of snippets with
+/// annotated spans.
+///
+/// If a snippet for the given code already exists in the vector, this function
+/// adds the span to that snippet. Otherwise, it creates a new snippet with the
+/// given code and span, and appends it to the vector.
+pub fn add_span<'a>(code: &Rc<super::Code>, span: Span<'a>, snippets: &mut Vec<Snippet<'a>>) {
+    if let Some(snippet) = snippets.iter_mut().find(|s| Rc::ptr_eq(&s.code, code)) {
+        snippet.spans.push(span);
+    } else {
+        snippets.push(Snippet {
+            code: Rc::clone(code),
+            spans: vec![span],
+        });
+    }
+}
+
+#[test]
+fn test_add_span_with_matching_code() {
+    let code = Rc::new(super::Code {
+        value: std::cell::RefCell::new("echo hello".to_string()),
+        start_line_number: std::num::NonZero::new(1).unwrap(),
+        source: Rc::new(super::Source::CommandString),
+    });
+    let span = Span {
+        range: 5..10,
+        role: SpanRole::Primary {
+            label: "greeting".into(),
+        },
+    };
+    let mut snippets = vec![Snippet {
+        code: Rc::clone(&code),
+        spans: vec![],
+    }];
+
+    add_span(&code, span, &mut snippets);
+
+    assert_eq!(snippets.len(), 1);
+    assert_eq!(snippets[0].spans.len(), 1);
+    assert_eq!(snippets[0].spans[0].range, 5..10);
+    assert_eq!(
+        snippets[0].spans[0].role,
+        SpanRole::Primary {
+            label: "greeting".into()
+        }
+    );
+}
+
+#[test]
+fn test_add_span_without_matching_code() {
+    let code1 = Rc::new(super::Code {
+        value: std::cell::RefCell::new("echo hello".to_string()),
+        start_line_number: std::num::NonZero::new(1).unwrap(),
+        source: Rc::new(super::Source::CommandString),
+    });
+    let code2 = Rc::new(super::Code {
+        value: std::cell::RefCell::new("ls -l".to_string()),
+        start_line_number: std::num::NonZero::new(1).unwrap(),
+        source: Rc::new(super::Source::CommandString),
+    });
+    let span = Span {
+        range: 0..2,
+        role: SpanRole::Primary {
+            label: "list".into(),
+        },
+    };
+    let mut snippets = vec![Snippet {
+        code: code1,
+        spans: vec![],
+    }];
+
+    add_span(&code2, span, &mut snippets);
+
+    assert_eq!(snippets.len(), 2);
+    assert_eq!(snippets[0].code.value.borrow().as_str(), "echo hello");
+    assert_eq!(snippets[0].spans.len(), 0);
+    assert_eq!(snippets[1].code.value.borrow().as_str(), "ls -l");
+    assert_eq!(snippets[1].spans.len(), 1);
+    assert_eq!(snippets[1].spans[0].range, 0..2);
+    assert_eq!(
+        snippets[1].spans[0].role,
+        SpanRole::Primary {
+            label: "list".into()
+        }
+    );
+}
+
 impl super::Source {
-    // TODO Deprecate
+    /// Extends the given vector of snippets with spans annotating the context of this source.
+    ///
+    /// If `self` is a source that has a related location (e.g., the `original` field of
+    /// `CommandSubst`), this method adds one or more spans describing the location to the given
+    /// vector. If the `code` of the location is already present in the vector, it adds the span
+    /// to the existing snippet; otherwise, it creates a new snippet.
+    ///
+    /// If `self` does not have a related location, this method does nothing.
+    pub fn extend_with_context<'a>(&self, snippets: &mut Vec<Snippet<'a>>) {
+        use super::Source::*;
+        match self {
+            Unknown
+            | Stdin
+            | CommandString
+            | CommandFile { .. }
+            | VariableValue { .. }
+            | InitFile { .. }
+            | Other { .. } => (),
+
+            CommandSubst { original } => {
+                let range = original.byte_range();
+                let role = SpanRole::Supplementary {
+                    label: "command substitution appeared here".into(),
+                };
+                add_span(&original.code, Span { range, role }, snippets);
+            }
+
+            Arith { original } => {
+                let range = original.byte_range();
+                let role = SpanRole::Supplementary {
+                    label: "arithmetic expansion appeared here".into(),
+                };
+                add_span(&original.code, Span { range, role }, snippets);
+            }
+
+            Eval { original } => {
+                let range = original.byte_range();
+                let role = SpanRole::Supplementary {
+                    label: "command passed to the eval built-in here".into(),
+                };
+                add_span(&original.code, Span { range, role }, snippets);
+            }
+
+            DotScript { name, origin } => {
+                let range = origin.byte_range();
+                let role = SpanRole::Supplementary {
+                    label: format!("script `{name}` was sourced here").into(),
+                };
+                add_span(&origin.code, Span { range, role }, snippets);
+            }
+
+            Trap { origin, .. } => {
+                let range = origin.byte_range();
+                let role = SpanRole::Supplementary {
+                    label: "trap was set here".into(),
+                };
+                add_span(&origin.code, Span { range, role }, snippets);
+            }
+
+            Alias { original, alias } => {
+                // Where the alias was substituted
+                let range = original.byte_range();
+                let role = SpanRole::Supplementary {
+                    label: format!("alias `{}` was substituted here", alias.name).into(),
+                };
+                add_span(&original.code, Span { range, role }, snippets);
+                // Recurse into the source of the substituted code
+                original.code.source.extend_with_context(snippets);
+
+                // Where the alias was defined
+                let range = alias.origin.byte_range();
+                let role = SpanRole::Supplementary {
+                    label: format!("alias `{}` was defined here", alias.name).into(),
+                };
+                add_span(&alias.origin.code, Span { range, role }, snippets);
+                // Recurse into the source of the alias definition
+                alias.origin.code.source.extend_with_context(snippets);
+            }
+        }
+    }
+
     /// Appends complementary annotations describing this source.
     #[allow(deprecated)]
+    #[deprecated(note = "Use `extend_with_context` instead", since = "0.16.0")]
     pub fn complement_annotations<'a, 's: 'a, T: Extend<Annotation<'a>>>(&'s self, result: &mut T) {
         use super::Source::*;
         match self {
