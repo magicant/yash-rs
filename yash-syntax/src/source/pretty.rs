@@ -480,13 +480,13 @@ impl super::Source {
     }
 }
 
-// TODO Deprecate
 /// Helper for constructing a [`Message`]
 ///
 /// Thanks to the blanket implementation `impl<'a, T: MessageBase> From<&'a T>
 /// for Message<'a>`, implementors of this trait can be converted to a message
 /// for free.
 #[allow(deprecated)]
+#[deprecated(note = "Use `Report` instead", since = "0.16.0")]
 pub trait MessageBase {
     /// Returns the type of the entire message.
     ///
