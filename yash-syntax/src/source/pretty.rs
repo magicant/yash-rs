@@ -334,7 +334,7 @@ impl super::Source {
     /// to the existing snippet; otherwise, it creates a new snippet.
     ///
     /// If `self` does not have a related location, this method does nothing.
-    pub fn extend_with_context<'a>(&self, snippets: &mut Vec<Snippet<'a>>) {
+    pub fn extend_with_context<'a>(&'a self, snippets: &mut Vec<Snippet<'a>>) {
         use super::Source::*;
         match self {
             Unknown
