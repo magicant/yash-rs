@@ -30,6 +30,9 @@ items are deprecated.
     - `SpanRole` defines the content of a span.
     - `Footnote` represents a footnote attached to a report.
     - `FootnoteType` represents the type of a footnote.
+    - `add_span` adds a span to a snippet.
+- The `source::Source::extend_with_context` method is added to extend a vector
+  of snippets with spans that provide context around a given location.
 - Conversions to `annotate-snippets` types for the newly added items are
   provided if the `annotate-snippets` feature is enabled:
     - `impl<'a> From<&'a Report<'a>> for annotate_snippets::Group<'a>`
