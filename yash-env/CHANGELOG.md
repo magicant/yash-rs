@@ -11,10 +11,25 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.9.0] - Unreleased
 
+### Added
+
+- `io::report_to_string`
+    - This function converts a `yash_syntax::source::pretty::Report` to a string.
+- `io::print_report`
+    - This function prints a `yash_syntax::source::pretty::Report` to the standard
+      error output of the given environment.
+
+### Changed
+
 - Public dependency versions:
     - yash-syntax 0.15.0 → 0.16.0
 - Private dependency versions:
     - annotate-snippets 0.11.4 → 0.12.4
+
+### Deprecated
+
+- `io::message_to_string` in favor of `io::report_to_string`
+- `io::print_message` in favor of `io::print_report`
 
 ## [0.8.1] - 2025-09-23
 
