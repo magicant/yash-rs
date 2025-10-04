@@ -97,10 +97,16 @@ use yash_env::system::Errno;
 use yash_env::variable::IFS;
 use yash_env::variable::Value;
 use yash_syntax::source::Location;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Footer;
-use yash_syntax::source::pretty::MessageBase;
+use yash_syntax::source::pretty::Footnote;
+use yash_syntax::source::pretty::FootnoteType;
+use yash_syntax::source::pretty::Report;
+use yash_syntax::source::pretty::ReportType;
+use yash_syntax::source::pretty::Snippet;
+use yash_syntax::source::pretty::Span;
+use yash_syntax::source::pretty::SpanRole;
+use yash_syntax::source::pretty::add_span;
+#[allow(deprecated)]
+use yash_syntax::source::pretty::{Annotation, AnnotationType, Footer, MessageBase};
 use yash_syntax::syntax::ExpansionMode;
 use yash_syntax::syntax::Param;
 use yash_syntax::syntax::Text;
@@ -238,6 +244,76 @@ pub struct Error {
     pub location: Location,
 }
 
+impl Error {
+    /// Returns a report for the error.
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = self.cause.message().into();
+
+        let label = self.cause.label();
+        let span = Span {
+            range: self.location.byte_range(),
+            role: SpanRole::Primary { label },
+        };
+        let snippet = Snippet::with_code_and_spans(&self.location.code, vec![span]);
+        report.snippets.push(snippet);
+
+        self.location
+            .code
+            .source
+            .extend_with_context(&mut report.snippets);
+
+        if let Some((location, label)) = self.cause.related_location() {
+            let label = label.into();
+            let span = Span {
+                range: location.byte_range(),
+                role: SpanRole::Supplementary { label },
+            };
+            add_span(&location.code, span, &mut report.snippets);
+        }
+
+        if let Some(footer) = self.cause.footer() {
+            report.footnotes.push(Footnote {
+                r#type: FootnoteType::Note,
+                label: footer.into(),
+            });
+        }
+
+        // Report the vacancy that caused the assignment that led to the error.
+        let vacancy = match &self.cause {
+            ErrorCause::CommandSubstError(_) => None,
+            ErrorCause::ArithError(_) => None,
+            ErrorCause::AssignReadOnly(e) => e.vacancy,
+            ErrorCause::UnsetParameter { .. } => None,
+            ErrorCause::VacantExpansion(_) => None,
+            ErrorCause::NonassignableParameter(e) => Some(e.vacancy),
+        };
+        if let Some(vacancy) = vacancy {
+            let message = match vacancy {
+                Vacancy::Unset => "assignment was attempted because the parameter was not set",
+                Vacancy::EmptyScalar => {
+                    "assignment was attempted because the parameter was an empty string"
+                }
+                Vacancy::ValuelessArray => {
+                    "assignment was attempted because the parameter was an empty array"
+                }
+                Vacancy::EmptyValueArray => {
+                    "assignment was attempted because the parameter was an array of an empty string"
+                }
+            };
+            report.footnotes.push(Footnote {
+                r#type: FootnoteType::Note,
+                label: message.into(),
+            });
+        }
+
+        report
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for Error {
     fn message_title(&self) -> Cow<'_, str> {
         self.cause.message().into()

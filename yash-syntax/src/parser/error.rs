@@ -509,6 +509,11 @@ impl Error {
         let snippet = Snippet::with_code_and_spans(&self.location.code, vec![span]);
         report.snippets.push(snippet);
 
+        self.location
+            .code
+            .source
+            .extend_with_context(&mut report.snippets);
+
         if let Some((location, label)) = self.cause.related_location() {
             let label = label.into();
             let span = Span {

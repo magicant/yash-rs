@@ -18,6 +18,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `io::print_report`
     - This function prints a `yash_syntax::source::pretty::Report` to the standard
       error output of the given environment.
+- `expansion::Error::to_report`
+    - This method converts an expansion error to a `yash_syntax::source::pretty::Report`.
 
 ### Changed
 

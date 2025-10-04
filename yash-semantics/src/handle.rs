@@ -70,7 +70,7 @@ impl Handle for yash_syntax::parser::Error {
 /// [`ErrExit`]: yash_env::option::Option::ErrExit
 impl Handle for crate::expansion::Error {
     async fn handle(&self, env: &mut Env) -> super::Result {
-        print_message(env, self).await;
+        print_report(env, &self.to_report()).await;
 
         if env.errexit_is_applicable() {
             Break(Divert::Exit(Some(ExitStatus::ERROR)))
