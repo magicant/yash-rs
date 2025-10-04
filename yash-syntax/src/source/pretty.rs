@@ -540,23 +540,59 @@ impl<'a, T: MessageBase> From<&'a T> for Message<'a> {
 mod annotate_snippets_support {
     use super::*;
 
-    /// Converts `yash_syntax::source::pretty::AnnotationType` into
-    /// `annotate_snippets::Level`.
-    ///
-    /// This implementation is only available when the `yash_syntax` crate is
-    /// built with the `annotate-snippets` feature enabled.
-    #[allow(deprecated)]
-    impl<'a> From<AnnotationType> for annotate_snippets::Level<'a> {
-        fn from(r#type: AnnotationType) -> Self {
-            use AnnotationType::*;
+    impl From<ReportType> for annotate_snippets::Level<'_> {
+        fn from(r#type: ReportType) -> Self {
+            use ReportType::*;
             match r#type {
+                None => Self::INFO.no_name(),
                 Error => Self::ERROR,
                 Warning => Self::WARNING,
-                Info => Self::INFO,
-                Note => Self::NOTE,
-                Help => Self::HELP,
             }
         }
+    }
+
+    /// Converts `yash_syntax::source::pretty::Span` into
+    /// `annotate_snippets::Annotation`.
+    ///
+    /// This conversion is not provided as a public `From<&Span> for Annotation` implementation
+    /// because a future variant of `SpanRole` may map to
+    /// `annotate_snippets::Patch` instead of `annotate_snippets::Annotation`.
+    fn span_to_annotation<'a>(span: &'a Span<'a>) -> annotate_snippets::Annotation<'a> {
+        use annotate_snippets::AnnotationKind as AK;
+        let (kind, label) = match &span.role {
+            SpanRole::Primary { label } => (AK::Primary, label),
+            SpanRole::Supplementary { label } => (AK::Context, label),
+        };
+        kind.span(span.range.clone()).label(label)
+    }
+
+    // `From<&Snippet>` is not implemented for
+    // `annotate_snippets::Snippet<'_, annotate_snippets::Annotation<'_>>`
+    // because a future variant of `SpanRole` may map to
+    // `annotate_snippets::Patch` instead of `annotate_snippets::Annotation`.
+
+    /// Converts `yash_syntax::source::pretty::Snippet` into
+    /// `annotate_snippets::Snippet<'a, annotate_snippets::Annotation<'a>>`.
+    ///
+    /// This conversion is not provided as a public `From<&Snippet> for Snippet` implementation
+    /// because a future variant of `SpanRole` may map to
+    /// `annotate_snippets::Patch` instead of `annotate_snippets::Annotation`, which does not fit
+    /// into a single `annotate_snippets::Snippet<'a, annotate_snippets::Annotation<'a>>`.
+    fn snippet_to_annotation_snippet<'a>(
+        snippet: &'a Snippet<'a>,
+    ) -> annotate_snippets::Snippet<'a, annotate_snippets::Annotation<'a>> {
+        // TODO: Avoid cloning the source string
+        annotate_snippets::Snippet::source(snippet.code.value.borrow().to_owned())
+            .line_start(
+                snippet
+                    .code
+                    .start_line_number
+                    .get()
+                    .try_into()
+                    .unwrap_or(usize::MAX),
+            )
+            .path(snippet.code.source.label())
+            .annotations(snippet.spans.iter().map(span_to_annotation))
     }
 
     /// Converts `yash_syntax::source::pretty::FootnoteType` into
@@ -572,6 +608,72 @@ mod annotate_snippets_support {
                 Info => Self::INFO,
                 Note => Self::NOTE,
                 Suggestion => Self::HELP,
+            }
+        }
+    }
+
+    /// Converts `yash_syntax::source::pretty::Footnote` into
+    /// `annotate_snippets::Message`.
+    ///
+    /// This implementation is only available when the `yash_syntax` crate is
+    /// built with the `annotate-snippets` feature enabled.
+    impl<'a> From<Footnote<'a>> for annotate_snippets::Message<'a> {
+        fn from(footer: Footnote<'a>) -> Self {
+            annotate_snippets::Level::from(footer.r#type).message(footer.label)
+        }
+    }
+
+    /// Converts `&yash_syntax::source::pretty::Footnote` into
+    /// `annotate_snippets::Message`.
+    ///
+    /// This implementation is only available when the `yash_syntax` crate is
+    /// built with the `annotate-snippets` feature enabled.
+    impl<'a> From<&'a Footnote<'a>> for annotate_snippets::Message<'a> {
+        fn from(footer: &'a Footnote<'a>) -> Self {
+            annotate_snippets::Level::from(footer.r#type).message(&*footer.label)
+        }
+    }
+
+    /// Converts `yash_syntax::source::pretty::Report` into
+    /// `annotate_snippets::Group`.
+    ///
+    /// This implementation is only available when the `yash_syntax` crate is
+    /// built with the `annotate-snippets` feature enabled.
+    impl<'a> From<&'a Report<'a>> for annotate_snippets::Group<'a> {
+        fn from(report: &'a Report<'a>) -> Self {
+            let title = annotate_snippets::Level::from(report.r#type).primary_title(&*report.title);
+            let title = if let Some(id) = &report.id {
+                title.id(&**id)
+            } else {
+                title
+            };
+
+            title
+                .elements(report.snippets.iter().map(snippet_to_annotation_snippet))
+                .elements(
+                    report
+                        .footnotes
+                        .iter()
+                        .map(annotate_snippets::Message::from),
+                )
+        }
+    }
+
+    /// Converts `yash_syntax::source::pretty::AnnotationType` into
+    /// `annotate_snippets::Level`.
+    ///
+    /// This implementation is only available when the `yash_syntax` crate is
+    /// built with the `annotate-snippets` feature enabled.
+    #[allow(deprecated)]
+    impl<'a> From<AnnotationType> for annotate_snippets::Level<'a> {
+        fn from(r#type: AnnotationType) -> Self {
+            use AnnotationType::*;
+            match r#type {
+                Error => Self::ERROR,
+                Warning => Self::WARNING,
+                Info => Self::INFO,
+                Note => Self::NOTE,
+                Help => Self::HELP,
             }
         }
     }

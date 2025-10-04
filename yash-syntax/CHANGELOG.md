@@ -20,7 +20,8 @@ items are deprecated.
 ### Added
 
 - New items in the `source::pretty` module for pretty-printing diagnostic
-  messages:
+  messages have been added to replace the existing ones that are now
+  deprecated:
     - `Report` represents a complete diagnostic report, which may contain
       multiple messages.
     - `ReportType` defines the type of a report.
@@ -29,6 +30,13 @@ items are deprecated.
     - `SpanRole` defines the content of a span.
     - `Footnote` represents a footnote attached to a report.
     - `FootnoteType` represents the type of a footnote.
+- Conversions to `annotate-snippets` types for the newly added items are
+  provided if the `annotate-snippets` feature is enabled:
+    - `impl<'a> From<&'a Report<'a>> for annotate_snippets::Group<'a>`
+    - `impl From<ReportType> for annotate_snippets::Level`
+    - `impl<'a> From<Footnote<'a>> for annotate_snippets::Message<'a>`
+    - `impl<'a> From<&'a Footnote<'a>> for annotate_snippets::Message<'a>`
+    - `impl From<FootnoteType> for annotate_snippets::Level`
 
 ### Changed
 
