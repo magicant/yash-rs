@@ -564,13 +564,14 @@ impl MessageBase for Error {
     }
 }
 
-#[allow(deprecated)]
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::source::Code;
     use crate::source::Source;
+    #[allow(deprecated)]
     use crate::source::pretty::Message;
+    use assert_matches::assert_matches;
     use std::num::NonZeroU64;
     use std::rc::Rc;
 
@@ -592,6 +593,37 @@ mod tests {
         );
     }
 
+    #[test]
+    fn from_error_for_report() {
+        let code = Rc::new(Code {
+            value: "!!!".to_string().into(),
+            start_line_number: NonZeroU64::new(1).unwrap(),
+            source: Source::Unknown.into(),
+        });
+        let error = Error {
+            cause: SyntaxError::MissingHereDocDelimiter.into(),
+            location: Location { code, range: 0..42 },
+        };
+
+        let report = Report::from(&error);
+
+        assert_eq!(report.r#type, ReportType::Error);
+        assert_eq!(
+            report.title,
+            "the here-document operator is missing its delimiter"
+        );
+        assert_eq!(report.snippets.len(), 1);
+        assert_eq!(*report.snippets[0].code.value.borrow(), "!!!");
+        assert_eq!(report.snippets[0].spans.len(), 1);
+        assert_eq!(report.snippets[0].spans[0].range, 0..3);
+        assert_matches!(
+            &report.snippets[0].spans[0].role,
+            SpanRole::Primary { label } if label == "expected a delimiter word"
+        );
+        assert_eq!(report.footnotes, []);
+    }
+
+    #[allow(deprecated)]
     #[test]
     fn from_error_for_message() {
         let code = Rc::new(Code {
