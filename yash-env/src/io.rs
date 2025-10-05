@@ -80,7 +80,7 @@ pub fn message_to_string(env: &Env, message: &Message<'_>) -> String {
 
 /// Convenience function for printing a report.
 ///
-/// This function converts the `report` into a string using
+/// This function converts the `report` into a string by using
 /// [`report_to_string`], and prints the result to the standard error.
 pub async fn print_report(env: &mut Env, report: &Report<'_>) {
     let report_str = report_to_string(env, report);

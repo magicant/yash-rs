@@ -301,6 +301,14 @@ impl Error {
     }
 }
 
+/// Converts the error into a report by calling [`Error::to_report`].
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline(always)]
+    fn from(error: &'a Error) -> Self {
+        error.to_report()
+    }
+}
+
 #[allow(deprecated)]
 impl MessageBase for Error {
     fn message_title(&self) -> Cow<'_, str> {
