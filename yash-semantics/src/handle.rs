@@ -19,7 +19,7 @@
 use crate::ExitStatus;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
-use yash_env::io::{print_message, print_report};
+use yash_env::io::print_report;
 use yash_env::semantics::Divert;
 use yash_syntax::source::Source;
 
@@ -94,7 +94,7 @@ impl Handle for crate::expansion::Error {
 /// interrupting accordingly.
 impl Handle for crate::redir::Error {
     async fn handle(&self, env: &mut Env) -> super::Result {
-        print_message(env, self).await;
+        print_report(env, &self.to_report()).await;
         env.exit_status = ExitStatus::ERROR;
         Continue(())
     }
