@@ -131,6 +131,28 @@ impl Snippet<'_> {
         }
     }
 
+    /// Creates a vector containing a snippet with a primary span.
+    ///
+    /// This is a convenience function for creating a vector of snippets
+    /// containing a primary span created from the given location and label.
+    /// The returned vector can be used as the `snippets` field of a
+    /// [`Report`].
+    ///
+    /// This function calls
+    /// [`Source::extend_with_context`](super::Source::extend_with_context) for
+    /// `location.code.source`, thereby adding supplementary spans describing the
+    /// context of the source code. This means that the returned vector may
+    /// contain multiple snippets or spans if the source has a related location.
+    #[must_use]
+    pub fn with_primary_span<'a>(location: &'a Location, label: Cow<'a, str>) -> Vec<Snippet<'a>> {
+        let range = location.byte_range();
+        let role = SpanRole::Primary { label };
+        let spans = vec![Span { range, role }];
+        let mut snippets = vec![Snippet::with_code_and_spans(&location.code, spans)];
+        location.code.source.extend_with_context(&mut snippets);
+        snippets
+    }
+
     /// Returns the string held in `self.code.value`.
     ///
     /// This method returns a reference to the string held in `self.code.value`.

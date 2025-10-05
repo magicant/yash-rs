@@ -251,19 +251,7 @@ impl Error {
         let mut report = Report::new();
         report.r#type = ReportType::Error;
         report.title = self.cause.message().into();
-
-        let label = self.cause.label();
-        let span = Span {
-            range: self.location.byte_range(),
-            role: SpanRole::Primary { label },
-        };
-        let snippet = Snippet::with_code_and_spans(&self.location.code, vec![span]);
-        report.snippets.push(snippet);
-
-        self.location
-            .code
-            .source
-            .extend_with_context(&mut report.snippets);
+        report.snippets = Snippet::with_primary_span(&self.location, self.cause.label());
 
         if let Some((location, label)) = self.cause.related_location() {
             let label = label.into();

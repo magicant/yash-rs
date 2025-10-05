@@ -24,7 +24,7 @@ use std::borrow::Cow;
 use yash_syntax::source::Location;
 #[allow(deprecated)]
 use yash_syntax::source::pretty::Message;
-use yash_syntax::source::pretty::{Report, ReportType, Snippet, Span, SpanRole};
+use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 #[doc(no_inline)]
 pub use yash_syntax::syntax::Fd;
 
@@ -119,18 +119,6 @@ pub async fn print_error(
     let mut report = Report::new();
     report.r#type = ReportType::Error;
     report.title = title;
-
-    let span = Span {
-        range: location.byte_range(),
-        role: SpanRole::Primary { label },
-    };
-    let snippet = Snippet::with_code_and_spans(&location.code, vec![span]);
-    report.snippets.push(snippet);
-
-    location
-        .code
-        .source
-        .extend_with_context(&mut report.snippets);
-
+    report.snippets = Snippet::with_primary_span(location, label);
     print_report(env, &report).await;
 }
