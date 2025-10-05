@@ -29,12 +29,66 @@ use yash_env::semantics::ExitStatus;
 #[cfg(doc)]
 use yash_env::stack::Stack;
 use yash_syntax::source::Location;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
-use yash_syntax::source::pretty::MessageBase;
+use yash_syntax::source::pretty::Snippet;
+#[allow(deprecated)]
+use yash_syntax::source::pretty::{Annotation, AnnotationType, Message, MessageBase};
+use yash_syntax::source::pretty::{Report, ReportType, Span, SpanRole, add_span};
 
 pub mod syntax;
+
+/// Convenience function for constructing an error report and a divert value.
+///
+/// If the environment is currently executing a built-in
+/// ([`Stack::current_builtin`]), an annotation indicating the built-in name is
+/// appended to the given report. The report is then converted into a string
+/// using [`yash_env::io::report_to_string`] and returned with an appropriate
+/// divert value.
+///
+/// The [`Divert`] value indicates whether the caller should divert the
+/// execution flow. If the current built-in is a special built-in, the second
+/// return value is `Break(Divert::Interrupt(None))`; otherwise, `Continue(())`.
+///
+/// You should always use this function (or another function defined in this
+/// module which calls this function) to construct an error or warning message
+/// in a built-in. This ensures that the message contains the built-in name
+/// in a unified format.
+///
+/// Use [`SharedSystem::print_error`] to print the returned message and
+/// [`crate::Result::with_exit_status_and_divert`] to return the divert value
+/// along with an exit status.
+#[must_use = "returned message should be printed"]
+pub fn prepare_report_message_and_divert<'e: 'r, 'r>(
+    env: &'e Env,
+    mut report: Report<'r>,
+) -> (String, yash_env::semantics::Result) {
+    let is_special_builtin;
+
+    if let Some(builtin) = env.stack.current_builtin() {
+        // Add an annotation indicating the built-in name
+        let span = Span {
+            range: builtin.name.origin.byte_range(),
+            role: SpanRole::Supplementary {
+                label: format!("while executing the {} built-in", builtin.name.value).into(),
+            },
+        };
+        add_span(&builtin.name.origin.code, span, &mut report.snippets);
+
+        let source = &builtin.name.origin.code.source;
+        source.extend_with_context(&mut report.snippets);
+
+        is_special_builtin = builtin.is_special;
+    } else {
+        is_special_builtin = false;
+    }
+
+    let text = yash_env::io::report_to_string(env, &report);
+    let divert = if is_special_builtin {
+        Break(Divert::Interrupt(None))
+    } else {
+        Continue(())
+    };
+    (text, divert)
+}
 
 /// Convenience function for constructing an error message and a divert value.
 ///
@@ -56,6 +110,11 @@ pub mod syntax;
 /// Use [`SharedSystem::print_error`] to print the returned message and
 /// [`crate::Result::with_exit_status_and_divert`] to return the divert value
 /// along with an exit status.
+#[allow(deprecated)]
+#[deprecated(
+    note = "Use `prepare_report_message_and_divert` instead",
+    since = "0.11.0"
+)]
 #[must_use = "returned message should be printed"]
 pub fn arrange_message_and_divert<'e: 'm, 'm>(
     env: &'e Env,
@@ -87,6 +146,65 @@ pub fn arrange_message_and_divert<'e: 'm, 'm>(
     (message, divert)
 }
 
+// TODO Rename to report
+/// Reports a message with the given exit status.
+///
+/// This is a convenience function for reporting a message with a specific exit
+/// status. The message is converted to a string and [`Divert`] using
+/// [`prepare_report_message_and_divert`], and then printed to the standard
+/// error. The returned result contains the given exit status and the divert
+/// value.
+///
+/// When the exit status is [`ExitStatus::FAILURE`] or [`ExitStatus::ERROR`],
+/// you can use [`report_failure`] or [`report_error`] instead of this function,
+/// respectively.
+///
+/// This function requires a mutable borrow of the environment to print the
+/// message, so it is only usable when the `report` argument does not contain
+/// any borrows from the environment. Otherwise, directly call
+/// [`prepare_report_message_and_divert`], which only requires an immutable
+/// borrow of the environment, to construct the message and divert value, and
+/// then print the message yourself:
+///
+/// ```
+/// # use futures_util::future::FutureExt as _;
+/// # use yash_builtin::common::prepare_report_message_and_divert;
+/// # use yash_env::builtin::Result;
+/// # use yash_env::semantics::ExitStatus;
+/// # use yash_syntax::source::pretty::{Report, ReportType, Snippet};
+/// # use yash_syntax::syntax::Fd;
+/// # async {
+/// # let mut env = yash_env::Env::new_virtual();
+/// # let mut report = Report::new();
+/// # report.r#type = ReportType::Error;
+/// # report.title = "cannot assign to read-only variable".into();
+/// let (message, divert) = prepare_report_message_and_divert(&env, report);
+/// env.system.print_error(&message).await;
+/// Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
+/// # }.now_or_never().unwrap();
+/// ```
+#[inline]
+pub async fn report2<'a, R>(
+    env: &mut Env,
+    report: R,
+    exit_status: ExitStatus,
+) -> yash_env::builtin::Result
+where
+    R: Into<Report<'a>> + 'a,
+{
+    async fn inner(
+        env: &mut Env,
+        report: Report<'_>,
+        exit_status: ExitStatus,
+    ) -> yash_env::builtin::Result {
+        let (message, divert) = prepare_report_message_and_divert(env, report);
+        env.system.print_error(&message).await;
+        yash_env::builtin::Result::with_exit_status_and_divert(exit_status, divert)
+    }
+    inner(env, report.into(), exit_status).await
+}
+
+// TODO Remove this function
 /// Reports a message with the given exit status.
 ///
 /// This is a convenience function for reporting a message with a specific exit
@@ -120,6 +238,7 @@ pub fn arrange_message_and_divert<'e: 'm, 'm>(
 /// Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
 /// # }.now_or_never().unwrap();
 /// ```
+#[allow(deprecated)]
 #[inline]
 pub async fn report<'a, M>(
     env: &mut Env,
@@ -141,9 +260,24 @@ where
     inner(env, message.into(), exit_status).await
 }
 
+// TODO Rename to report_failure
 /// Prints a failure message.
 ///
 /// This is a simple shortcut for calling [`report`] with [`ExitStatus::FAILURE`].
+#[inline]
+pub async fn report2_failure<'a, R>(env: &mut Env, report: R) -> yash_env::builtin::Result
+where
+    R: Into<Report<'a>> + 'a,
+{
+    report2(env, report, ExitStatus::FAILURE).await
+}
+
+// TODO Remove this function
+/// Prints a failure message.
+///
+/// This is a simple shortcut for calling [`report`] with [`ExitStatus::FAILURE`].
+#[allow(deprecated)]
+#[deprecated(note = "Use `report2_failure` instead", since = "0.11.0")]
 #[inline]
 pub async fn report_failure<'a, M>(env: &mut Env, message: M) -> yash_env::builtin::Result
 where
@@ -152,9 +286,24 @@ where
     report(env, message, ExitStatus::FAILURE).await
 }
 
+// TODO Rename to report_error
 /// Prints an error message.
 ///
 /// This is a simple shortcut for calling [`report`] with [`ExitStatus::ERROR`].
+#[inline]
+pub async fn report2_error<'a, R>(env: &mut Env, report: R) -> yash_env::builtin::Result
+where
+    R: Into<Report<'a>> + 'a,
+{
+    report2(env, report, ExitStatus::ERROR).await
+}
+
+// TODO Remove this function
+/// Prints an error message.
+///
+/// This is a simple shortcut for calling [`report`] with [`ExitStatus::ERROR`].
+#[allow(deprecated)]
+#[deprecated(note = "Use `report2_error` instead", since = "0.11.0")]
 #[inline]
 pub async fn report_error<'a, M>(env: &mut Env, message: M) -> yash_env::builtin::Result
 where
@@ -165,9 +314,9 @@ where
 
 /// Reports a simple message with the given exit status.
 ///
-/// This function constructs a [`Message`] with the given title and prints it
+/// This function constructs a [`Report`] with the given title and prints it
 /// using [`report`]. The message has no annotations except for the built-in
-/// name which is added by [`arrange_message_and_divert`].
+/// name which is added by [`prepare_report_message_and_divert`].
 ///
 /// When the exit status is [`ExitStatus::FAILURE`] or [`ExitStatus::ERROR`],
 /// you can use [`report_simple_failure`] or [`report_simple_error`] instead of
@@ -177,13 +326,10 @@ pub async fn report_simple(
     title: &str,
     exit_status: ExitStatus,
 ) -> yash_env::builtin::Result {
-    let message = Message {
-        r#type: AnnotationType::Error,
-        title: title.into(),
-        annotations: vec![],
-        footers: vec![],
-    };
-    report(env, message, exit_status).await
+    let mut report = Report::new();
+    report.r#type = ReportType::Error;
+    report.title = title.into();
+    report2(env, report, exit_status).await
 }
 
 /// Prints a simple failure message.
@@ -202,22 +348,18 @@ pub async fn report_simple_error(env: &mut Env, title: &str) -> yash_env::builti
 
 /// Prints a simple error message for a command syntax error.
 ///
-/// This function constructs a [`Message`] with a predefined title and an
-/// [`Annotation`] created from the given label and location, and calls
-/// [`report_error`].
+/// This function constructs a [`Report`] with a predefined title and a [`Span`]
+/// created from the given label and location, and calls [`report_error`].
 pub async fn syntax_error(
     env: &mut Env,
     label: &str,
     location: &Location,
 ) -> yash_env::builtin::Result {
-    let annotation = Annotation::new(AnnotationType::Error, label.into(), location);
-    let message = Message {
-        r#type: AnnotationType::Error,
-        title: "command argument syntax error".into(),
-        annotations: vec![annotation],
-        footers: vec![],
-    };
-    report_error(env, message).await
+    let mut report = Report::new();
+    report.r#type = ReportType::Error;
+    report.title = "command argument syntax error".into();
+    report.snippets = Snippet::with_primary_span(location, label.into());
+    report2_error(env, report).await
 }
 
 /// Prints a text to the standard output.
@@ -230,17 +372,31 @@ pub async fn syntax_error(
 pub async fn output(env: &mut Env, content: &str) -> yash_env::builtin::Result {
     match env.system.write_all(Fd::STDOUT, content.as_bytes()).await {
         Ok(_) => Default::default(),
-
         Err(errno) => {
-            let message = Message {
-                r#type: AnnotationType::Error,
-                title: format!("error printing results to stdout: {errno}").into(),
-                annotations: vec![],
-                footers: vec![],
-            };
-            report_failure(env, message).await
+            report_simple_failure(env, &format!("error printing results to stdout: {errno}")).await
         }
     }
+}
+
+/// Merges multiple reports into a single report.
+///
+/// If the given iterator is empty, this function returns `None`. Otherwise,
+/// the first report's title and type are used as the merged report's title and
+/// type. Snippets and footnotes from all reports are concatenated.
+#[must_use]
+pub fn merge_reports<'a, I, R>(reports: I) -> Option<Report<'a>>
+where
+    I: IntoIterator<Item = R> + 'a,
+    R: Into<Report<'a>> + 'a,
+{
+    let mut reports = reports.into_iter();
+    let mut first = reports.next()?.into();
+    for report in reports {
+        let report = report.into();
+        first.snippets.extend(report.snippets);
+        first.footnotes.extend(report.footnotes);
+    }
+    Some(first)
 }
 
 /// Converts errors to a single message.
@@ -248,6 +404,8 @@ pub async fn output(env: &mut Env, content: &str) -> yash_env::builtin::Result {
 /// If the given iterator is empty, this function returns `None`. Otherwise,
 /// the first error's title is used as the message title. The other errors are
 /// added as additional annotations.
+#[allow(deprecated)]
+#[deprecated(note = "Use `merge_reports` instead", since = "0.11.0")]
 #[must_use]
 pub fn to_single_message<'a, I, M>(errors: I) -> Option<Message<'a>>
 where
@@ -283,6 +441,9 @@ mod tests {
         let env = Env::new_virtual();
         let (_message, divert) = arrange_message_and_divert(&env, dummy_message());
         assert_eq!(divert, Continue(()));
+
+        let (_message, divert) = prepare_report_message_and_divert(&env, Report::new());
+        assert_eq!(divert, Continue(()));
     }
 
     #[test]
@@ -295,6 +456,9 @@ mod tests {
 
         let (_message, divert) = arrange_message_and_divert(&env, dummy_message());
         assert_eq!(divert, Break(Divert::Interrupt(None)));
+
+        let (_message, divert) = prepare_report_message_and_divert(&env, Report::new());
+        assert_eq!(divert, Break(Divert::Interrupt(None)));
     }
 
     #[test]
@@ -306,6 +470,9 @@ mod tests {
         }));
 
         let (_message, divert) = arrange_message_and_divert(&env, dummy_message());
+        assert_eq!(divert, Continue(()));
+
+        let (_message, divert) = prepare_report_message_and_divert(&env, Report::new());
         assert_eq!(divert, Continue(()));
     }
 }

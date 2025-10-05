@@ -11,6 +11,15 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.11.0] - Unreleased
 
+### Added
+
+- `common::prepare_report_message_and_divert`
+    - This function is a replacement for the deprecated
+      `common::arrange_report_and_divert` function.
+- `common::merge_reports`
+    - This function merges multiple `Report`s into one. It is a replacement for the
+      deprecated `common::to_single_message` function.
+
 ### Changed
 
 - Public dependency versions:
@@ -19,6 +28,14 @@ A _private dependency_ is used internally and not visible to downstream users.
     - yash-syntax 0.15.2 → 0.16.0
 - Private dependency versions:
     - yash-prompt (optional) 0.6.0 → 0.7.0
+
+### Deprecated
+
+- `common::arrange_report_and_divert`
+    - This function is replaced by the new
+      `common::prepare_report_message_and_divert` function.
+- `common::to_single_message`
+    - This function is replaced by the new `common::merge_reports` function.
 
 ## [0.10.0] - 2025-09-23
 
