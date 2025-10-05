@@ -13,12 +13,20 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Added
 
-- `common::prepare_report_message_and_divert`
-    - This function is a replacement for the deprecated
-      `common::arrange_report_and_divert` function.
-- `common::merge_reports`
-    - This function merges multiple `Report`s into one. It is a replacement for the
-      deprecated `common::to_single_message` function.
+- The new module `common::report` provides utility functions for creating and
+  printing error and failure messages. These functions replace the deprecated
+  functions in the `common` module. The new functions operate on the
+  `yash_syntax::source::pretty::Report` type instead of the deprecated
+  `yash_syntax::source::pretty::Message` type.
+    - `prepare_report_message_and_divert`
+    - `report`
+    - `report_failure`
+    - `report_error`
+    - `report_simple`
+    - `report_simple_failure`
+    - `report_simple_error`
+    - `syntax_error`
+    - `merge_reports`
 
 ### Changed
 
@@ -31,11 +39,17 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Deprecated
 
-- `common::arrange_report_and_divert`
-    - This function is replaced by the new
-      `common::prepare_report_message_and_divert` function.
-- `common::to_single_message`
-    - This function is replaced by the new `common::merge_reports` function.
+- The following functions in the `common` module are now deprecated. Use the
+  corresponding functions in the new `common::report` module instead.
+    - `arrange_message_and_divert` (use `prepare_report_message_and_divert`)
+    - `report` (use `report`)
+    - `report_failure` (use `report_failure`)
+    - `report_error` (use `report_error`)
+    - `report_simple` (use `report_simple`)
+    - `report_simple_failure` (use `report_simple_failure`)
+    - `report_simple_error` (use `report_simple_error`)
+    - `syntax_error` (use `syntax_error`)
+    - `to_single_message` (use `merge_reports`)
 
 ## [0.10.0] - 2025-09-23
 
