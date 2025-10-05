@@ -576,8 +576,73 @@ mod tests {
     use futures_util::FutureExt;
     use yash_env::variable::Scope;
     use yash_env_test_helper::in_virtual_system;
+    #[allow(deprecated)]
     use yash_syntax::source::pretty::Message;
 
+    #[test]
+    fn from_error_for_report() {
+        let error = Error {
+            cause: ErrorCause::AssignReadOnly(AssignReadOnlyError {
+                name: "foo".into(),
+                new_value: "value".into(),
+                read_only_location: Location::dummy("ROL"),
+                vacancy: None,
+            }),
+            location: Location {
+                range: 2..4,
+                ..Location::dummy("hello")
+            },
+        };
+
+        let report = Report::from(&error);
+
+        assert_eq!(report.r#type, ReportType::Error);
+        assert_eq!(report.title, "error assigning to variable");
+        assert_eq!(report.snippets.len(), 2);
+        assert_eq!(*report.snippets[0].code.value.borrow(), "hello");
+        assert_eq!(report.snippets[0].spans.len(), 1);
+        assert_eq!(report.snippets[0].spans[0].range, 2..4);
+        assert_matches!(
+            &report.snippets[0].spans[0].role,
+            SpanRole::Primary { label } if label == "cannot assign to read-only variable \"foo\""
+        );
+        assert_eq!(*report.snippets[1].code.value.borrow(), "ROL");
+        assert_eq!(report.snippets[1].spans.len(), 1);
+        assert_eq!(report.snippets[1].spans[0].range, 0..3);
+        assert_matches!(
+            &report.snippets[1].spans[0].role,
+            SpanRole::Supplementary { label } if label == "the variable was made read-only here"
+        );
+        assert_eq!(report.footnotes, []);
+    }
+
+    #[test]
+    fn from_error_for_report_with_vacancy() {
+        let error = Error {
+            cause: ErrorCause::AssignReadOnly(AssignReadOnlyError {
+                name: "foo".into(),
+                new_value: "value".into(),
+                read_only_location: Location::dummy("ROL"),
+                vacancy: Some(Vacancy::EmptyScalar),
+            }),
+            location: Location {
+                range: 2..4,
+                ..Location::dummy("hello")
+            },
+        };
+
+        let report = Report::from(&error);
+
+        assert_eq!(
+            report.footnotes,
+            [Footnote {
+                r#type: FootnoteType::Note,
+                label: "assignment was attempted because the parameter was an empty string".into(),
+            }]
+        );
+    }
+
+    #[allow(deprecated)]
     #[test]
     fn from_error_for_message() {
         let error = Error {
@@ -610,6 +675,7 @@ mod tests {
         assert_eq!(message.annotations[1].location, &Location::dummy("ROL"));
     }
 
+    #[allow(deprecated)]
     #[test]
     fn from_error_for_message_with_vacancy() {
         let error = Error {
