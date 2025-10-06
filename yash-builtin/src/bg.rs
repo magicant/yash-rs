@@ -34,13 +34,9 @@
 //!
 //! [expected state]: yash_env::job::Job::expected_state
 
-use crate::common::report_error;
-use crate::common::report_failure;
-use crate::common::report_simple_failure;
+use crate::common::report::{merge_reports, report_error, report_failure, report_simple_failure};
 use crate::common::syntax::Mode;
 use crate::common::syntax::parse_arguments;
-use crate::common::to_single_message;
-use std::borrow::Cow;
 use std::fmt::Display;
 use thiserror::Error;
 use yash_env::Env;
@@ -57,9 +53,7 @@ use yash_env::option::State::Off;
 use yash_env::semantics::Field;
 use yash_env::signal;
 use yash_env::system::Errno;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::MessageBase;
+use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 // Some definitions in this module are shared with the `fg` built-in.
 
@@ -98,14 +92,23 @@ impl Display for OperandError {
     }
 }
 
-impl MessageBase for OperandError {
-    fn message_title(&self) -> Cow<'_, str> {
-        "cannot resume job".into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
+impl OperandError {
+    /// Converts the error to a [`Report`].
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = "cannot resume job".into();
         let label = format!("{}: {}", self.0.value, self.1).into();
-        Annotation::new(AnnotationType::Error, label, &self.0.origin)
+        report.snippets = Snippet::with_primary_span(&self.0.origin, label);
+        report
+    }
+}
+
+impl<'a> From<&'a OperandError> for Report<'a> {
+    #[inline]
+    fn from(error: &'a OperandError) -> Self {
+        error.to_report()
     }
 }
 
@@ -184,9 +187,9 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
                 Err(error) => errors.push(OperandError(operand, error)),
             }
         }
-        match to_single_message(&errors) {
+        match merge_reports(&errors) {
             None => crate::Result::default(),
-            Some(message) => report_failure(env, message).await,
+            Some(report) => report_failure(env, report).await,
         }
     }
 }
