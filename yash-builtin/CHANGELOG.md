@@ -27,6 +27,12 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `report_simple_error`
     - `syntax_error`
     - `merge_reports`
+- The following types now implement the `to_report` method that converts an
+  instance to a `yash_syntax::source::pretty::Report`. They also implement the
+  `From<&Self>` trait for `yash_syntax::source::pretty::Report`.
+    - `alias::semantics::Error`
+    - `common::syntax::ConflictingOptionError`
+    - `common::syntax::ParseError`
 
 ### Changed
 
