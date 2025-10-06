@@ -227,7 +227,11 @@ where
     let mut first = reports.next()?.into();
     for report in reports {
         let report = report.into();
-        first.snippets.extend(report.snippets);
+        for snippet in report.snippets {
+            for span in snippet.spans {
+                add_span(snippet.code, span, &mut first.snippets);
+            }
+        }
         first.footnotes.extend(report.footnotes);
     }
     Some(first)
@@ -269,5 +273,76 @@ mod tests {
 
         let (_message, divert) = prepare_report_message_and_divert(&env, Report::new());
         assert_eq!(divert, Continue(()));
+    }
+
+    #[test]
+    fn merge_reports_with_common_code() {
+        // In this test, report1 and report2 have snippets with overlapping spans in
+        // the same source code. The merged report should contain both spans in a single snippet.
+        let location1 = Location::dummy("code 1");
+        let location2 = Location {
+            range: 1..5,
+            ..location1.clone()
+        };
+        let location3 = Location::dummy("code 2");
+
+        let mut report1 = Report::new();
+        report1.r#type = ReportType::Error;
+        report1.title = "foo".into();
+        report1.snippets = Snippet::with_primary_span(&location1, "label 1".into());
+
+        let mut report2 = Report::new();
+        report2.r#type = ReportType::Warning;
+        report2.title = "bar".into();
+        report2.snippets = Snippet::with_primary_span(&location2, "label 2".into());
+
+        let span = Span {
+            range: 2..4,
+            role: SpanRole::Primary {
+                label: "label 3".into(),
+            },
+        };
+        let snippet = Snippet::with_code_and_spans(&location3.code, vec![span]);
+        report2.snippets.push(snippet);
+
+        let merged = merge_reports([report1, report2]).unwrap();
+        assert_eq!(merged.r#type, ReportType::Error);
+        assert_eq!(merged.title, "foo");
+        assert_eq!(merged.snippets.len(), 2, "{:?}", merged.snippets);
+        assert_eq!(merged.snippets[0].code_string(), "code 1");
+        assert_eq!(
+            merged.snippets[0].spans.len(),
+            2,
+            "{:?}",
+            merged.snippets[0].spans
+        );
+        assert_eq!(merged.snippets[0].spans[0].range, 0..6);
+        assert_eq!(
+            merged.snippets[0].spans[0].role,
+            SpanRole::Primary {
+                label: "label 1".into()
+            }
+        );
+        assert_eq!(merged.snippets[0].spans[1].range, 1..5);
+        assert_eq!(
+            merged.snippets[0].spans[1].role,
+            SpanRole::Primary {
+                label: "label 2".into()
+            }
+        );
+        assert_eq!(merged.snippets[1].code_string(), "code 2");
+        assert_eq!(
+            merged.snippets[1].spans.len(),
+            1,
+            "{:?}",
+            merged.snippets[1].spans
+        );
+        assert_eq!(merged.snippets[1].spans[0].range, 2..4);
+        assert_eq!(
+            merged.snippets[1].spans[0].role,
+            SpanRole::Primary {
+                label: "label 3".into()
+            }
+        );
     }
 }
