@@ -16,19 +16,17 @@
 
 //! Pretty-printing diagnostic messages containing references to source code
 //!
-//! TODO: Update the documentation for the new API
-//!
 //! This module defines some data types for constructing intermediate data
 //! structures for printing diagnostic messages referencing source code
 //! fragments.  When you have an [`Error`](crate::parser::Error), you can
-//! convert it to a [`Message`]. Then, you can in turn convert it into
+//! convert it to a [`Report`]. Then, you can in turn convert it into
 //! `annotate_snippets::Snippet`, for example, and finally format a printable
 //! diagnostic message string.
 //!
 //! When the `yash_syntax` crate is built with the `annotate-snippets` feature
-//! enabled, it supports conversion from `Message` to `Group`. If you would
-//! like to use another formatter instead, you can provide your own conversion
-//! for yourself.
+//! enabled, it supports conversion from [`Report`] to
+//! [`Group`](annotate_snippets::Group). If you would like to use another
+//! formatter instead, you can provide your own conversion for yourself.
 //!
 //! ## Printing an error
 //!
@@ -38,25 +36,34 @@
 //! ```
 //! # use yash_syntax::parser::{Error, ErrorCause, SyntaxError};
 //! # use yash_syntax::source::Location;
-//! # use yash_syntax::source::pretty::Message;
+//! # use yash_syntax::source::pretty::Report;
 //! let error = Error {
 //!     cause: ErrorCause::Syntax(SyntaxError::EmptyParam),
 //!     location: Location::dummy(""),
 //! };
-//! let message = Message::from(&error);
+//! let report = Report::from(&error);
 //! // The lines below require the `annotate-snippets` feature.
 //! # #[cfg(feature = "annotate-snippets")]
 //! # {
-//! let group = annotate_snippets::Group::from(&message);
-//! eprint!("{}", annotate_snippets::Renderer::plain().render(&[group]));
+//! let group = annotate_snippets::Group::from(&report);
+//! eprintln!("{}", annotate_snippets::Renderer::plain().render(&[group]));
 //! # }
 //! ```
 //!
 //! You can also implement conversion from your custom error object to a
-//! [`Message`], which then can be used in the same way to format a diagnostic
-//! message. To do this, you can either directly implement `From<YourError>` for
-//! `Message`, or implement [`MessageBase`] for `YourError` thereby deriving
-//! `From<&YourError>` for `Message`.
+//! [`Report`], which then can be used in the same way to format a diagnostic
+//! message. To do this, implement `From<YourError>` or `From<&YourError>` for
+//! `Report`.
+//!
+//! ## Deprecated items
+//!
+//! Before [`Report`] was introduced, this module provided [`Message`] as the
+//! main data structure for constructing a diagnostic message. `Message` could
+//! be constructed directly or through the [`MessageBase`] trait, which
+//! provided a blanket implementation of `From<&T> for Message` for
+//! implementors of the trait. These items are now deprecated in favor of
+//! `Report`, but are available for backward compatibility for now. Please
+//! migrate to `Report` before they are removed in a future release.
 
 use super::Location;
 use std::borrow::Cow;
@@ -168,7 +175,7 @@ impl Snippet<'_> {
 impl Clone for Snippet<'_> {
     fn clone(&self) -> Self {
         Snippet {
-            code: &self.code,
+            code: self.code,
             code_string: Ref::clone(&self.code_string),
             spans: self.spans.clone(),
         }
@@ -190,8 +197,7 @@ pub enum FootnoteType {
     /// No specific type
     #[default]
     None,
-    // TODO Do we need both Info and Note?
-    Info,
+    /// For footnotes that provide additional information
     Note,
     /// For footnotes that provide suggestions
     Suggestion,
@@ -680,7 +686,6 @@ mod annotate_snippets_support {
             use FootnoteType::*;
             match r#type {
                 None => Self::INFO.no_name(),
-                Info => Self::INFO,
                 Note => Self::NOTE,
                 Suggestion => Self::HELP,
             }
