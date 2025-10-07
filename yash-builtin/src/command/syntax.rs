@@ -28,7 +28,9 @@ use crate::common::syntax::parse_arguments;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
+#[allow(deprecated)]
 use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::Report;
 
 /// Error in parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -42,6 +44,24 @@ pub enum Error {
     // TODO UninvokableCategory
 }
 
+impl Error {
+    /// Converts this error to a [`Report`].
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        match self {
+            Self::CommonError(e) => e.to_report(),
+        }
+    }
+}
+
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline]
+    fn from(error: &'a Error) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl<'a> From<&'a Error> for Message<'a> {
     fn from(error: &'a Error) -> Self {
         match error {

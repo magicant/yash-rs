@@ -34,6 +34,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `break::syntax::Error`
     - `cd::syntax::Error`
     - `cd::target::TargetError`
+    - `command::identify::NotFound`
+    - `command::syntax::Error`
     - `common::syntax::ConflictingOptionError`
     - `common::syntax::ParseError`
 
