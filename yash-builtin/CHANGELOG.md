@@ -32,6 +32,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   `From<&Self>` trait for `yash_syntax::source::pretty::Report`.
     - `alias::semantics::Error`
     - `break::syntax::Error`
+    - `cd::syntax::Error`
+    - `cd::target::TargetError`
     - `common::syntax::ConflictingOptionError`
     - `common::syntax::ParseError`
 

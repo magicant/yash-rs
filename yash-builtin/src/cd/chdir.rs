@@ -16,7 +16,7 @@
 
 //! Part of the cd built-in that invokes the underlying system call
 
-use crate::common::arrange_message_and_divert;
+use crate::common::report::prepare_report_message_and_divert;
 use std::borrow::Cow;
 use std::ffi::CString;
 use std::ffi::NulError;
@@ -31,9 +31,7 @@ use yash_env::system::Errno;
 #[cfg(doc)]
 use yash_env::system::SharedSystem;
 use yash_syntax::source::Location;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 /// Error invoking the underlying system call
 #[derive(Debug, Clone, Eq, Error, PartialEq)]
@@ -73,19 +71,16 @@ pub fn failure_message(
     path: &Path,
     error: &Error,
 ) -> (String, yash_env::semantics::Result) {
-    let label = Cow::Owned(format!("{path:?}: {error}"));
     let location = operand
         .or_else(|| env.stack.current_builtin().map(|builtin| &builtin.name))
         .map(|field| Cow::Borrowed(&field.origin))
         .unwrap_or_else(|| Cow::Owned(Location::dummy("")));
-    let error = Annotation::new(AnnotationType::Error, label, &location);
-    let message = Message {
-        r#type: AnnotationType::Error,
-        title: "cannot change the working directory".into(),
-        annotations: vec![error],
-        footers: vec![],
-    };
-    arrange_message_and_divert(env, message)
+    let label = Cow::Owned(format!("{path:?}: {error}"));
+    let mut report = Report::new();
+    report.r#type = ReportType::Error;
+    report.title = "cannot change the working directory".into();
+    report.snippets = Snippet::with_primary_span(&location, label);
+    prepare_report_message_and_divert(env, report)
 }
 
 /// Prints an error message to the standard error.

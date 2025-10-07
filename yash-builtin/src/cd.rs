@@ -21,7 +21,7 @@
 //! [`cd` built-in]: https://magicant.github.io/yash-rs/builtins/cd.html
 
 use crate::Result;
-use crate::common::report;
+use crate::common::report::report;
 use yash_env::Env;
 use yash_env::path::Path;
 use yash_env::path::PathBuf;
@@ -29,9 +29,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::Errno;
 use yash_env::variable::PWD;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Footer;
-use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::{Footnote, FootnoteType, Report, ReportType};
 
 /// Exit status when the built-in succeeds
 pub const EXIT_STATUS_SUCCESS: ExitStatus = ExitStatus(0);
@@ -103,22 +101,19 @@ fn get_pwd(env: &Env) -> String {
 /// corresponding exit status.
 async fn report_pwd_error(env: &mut Env, errno: Errno, ensure_pwd: bool) -> Result {
     let (r#type, exit_status) = if ensure_pwd {
-        (AnnotationType::Error, EXIT_STATUS_STALE_PWD)
+        (ReportType::Error, EXIT_STATUS_STALE_PWD)
     } else {
-        (AnnotationType::Warning, EXIT_STATUS_SUCCESS)
+        (ReportType::Warning, EXIT_STATUS_SUCCESS)
     };
 
-    let message = Message {
-        r#type,
-        title: "cannot compute new $PWD".into(),
-        annotations: vec![],
-        footers: vec![Footer {
-            r#type: AnnotationType::Info,
-            label: format!("error from underlying system call: {errno}").into(),
-        }],
-    };
-
-    report(env, message, exit_status).await
+    let mut report = Report::new();
+    report.r#type = r#type;
+    report.title = "cannot compute new $PWD".into();
+    report.footnotes.push(Footnote {
+        r#type: FootnoteType::Note,
+        label: format!("error from underlying system call: {errno}").into(),
+    });
+    self::report(env, report, exit_status).await
 }
 
 /// Entry point for executing the `cd` built-in
