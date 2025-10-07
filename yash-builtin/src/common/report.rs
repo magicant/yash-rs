@@ -27,7 +27,9 @@ use yash_env::semantics::{Divert, ExitStatus};
 #[cfg(doc)]
 use yash_env::stack::Stack;
 use yash_syntax::source::Location;
-use yash_syntax::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
+use yash_syntax::source::pretty::{
+    Report, ReportType, Snippet, Span, SpanRole, add_span, snippet_for_code,
+};
 
 /// Convenience function for constructing an error report and a divert value.
 ///
@@ -227,10 +229,9 @@ where
     let mut first = reports.next()?.into();
     for report in reports {
         let report = report.into();
-        for snippet in report.snippets {
-            for span in snippet.spans {
-                add_span(snippet.code, span, &mut first.snippets);
-            }
+        for from_snippet in report.snippets {
+            let to_snippet = snippet_for_code(&mut first.snippets, from_snippet.code);
+            to_snippet.spans.extend(from_snippet.spans);
         }
         first.footnotes.extend(report.footnotes);
     }

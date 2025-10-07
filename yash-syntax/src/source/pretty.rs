@@ -327,6 +327,30 @@ pub struct Message<'a> {
     pub footers: Vec<Footer<'a>>,
 }
 
+/// Returns a mutable reference to the snippet for the given code, creating it
+/// if necessary.
+///
+/// This is a utility function used in constructing a vector of snippets.
+///
+/// If a snippet for the given code already exists in the vector, this function
+/// returns a mutable reference to that snippet. Otherwise, it creates a new
+/// snippet with the given code and appends it to the vector, returning a
+/// mutable reference to the newly created snippet.
+pub fn snippet_for_code<'a, 'b>(
+    snippets: &'b mut Vec<Snippet<'a>>,
+    code: &'a super::Code,
+) -> &'b mut Snippet<'a> {
+    // if let Some(snippet) = snippets.iter_mut().find(|s| std::ptr::eq(s.code, code)) {
+    //     snippet
+    if let Some(i) = snippets.iter().position(|s| std::ptr::eq(s.code, code)) {
+        &mut snippets[i]
+    } else {
+        // TODO Use Vec::push_mut when stabilized
+        snippets.push(Snippet::with_code(code));
+        snippets.last_mut().unwrap()
+    }
+}
+
 /// Adds a span to the appropriate snippet in the given vector.
 ///
 /// This is a utility function used in constructing a vector of snippets with
@@ -336,11 +360,7 @@ pub struct Message<'a> {
 /// adds the span to that snippet. Otherwise, it creates a new snippet with the
 /// given code and span, and appends it to the vector.
 pub fn add_span<'a>(code: &'a super::Code, span: Span<'a>, snippets: &mut Vec<Snippet<'a>>) {
-    if let Some(snippet) = snippets.iter_mut().find(|s| std::ptr::eq(s.code, code)) {
-        snippet.spans.push(span);
-    } else {
-        snippets.push(Snippet::with_code_and_spans(code, vec![span]));
-    }
+    snippet_for_code(snippets, code).spans.push(span);
 }
 
 #[test]
