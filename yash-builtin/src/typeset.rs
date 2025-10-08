@@ -32,7 +32,8 @@
 //! differently from all of them.
 
 use self::syntax::OptionSpec;
-use crate::common::{output, report_error, report_failure, to_single_message};
+use crate::common::output;
+use crate::common::report::{merge_reports, report_error, report_failure};
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::function::Function;
@@ -40,7 +41,9 @@ use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_env::variable::{Value, Variable};
 use yash_syntax::source::Location;
+#[allow(deprecated)]
 use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_syntax::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
 
 mod print_functions;
 mod print_variables;
@@ -294,6 +297,37 @@ impl From<AssignReadOnlyError> for yash_semantics::expansion::AssignReadOnlyErro
     }
 }
 
+impl AssignReadOnlyError {
+    /// Converts the error to a report.
+    #[must_use]
+    fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = "error assigning to variable".into();
+        report.snippets =
+            Snippet::with_primary_span(&self.assigned_location, self.to_string().into());
+        add_span(
+            &self.read_only_location.code,
+            Span {
+                range: self.read_only_location.byte_range(),
+                role: SpanRole::Supplementary {
+                    label: "the variable was made read-only here".into(),
+                },
+            },
+            &mut report.snippets,
+        );
+        report
+    }
+}
+
+impl<'a> From<&'a AssignReadOnlyError> for Report<'a> {
+    #[inline]
+    fn from(error: &'a AssignReadOnlyError) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for AssignReadOnlyError {
     fn message_title(&self) -> std::borrow::Cow<'_, str> {
         "cannot assign to read-only variable".into()
@@ -345,17 +379,104 @@ pub enum ExecuteError {
     PrintUnsetFunction(Field),
 }
 
+impl std::fmt::Display for ExecuteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AssignReadOnlyVariable(e) => e.fmt(f),
+            Self::UndoReadOnlyVariable(e) => {
+                write!(f, "cannot cancel read-only-ness of variable `{}`", e.name)
+            }
+            Self::UndoReadOnlyFunction(e) => {
+                write!(f, "cannot cancel read-only-ness of function `{}`", e.name)
+            }
+            Self::ModifyUnsetFunction(field) => {
+                write!(f, "cannot modify non-existing function `{}`", field)
+            }
+            Self::PrintUnsetVariable(field) => {
+                write!(f, "cannot print non-existing variable `{}`", field)
+            }
+            Self::PrintUnsetFunction(field) => {
+                write!(f, "cannot print non-existing function `{}`", field)
+            }
+        }
+    }
+}
+
+impl ExecuteError {
+    /// Converts the error to a report.
+    #[must_use]
+    fn to_report(&self) -> Report<'_> {
+        let (title, location, label) = match self {
+            Self::AssignReadOnlyVariable(error) => return error.to_report(),
+            Self::UndoReadOnlyVariable(error) => (
+                "cannot cancel read-only-ness of variable",
+                &error.name.origin,
+                format!("read-only variable `{}`", error.name.value).into(),
+            ),
+            Self::UndoReadOnlyFunction(error) => (
+                "cannot cancel read-only-ness of function",
+                &error.name.origin,
+                format!("read-only function `{}`", error.name.value).into(),
+            ),
+            Self::ModifyUnsetFunction(field) => (
+                "cannot modify non-existing function",
+                &field.origin,
+                format!("non-existing function `{field}`").into(),
+            ),
+            Self::PrintUnsetVariable(field) => (
+                "cannot print non-existing variable",
+                &field.origin,
+                format!("non-existing variable `{field}`").into(),
+            ),
+            Self::PrintUnsetFunction(field) => (
+                "cannot print non-existing function",
+                &field.origin,
+                format!("non-existing function `{field}`").into(),
+            ),
+        };
+
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = title.into();
+        report.snippets = Snippet::with_primary_span(location, label);
+        match self {
+            Self::UndoReadOnlyVariable(error) => add_span(
+                &error.read_only_location.code,
+                Span {
+                    range: error.read_only_location.byte_range(),
+                    role: SpanRole::Supplementary {
+                        label: "the variable was made read-only here".into(),
+                    },
+                },
+                &mut report.snippets,
+            ),
+            Self::UndoReadOnlyFunction(error) => add_span(
+                &error.read_only_location.code,
+                Span {
+                    range: error.read_only_location.byte_range(),
+                    role: SpanRole::Supplementary {
+                        label: "the function was made read-only here".into(),
+                    },
+                },
+                &mut report.snippets,
+            ),
+            _ => { /* No additional spans */ }
+        }
+        report
+    }
+}
+
+impl<'a> From<&'a ExecuteError> for Report<'a> {
+    #[inline]
+    fn from(error: &'a ExecuteError) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for ExecuteError {
     fn message_title(&self) -> std::borrow::Cow<'_, str> {
-        match self {
-            Self::AssignReadOnlyVariable(error) => return error.message_title(),
-            Self::UndoReadOnlyVariable(_) => "cannot cancel read-only-ness of variable",
-            Self::UndoReadOnlyFunction(_) => "cannot cancel read-only-ness of function",
-            Self::ModifyUnsetFunction(_) => "cannot modify non-existing function",
-            Self::PrintUnsetVariable(_) => "cannot print non-existing variable",
-            Self::PrintUnsetFunction(_) => "cannot print non-existing function",
-        }
-        .into()
+        self.to_string().into()
     }
 
     fn main_annotation(&self) -> Annotation<'_> {
@@ -402,19 +523,13 @@ impl MessageBase for ExecuteError {
     }
 }
 
-impl std::fmt::Display for ExecuteError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.message_title().fmt(f)
-    }
-}
-
 /// Entry point of the typeset built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> yash_env::builtin::Result {
     match syntax::parse(syntax::ALL_OPTIONS, args) {
         Ok((options, operands)) => match syntax::interpret(options, operands) {
             Ok(command) => match command.execute(env, &PRINT_CONTEXT) {
                 Ok(result) => output(env, &result).await,
-                Err(errors) => report_failure(env, to_single_message(&errors).unwrap()).await,
+                Err(errors) => report_failure(env, merge_reports(&errors).unwrap()).await,
             },
             Err(error) => report_error(env, &error).await,
         },

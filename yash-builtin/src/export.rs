@@ -31,9 +31,7 @@
 //! - Printed commands do not include options that modify variable attributes.
 
 use crate::common::output;
-use crate::common::report_error;
-use crate::common::report_failure;
-use crate::common::to_single_message;
+use crate::common::report::{merge_reports, report_error, report_failure};
 use crate::typeset::Command;
 use crate::typeset::PrintContext;
 use crate::typeset::Scope::Global;
@@ -75,7 +73,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> yash_env::builtin::Result 
                 }
                 match command.execute(env, &PRINT_CONTEXT) {
                     Ok(result) => output(env, &result).await,
-                    Err(errors) => report_failure(env, to_single_message(&errors).unwrap()).await,
+                    Err(errors) => report_failure(env, merge_reports(&errors).unwrap()).await,
                 }
             }
             Err(error) => report_error(env, &error).await,
