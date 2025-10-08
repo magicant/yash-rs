@@ -38,6 +38,7 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `command::syntax::Error`
     - `common::syntax::ConflictingOptionError`
     - `common::syntax::ParseError`
+    - `getopts::report::Error`
 
 ### Changed
 
@@ -61,6 +62,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `report_simple_error` (use `report_simple_error`)
     - `syntax_error` (use `syntax_error`)
     - `to_single_message` (use `merge_reports`)
+- The `getopts::report::Error::to_message` method is now deprecated. Use the
+  `to_report` method instead.
 
 ## [0.10.0] - 2025-09-23
 
