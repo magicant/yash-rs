@@ -24,20 +24,13 @@
 //!
 //! The result for the `-P` option is obtained with [`System::getcwd`].
 
-use crate::common::arrange_message_and_divert;
 use crate::common::output;
-use crate::common::report_error;
-use std::borrow::Cow;
+use crate::common::report::{report_error, report_failure};
 use yash_env::Env;
 #[cfg(doc)]
 use yash_env::System;
 use yash_env::builtin::Result;
-use yash_env::semantics::ExitStatus;
-use yash_env::semantics::Field;
-use yash_syntax::source::Location;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
+use yash_semantics::Field;
 
 /// Choice of the behavior of the built-in
 #[derive(Debug, Clone, Copy, Default, Eq, Hash, PartialEq)]
@@ -58,23 +51,6 @@ pub enum Mode {
 pub mod semantics;
 pub mod syntax;
 
-async fn report_semantics_error(env: &mut Env, error: &semantics::Error) -> Result {
-    let location = env.stack.current_builtin().map_or_else(
-        || Cow::Owned(Location::dummy("")),
-        |field| Cow::Borrowed(&field.name.origin),
-    );
-    let annotation = Annotation::new(AnnotationType::Error, error.to_string().into(), &location);
-    let message = Message {
-        r#type: AnnotationType::Error,
-        title: "cannot compute the working directory path".into(),
-        annotations: vec![annotation],
-        footers: vec![],
-    };
-    let (message, divert) = arrange_message_and_divert(env, message);
-    env.system.print_error(&message).await;
-    Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
-}
-
 /// Entry point for executing the `pwd` built-in
 ///
 /// This function uses the [`syntax`] and [`semantics`] modules to execute the built-in.
@@ -82,7 +58,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     match syntax::parse(env, args) {
         Ok(mode) => match semantics::compute(env, mode) {
             Ok(result) => output(env, &result).await,
-            Err(e) => report_semantics_error(env, &e).await,
+            Err(e) => report_failure(env, &e).await,
         },
         Err(e) => report_error(env, &e).await,
     }

@@ -41,6 +41,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `getopts::report::Error`
     - `kill::print::InvalidSignal`
     - `kill::syntax::Error`
+    - `pwd::semantics::Error`
+    - `pwd::syntax::Error`
 
 ### Changed
 
