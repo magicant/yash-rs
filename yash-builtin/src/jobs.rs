@@ -21,8 +21,8 @@
 //! [`jobs` built-in]: https://magicant.github.io/yash-rs/builtins/jobs.html
 
 use crate::common::output;
-use crate::common::report_error;
-use crate::common::report_failure;
+use crate::common::report::report_error;
+use crate::common::report::report_failure;
 use crate::common::syntax::Mode;
 use crate::common::syntax::OptionSpec;
 use crate::common::syntax::parse_arguments;
@@ -33,9 +33,9 @@ use yash_env::job::id::FindError;
 use yash_env::job::id::parse;
 use yash_env::job::id::parse_tail;
 use yash_env::semantics::Field;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::Report;
+use yash_syntax::source::pretty::ReportType;
+use yash_syntax::source::pretty::Snippet;
 
 // TODO Split into syntax and semantics submodules
 
@@ -44,17 +44,16 @@ const OPTIONS: &[OptionSpec] = &[
     OptionSpec::new().short('p').long("pgid-only"),
 ];
 
-fn find_error_message(error: FindError, operand: &Field) -> Message<'_> {
-    Message {
-        r#type: AnnotationType::Error,
-        title: "cannot report job status".into(),
-        annotations: vec![Annotation::new(
-            AnnotationType::Error,
-            format!("{:?}: {}", &operand.value, error).into(),
-            &operand.origin,
-        )],
-        footers: vec![],
-    }
+/// Error report for job ID parsing and finding errors
+fn find_error_report(error: FindError, operand: &Field) -> Report<'_> {
+    let mut report = Report::new();
+    report.r#type = ReportType::Error;
+    report.title = "cannot report job status".into();
+    report.snippets = Snippet::with_primary_span(
+        &operand.origin,
+        format!("{:?}: {}", &operand.value, error).into(),
+    );
+    report
 }
 
 /// Entry point for executing the `jobs` built-in
@@ -94,7 +93,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             match job_id.find(&env.jobs) {
                 Ok(index) => accumulator.add(index, &env.jobs[index], &env.system),
                 Err(error) => {
-                    return report_failure(env, find_error_message(error, &operand)).await;
+                    return report_failure(env, find_error_report(error, &operand)).await;
                 }
             }
         }
