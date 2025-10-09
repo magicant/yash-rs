@@ -20,7 +20,7 @@
 //!
 //! [`kill` built-in]: https://magicant.github.io/yash-rs/builtins/kill.html
 
-use crate::common::report_error;
+use crate::common::report::report_error;
 use yash_env::Env;
 use yash_env::semantics::Field;
 
@@ -75,6 +75,6 @@ impl Command {
 pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     match syntax::parse(env, args) {
         Ok(command) => command.execute(env).await,
-        Err(error) => report_error(env, error.to_message()).await,
+        Err(error) => report_error(env, &error).await,
     }
 }
