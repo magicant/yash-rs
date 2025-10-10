@@ -25,9 +25,10 @@ use yash_env::option::canonicalize;
 use yash_env::option::parse_long;
 use yash_env::option::parse_short;
 use yash_env::semantics::Field;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::MessageBase;
+use yash_syntax::source::pretty::Snippet;
+#[allow(deprecated)]
+use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_syntax::source::pretty::{Report, ReportType};
 
 /// Error in command line parsing
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -69,8 +70,29 @@ impl Error {
             Error::UnmodifiableLongOption(field) => field,
         }
     }
+
+    /// Converts this error to a report.
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = self.to_string().into();
+
+        let field = self.field();
+        report.snippets = Snippet::with_primary_span(&field.origin, field.value.as_str().into());
+
+        report
+    }
 }
 
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline]
+    fn from(value: &'a Error) -> Self {
+        value.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for Error {
     fn message_title(&self) -> std::borrow::Cow<'_, str> {
         self.to_string().into()

@@ -45,6 +45,7 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `pwd::syntax::Error`
     - `read::input::Error`
     - `read::syntax::Error`
+    - `set::syntax::Error`
 
 ### Changed
 
