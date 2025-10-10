@@ -43,6 +43,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `kill::syntax::Error`
     - `pwd::semantics::Error`
     - `pwd::syntax::Error`
+    - `read::input::Error`
+    - `read::syntax::Error`
 
 ### Changed
 
@@ -70,6 +72,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   instead.
     - `getopts::report::Error::to_message`
     - `kill::syntax::Error::to_message`
+    - `read::input::Error::to_message`
+    - `read::syntax::Error::to_message`
 
 ## [0.10.0] - 2025-09-23
 
