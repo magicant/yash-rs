@@ -63,7 +63,7 @@ pub fn chdir(env: &mut Env, path: &Path) -> Result<(), Error> {
 /// If it returns `None`, the function will annotate the message with a dummy
 /// location.
 ///
-/// See [`arrange_message_and_divert`] for the second return value.
+/// See [`prepare_report_message_and_divert`] for the second return value.
 #[must_use = "returned message should be printed"]
 pub fn failure_message(
     env: &Env,
