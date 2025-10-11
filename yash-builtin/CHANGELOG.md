@@ -46,6 +46,7 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `read::input::Error`
     - `read::syntax::Error`
     - `set::syntax::Error`
+    - `source::syntax::Error`
 
 ### Changed
 

@@ -17,7 +17,7 @@
 //! Implementation of the main behavior of the `.` built-in
 
 use super::Command;
-use crate::common::report_failure;
+use crate::common::report::report_failure;
 use std::cell::RefCell;
 use std::ffi::CStr;
 use std::ffi::CString;
@@ -42,9 +42,7 @@ use yash_env::variable::PATH;
 use yash_semantics::read_eval_loop;
 use yash_syntax::parser::lex::Lexer;
 use yash_syntax::source::Source;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 impl Command {
     /// Executes the `.` built-in.
@@ -144,17 +142,11 @@ async fn report_find_and_open_file_failure(
     name: &Field,
     errno: Errno,
 ) -> crate::Result {
-    let message = Message {
-        r#type: AnnotationType::Error,
-        title: "cannot open script file".into(),
-        annotations: vec![Annotation::new(
-            AnnotationType::Error,
-            format!("`{}` ({errno})", name.value).into(),
-            &name.origin,
-        )],
-        footers: vec![],
-    };
-    report_failure(env, message).await
+    let mut report = Report::new();
+    report.r#type = ReportType::Error;
+    report.title = "cannot open script file".into();
+    report.snippets = Snippet::with_primary_span(&name.origin, format!("`{name}`: {errno}").into());
+    report_failure(env, report).await
 }
 
 #[cfg(test)]
