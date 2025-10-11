@@ -26,7 +26,9 @@ use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::system::resource::Resource;
 use yash_syntax::source::Location;
+#[allow(deprecated)]
 use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_syntax::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[non_exhaustive]
@@ -59,6 +61,59 @@ pub enum Error {
     InvalidLimit(Field, ParseIntError),
 }
 
+impl Error {
+    /// Converts the error to a report.
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let snippets = match self {
+            Self::CommonError(e) => return e.to_report(),
+            Self::AllWithOperand(field) => Snippet::with_primary_span(
+                &field.origin,
+                format!("{field}: unexpected operand").into(),
+            ),
+            Self::ShowingBoth { soft, hard } => {
+                let mut snippets =
+                    Snippet::with_primary_span(soft, "soft limit requested here".into());
+                add_span(
+                    &hard.code,
+                    Span {
+                        range: hard.byte_range(),
+                        role: SpanRole::Primary {
+                            label: "hard limit requested here".into(),
+                        },
+                    },
+                    &mut snippets,
+                );
+                snippets
+            }
+            Self::TooManyResources(location) => {
+                Snippet::with_primary_span(location, "unexpected option".into())
+            }
+            Self::TooManyOperands(fields) => Snippet::with_primary_span(
+                &fields[1].origin,
+                format!("{}: unexpected operand", fields[1].value).into(),
+            ),
+            Self::InvalidLimit(operand, parse_int_error) => Snippet::with_primary_span(
+                &operand.origin,
+                format!("{operand}: invalid limit ({parse_int_error})").into(),
+            ),
+        };
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = self.to_string().into();
+        report.snippets = snippets;
+        report
+    }
+}
+
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline]
+    fn from(error: &'a Error) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for Error {
     fn message_title(&self) -> Cow<'_, str> {
         self.to_string().into()
