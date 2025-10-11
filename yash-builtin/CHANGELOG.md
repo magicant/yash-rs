@@ -51,6 +51,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `typeset::ExecuteError`
     - `typeset::syntax::InterpretError`
     - `typeset::syntax::ParseError`
+    - `trap::Error`
+    - `trap::syntax::Error`
 
 ### Changed
 
