@@ -19,7 +19,7 @@
 use super::Invoke;
 use super::identify::NotFound;
 use super::search::SearchEnv;
-use crate::common::report_failure;
+use crate::common::report::report_failure;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;

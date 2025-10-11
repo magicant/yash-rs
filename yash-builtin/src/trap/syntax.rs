@@ -23,7 +23,9 @@ use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::semantics::Field;
 use yash_env::trap::Action;
+#[allow(deprecated)]
 use yash_syntax::source::pretty::{Annotation, AnnotationType, Footer, MessageBase};
+use yash_syntax::source::pretty::{Footnote, FootnoteType, Report, ReportType, Snippet};
 
 /// Command line options for the trap built-in
 pub const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('p').long("print")];
@@ -41,6 +43,48 @@ pub enum Error {
     MissingCondition { action: Field },
 }
 
+impl Error {
+    /// Converts the error to a report.
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        match self {
+            Self::UnknownCondition(field) => {
+                report.title = "unknown condition".into();
+                report.snippets = Snippet::with_primary_span(
+                    &field.origin,
+                    format!("unknown condition `{field}`").into(),
+                );
+            }
+            Self::MissingCondition { action } => {
+                report.title = "trap condition is missing".into();
+                report.snippets = Snippet::with_primary_span(
+                    &action.origin,
+                    "trap action specified without condition".into(),
+                );
+                report.footnotes.push(Footnote {
+                    r#type: FootnoteType::Note,
+                    label: format!(
+                        "the first operand `{action}` was not regarded as a condition \
+                         because it was not an unsigned integer"
+                    )
+                    .into(),
+                });
+            }
+        }
+        report
+    }
+}
+
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline]
+    fn from(error: &'a Error) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for Error {
     fn message_title(&self) -> Cow<'_, str> {
         match self {

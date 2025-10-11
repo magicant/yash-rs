@@ -29,8 +29,7 @@
 //!
 //! [`break` built-in]: https://magicant.github.io/yash-rs/builtins/break.html
 
-use crate::common::report_error;
-use crate::common::report_simple_failure;
+use crate::common::report::{report_error, report_simple_failure};
 use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;

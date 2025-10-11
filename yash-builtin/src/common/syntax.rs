@@ -64,10 +64,13 @@
 
 use std::iter::Peekable;
 use thiserror::Error;
-use yash_syntax::source::Location;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::MessageBase;
+#[allow(deprecated)]
+use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_syntax::source::pretty::{Report, ReportType, Snippet};
+use yash_syntax::source::{
+    Location,
+    pretty::{Span, SpanRole, add_span},
+};
 
 #[doc(no_inline)]
 pub use yash_env::semantics::Field;
@@ -352,8 +355,28 @@ impl ParseError<'_> {
             UnexpectedOptionArgument(field, _spec) => field,
         }
     }
+
+    /// Converts this error to a [`Report`].
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let field = self.field();
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = self.to_string().into();
+        report.snippets = Snippet::with_primary_span(&field.origin, field.value.as_str().into());
+        // TODO provide more info about the erroneous option
+        report
+    }
 }
 
+impl<'a> From<&'a ParseError<'a>> for Report<'a> {
+    #[inline]
+    fn from(error: &'a ParseError<'a>) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for ParseError<'_> {
     fn message_title(&self) -> std::borrow::Cow<'_, str> {
         self.to_string().into()
@@ -567,7 +590,7 @@ pub fn parse_arguments<'a>(
 /// This is a helper object for constructing an error message from a list of
 /// conflicting option occurrences. An instance of this type can be created
 /// using [`new`](Self::new) or [`pick_from_indexes`](Self::pick_from_indexes)
-/// and printed with [`report_error`](crate::common::report_error).
+/// and printed with [`report_error`](crate::common::report::report_error).
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[error("conflicting options")]
 pub struct ConflictingOptionError<'a> {
@@ -642,6 +665,28 @@ impl<'a> ConflictingOptionError<'a> {
     pub fn options(&self) -> &[OptionOccurrence<'a>] {
         &self.options
     }
+
+    /// Converts this error into a report.
+    #[must_use]
+    pub fn to_report(&'a self) -> Report<'a> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = self.to_string().into();
+        report.snippets = Snippet::with_primary_span(
+            &self.options[0].location,
+            format!("the {} option ...", &self.options[0].spec).into(),
+        );
+        for option in &self.options[1..] {
+            let span = Span {
+                range: option.location.byte_range(),
+                role: SpanRole::Primary {
+                    label: format!("... cannot be used with the {} option", &option.spec).into(),
+                },
+            };
+            add_span(&option.location.code, span, &mut report.snippets);
+        }
+        report
+    }
 }
 
 impl<'a> From<Vec<OptionOccurrence<'a>>> for ConflictingOptionError<'a> {
@@ -660,6 +705,14 @@ impl<'a> From<ConflictingOptionError<'a>> for Vec<OptionOccurrence<'a>> {
     }
 }
 
+impl<'a> From<&'a ConflictingOptionError<'a>> for Report<'a> {
+    #[inline]
+    fn from(error: &'a ConflictingOptionError<'a>) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for ConflictingOptionError<'_> {
     fn message_title(&self) -> std::borrow::Cow<'_, str> {
         self.to_string().into()

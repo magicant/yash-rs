@@ -17,12 +17,11 @@
 //! Part of the cd built-in that prints the new working directory
 
 use super::target::Origin;
-use crate::common::arrange_message_and_divert;
+use crate::common::report::prepare_report_message_and_divert;
 use yash_env::Env;
 use yash_env::path::Path;
 use yash_env::system::Errno;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::{Report, ReportType};
 use yash_syntax::syntax::Fd;
 
 impl Origin {
@@ -53,12 +52,9 @@ pub async fn print_path(env: &mut Env, path: &Path, origin: &Origin) {
 ///
 /// The message is only a warning because it does not affect the exit status.
 async fn handle_print_error(env: &mut Env, errno: Errno) {
-    let message = Message {
-        r#type: AnnotationType::Warning,
-        title: format!("cannot print new $PWD: {errno}").into(),
-        annotations: vec![],
-        footers: vec![],
-    };
-    let (message, _divert) = arrange_message_and_divert(env, message);
+    let mut report = Report::new();
+    report.r#type = ReportType::Warning;
+    report.title = format!("cannot print new $PWD: {errno}").into();
+    let (message, _divert) = prepare_report_message_and_divert(env, report);
     env.system.print_error(&message).await;
 }

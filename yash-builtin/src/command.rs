@@ -32,7 +32,7 @@
 //!
 //! [`type`]: crate::type
 
-use crate::common::report_error;
+use crate::common::report::report_error;
 use enumset::EnumSet;
 use enumset::EnumSetType;
 use yash_env::Env;

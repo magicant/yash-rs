@@ -22,7 +22,7 @@
 //! [`print`]: print()
 
 use super::Signal;
-use crate::common::{report_failure, to_single_message};
+use crate::common::report::{merge_reports, report_failure};
 use std::borrow::Cow;
 use std::fmt::Write;
 use std::num::NonZero;
@@ -32,7 +32,9 @@ use yash_env::semantics::Field;
 use yash_env::signal::{Name, Number};
 use yash_env::system::System;
 use yash_env::system::SystemEx;
+#[allow(deprecated)]
 use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 /// Returns an iterator over all supported signals.
 ///
@@ -94,6 +96,26 @@ pub struct InvalidSignal<'a> {
     pub origin: &'a Field,
 }
 
+impl InvalidSignal<'_> {
+    /// Converts this error to a [`Report`].
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = "unrecognized operand".into();
+        report.snippets = Snippet::with_primary_span(&self.origin.origin, self.to_string().into());
+        report
+    }
+}
+
+impl<'a> From<&'a InvalidSignal<'a>> for Report<'a> {
+    #[inline]
+    fn from(error: &'a InvalidSignal<'a>) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for InvalidSignal<'_> {
     fn message_title(&self) -> Cow<'_, str> {
         "unrecognized operand".into()
@@ -147,7 +169,7 @@ pub fn print<'a, S: SystemEx>(
 pub async fn execute(env: &mut Env, signals: &[(Signal, Field)], verbose: bool) -> crate::Result {
     match print(&env.system, signals, verbose) {
         Ok(output) => crate::common::output(env, &output).await,
-        Err(errors) => report_failure(env, to_single_message(&errors).unwrap()).await,
+        Err(errors) => report_failure(env, merge_reports(&errors).unwrap()).await,
     }
 }
 

@@ -28,9 +28,7 @@
 //!
 //! Prompting requires the optional `yash-prompt` feature.
 
-use crate::common::report;
-use crate::common::report_simple;
-use crate::common::to_single_message;
+use crate::common::report::{merge_reports, report, report_simple};
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -99,10 +97,9 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     }
 
     let errors = assigning::assign(env, &input, command.variables, command.last_variable);
-    let message = to_single_message(&errors);
-    match message {
+    match merge_reports(&errors) {
         None if newline_found => EXIT_STATUS_SUCCESS.into(),
         None => EXIT_STATUS_EOF.into(),
-        Some(message) => report(env, message, EXIT_STATUS_ASSIGN_ERROR).await,
+        Some(report) => self::report(env, report, EXIT_STATUS_ASSIGN_ERROR).await,
     }
 }

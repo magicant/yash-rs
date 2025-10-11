@@ -27,9 +27,9 @@ use yash_env::semantics::ExitStatus;
 use yash_env::variable::HOME;
 use yash_env::variable::OLDPWD;
 use yash_syntax::source::Location;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::MessageBase;
+#[allow(deprecated)]
+use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 /// Indicates how the target directory was resolved.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
@@ -90,8 +90,45 @@ impl TargetError {
             TargetError::NonExistingDirectory { .. } => super::EXIT_STATUS_CANNOT_CANONICALIZE,
         }
     }
+
+    /// Converts this error to a [`Report`].
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        use TargetError::*;
+        let (location, label) = match self {
+            UnsetHome { location } => (
+                location,
+                "cd built-in used without operand requires non-empty $HOME".into(),
+            ),
+
+            UnsetOldpwd { location } => (location, "'-' operand requires non-empty $OLDPWD".into()),
+
+            NonExistingDirectory {
+                missing,
+                target: _,
+                location,
+            } => (
+                location,
+                format!("intermediate directory '{}' not found", missing.display()).into(),
+            ),
+        };
+
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = self.to_string().into();
+        report.snippets = Snippet::with_primary_span(location, label);
+        report
+    }
 }
 
+impl<'a> From<&'a TargetError> for Report<'a> {
+    #[inline]
+    fn from(error: &'a TargetError) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for TargetError {
     fn message_title(&self) -> Cow<'_, str> {
         self.to_string().into()

@@ -28,7 +28,7 @@
 //! Long options are [canonicalize]d before being passed to `parse_long`.
 
 use crate::common::output;
-use crate::common::report_error;
+use crate::common::report::report_error;
 use std::fmt::Write;
 use yash_env::Env;
 use yash_env::builtin::Result;

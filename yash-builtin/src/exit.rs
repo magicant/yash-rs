@@ -43,8 +43,8 @@
 //! In case of an error, the result will have a [`Divert::Interrupt`] value
 //! instead, in which case the shell will not exit if it is interactive.
 
+use crate::common::report::{report_error, syntax_error};
 use crate::common::syntax::{Mode, parse_arguments};
-use crate::common::{report_error, syntax_error};
 use std::num::ParseIntError;
 use std::ops::ControlFlow::Break;
 use yash_env::Env;

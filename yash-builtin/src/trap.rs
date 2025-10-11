@@ -30,11 +30,11 @@
 mod cond;
 
 pub use self::cond::CondSpec;
-use crate::common::report_error;
-use crate::common::report_failure;
+use crate::common::report::merge_reports;
+use crate::common::report::report_error;
+use crate::common::report::report_failure;
 use crate::common::syntax::Mode;
 use crate::common::syntax::parse_arguments;
-use crate::common::to_single_message;
 use itertools::Itertools as _;
 use std::borrow::Cow;
 use std::fmt::Write;
@@ -53,9 +53,9 @@ use yash_env::trap::SetActionError;
 use yash_env::trap::SignalSystem;
 use yash_env::trap::TrapSet;
 use yash_quote::quoted;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::MessageBase;
+#[allow(deprecated)]
+use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 /// Interpretation of command line arguments that selects the behavior of the
 /// `trap` built-in
@@ -177,6 +177,30 @@ impl std::fmt::Display for Error {
     }
 }
 
+impl Error {
+    /// Converts this error to a [`Report`].
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = match &self.cause {
+            ErrorCause::UnsupportedSignal => "invalid trap condition".into(),
+            ErrorCause::SetAction(_) => "cannot update trap".into(),
+        };
+        report.snippets =
+            Snippet::with_primary_span(&self.field.origin, self.cause.to_string().into());
+        report
+    }
+}
+
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline]
+    fn from(error: &'a Error) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for Error {
     fn message_title(&self) -> Cow<'_, str> {
         match &self.cause {
@@ -304,8 +328,8 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
             let is_soft_failure = errors
                 .iter()
                 .all(|e| matches!(e, syntax::Error::UnknownCondition(_)));
-            let message = to_single_message(&errors).unwrap();
-            let mut result = report_error(env, message).await;
+            let report = merge_reports(&errors).unwrap();
+            let mut result = report_error(env, report).await;
             if is_soft_failure {
                 result = crate::Result::from(ExitStatus::FAILURE);
             }
@@ -320,9 +344,9 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
             // required by POSIX.
             errors.retain(|error| error.cause != SetActionError::InitiallyIgnored.into());
 
-            match to_single_message(&errors) {
+            match merge_reports(&errors) {
                 None => crate::Result::default(),
-                Some(message) => report_failure(env, message).await,
+                Some(report) => report_failure(env, report).await,
             }
         }
     }

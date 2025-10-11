@@ -21,19 +21,15 @@
 //!
 //! [`shift` built-in]: https://magicant.github.io/yash-rs/builtins/shift.html
 
-use crate::common::arrange_message_and_divert;
-use crate::common::report_error;
+use crate::common::report::{report_error, report_failure, syntax_error};
 use crate::common::syntax::{Mode, parse_arguments};
-use crate::common::syntax_error;
-use std::borrow::Cow;
 use yash_env::Env;
 use yash_env::builtin::Result;
-use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_syntax::source::Location;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::{
+    Footnote, FootnoteType, Report, ReportType, Snippet, Span, SpanRole, add_span,
+};
 
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     // TODO Support non-POSIX options
@@ -64,15 +60,36 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     let len = params.values.len();
     if len < count {
         // Failure: cannot shift so many positional parameters
-        let (label, location) = match operand_location {
-            None => (
-                "there are no positional parameters".into(),
-                env.stack.current_builtin().map_or_else(
-                    || Cow::Owned(Location::dummy("")),
-                    |b| Cow::Borrowed(&b.name.origin),
-                ),
-            ),
-            Some(location) => (
+        let last_location = params.last_modified_location.clone();
+        let report = report_for_too_large_operand(count, operand_location, len, &last_location);
+        return report_failure(env, report).await;
+    }
+
+    params.values.drain(..count);
+    params.last_modified_location = env.stack.current_builtin().map(|b| b.name.origin.clone());
+    Result::default()
+}
+
+/// Constructs a report for the case where too many positional parameters are
+/// requested to be shifted.
+fn report_for_too_large_operand<'a>(
+    count: usize,
+    operand_location: Option<&'a Location>,
+    len: usize,
+    last_location: &'a Option<Location>,
+) -> Report<'a> {
+    let mut report = Report::new();
+    report.r#type = ReportType::Error;
+    report.title = "cannot shift positional parameters".into();
+
+    match operand_location {
+        None => report.footnotes.push(Footnote {
+            r#type: FootnoteType::Note,
+            label: "there are no positional parameters".into(),
+        }),
+        Some(location) => {
+            report.snippets = Snippet::with_primary_span(
+                location,
                 format!(
                     "requested to shift {} but there {} only {}",
                     count,
@@ -80,32 +97,24 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
                     len,
                 )
                 .into(),
-                Cow::Borrowed(location),
-            ),
-        };
-        let last_location = params.last_modified_location.clone();
-        let mut annotations = vec![Annotation::new(AnnotationType::Error, label, &location)];
-        if let Some(last_location) = &last_location {
-            annotations.push(Annotation::new(
-                AnnotationType::Info,
-                "positional parameters were last modified here".into(),
-                last_location,
-            ));
+            );
         }
-        let message = Message {
-            r#type: AnnotationType::Error,
-            title: "cannot shift positional parameters".into(),
-            annotations,
-            footers: vec![],
-        };
-        let (message, divert) = arrange_message_and_divert(env, message);
-        env.system.print_error(&message).await;
-        return Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert);
     }
 
-    params.values.drain(..count);
-    params.last_modified_location = env.stack.current_builtin().map(|b| b.name.origin.clone());
-    Result::default()
+    if let Some(location) = &last_location {
+        add_span(
+            &location.code,
+            Span {
+                range: location.byte_range(),
+                role: SpanRole::Supplementary {
+                    label: "positional parameters were last modified here".into(),
+                },
+            },
+            &mut report.snippets,
+        );
+    }
+
+    report
 }
 
 #[cfg(test)]

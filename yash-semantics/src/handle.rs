@@ -19,7 +19,7 @@
 use crate::ExitStatus;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
-use yash_env::io::print_message;
+use yash_env::io::print_report;
 use yash_env::semantics::Divert;
 use yash_syntax::source::Source;
 
@@ -45,7 +45,7 @@ pub trait Handle {
 /// exit statuses instead of `ExitStatus::ERROR`.
 impl Handle for yash_syntax::parser::Error {
     async fn handle(&self, env: &mut Env) -> super::Result {
-        print_message(env, self).await;
+        print_report(env, &self.to_report()).await;
 
         use yash_syntax::parser::ErrorCause::*;
         let exit_status = match (&self.cause, &*self.location.code.source) {
@@ -70,7 +70,7 @@ impl Handle for yash_syntax::parser::Error {
 /// [`ErrExit`]: yash_env::option::Option::ErrExit
 impl Handle for crate::expansion::Error {
     async fn handle(&self, env: &mut Env) -> super::Result {
-        print_message(env, self).await;
+        print_report(env, &self.to_report()).await;
 
         if env.errexit_is_applicable() {
             Break(Divert::Exit(Some(ExitStatus::ERROR)))
@@ -94,7 +94,7 @@ impl Handle for crate::expansion::Error {
 /// interrupting accordingly.
 impl Handle for crate::redir::Error {
     async fn handle(&self, env: &mut Env) -> super::Result {
-        print_message(env, self).await;
+        print_report(env, &self.to_report()).await;
         env.exit_status = ExitStatus::ERROR;
         Continue(())
     }

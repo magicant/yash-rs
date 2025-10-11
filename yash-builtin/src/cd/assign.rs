@@ -17,7 +17,7 @@
 //! Part of the cd built-in that updates `$PWD` and `$OLDPWD`
 
 use super::Mode;
-use crate::common::report;
+use crate::common::report::report;
 use yash_env::Env;
 use yash_env::System;
 use yash_env::path::Path;
@@ -28,9 +28,7 @@ use yash_env::variable::OLDPWD;
 use yash_env::variable::PWD;
 use yash_env::variable::Scope::Global;
 use yash_env::variable::Value::Scalar;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::{Report, ReportType, Snippet, Span, SpanRole};
 
 /// Assigns the given value to `$OLDPWD`.
 ///
@@ -70,17 +68,19 @@ async fn set_variable(env: &mut Env, name: &str, value: String) -> crate::Result
 
 /// Prints an error message for a read-only variable.
 async fn handle_assign_error(env: &mut Env, name: &str, error: AssignError) -> crate::Result {
-    let message = Message {
-        r#type: AnnotationType::Error,
-        title: format!("cannot update read-only variable `{name}`").into(),
-        annotations: vec![Annotation::new(
-            AnnotationType::Info,
-            "the variable was made read-only here".into(),
-            &error.read_only_location,
-        )],
-        footers: vec![],
-    };
-    report(env, message, super::EXIT_STATUS_ASSIGN_ERROR).await
+    let mut report = Report::new();
+    report.r#type = ReportType::Error;
+    report.title = format!("cannot update read-only variable `{name}`").into();
+    report.snippets.push(Snippet::with_code_and_spans(
+        &error.read_only_location.code,
+        vec![Span {
+            range: error.read_only_location.byte_range(),
+            role: SpanRole::Supplementary {
+                label: "the variable was made read-only here".into(),
+            },
+        }],
+    ));
+    self::report(env, report, super::EXIT_STATUS_ASSIGN_ERROR).await
 }
 
 /// Computes the new value of `$PWD`.

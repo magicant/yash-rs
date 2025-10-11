@@ -22,11 +22,11 @@
 //! [`alias` built-in]: https://magicant.github.io/yash-rs/builtins/alias.html
 
 use crate::common::output;
-use crate::common::report_error;
-use crate::common::report_failure;
+use crate::common::report::merge_reports;
+use crate::common::report::report_error;
+use crate::common::report::report_failure;
 use crate::common::syntax::Mode;
 use crate::common::syntax::parse_arguments;
-use crate::common::to_single_message;
 use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
@@ -50,8 +50,8 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             let command = Command { operands };
             let (result, errors) = command.execute(env).await;
             let mut result = output(env, &result).await;
-            if let Some(message) = to_single_message(&errors) {
-                result = result.max(report_failure(env, message).await);
+            if let Some(report) = merge_reports(&errors) {
+                result = result.max(report_failure(env, report).await);
             }
             result
         }

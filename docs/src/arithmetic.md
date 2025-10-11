@@ -59,7 +59,7 @@ error: cannot expand unset parameter
 2 | echo $((x + 3))
   |      ---------- arithmetic expansion appeared here
   |
-  = info: unset parameters are disallowed by the nounset option
+  = note: unset parameters are disallowed by the nounset option
 ```
 
 If a variable has a non-numeric value, an error occurs.

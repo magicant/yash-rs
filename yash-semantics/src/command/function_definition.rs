@@ -27,9 +27,7 @@ use yash_env::function::DefineError;
 use yash_env::function::Function;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
 use yash_syntax::syntax;
 
 /// Executes the function definition command.
@@ -77,30 +75,36 @@ async fn define_function(env: &mut Env, def: &syntax::FunctionDefinition) -> Res
 ///
 /// This function assumes `error.existing.read_only_location.is_some()`.
 async fn report_define_error(env: &mut Env, error: &DefineError) {
-    let message = Message {
-        r#type: AnnotationType::Error,
-        title: error.to_string().into(),
-        annotations: vec![
-            Annotation::new(
-                AnnotationType::Error,
-                "failed function redefinition".into(),
-                &error.new.origin,
-            ),
-            Annotation::new(
-                AnnotationType::Info,
-                "existing function was defined here".into(),
-                &error.existing.origin,
-            ),
-            Annotation::new(
-                AnnotationType::Info,
-                "existing function was made read-only here".into(),
-                error.existing.read_only_location.as_ref().unwrap(),
-            ),
-        ],
-        footers: vec![],
-    };
+    let mut report = Report::new();
+    report.r#type = ReportType::Error;
+    report.title = error.to_string().into();
+    report.snippets =
+        Snippet::with_primary_span(&error.new.origin, "failed function redefinition".into());
 
-    yash_env::io::print_message(env, message).await;
+    add_span(
+        &error.existing.origin.code,
+        Span {
+            range: error.existing.origin.byte_range(),
+            role: SpanRole::Supplementary {
+                label: "existing function was defined here".into(),
+            },
+        },
+        &mut report.snippets,
+    );
+
+    let read_only_location = error.existing.read_only_location.as_ref().unwrap();
+    add_span(
+        &read_only_location.code,
+        Span {
+            range: read_only_location.byte_range(),
+            role: SpanRole::Supplementary {
+                label: "existing function was made read-only here".into(),
+            },
+        },
+        &mut report.snippets,
+    );
+
+    yash_env::io::print_report(env, &report).await;
 }
 
 #[cfg(test)]

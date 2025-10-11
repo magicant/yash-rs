@@ -20,6 +20,7 @@ use super::Mode;
 use thiserror::Error;
 use yash_env::system::Errno;
 use yash_env::{Env, System};
+use yash_syntax::source::pretty::{Report, ReportType};
 
 /// Error in running the pwd built-in
 #[derive(Debug, Clone, Eq, Error, PartialEq)]
@@ -27,6 +28,24 @@ pub enum Error {
     /// Error obtaining the current working directory path
     #[error(transparent)]
     SystemError(Errno),
+}
+
+impl Error {
+    /// Converts this error to a [`Report`].
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = format!("cannot determine working directory: {self}").into();
+        report
+    }
+}
+
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline]
+    fn from(error: &'a Error) -> Self {
+        error.to_report()
+    }
 }
 
 /// Logical result of the pwd built-in

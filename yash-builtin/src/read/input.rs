@@ -21,8 +21,9 @@ use yash_env::Env;
 use yash_env::system::Errno;
 use yash_semantics::expansion::attr::AttrChar;
 use yash_semantics::expansion::attr::Origin;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
+#[allow(deprecated)]
+use yash_syntax::source::pretty::{AnnotationType, Message};
+use yash_syntax::source::pretty::{Report, ReportType};
 use yash_syntax::syntax::Fd;
 
 /// Error reading from the standard input
@@ -37,7 +38,18 @@ pub struct Error {
 }
 
 impl Error {
+    /// Converts this error to a report.
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = self.to_string().into();
+        report
+    }
+
     /// Converts this error to a message.
+    #[allow(deprecated)]
+    #[deprecated(note = "use `to_report` instead", since = "0.11.0")]
     #[must_use]
     pub fn to_message(&self) -> Message<'_> {
         Message {
@@ -49,6 +61,14 @@ impl Error {
     }
 }
 
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline]
+    fn from(error: &'a Error) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl<'a> From<&'a Error> for Message<'a> {
     #[inline]
     fn from(error: &'a Error) -> Self {

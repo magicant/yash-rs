@@ -29,8 +29,7 @@
 
 use crate::bg::OperandErrorKind;
 use crate::bg::ResumeError;
-use crate::common::report_error;
-use crate::common::report_simple_failure;
+use crate::common::report::{report_error, report_simple_failure};
 use crate::common::syntax::Mode;
 use crate::common::syntax::parse_arguments;
 use std::ops::ControlFlow::Break;

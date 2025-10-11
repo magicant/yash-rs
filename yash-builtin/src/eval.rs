@@ -22,7 +22,7 @@
 //! [`eval` built-in]: https://magicant.github.io/yash-rs/builtins/eval.html
 
 use crate::Result;
-use crate::common::report_error;
+use crate::common::report::report_error;
 use crate::common::syntax::{Mode, parse_arguments};
 use std::cell::RefCell;
 use std::rc::Rc;

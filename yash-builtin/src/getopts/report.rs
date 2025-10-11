@@ -32,9 +32,11 @@ use yash_env::variable::Scope;
 use yash_env::variable::UnsetError;
 use yash_env::variable::Value;
 use yash_syntax::source::Location;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
+#[allow(deprecated)]
+use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
+use yash_syntax::source::pretty::{
+    Footnote, FootnoteType, Report, ReportType, Snippet, Span, SpanRole, add_span,
+};
 
 /// Error in reporting the result to the environment
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -86,7 +88,83 @@ impl Error {
         }
     }
 
+    /// Converts this error to a report.
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = self.to_string().into();
+
+        match self {
+            Self::InvalidVariableName { name } => {
+                report.snippets = Snippet::with_primary_span(
+                    &name.origin,
+                    format!("variable name {:?} is not valid", name.value).into(),
+                );
+            }
+
+            Self::AssignReadOnlyError {
+                name,
+                new_value,
+                assigned_location,
+                read_only_location,
+            } => {
+                let label = format!(
+                    "the built-in needs to update the variable to {}",
+                    new_value.quote()
+                )
+                .into();
+                if let Some(location) = assigned_location {
+                    add_span(
+                        &location.code,
+                        Span {
+                            range: location.byte_range(),
+                            role: SpanRole::Supplementary { label },
+                        },
+                        &mut report.snippets,
+                    );
+                } else {
+                    report.footnotes.push(Footnote {
+                        r#type: FootnoteType::Note,
+                        label,
+                    });
+                }
+
+                add_span(
+                    &read_only_location.code,
+                    Span {
+                        range: read_only_location.byte_range(),
+                        role: SpanRole::Supplementary {
+                            label: format!("`{name}` was made read-only here").into(),
+                        },
+                    },
+                    &mut report.snippets,
+                );
+            }
+
+            Self::UnsetReadOnlyError {
+                name,
+                read_only_location,
+            } => {
+                add_span(
+                    &read_only_location.code,
+                    Span {
+                        range: read_only_location.byte_range(),
+                        role: SpanRole::Supplementary {
+                            label: format!("`{name}` was made read-only here").into(),
+                        },
+                    },
+                    &mut report.snippets,
+                );
+            }
+        }
+
+        report
+    }
+
     /// Converts this error to a printable message.
+    #[allow(deprecated)]
+    #[deprecated(note = "use `to_report` instead", since = "0.11.0")]
     pub fn to_message(&self) -> Message<'_> {
         let mut annotations = Vec::new();
 
@@ -142,6 +220,13 @@ impl Error {
             annotations,
             footers: vec![],
         }
+    }
+}
+
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline]
+    fn from(e: &'a Error) -> Self {
+        e.to_report()
     }
 }
 
