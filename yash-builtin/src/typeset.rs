@@ -300,7 +300,7 @@ impl From<AssignReadOnlyError> for yash_semantics::expansion::AssignReadOnlyErro
 impl AssignReadOnlyError {
     /// Converts the error to a report.
     #[must_use]
-    fn to_report(&self) -> Report<'_> {
+    pub fn to_report(&self) -> Report<'_> {
         let mut report = Report::new();
         report.r#type = ReportType::Error;
         report.title = "error assigning to variable".into();
@@ -405,7 +405,7 @@ impl std::fmt::Display for ExecuteError {
 impl ExecuteError {
     /// Converts the error to a report.
     #[must_use]
-    fn to_report(&self) -> Report<'_> {
+    pub fn to_report(&self) -> Report<'_> {
         let (title, location, label) = match self {
             Self::AssignReadOnlyVariable(error) => return error.to_report(),
             Self::UndoReadOnlyVariable(error) => (

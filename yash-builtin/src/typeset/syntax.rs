@@ -183,7 +183,7 @@ impl ParseError {
 
     /// Converts this error to a [`Report`].
     #[must_use]
-    fn to_report(&self) -> Report<'_> {
+    pub fn to_report(&self) -> Report<'_> {
         let mut report = Report::new();
         report.r#type = ReportType::Error;
         report.title = self.to_string().into();
@@ -347,7 +347,7 @@ pub enum InterpretError<'a> {
 impl InterpretError<'_> {
     /// Converts the error to a report.
     #[must_use]
-    fn to_report(&self) -> Report<'_> {
+    pub fn to_report(&self) -> Report<'_> {
         let Self::OptionInapplicableForFunction { clashing, function } = self;
         let mut report = Report::new();
         report.r#type = ReportType::Error;

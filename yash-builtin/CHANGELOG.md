@@ -47,6 +47,10 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `read::syntax::Error`
     - `set::syntax::Error`
     - `source::syntax::Error`
+    - `typeset::AssignReadOnlyError`
+    - `typeset::ExecuteError`
+    - `typeset::syntax::InterpretError`
+    - `typeset::syntax::ParseError`
 
 ### Changed
 

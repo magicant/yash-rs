@@ -42,7 +42,7 @@ pub enum Error {
 impl Error {
     /// Converts this error to a report.
     #[must_use]
-    fn to_report(&self) -> Report<'_> {
+    pub fn to_report(&self) -> Report<'_> {
         match self {
             Self::CommonError(e) => e.to_report(),
             Self::MissingFile => {
