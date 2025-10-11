@@ -54,6 +54,7 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `trap::Error`
     - `trap::syntax::Error`
     - `ulimit::syntax::Error`
+    - `umask::syntax::Error`
 
 ### Changed
 

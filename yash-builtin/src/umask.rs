@@ -21,7 +21,8 @@
 //!
 //! [`umask` built-in]: https://magicant.github.io/yash-rs/builtins/umask.html
 
-use crate::common::{output, report_error};
+use crate::common::output;
+use crate::common::report::report_error;
 use yash_env::semantics::Field;
 use yash_env::system::Mode;
 use yash_env::{Env, System};
