@@ -21,9 +21,9 @@ use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::MessageBase;
+#[allow(deprecated)]
+use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 /// Errors that can occur while executing the `unalias` built-in
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -33,6 +33,33 @@ pub enum Error {
     UndefinedAlias(Field),
 }
 
+impl Error {
+    /// Converts the error to a report.
+    #[must_use]
+    fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = "cannot remove alias".into();
+        match self {
+            Self::UndefinedAlias(alias) => {
+                report.snippets = Snippet::with_primary_span(
+                    &alias.origin,
+                    format!("no such alias `{alias}`").into(),
+                );
+            }
+        }
+        report
+    }
+}
+
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline]
+    fn from(error: &'a Error) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for Error {
     fn message_title(&self) -> Cow<'_, str> {
         "cannot remove alias".into()

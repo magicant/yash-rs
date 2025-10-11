@@ -20,12 +20,13 @@
 //!
 //! [`unalias` built-in]: https://magicant.github.io/yash-rs/builtins/unalias.html
 
-use crate::common::report_error;
-use crate::common::report_failure;
+use crate::common::report::merge_reports;
+use crate::common::report::report_error;
+use crate::common::report::report_failure;
 use yash_env::Env;
 use yash_env::semantics::Field;
-use yash_syntax::source::pretty::Message;
-use yash_syntax::source::pretty::MessageBase;
+#[allow(deprecated)]
+use yash_syntax::source::pretty::{Message, MessageBase};
 
 /// Parsed command arguments for the `unalias` built-in
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -46,6 +47,11 @@ pub mod syntax;
 ///
 /// This is a utility for printing errors returned by [`Command::execute`].
 /// The returned message can be passed to [`report_failure`].
+#[allow(deprecated)]
+#[deprecated(
+    note = "use `crate::common::report::merge_reports` instead",
+    since = "0.11.0"
+)]
 #[must_use]
 pub fn to_message(errors: &[semantics::Error]) -> Option<Message<'_>> {
     let mut message = Message::from(errors.first()?);
@@ -59,11 +65,11 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     match syntax::parse(env, args) {
         Ok(command) => {
             let errors = command.execute(env);
-            match to_message(&errors) {
+            match merge_reports(&errors) {
                 None => crate::Result::default(),
-                Some(message) => report_failure(env, message).await,
+                Some(report) => report_failure(env, report).await,
             }
         }
-        Err(e) => report_error(env, e.to_message()).await,
+        Err(e) => report_error(env, &e).await,
     }
 }

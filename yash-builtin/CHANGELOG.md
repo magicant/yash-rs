@@ -55,6 +55,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `trap::syntax::Error`
     - `ulimit::syntax::Error`
     - `umask::syntax::Error`
+    - `unalias::semantics::Error`
+    - `unalias::syntax::Error`
 
 ### Changed
 
