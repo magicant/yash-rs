@@ -21,7 +21,7 @@
 //! [`kill`](yash_env::System::kill) system call.
 
 use super::Signal;
-use crate::common::{report_failure, to_single_message};
+use crate::common::report::{merge_reports, report_failure};
 use std::borrow::Cow;
 use std::num::ParseIntError;
 use thiserror::Error;
@@ -33,7 +33,9 @@ use yash_env::semantics::Field;
 use yash_env::signal;
 use yash_env::system::Errno;
 use yash_env::system::System as _;
+#[allow(deprecated)]
 use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 /// Error that may occur while [sending](send) a signal.
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -100,6 +102,26 @@ struct UnsupportedSignal<'a> {
     origin: &'a Field,
 }
 
+impl UnsupportedSignal<'_> {
+    /// Converts this error to a [`Report`].
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = "unsupported signal".into();
+        report.snippets = Snippet::with_primary_span(&self.origin.origin, self.to_string().into());
+        report
+    }
+}
+
+impl<'a> From<&'a UnsupportedSignal<'a>> for Report<'a> {
+    #[inline]
+    fn from(error: &'a UnsupportedSignal<'a>) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for UnsupportedSignal<'_> {
     fn message_title(&self) -> Cow<'_, str> {
         "unsupported signal".into()
@@ -121,6 +143,29 @@ struct TargetError<'a> {
     error: Error,
 }
 
+impl TargetError<'_> {
+    /// Converts this error to a [`Report`].
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = "cannot send signal".into();
+        report.snippets = Snippet::with_primary_span(
+            &self.target.origin,
+            format!("{}: {}", self.target.value, self.error).into(),
+        );
+        report
+    }
+}
+
+impl<'a> From<&'a TargetError<'a>> for Report<'a> {
+    #[inline]
+    fn from(error: &'a TargetError<'a>) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for TargetError<'_> {
     fn message_title(&self) -> Cow<'_, str> {
         "cannot send signal".into()
@@ -152,8 +197,8 @@ pub async fn execute(
 ) -> crate::Result {
     let Ok(signal) = signal.to_number(&env.system) else {
         let origin = signal_origin.unwrap();
-        let message = UnsupportedSignal { signal, origin };
-        return report_failure(env, &message).await;
+        let report = UnsupportedSignal { signal, origin };
+        return report_failure(env, &report).await;
     };
 
     let mut errors = Vec::new();
@@ -163,8 +208,8 @@ pub async fn execute(
         }
     }
 
-    if let Some(message) = to_single_message(&errors) {
-        report_failure(env, message).await
+    if let Some(report) = merge_reports(&errors) {
+        report_failure(env, report).await
     } else {
         crate::Result::default()
     }

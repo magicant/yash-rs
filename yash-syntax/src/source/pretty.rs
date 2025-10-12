@@ -19,14 +19,14 @@
 //! This module defines some data types for constructing intermediate data
 //! structures for printing diagnostic messages referencing source code
 //! fragments.  When you have an [`Error`](crate::parser::Error), you can
-//! convert it to a [`Message`]. Then, you can in turn convert it into
+//! convert it to a [`Report`]. Then, you can in turn convert it into
 //! `annotate_snippets::Snippet`, for example, and finally format a printable
 //! diagnostic message string.
 //!
 //! When the `yash_syntax` crate is built with the `annotate-snippets` feature
-//! enabled, it supports conversion from `Message` to `Group`. If you would
-//! like to use another formatter instead, you can provide your own conversion
-//! for yourself.
+//! enabled, it supports conversion from [`Report`] to
+//! [`Group`](annotate_snippets::Group). If you would like to use another
+//! formatter instead, you can provide your own conversion for yourself.
 //!
 //! ## Printing an error
 //!
@@ -36,33 +36,214 @@
 //! ```
 //! # use yash_syntax::parser::{Error, ErrorCause, SyntaxError};
 //! # use yash_syntax::source::Location;
-//! # use yash_syntax::source::pretty::Message;
+//! # use yash_syntax::source::pretty::Report;
 //! let error = Error {
 //!     cause: ErrorCause::Syntax(SyntaxError::EmptyParam),
 //!     location: Location::dummy(""),
 //! };
-//! let message = Message::from(&error);
+//! let report = Report::from(&error);
 //! // The lines below require the `annotate-snippets` feature.
 //! # #[cfg(feature = "annotate-snippets")]
 //! # {
-//! let group = annotate_snippets::Group::from(&message);
-//! eprint!("{}", annotate_snippets::Renderer::plain().render(&[group]));
+//! let group = annotate_snippets::Group::from(&report);
+//! eprintln!("{}", annotate_snippets::Renderer::plain().render(&[group]));
 //! # }
 //! ```
 //!
 //! You can also implement conversion from your custom error object to a
-//! [`Message`], which then can be used in the same way to format a diagnostic
-//! message. To do this, you can either directly implement `From<YourError>` for
-//! `Message`, or implement [`MessageBase`] for `YourError` thereby deriving
-//! `From<&YourError>` for `Message`.
+//! [`Report`], which then can be used in the same way to format a diagnostic
+//! message. To do this, implement `From<YourError>` or `From<&YourError>` for
+//! `Report`.
+//!
+//! ## Deprecated items
+//!
+//! Before [`Report`] was introduced, this module provided [`Message`] as the
+//! main data structure for constructing a diagnostic message. `Message` could
+//! be constructed directly or through the [`MessageBase`] trait, which
+//! provided a blanket implementation of `From<&T> for Message` for
+//! implementors of the trait. These items are now deprecated in favor of
+//! `Report`, but are available for backward compatibility for now. Please
+//! migrate to `Report` before they are removed in a future release.
 
 use super::Location;
 use std::borrow::Cow;
 use std::cell::Ref;
-use std::ops::Deref;
+use std::ops::{Deref, Range};
 use std::rc::Rc;
 
+/// Type of [`Report`]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum ReportType {
+    #[default]
+    None,
+    Error,
+    Warning,
+}
+
+/// Type and label annotating a [`Span`]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum SpanRole<'a> {
+    /// Primary span, usually indicating the main cause of a problem
+    Primary { label: Cow<'a, str> },
+    /// Secondary span, usually indicating related information
+    Supplementary { label: Cow<'a, str> },
+    // Patch { replacement: Cow<'a, str> },
+}
+
+/// Part of source code [`Snippet`] annotated with additional information
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Span<'a> {
+    /// Range of bytes in the source code
+    pub range: Range<usize>,
+    /// Type and label of this span
+    pub role: SpanRole<'a>,
+}
+
+/// Fragment of source code with annotated spans highlighting specific regions
+///
+/// A snippet corresponds to a single source [`Code`](super::Code). It contains
+/// zero or more [`Span`]s that annotate specific parts of the code.
+///
+/// `Snippet` holds a [`Ref`] to the string held in `self.code.value`, which
+/// provides an access to the string without making a new borrow
+/// ([`code_string`](Self::code_string)). This allows creating another
+/// message builder such as `annotate_snippets::Snippet` without the need to
+/// retain a borrow of `self.code.value`.
+#[derive(Debug)]
+pub struct Snippet<'a> {
+    /// Source code to which the spans refer
+    pub code: &'a super::Code,
+    /// Reference to the string held in `self.code.value`
+    code_string: Ref<'a, str>,
+    /// Spans describing parts of the code
+    pub spans: Vec<Span<'a>>,
+}
+
+impl Snippet<'_> {
+    /// Creates a new snippet for the given code without any spans.
+    #[must_use]
+    pub fn with_code(code: &super::Code) -> Snippet<'_> {
+        Self::with_code_and_spans(code, Vec::new())
+    }
+
+    /// Creates a new snippet for the given code with the given spans.
+    #[must_use]
+    pub fn with_code_and_spans<'a>(code: &'a super::Code, spans: Vec<Span<'a>>) -> Snippet<'a> {
+        Snippet {
+            code,
+            code_string: Ref::map(code.value.borrow(), String::as_str),
+            spans,
+        }
+    }
+
+    /// Creates a vector containing a snippet with a primary span.
+    ///
+    /// This is a convenience function for creating a vector of snippets
+    /// containing a primary span created from the given location and label.
+    /// The returned vector can be used as the `snippets` field of a
+    /// [`Report`].
+    ///
+    /// This function calls
+    /// [`Source::extend_with_context`](super::Source::extend_with_context) for
+    /// `location.code.source`, thereby adding supplementary spans describing the
+    /// context of the source code. This means that the returned vector may
+    /// contain multiple snippets or spans if the source has a related location.
+    #[must_use]
+    pub fn with_primary_span<'a>(location: &'a Location, label: Cow<'a, str>) -> Vec<Snippet<'a>> {
+        let range = location.byte_range();
+        let role = SpanRole::Primary { label };
+        let spans = vec![Span { range, role }];
+        let mut snippets = vec![Snippet::with_code_and_spans(&location.code, spans)];
+        location.code.source.extend_with_context(&mut snippets);
+        snippets
+    }
+
+    /// Returns the string held in `self.code.value`.
+    ///
+    /// This method returns a reference to the string held in `self.code.value`.
+    /// `Snippet` internally holds a `Ref` to the string, which provides an
+    /// access to the string without making a new borrow.
+    #[inline(always)]
+    #[must_use]
+    pub fn code_string(&self) -> &str {
+        &self.code_string
+    }
+}
+
+impl Clone for Snippet<'_> {
+    fn clone(&self) -> Self {
+        Snippet {
+            code: self.code,
+            code_string: Ref::clone(&self.code_string),
+            spans: self.spans.clone(),
+        }
+    }
+}
+
+impl PartialEq<Snippet<'_>> for Snippet<'_> {
+    fn eq(&self, other: &Snippet<'_>) -> bool {
+        self.code == other.code && self.spans == other.spans
+    }
+}
+
+impl Eq for Snippet<'_> {}
+
+/// Type of [`Footnote`]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum FootnoteType {
+    /// No specific type
+    #[default]
+    None,
+    /// For footnotes that provide additional information
+    Note,
+    /// For footnotes that provide suggestions
+    Suggestion,
+}
+
+/// Message without associated source code
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct Footnote<'a> {
+    /// Type of this footnote
+    pub r#type: FootnoteType,
+    /// Text of this footnote
+    pub label: Cow<'a, str>,
+}
+
+/// Entire report containing multiple snippets
+///
+/// `Report` is an intermediate data structure for constructing a diagnostic
+/// message. It contains multiple [`Snippet`]s, each of which corresponds to a
+/// specific part of the source code being analyzed.
+/// See the [module documentation](self) for more details.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct Report<'a> {
+    /// Type of this report
+    pub r#type: ReportType,
+    /// Optional identifier of this report (e.g., error code)
+    pub id: Option<Cow<'a, str>>,
+    /// Main caption of this report
+    pub title: Cow<'a, str>,
+    /// Source code fragments annotated with additional information
+    pub snippets: Vec<Snippet<'a>>,
+    /// Additional message without associated source code
+    pub footnotes: Vec<Footnote<'a>>,
+}
+
+impl Report<'_> {
+    /// Creates a new, empty report.
+    #[inline]
+    #[must_use]
+    pub fn new() -> Self {
+        Report::default()
+    }
+}
+
 /// Type of annotation.
+#[deprecated(note = "Use `ReportType` or `FootnoteType` instead", since = "0.16.0")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AnnotationType {
     Error,
@@ -75,9 +256,11 @@ pub enum AnnotationType {
 /// Source code fragment annotated with a label
 ///
 /// Annotations are part of an entire [`Message`].
+#[deprecated(note = "Use `Snippet` and `Span` instead", since = "0.16.0")]
 #[derive(Clone)]
 pub struct Annotation<'a> {
     /// Type of annotation
+    #[allow(deprecated)]
     pub r#type: AnnotationType,
     /// String that describes the annotated part of the source code
     pub label: Cow<'a, str>,
@@ -90,6 +273,7 @@ pub struct Annotation<'a> {
     pub code: Rc<dyn Deref<Target = str> + 'a>,
 }
 
+#[allow(deprecated)]
 impl std::fmt::Debug for Annotation<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Annotation")
@@ -101,6 +285,7 @@ impl std::fmt::Debug for Annotation<'_> {
     }
 }
 
+#[allow(deprecated)]
 impl<'a> Annotation<'a> {
     /// Creates a new annotation.
     ///
@@ -116,16 +301,20 @@ impl<'a> Annotation<'a> {
     }
 }
 
-/// Additional text without associated source code
+/// Additional message without associated source code
+#[deprecated(note = "Use `Footnote` instead", since = "0.16.0")]
 #[derive(Clone, Debug)]
 pub struct Footer<'a> {
     /// Type of this footer
+    #[allow(deprecated)]
     pub r#type: AnnotationType,
     /// Text of this footer
     pub label: Cow<'a, str>,
 }
 
 /// Entire diagnostic message
+#[allow(deprecated)]
+#[deprecated(note = "Use `Report` instead", since = "0.16.0")]
 #[derive(Clone, Debug)]
 pub struct Message<'a> {
     /// Type of this message
@@ -138,8 +327,191 @@ pub struct Message<'a> {
     pub footers: Vec<Footer<'a>>,
 }
 
+/// Returns a mutable reference to the snippet for the given code, creating it
+/// if necessary.
+///
+/// This is a utility function used in constructing a vector of snippets.
+///
+/// If a snippet for the given code already exists in the vector, this function
+/// returns a mutable reference to that snippet. Otherwise, it creates a new
+/// snippet with the given code and appends it to the vector, returning a
+/// mutable reference to the newly created snippet.
+pub fn snippet_for_code<'a, 'b>(
+    snippets: &'b mut Vec<Snippet<'a>>,
+    code: &'a super::Code,
+) -> &'b mut Snippet<'a> {
+    // if let Some(snippet) = snippets.iter_mut().find(|s| std::ptr::eq(s.code, code)) {
+    //     snippet
+    if let Some(i) = snippets.iter().position(|s| std::ptr::eq(s.code, code)) {
+        &mut snippets[i]
+    } else {
+        // TODO Use Vec::push_mut when stabilized
+        snippets.push(Snippet::with_code(code));
+        snippets.last_mut().unwrap()
+    }
+}
+
+/// Adds a span to the appropriate snippet in the given vector.
+///
+/// This is a utility function used in constructing a vector of snippets with
+/// annotated spans.
+///
+/// If a snippet for the given code already exists in the vector, this function
+/// adds the span to that snippet. Otherwise, it creates a new snippet with the
+/// given code and span, and appends it to the vector.
+pub fn add_span<'a>(code: &'a super::Code, span: Span<'a>, snippets: &mut Vec<Snippet<'a>>) {
+    snippet_for_code(snippets, code).spans.push(span);
+}
+
+#[test]
+fn test_add_span_with_matching_code() {
+    let code = Rc::new(super::Code {
+        value: std::cell::RefCell::new("echo hello".to_string()),
+        start_line_number: std::num::NonZero::new(1).unwrap(),
+        source: Rc::new(super::Source::CommandString),
+    });
+    let span = Span {
+        range: 5..10,
+        role: SpanRole::Primary {
+            label: "greeting".into(),
+        },
+    };
+    let mut snippets = vec![Snippet::with_code(&code)];
+
+    add_span(&code, span, &mut snippets);
+
+    assert_eq!(snippets.len(), 1);
+    assert_eq!(snippets[0].spans.len(), 1);
+    assert_eq!(snippets[0].spans[0].range, 5..10);
+    assert_eq!(
+        snippets[0].spans[0].role,
+        SpanRole::Primary {
+            label: "greeting".into()
+        }
+    );
+}
+
+#[test]
+fn test_add_span_without_matching_code() {
+    let code1 = Rc::new(super::Code {
+        value: std::cell::RefCell::new("echo hello".to_string()),
+        start_line_number: std::num::NonZero::new(1).unwrap(),
+        source: Rc::new(super::Source::CommandString),
+    });
+    let code2 = Rc::new(super::Code {
+        value: std::cell::RefCell::new("ls -l".to_string()),
+        start_line_number: std::num::NonZero::new(1).unwrap(),
+        source: Rc::new(super::Source::CommandString),
+    });
+    let span = Span {
+        range: 0..2,
+        role: SpanRole::Primary {
+            label: "list".into(),
+        },
+    };
+    let mut snippets = vec![Snippet::with_code(&code1)];
+
+    add_span(&code2, span, &mut snippets);
+
+    assert_eq!(snippets.len(), 2);
+    assert_eq!(snippets[0].code.value.borrow().as_str(), "echo hello");
+    assert_eq!(snippets[0].spans.len(), 0);
+    assert_eq!(snippets[1].code.value.borrow().as_str(), "ls -l");
+    assert_eq!(snippets[1].spans.len(), 1);
+    assert_eq!(snippets[1].spans[0].range, 0..2);
+    assert_eq!(
+        snippets[1].spans[0].role,
+        SpanRole::Primary {
+            label: "list".into()
+        }
+    );
+}
+
 impl super::Source {
+    /// Extends the given vector of snippets with spans annotating the context of this source.
+    ///
+    /// If `self` is a source that has a related location (e.g., the `original` field of
+    /// `CommandSubst`), this method adds one or more spans describing the location to the given
+    /// vector. If the `code` of the location is already present in the vector, it adds the span
+    /// to the existing snippet; otherwise, it creates a new snippet.
+    ///
+    /// If `self` does not have a related location, this method does nothing.
+    pub fn extend_with_context<'a>(&'a self, snippets: &mut Vec<Snippet<'a>>) {
+        use super::Source::*;
+        match self {
+            Unknown
+            | Stdin
+            | CommandString
+            | CommandFile { .. }
+            | VariableValue { .. }
+            | InitFile { .. }
+            | Other { .. } => (),
+
+            CommandSubst { original } => {
+                let range = original.byte_range();
+                let role = SpanRole::Supplementary {
+                    label: "command substitution appeared here".into(),
+                };
+                add_span(&original.code, Span { range, role }, snippets);
+            }
+
+            Arith { original } => {
+                let range = original.byte_range();
+                let role = SpanRole::Supplementary {
+                    label: "arithmetic expansion appeared here".into(),
+                };
+                add_span(&original.code, Span { range, role }, snippets);
+            }
+
+            Eval { original } => {
+                let range = original.byte_range();
+                let role = SpanRole::Supplementary {
+                    label: "command passed to the eval built-in here".into(),
+                };
+                add_span(&original.code, Span { range, role }, snippets);
+            }
+
+            DotScript { name, origin } => {
+                let range = origin.byte_range();
+                let role = SpanRole::Supplementary {
+                    label: format!("script `{name}` was sourced here").into(),
+                };
+                add_span(&origin.code, Span { range, role }, snippets);
+            }
+
+            Trap { origin, .. } => {
+                let range = origin.byte_range();
+                let role = SpanRole::Supplementary {
+                    label: "trap was set here".into(),
+                };
+                add_span(&origin.code, Span { range, role }, snippets);
+            }
+
+            Alias { original, alias } => {
+                // Where the alias was substituted
+                let range = original.byte_range();
+                let role = SpanRole::Supplementary {
+                    label: format!("alias `{}` was substituted here", alias.name).into(),
+                };
+                add_span(&original.code, Span { range, role }, snippets);
+                // Recurse into the source of the substituted code
+                original.code.source.extend_with_context(snippets);
+
+                // Where the alias was defined
+                let range = alias.origin.byte_range();
+                let role = SpanRole::Supplementary {
+                    label: format!("alias `{}` was defined here", alias.name).into(),
+                };
+                add_span(&alias.origin.code, Span { range, role }, snippets);
+                // Recurse into the source of the alias definition
+                alias.origin.code.source.extend_with_context(snippets);
+            }
+        }
+    }
+
     /// Appends complementary annotations describing this source.
+    #[allow(deprecated)]
+    #[deprecated(note = "Use `extend_with_context` instead", since = "0.16.0")]
     pub fn complement_annotations<'a, 's: 'a, T: Extend<Annotation<'a>>>(&'s self, result: &mut T) {
         use super::Source::*;
         match self {
@@ -215,6 +587,8 @@ impl super::Source {
 /// Thanks to the blanket implementation `impl<'a, T: MessageBase> From<&'a T>
 /// for Message<'a>`, implementors of this trait can be converted to a message
 /// for free.
+#[allow(deprecated)]
+#[deprecated(note = "Use `Report` instead", since = "0.16.0")]
 pub trait MessageBase {
     /// Returns the type of the entire message.
     ///
@@ -245,6 +619,7 @@ pub trait MessageBase {
 }
 
 /// Constructs a message based on the message base.
+#[allow(deprecated)]
 impl<'a, T: MessageBase> From<&'a T> for Message<'a> {
     fn from(base: &'a T) -> Self {
         let main_annotation = base.main_annotation();
@@ -267,11 +642,129 @@ impl<'a, T: MessageBase> From<&'a T> for Message<'a> {
 mod annotate_snippets_support {
     use super::*;
 
+    impl From<ReportType> for annotate_snippets::Level<'_> {
+        fn from(r#type: ReportType) -> Self {
+            use ReportType::*;
+            match r#type {
+                None => Self::INFO.no_name(),
+                Error => Self::ERROR,
+                Warning => Self::WARNING,
+            }
+        }
+    }
+
+    /// Converts `yash_syntax::source::pretty::Span` into
+    /// `annotate_snippets::Annotation`.
+    ///
+    /// This conversion is not provided as a public `From<&Span> for Annotation` implementation
+    /// because a future variant of `SpanRole` may map to
+    /// `annotate_snippets::Patch` instead of `annotate_snippets::Annotation`.
+    fn span_to_annotation<'a>(span: &'a Span<'a>) -> annotate_snippets::Annotation<'a> {
+        use annotate_snippets::AnnotationKind as AK;
+        let (kind, label) = match &span.role {
+            SpanRole::Primary { label } => (AK::Primary, label),
+            SpanRole::Supplementary { label } => (AK::Context, label),
+        };
+        kind.span(span.range.clone()).label(label)
+    }
+
+    // `From<&Snippet>` is not implemented for
+    // `annotate_snippets::Snippet<'_, annotate_snippets::Annotation<'_>>`
+    // because a future variant of `SpanRole` may map to
+    // `annotate_snippets::Patch` instead of `annotate_snippets::Annotation`.
+
+    /// Converts `yash_syntax::source::pretty::Snippet` into
+    /// `annotate_snippets::Snippet<'a, annotate_snippets::Annotation<'a>>`.
+    ///
+    /// This conversion is not provided as a public `From<&Snippet> for Snippet` implementation
+    /// because a future variant of `SpanRole` may map to
+    /// `annotate_snippets::Patch` instead of `annotate_snippets::Annotation`, which does not fit
+    /// into a single `annotate_snippets::Snippet<'a, annotate_snippets::Annotation<'a>>`.
+    fn snippet_to_annotation_snippet<'a>(
+        snippet: &'a Snippet<'a>,
+    ) -> annotate_snippets::Snippet<'a, annotate_snippets::Annotation<'a>> {
+        annotate_snippets::Snippet::source(snippet.code_string())
+            .line_start(
+                snippet
+                    .code
+                    .start_line_number
+                    .get()
+                    .try_into()
+                    .unwrap_or(usize::MAX),
+            )
+            .path(snippet.code.source.label())
+            .annotations(snippet.spans.iter().map(span_to_annotation))
+    }
+
+    /// Converts `yash_syntax::source::pretty::FootnoteType` into
+    /// `annotate_snippets::Level`.
+    ///
+    /// This implementation is only available when the `yash_syntax` crate is
+    /// built with the `annotate-snippets` feature enabled.
+    impl From<FootnoteType> for annotate_snippets::Level<'_> {
+        fn from(r#type: FootnoteType) -> Self {
+            use FootnoteType::*;
+            match r#type {
+                None => Self::INFO.no_name(),
+                Note => Self::NOTE,
+                Suggestion => Self::HELP,
+            }
+        }
+    }
+
+    /// Converts `yash_syntax::source::pretty::Footnote` into
+    /// `annotate_snippets::Message`.
+    ///
+    /// This implementation is only available when the `yash_syntax` crate is
+    /// built with the `annotate-snippets` feature enabled.
+    impl<'a> From<Footnote<'a>> for annotate_snippets::Message<'a> {
+        fn from(footer: Footnote<'a>) -> Self {
+            annotate_snippets::Level::from(footer.r#type).message(footer.label)
+        }
+    }
+
+    /// Converts `&yash_syntax::source::pretty::Footnote` into
+    /// `annotate_snippets::Message`.
+    ///
+    /// This implementation is only available when the `yash_syntax` crate is
+    /// built with the `annotate-snippets` feature enabled.
+    impl<'a> From<&'a Footnote<'a>> for annotate_snippets::Message<'a> {
+        fn from(footer: &'a Footnote<'a>) -> Self {
+            annotate_snippets::Level::from(footer.r#type).message(&*footer.label)
+        }
+    }
+
+    /// Converts `yash_syntax::source::pretty::Report` into
+    /// `annotate_snippets::Group`.
+    ///
+    /// This implementation is only available when the `yash_syntax` crate is
+    /// built with the `annotate-snippets` feature enabled.
+    impl<'a> From<&'a Report<'a>> for annotate_snippets::Group<'a> {
+        fn from(report: &'a Report<'a>) -> Self {
+            let title = annotate_snippets::Level::from(report.r#type).primary_title(&*report.title);
+            let title = if let Some(id) = &report.id {
+                title.id(&**id)
+            } else {
+                title
+            };
+
+            title
+                .elements(report.snippets.iter().map(snippet_to_annotation_snippet))
+                .elements(
+                    report
+                        .footnotes
+                        .iter()
+                        .map(annotate_snippets::Message::from),
+                )
+        }
+    }
+
     /// Converts `yash_syntax::source::pretty::AnnotationType` into
     /// `annotate_snippets::Level`.
     ///
     /// This implementation is only available when the `yash_syntax` crate is
     /// built with the `annotate-snippets` feature enabled.
+    #[allow(deprecated)]
     impl<'a> From<AnnotationType> for annotate_snippets::Level<'a> {
         fn from(r#type: AnnotationType) -> Self {
             use AnnotationType::*;
@@ -285,6 +778,12 @@ mod annotate_snippets_support {
         }
     }
 
+    /// Converts `yash_syntax::source::pretty::AnnotationType` into
+    /// `annotate_snippets::AnnotationKind`.
+    ///
+    /// This implementation is only available when the `yash_syntax` crate is
+    /// built with the `annotate-snippets` feature enabled.
+    #[allow(deprecated)]
     impl From<AnnotationType> for annotate_snippets::AnnotationKind {
         fn from(r#type: AnnotationType) -> Self {
             use AnnotationType::*;
@@ -300,6 +799,7 @@ mod annotate_snippets_support {
     ///
     /// This implementation is only available when the `yash_syntax` crate is
     /// built with the `annotate-snippets` feature enabled.
+    #[allow(deprecated)]
     impl<'a> From<&'a Message<'a>> for annotate_snippets::Group<'a> {
         fn from(message: &'a Message<'a>) -> Self {
             let mut snippets: Vec<(

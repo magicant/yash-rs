@@ -37,8 +37,8 @@
 //!   built-in is invoked in a trap executed in the function or script, the
 //!   caller should use the value of `$?` before entering trap.
 
+use crate::common::report::{report_error, syntax_error};
 use crate::common::syntax::{Mode, OptionSpec, parse_arguments};
-use crate::common::{report_error, syntax_error};
 use std::num::ParseIntError;
 use std::ops::ControlFlow::Break;
 use yash_env::Env;

@@ -19,7 +19,8 @@
 use super::Identify;
 use super::search::SearchEnv;
 use crate::command::Category;
-use crate::common::{output, report_failure, to_single_message};
+use crate::common::output;
+use crate::common::report::{merge_reports, report_failure};
 use std::borrow::Cow;
 use std::ffi::CStr;
 use std::ffi::CString;
@@ -36,9 +37,9 @@ use yash_semantics::command_search::Target;
 use yash_semantics::command_search::search;
 use yash_syntax::alias::Alias;
 use yash_syntax::parser::lex::Keyword;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::MessageBase;
+#[allow(deprecated)]
+use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 /// Result of [categorizing](categorize) a command
 ///
@@ -85,6 +86,29 @@ pub struct NotFound<'a> {
     pub name: &'a Field,
 }
 
+impl NotFound<'_> {
+    /// Converts this error to a [`Report`].
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = "command not found".into();
+        report.snippets = Snippet::with_primary_span(
+            &self.name.origin,
+            format!("{}: not found", self.name.value).into(),
+        );
+        report
+    }
+}
+
+impl<'a> From<&'a NotFound<'a>> for Report<'a> {
+    #[inline]
+    fn from(error: &'a NotFound<'a>) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for NotFound<'_> {
     fn message_title(&self) -> Cow<'_, str> {
         "command not found".into()
@@ -310,9 +334,9 @@ impl Identify {
 
         let output_result = output(env, &result).await;
 
-        let error_result = if let Some(message) = to_single_message(&errors) {
+        let error_result = if let Some(report) = merge_reports(&errors) {
             if self.verbose {
-                report_failure(env, message).await
+                report_failure(env, report).await
             } else {
                 crate::Result::from(ExitStatus::FAILURE)
             }

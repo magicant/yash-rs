@@ -11,14 +11,96 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.11.0] - Unreleased
 
+### Added
+
+- The new module `common::report` provides utility functions for creating and
+  printing error and failure messages. These functions replace the deprecated
+  functions in the `common` module. The new functions operate on the
+  `yash_syntax::source::pretty::Report` type instead of the deprecated
+  `yash_syntax::source::pretty::Message` type.
+    - `prepare_report_message_and_divert`
+    - `report`
+    - `report_failure`
+    - `report_error`
+    - `report_simple`
+    - `report_simple_failure`
+    - `report_simple_error`
+    - `syntax_error`
+    - `merge_reports`
+- The following types now implement the `to_report` method that converts an
+  instance to a `yash_syntax::source::pretty::Report`. They also implement the
+  `From<&Self>` trait for `yash_syntax::source::pretty::Report`.
+    - `alias::semantics::Error`
+    - `break::syntax::Error`
+    - `cd::syntax::Error`
+    - `cd::target::TargetError`
+    - `command::identify::NotFound`
+    - `command::syntax::Error`
+    - `common::syntax::ConflictingOptionError`
+    - `common::syntax::ParseError`
+    - `getopts::report::Error`
+    - `kill::print::InvalidSignal`
+    - `kill::syntax::Error`
+    - `pwd::semantics::Error`
+    - `pwd::syntax::Error`
+    - `read::input::Error`
+    - `read::syntax::Error`
+    - `set::syntax::Error`
+    - `source::syntax::Error`
+    - `typeset::AssignReadOnlyError`
+    - `typeset::ExecuteError`
+    - `typeset::syntax::InterpretError`
+    - `typeset::syntax::ParseError`
+    - `trap::Error`
+    - `trap::syntax::Error`
+    - `ulimit::syntax::Error`
+    - `umask::syntax::Error`
+    - `unalias::semantics::Error`
+    - `unalias::syntax::Error`
+    - `unset::semantics::UnsetFunctionsError`
+    - `unset::semantics::UnsetVariablesError`
+    - `unset::syntax::Error`
+    - `wait::search::AmbiguousJobId`
+    - `wait::syntax::Error`
+
 ### Changed
 
+- `unset::semantics::unset_variables` now returns a vector of
+  `UnsetVariablesError` instead of a `Result<(), _>`.
+- `unset::semantics::unset_functions` now returns a vector of
+  `UnsetFunctionsError` instead of a `Result<(), _>`.
 - Public dependency versions:
     - yash-env 0.8.1 → 0.9.0
     - yash-semantics (optional) 0.9.0 → 0.10.0
     - yash-syntax 0.15.2 → 0.16.0
 - Private dependency versions:
     - yash-prompt (optional) 0.6.0 → 0.7.0
+
+### Deprecated
+
+- The following functions in the `common` module are now deprecated. Use the
+  corresponding functions in the new `common::report` module instead.
+    - `arrange_message_and_divert` (use `prepare_report_message_and_divert`)
+    - `report` (use `report`)
+    - `report_failure` (use `report_failure`)
+    - `report_error` (use `report_error`)
+    - `report_simple` (use `report_simple`)
+    - `report_simple_failure` (use `report_simple_failure`)
+    - `report_simple_error` (use `report_simple_error`)
+    - `syntax_error` (use `syntax_error`)
+    - `to_single_message` (use `merge_reports`)
+- The following methods are now deprecated. Use the `to_report` method
+  instead.
+    - `getopts::report::Error::to_message`
+    - `kill::syntax::Error::to_message`
+    - `read::input::Error::to_message`
+    - `read::syntax::Error::to_message`
+- The following functions are now deprecated. Use the `merge_reports` function
+  and the functions in the `common::report` module instead.
+    - `unset::semantics::report_functions_error`
+    - `unset::semantics::report_variables_error`
+    - `unset::semantics::unset_functions_error_message`
+    - `unset::semantics::unset_variables_error_message`
 
 ## [0.10.0] - 2025-09-23
 

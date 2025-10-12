@@ -24,7 +24,9 @@ use std::num::ParseIntError;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
+#[allow(deprecated)]
 use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[non_exhaustive]
@@ -48,6 +50,41 @@ pub enum Error {
     InvalidSymbolicMode(Field, ParseClausesError),
 }
 
+impl Error {
+    /// Converts the error to a report.
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let snippets = match self {
+            Self::CommonError(e) => return e.to_report(),
+            Self::TooManyOperands(operands) => Snippet::with_primary_span(
+                &operands[1].origin,
+                format!("{}: unexpected operand", operands[1].value).into(),
+            ),
+            Self::InvalidNumericMode(operand, parse_int_error) => Snippet::with_primary_span(
+                &operand.origin,
+                format!("{operand}: {parse_int_error}").into(),
+            ),
+            Self::InvalidSymbolicMode(operand, parse_clauses_error) => Snippet::with_primary_span(
+                &operand.origin,
+                format!("{operand}: {parse_clauses_error}").into(),
+            ),
+        };
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = self.to_string().into();
+        report.snippets = snippets;
+        report
+    }
+}
+
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline]
+    fn from(error: &'a Error) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for Error {
     fn message_title(&self) -> Cow<'_, str> {
         self.to_string().into()
@@ -58,7 +95,7 @@ impl MessageBase for Error {
             Self::CommonError(e) => e.main_annotation(),
             Self::TooManyOperands(operands) => Annotation::new(
                 AnnotationType::Error,
-                format!("{}: redundant operand", operands[1].value).into(),
+                format!("{}: unexpected operand", operands[1].value).into(),
                 &operands[1].origin,
             ),
             Self::InvalidNumericMode(operand, e) => Annotation::new(

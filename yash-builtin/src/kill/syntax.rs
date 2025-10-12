@@ -28,7 +28,9 @@ use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::signal;
 use yash_syntax::source::Location;
+#[allow(deprecated)]
 use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
+use yash_syntax::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
 
 /// Error that may occur during parsing
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -78,7 +80,79 @@ pub enum Error {
 }
 
 impl Error {
+    /// Converts this error to a report
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = self.to_string().into();
+        report.snippets = match self {
+            Self::UnknownOption(field) => Snippet::with_primary_span(
+                &field.origin,
+                format!("{field:?} is not a valid option").into(),
+            ),
+
+            Self::ConflictingOptions {
+                signal_arg,
+                list_option_name,
+                list_option_location,
+            } => {
+                let mut snippets = Snippet::with_primary_span(
+                    &signal_arg.origin,
+                    "signal to send is specified here".into(),
+                );
+                add_span(
+                    &list_option_location.code,
+                    Span {
+                        range: list_option_location.byte_range(),
+                        role: SpanRole::Primary {
+                            label: format!("option `{list_option_name}` is incompatible").into(),
+                        },
+                    },
+                    &mut snippets,
+                );
+                snippets
+            }
+
+            Self::MissingSignal {
+                signal_option_name,
+                signal_option_location,
+            } => Snippet::with_primary_span(
+                signal_option_location,
+                format!("option `{signal_option_name}` requires a signal name or number").into(),
+            ),
+
+            Self::MultipleSignals(field1, field2) => {
+                let mut snippets = Snippet::with_primary_span(
+                    &field1.origin,
+                    format!("first signal {field1:?}").into(),
+                );
+                add_span(
+                    &field2.origin.code,
+                    Span {
+                        range: field2.origin.byte_range(),
+                        role: SpanRole::Primary {
+                            label: format!("second signal {field2:?}").into(),
+                        },
+                    },
+                    &mut snippets,
+                );
+                snippets
+            }
+
+            Self::InvalidSignal(field) => Snippet::with_primary_span(
+                &field.origin,
+                format!("{field:?} is not a valid signal name or number").into(),
+            ),
+
+            Self::MissingTarget => vec![],
+        };
+        report
+    }
+
     /// Converts this error to a printable message
+    #[allow(deprecated)]
+    #[deprecated(note = "Use `report::to_message` instead", since = "0.11.0")]
     pub fn to_message(&self) -> Message<'_> {
         let title = self.to_string().into();
         let annotations = match self {
@@ -145,6 +219,13 @@ impl Error {
             annotations,
             footers: vec![],
         }
+    }
+}
+
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline]
+    fn from(error: &'a Error) -> Self {
+        error.to_report()
     }
 }
 

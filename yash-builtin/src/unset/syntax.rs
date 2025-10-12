@@ -23,8 +23,9 @@ use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::MessageBase;
+use yash_syntax::source::pretty::Report;
+#[allow(deprecated)]
+use yash_syntax::source::pretty::{Annotation, MessageBase};
 
 use super::Command;
 use super::Mode;
@@ -43,6 +44,24 @@ pub enum Error {
     // TODO MissingOperand
 }
 
+impl Error {
+    /// Converts the error to a report.
+    pub fn to_report(&self) -> Report<'_> {
+        match self {
+            Error::CommonError(inner) => inner.to_report(),
+            Error::ConflictingOption(inner) => inner.to_report(),
+        }
+    }
+}
+
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline]
+    fn from(error: &'a Error) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for Error {
     fn message_title(&self) -> Cow<'_, str> {
         self.to_string().into()

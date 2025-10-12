@@ -24,9 +24,11 @@ use std::num::ParseIntError;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::MessageBase;
+use yash_syntax::source::pretty::Report;
+use yash_syntax::source::pretty::ReportType;
+use yash_syntax::source::pretty::Snippet;
+#[allow(deprecated)]
+use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 
 /// Error in parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -45,6 +47,37 @@ pub enum Error {
     InvalidNumber(Field, ParseIntError),
 }
 
+impl Error {
+    /// Converts this error to a [`Report`].
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let (location, label) = match self {
+            Self::CommonError(e) => return e.to_report(),
+            Self::TooManyOperands(operands) => (
+                &operands[1].origin,
+                format!("{}: redundant operand", operands[1].value),
+            ),
+            Self::InvalidNumber(operand, e) => {
+                (&operand.origin, format!("{}: {}", operand.value, e))
+            }
+        };
+
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = self.to_string().into();
+        report.snippets = Snippet::with_primary_span(location, label.into());
+        report
+    }
+}
+
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline]
+    fn from(error: &'a Error) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for Error {
     fn message_title(&self) -> Cow<'_, str> {
         self.to_string().into()

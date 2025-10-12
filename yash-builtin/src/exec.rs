@@ -31,7 +31,7 @@
 //! This implementation uses [`Result::retain_redirs`] to flag redirections to
 //! be made permanent.
 
-use crate::common::report_error;
+use crate::common::report::report_error;
 use crate::common::syntax::Mode;
 use crate::common::syntax::parse_arguments;
 use std::ffi::CString;

@@ -17,14 +17,14 @@
 //! Parsing command line arguments to the source built-in
 
 use super::Command;
-use crate::common::report_error;
-use crate::common::report_simple_error;
+use crate::common::report::report_error;
 use crate::common::syntax::Mode;
 use crate::common::syntax::ParseError;
 use crate::common::syntax::parse_arguments;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
+use yash_syntax::source::pretty::{Report, ReportType};
 
 /// Error in parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -40,12 +40,31 @@ pub enum Error {
 }
 
 impl Error {
-    /// Reports the error to the standard error.
-    pub async fn report(&self, env: &mut Env) -> crate::Result {
+    /// Converts this error to a report.
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
         match self {
-            Error::CommonError(e) => report_error(env, e).await,
-            Error::MissingFile => report_simple_error(env, "missing file operand").await,
+            Self::CommonError(e) => e.to_report(),
+            Self::MissingFile => {
+                let mut report = Report::new();
+                report.r#type = ReportType::Error;
+                report.title = "missing file operand".into();
+                report
+            }
         }
+    }
+
+    /// Reports the error to the standard error.
+    #[inline(always)]
+    pub async fn report(&self, env: &mut Env) -> crate::Result {
+        report_error(env, self).await
+    }
+}
+
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline]
+    fn from(error: &'a Error) -> Self {
+        error.to_report()
     }
 }
 

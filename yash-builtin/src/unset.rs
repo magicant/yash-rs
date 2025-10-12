@@ -22,7 +22,7 @@
 //! [`unset` built-in]: https://magicant.github.io/yash-rs/builtins/unset.html
 
 use crate::Result;
-use crate::common::report_error;
+use crate::common::report::{merge_reports, report_error, report_failure};
 use yash_env::Env;
 use yash_env::semantics::Field;
 
@@ -60,14 +60,20 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     };
 
     match command.mode {
-        Mode::Variables => match semantics::unset_variables(env, &command.names) {
-            Ok(()) => Result::default(),
-            Err(errors) => semantics::report_variables_error(env, &errors).await,
-        },
+        Mode::Variables => {
+            let errors = semantics::unset_variables(env, &command.names);
+            match merge_reports(&errors) {
+                None => Result::default(),
+                Some(report) => report_failure(env, report).await,
+            }
+        }
 
-        Mode::Functions => match semantics::unset_functions(env, &command.names) {
-            Ok(()) => Result::default(),
-            Err(errors) => semantics::report_functions_error(env, &errors).await,
-        },
+        Mode::Functions => {
+            let errors = semantics::unset_functions(env, &command.names);
+            match merge_reports(&errors) {
+                None => Result::default(),
+                Some(report) => report_failure(env, report).await,
+            }
+        }
     }
 }

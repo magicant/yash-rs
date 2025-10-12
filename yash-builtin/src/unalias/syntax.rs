@@ -24,9 +24,11 @@ use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_syntax::source::Location;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::Report;
+use yash_syntax::source::pretty::ReportType;
+use yash_syntax::source::pretty::Snippet;
+#[allow(deprecated)]
+use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
 
 /// List of all options supported by the `unalias` built-in
 pub const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('a')];
@@ -48,7 +50,28 @@ pub enum Error {
 }
 
 impl Error {
+    /// Converts the error into a [`Report`].
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let (title, snippets) = match self {
+            Self::CommonError(e) => return e.to_report(),
+            Self::ConflictingOptionAndOperand(location) => (
+                "`-a` cannot be used with operands",
+                Snippet::with_primary_span(location, "`-a` specified here".into()),
+            ),
+            Self::MissingArgument => ("no option or operand specified", vec![]),
+        };
+
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = title.into();
+        report.snippets = snippets;
+        report
+    }
+
     /// Converts the error into a [`Message`].
+    #[allow(deprecated)]
+    #[deprecated(note = "use `to_report` instead", since = "0.11.0")]
     pub fn to_message(&self) -> Message<'_> {
         let (title, annotations) = match self {
             Error::CommonError(e) => return e.into(),
@@ -74,6 +97,14 @@ impl Error {
     }
 }
 
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline]
+    fn from(error: &'a Error) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl<'a> From<&'a Error> for Message<'a> {
     #[inline]
     fn from(e: &'a Error) -> Self {

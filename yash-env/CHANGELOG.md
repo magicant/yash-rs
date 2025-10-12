@@ -11,10 +11,27 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.9.0] - Unreleased
 
+### Added
+
+- `io::report_to_string`
+    - This function converts a `yash_syntax::source::pretty::Report` to a string.
+- `io::print_report`
+    - This function prints a `yash_syntax::source::pretty::Report` to the standard
+      error output of the given environment.
+- `expansion::Error::to_report`
+    - This method converts an expansion error to a `yash_syntax::source::pretty::Report`.
+
+### Changed
+
 - Public dependency versions:
     - yash-syntax 0.15.0 → 0.16.0
 - Private dependency versions:
     - annotate-snippets 0.11.4 → 0.12.4
+
+### Deprecated
+
+- `io::message_to_string` in favor of `io::report_to_string`
+- `io::print_message` in favor of `io::print_report`
 
 ## [0.8.1] - 2025-09-23
 
@@ -98,7 +115,7 @@ A _private dependency_ is used internally and not visible to downstream users.
   incorrectly assumed that the shell was in the session leader's process
   group if the shell was in the foreground.
 
-## Removed
+### Removed
 
 - The `SystemEx` trait no longer has the `signal_number_from_exit_status` method.
     - This method has been moved in favor of `semantics::ExitStatus::to_signal`.

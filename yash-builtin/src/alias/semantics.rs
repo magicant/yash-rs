@@ -24,9 +24,9 @@ use yash_env::semantics::Field;
 use yash_quote::quoted;
 use yash_syntax::alias::Alias;
 use yash_syntax::alias::HashEntry;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::MessageBase;
+#[allow(deprecated)]
+use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 /// Error in executing the alias built-in
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -36,6 +36,30 @@ pub enum Error {
     NonExistentAlias { name: Field },
 }
 
+impl Error {
+    /// Converts this error to a [`Report`].
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = "cannot print alias definition".into();
+        report.snippets = match self {
+            Self::NonExistentAlias { name } => {
+                Snippet::with_primary_span(&name.origin, self.to_string().into())
+            }
+        };
+        report
+    }
+}
+
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline]
+    fn from(error: &'a Error) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for Error {
     fn message_title(&self) -> Cow<'_, str> {
         "cannot print alias definition".into()

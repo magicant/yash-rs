@@ -26,9 +26,7 @@
 //! The built-in treats disowned jobs as if they were finished with an exit
 //! status of 127.
 
-use crate::common::report_error;
-use crate::common::report_simple_failure;
-use crate::common::to_single_message;
+use crate::common::report::{merge_reports, report_error, report_simple_failure};
 use itertools::Itertools as _;
 use yash_env::Env;
 use yash_env::job::Pid;
@@ -100,8 +98,8 @@ impl Command {
         let (indexes, errors): (Vec<_>, Vec<_>) = jobs
             .map(|spec| search::resolve(&env.jobs, spec))
             .partition_result();
-        if let Some(message) = to_single_message(&errors) {
-            return report_error(env, message).await;
+        if let Some(report) = merge_reports(&errors) {
+            return report_error(env, report).await;
         }
 
         // Await jobs specified by the indexes

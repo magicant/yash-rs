@@ -268,7 +268,7 @@ error: unexpected operand
 1 | cd /dev -P
   | --      ^^ -P: unexpected operand
   | |
-  | executing the cd built-in
+  | while executing the cd built-in
 ```
 
 Specifying options after operands may be supported in the future.

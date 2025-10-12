@@ -24,9 +24,14 @@ use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::MessageBase;
+use yash_syntax::source::pretty::Report;
+use yash_syntax::source::pretty::ReportType;
+use yash_syntax::source::pretty::Snippet;
+use yash_syntax::source::pretty::Span;
+use yash_syntax::source::pretty::SpanRole;
+use yash_syntax::source::pretty::add_span;
+#[allow(deprecated)]
+use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 
 /// Error in parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -41,6 +46,47 @@ pub enum Error {
     UnexpectedOperands(Vec<Field>),
 }
 
+impl Error {
+    /// Converts this error to a [`Report`].
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        match self {
+            Self::CommonError(e) => e.to_report(),
+
+            Self::UnexpectedOperands(operands) => {
+                let mut report = Report::new();
+                report.r#type = ReportType::Error;
+                report.title = "unexpected operand".into();
+                report.snippets = Snippet::with_primary_span(
+                    &operands[0].origin,
+                    format!("{}: unexpected", operands[0]).into(),
+                );
+                for operand in &operands[1..] {
+                    add_span(
+                        &operand.origin.code,
+                        Span {
+                            range: operand.origin.byte_range(),
+                            role: SpanRole::Primary {
+                                label: format!("{}: unexpected", operand).into(),
+                            },
+                        },
+                        &mut report.snippets,
+                    );
+                }
+                report
+            }
+        }
+    }
+}
+
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline]
+    fn from(error: &'a Error) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for Error {
     fn message_title(&self) -> Cow<'_, str> {
         self.to_string().into()

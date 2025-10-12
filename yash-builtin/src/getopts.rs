@@ -27,8 +27,7 @@
 //! built-in is invoked with the same arguments and `$OPTIND` as the previous
 //! invocation.
 
-use crate::common::report_error;
-use crate::common::report_simple_error;
+use crate::common::report::{report_error, report_simple_error};
 use crate::common::syntax::Mode;
 use crate::common::syntax::parse_arguments;
 use either::Either::{Left, Right};
@@ -124,7 +123,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
             ExitStatus::SUCCESS.into()
         }
         Ok(None) => ExitStatus::FAILURE.into(),
-        Err(error) => report_error(env, error.to_message()).await,
+        Err(error) => report_error(env, &error).await,
     }
 }
 

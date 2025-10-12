@@ -27,6 +27,7 @@ use thiserror::Error;
 use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_syntax::source::Location;
+#[allow(deprecated)]
 use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 
 /// Attribute that can be set on a variable or function
@@ -179,8 +180,27 @@ impl ParseError {
             | ParseError::UncancelableLongOption(field) => field,
         }
     }
+
+    /// Converts this error to a [`Report`].
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = self.to_string().into();
+        report.snippets =
+            Snippet::with_primary_span(&self.field().origin, self.field().value.as_str().into());
+        report
+    }
 }
 
+impl<'a> From<&'a ParseError> for Report<'a> {
+    #[inline]
+    fn from(error: &'a ParseError) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for ParseError {
     fn message_title(&self) -> Cow<'_, str> {
         self.to_string().into()
@@ -324,6 +344,40 @@ pub enum InterpretError<'a> {
     },
 }
 
+impl InterpretError<'_> {
+    /// Converts the error to a report.
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let Self::OptionInapplicableForFunction { clashing, function } = self;
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = self.to_string().into();
+        report.snippets = Snippet::with_primary_span(
+            &clashing.location,
+            format!("the {} option ...", clashing.spec).into(),
+        );
+        add_span(
+            &function.location.code,
+            Span {
+                range: function.location.byte_range(),
+                role: SpanRole::Primary {
+                    label: "... cannot be used for -f/--functions".into(),
+                },
+            },
+            &mut report.snippets,
+        );
+        report
+    }
+}
+
+impl<'a> From<&'a InterpretError<'a>> for Report<'a> {
+    #[inline]
+    fn from(error: &'a InterpretError) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for InterpretError<'_> {
     fn message_title(&self) -> Cow<'_, str> {
         self.to_string().into()

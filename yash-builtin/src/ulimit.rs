@@ -26,7 +26,8 @@
 //! See the source code for [`Resource::as_raw_type`] to see which resources are
 //! supported on which platforms.
 
-use crate::common::{output, report_error, report_simple_failure};
+use crate::common::output;
+use crate::common::report::{report_error, report_simple_failure};
 use yash_env::Env;
 use yash_env::System as _;
 use yash_env::semantics::Field;

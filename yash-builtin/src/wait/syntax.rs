@@ -23,7 +23,9 @@ use thiserror::Error;
 use yash_env::Env;
 use yash_env::job::Pid;
 use yash_env::semantics::Field;
+#[allow(deprecated)]
 use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 use crate::common::syntax::{Mode, ParseError, parse_arguments};
 
@@ -43,6 +45,33 @@ pub enum Error {
     NonPositive(Field),
 }
 
+impl Error {
+    /// Converts the error to a report.
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let (title, snippets) = match self {
+            Self::CommonError(e) => return e.to_report(),
+            Self::ParseInt(field, _) | Self::NonPositive(field) => (
+                "invalid job specification".into(),
+                Snippet::with_primary_span(&field.origin, self.to_string().into()),
+            ),
+        };
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = title;
+        report.snippets = snippets;
+        report
+    }
+}
+
+impl<'a> From<&'a Error> for Report<'a> {
+    #[inline]
+    fn from(error: &'a Error) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for Error {
     fn message_title(&self) -> Cow<'_, str> {
         "invalid job specification".into()
