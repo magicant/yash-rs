@@ -16,7 +16,7 @@
 
 //! Defines the behavior of the unset built-in.
 
-use crate::common::arrange_message_and_divert;
+use crate::common::report::prepare_report_message_and_divert;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
@@ -25,9 +25,7 @@ use yash_env::semantics::Field;
 use yash_env::system::SharedSystem;
 use yash_env::variable::Scope::Global;
 use yash_syntax::source::Location;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::{Report, ReportType, Span, SpanRole, add_span};
 
 /// Error returned by [`unset_variables`].
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -78,36 +76,38 @@ pub fn unset_variables<'a>(
 
 /// Creates a message that describes the errors.
 ///
-/// See [`arrange_message_and_divert`] for the second return value.
+/// See [`prepare_report_message_and_divert`] for the second return value.
 #[must_use = "returned message should be printed"]
 pub fn unset_variables_error_message(
     env: &Env,
     errors: &[UnsetVariablesError],
 ) -> (String, yash_env::semantics::Result) {
-    let annotations = errors
-        .iter()
-        .flat_map(|error| {
-            [
-                Annotation::new(
-                    AnnotationType::Error,
-                    error.to_string().into(),
-                    &error.name.origin,
-                ),
-                Annotation::new(
-                    AnnotationType::Info,
-                    format!("variable `{}` was made read-only here", error.name).into(),
-                    &error.read_only_location,
-                ),
-            ]
-        })
-        .collect();
-    let message = Message {
-        r#type: AnnotationType::Error,
-        title: "cannot unset variable".into(),
-        annotations,
-        footers: vec![],
-    };
-    arrange_message_and_divert(env, message)
+    let mut report = Report::new();
+    report.r#type = ReportType::Error;
+    report.title = "cannot unset variable".into();
+    for error in errors {
+        add_span(
+            &error.name.origin.code,
+            Span {
+                range: error.name.origin.byte_range(),
+                role: SpanRole::Primary {
+                    label: error.to_string().into(),
+                },
+            },
+            &mut report.snippets,
+        );
+        add_span(
+            &error.read_only_location.code,
+            Span {
+                range: error.read_only_location.byte_range(),
+                role: SpanRole::Supplementary {
+                    label: format!("variable `{}` was made read-only here", error.name).into(),
+                },
+            },
+            &mut report.snippets,
+        );
+    }
+    prepare_report_message_and_divert(env, report)
 }
 
 /// Prints an error message to the standard error.
@@ -161,36 +161,38 @@ pub fn unset_functions<'a>(
 
 /// Creates a message that describes the errors.
 ///
-/// See [`arrange_message_and_divert`] for the second return value.
+/// See [`prepare_report_message_and_divert`] for the second return value.
 #[must_use = "returned message should be printed"]
 pub fn unset_functions_error_message(
     env: &mut Env,
     errors: &[UnsetFunctionsError<'_>],
 ) -> (String, yash_env::semantics::Result) {
-    let annotations = errors
-        .iter()
-        .flat_map(|error| {
-            [
-                Annotation::new(
-                    AnnotationType::Error,
-                    error.to_string().into(),
-                    &error.name.origin,
-                ),
-                Annotation::new(
-                    AnnotationType::Info,
-                    format!("function `{}` was made read-only here", error.name).into(),
-                    &error.read_only_location,
-                ),
-            ]
-        })
-        .collect();
-    let message = Message {
-        r#type: AnnotationType::Error,
-        title: "cannot unset function".into(),
-        annotations,
-        footers: vec![],
-    };
-    arrange_message_and_divert(env, message)
+    let mut report = Report::new();
+    report.r#type = ReportType::Error;
+    report.title = "cannot unset function".into();
+    for error in errors {
+        add_span(
+            &error.name.origin.code,
+            Span {
+                range: error.name.origin.byte_range(),
+                role: SpanRole::Primary {
+                    label: error.to_string().into(),
+                },
+            },
+            &mut report.snippets,
+        );
+        add_span(
+            &error.read_only_location.code,
+            Span {
+                range: error.read_only_location.byte_range(),
+                role: SpanRole::Supplementary {
+                    label: format!("function `{}` was made read-only here", error.name).into(),
+                },
+            },
+            &mut report.snippets,
+        );
+    }
+    prepare_report_message_and_divert(env, report)
 }
 
 /// Prints an error message to the standard error.

@@ -22,7 +22,7 @@
 //! [`unset` built-in]: https://magicant.github.io/yash-rs/builtins/unset.html
 
 use crate::Result;
-use crate::common::report_error;
+use crate::common::report::report_error;
 use yash_env::Env;
 use yash_env::semantics::Field;
 

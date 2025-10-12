@@ -57,6 +57,7 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `umask::syntax::Error`
     - `unalias::semantics::Error`
     - `unalias::syntax::Error`
+    - `unset::syntax::Error`
 
 ### Changed
 
