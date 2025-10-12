@@ -23,14 +23,39 @@ use yash_env::job::id::FindError;
 use yash_env::job::id::JobId;
 use yash_env::job::id::ParseError;
 use yash_env::semantics::Field;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::MessageBase;
+use yash_syntax::source::pretty::Report;
+use yash_syntax::source::pretty::ReportType;
+use yash_syntax::source::pretty::Snippet;
+#[allow(deprecated)]
+use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 
 /// Error returned when a job ID is ambiguous.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AmbiguousJobId(Field);
 
+impl AmbiguousJobId {
+    /// Converts the error to a report.
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = "ambiguous job ID".into();
+        report.snippets = Snippet::with_primary_span(
+            &self.0.origin,
+            format!("job ID `{}` matches more than one job", self.0).into(),
+        );
+        report
+    }
+}
+
+impl<'a> From<&'a AmbiguousJobId> for Report<'a> {
+    #[inline]
+    fn from(error: &'a AmbiguousJobId) -> Self {
+        error.to_report()
+    }
+}
+
+#[allow(deprecated)]
 impl MessageBase for AmbiguousJobId {
     fn message_title(&self) -> Cow<'_, str> {
         "ambiguous job ID".into()

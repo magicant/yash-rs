@@ -60,6 +60,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `unset::semantics::UnsetFunctionsError`
     - `unset::semantics::UnsetVariablesError`
     - `unset::syntax::Error`
+    - `wait::search::AmbiguousJobId`
+    - `wait::syntax::Error`
 
 ### Changed
 
