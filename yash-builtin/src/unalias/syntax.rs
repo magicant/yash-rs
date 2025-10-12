@@ -24,11 +24,9 @@ use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_syntax::source::Location;
-use yash_syntax::source::pretty::Report;
-use yash_syntax::source::pretty::ReportType;
-use yash_syntax::source::pretty::Snippet;
 #[allow(deprecated)]
 use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
+use yash_syntax::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
 
 /// List of all options supported by the `unalias` built-in
 pub const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('a')];
@@ -41,8 +39,11 @@ pub enum Error {
     CommonError(#[from] crate::common::syntax::ParseError<'static>),
 
     /// The `-a` option was specified with other operands.
-    #[error("cannot specify `-a` with other operands")]
-    ConflictingOptionAndOperand(Location),
+    #[error("`-a` cannot be used with operands")]
+    ConflictingOptionAndOperand {
+        option_location: Location,
+        operand_location: Location,
+    },
 
     /// No option or operand was specified.
     #[error("no option or operand specified")]
@@ -55,10 +56,26 @@ impl Error {
     pub fn to_report(&self) -> Report<'_> {
         let (title, snippets) = match self {
             Self::CommonError(e) => return e.to_report(),
-            Self::ConflictingOptionAndOperand(location) => (
-                "`-a` cannot be used with operands",
-                Snippet::with_primary_span(location, "`-a` specified here".into()),
-            ),
+
+            Self::ConflictingOptionAndOperand {
+                option_location,
+                operand_location,
+            } => ("`-a` cannot be used with operands", {
+                let mut snippets =
+                    Snippet::with_primary_span(option_location, "`-a` specified here".into());
+                add_span(
+                    &operand_location.code,
+                    Span {
+                        range: operand_location.byte_range(),
+                        role: SpanRole::Primary {
+                            label: "operand specified here".into(),
+                        },
+                    },
+                    &mut snippets,
+                );
+                snippets
+            }),
+
             Self::MissingArgument => ("no option or operand specified", vec![]),
         };
 
@@ -76,13 +93,23 @@ impl Error {
         let (title, annotations) = match self {
             Error::CommonError(e) => return e.into(),
 
-            Error::ConflictingOptionAndOperand(location) => (
+            Error::ConflictingOptionAndOperand {
+                option_location,
+                operand_location,
+            } => (
                 "cannot specify `-a` with other operands".into(),
-                vec![Annotation::new(
-                    AnnotationType::Error,
-                    "cannot specify `-a` with other operands".into(),
-                    location,
-                )],
+                vec![
+                    Annotation::new(
+                        AnnotationType::Error,
+                        "cannot specify `-a` with other operands".into(),
+                        option_location,
+                    ),
+                    Annotation::new(
+                        AnnotationType::Error,
+                        "operand specified here".into(),
+                        operand_location,
+                    ),
+                ],
             ),
 
             Error::MissingArgument => ("no option or operand specified".into(), vec![]),
@@ -125,7 +152,10 @@ pub fn parse(env: &Env, args: Vec<Field>) -> Result<Command, Error> {
         (None, true) => Err(Error::MissingArgument),
         (None, false) => Ok(Command::Remove(operands)),
         (Some(_), true) => Ok(Command::RemoveAll),
-        (Some(option), false) => Err(Error::ConflictingOptionAndOperand(option.location)),
+        (Some(option), false) => Err(Error::ConflictingOptionAndOperand {
+            option_location: option.location,
+            operand_location: { operands }.swap_remove(0).origin,
+        }),
     }
 }
 
@@ -162,7 +192,10 @@ mod tests {
         let result = parse(&env, args);
         assert_eq!(
             result,
-            Err(Error::ConflictingOptionAndOperand(Location::dummy("-a"))),
+            Err(Error::ConflictingOptionAndOperand {
+                option_location: Location::dummy("-a"),
+                operand_location: Location::dummy("foo"),
+            }),
         );
     }
 }
