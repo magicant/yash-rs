@@ -46,17 +46,52 @@ impl std::fmt::Display for UnsetVariablesError<'_> {
     }
 }
 
+impl UnsetVariablesError<'_> {
+    /// Converts the error to a report.
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = "cannot unset variable".into();
+        add_span(
+            &self.name.origin.code,
+            Span {
+                range: self.name.origin.byte_range(),
+                role: SpanRole::Primary {
+                    label: format!("read-only variable `{}`", self.name).into(),
+                },
+            },
+            &mut report.snippets,
+        );
+        add_span(
+            &self.read_only_location.code,
+            Span {
+                range: self.read_only_location.byte_range(),
+                role: SpanRole::Supplementary {
+                    label: format!("variable `{}` was made read-only here", self.name).into(),
+                },
+            },
+            &mut report.snippets,
+        );
+        report
+    }
+}
+
+impl<'a> From<&'a UnsetVariablesError<'_>> for Report<'a> {
+    #[inline]
+    fn from(error: &'a UnsetVariablesError<'_>) -> Self {
+        error.to_report()
+    }
+}
+
 /// Unsets shell variables.
 ///
 /// This function tries to unset all the variables named by `names`. Any error
-/// for a variable is reported in the returned vector and the function continues
-/// to unset the remaining variables.
+/// unsetting a variable is reported in the returned vector and the function
+/// continues to unset the remaining variables. The returned vector is empty if
+/// all the variables are unset successfully.
 ///
 /// TODO Allow unsetting local variables only.
-pub fn unset_variables<'a>(
-    env: &mut Env,
-    names: &'a [Field],
-) -> Result<(), Vec<UnsetVariablesError<'a>>> {
+pub fn unset_variables<'a>(env: &mut Env, names: &'a [Field]) -> Vec<UnsetVariablesError<'a>> {
     let mut errors = Vec::new();
     for name in names {
         match env.variables.unset(&name.value, Global) {
@@ -67,16 +102,16 @@ pub fn unset_variables<'a>(
             }),
         }
     }
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors)
-    }
+    errors
 }
 
 /// Creates a message that describes the errors.
 ///
 /// See [`prepare_report_message_and_divert`] for the second return value.
+#[deprecated(
+    note = "use `merge_reports` and `prepare_report_message_and_divert` directly",
+    since = "0.11.0"
+)]
 #[must_use = "returned message should be printed"]
 pub fn unset_variables_error_message(
     env: &Env,
@@ -114,10 +149,15 @@ pub fn unset_variables_error_message(
 ///
 /// This function constructs a message with [`unset_variables_error_message`]
 /// and prints it with [`SharedSystem::print_error`].
+#[deprecated(
+    note = "use `merge_reports` and `report_failure` directly",
+    since = "0.11.0"
+)]
 pub async fn report_variables_error(
     env: &mut Env,
     errors: &[UnsetVariablesError<'_>],
 ) -> crate::Result {
+    #[allow(deprecated)]
     let (message, divert) = unset_variables_error_message(env, errors);
     env.system.print_error(&message).await;
     crate::Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
@@ -133,15 +173,51 @@ pub struct UnsetFunctionsError<'a> {
     pub read_only_location: Location,
 }
 
+impl UnsetFunctionsError<'_> {
+    /// Converts the error to a report.
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = "cannot unset function".into();
+        add_span(
+            &self.name.origin.code,
+            Span {
+                range: self.name.origin.byte_range(),
+                role: SpanRole::Primary {
+                    label: format!("read-only function `{}`", self.name).into(),
+                },
+            },
+            &mut report.snippets,
+        );
+        add_span(
+            &self.read_only_location.code,
+            Span {
+                range: self.read_only_location.byte_range(),
+                role: SpanRole::Supplementary {
+                    label: format!("function `{}` was made read-only here", self.name).into(),
+                },
+            },
+            &mut report.snippets,
+        );
+        report
+    }
+}
+
+impl<'a> From<&'a UnsetFunctionsError<'_>> for Report<'a> {
+    #[inline]
+    fn from(error: &'a UnsetFunctionsError<'_>) -> Self {
+        error.to_report()
+    }
+}
+
 /// Unsets shell functions.
 ///
 /// This function tries to unset all the functions named by `names`. Any error
-/// for a function is reported in the returned vector and the function continues
-/// to unset the remaining functions.
-pub fn unset_functions<'a>(
-    env: &mut Env,
-    names: &'a [Field],
-) -> Result<(), Vec<UnsetFunctionsError<'a>>> {
+/// unsetting a function is reported in the returned vector and the function
+/// continues to unset the remaining functions. The returned vector is empty if
+/// all the functions are unset successfully.
+pub fn unset_functions<'a>(env: &mut Env, names: &'a [Field]) -> Vec<UnsetFunctionsError<'a>> {
     let mut errors = Vec::new();
     for name in names {
         match env.functions.unset(&name.value) {
@@ -152,16 +228,16 @@ pub fn unset_functions<'a>(
             }),
         }
     }
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors)
-    }
+    errors
 }
 
 /// Creates a message that describes the errors.
 ///
 /// See [`prepare_report_message_and_divert`] for the second return value.
+#[deprecated(
+    note = "use `merge_reports` and `prepare_report_message_and_divert` directly",
+    since = "0.11.0"
+)]
 #[must_use = "returned message should be printed"]
 pub fn unset_functions_error_message(
     env: &mut Env,
@@ -199,10 +275,15 @@ pub fn unset_functions_error_message(
 ///
 /// This function constructs a message with [`unset_functions_error_message`]
 /// and prints it with [`SharedSystem::print_error`].
+#[deprecated(
+    note = "use `merge_reports` and `report_failure` directly",
+    since = "0.11.0"
+)]
 pub async fn report_functions_error(
     env: &mut Env,
     errors: &[UnsetFunctionsError<'_>],
 ) -> crate::Result {
+    #[allow(deprecated)]
     let (message, divert) = unset_functions_error_message(env, errors);
     env.system.print_error(&message).await;
     crate::Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
@@ -229,8 +310,10 @@ mod tests {
         env.get_or_create_variable("baz", Global)
             .assign("BAZ", None)
             .unwrap();
+        let names = Field::dummies(["bar"]);
 
-        unset_variables(&mut env, &Field::dummies(["bar"])).unwrap();
+        let errors = unset_variables(&mut env, &names);
+        assert_eq!(errors, []);
         assert_eq!(
             env.variables.get("foo").unwrap().value,
             Some(Value::scalar("FOO")),
@@ -254,8 +337,10 @@ mod tests {
         env.get_or_create_variable("baz", Global)
             .assign("BAZ", None)
             .unwrap();
+        let names = Field::dummies(["bar", "foo", "baz"]);
 
-        unset_variables(&mut env, &Field::dummies(["bar", "foo", "baz"])).unwrap();
+        let errors = unset_variables(&mut env, &names);
+        assert_eq!(errors, []);
         assert_eq!(env.variables.get("foo"), None);
         assert_eq!(env.variables.get("bar"), None);
         assert_eq!(env.variables.get("baz"), None);
@@ -278,7 +363,7 @@ mod tests {
         d.assign("D", None).unwrap();
         let names = Field::dummies(["a", "b", "c", "d"]);
 
-        let errors = unset_variables(&mut env, &names).unwrap_err();
+        let errors = unset_variables(&mut env, &names);
         assert_matches!(&errors[..], [e1, e2] => {
             assert_eq!(e1.name, &Field::dummy("b"));
             assert_eq!(e1.read_only_location, location_b);
@@ -311,8 +396,10 @@ mod tests {
         env.functions.define(dummy_function("foo")).unwrap();
         env.functions.define(dummy_function("bar")).unwrap();
         env.functions.define(dummy_function("baz")).unwrap();
+        let names = Field::dummies(["foo"]);
 
-        unset_functions(&mut env, &Field::dummies(["foo"])).unwrap();
+        let errors = unset_functions(&mut env, &names);
+        assert_eq!(errors, []);
         assert_eq!(env.functions.get("foo"), None);
         assert_eq!(env.functions.get("bar").unwrap().name, "bar");
         assert_eq!(env.functions.get("baz").unwrap().name, "baz");
@@ -324,8 +411,10 @@ mod tests {
         env.functions.define(dummy_function("foo")).unwrap();
         env.functions.define(dummy_function("bar")).unwrap();
         env.functions.define(dummy_function("baz")).unwrap();
+        let names = Field::dummies(["bar", "foo", "baz"]);
 
-        unset_functions(&mut env, &Field::dummies(["bar", "foo", "baz"])).unwrap();
+        let errors = unset_functions(&mut env, &names);
+        assert_eq!(errors, []);
         assert_eq!(env.functions.get("foo"), None);
         assert_eq!(env.functions.get("bar"), None);
         assert_eq!(env.functions.get("baz"), None);
@@ -346,7 +435,7 @@ mod tests {
         env.functions.define(dummy_function("d")).unwrap();
         let names = Field::dummies(["a", "b", "c", "d"]);
 
-        let errors = unset_functions(&mut env, &names).unwrap_err();
+        let errors = unset_functions(&mut env, &names);
         assert_matches!(&errors[..], [e1, e2] => {
             assert_eq!(e1.name, &Field::dummy("b"));
             assert_eq!(e1.read_only_location, location_b);

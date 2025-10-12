@@ -57,10 +57,16 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `umask::syntax::Error`
     - `unalias::semantics::Error`
     - `unalias::syntax::Error`
+    - `unset::semantics::UnsetFunctionsError`
+    - `unset::semantics::UnsetVariablesError`
     - `unset::syntax::Error`
 
 ### Changed
 
+- `unset::semantics::unset_variables` now returns a vector of
+  `UnsetVariablesError` instead of a `Result<(), _>`.
+- `unset::semantics::unset_functions` now returns a vector of
+  `UnsetFunctionsError` instead of a `Result<(), _>`.
 - Public dependency versions:
     - yash-env 0.8.1 → 0.9.0
     - yash-semantics (optional) 0.9.0 → 0.10.0
@@ -87,6 +93,12 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `kill::syntax::Error::to_message`
     - `read::input::Error::to_message`
     - `read::syntax::Error::to_message`
+- The following functions are now deprecated. Use the `merge_reports` function
+  and the functions in the `common::report` module instead.
+    - `unset::semantics::report_functions_error`
+    - `unset::semantics::report_variables_error`
+    - `unset::semantics::unset_functions_error_message`
+    - `unset::semantics::unset_variables_error_message`
 
 ## [0.10.0] - 2025-09-23
 
