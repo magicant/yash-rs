@@ -30,7 +30,7 @@ use yash_env::Env;
 #[cfg(doc)]
 use yash_env::System;
 use yash_env::builtin::Result;
-use yash_semantics::Field;
+use yash_env::semantics::Field;
 
 /// Choice of the behavior of the built-in
 #[derive(Debug, Clone, Copy, Default, Eq, Hash, PartialEq)]
