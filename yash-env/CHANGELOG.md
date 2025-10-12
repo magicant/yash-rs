@@ -115,7 +115,7 @@ A _private dependency_ is used internally and not visible to downstream users.
   incorrectly assumed that the shell was in the session leader's process
   group if the shell was in the foreground.
 
-## Removed
+### Removed
 
 - The `SystemEx` trait no longer has the `signal_number_from_exit_status` method.
     - This method has been moved in favor of `semantics::ExitStatus::to_signal`.

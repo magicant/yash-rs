@@ -58,7 +58,7 @@ items are deprecated.
     - `impl<'a> From<&'a Message<'a>> for annotate_snippets::Message<'a>` →
       `impl<'a> From<&'a Message<'a>> for annotate_snippets::Group<'a>`
 
-## Deprecated
+### Deprecated
 
 - The existing items in the `source::pretty` module for pretty-printing diagnostic
   messages are deprecated in favor of the new items added in this version:
