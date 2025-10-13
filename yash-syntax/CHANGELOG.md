@@ -9,7 +9,7 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
-## [0.16.0] - Unreleased
+## [0.16.0] - 2025-10-13
 
 The most changes in this version are related to the version bump of the
 `annotate-snippets` dependency from 0.11 to 0.12, which introduces breaking
