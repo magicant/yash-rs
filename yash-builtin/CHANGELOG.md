@@ -69,6 +69,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   `UnsetVariablesError` instead of a `Result<(), _>`.
 - `unset::semantics::unset_functions` now returns a vector of
   `UnsetFunctionsError` instead of a `Result<(), _>`.
+- `unalias::syntax::Error::ConflictingOptionAndOperand` now contains the
+  locations of both the `-a` option and the first operand.
 - Public dependency versions:
     - yash-env 0.8.1 → 0.9.0
     - yash-semantics (optional) 0.9.0 → 0.10.0
