@@ -14,6 +14,9 @@ keywords = ["posix", "shell", "glob"]
 categories = ["command-line-utilities"]
 publish = false
 
+[package.metadata.docs.rs]
+all-features = true
+
 [dependencies]
 regex = { workspace = true }
 regex-syntax = { workspace = true }
@@ -24,6 +27,3 @@ assert_matches = { workspace = true }
 
 [lints]
 workspace = true
-
-[package.metadata.docs.rs]
-all-features = true

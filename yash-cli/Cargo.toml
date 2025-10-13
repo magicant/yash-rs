@@ -17,6 +17,9 @@ publish = false
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/yash-cli-{ version }/{ name }-{ target }{ archive-suffix }"
 
+[package.metadata.docs.rs]
+all-features = true
+
 [[bin]]
 name = "yash3"
 path = "src/main.rs"
@@ -39,6 +42,3 @@ tempfile = { workspace = true }
 
 [lints]
 workspace = true
-
-[package.metadata.docs.rs]
-all-features = true

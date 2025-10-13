@@ -14,11 +14,11 @@ keywords = ["posix", "shell"]
 categories = ["command-line-utilities"]
 publish = false
 
+[package.metadata.docs.rs]
+all-features = true
+
 [dependencies]
 thiserror = { workspace = true }
 
 [lints]
 workspace = true
-
-[package.metadata.docs.rs]
-all-features = true
