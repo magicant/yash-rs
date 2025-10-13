@@ -14,6 +14,9 @@ keywords = ["posix", "shell"]
 categories = ["command-line-utilities"]
 publish = false
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 default = ["yash-prompt", "yash-semantics"]
 # yash-prompt is used in the read built-in, which requires yash-semantics.

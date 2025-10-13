@@ -14,6 +14,9 @@ keywords = ["posix", "shell"]
 categories = ["command-line-utilities"]
 publish = false
 
+[package.metadata.docs.rs]
+all-features = true
+
 [dependencies]
 either = { workspace = true }
 enumset = { workspace = true }

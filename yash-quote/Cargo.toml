@@ -14,5 +14,8 @@ keywords = ["posix", "shell"]
 categories = ["command-line-interface"]
 publish = false
 
+[package.metadata.docs.rs]
+all-features = true
+
 [lints]
 workspace = true
