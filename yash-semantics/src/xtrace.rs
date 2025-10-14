@@ -177,6 +177,11 @@ impl XTrace {
     ///
     /// If `$PS4` fails to expand, this function prints an error message and
     /// uses the variable value intact.
+    ///
+    /// If this function is called while `$PS4` is being expanded inside this
+    /// function, the expansion of `$PS4` is skipped and an empty string is
+    /// returned. This prevents infinite recursion when `$PS4` contains a
+    /// command substitution that causes `XTrace::finish` to be called again.
     pub async fn finish(&self, env: &mut Env) -> String {
         let len = self.assigns.len()
             + self.words.len()
@@ -186,9 +191,20 @@ impl XTrace {
             return String::new();
         }
 
+        // Expand $PS4 while preventing infinite recursion
+        #[derive(Clone, Debug, Default, Eq, PartialEq)]
+        struct ExpandingPs4(bool);
+        let expanding_ps4 = env.any.get_or_insert_with(Box::<ExpandingPs4>::default);
+        if expanding_ps4.0 {
+            return String::new();
+        }
+        expanding_ps4.0 = true;
         // TODO Support $YASH_PS4 and $YASH_PS4S
-        let mut result = expand_ps4(env).await;
-        let ps4_len = result.len();
+        let ps4 = expand_ps4(env).await;
+        env.any.get_mut::<ExpandingPs4>().unwrap().0 = false;
+
+        let ps4_len = ps4.len();
+        let mut result = ps4;
         result.reserve_exact(len);
         result += &self.assigns;
         result += &self.words;
@@ -233,8 +249,10 @@ pub async fn print<X: Into<Option<XTrace>>>(env: &mut Env, xtrace: X) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::echo_builtin;
     use futures_util::FutureExt;
     use yash_env::variable::Scope::Global;
+    use yash_env_test_helper::in_virtual_system;
 
     #[test]
     fn tracing_some_fields() {
@@ -355,5 +373,21 @@ mod tests {
         xtrace.here_doc_contents.push_str(" X \nEND\n");
         let result = xtrace.finish(&mut env).now_or_never().unwrap();
         assert_eq!(result, "+x+ 0<< END\n X \nEND\n");
+    }
+
+    #[test]
+    fn finish_prevents_recursion() {
+        in_virtual_system(|mut env, _state| async move {
+            env.builtins.insert("echo", echo_builtin());
+            env.variables
+                .get_or_new(PS4, Global)
+                .assign("$(echo recursive) ", None)
+                .unwrap();
+
+            let mut xtrace = XTrace::new();
+            xtrace.words.push_str("foo bar ");
+            let result = xtrace.finish(&mut env).await;
+            assert_eq!(result, "recursive foo bar\n");
+        })
     }
 }
