@@ -419,31 +419,38 @@ impl System for RealSystem {
         Instant::now()
     }
 
+    /// Returns consumed CPU times.
+    ///
+    /// This function actually uses `getrusage` rather than `times` because it
+    /// provides better resolution on many systems.
     fn times(&self) -> Result<Times> {
-        let mut tms = MaybeUninit::<libc::tms>::uninit();
-        let raw_result = unsafe { libc::times(tms.as_mut_ptr()) };
-        if raw_result == (-1) as _ {
-            return Err(Errno::last());
-        }
+        let mut usage = MaybeUninit::<libc::rusage>::uninit();
 
-        let ticks_per_second = unsafe { libc::sysconf(libc::_SC_CLK_TCK) };
-        if ticks_per_second <= 0 {
-            return Err(Errno::last());
-        }
+        unsafe { libc::getrusage(libc::RUSAGE_SELF, usage.as_mut_ptr()) }.errno_if_m1()?;
+        let self_user = unsafe {
+            (*usage.as_ptr()).ru_utime.tv_sec as f64
+                + (*usage.as_ptr()).ru_utime.tv_usec as f64 * 1e-6
+        };
+        let self_system = unsafe {
+            (*usage.as_ptr()).ru_stime.tv_sec as f64
+                + (*usage.as_ptr()).ru_stime.tv_usec as f64 * 1e-6
+        };
 
-        // SAFETY: These four fields of `tms` have been initialized by `times`.
-        // (But that does not mean *all* fields are initialized,
-        // so we cannot use `assume_init` here.)
-        let utime = unsafe { (*tms.as_ptr()).tms_utime };
-        let stime = unsafe { (*tms.as_ptr()).tms_stime };
-        let cutime = unsafe { (*tms.as_ptr()).tms_cutime };
-        let cstime = unsafe { (*tms.as_ptr()).tms_cstime };
+        unsafe { libc::getrusage(libc::RUSAGE_CHILDREN, usage.as_mut_ptr()) }.errno_if_m1()?;
+        let children_user = unsafe {
+            (*usage.as_ptr()).ru_utime.tv_sec as f64
+                + (*usage.as_ptr()).ru_utime.tv_usec as f64 * 1e-6
+        };
+        let children_system = unsafe {
+            (*usage.as_ptr()).ru_stime.tv_sec as f64
+                + (*usage.as_ptr()).ru_stime.tv_usec as f64 * 1e-6
+        };
 
         Ok(Times {
-            self_user: utime as f64 / ticks_per_second as f64,
-            self_system: stime as f64 / ticks_per_second as f64,
-            children_user: cutime as f64 / ticks_per_second as f64,
-            children_system: cstime as f64 / ticks_per_second as f64,
+            self_user,
+            self_system,
+            children_user,
+            children_system,
         })
     }
 
