@@ -80,6 +80,8 @@ $ while getopts n option -n foo; do
 4+ getopts n option -n foo
 ```
 
+Since yash 3.0.2, the `xtrace` option is ignored while expanding `PS4`. This prevents infinite recursion in case `PS4` contains a command substitution that would cause it to be expanded again.
+
 ## Checking syntax
 
 If the `exec` [shell option] is unset, the shell only parses commands without executing them. This is useful for checking syntax errors in scripts without running them.

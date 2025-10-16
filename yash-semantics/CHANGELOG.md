@@ -9,6 +9,14 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.10.1] - Unreleased
+
+### Changed
+
+- `xtrace::XTrace::finish` now returns an empty string when called while `PS4`
+  is being expanded inside this function. This prevents infinite recursion when
+  `PS4` contains a command substitution that causes the function to be called again.
+
 ## [0.10.0] - 2025-10-13
 
 ### Changed
@@ -334,6 +342,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Initial implementation of the `yash-semantics` crate
 
+[0.10.1]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.10.1
 [0.10.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.10.0
 [0.9.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.9.0
 [0.8.1]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.8.1

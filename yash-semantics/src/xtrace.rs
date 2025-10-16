@@ -36,6 +36,7 @@
 use crate::Handle;
 use crate::expansion::expand_text;
 use std::fmt::Write;
+use std::ops::{Deref, DerefMut};
 use yash_env::Env;
 use yash_env::option::OptionSet;
 use yash_env::option::State;
@@ -60,6 +61,58 @@ async fn expand_ps4(env: &mut Env) -> String {
         Err(error) => {
             _ = error.handle(env).await;
             value
+        }
+    }
+}
+
+/// Flag to indicate whether `$PS4` is being expanded
+///
+/// This is used in [`XTrace::finish`] to prevent (possibly infinite) recursion
+/// when `$PS4` contains a command substitution that causes `XTrace::finish` to
+/// be called again.
+///
+/// This flag is stored in [`Env::any`].
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct ExpandingPs4(bool);
+
+/// Guard that sets the [`ExpandingPs4`] flag to true while it is alive
+/// and resets it to false when dropped
+#[derive(Debug)]
+struct ExpandingGuard<'a>(&'a mut Env);
+
+impl Deref for ExpandingGuard<'_> {
+    type Target = Env;
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
+
+impl DerefMut for ExpandingGuard<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0
+    }
+}
+
+impl<'a> ExpandingGuard<'a> {
+    /// Creates a new guard that sets the [`ExpandingPs4`] flag to true.
+    ///
+    /// If the flag is already true, this function returns `None`.
+    #[must_use]
+    fn new(env: &'a mut Env) -> Option<Self> {
+        let expanding_ps4 = env.any.get_or_insert_with(Box::<ExpandingPs4>::default);
+        if expanding_ps4.0 {
+            None
+        } else {
+            expanding_ps4.0 = true;
+            Some(Self(env))
+        }
+    }
+}
+
+impl Drop for ExpandingGuard<'_> {
+    fn drop(&mut self) {
+        if let Some(expanding_ps4) = self.any.get_mut::<ExpandingPs4>() {
+            expanding_ps4.0 = false;
         }
     }
 }
@@ -177,6 +230,11 @@ impl XTrace {
     ///
     /// If `$PS4` fails to expand, this function prints an error message and
     /// uses the variable value intact.
+    ///
+    /// If this function is called while `$PS4` is being expanded inside this
+    /// function, the expansion of `$PS4` is skipped and an empty string is
+    /// returned. This prevents infinite recursion when `$PS4` contains a
+    /// command substitution that causes `XTrace::finish` to be called again.
     pub async fn finish(&self, env: &mut Env) -> String {
         let len = self.assigns.len()
             + self.words.len()
@@ -186,9 +244,17 @@ impl XTrace {
             return String::new();
         }
 
+        // Expand $PS4 while preventing infinite recursion
+        let Some(mut env) = ExpandingGuard::new(env) else {
+            return String::new();
+        };
         // TODO Support $YASH_PS4 and $YASH_PS4S
-        let mut result = expand_ps4(env).await;
-        let ps4_len = result.len();
+        let ps4 = expand_ps4(&mut env).await;
+        drop(env);
+
+        // Construct the final string
+        let ps4_len = ps4.len();
+        let mut result = ps4;
         result.reserve_exact(len);
         result += &self.assigns;
         result += &self.words;
@@ -233,8 +299,10 @@ pub async fn print<X: Into<Option<XTrace>>>(env: &mut Env, xtrace: X) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::echo_builtin;
     use futures_util::FutureExt;
     use yash_env::variable::Scope::Global;
+    use yash_env_test_helper::in_virtual_system;
 
     #[test]
     fn tracing_some_fields() {
@@ -355,5 +423,21 @@ mod tests {
         xtrace.here_doc_contents.push_str(" X \nEND\n");
         let result = xtrace.finish(&mut env).now_or_never().unwrap();
         assert_eq!(result, "+x+ 0<< END\n X \nEND\n");
+    }
+
+    #[test]
+    fn finish_prevents_recursion() {
+        in_virtual_system(|mut env, _state| async move {
+            env.builtins.insert("echo", echo_builtin());
+            env.variables
+                .get_or_new(PS4, Global)
+                .assign("$(echo recursive) ", None)
+                .unwrap();
+
+            let mut xtrace = XTrace::new();
+            xtrace.words.push_str("foo bar ");
+            let result = xtrace.finish(&mut env).await;
+            assert_eq!(result, "recursive foo bar\n");
+        })
     }
 }

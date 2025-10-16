@@ -64,8 +64,7 @@ test_O -d -e 2 'unset off: unset variable $((foo))' -u
 eval '$((x))'
 __IN__
 
-# TODO not yet implemented
-test_oe -f 'xtrace on: recursion' -x
+test_oe 'xtrace on: recursion' -x
 PS4='$(echo X)+ '
 echo 1
 echo 2
