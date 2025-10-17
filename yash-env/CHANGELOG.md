@@ -9,6 +9,13 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.9.1] - Unreleased
+
+### Changed
+
+- The `times` method of `RealSystem` now uses `getrusage` instead of `times`
+  to get CPU times. This provides better resolution on many systems.
+
 ## [0.9.0] - 2025-10-13
 
 ### Added
@@ -503,6 +510,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Initial implementation of the `yash-env` crate
 
+[0.9.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.9.1
 [0.9.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.9.0
 [0.8.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.8.1
 [0.8.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.8.0
