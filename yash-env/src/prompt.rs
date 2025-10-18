@@ -45,7 +45,8 @@ use std::pin::Pin;
 /// string.
 ///
 /// The most standard way to implement such a function is to use the
-/// [`yash-prompt` crate](yash-prompt):
+/// [`yash-prompt` crate](https://crates.io/crates/yash-prompt) to fetch and
+/// expand the prompt string.
 ///
 /// ```
 /// # use yash_env::prompt::GetPrompt;
