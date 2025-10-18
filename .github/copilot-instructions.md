@@ -151,13 +151,15 @@ The CI pipeline (`.github/workflows/ci.yml`) runs on push/PR to master with 6 jo
 
 ### Version Bumping Rules (CRITICAL)
 
-When making changes, **always update version numbers** in affected crates' `Cargo.toml` according to:
+When making changes, **update version numbers** in affected crates' `Cargo.toml` according to the type of change:
 - **Patch**: Bug fixes, internal changes
 - **Minor**: New features, non-breaking API additions
 - **Major**: Breaking changes
 
 For library crates: API changes drive version bumps.
 For yash-cli: Observable behavior changes drive version bumps.
+
+**Important**: `Cargo.toml` should always forecast the next release version. **Avoid double version bumps** - if a version was already bumped in a previous merged PR that hasn't been released yet, do not bump it again.
 
 **Two files to update per affected crate:**
 1. `<crate>/Cargo.toml` - Update `version = "x.y.z"`
