@@ -12,7 +12,7 @@
 
 ## Workspace Structure
 
-This is a Cargo workspace with the following crates (all in `/home/runner/work/yash-rs/yash-rs/`):
+This is a Cargo workspace with the following crates (all in the workspace root (`.`)):
 
 - **yash-cli**: Main executable binary, produces `yash3` command
 - **yash-syntax**: POSIX shell script parser
@@ -180,7 +180,7 @@ For yash-cli CHANGELOG: Include changes in observable behavior even if yash-cli 
 ### Test Requirements
 
 **Unit tests**: Add in same file as code being tested
-**Integration tests**: Update `yash-cli/tests/scripted_test.rs` for observable shell behavior changes
+**Integration tests**: Update the Rust test harness `yash-cli/tests/scripted_test.rs` for observable shell behavior changes. Add or modify shell script test cases in the `yash-cli/tests/scripted_test/` directory (contains `.sh` files executed by the harness).
 
 ### Style Guidelines
 
