@@ -35,7 +35,6 @@ use yash_env::semantics::Field;
 
 pub mod assigning;
 pub mod input;
-pub mod prompt;
 pub mod syntax;
 
 /// Exit status when the built-in succeeds
