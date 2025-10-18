@@ -1,6 +1,6 @@
 [package]
 name = "yash-env"
-version = "0.9.1"
+version = "0.9.2"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2024"
 rust-version = "1.86.0"
@@ -42,6 +42,7 @@ yash-executor = { workspace = true }
 assert_matches = { workspace = true }
 futures-executor = { workspace = true }
 futures-util = { workspace = true, features = ["channel"] }
+yash-prompt = { workspace = true }
 
 [lints]
 workspace = true

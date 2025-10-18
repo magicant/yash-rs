@@ -18,9 +18,7 @@ publish = false
 all-features = true
 
 [features]
-default = ["yash-prompt", "yash-semantics"]
-# yash-prompt is used in the read built-in, which requires yash-semantics.
-yash-prompt = ["dep:yash-prompt", "yash-semantics"]
+default = ["yash-semantics"]
 yash-semantics = ["dep:yash-semantics", "dep:enumset"]
 
 [dependencies]
@@ -29,7 +27,6 @@ enumset = { workspace = true, optional = true }
 itertools = { workspace = true }
 thiserror = { workspace = true }
 yash-env = { workspace = true }
-yash-prompt = { workspace = true, optional = true }
 yash-quote = { workspace = true }
 yash-semantics = { workspace = true, optional = true }
 yash-syntax = { workspace = true }
