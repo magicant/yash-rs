@@ -11,8 +11,16 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.12.0] - Unreleased
 
+### Changed
+
+- The `read` built-in now requires a `yash_env::prompt::GetPrompt` instance to
+  be available in the environment's `any` storage. This instance is used to
+  generate prompts when reading input in the `read::input::read` function.
+
 ### Removed
 
+- The `yash-prompt` feature flag has been removed. This crate no longer depends
+  on the `yash-prompt` crate directly.
 - The `read::prompt` module has been removed. It was empty and unused.
 
 ## [0.11.0] - 2025-10-13

@@ -499,7 +499,6 @@ dependencies = [
  "thiserror",
  "yash-env",
  "yash-env-test-helper",
- "yash-prompt",
  "yash-quote",
  "yash-semantics",
  "yash-syntax",
@@ -525,7 +524,7 @@ dependencies = [
 
 [[package]]
 name = "yash-env"
-version = "0.9.1"
+version = "0.9.2"
 dependencies = [
  "annotate-snippets",
  "assert_matches",
@@ -545,6 +544,7 @@ dependencies = [
  "unix_path",
  "unix_str",
  "yash-executor",
+ "yash-prompt",
  "yash-quote",
  "yash-syntax",
 ]

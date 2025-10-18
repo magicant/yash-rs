@@ -18,6 +18,7 @@
 
 use thiserror::Error;
 use yash_env::Env;
+use yash_env::prompt::GetPrompt;
 use yash_env::system::Errno;
 use yash_semantics::expansion::attr::AttrChar;
 use yash_semantics::expansion::attr::Origin;
@@ -115,8 +116,9 @@ fn plain(value: char) -> AttrChar {
 /// continuation, this function removes the backslash-newline pair and continues
 /// reading the next line. When reading the second and subsequent lines, this
 /// function displays the value of the `PS2` variable as a prompt if the shell
-/// is interactive and the input is from a terminal. This requires the optional
-/// `yash-prompt` feature.
+/// is interactive and the input is from a terminal. This requires a
+/// [`GetPrompt`] instance to be available in the environment's
+/// [`any`](Env::any) storage.
 ///
 /// If successful, this function returns a vector of [`AttrChar`]s representing
 /// the line read and a boolean value indicating whether the line was terminated
@@ -210,26 +212,25 @@ async fn read_char(env: &mut Env) -> Result<Option<char>, Error> {
 /// This function prints the value of the `PS2` variable as a prompt for the
 /// continuation line. If the shell is not interactive or the standard input
 /// is not a terminal, this function does nothing.
+///
+/// This function requires a [`GetPrompt`] instance to be in the environment's
+/// `any` storage. If no such instance is found, this function does nothing.
 async fn print_prompt(env: &mut Env) {
-    #[cfg(feature = "yash-prompt")]
-    {
-        use yash_env::System as _;
-        if !env.is_interactive() || !env.system.isatty(Fd::STDIN) {
-            return;
-        }
-
-        // Obtain the prompt string
-        let mut context = yash_env::input::Context::default();
-        context.set_is_first_line(false);
-        let prompt = yash_prompt::fetch_posix(&env.variables, &context);
-        let prompt = yash_prompt::expand_posix(env, &prompt, false).await;
-        env.system.print_error(&prompt).await;
+    use yash_env::System as _;
+    if !env.is_interactive() || !env.system.isatty(Fd::STDIN) {
+        return;
     }
 
-    #[cfg(not(feature = "yash-prompt"))]
-    {
-        _ = env;
-    }
+    // Obtain the prompt string
+    let Some(get_prompt) = env.any.get::<GetPrompt>().copied() else {
+        return;
+    };
+    let mut context = yash_env::input::Context::default();
+    context.set_is_first_line(false);
+    let prompt = get_prompt.0(env, &context).await;
+
+    // Print the prompt
+    env.system.print_error(&prompt).await;
 }
 
 #[cfg(test)]

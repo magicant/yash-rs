@@ -48,10 +48,14 @@
 //! - `type`
 //! - `wait`
 //!
-//! The `yash-builtin` crate also has an optional dependency on the
-//! `yash-prompt` crate, which is enabled by default. If you disable the
-//! `yash-prompt` feature, the `read` built-in will not print the prompt.
-//! Note that the `yash-prompt` feature requires the `yash-semantics` feature.
+//! # Dependencies to be injected
+//!
+//! Some built-ins in this crate require certain dependencies to be injected
+//! into the environment's [`any`](yash_env::Env::any) storage. If these
+//! dependencies are not injected, the built-in may not function correctly.
+//!
+//! The `read` built-in requires a [`GetPrompt`](yash_env::prompt::GetPrompt)
+//! instance in the `any` storage to generate prompts when reading input.
 
 pub mod alias;
 pub mod bg;
