@@ -26,7 +26,8 @@
 //! necessary not to read past the delimiter.
 //! (TODO: Use a buffered reader if the input is seekable)
 //!
-//! Prompting requires the optional `yash-prompt` feature.
+//! Prompting requires a [`GetPrompt`](yash_env::prompt::GetPrompt) instance to
+//! be available in the environment's [`any`](yash_env::Env::any) storage.
 
 use crate::common::report::{merge_reports, report, report_simple};
 use yash_env::Env;

@@ -23,6 +23,7 @@ use yash_env::System;
 use yash_env::io::Fd;
 use yash_env::option::Option::{Interactive, Monitor, Stdin};
 use yash_env::option::State::On;
+use yash_env::prompt::GetPrompt;
 
 pub mod args;
 pub mod init_file;
@@ -98,5 +99,18 @@ pub fn configure_environment(env: &mut Env, run: Run) -> Work {
     // Prepare variables
     env.init_variables();
 
+    // Inject dependencies
+    inject_dependencies(env);
+
     run.work
+}
+
+/// Inject dependencies into the environment.
+fn inject_dependencies(env: &mut Env) {
+    env.any.insert(Box::new(GetPrompt(|env, context| {
+        Box::pin(async move {
+            let prompt = yash_prompt::fetch_posix(&env.variables, context);
+            yash_prompt::expand_posix(env, &prompt, false).await
+        })
+    })));
 }
