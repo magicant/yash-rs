@@ -18,19 +18,16 @@
 
 use super::Command;
 use crate::common::report::report_failure;
-use std::cell::RefCell;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ops::ControlFlow;
-use std::rc::Rc;
 use yash_env::Env;
-use yash_env::input::Echo;
-use yash_env::input::FdReader;
 use yash_env::io::Fd;
 use yash_env::path::PathBuf;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
+use yash_env::semantics::SourceFile;
 use yash_env::stack::Frame;
 use yash_env::system::Errno;
 use yash_env::system::Mode;
@@ -39,9 +36,6 @@ use yash_env::system::OpenFlag;
 use yash_env::system::System;
 use yash_env::system::SystemEx as _;
 use yash_env::variable::PATH;
-use yash_semantics::read_eval_loop;
-use yash_syntax::parser::lex::Lexer;
-use yash_syntax::source::Source;
 use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 impl Command {
@@ -59,19 +53,13 @@ impl Command {
 
         // TODO set positional parameters
 
-        // Parse and execute the command script
-        let system = env.system.clone();
-        let ref_env = RefCell::new(&mut *env);
-        let mut config = Lexer::config();
-        config.source = Some(Rc::new(Source::DotScript {
-            name: self.file.value,
-            origin: self.file.origin,
-        }));
-        let input = Box::new(Echo::new(FdReader::new(fd, system), &ref_env));
-        let mut lexer = config.input(input);
-        let divert = read_eval_loop(&ref_env, &mut { lexer }).await;
-
-        _ = env.system.close(fd);
+        // Execute the command script
+        let source_file = env
+            .any
+            .get::<SourceFile>()
+            .expect("SourceFile dependency should be injected")
+            .0;
+        let divert = source_file(env, fd, self.file.value, self.file.origin).await;
 
         let (exit_status, divert) = consume_return(divert);
         let exit_status = exit_status.unwrap_or(env.exit_status);
@@ -257,6 +245,15 @@ mod tests {
     fn fd_is_closed_after_execute() {
         let system = system_with_file("/foo/file", "");
         let mut env = Env::with_system(Box::new(system.clone()));
+
+        // Inject the SourceFile dependency
+        env.any
+            .insert(Box::new(SourceFile(|env, fd, filename, origin| {
+                Box::pin(
+                    async move { yash_semantics::source_file(env, fd, filename, origin).await },
+                )
+            })));
+
         let command = Command {
             file: Field::dummy("/foo/file"),
             params: vec![],

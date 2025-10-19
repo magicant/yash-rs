@@ -9,7 +9,18 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
-## [0.9.2] - Unreleased
+## [0.10.0] - Unreleased
+
+### Added
+
+- `semantics::EvalCode`
+    - This struct wraps a function for evaluating shell code strings,
+      used by the `eval` built-in.
+- `semantics::SourceFile`
+    - This struct wraps a function for sourcing files from file descriptors,
+      used by the `.` (source) built-in.
+
+## [0.9.2] - 2025-10-19
 
 ### Added
 

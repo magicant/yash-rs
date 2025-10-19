@@ -42,8 +42,10 @@ mod handle;
 pub use handle::Handle;
 
 mod runner;
+pub use runner::eval_code;
 pub use runner::interactive_read_eval_loop;
 pub use runner::read_eval_loop;
+pub use runner::source_file;
 
 mod runner_legacy;
 #[allow(deprecated)]

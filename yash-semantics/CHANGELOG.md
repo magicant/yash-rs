@@ -9,6 +9,22 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.11.0] - Unreleased
+
+### Added
+
+- `eval_code` function
+    - This function is a helper for implementing the `eval` built-in using
+      dependency injection.
+- `source_file` function
+    - This function is a helper for implementing the `.` (source) built-in using
+      dependency injection.
+
+### Changed
+
+- Public dependency versions:
+    - yash-env 0.9.2 → 0.10.0
+
 ## [0.10.1] - 2025-10-16
 
 ### Changed

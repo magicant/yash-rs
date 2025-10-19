@@ -20,6 +20,7 @@ use crate::signal;
 use crate::system::System;
 use std::ffi::c_int;
 use std::ops::ControlFlow;
+use std::pin::Pin;
 use std::process::ExitCode;
 use std::process::Termination;
 use yash_syntax::source::Location;
@@ -256,6 +257,78 @@ impl Divert {
 /// will be a `Break` having a [`Divert`] value which specifies what to execute
 /// next.
 pub type Result<T = ()> = ControlFlow<Divert, T>;
+
+/// Wrapper for executing eval code
+///
+/// This struct declares a function type that evaluates a string of shell code.
+/// An implementation of this function type should be provided and stored in the
+/// environment's [`any`](crate::Env::any) storage so that it can be used by
+/// built-ins like `eval`.
+///
+/// The function takes a mutable reference to the environment and a code field
+/// (containing the code string and its origin). It returns a future that
+/// resolves to the execution result.
+///
+/// The most standard implementation of this function type is provided in the
+/// [`yash-semantics` crate](https://crates.io/crates/yash-semantics).
+///
+/// ```
+/// # use yash_env::semantics::{EvalCode, Field};
+/// # use yash_env::Env;
+/// let mut env = yash_env::Env::new_virtual();
+/// env.any.insert(Box::new(EvalCode(|env, code| {
+///     Box::pin(async move {
+///         // Implementation would create lexer and call read_eval_loop
+///         std::ops::ControlFlow::Continue(())
+///     })
+/// })));
+/// ```
+#[derive(Clone, Copy, Debug)]
+pub struct EvalCode(
+    #[allow(clippy::type_complexity)]
+    pub  for<'a> fn(
+        env: &'a mut crate::Env,
+        code: &'a Field,
+    ) -> Pin<Box<dyn std::future::Future<Output = Result> + 'a>>,
+);
+
+/// Wrapper for executing a source file
+///
+/// This struct declares a function type that sources a file from a file descriptor.
+/// An implementation of this function type should be provided and stored in the
+/// environment's [`any`](crate::Env::any) storage so that it can be used by
+/// built-ins like `.` (source).
+///
+/// The function takes a mutable reference to the environment, a file descriptor to
+/// read from, and source information (filename and origin). It returns a future that
+/// resolves to the execution result.
+///
+/// The most standard implementation of this function type is provided in the
+/// [`yash-semantics` crate](https://crates.io/crates/yash-semantics).
+///
+/// ```
+/// # use yash_env::semantics::SourceFile;
+/// # use yash_env::Env;
+/// # use yash_env::io::Fd;
+/// # use yash_syntax::source::Location;
+/// let mut env = yash_env::Env::new_virtual();
+/// env.any.insert(Box::new(SourceFile(|env, fd, filename, origin| {
+///     Box::pin(async move {
+///         // Implementation would create lexer from fd and call read_eval_loop
+///         std::ops::ControlFlow::Continue(())
+///     })
+/// })));
+/// ```
+#[derive(Clone, Copy, Debug)]
+pub struct SourceFile(
+    #[allow(clippy::type_complexity)]
+    pub  for<'a> fn(
+        env: &'a mut crate::Env,
+        fd: crate::io::Fd,
+        filename: String,
+        origin: Location,
+    ) -> Pin<Box<dyn std::future::Future<Output = Result> + 'a>>,
+);
 
 #[cfg(test)]
 mod tests {

@@ -9,7 +9,21 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
-## [0.12.0] - Unreleased
+## [0.13.0] - Unreleased
+
+### Changed
+
+- The `eval` built-in now requires a `yash_env::semantics::EvalCode` instance to
+  be available in the environment's `any` storage. This instance is used to
+  execute the evaluated code string.
+- The `.` (source) built-in now requires a `yash_env::semantics::SourceFile`
+  instance to be available in the environment's `any` storage. This instance is
+  used to execute the sourced file.
+- Public dependency versions:
+    - yash-env 0.9.2 → 0.10.0
+    - yash-semantics 0.10.1 → 0.11.0
+
+## [0.12.0] - 2025-10-19
 
 ### Changed
 

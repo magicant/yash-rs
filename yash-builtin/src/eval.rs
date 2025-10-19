@@ -24,16 +24,10 @@
 use crate::Result;
 use crate::common::report::report_error;
 use crate::common::syntax::{Mode, parse_arguments};
-use std::cell::RefCell;
-use std::rc::Rc;
 use yash_env::Env;
 #[cfg(doc)]
 use yash_env::semantics::ExitStatus;
-use yash_env::semantics::Field;
-use yash_semantics::read_eval_loop;
-use yash_syntax::input::Memory;
-use yash_syntax::parser::lex::Lexer;
-use yash_syntax::source::Source;
+use yash_env::semantics::{EvalCode, Field};
 
 /// Entry point of the `eval` built-in execution
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
@@ -48,13 +42,13 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
         None => return Result::default(),
     };
 
-    // Parse and execute the command string
-    let mut config = Lexer::config();
-    config.source = Some(Rc::new(Source::Eval {
-        original: command.origin,
-    }));
-    let mut lexer = config.input(Box::new(Memory::new(&command.value)));
-    let divert = read_eval_loop(&RefCell::new(env), &mut lexer).await;
+    // Execute the command string
+    let eval_code = env
+        .any
+        .get::<EvalCode>()
+        .expect("EvalCode dependency should be injected")
+        .0;
+    let divert = eval_code(env, &command).await;
     Result::with_exit_status_and_divert(env.exit_status, divert)
 }
 

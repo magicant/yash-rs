@@ -22,6 +22,7 @@ use crate::trap::run_traps_for_caught_signals;
 use std::cell::RefCell;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
+use yash_env::System;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
@@ -126,6 +127,63 @@ pub async fn read_eval_loop(env: &RefCell<&mut Env>, lexer: &mut Lexer<'_>) -> R
 /// [`IgnoreEof`]: yash_env::input::IgnoreEof
 pub async fn interactive_read_eval_loop(env: &RefCell<&mut Env>, lexer: &mut Lexer<'_>) -> Result {
     read_eval_loop_impl(env, lexer, /* is_interactive */ true).await
+}
+
+/// Evaluates a string of shell code
+///
+/// This function is a helper for implementing the `eval` built-in. It creates a
+/// lexer from the given code string and calls [`read_eval_loop`] to execute it.
+///
+/// The code field contains both the code string and its origin location for
+/// error reporting.
+pub async fn eval_code(env: &mut Env, code: &yash_env::semantics::Field) -> Result {
+    use std::rc::Rc;
+    use yash_syntax::input::Memory;
+    use yash_syntax::source::Source;
+
+    let mut config = Lexer::config();
+    config.source = Some(Rc::new(Source::Eval {
+        original: code.origin.clone(),
+    }));
+    let mut lexer = config.input(Box::new(Memory::new(&code.value)));
+    read_eval_loop(&RefCell::new(env), &mut lexer).await
+}
+
+/// Sources a file from a file descriptor
+///
+/// This function is a helper for implementing the `.` (source) built-in. It
+/// creates a lexer from the given file descriptor and calls [`read_eval_loop`]
+/// to execute the commands in the file.
+///
+/// The function takes ownership of the file descriptor and closes it when done.
+pub async fn source_file(
+    env: &mut Env,
+    fd: yash_env::io::Fd,
+    filename: String,
+    origin: yash_syntax::source::Location,
+) -> Result {
+    use std::rc::Rc;
+    use yash_env::input::{Echo, FdReader};
+    use yash_syntax::source::Source;
+
+    let system = env.system.clone();
+    let mut config = Lexer::config();
+    config.source = Some(Rc::new(Source::DotScript {
+        name: filename,
+        origin,
+    }));
+
+    let result = {
+        let ref_env = RefCell::new(&mut *env);
+        let input = Box::new(Echo::new(FdReader::new(fd, system), &ref_env));
+        let mut lexer = config.input(input);
+        read_eval_loop(&ref_env, &mut lexer).await
+    };
+
+    // Close the file descriptor
+    _ = env.system.close(fd);
+
+    result
 }
 
 // The RefCell should be local to the loop, so it is safe to keep the mutable
