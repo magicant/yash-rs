@@ -26,7 +26,7 @@ use yash_env::System as _;
 use yash_env::job::Pid;
 use yash_env::signal;
 use yash_env::system::Errno;
-use yash_semantics::trap::run_trap_if_caught;
+use yash_env::trap::RunSignalTrapIfCaught;
 
 /// Errors that may occur while waiting for a job
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
@@ -50,6 +50,11 @@ pub enum Error {
 /// returns `Ok(())`. Otherwise, this function performs the trap action and
 /// returns the signal and the result of the trap action.
 ///
+/// This function expects that an instance of [`RunSignalTrapIfCaught`] is
+/// stored in [`Env::any`] to check if any signal has been caught and run the
+/// corresponding trap action. If there is no such instance, this function will
+/// ignore all signals.
+///
 /// Note that this function returns on a job state change of any kind. You need
 /// to call this function repeatedly until the job state becomes the one you
 /// want.
@@ -57,6 +62,12 @@ pub enum Error {
 /// If there is no job to wait for, this function returns
 /// `Err(Error::NothingToWait)` immediately.
 pub async fn wait_for_any_job_or_trap(env: &mut Env) -> Result<(), Error> {
+    let run_trap_if_caught = env
+        .any
+        .get::<RunSignalTrapIfCaught>()
+        .map(|r| r.0)
+        .unwrap_or(|_, _| Box::pin(async { None }));
+
     // We need to install the internal disposition before calling `wait` so we
     // don't miss any `SIGCHLD` that may arrive between `wait` and
     // `wait_for_signals`.  See also Env::wait_for_subshell.
@@ -166,6 +177,13 @@ mod tests {
     #[test]
     fn trap() {
         in_virtual_system(|mut env, state| async move {
+            env.any
+                .insert(Box::new(RunSignalTrapIfCaught(|env, signal| {
+                    Box::pin(
+                        async move { yash_semantics::trap::run_trap_if_caught(env, signal).await },
+                    )
+                })));
+
             let mut system = VirtualSystem {
                 state,
                 process_id: env.main_pid,

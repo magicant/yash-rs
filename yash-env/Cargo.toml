@@ -43,6 +43,7 @@ assert_matches = { workspace = true }
 futures-executor = { workspace = true }
 futures-util = { workspace = true, features = ["channel"] }
 yash-prompt = { workspace = true }
+yash-semantics = { workspace = true }
 
 [lints]
 workspace = true

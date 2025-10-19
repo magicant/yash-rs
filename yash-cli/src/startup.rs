@@ -24,6 +24,7 @@ use yash_env::io::Fd;
 use yash_env::option::Option::{Interactive, Monitor, Stdin};
 use yash_env::option::State::On;
 use yash_env::prompt::GetPrompt;
+use yash_env::trap::RunSignalTrapIfCaught;
 
 pub mod args;
 pub mod init_file;
@@ -113,4 +114,9 @@ fn inject_dependencies(env: &mut Env) {
             yash_prompt::expand_posix(env, &prompt, false).await
         })
     })));
+
+    env.any
+        .insert(Box::new(RunSignalTrapIfCaught(|env, signal| {
+            Box::pin(async move { yash_semantics::trap::run_trap_if_caught(env, signal).await })
+        })));
 }

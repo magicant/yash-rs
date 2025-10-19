@@ -546,6 +546,7 @@ dependencies = [
  "yash-executor",
  "yash-prompt",
  "yash-quote",
+ "yash-semantics",
  "yash-syntax",
 ]
 

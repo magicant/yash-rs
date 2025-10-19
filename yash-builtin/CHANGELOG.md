@@ -16,6 +16,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `read` built-in now requires a `yash_env::prompt::GetPrompt` instance to
   be available in the environment's `any` storage. This instance is used to
   generate prompts when reading input in the `read::input::read` function.
+- The `wait` built-in now requires a
+  `yash_env::trap::RunSignalTrapIfCaught` instance to be available in the
+  environment's `any` storage. This instance is used to handle trapped signals
+  while waiting for jobs in the `wait::core::wait_for_any_job_or_trap` function.
 
 ### Removed
 
