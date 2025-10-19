@@ -54,8 +54,11 @@
 //! into the environment's [`any`](yash_env::Env::any) storage. If these
 //! dependencies are not injected, the built-in may not function correctly.
 //!
-//! The `read` built-in requires a [`GetPrompt`](yash_env::prompt::GetPrompt)
-//! instance in the `any` storage to generate prompts when reading input.
+//! - The `read` built-in requires a [`GetPrompt`](yash_env::prompt::GetPrompt)
+//!   instance in the `any` storage to generate prompts when reading input.
+//! - The `wait` built-in requires a
+//!   [`RunSignalTrapIfCaught`](yash_env::trap::RunSignalTrapIfCaught) instance
+//!   in the `any` storage to handle trapped signals while waiting for jobs.
 
 pub mod alias;
 pub mod bg;

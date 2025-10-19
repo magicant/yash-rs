@@ -39,12 +39,14 @@ mod state;
 pub use self::cond::Condition;
 pub use self::state::{Action, Origin, SetActionError, TrapState};
 use self::state::{EnterSubshellOption, GrandState};
+use crate::Env;
 use crate::signal;
 use crate::system::{Disposition, Errno};
 #[cfg(doc)]
 use crate::system::{SharedSystem, System};
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
+use std::pin::Pin;
 use yash_syntax::source::Location;
 
 /// System interface for signal handling configuration
@@ -483,6 +485,38 @@ impl<'a> IntoIterator for &'a TrapSet {
         self.iter()
     }
 }
+
+/// Wrapper for running signal trap if caught
+///
+/// This struct declares a function type that runs a signal trap if the signal
+/// has been caught. An implementation of this function type should be provided
+/// and stored in the environment's [`any`](Env::any) storage so that it can
+/// be used by modules that need to run signal traps.
+///
+/// This function takes a mutable reference to the environment and a signal
+/// number to be checked. If the signal has been caught, the function runs the
+/// corresponding trap action and returns `Some(result)`, where `result` is the
+/// result of running the trap action. If the signal has not been caught, the
+/// function returns `None`.
+///
+/// The most standard implementation of this function type is provided in the
+/// [`yash-semantics` crate](https://crates.io/crates/yash-semantics):
+///
+/// ```
+/// # use yash_env::trap::RunSignalTrapIfCaught;
+/// let mut env = yash_env::Env::new_virtual();
+/// env.any.insert(Box::new(RunSignalTrapIfCaught(|env, signal| {
+///     Box::pin(async move { yash_semantics::trap::run_trap_if_caught(env, signal).await })
+/// })));
+/// ```
+#[derive(Clone, Copy, Debug)]
+pub struct RunSignalTrapIfCaught(
+    #[allow(clippy::type_complexity)]
+    pub  for<'a> fn(
+        env: &'a mut Env,
+        signal: signal::Number,
+    ) -> Pin<Box<dyn Future<Output = Option<crate::semantics::Result>> + 'a>>,
+);
 
 #[cfg(test)]
 mod tests {

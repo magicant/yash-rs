@@ -23,8 +23,10 @@
 //!
 //! # Implementation notes
 //!
-//! The built-in treats disowned jobs as if they were finished with an exit
-//! status of 127.
+//! The built-in expects that an instance of
+//! [`RunSignalTrapIfCaught`](yash_env::trap::RunSignalTrapIfCaught) is stored
+//! in [`Env::any`] to handle trapped signals while waiting for jobs. If there
+//! is no such instance, the built-in will ignore all signals.
 
 use crate::common::report::{merge_reports, report_error, report_simple_failure};
 use itertools::Itertools as _;
