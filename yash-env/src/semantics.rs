@@ -16,12 +16,16 @@
 
 //! Type definitions for command execution.
 
+use crate::Env;
 use crate::signal;
 use crate::system::System;
+use std::cell::RefCell;
 use std::ffi::c_int;
 use std::ops::ControlFlow;
+use std::pin::Pin;
 use std::process::ExitCode;
 use std::process::Termination;
+use yash_syntax::parser::lex::Lexer;
 use yash_syntax::source::Location;
 
 /// Resultant string of word expansion.
@@ -256,6 +260,53 @@ impl Divert {
 /// will be a `Break` having a [`Divert`] value which specifies what to execute
 /// next.
 pub type Result<T = ()> = ControlFlow<Divert, T>;
+
+/// Wrapper for running a read-eval-loop
+///
+/// This struct declares a function type for running a read-eval-loop. An
+/// implementation of this function type should be provided and stored in the
+/// environment's [`any`](Env::any) storage so that it can be used by modules
+/// depending on read-eval-loop execution.
+///
+/// The function takes two arguments. The first argument is a mutable reference
+/// to an environment wrapped in a [`RefCell`]. The second argument is a mutable
+/// reference to a [`Lexer`] from which commands are read. The `RefCell` can be
+/// shared with the [`Input`](crate::input::Input) implementor used by the
+/// lexer, so that the implementor can access and modify the environment while
+/// reading commands. After reading a command, the `RefCell` should be borrowed
+/// mutably outside the lexer to execute the command. The `RefCell` should not
+/// be borrowed otherwise during the read-eval-loop execution.
+///
+/// The function returns a future which resolves to a [`Result`] when awaited.
+/// The function should execute commands read from the lexer until the end of
+/// input or a [`Divert`] is encountered.
+///
+/// The function should set [`Env::exit_status`] appropriately after the loop
+/// ends. If the input contains no commands, the exit status should be set to
+/// `ExitStatus(0)`.
+///
+/// The function should also
+/// [update subshell statuses](Env::update_all_subshell_statuses) and handle
+/// traps during the loop execution as specified in the shell semantics.
+///
+/// The most standard implementation of this function type is provided in the
+/// [`yash-semantics` crate](https://crates.io/crates/yash-semantics):
+///
+/// ```
+/// # use yash_env::semantics::RunReadEvalLoop;
+/// let mut env = yash_env::Env::new_virtual();
+/// env.any.insert(Box::new(RunReadEvalLoop(|env, lexer| {
+///     Box::pin(async move { yash_semantics::read_eval_loop(env, lexer).await })
+/// })));
+/// ```
+#[derive(Clone, Copy, Debug)]
+pub struct RunReadEvalLoop(
+    #[allow(clippy::type_complexity)]
+    pub  for<'a> fn(
+        &'a RefCell<&mut Env>,
+        &'a mut Lexer,
+    ) -> Pin<Box<dyn Future<Output = Result> + 'a>>,
+);
 
 #[cfg(test)]
 mod tests {

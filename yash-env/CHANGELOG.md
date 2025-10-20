@@ -16,6 +16,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `prompt` module
     - This module currently contains the `GetPrompt` struct, which wraps
       a prompt-generating function.
+- `semantics::RunReadEvalLoop`
+    - This struct wraps a function that runs the read-eval loop.
 - `trap::RunSignalTrapIfCaught`
     - This struct wraps a function that runs a signal trap if the signal has been
       caught.

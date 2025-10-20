@@ -52,8 +52,11 @@
 //!
 //! Some built-ins in this crate require certain dependencies to be injected
 //! into the environment's [`any`](yash_env::Env::any) storage. If these
-//! dependencies are not injected, the built-in may not function correctly.
+//! dependencies are not injected, the built-in may **panic** at runtime.
 //!
+//! - The `eval` and `source` built-ins require a
+//!   [`RunReadEvalLoop`](yash_env::semantics::RunReadEvalLoop) instance in the
+//!   `any` storage to run the read-eval loop for executing commands.
 //! - The `read` built-in requires a [`GetPrompt`](yash_env::prompt::GetPrompt)
 //!   instance in the `any` storage to generate prompts when reading input.
 //! - The `wait` built-in requires a
