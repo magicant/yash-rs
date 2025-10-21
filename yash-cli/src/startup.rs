@@ -25,6 +25,7 @@ use yash_env::option::Option::{Interactive, Monitor, Stdin};
 use yash_env::option::State::On;
 use yash_env::prompt::GetPrompt;
 use yash_env::trap::RunSignalTrapIfCaught;
+use yash_semantics::RunReadEvalLoop;
 
 pub mod args;
 pub mod init_file;
@@ -108,15 +109,19 @@ pub fn configure_environment(env: &mut Env, run: Run) -> Work {
 
 /// Inject dependencies into the environment.
 fn inject_dependencies(env: &mut Env) {
-    env.any.insert(Box::new(GetPrompt(|env, context| {
-        Box::pin(async move {
-            let prompt = yash_prompt::fetch_posix(&env.variables, context);
-            yash_prompt::expand_posix(env, &prompt, false).await
-        })
+    env.any.insert(Box::new(RunReadEvalLoop(|env, lexer| {
+        Box::pin(async move { yash_semantics::read_eval_loop(env, lexer).await })
     })));
 
     env.any
         .insert(Box::new(RunSignalTrapIfCaught(|env, signal| {
             Box::pin(async move { yash_semantics::trap::run_trap_if_caught(env, signal).await })
         })));
+
+    env.any.insert(Box::new(GetPrompt(|env, context| {
+        Box::pin(async move {
+            let prompt = yash_prompt::fetch_posix(&env.variables, context);
+            yash_prompt::expand_posix(env, &prompt, false).await
+        })
+    })));
 }

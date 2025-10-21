@@ -28,9 +28,7 @@ use yash_env::input::Echo;
 use yash_env::input::FdReader;
 use yash_env::io::Fd;
 use yash_env::path::PathBuf;
-use yash_env::semantics::Divert;
-use yash_env::semantics::ExitStatus;
-use yash_env::semantics::Field;
+use yash_env::semantics::{Divert, ExitStatus, Field, RunReadEvalLoop};
 use yash_env::stack::Frame;
 use yash_env::system::Errno;
 use yash_env::system::Mode;
@@ -39,7 +37,6 @@ use yash_env::system::OpenFlag;
 use yash_env::system::System;
 use yash_env::system::SystemEx as _;
 use yash_env::variable::PATH;
-use yash_semantics::read_eval_loop;
 use yash_syntax::parser::lex::Lexer;
 use yash_syntax::source::Source;
 use yash_syntax::source::pretty::{Report, ReportType, Snippet};
@@ -60,6 +57,11 @@ impl Command {
         // TODO set positional parameters
 
         // Parse and execute the command script
+        let run_read_eval_loop = env
+            .any
+            .get::<RunReadEvalLoop>()
+            .cloned()
+            .expect("`source` built-in requires `RunReadEvalLoop` in `Env::any`");
         let system = env.system.clone();
         let ref_env = RefCell::new(&mut *env);
         let mut config = Lexer::config();
@@ -69,7 +71,7 @@ impl Command {
         }));
         let input = Box::new(Echo::new(FdReader::new(fd, system), &ref_env));
         let mut lexer = config.input(input);
-        let divert = read_eval_loop(&ref_env, &mut { lexer }).await;
+        let divert = run_read_eval_loop.0(&ref_env, &mut { lexer }).await;
 
         _ = env.system.close(fd);
 
@@ -257,6 +259,9 @@ mod tests {
     fn fd_is_closed_after_execute() {
         let system = system_with_file("/foo/file", "");
         let mut env = Env::with_system(Box::new(system.clone()));
+        env.any.insert(Box::new(RunReadEvalLoop(|_env, _lexer| {
+            Box::pin(async { ControlFlow::Continue(()) })
+        })));
         let command = Command {
             file: Field::dummy("/foo/file"),
             params: vec![],

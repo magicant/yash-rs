@@ -13,13 +13,19 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- The `eval` built-in now requires a `yash_env::semantics::RunReadEvalLoop`
+  instance to be available in the environment's `any` storage. This instance is
+  used to run the read-eval loop in the `eval::main` function.
 - The `read` built-in now requires a `yash_env::prompt::GetPrompt` instance to
   be available in the environment's `any` storage. This instance is used to
   generate prompts when reading input in the `read::input::read` function.
-- The `wait` built-in now requires a
-  `yash_env::trap::RunSignalTrapIfCaught` instance to be available in the
-  environment's `any` storage. This instance is used to handle trapped signals
-  while waiting for jobs in the `wait::core::wait_for_any_job_or_trap` function.
+- The `source` built-in now requires a `yash_env::semantics::RunReadEvalLoop`
+  instance to be available in the environment's `any` storage. This instance is
+  used to run the read-eval loop in the `source::Command::execute` function.
+- The `wait` built-in now requires a `yash_env::trap::RunSignalTrapIfCaught`
+  instance to be available in the environment's `any` storage. This instance is
+  used to handle trapped signals while waiting for jobs in the
+  `wait::core::wait_for_any_job_or_trap` function.
 
 ### Removed
 

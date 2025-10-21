@@ -20,6 +20,11 @@
 //! as shell commands.
 //!
 //! [`eval` built-in]: https://magicant.github.io/yash-rs/builtins/eval.html
+//!
+//! # Implementation notes
+//!
+//! The built-in requires a [`RunReadEvalLoop`] instance to be available in the
+//! environment's [`any`](yash_env::Env::any) storage.
 
 use crate::Result;
 use crate::common::report::report_error;
@@ -29,13 +34,22 @@ use std::rc::Rc;
 use yash_env::Env;
 #[cfg(doc)]
 use yash_env::semantics::ExitStatus;
-use yash_env::semantics::Field;
-use yash_semantics::read_eval_loop;
+use yash_env::semantics::{Field, RunReadEvalLoop};
 use yash_syntax::input::Memory;
 use yash_syntax::parser::lex::Lexer;
 use yash_syntax::source::Source;
 
 /// Entry point of the `eval` built-in execution
+///
+/// This function implements the main logic of the `eval` built-in. It takes the
+/// shell environment and the command-line arguments as input, joins the
+/// arguments into a single command string, and evaluates the command string by
+/// invoking the read-eval loop.
+///
+/// The function requires a [`RunReadEvalLoop`] instance to be available in the
+/// environment's [`any`](Env::any) storage. This instance is used to run the
+/// read-eval loop for evaluating the command string. If the instance is not
+/// found, the function **panics**.
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     // TODO Support non-POSIX options
     let args = match parse_arguments(&[], Mode::with_env(env), args) {
@@ -49,12 +63,17 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     };
 
     // Parse and execute the command string
+    let run_read_eval_loop = env
+        .any
+        .get::<RunReadEvalLoop>()
+        .cloned()
+        .expect("`eval` built-in requires `RunReadEvalLoop` in `Env::any`");
     let mut config = Lexer::config();
     config.source = Some(Rc::new(Source::Eval {
         original: command.origin,
     }));
     let mut lexer = config.input(Box::new(Memory::new(&command.value)));
-    let divert = read_eval_loop(&RefCell::new(env), &mut lexer).await;
+    let divert = run_read_eval_loop.0(&RefCell::new(env), &mut lexer).await;
     Result::with_exit_status_and_divert(env.exit_status, divert)
 }
 

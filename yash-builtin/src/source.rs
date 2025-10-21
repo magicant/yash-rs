@@ -27,6 +27,11 @@
 //! [variable context](yash_env::variable::Context) is pushed to secure the
 //! existing positional parameters. The context is popped when the execution of
 //! the file is finished.
+//!
+//! This built-in requires a [`RunReadEvalLoop`] instance to be available in the
+//! environment's [`any`](yash_env::Env::any) storage.
+//!
+//! [`RunReadEvalLoop`]: yash_env::semantics::RunReadEvalLoop
 
 use crate::Result;
 use yash_env::Env;
