@@ -576,7 +576,7 @@ dependencies = [
 
 [[package]]
 name = "yash-prompt"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "futures-util",
  "yash-env",
@@ -591,7 +591,7 @@ version = "1.1.1"
 
 [[package]]
 name = "yash-semantics"
-version = "0.10.1"
+version = "0.10.2"
 dependencies = [
  "assert_matches",
  "either",
