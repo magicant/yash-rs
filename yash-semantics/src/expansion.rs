@@ -69,6 +69,7 @@
 //! expansion.
 
 pub mod attr;
+pub(crate) mod attr_fnmatch;
 pub mod attr_strip;
 pub mod glob;
 pub mod initial;

@@ -18,8 +18,8 @@
 
 use super::Env;
 use super::Error;
-use crate::expansion::attr::fnmatch::apply_escapes;
-use crate::expansion::attr::fnmatch::to_pattern_chars;
+use crate::expansion::attr_fnmatch::apply_escapes;
+use crate::expansion::attr_fnmatch::to_pattern_chars;
 use crate::expansion::initial::Expand as _;
 use yash_env::variable::Value::{self, Array, Scalar};
 use yash_fnmatch::Config;

@@ -18,8 +18,8 @@
 
 use crate::Handle;
 use crate::command::Command;
-use crate::expansion::attr::fnmatch::apply_escapes;
-use crate::expansion::attr::fnmatch::to_pattern_chars;
+use crate::expansion::attr_fnmatch::apply_escapes;
+use crate::expansion::attr_fnmatch::to_pattern_chars;
 use crate::expansion::expand_word;
 use crate::expansion::expand_word_attr;
 use crate::xtrace::XTrace;
