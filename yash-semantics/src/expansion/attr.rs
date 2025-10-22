@@ -29,41 +29,8 @@ pub(crate) mod fnmatch;
 use yash_env::semantics::Field;
 use yash_syntax::source::Location;
 
-/// Category of syntactic elements from which expansion originates.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum Origin {
-    /// The character appeared literally in the original word.
-    Literal,
-
-    /// The character originates from a tilde expansion or sequencing brace
-    /// expansion.
-    ///
-    /// This kind of character is treated literally in the pathname expansion.
-    HardExpansion,
-
-    /// The character originates from a parameter expansion, command
-    /// substitution, or arithmetic expansion.
-    ///
-    /// This kind of character is subject to field splitting where applicable.
-    SoftExpansion,
-}
-
-/// Character with attributes describing its origin.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct AttrChar {
-    /// Character value.
-    pub value: char,
-    /// Character origin.
-    pub origin: Origin,
-    /// Whether this character is quoted by another character.
-    pub is_quoted: bool,
-    /// Whether this is a quotation character that quotes another character.
-    ///
-    /// Note that a character can be both quoting and quoted. For example, the
-    /// backslash in `"\$"` quotes the dollar and is quoted by the
-    /// double-quotes.
-    pub is_quoting: bool,
-}
+// Re-export items from yash_env for backward compatibility
+pub use yash_env::expansion::attr::{AttrChar, Origin};
 
 /// String of `AttrChar`s with the location of the originating word.
 #[derive(Clone, Debug, Eq, PartialEq)]

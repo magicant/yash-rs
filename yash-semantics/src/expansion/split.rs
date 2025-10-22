@@ -87,11 +87,8 @@
 //!
 //! TODO: Not yet supported
 
-mod ifs;
-mod ranges;
-
-pub use self::ifs::{Class, Ifs};
-pub use self::ranges::Ranges;
+// Re-export items from yash_env for backward compatibility
+pub use yash_env::expansion::split::{Class, Ifs, Ranges};
 
 use super::attr::AttrField;
 #[cfg(doc)]
