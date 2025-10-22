@@ -13,6 +13,12 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- The following modules are no longer defined in this crate and are
+  re-exported from `yash-env` instead:
+    - `expansion::attr`
+    - `expansion::attr_strip`
+    - `expansion::quote_removal`
+    - `expansion::split`
 - `expansion::split::Ifs`'s `new` and `empty` functions are now marked with
   the `must_use` attribute.
 - Public dependency versions:

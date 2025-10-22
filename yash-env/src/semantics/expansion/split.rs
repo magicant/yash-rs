@@ -16,23 +16,32 @@
 
 //! Field splitting
 //!
-//! The field splitting divides a field into smaller parts delimited by a field
-//! separator character.  Fields are delimited by a field separator character,
-//! usually obtained from the `$IFS` variable. Every occurrence of a
-//! non-whitespace separator delimits a new field (which may be an empty field).
-//! One or more adjacent whitespace separators in the middle of a field further
-//! split the field. Any separator does not remain in the final results.
+//! This module provides components for field splitting used in word expansion.
+//! [`Ifs`] represents the field separator characters, and [`Class`] classifies
+//! them into whitespace and non-whitespace characters. [`Ranges`] is an
+//! iterator that yields the ranges of characters in a field separated by the
+//! field separators. The [`split_into`] and [`split`] functions perform field
+//! splitting on a given field using a given IFS.
 //!
-//! Only [unquoted characters](AttrChar) having a `SoftExpansion`
-//! [origin](Origin) are considered for delimiting. Other characters are not
-//! subject to field splitting.
+//! # Field splitting semantics
+//!
+//! Field splitting divides a field into smaller parts delimited by a field
+//! separator character, which is usually obtained from the `$IFS` variable.
+//! Every occurrence of a non-whitespace separator delimits a new field (which
+//! may be an empty field). One or more adjacent whitespace separators in the
+//! middle of a field further split the field. The separators are not included
+//! in the final results.
+//!
+//! Only [unquoted characters](super::attr::AttrChar) having a
+//! `SoftExpansion` [origin](super::attr::Origin) are considered for delimiting.
+//! Other characters are not subject to field splitting.
 //!
 //! # Example
 //!
 //! ```
 //! use yash_syntax::source::Location;
-//! use yash_semantics::expansion::attr::{AttrChar, AttrField, Origin};
-//! use yash_semantics::expansion::split::{Ifs, split};
+//! use yash_env::semantics::expansion::attr::{AttrChar, AttrField, Origin};
+//! use yash_env::semantics::expansion::split::{Ifs, split};
 //!
 //! // We use this utility to prepare fields used in the examples below:
 //! fn field(s: &str) -> AttrField {
@@ -94,8 +103,6 @@ pub use self::ifs::{Class, Ifs};
 pub use self::ranges::Ranges;
 
 use super::attr::AttrField;
-#[cfg(doc)]
-use super::attr::{AttrChar, Origin};
 
 /// Performs field splitting and appends the result to a collection.
 ///

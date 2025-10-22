@@ -16,13 +16,13 @@
 
 //! Attribute stripping
 //!
-//! The attribute stripping is the final step of the word expansion that
-//! converts [`AttrChar`] to plain `char`. The conversion is performed by
-//! implementors of the [`Strip`] trait.
+//! This module defines types for attribute stripping, the final step of the
+//! word expansion that converts [`AttrChar`] to plain `char`. The conversion is
+//! performed by implementors of the [`Strip`] trait.
 //!
 //! ```
-//! # use yash_semantics::expansion::attr::{AttrChar, Origin};
-//! # use yash_semantics::expansion::attr_strip::Strip;
+//! # use yash_env::semantics::expansion::attr::{AttrChar, Origin};
+//! # use yash_env::semantics::expansion::attr_strip::Strip;
 //! let c = AttrChar {
 //!     value: 'X',
 //!     origin: Origin::Literal,
@@ -32,11 +32,10 @@
 //! assert_eq!(c.strip(), 'X');
 //! ```
 
-use super::attr::AttrChar;
-use super::attr::AttrField;
-use yash_env::semantics::Field;
+use super::attr::{AttrChar, AttrField};
+use crate::semantics::Field;
 
-/// Trait for performing attribute stripping.
+/// Trait for performing attribute stripping
 pub trait Strip {
     /// Result of attribute stripping
     type Output;

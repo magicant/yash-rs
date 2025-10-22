@@ -18,17 +18,17 @@
 //!
 //! The quote removal is a step of the word expansion that removes quotes from
 //! the field. Yash's notion of the quote removal is a bit different from that
-//! of POSIX in that the [attribute stripping](super::attr_strip::Strip) is a
-//! separate operation from the quote removal.
+//! of POSIX in that the [attribute stripping](super::attr_strip) is a separate
+//! operation from the quote removal.
 //!
 //! There are two versions of quote removal implementation.
-//! [`skip_quotes`] wraps an iterator of `AttrChar`s with another iterator that
-//! removes quotes from iteration.
+//! [`skip_quotes`] wraps an iterator of [`AttrChar`]s with another iterator
+//! that removes quotes from iteration.
 //! [`remove_quotes`] removes quotes from a mutable vector of `AttrChar`s.
 //!
 //! ```
-//! # use yash_semantics::expansion::attr::{AttrChar, Origin};
-//! # use yash_semantics::expansion::quote_removal::skip_quotes;
+//! # use yash_env::semantics::expansion::attr::{AttrChar, Origin};
+//! # use yash_env::semantics::expansion::quote_removal::skip_quotes;
 //! let a = AttrChar {
 //!     value: '\\',
 //!     origin: Origin::Literal,
@@ -46,7 +46,7 @@
 //! assert_eq!(output, [b]);
 //! ```
 
-use super::AttrChar;
+use super::attr::AttrChar;
 
 /// Performs quote removal on an iterator.
 ///
@@ -68,7 +68,7 @@ pub fn remove_quotes(chars: &mut Vec<AttrChar>) {
 
 #[cfg(test)]
 mod tests {
-    use super::super::Origin;
+    use super::super::attr::Origin;
     use super::*;
 
     #[test]

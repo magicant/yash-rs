@@ -138,7 +138,7 @@ impl<I> FusedIterator for Ranges<'_, I> where I: Iterator<Item = AttrChar> {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expansion::attr::Origin;
+    use crate::semantics::expansion::attr::Origin;
 
     fn attr_chars(s: &str) -> impl Iterator<Item = AttrChar> + '_ {
         s.chars().map(|c| AttrChar {
