@@ -9,6 +9,24 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+
+## [0.10.0] - Unreleased
+
+### Added
+
+- `expansion` module
+    - This module contains types and utilities for word expansion.
+- `expansion::attr` module
+    - `AttrChar`: Character with attributes describing its origin
+    - `Origin`: Category of syntactic elements from which expansion originates
+- `expansion::attr_strip` module
+    - `Strip`: Trait for performing attribute stripping
+    - `Iter`: Iterator wrapper that performs attribute stripping on items
+- `expansion::split` module
+    - `Class`: Type of characters that affect field splitting
+    - `Ifs`: Collection of input field separator characters
+    - `Ranges`: Iterator that yields index ranges of separated fields
+
 ## [0.9.2] - Unreleased
 
 ### Added

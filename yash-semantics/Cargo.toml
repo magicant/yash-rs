@@ -1,6 +1,6 @@
 [package]
 name = "yash-semantics"
-version = "0.10.1"
+version = "0.10.2"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2024"
 rust-version = "1.86.0"
