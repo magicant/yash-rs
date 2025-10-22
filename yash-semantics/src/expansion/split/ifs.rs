@@ -71,6 +71,7 @@ impl<'a> Ifs<'a> {
     /// Creates a new IFS consisting of the given separators.
     ///
     /// The argument is treated as a list of separator characters.
+    #[must_use = "just creating an `Ifs` has no effect"]
     pub fn new(chars: &'a str) -> Self {
         Ifs {
             chars,
@@ -79,6 +80,8 @@ impl<'a> Ifs<'a> {
     }
 
     /// Creates a new IFS containing no separators.
+    #[inline]
+    #[must_use = "just creating an `Ifs` has no effect"]
     pub fn empty() -> Self {
         Self::new("")
     }
