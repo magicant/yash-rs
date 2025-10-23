@@ -18,13 +18,13 @@
 
 use yash_env::Env;
 use yash_env::semantics::Field;
+use yash_env::semantics::expansion::attr::AttrChar;
+use yash_env::semantics::expansion::attr_strip::Strip as _;
+use yash_env::semantics::expansion::quote_removal::skip_quotes;
+use yash_env::semantics::expansion::split::Class;
+use yash_env::semantics::expansion::split::Ifs;
 use yash_env::variable::IFS;
 use yash_env::variable::Scope;
-use yash_semantics::expansion::attr::AttrChar;
-use yash_semantics::expansion::attr_strip::Strip as _;
-use yash_semantics::expansion::quote_removal::skip_quotes;
-use yash_semantics::expansion::split::Class;
-use yash_semantics::expansion::split::Ifs;
 
 pub use crate::typeset::AssignReadOnlyError as Error;
 
@@ -103,10 +103,10 @@ fn assign_one(env: &mut Env, name: Field, value: &[AttrChar]) -> Result<(), Erro
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use yash_env::semantics::expansion::attr::Origin;
     use yash_env::variable::Value;
     use yash_env::variable::Variable;
     use yash_env::variable::VariableSet;
-    use yash_semantics::expansion::attr::Origin;
     use yash_syntax::source::Location;
 
     fn attr_chars(s: &str) -> Vec<AttrChar> {
