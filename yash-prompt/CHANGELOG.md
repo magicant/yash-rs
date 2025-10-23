@@ -14,7 +14,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 ### Changed
 
 - Private dependency versions:
-    - yash-semantics 0.10.0 → 0.10.2
+    - yash-semantics 0.10.0 → 0.11.0
 
 ## [0.7.0] - 2025-10-13
 

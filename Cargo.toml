@@ -32,7 +32,7 @@ yash-executor = { path = "yash-executor", version = "1.0.0" }
 yash-fnmatch = { path = "yash-fnmatch", version = "1.1.1" }
 yash-prompt = { path = "yash-prompt", version = "0.7.0" }
 yash-quote = { path = "yash-quote", version = "1.1.1" }
-yash-semantics = { path = "yash-semantics", version = "0.10.2" }
+yash-semantics = { path = "yash-semantics", version = "0.11.0" }
 yash-syntax = { path = "yash-syntax", version = "0.16.0" }
 
 [workspace.lints]
