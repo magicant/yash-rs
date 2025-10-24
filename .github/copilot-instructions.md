@@ -187,6 +187,8 @@ For yash-cli CHANGELOG: Include changes in observable behavior even if yash-cli 
 - Code style: Use existing Rust conventions, verified by `cargo fmt`
 - Clippy must pass without warnings
 - Match existing patterns in the codebase
+- All public APIs must have documentation comments, except for trivial trait implementations
+    - If the documentation comment for an item starts with a paragraph composed only of a noun phrase, do not end that paragraph with a period. Other paragraphs should end with periods.
 
 ## Key Configuration Files
 
