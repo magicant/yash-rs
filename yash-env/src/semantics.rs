@@ -308,6 +308,7 @@ pub struct RunReadEvalLoop(
     ) -> Pin<Box<dyn Future<Output = Result> + 'a>>,
 );
 
+pub mod command;
 pub mod expansion;
 
 #[cfg(test)]
