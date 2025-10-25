@@ -24,6 +24,7 @@ use crate::xtrace::XTrace;
 use crate::xtrace::print;
 use crate::xtrace::trace_fields;
 use std::ops::ControlFlow::{Break, Continue};
+use std::pin::Pin;
 use std::rc::Rc;
 use yash_env::Env;
 use yash_env::function::Function;
@@ -54,8 +55,10 @@ pub async fn execute_function(
     trace_fields(xtrace.as_mut(), &fields);
     print(&mut env, xtrace).await;
 
-    execute_function_body(&mut env, function, fields, |_| ()).await
+    execute_function_body(&mut env, function, fields, None).await
 }
+
+type EnvPrepHook = fn(&mut Env) -> Pin<Box<dyn Future<Output = ()>>>;
 
 /// Executes the body of the function.
 ///
@@ -63,21 +66,20 @@ pub async fn execute_function(
 /// passed as positional parameters to the function except for the first field
 /// which is the name of the function.
 ///
-/// The modifier function is called with the environment after the new variable
-/// context is pushed to the environment. This is useful for assigning custom
-/// local variables before the function body is executed.
-pub async fn execute_function_body<F>(
+/// `env_prep_hook` is called after the new variable context is pushed to the
+/// environment. This is useful for assigning custom local variables before the
+/// function body is executed.
+pub async fn execute_function_body(
     env: &mut Env,
     function: Rc<Function>,
     fields: Vec<Field>,
-    modifier: F,
-) -> Result
-where
-    F: FnOnce(&mut Env),
-{
+    env_prep_hook: Option<EnvPrepHook>,
+) -> Result {
     let positional_params = PositionalParams::from_fields(fields);
     let mut env = env.push_context(Context::Regular { positional_params });
-    modifier(&mut env);
+    if let Some(hook) = env_prep_hook {
+        hook(&mut env).await;
+    }
 
     // TODO Update control flow stack
     let result = function.body.execute(&mut env).await;

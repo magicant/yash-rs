@@ -65,7 +65,7 @@ async fn invoke_target(env: &mut Env, target: Target, mut fields: Vec<Field>) ->
         }
 
         Target::Function(function) => {
-            let divert = execute_function_body(env, function, fields, |_| ()).await;
+            let divert = execute_function_body(env, function, fields, None).await;
             crate::Result::with_exit_status_and_divert(env.exit_status, divert)
         }
 
