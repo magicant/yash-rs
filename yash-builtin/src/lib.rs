@@ -54,6 +54,9 @@
 //! into the environment's [`any`](yash_env::Env::any) storage. If these
 //! dependencies are not injected, the built-in may **panic** at runtime.
 //!
+//! - The `command` built-in requires a
+//!   [`RunFunction`](yash_env::semantics::command::RunFunction) instance in the
+//!   `any` storage to invoke shell functions.
 //! - The `eval` and `source` built-ins require a
 //!   [`RunReadEvalLoop`](yash_env::semantics::RunReadEvalLoop) instance in the
 //!   `any` storage to run the read-eval loop for executing commands.

@@ -24,6 +24,7 @@ use yash_env::io::Fd;
 use yash_env::option::Option::{Interactive, Monitor, Stdin};
 use yash_env::option::State::On;
 use yash_env::prompt::GetPrompt;
+use yash_env::semantics::command::RunFunction;
 use yash_env::trap::RunSignalTrapIfCaught;
 use yash_semantics::RunReadEvalLoop;
 
@@ -112,6 +113,20 @@ fn inject_dependencies(env: &mut Env) {
     env.any.insert(Box::new(RunReadEvalLoop(|env, lexer| {
         Box::pin(async move { yash_semantics::read_eval_loop(env, lexer).await })
     })));
+
+    env.any.insert(Box::new(RunFunction(
+        |env, function, fields, env_prep_hook| {
+            Box::pin(async move {
+                yash_semantics::command::simple_command::execute_function_body(
+                    env,
+                    function,
+                    fields,
+                    env_prep_hook,
+                )
+                .await
+            })
+        },
+    )));
 
     env.any
         .insert(Box::new(RunSignalTrapIfCaught(|env, signal| {

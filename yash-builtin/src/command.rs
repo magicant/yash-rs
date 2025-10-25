@@ -27,9 +27,14 @@
 //! search path. See the source code of [`RealSystem::confstr_path`] for the
 //! platforms supported on the real system.
 //!
+//! Function invocation depends on an instance of [`RunFunction`] being present
+//! in the environment's [`any`](Env::any) storage. If no such instance is found,
+//! the built-in will **panic**.
+//!
 //! The [`type`] built-in is equivalent to the `command` built-in with the `-V`
 //! option.
 //!
+//! [`RunFunction`]: yash_env::semantics::command::RunFunction
 //! [`type`]: crate::type
 
 use crate::common::report::report_error;

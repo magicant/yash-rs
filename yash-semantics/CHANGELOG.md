@@ -13,6 +13,13 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- The fourth argument of `command::simple_command::execute_function_body` has
+  been changed from `modifier: impl FnOnce(&mut Env)` to
+  `env_prep_hook: Option<fn(&mut Env) -> Pin<Box<dyn Future<Output = ()>>>>`.
+    - This allows asynchronous preparation of the environment before executing
+      the function body.
+    - The function no longer takes the type parameter `F` for the environment
+      preparation hook.
 - The following modules are no longer defined in this crate and are
   re-exported from `yash-env` instead:
     - `expansion::attr`
