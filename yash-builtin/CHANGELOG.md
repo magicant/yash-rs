@@ -28,7 +28,7 @@ A _private dependency_ is used internally and not visible to downstream users.
   `wait::core::wait_for_any_job_or_trap` function.
 - Public dependency versions:
     - yash-env 0.9.0 → 0.9.2
-    - yash-semantics (optional) 0.10.0 → 0.10.2
+    - yash-semantics (optional) 0.10.0 → 0.11.0
 - Private dependency versions:
     - yash-prompt (optional) 0.7.0 → 0.7.1
 

@@ -16,20 +16,18 @@
 
 //! Intermediate expansion results
 //!
-//! This module defines some types that represent intermediate results of
-//! the expansion.
+//! This module defines types that represent intermediate results of the
+//! expansion.
 //!
 //! An [`AttrChar`] is a character with attributes describing how the character
 //! was derived in the initial expansion. The attributes affect the behavior of
 //! later steps of the expansion. An [`AttrField`] is a string of `AttrChar`s
 //! associated with the location of the originating word.
 
-pub(crate) mod fnmatch;
-
-use yash_env::semantics::Field;
+use crate::semantics::Field;
 use yash_syntax::source::Location;
 
-/// Category of syntactic elements from which expansion originates.
+/// Category of syntactic elements from which expansion originates
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Origin {
     /// The character appeared literally in the original word.
@@ -48,7 +46,7 @@ pub enum Origin {
     SoftExpansion,
 }
 
-/// Character with attributes describing its origin.
+/// Character with attributes describing how it was derived in the expansion
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct AttrChar {
     /// Character value.
@@ -65,12 +63,12 @@ pub struct AttrChar {
     pub is_quoting: bool,
 }
 
-/// String of `AttrChar`s with the location of the originating word.
+/// String of [attributed characters](AttrChar) with the location of the originating word
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AttrField {
-    /// Value of the field.
+    /// Value of the field
     pub chars: Vec<AttrChar>,
-    /// Location of the word this field resulted from.
+    /// Location of the word this field resulted from
     pub origin: Location,
 }
 

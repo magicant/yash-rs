@@ -68,13 +68,10 @@
 //! [`expand_word`], they are carried out as the last step of the whole
 //! expansion.
 
-pub mod attr;
-pub mod attr_strip;
+pub(crate) mod attr_fnmatch;
 pub mod glob;
 pub mod initial;
 pub mod phrase;
-pub mod quote_removal;
-pub mod split;
 
 use self::attr::AttrChar;
 use self::attr::AttrField;
@@ -114,6 +111,8 @@ use yash_syntax::syntax::Word;
 
 #[doc(no_inline)]
 pub use yash_env::semantics::Field;
+#[doc(no_inline)]
+pub use yash_env::semantics::expansion::{attr, attr_strip, quote_removal, split};
 
 /// Error returned on assigning to a read-only variable
 #[derive(Clone, Debug, Eq, Error, PartialEq)]

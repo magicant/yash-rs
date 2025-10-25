@@ -9,10 +9,16 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
-## [0.10.2] - Unreleased
+## [0.11.0] - Unreleased
 
 ### Changed
 
+- The following modules are no longer defined in this crate and are
+  re-exported from `yash-env` instead:
+    - `expansion::attr`
+    - `expansion::attr_strip`
+    - `expansion::quote_removal`
+    - `expansion::split`
 - `expansion::split::Ifs`'s `new` and `empty` functions are now marked with
   the `must_use` attribute.
 - Public dependency versions:
@@ -351,7 +357,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Initial implementation of the `yash-semantics` crate
 
-[0.10.2]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.10.2
+[0.11.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.11.0
 [0.10.1]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.10.1
 [0.10.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.10.0
 [0.9.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.9.0

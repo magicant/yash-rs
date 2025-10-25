@@ -19,9 +19,9 @@
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::prompt::GetPrompt;
+use yash_env::semantics::expansion::attr::AttrChar;
+use yash_env::semantics::expansion::attr::Origin;
 use yash_env::system::Errno;
-use yash_semantics::expansion::attr::AttrChar;
-use yash_semantics::expansion::attr::Origin;
 #[allow(deprecated)]
 use yash_syntax::source::pretty::{AnnotationType, Message};
 use yash_syntax::source::pretty::{Report, ReportType};

@@ -16,8 +16,7 @@
 
 //! IFS parser
 
-use crate::expansion::attr::AttrChar;
-use crate::expansion::attr::Origin;
+use crate::semantics::expansion::attr::{AttrChar, Origin};
 use std::borrow::Cow;
 
 /// Type of characters that affect field splitting
@@ -89,7 +88,7 @@ impl<'a> Ifs<'a> {
     /// String containing the default separators.
     ///
     /// The default separators are a space, tab, and newline (`" \t\n"`).
-    pub const DEFAULT: &'static str = yash_env::variable::IFS_INITIAL_VALUE;
+    pub const DEFAULT: &'static str = crate::variable::IFS_INITIAL_VALUE;
 }
 
 /// The default IFS contains a space, tab, and newline (`" \t\n"`).
@@ -143,7 +142,7 @@ impl Ifs<'_> {
     /// Tests if the given character is a separator contained in this IFS.
     ///
     /// ```
-    /// # use yash_semantics::expansion::split::Ifs;
+    /// # use yash_env::semantics::expansion::split::Ifs;
     /// let ifs = Ifs::new(" a");
     /// assert!(ifs.is_ifs(' '));
     /// assert!(ifs.is_ifs('a'));
@@ -161,7 +160,7 @@ impl Ifs<'_> {
     /// [`self.chars()`](Self::chars) and is not whitespace.
     ///
     /// ```
-    /// # use yash_semantics::expansion::split::Ifs;
+    /// # use yash_env::semantics::expansion::split::Ifs;
     /// let ifs = Ifs::new(" a");
     /// assert!(ifs.is_ifs_non_whitespace('a'));
     ///

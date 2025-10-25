@@ -21,6 +21,25 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `trap::RunSignalTrapIfCaught`
     - This struct wraps a function that runs a signal trap if the signal has been
       caught.
+- `semantics::expansion` module
+    - The content of this module has been moved from `yash_semantics::expansion`
+      to here for better modularity. Currently, it contains the following
+      submodules:
+        - `semantics::expansion::attr` module
+            - `AttrChar`: Character with attributes describing its origin
+            - `AttrField`: String of attributed characters
+            - `Origin`: Category of syntactic elements from which expansion originates
+        - `semantics::expansion::attr_strip` module
+            - `Strip`: Trait for performing attribute stripping
+            - `Iter`: Iterator wrapper that performs attribute stripping on items
+        - `semantics::expansion::quote_removal` module
+            - `remove_quotes` and `skip_quotes`: Functions for removing quotes from
+              attributed fields
+        - `semantics::expansion::split` module
+            - `Class`: Type of characters that affect field splitting
+            - `Ifs`: Collection of input field separator characters
+            - `Ranges`: Iterator that yields index ranges of separated fields
+            - `split_into` and `split`: Functions for performing field splitting
 
 ## [0.9.1] - 2025-10-18
 
