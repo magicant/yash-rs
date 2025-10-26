@@ -23,8 +23,8 @@ use crate::common::report::report_failure;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
+use yash_env::semantics::command::RunExternalUtilityInSubshell;
 use yash_env::semantics::command::RunFunction;
-use yash_semantics::command::simple_command::start_external_utility_in_subshell_and_wait;
 use yash_semantics::command_search::Target;
 use yash_semantics::command_search::search;
 
@@ -53,9 +53,10 @@ impl Invoke {
 /// the command name that was searched for. The rest of the fields are the
 /// arguments to the command.
 ///
-/// This function requires an instance of [`RunFunction`] to be present in
-/// [`env.any`](Env::any), which is used to invoke shell functions. If no such
-/// instance is found, this function will **panic**.
+/// This function requires instances of [`RunFunction`] and
+/// [`RunExternalUtilityInSubshell`] to be present in [`env.any`](Env::any),
+/// which are used to invoke shell functions and external utilities,
+/// respectively. If either instance is missing, this function will **panic**.
 async fn invoke_target(env: &mut Env, target: Target, mut fields: Vec<Field>) -> crate::Result {
     match target {
         Target::Builtin { builtin, .. } => {
@@ -70,14 +71,18 @@ async fn invoke_target(env: &mut Env, target: Target, mut fields: Vec<Field>) ->
 
         Target::Function(function) => {
             let RunFunction(run_function) =
-                env.any.get().expect("RunFunction not found in env.any");
+                *env.any.get().expect("RunFunction not found in env.any");
             let divert = run_function(env, function, fields, None).await;
             crate::Result::with_exit_status_and_divert(env.exit_status, divert)
         }
 
         Target::External { path } => {
             use std::ops::ControlFlow::{Break, Continue};
-            match start_external_utility_in_subshell_and_wait(env, path, fields).await {
+            let RunExternalUtilityInSubshell(run_external) = *env
+                .any
+                .get()
+                .expect("RunExternalUtilityInSubshell not found in env.any");
+            match run_external(env, path, fields).await {
                 Continue(exit_status) => exit_status.into(),
                 Break(divert) => {
                     crate::Result::with_exit_status_and_divert(env.exit_status, Break(divert))

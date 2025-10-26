@@ -54,15 +54,17 @@
 //! into the environment's [`any`](yash_env::Env::any) storage. If these
 //! dependencies are not injected, the built-in may **panic** at runtime.
 //!
-//! - The `command` built-in requires a
-//!   [`RunFunction`](yash_env::semantics::command::RunFunction) instance in the
-//!   `any` storage to invoke shell functions.
-//! - The `eval` and `source` built-ins require a
+//! - The [`command`] built-in requires
+//!   [`RunFunction`](yash_env::semantics::command::RunFunction) and
+//!   [`RunExternalUtilityInSubshell`](yash_env::semantics::command::RunExternalUtilityInSubshell)
+//!   instances in the `any` storage to invoke shell functions and run external
+//!   utilities, respectively.
+//! - The [`eval`] and [`source`] built-ins require a
 //!   [`RunReadEvalLoop`](yash_env::semantics::RunReadEvalLoop) instance in the
 //!   `any` storage to run the read-eval loop for executing commands.
 //! - The `read` built-in requires a [`GetPrompt`](yash_env::prompt::GetPrompt)
 //!   instance in the `any` storage to generate prompts when reading input.
-//! - The `wait` built-in requires a
+//! - The [`wait`] built-in requires a
 //!   [`RunSignalTrapIfCaught`](yash_env::trap::RunSignalTrapIfCaught) instance
 //!   in the `any` storage to handle trapped signals while waiting for jobs.
 

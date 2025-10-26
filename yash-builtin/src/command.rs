@@ -27,13 +27,15 @@
 //! search path. See the source code of [`RealSystem::confstr_path`] for the
 //! platforms supported on the real system.
 //!
-//! Function invocation depends on an instance of [`RunFunction`] being present
-//! in the environment's [`any`](Env::any) storage. If no such instance is found,
-//! the built-in will **panic**.
+//! Function invocation depends on instances of [`RunFunction`] and
+//! [`RunExternalUtilityInSubshell`] being present in the environment's
+//! [`any`](Env::any) storage. If either instance is missing, the built-in will
+//! **panic**.
 //!
 //! The [`type`] built-in is equivalent to the `command` built-in with the `-V`
 //! option.
 //!
+//! [`RunExternalUtilityInSubshell`]: yash_env::semantics::command::RunExternalUtilityInSubshell
 //! [`RunFunction`]: yash_env::semantics::command::RunFunction
 //! [`type`]: crate::type
 

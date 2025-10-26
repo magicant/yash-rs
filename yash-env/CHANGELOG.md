@@ -22,6 +22,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - This struct wraps a function that runs a signal trap if the signal has been
       caught.
 - `semantics::command` module
+    - `RunExternalUtilityInSubshell`: Struct that wraps a function for invoking
+      external utilities in a subshell.
     - `RunFunction`: Struct that wraps a function for invoking shell functions.
 - `semantics::expansion` module
     - The content of this module has been moved from `yash_semantics::expansion`
