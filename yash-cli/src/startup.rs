@@ -24,7 +24,7 @@ use yash_env::io::Fd;
 use yash_env::option::Option::{Interactive, Monitor, Stdin};
 use yash_env::option::State::On;
 use yash_env::prompt::GetPrompt;
-use yash_env::semantics::command::RunFunction;
+use yash_env::semantics::command::{ReplaceCurrentProcess, RunFunction};
 use yash_env::trap::RunSignalTrapIfCaught;
 use yash_semantics::RunReadEvalLoop;
 
@@ -122,6 +122,17 @@ fn inject_dependencies(env: &mut Env) {
                     function,
                     fields,
                     env_prep_hook,
+                )
+                .await
+            })
+        },
+    )));
+
+    env.any.insert(Box::new(ReplaceCurrentProcess(
+        |env, path, args, location| {
+            Box::pin(async move {
+                yash_semantics::command::simple_command::replace_current_process(
+                    env, path, args, location,
                 )
                 .await
             })

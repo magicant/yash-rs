@@ -40,9 +40,10 @@ use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::io::print_error;
 use yash_env::semantics::Field;
+use yash_env::semantics::command::ReplaceCurrentProcess;
 use yash_semantics::Divert::Abort;
 use yash_semantics::ExitStatus;
-use yash_semantics::command::simple_command::{replace_current_process, to_c_strings};
+use yash_semantics::command::simple_command::to_c_strings;
 use yash_semantics::command_search::search_path;
 
 // TODO Split into syntax and semantics submodules
@@ -72,6 +73,10 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
         if let Some(path) = path {
             let location = name.origin.clone();
             let args = to_c_strings(args);
+            let ReplaceCurrentProcess(replace_current_process) = env
+                .any
+                .get()
+                .expect("ReplaceCurrentProcess not found in env.any");
             replace_current_process(env, path, args, location).await;
             result.set_exit_status(env.exit_status);
         } else {
@@ -99,9 +104,23 @@ mod tests {
     use yash_env::VirtualSystem;
     use yash_env::option::Option::Interactive;
     use yash_env::option::State::On;
+    use yash_env::semantics::command::ReplaceCurrentProcess;
     use yash_env::system::Mode;
     use yash_env::system::r#virtual::{FileBody, Inode};
     use yash_env::variable::{PATH, Scope};
+
+    fn inject_replace_current_process(env: &mut Env) {
+        env.any.insert(Box::new(ReplaceCurrentProcess(
+            |env, path, args, location| {
+                Box::pin(async move {
+                    yash_semantics::command::simple_command::replace_current_process(
+                        env, path, args, location,
+                    )
+                    .await
+                })
+            },
+        )));
+    }
 
     fn dummy_file(is_native_executable: bool) -> Inode {
         let mut content = Inode::default();
@@ -133,6 +152,7 @@ mod tests {
     fn executes_external_utility_when_given_operand() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
+        inject_replace_current_process(&mut env);
 
         // Prepare the external utility file
         system
@@ -161,6 +181,7 @@ mod tests {
     fn accepts_double_hyphen_separator() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
+        inject_replace_current_process(&mut env);
 
         // Prepare the external utility file
         system
@@ -183,6 +204,7 @@ mod tests {
     fn passing_argument_to_external_utility() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
+        inject_replace_current_process(&mut env);
 
         // Prepare the external utility file
         system
@@ -211,6 +233,7 @@ mod tests {
     fn utility_name_with_slash() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
+        inject_replace_current_process(&mut env);
 
         // Prepare the external utility file
         system
@@ -258,6 +281,7 @@ mod tests {
     fn utility_not_executable() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
+        inject_replace_current_process(&mut env);
 
         // Prepare the file without executable permission
         let content = non_executable_file();
@@ -278,6 +302,7 @@ mod tests {
     fn utility_not_executable_interactive_no_abort() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
+        inject_replace_current_process(&mut env);
         env.options.set(Interactive, On);
 
         // Prepare the file without executable permission
