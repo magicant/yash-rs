@@ -238,6 +238,7 @@ mod external;
 use external::execute_external_utility;
 pub use external::replace_current_process;
 pub use external::start_external_utility_in_subshell_and_wait;
+#[allow(deprecated)]
 pub use external::to_c_strings;
 
 #[cfg(test)]

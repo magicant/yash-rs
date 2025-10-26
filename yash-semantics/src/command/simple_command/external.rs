@@ -109,9 +109,8 @@ pub async fn start_external_utility_in_subshell_and_wait(
     } else {
         String::new()
     };
-    let args = to_c_strings(fields);
     let subshell = Subshell::new(move |env, _job_control| {
-        Box::pin(replace_current_process(env, path, args, location))
+        Box::pin(replace_current_process(env, path, fields, location))
     })
     .job_control(JobControl::Foreground);
 
@@ -138,6 +137,14 @@ fn to_job_name(fields: &[Field]) -> String {
 }
 
 /// Converts fields to C strings.
+///
+/// # Deprecated
+///
+/// This function is deprecated because it does not handle null bytes in field
+/// values. If a field contains a null byte, the field is simply skipped, which
+/// may lead to unexpected behavior. Users are encouraged to implement their own
+/// conversion that handles null bytes appropriately.
+#[deprecated(since = "0.11.0")]
 pub fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
     s.into_iter()
         .filter_map(|f| {
@@ -163,13 +170,14 @@ pub fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
 pub async fn replace_current_process(
     env: &mut Env,
     path: CString,
-    args: Vec<CString>,
+    args: Vec<Field>,
     location: Location,
 ) {
     env.traps
         .disable_internal_dispositions(&mut env.system)
         .ok();
 
+    let args = to_c_strings(args);
     let envs = env.variables.env_c_strings();
     let result = env.system.execve(path.as_c_str(), &args, &envs).await;
     // TODO Prefer into_err to unwrap_err

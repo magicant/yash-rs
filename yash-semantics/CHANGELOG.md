@@ -13,6 +13,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- The third argument of `command::simple_command::replace_current_process` has
+  been changed from `args: Vec<CString>` to `args: Vec<Field>`.
+    - This allows passing the command arguments without converting them to C
+      strings first.
 - The fourth argument of `command::simple_command::execute_function_body` has
   been changed from `modifier: impl FnOnce(&mut Env)` to
   `env_prep_hook: Option<fn(&mut Env) -> Pin<Box<dyn Future<Output = ()>>>>`.
@@ -30,6 +34,14 @@ A _private dependency_ is used internally and not visible to downstream users.
   the `must_use` attribute.
 - Public dependency versions:
     - yash-env 0.9.0 → 0.9.2
+
+### Deprecated
+
+- The `to_c_strings` function in the `command::simple_command` module has been
+  deprecated because it does not handle null bytes in field values. If a field
+  contains a null byte, the field is simply skipped, which may lead to unexpected
+  behavior. Users are encouraged to implement their own conversion that handles
+  null bytes appropriately.
 
 ## [0.10.1] - 2025-10-16
 

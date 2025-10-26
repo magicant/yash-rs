@@ -42,7 +42,7 @@ use yash_env::io::print_error;
 use yash_env::semantics::Field;
 use yash_semantics::Divert::Abort;
 use yash_semantics::ExitStatus;
-use yash_semantics::command::simple_command::{replace_current_process, to_c_strings};
+use yash_semantics::command::simple_command::replace_current_process;
 use yash_semantics::command_search::search_path;
 
 // TODO Split into syntax and semantics submodules
@@ -71,7 +71,6 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
 
         if let Some(path) = path {
             let location = name.origin.clone();
-            let args = to_c_strings(args);
             replace_current_process(env, path, args, location).await;
             result.set_exit_status(env.exit_status);
         } else {

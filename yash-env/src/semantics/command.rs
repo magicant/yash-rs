@@ -16,17 +16,17 @@
 
 //! Command execution components
 //!
-//! This module defines types for injecting command execution behavior.
+//! This module provides functionality related to command execution semantics.
 
 use crate::Env;
 use crate::function::Function;
-use crate::semantics::Field;
+use crate::semantics::{Field, Result};
 use std::pin::Pin;
 use std::rc::Rc;
 
 type EnvPrepHook = fn(&mut Env) -> Pin<Box<dyn Future<Output = ()>>>;
 
-type RunFunctionResult<'a> = Pin<Box<dyn Future<Output = crate::semantics::Result> + 'a>>;
+type FutureResult<'a, T = ()> = Pin<Box<dyn Future<Output = Result<T>> + 'a>>;
 
 /// Wrapper for a function that runs a shell function
 ///
@@ -47,8 +47,8 @@ type RunFunctionResult<'a> = Pin<Box<dyn Future<Output = crate::semantics::Resul
 ///     - This hook is called after setting up the local variable context. It can inject
 ///       additional setup logic or modify the environment before the function is executed.
 ///
-/// The function returns a future that resolves to a [`Result`](crate::semantics::Result)
-/// indicating the outcome of the function execution.
+/// The function returns a future that resolves to a [`Result`] indicating the
+/// outcome of the function execution.
 ///
 /// The most standard implementation of this type is provided in the
 /// [`yash-semantics` crate](https://crates.io/crates/yash-semantics):
@@ -66,10 +66,5 @@ type RunFunctionResult<'a> = Pin<Box<dyn Future<Output = crate::semantics::Resul
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct RunFunction(
-    pub  for<'a> fn(
-        &'a mut Env,
-        Rc<Function>,
-        Vec<Field>,
-        Option<EnvPrepHook>,
-    ) -> RunFunctionResult<'a>,
+    pub for<'a> fn(&'a mut Env, Rc<Function>, Vec<Field>, Option<EnvPrepHook>) -> FutureResult<'a>,
 );
