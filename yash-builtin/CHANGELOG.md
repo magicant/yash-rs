@@ -9,6 +9,15 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.12.1] - Unreleased
+
+### Changed
+
+- The `exec` built-in now requires a `yash_env::semantics::command::ReplaceCurrentProcess`
+  instance to be available in the environment's `any` storage. This instance is
+  used to replace the current process with an external utility in the `exec::main`
+  function.
+
 ## [0.12.0] - Unreleased
 
 ### Changed

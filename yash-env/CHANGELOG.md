@@ -9,6 +9,15 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.10.0] - Unreleased
+
+### Added
+
+- `semantics::command::ReplaceCurrentProcess`
+    - This struct wraps a function that replaces the current process with an
+      external utility. It is used to inject command execution behavior into
+      the shell environment.
+
 ## [0.9.2] - Unreleased
 
 ### Added
