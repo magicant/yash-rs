@@ -63,17 +63,16 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     };
 
     // Parse and execute the command string
-    let run_read_eval_loop = env
+    let RunReadEvalLoop(run_read_eval_loop) = *env
         .any
-        .get::<RunReadEvalLoop>()
-        .cloned()
+        .get()
         .expect("`eval` built-in requires `RunReadEvalLoop` in `Env::any`");
     let mut config = Lexer::config();
     config.source = Some(Rc::new(Source::Eval {
         original: command.origin,
     }));
     let mut lexer = config.input(Box::new(Memory::new(&command.value)));
-    let divert = run_read_eval_loop.0(&RefCell::new(env), &mut lexer).await;
+    let divert = run_read_eval_loop(&RefCell::new(env), &mut lexer).await;
     Result::with_exit_status_and_divert(env.exit_status, divert)
 }
 

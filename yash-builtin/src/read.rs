@@ -27,7 +27,8 @@
 //! (TODO: Use a buffered reader if the input is seekable)
 //!
 //! Prompting requires a [`GetPrompt`](yash_env::prompt::GetPrompt) instance to
-//! be available in the environment's [`any`](yash_env::Env::any) storage.
+//! be available in the environment's [`any`](yash_env::Env::any) storage. If no
+//! such instance is found, the built-in will **panic**.
 
 use crate::common::report::{merge_reports, report, report_simple};
 use yash_env::Env;
