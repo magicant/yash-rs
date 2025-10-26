@@ -21,6 +21,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `trap::RunSignalTrapIfCaught`
     - This struct wraps a function that runs a signal trap if the signal has been
       caught.
+- `semantics::command` module
+    - `RunFunction`: Struct that wraps a function for invoking shell functions.
 - `semantics::expansion` module
     - The content of this module has been moved from `yash_semantics::expansion`
       to here for better modularity. Currently, it contains the following

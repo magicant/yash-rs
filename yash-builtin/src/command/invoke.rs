@@ -23,7 +23,7 @@ use crate::common::report::report_failure;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_semantics::command::simple_command::execute_function_body;
+use yash_env::semantics::command::RunFunction;
 use yash_semantics::command::simple_command::start_external_utility_in_subshell_and_wait;
 use yash_semantics::command_search::Target;
 use yash_semantics::command_search::search;
@@ -52,6 +52,10 @@ impl Invoke {
 /// This function is called after the command is found. The first field must be
 /// the command name that was searched for. The rest of the fields are the
 /// arguments to the command.
+///
+/// This function requires an instance of [`RunFunction`] to be present in
+/// [`env.any`](Env::any), which is used to invoke shell functions. If no such
+/// instance is found, this function will **panic**.
 async fn invoke_target(env: &mut Env, target: Target, mut fields: Vec<Field>) -> crate::Result {
     match target {
         Target::Builtin { builtin, .. } => {
@@ -65,7 +69,9 @@ async fn invoke_target(env: &mut Env, target: Target, mut fields: Vec<Field>) ->
         }
 
         Target::Function(function) => {
-            let divert = execute_function_body(env, function, fields, |_| ()).await;
+            let RunFunction(run_function) =
+                env.any.get().expect("RunFunction not found in env.any");
+            let divert = run_function(env, function, fields, None).await;
             crate::Result::with_exit_status_and_divert(env.exit_status, divert)
         }
 
@@ -163,6 +169,19 @@ mod tests {
     #[test]
     fn invoking_function() {
         let mut env = Env::new_virtual();
+        env.any.insert(Box::new(RunFunction(
+            |env, function, fields, env_prep_hook| {
+                Box::pin(async move {
+                    yash_semantics::command::simple_command::execute_function_body(
+                        env,
+                        function,
+                        fields,
+                        env_prep_hook,
+                    )
+                    .await
+                })
+            },
+        )));
         env.builtins.insert(
             ":",
             Builtin::new(Special, |_, args| {
