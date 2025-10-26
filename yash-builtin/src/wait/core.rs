@@ -53,7 +53,7 @@ pub enum Error {
 /// This function expects that an instance of [`RunSignalTrapIfCaught`] is
 /// stored in [`Env::any`] to check if any signal has been caught and run the
 /// corresponding trap action. If there is no such instance, this function will
-/// ignore all signals.
+/// **panic**.
 ///
 /// Note that this function returns on a job state change of any kind. You need
 /// to call this function repeatedly until the job state becomes the one you
@@ -62,11 +62,10 @@ pub enum Error {
 /// If there is no job to wait for, this function returns
 /// `Err(Error::NothingToWait)` immediately.
 pub async fn wait_for_any_job_or_trap(env: &mut Env) -> Result<(), Error> {
-    let run_trap_if_caught = env
+    let RunSignalTrapIfCaught(run_trap_if_caught) = *env
         .any
-        .get::<RunSignalTrapIfCaught>()
-        .map(|r| r.0)
-        .unwrap_or(|_, _| Box::pin(async { None }));
+        .get()
+        .expect("`wait` built-in requires `RunSignalTrapIfCaught` in `Env::any`");
 
     // We need to install the internal disposition before calling `wait` so we
     // don't miss any `SIGCHLD` that may arrive between `wait` and
@@ -106,6 +105,7 @@ pub async fn wait_for_any_job_or_trap(env: &mut Env) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::tests::stub_run_signal_trap_if_caught;
     use super::*;
     use futures_util::FutureExt as _;
     use futures_util::poll;
@@ -127,6 +127,8 @@ mod tests {
     #[test]
     fn running_job() {
         in_virtual_system(|mut env, _| async move {
+            stub_run_signal_trap_if_caught(&mut env);
+
             // Start a child process that never exits.
             let subshell = Subshell::new(|_, _| Box::pin(pending()));
             subshell.start(&mut env).await.unwrap();
@@ -140,6 +142,8 @@ mod tests {
     #[test]
     fn finished_job() {
         in_virtual_system(|mut env, _| async move {
+            stub_run_signal_trap_if_caught(&mut env);
+
             // Start a child process that exits immediately.
             let subshell = Subshell::new(|_, _| Box::pin(ready(())));
             let pid = subshell.start(&mut env).await.unwrap().0;
@@ -159,6 +163,8 @@ mod tests {
     #[test]
     fn suspended_job() {
         in_virtual_system(|mut env, _| async move {
+            stub_run_signal_trap_if_caught(&mut env);
+
             // Start a child process that never exits.
             let subshell = Subshell::new(|_, _| Box::pin(pending()));
             let pid = subshell.start(&mut env).await.unwrap().0;
@@ -228,6 +234,8 @@ mod tests {
     #[test]
     fn no_child_processes() {
         let mut env = Env::new_virtual();
+        stub_run_signal_trap_if_caught(&mut env);
+
         let result = wait_for_any_job_or_trap(&mut env).now_or_never().unwrap();
         assert_eq!(result, Err(Error::NothingToWait));
     }

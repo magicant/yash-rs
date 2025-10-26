@@ -214,7 +214,8 @@ async fn read_char(env: &mut Env) -> Result<Option<char>, Error> {
 /// is not a terminal, this function does nothing.
 ///
 /// This function requires a [`GetPrompt`] instance to be in the environment's
-/// `any` storage. If no such instance is found, this function does nothing.
+/// [`any`](Env::any) storage. If no such instance is found, this function
+/// **panics**.
 async fn print_prompt(env: &mut Env) {
     use yash_env::System as _;
     if !env.is_interactive() || !env.system.isatty(Fd::STDIN) {
@@ -222,12 +223,13 @@ async fn print_prompt(env: &mut Env) {
     }
 
     // Obtain the prompt string
-    let Some(get_prompt) = env.any.get::<GetPrompt>().copied() else {
-        return;
-    };
+    let GetPrompt(get_prompt) = *env
+        .any
+        .get()
+        .expect("reading input requires `GetPrompt` in `Env::any`");
     let mut context = yash_env::input::Context::default();
     context.set_is_first_line(false);
-    let prompt = get_prompt.0(env, &context).await;
+    let prompt = get_prompt(env, &context).await;
 
     // Print the prompt
     env.system.print_error(&prompt).await;

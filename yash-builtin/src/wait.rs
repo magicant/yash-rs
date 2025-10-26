@@ -134,7 +134,14 @@ mod tests {
     use yash_env::option::{Monitor, On};
     use yash_env::subshell::{JobControl, Subshell};
     use yash_env::system::r#virtual::SIGSTOP;
+    use yash_env::trap::RunSignalTrapIfCaught;
     use yash_env_test_helper::{in_virtual_system, stub_tty};
+
+    pub(super) fn stub_run_signal_trap_if_caught(env: &mut Env) {
+        env.any.insert(Box::new(RunSignalTrapIfCaught(|_, _| {
+            Box::pin(std::future::ready(None))
+        })));
+    }
 
     async fn suspend(env: &mut Env) {
         let target = env.system.getpid();
@@ -157,6 +164,7 @@ mod tests {
         // Suspended jobs are not treated as finished, so the built-in waits indefinitely.
         in_virtual_system(|mut env, state| async move {
             stub_tty(&state);
+            stub_run_signal_trap_if_caught(&mut env);
             env.options.set(Monitor, On);
             start_self_suspending_job(&mut env).await;
 
