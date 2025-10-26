@@ -95,7 +95,7 @@ error: cannot execute external utility "!ls"
  --> <stdin>:1:1
   |
 1 | !ls | grep .zip
-  | ^^^ utility not found
+  | ^^^ utility "!ls" not found
 ```
 
 ## Compatibility

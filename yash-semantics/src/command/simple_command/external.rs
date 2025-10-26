@@ -25,8 +25,10 @@ use crate::xtrace::XTrace;
 use crate::xtrace::print;
 use crate::xtrace::trace_fields;
 use itertools::Itertools;
+use std::convert::Infallible;
 use std::ffi::CString;
 use std::ops::ControlFlow::Continue;
+use thiserror::Error;
 use yash_env::Env;
 use yash_env::System;
 use yash_env::io::print_error;
@@ -37,7 +39,6 @@ use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
 use yash_env::variable::Context;
-use yash_syntax::source::Location;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
 
@@ -74,7 +75,7 @@ pub async fn execute_external_utility(
         print_error(
             &mut env,
             format!("cannot execute external utility {:?}", name.value).into(),
-            "utility not found".into(),
+            format!("utility {:?} not found", name.value).into(),
             &name.origin,
         )
         .await;
@@ -110,7 +111,16 @@ pub async fn start_external_utility_in_subshell_and_wait(
         String::new()
     };
     let subshell = Subshell::new(move |env, _job_control| {
-        Box::pin(replace_current_process(env, path, fields, location))
+        Box::pin(async move {
+            let Err(e) = replace_current_process(env, path, fields).await;
+            print_error(
+                env,
+                format!("cannot execute external utility {:?}", e.path).into(),
+                format!("{:?}: {}", e.path, e.errno).into(),
+                &location,
+            )
+            .await;
+        })
     })
     .job_control(JobControl::Foreground);
 
@@ -120,7 +130,7 @@ pub async fn start_external_utility_in_subshell_and_wait(
             print_error(
                 env,
                 format!("cannot execute external utility {:?}", name.value).into(),
-                errno.to_string().into(),
+                format!("{:?}: {}", name.value, errno).into(),
                 &name.origin,
             )
             .await;
@@ -155,6 +165,16 @@ pub fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
         .collect()
 }
 
+/// Error returned when [replacing the current process](replace_current_process) fails
+#[derive(Clone, Debug, Error)]
+#[error("cannot execute external utility {path:?}: {errno}")]
+pub struct ReplaceCurrentProcessError {
+    /// Path of the external utility attempted to be executed
+    pub path: CString,
+    /// Error returned by the `execve` system call
+    pub errno: Errno,
+}
+
 /// Substitutes the currently executing shell process with the external utility.
 ///
 /// This function performs the very last step of the simple command execution.
@@ -171,8 +191,7 @@ pub async fn replace_current_process(
     env: &mut Env,
     path: CString,
     args: Vec<Field>,
-    location: Location,
-) {
+) -> std::result::Result<Infallible, ReplaceCurrentProcessError> {
     env.traps
         .disable_internal_dispositions(&mut env.system)
         .ok();
@@ -194,13 +213,7 @@ pub async fn replace_current_process(
             env.exit_status = ExitStatus::NOEXEC;
         }
     }
-    print_error(
-        env,
-        format!("cannot execute external utility {path:?}").into(),
-        errno.to_string().into(),
-        &location,
-    )
-    .await;
+    Err(ReplaceCurrentProcessError { path, errno })
 }
 
 /// Invokes the shell with the given arguments.

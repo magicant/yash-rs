@@ -68,7 +68,7 @@ error: cannot execute external utility "{echo"
  --> <stdin>:1:1
   |
 1 | {echo Hello}
-  | ^^^^^ utility not found
+  | ^^^^^ utility "{echo" not found
 ```
 
 To use `{` and `}` as reserved words, write them as separate words:
