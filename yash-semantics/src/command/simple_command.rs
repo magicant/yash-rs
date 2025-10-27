@@ -235,12 +235,13 @@ use function::execute_function;
 pub use function::execute_function_body;
 
 mod external;
-pub use external::ReplaceCurrentProcessError;
 use external::execute_external_utility;
-pub use external::replace_current_process;
 pub use external::start_external_utility_in_subshell_and_wait;
 #[allow(deprecated)]
 pub use external::to_c_strings;
+
+#[doc(no_inline)]
+pub use yash_env::semantics::command::replace_current_process;
 
 #[cfg(test)]
 mod tests {

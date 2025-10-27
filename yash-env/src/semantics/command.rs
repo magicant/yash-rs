@@ -20,9 +20,13 @@
 
 use crate::Env;
 use crate::function::Function;
-use crate::semantics::{Field, Result};
+use crate::semantics::{ExitStatus, Field, Result};
+use crate::system::{Errno, System};
+use std::convert::Infallible;
+use std::ffi::CString;
 use std::pin::Pin;
 use std::rc::Rc;
+use thiserror::Error;
 
 type EnvPrepHook = fn(&mut Env) -> Pin<Box<dyn Future<Output = ()>>>;
 
@@ -68,3 +72,90 @@ type FutureResult<'a, T = ()> = Pin<Box<dyn Future<Output = Result<T>> + 'a>>;
 pub struct RunFunction(
     pub for<'a> fn(&'a mut Env, Rc<Function>, Vec<Field>, Option<EnvPrepHook>) -> FutureResult<'a>,
 );
+
+/// Error returned when [replacing the current process](replace_current_process) fails
+#[derive(Clone, Debug, Error)]
+#[error("cannot execute external utility {path:?}: {errno}")]
+pub struct ReplaceCurrentProcessError {
+    /// Path of the external utility attempted to be executed
+    pub path: CString,
+    /// Error returned by the [`execve`](System::execve) system call
+    pub errno: Errno,
+}
+
+/// Substitutes the currently executing shell process with the external utility.
+///
+/// This function performs the very last step of the simple command execution.
+/// It disables the internal signal dispositions and calls the
+/// [`execve`](System::execve) system call. If the call fails, it updates
+/// `env.exit_status` and returns an error, in which case the caller should
+/// print an error message and terminate the current process with the exit
+/// status.
+///
+/// If the `execve` call fails with [`ENOEXEC`](Errno::ENOEXEC), this function
+/// falls back on invoking the shell with the given arguments, so that the shell
+/// can interpret the script. The path to the shell executable is taken from
+/// [`System::shell_path`].
+///
+/// If the `execve` call succeeds, the future returned by this function never
+/// resolves.
+///
+/// This function is for implementing the simple command execution semantics and
+/// the `exec` built-in utility.
+pub async fn replace_current_process(
+    env: &mut Env,
+    path: CString,
+    args: Vec<Field>,
+) -> std::result::Result<Infallible, ReplaceCurrentProcessError> {
+    env.traps
+        .disable_internal_dispositions(&mut env.system)
+        .ok();
+
+    let args = to_c_strings(args);
+    let envs = env.variables.env_c_strings();
+    let Err(errno) = env.system.execve(path.as_c_str(), &args, &envs).await;
+    env.exit_status = match errno {
+        Errno::ENOEXEC => {
+            fall_back_on_sh(&mut env.system, path.clone(), args, envs).await;
+            ExitStatus::NOEXEC
+        }
+        Errno::ENOENT | Errno::ENOTDIR => ExitStatus::NOT_FOUND,
+        _ => ExitStatus::NOEXEC,
+    };
+    Err(ReplaceCurrentProcessError { path, errno })
+}
+
+/// Converts fields to C strings.
+fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
+    s.into_iter()
+        .filter_map(|f| {
+            let bytes = f.value.into_bytes();
+            // TODO Handle interior null bytes more gracefully
+            CString::new(bytes).ok()
+        })
+        .collect()
+}
+
+/// Invokes the shell with the given arguments.
+async fn fall_back_on_sh<S: System>(
+    system: &mut S,
+    mut script_path: CString,
+    mut args: Vec<CString>,
+    envs: Vec<CString>,
+) {
+    // Prevent the path to be regarded as an option
+    if script_path.as_bytes().starts_with("-".as_bytes()) {
+        let mut bytes = script_path.into_bytes();
+        bytes.splice(0..0, "./".bytes());
+        script_path = CString::new(bytes).unwrap();
+    }
+
+    args.insert(1, script_path);
+
+    // Some shells change their behavior depending on args[0].
+    // We set it to "sh" for the maximum portability.
+    c"sh".clone_into(&mut args[0]);
+
+    let sh_path = system.shell_path();
+    system.execve(&sh_path, &args, &envs).await.ok();
+}

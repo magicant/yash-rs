@@ -25,19 +25,16 @@ use crate::xtrace::XTrace;
 use crate::xtrace::print;
 use crate::xtrace::trace_fields;
 use itertools::Itertools;
-use std::convert::Infallible;
 use std::ffi::CString;
 use std::ops::ControlFlow::Continue;
-use thiserror::Error;
 use yash_env::Env;
-use yash_env::System;
 use yash_env::io::print_error;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
+use yash_env::semantics::command::replace_current_process;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
-use yash_env::system::Errno;
 use yash_env::variable::Context;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
@@ -163,81 +160,6 @@ pub fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
             CString::new(bytes).ok()
         })
         .collect()
-}
-
-/// Error returned when [replacing the current process](replace_current_process) fails
-#[derive(Clone, Debug, Error)]
-#[error("cannot execute external utility {path:?}: {errno}")]
-pub struct ReplaceCurrentProcessError {
-    /// Path of the external utility attempted to be executed
-    pub path: CString,
-    /// Error returned by the `execve` system call
-    pub errno: Errno,
-}
-
-/// Substitutes the currently executing shell process with the external utility.
-///
-/// This function performs the very last step of the simple command execution.
-/// It disables the internal signal dispositions and calls the `execve` system
-/// call. If the call fails, it prints an error message to the standard error
-/// and updates `env.exit_status`, in which case the caller should immediately
-/// exit the current process with the exit status.
-///
-/// If the `execve` call fails with `ENOEXEC`, this function falls back on
-/// invoking the shell with the given arguments, so that the shell can interpret
-/// the script. The path to the shell executable is taken from
-/// [`System::shell_path`].
-pub async fn replace_current_process(
-    env: &mut Env,
-    path: CString,
-    args: Vec<Field>,
-) -> std::result::Result<Infallible, ReplaceCurrentProcessError> {
-    env.traps
-        .disable_internal_dispositions(&mut env.system)
-        .ok();
-
-    let args = to_c_strings(args);
-    let envs = env.variables.env_c_strings();
-    let result = env.system.execve(path.as_c_str(), &args, &envs).await;
-    // TODO Prefer into_err to unwrap_err
-    let errno = result.unwrap_err();
-    match errno {
-        Errno::ENOEXEC => {
-            fall_back_on_sh(&mut env.system, path.clone(), args, envs).await;
-            env.exit_status = ExitStatus::NOEXEC;
-        }
-        Errno::ENOENT | Errno::ENOTDIR => {
-            env.exit_status = ExitStatus::NOT_FOUND;
-        }
-        _ => {
-            env.exit_status = ExitStatus::NOEXEC;
-        }
-    }
-    Err(ReplaceCurrentProcessError { path, errno })
-}
-
-/// Invokes the shell with the given arguments.
-async fn fall_back_on_sh<S: System>(
-    system: &mut S,
-    mut script_path: CString,
-    mut args: Vec<CString>,
-    envs: Vec<CString>,
-) {
-    // Prevent the path to be regarded as an option
-    if script_path.as_bytes().starts_with("-".as_bytes()) {
-        let mut bytes = script_path.into_bytes();
-        bytes.splice(0..0, "./".bytes());
-        script_path = CString::new(bytes).unwrap();
-    }
-
-    args.insert(1, script_path);
-
-    // Some shells change their behavior depending on args[0].
-    // We set it to "sh" for the maximum portability.
-    c"sh".clone_into(&mut args[0]);
-
-    let sh_path = system.shell_path();
-    system.execve(&sh_path, &args, &envs).await.ok();
 }
 
 #[cfg(test)]

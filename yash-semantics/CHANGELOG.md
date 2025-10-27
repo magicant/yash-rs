@@ -11,23 +11,16 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.11.0] - Unreleased
 
-### Added
-
-- The `ReplaceCurrentProcessError` struct has been added in the
-  `command::simple_command` module.
-    - This error type is returned when the `replace_current_process` function
-      fails to execute an external utility.
-
 ### Changed
 
-- The third argument of `command::simple_command::replace_current_process` has
-  been changed from `args: Vec<CString>` to `args: Vec<Field>`.
-    - This allows passing the command arguments without converting them to C
-      strings first.
-- The `command::simple_command::replace_current_process` function no longer
-  prints an error message when it fails to execute an external utility.
-    - Instead, it returns a `ReplaceCurrentProcessError` containing the path of
-      the utility and the error number.
+- The `command::simple_command::replace_current_process` function is now defined
+  in the `yash_env::semantics::command` module and re-exported in this crate.
+    - The third argument of this function has been changed from
+      `args: Vec<CString>` to `args: Vec<Field>`. This allows passing the
+      command arguments without converting them to C strings first.
+    - This function no longer prints an error message when it fails to execute
+      an external utility. Instead, it returns a `ReplaceCurrentProcessError`
+      containing the path of the utility and the error number.
     - The fourth argument `location: Location` has been removed since it is no
       longer needed for error reporting.
 - The fourth argument of `command::simple_command::execute_function_body` has
