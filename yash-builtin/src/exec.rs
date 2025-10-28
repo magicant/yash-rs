@@ -32,18 +32,20 @@
 //! be made permanent.
 
 use crate::common::report::report_error;
+use crate::common::report::report_failure;
 use crate::common::syntax::Mode;
 use crate::common::syntax::parse_arguments;
 use std::ffi::CString;
 use std::ops::ControlFlow::Break;
 use yash_env::Env;
 use yash_env::builtin::Result;
-use yash_env::io::print_error;
 use yash_env::semantics::Field;
+use yash_env::semantics::command::{ReplaceCurrentProcessError, replace_current_process};
 use yash_semantics::Divert::Abort;
 use yash_semantics::ExitStatus;
-use yash_semantics::command::simple_command::{replace_current_process, to_c_strings};
 use yash_semantics::command_search::search_path;
+use yash_syntax::source::Location;
+use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 // TODO Split into syntax and semantics submodules
 
@@ -71,22 +73,52 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
 
         if let Some(path) = path {
             let location = name.origin.clone();
-            let args = to_c_strings(args);
-            replace_current_process(env, path, args, location).await;
+            let Err(e) = replace_current_process(env, path, args).await;
+            let report = ExecFailure { inner: e, location };
+            let _ = report_failure(env, &report).await;
             result.set_exit_status(env.exit_status);
         } else {
-            print_error(
-                env,
-                format!("cannot execute external utility {:?}", name.value).into(),
-                "utility not found".into(),
-                &name.origin,
-            )
-            .await;
+            let _ = report_failure(env, NotFound(name)).await;
             result.set_exit_status(ExitStatus::NOT_FOUND);
         }
     }
 
     result
+}
+
+#[derive(Debug)]
+struct ExecFailure {
+    inner: ReplaceCurrentProcessError,
+    location: Location,
+}
+
+impl<'a> From<&'a ExecFailure> for Report<'a> {
+    fn from(value: &'a ExecFailure) -> Self {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = format!("cannot execute external utility {:?}", value.inner.path).into();
+        report.snippets = Snippet::with_primary_span(
+            &value.location,
+            format!("{:?}: {}", value.inner.path, value.inner.errno).into(),
+        );
+        report
+    }
+}
+
+#[derive(Debug)]
+struct NotFound<'a>(&'a Field);
+
+impl<'a> From<NotFound<'a>> for Report<'a> {
+    fn from(value: NotFound<'a>) -> Self {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = format!("cannot execute external utility {:?}", value.0.value).into();
+        report.snippets = Snippet::with_primary_span(
+            &value.0.origin,
+            format!("utility {:?} not found", value.0.value).into(),
+        );
+        report
+    }
 }
 
 #[cfg(test)]

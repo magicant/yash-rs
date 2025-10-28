@@ -52,7 +52,7 @@ error: cannot execute external utility "greet"
  --> <stdin>:4:1
   |
 4 | greet
-  | ^^^^^ utility not found
+  | ^^^^^ utility "greet" not found
 ```
 
 Redirections in a function definition apply when the function is called, not when it is defined:
@@ -174,7 +174,7 @@ error: cannot execute external utility "greet"
  --> <stdin>:3:1
   |
 3 | greet
-  | ^^^^^ utility not found
+  | ^^^^^ utility "greet" not found
 ```
 
 ## Replacing existing utilities

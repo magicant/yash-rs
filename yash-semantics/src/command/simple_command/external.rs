@@ -28,16 +28,14 @@ use itertools::Itertools;
 use std::ffi::CString;
 use std::ops::ControlFlow::Continue;
 use yash_env::Env;
-use yash_env::System;
 use yash_env::io::print_error;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
+use yash_env::semantics::command::replace_current_process;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
-use yash_env::system::Errno;
 use yash_env::variable::Context;
-use yash_syntax::source::Location;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
 
@@ -74,7 +72,7 @@ pub async fn execute_external_utility(
         print_error(
             &mut env,
             format!("cannot execute external utility {:?}", name.value).into(),
-            "utility not found".into(),
+            format!("utility {:?} not found", name.value).into(),
             &name.origin,
         )
         .await;
@@ -109,9 +107,17 @@ pub async fn start_external_utility_in_subshell_and_wait(
     } else {
         String::new()
     };
-    let args = to_c_strings(fields);
     let subshell = Subshell::new(move |env, _job_control| {
-        Box::pin(replace_current_process(env, path, args, location))
+        Box::pin(async move {
+            let Err(e) = replace_current_process(env, path, fields).await;
+            print_error(
+                env,
+                format!("cannot execute external utility {:?}", e.path).into(),
+                format!("{:?}: {}", e.path, e.errno).into(),
+                &location,
+            )
+            .await;
+        })
     })
     .job_control(JobControl::Foreground);
 
@@ -121,7 +127,7 @@ pub async fn start_external_utility_in_subshell_and_wait(
             print_error(
                 env,
                 format!("cannot execute external utility {:?}", name.value).into(),
-                errno.to_string().into(),
+                format!("{:?}: {}", name.value, errno).into(),
                 &name.origin,
             )
             .await;
@@ -138,6 +144,14 @@ fn to_job_name(fields: &[Field]) -> String {
 }
 
 /// Converts fields to C strings.
+///
+/// # Deprecated
+///
+/// This function is deprecated because it does not handle null bytes in field
+/// values. If a field contains a null byte, the field is simply skipped, which
+/// may lead to unexpected behavior. Users are encouraged to implement their own
+/// conversion that handles null bytes appropriately.
+#[deprecated(since = "0.11.0")]
 pub fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
     s.into_iter()
         .filter_map(|f| {
@@ -146,77 +160,6 @@ pub fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
             CString::new(bytes).ok()
         })
         .collect()
-}
-
-/// Substitutes the currently executing shell process with the external utility.
-///
-/// This function performs the very last step of the simple command execution.
-/// It disables the internal signal dispositions and calls the `execve` system
-/// call. If the call fails, it prints an error message to the standard error
-/// and updates `env.exit_status`, in which case the caller should immediately
-/// exit the current process with the exit status.
-///
-/// If the `execve` call fails with `ENOEXEC`, this function falls back on
-/// invoking the shell with the given arguments, so that the shell can interpret
-/// the script. The path to the shell executable is taken from
-/// [`System::shell_path`].
-pub async fn replace_current_process(
-    env: &mut Env,
-    path: CString,
-    args: Vec<CString>,
-    location: Location,
-) {
-    env.traps
-        .disable_internal_dispositions(&mut env.system)
-        .ok();
-
-    let envs = env.variables.env_c_strings();
-    let result = env.system.execve(path.as_c_str(), &args, &envs).await;
-    // TODO Prefer into_err to unwrap_err
-    let errno = result.unwrap_err();
-    match errno {
-        Errno::ENOEXEC => {
-            fall_back_on_sh(&mut env.system, path.clone(), args, envs).await;
-            env.exit_status = ExitStatus::NOEXEC;
-        }
-        Errno::ENOENT | Errno::ENOTDIR => {
-            env.exit_status = ExitStatus::NOT_FOUND;
-        }
-        _ => {
-            env.exit_status = ExitStatus::NOEXEC;
-        }
-    }
-    print_error(
-        env,
-        format!("cannot execute external utility {path:?}").into(),
-        errno.to_string().into(),
-        &location,
-    )
-    .await;
-}
-
-/// Invokes the shell with the given arguments.
-async fn fall_back_on_sh<S: System>(
-    system: &mut S,
-    mut script_path: CString,
-    mut args: Vec<CString>,
-    envs: Vec<CString>,
-) {
-    // Prevent the path to be regarded as an option
-    if script_path.as_bytes().starts_with("-".as_bytes()) {
-        let mut bytes = script_path.into_bytes();
-        bytes.splice(0..0, "./".bytes());
-        script_path = CString::new(bytes).unwrap();
-    }
-
-    args.insert(1, script_path);
-
-    // Some shells change their behavior depending on args[0].
-    // We set it to "sh" for the maximum portability.
-    c"sh".clone_into(&mut args[0]);
-
-    let sh_path = system.shell_path();
-    system.execve(&sh_path, &args, &envs).await.ok();
 }
 
 #[cfg(test)]

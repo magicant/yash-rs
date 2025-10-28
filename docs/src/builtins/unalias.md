@@ -44,7 +44,7 @@ error: cannot execute external utility "greet"
  --> <stdin>:4:1
   |
 4 | greet world
-  | ^^^^^ utility not found
+  | ^^^^^ utility "greet" not found
 ```
 
 ## Compatibility

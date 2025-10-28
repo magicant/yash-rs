@@ -22,7 +22,11 @@ A _private dependency_ is used internally and not visible to downstream users.
     - This struct wraps a function that runs a signal trap if the signal has been
       caught.
 - `semantics::command` module
+    - `ReplaceCurrentProcessError`: Error returned when `replace_current_process`
+      fails.
     - `RunFunction`: Struct that wraps a function for invoking shell functions.
+    - `replace_current_process`: Function that replaces the current process
+      with an external utility.
 - `semantics::expansion` module
     - The content of this module has been moved from `yash_semantics::expansion`
       to here for better modularity. Currently, it contains the following
