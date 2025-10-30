@@ -19,7 +19,6 @@
 use super::perform_assignments;
 use crate::Handle;
 use crate::command_search::search_path;
-use crate::job::add_job_if_suspended;
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;
@@ -29,6 +28,7 @@ use std::ffi::CString;
 use std::ops::ControlFlow::Continue;
 use yash_env::Env;
 use yash_env::io::print_error;
+use yash_env::job::add_job_if_suspended;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;

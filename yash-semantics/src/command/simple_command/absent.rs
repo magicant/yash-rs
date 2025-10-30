@@ -18,7 +18,6 @@
 
 use super::perform_assignments;
 use crate::Handle;
-use crate::job::add_job_if_suspended;
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;
@@ -27,6 +26,7 @@ use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::Env;
 use yash_env::io::print_error;
+use yash_env::job::add_job_if_suspended;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;

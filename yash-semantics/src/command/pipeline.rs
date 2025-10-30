@@ -17,7 +17,6 @@
 //! Implementation of pipeline semantics.
 
 use super::Command;
-use crate::job::add_job_if_suspended;
 use crate::trap::run_exit_trap;
 use enumset::EnumSet;
 use itertools::Itertools;
@@ -27,6 +26,7 @@ use yash_env::Env;
 use yash_env::System;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
+use yash_env::job::add_job_if_suspended;
 use yash_env::option::Option::{Exec, Interactive, PipeFail};
 use yash_env::option::State::{Off, On};
 use yash_env::semantics::Divert;
