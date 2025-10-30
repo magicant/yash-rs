@@ -20,11 +20,13 @@ use super::Invoke;
 use super::identify::NotFound;
 use super::search::SearchEnv;
 use crate::common::report::report_failure;
+use crate::exec::ExecFailure;
+use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::command::RunFunction;
-use yash_semantics::command::simple_command::start_external_utility_in_subshell_and_wait;
+use yash_env::semantics::command::run_external_utility_in_subshell;
 use yash_semantics::command_search::Target;
 use yash_semantics::command_search::search;
 
@@ -76,8 +78,20 @@ async fn invoke_target(env: &mut Env, target: Target, mut fields: Vec<Field>) ->
         }
 
         Target::External { path } => {
-            use std::ops::ControlFlow::{Break, Continue};
-            match start_external_utility_in_subshell_and_wait(env, path, fields).await {
+            let result = run_external_utility_in_subshell(
+                env,
+                path,
+                fields,
+                |env, error| Box::pin(async move { _ = report_failure(env, &error).await }),
+                |env, inner, location| {
+                    Box::pin(async move {
+                        _ = report_failure(env, &ExecFailure { inner, location }).await
+                    })
+                },
+            )
+            .await;
+
+            match result {
                 Continue(exit_status) => exit_status.into(),
                 Break(divert) => {
                     crate::Result::with_exit_status_and_divert(env.exit_status, Break(divert))
@@ -95,7 +109,6 @@ mod tests {
     use enumset::EnumSet;
     use futures_util::FutureExt as _;
     use std::ffi::CString;
-    use std::ops::ControlFlow::Break;
     use std::rc::Rc;
     use yash_env::VirtualSystem;
     use yash_env::builtin::Builtin;

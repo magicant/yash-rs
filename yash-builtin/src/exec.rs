@@ -87,9 +87,9 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
 }
 
 #[derive(Debug)]
-struct ExecFailure {
-    inner: ReplaceCurrentProcessError,
-    location: Location,
+pub(crate) struct ExecFailure {
+    pub inner: ReplaceCurrentProcessError,
+    pub location: Location,
 }
 
 impl<'a> From<&'a ExecFailure> for Report<'a> {

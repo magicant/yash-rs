@@ -23,18 +23,16 @@ use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;
 use crate::xtrace::trace_fields;
-use itertools::Itertools;
 use std::ffi::CString;
 use std::ops::ControlFlow::Continue;
 use yash_env::Env;
 use yash_env::io::print_error;
-use yash_env::job::add_job_if_suspended;
+use yash_env::io::print_report;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
-use yash_env::semantics::command::replace_current_process;
-use yash_env::subshell::JobControl;
-use yash_env::subshell::Subshell;
+use yash_env::semantics::command::ReplaceCurrentProcessError;
+use yash_env::semantics::command::run_external_utility_in_subshell;
 use yash_env::variable::Context;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
@@ -99,48 +97,24 @@ pub async fn start_external_utility_in_subshell_and_wait(
     path: CString,
     fields: Vec<Field>,
 ) -> Result<ExitStatus> {
-    let name = fields[0].clone();
-    let location = name.origin.clone();
-
-    let job_name = if env.controls_jobs() {
-        to_job_name(&fields)
-    } else {
-        String::new()
-    };
-    let subshell = Subshell::new(move |env, _job_control| {
-        Box::pin(async move {
-            let Err(e) = replace_current_process(env, path, fields).await;
-            print_error(
-                env,
-                format!("cannot execute external utility {:?}", e.path).into(),
-                format!("{:?}: {}", e.path, e.errno).into(),
-                &location,
-            )
-            .await;
-        })
-    })
-    .job_control(JobControl::Foreground);
-
-    match subshell.start_and_wait(env).await {
-        Ok((pid, result)) => add_job_if_suspended(env, pid, result, || job_name),
-        Err(errno) => {
-            print_error(
-                env,
-                format!("cannot execute external utility {:?}", name.value).into(),
-                format!("{:?}: {}", name.value, errno).into(),
-                &name.origin,
-            )
-            .await;
-            Continue(ExitStatus::NOEXEC)
-        }
-    }
-}
-
-fn to_job_name(fields: &[Field]) -> String {
-    fields
-        .iter()
-        .format_with(" ", |field, f| f(&format_args!("{}", field.value)))
-        .to_string()
+    run_external_utility_in_subshell(
+        env,
+        path,
+        fields,
+        |env, error| Box::pin(async move { print_report(env, &(&error).into()).await }),
+        |env, ReplaceCurrentProcessError { path, errno }, location| {
+            Box::pin(async move {
+                print_error(
+                    env,
+                    format!("cannot execute external utility {:?}", path).into(),
+                    format!("{:?}: {}", path, errno).into(),
+                    &location,
+                )
+                .await;
+            })
+        },
+    )
+    .await
 }
 
 /// Converts fields to C strings.
