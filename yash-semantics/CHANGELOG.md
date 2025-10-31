@@ -36,6 +36,7 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `expansion::attr_strip`
     - `expansion::quote_removal`
     - `expansion::split`
+    - `job::add_job_if_suspended`
 - `expansion::split::Ifs`'s `new` and `empty` functions are now marked with
   the `must_use` attribute.
 - Public dependency versions:

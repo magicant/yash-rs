@@ -17,12 +17,12 @@
 //! Semantics of subshell compound commands
 
 use crate::command::Command;
-use crate::job::add_job_if_suspended;
 use crate::trap::run_exit_trap;
 use std::ops::ControlFlow::Break;
 use std::rc::Rc;
 use yash_env::Env;
 use yash_env::io::print_error;
+use yash_env::job::add_job_if_suspended;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;

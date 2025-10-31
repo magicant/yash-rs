@@ -13,6 +13,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Added
 
+- `job::add_job_if_suspended`
+    - This function adds a job to the job list if the given process is
+      suspended and job control is enabled.
 - `prompt` module
     - This module currently contains the `GetPrompt` struct, which wraps
       a prompt-generating function.
@@ -25,8 +28,11 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `ReplaceCurrentProcessError`: Error returned when `replace_current_process`
       fails.
     - `RunFunction`: Struct that wraps a function for invoking shell functions.
+    - `StartSubshellError`: Error returned when starting a subshell fails.
     - `replace_current_process`: Function that replaces the current process
       with an external utility.
+    - `run_external_utility_in_subshell`: Function that runs an external utility
+      in a subshell.
 - `semantics::expansion` module
     - The content of this module has been moved from `yash_semantics::expansion`
       to here for better modularity. Currently, it contains the following

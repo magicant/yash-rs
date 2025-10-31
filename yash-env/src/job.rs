@@ -41,11 +41,13 @@
 //! last executed asynchronous command, which will be the value of the `$!`
 //! special parameter.
 
-use crate::semantics::ExitStatus;
+use crate::Env;
+use crate::semantics::{Divert, ExitStatus};
 use crate::signal;
 use slab::Slab;
 use std::collections::HashMap;
 use std::iter::FusedIterator;
+use std::ops::ControlFlow::{Break, Continue};
 use std::ops::Deref;
 use thiserror::Error;
 
@@ -921,13 +923,60 @@ impl JobList {
     }
 }
 
+/// Adds a job if the process is suspended.
+///
+/// This is a convenience function for handling the result of
+/// [`Subshell::start_and_wait`](crate::subshell::Subshell::start_and_wait).
+///
+/// If the process result indicates that the process is stopped, this function
+/// adds a job to the job list in the environment. The job is marked as
+/// job-controlled and its state is derived from the process result. The job
+/// name is set to the result of the `name` closure. If the current environment
+/// is interactive, this function returns
+/// `Break(Divert::Interrupt(Some(exit_status)))` to indicate that the shell
+/// should be interrupted.
+///
+/// If the process is not stopped, this function does not add a job.
+///
+/// Returns the exit status of the process that should be assigned to
+/// `env.exit_status`.
+pub fn add_job_if_suspended<F>(
+    env: &mut Env,
+    pid: Pid,
+    result: ProcessResult,
+    name: F,
+) -> crate::semantics::Result<ExitStatus>
+where
+    F: FnOnce() -> String,
+{
+    let exit_status = result.into();
+
+    if result.is_stopped() {
+        let mut job = Job::new(pid);
+        job.job_controlled = true;
+        job.state = result.into();
+        job.name = name();
+        env.jobs.add(job);
+
+        if env.is_interactive() {
+            return Break(Divert::Interrupt(Some(exit_status)));
+        }
+    }
+
+    Continue(exit_status)
+}
+
 pub mod fmt;
 pub mod id;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::option::Option::Interactive;
+    use crate::option::State::On;
+    use crate::signal;
     use crate::system::r#virtual::{SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU};
+    use std::num::NonZero;
 
     #[test]
     fn job_list_find_by_pid() {
@@ -1515,5 +1564,64 @@ mod tests {
         list.update_status(Pid(12), ProcessState::stopped(SIGTTOU));
         assert_eq!(list.current_job(), Some(i12));
         assert_eq!(list.previous_job(), Some(i10));
+    }
+
+    #[test]
+    fn do_not_add_job_if_exited() {
+        let mut env = Env::new_virtual();
+        let result = add_job_if_suspended(
+            &mut env,
+            Pid(123),
+            ProcessResult::Exited(ExitStatus(42)),
+            || "foo".to_string(),
+        );
+        assert_eq!(result, Continue(ExitStatus(42)));
+        assert_eq!(env.jobs.len(), 0);
+    }
+
+    #[test]
+    fn do_not_add_job_if_signaled() {
+        let mut env = Env::new_virtual();
+        let signal = signal::Number::from_raw_unchecked(NonZero::new(42).unwrap());
+        let result = add_job_if_suspended(
+            &mut env,
+            Pid(123),
+            ProcessResult::Signaled {
+                signal,
+                core_dump: false,
+            },
+            || "foo".to_string(),
+        );
+        assert_eq!(result, Continue(ExitStatus::from(signal)));
+        assert_eq!(env.jobs.len(), 0);
+    }
+
+    #[test]
+    fn add_job_if_stopped() {
+        let mut env = Env::new_virtual();
+        let signal = signal::Number::from_raw_unchecked(NonZero::new(42).unwrap());
+        let process_result = ProcessResult::Stopped(signal);
+        let result = add_job_if_suspended(&mut env, Pid(123), process_result, || "foo".to_string());
+        assert_eq!(result, Continue(ExitStatus::from(signal)));
+        assert_eq!(env.jobs.len(), 1);
+        let job = env.jobs.get(0).unwrap();
+        assert_eq!(job.pid, Pid(123));
+        assert!(job.job_controlled);
+        assert_eq!(job.state, ProcessState::Halted(process_result));
+        assert_eq!(job.name, "foo");
+    }
+
+    #[test]
+    fn break_if_stopped_and_interactive() {
+        let mut env = Env::new_virtual();
+        env.options.set(Interactive, On);
+        let signal = signal::Number::from_raw_unchecked(NonZero::new(42).unwrap());
+        let process_result = ProcessResult::Stopped(signal);
+        let result = add_job_if_suspended(&mut env, Pid(123), process_result, || "foo".to_string());
+        assert_eq!(
+            result,
+            Break(Divert::Interrupt(Some(ExitStatus::from(signal))))
+        );
+        assert_eq!(env.jobs.len(), 1);
     }
 }

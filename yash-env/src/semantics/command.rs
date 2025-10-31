@@ -20,17 +20,24 @@
 
 use crate::Env;
 use crate::function::Function;
+use crate::job::add_job_if_suspended;
 use crate::semantics::{ExitStatus, Field, Result};
+use crate::subshell::{JobControl, Subshell};
 use crate::system::{Errno, System};
+use itertools::Itertools as _;
 use std::convert::Infallible;
 use std::ffi::CString;
+use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
 use std::rc::Rc;
 use thiserror::Error;
+use yash_syntax::source::Location;
+use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 type EnvPrepHook = fn(&mut Env) -> Pin<Box<dyn Future<Output = ()>>>;
 
-type FutureResult<'a, T = ()> = Pin<Box<dyn Future<Output = Result<T>> + 'a>>;
+type PinFuture<'a, T = ()> = Pin<Box<dyn Future<Output = T> + 'a>>;
+type FutureResult<'a, T = ()> = PinFuture<'a, Result<T>>;
 
 /// Wrapper for a function that runs a shell function
 ///
@@ -158,4 +165,92 @@ async fn fall_back_on_sh<S: System>(
 
     let sh_path = system.shell_path();
     system.execve(&sh_path, &args, &envs).await.ok();
+}
+
+/// Error returned when starting a subshell fails in [`run_external_utility_in_subshell`]
+#[derive(Clone, Debug, Error)]
+#[error("cannot start subshell for utility {utility:?}: {errno}")]
+pub struct StartSubshellError {
+    pub utility: Field,
+    pub errno: Errno,
+}
+
+impl<'a> From<&'a StartSubshellError> for Report<'a> {
+    fn from(error: &'a StartSubshellError) -> Self {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = format!(
+            "cannot start subshell for utility {:?}",
+            error.utility.value
+        )
+        .into();
+        report.snippets = Snippet::with_primary_span(
+            &error.utility.origin,
+            format!("{:?}: {}", error.utility.value, error.errno).into(),
+        );
+        report
+    }
+}
+
+/// Starts an external utility in a subshell and waits for it to finish.
+///
+/// `path` is the path to the external utility. `args` are the command line
+/// words of the utility. The first field must exist and be the name of the
+/// utility as it may be used in error messages.
+///
+/// This function starts the utility in a subshell and waits for it to finish.
+/// The subshell will be a foreground job if job control is enabled.
+///
+/// This function returns the exit status of the utility. In case of an error,
+/// one of the error handling functions will be called before returning an
+/// appropriate exit status. `handle_start_subshell_error` is called in the
+/// parent shell if starting the subshell fails.
+/// `handle_replace_current_process_error` is called in the subshell if
+/// replacing the subshell process with the utility fails. Both functions
+/// should print appropriate error messages.
+///
+/// This function is for implementing the simple command execution semantics and
+/// the `command` built-in utility. This function internally uses
+/// [`replace_current_process`] to execute the utility in the subshell.
+pub async fn run_external_utility_in_subshell(
+    env: &mut Env,
+    path: CString,
+    args: Vec<Field>,
+    handle_start_subshell_error: fn(&mut Env, StartSubshellError) -> PinFuture<'_>,
+    handle_replace_current_process_error: fn(
+        &mut Env,
+        ReplaceCurrentProcessError,
+        Location,
+    ) -> PinFuture<'_>,
+) -> Result<ExitStatus> {
+    let utility = args[0].clone();
+
+    let job_name = if env.controls_jobs() {
+        to_job_name(&args)
+    } else {
+        String::new()
+    };
+    let subshell = Subshell::new(move |env, _job_control| {
+        Box::pin(async move {
+            let location = args[0].origin.clone();
+            let Err(e) = replace_current_process(env, path, args).await;
+            handle_replace_current_process_error(env, e, location).await;
+        })
+    })
+    .job_control(JobControl::Foreground);
+
+    match subshell.start_and_wait(env).await {
+        Ok((pid, result)) => add_job_if_suspended(env, pid, result, || job_name),
+        Err(errno) => {
+            handle_start_subshell_error(env, StartSubshellError { utility, errno }).await;
+            Continue(ExitStatus::NOEXEC)
+        }
+    }
+}
+
+fn to_job_name(fields: &[Field]) -> String {
+    fields
+        .iter()
+        .format_with(" ", |field, f| f(&format_args!("{}", field.value)))
+        .to_string()
 }
