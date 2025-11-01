@@ -33,6 +33,7 @@ A _private dependency_ is used internally and not visible to downstream users.
       with an external utility.
     - `run_external_utility_in_subshell`: Function that runs an external utility
       in a subshell.
+    - `search`: module for command search functionality.
 - `semantics::expansion` module
     - The content of this module has been moved from `yash_semantics::expansion`
       to here for better modularity. Currently, it contains the following

@@ -34,17 +34,17 @@
 //! as a target, a corresponding executable file must be present in a directory
 //! specified in the `$PATH` variable.
 
+use crate::Env;
+use crate::System;
+use crate::builtin::Builtin;
+use crate::builtin::Type::{Special, Substitutive};
+use crate::function::Function;
+use crate::path::PathBuf;
+use crate::variable::Expansion;
+use crate::variable::PATH;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::rc::Rc;
-use yash_env::Env;
-use yash_env::System;
-use yash_env::builtin::Builtin;
-use yash_env::builtin::Type::{Special, Substitutive};
-use yash_env::function::Function;
-use yash_env::path::PathBuf;
-use yash_env::variable::Expansion;
-use yash_env::variable::PATH;
 
 /// Target of a simple command execution
 ///
@@ -286,12 +286,12 @@ pub fn search_path<E: PathEnv>(env: &mut E, name: &str) -> Option<CString> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::builtin::Type::{Elective, Extension, Mandatory};
+    use crate::function::FunctionSet;
+    use crate::variable::Value;
     use assert_matches::assert_matches;
     use std::collections::HashMap;
     use std::collections::HashSet;
-    use yash_env::builtin::Type::{Elective, Extension, Mandatory};
-    use yash_env::function::FunctionSet;
-    use yash_env::variable::Value;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::CompoundCommand;
     use yash_syntax::syntax::FullCompoundCommand;
