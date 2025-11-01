@@ -39,11 +39,9 @@ use std::ffi::CString;
 use std::ops::ControlFlow::Break;
 use yash_env::Env;
 use yash_env::builtin::Result;
-use yash_env::semantics::Field;
+use yash_env::semantics::command::search::search_path;
 use yash_env::semantics::command::{ReplaceCurrentProcessError, replace_current_process};
-use yash_semantics::Divert::Abort;
-use yash_semantics::ExitStatus;
-use yash_semantics::command_search::search_path;
+use yash_env::semantics::{Divert::Abort, ExitStatus, Field};
 use yash_syntax::source::Location;
 use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 

@@ -32,6 +32,7 @@ A _private dependency_ is used internally and not visible to downstream users.
       preparation hook.
 - The following modules are no longer defined in this crate and are
   re-exported from `yash-env` instead:
+    - `command_search`
     - `expansion::attr`
     - `expansion::attr_strip`
     - `expansion::quote_removal`

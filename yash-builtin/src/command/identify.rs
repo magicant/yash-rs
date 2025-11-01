@@ -31,10 +31,9 @@ use yash_env::builtin::{Builtin, Type};
 use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
+use yash_env::semantics::command::search::{Target, search};
 use yash_env::str::UnixStr;
 use yash_quote::quoted;
-use yash_semantics::command_search::Target;
-use yash_semantics::command_search::search;
 use yash_syntax::alias::Alias;
 use yash_syntax::parser::lex::Keyword;
 #[allow(deprecated)]

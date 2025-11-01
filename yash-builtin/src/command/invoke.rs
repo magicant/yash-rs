@@ -27,8 +27,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::command::RunFunction;
 use yash_env::semantics::command::run_external_utility_in_subshell;
-use yash_semantics::command_search::Target;
-use yash_semantics::command_search::search;
+use yash_env::semantics::command::search::{Target, search};
 
 impl Invoke {
     /// Execute the command

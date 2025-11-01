@@ -18,6 +18,8 @@
 //!
 //! This module provides functionality related to command execution semantics.
 
+pub mod search;
+
 use crate::Env;
 use crate::function::Function;
 use crate::job::add_job_if_suspended;

@@ -16,8 +16,8 @@
 
 //! Command search
 //!
-//! This module provides the search functionality of the `command` built-in.
-//! It is based on the [`yash_semantics::command_search`] module, but it adds
+//! This module provides the search functionality of the `command` built-in. It
+//! is based on the [`yash_env::semantics::command::search`] module, but it adds
 //! the ability to select the category of the command to search for.
 
 use super::Category;
@@ -32,17 +32,18 @@ use yash_env::variable::Expansion;
 
 /// Environment adapter for applying the search parameters
 ///
-/// This type implements the [`yash_semantics::command_search::ClassifyEnv`]
-/// and [`yash_semantics::command_search::PathEnv`] traits by filtering the
-/// results from an underlying [`yash_env::Env`] according to the
-/// [`Search`] parameters.
+/// This type implements the
+/// [`yash_env::semantics::command::search::ClassifyEnv`] and
+/// [`yash_env::semantics::command::search::PathEnv`] traits by filtering the
+/// results from an underlying [`yash_env::Env`] according to the [`Search`]
+/// parameters.
 #[derive(Debug)]
 pub struct SearchEnv<'a> {
     pub env: &'a mut Env,
     pub params: &'a Search,
 }
 
-impl yash_semantics::command_search::PathEnv for SearchEnv<'_> {
+impl yash_env::semantics::command::search::PathEnv for SearchEnv<'_> {
     /// Returns the path.
     ///
     /// If [`Search::standard_path`] is `true`, this function retrieves the
@@ -68,7 +69,7 @@ impl yash_semantics::command_search::PathEnv for SearchEnv<'_> {
     }
 }
 
-impl yash_semantics::command_search::ClassifyEnv for SearchEnv<'_> {
+impl yash_env::semantics::command::search::ClassifyEnv for SearchEnv<'_> {
     fn builtin(&self, name: &str) -> Option<Builtin> {
         if self.params.categories.contains(Category::Builtin) {
             self.env.builtin(name)
@@ -91,12 +92,11 @@ mod tests {
     use super::*;
     use enumset::EnumSet;
     use yash_env::builtin::Type::Special;
+    use yash_env::semantics::command::search::{ClassifyEnv as _, PathEnv as _};
     use yash_env::str::UnixString;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::variable::PATH;
     use yash_env::variable::Scope;
-    use yash_semantics::command_search::ClassifyEnv as _;
-    use yash_semantics::command_search::PathEnv as _;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::FullCompoundCommand;
 
