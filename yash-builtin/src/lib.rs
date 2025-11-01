@@ -34,20 +34,6 @@
 //! [stack](Env::stack) should contain a [built-in frame](Frame::Builtin) so
 //! that `Stack::current_builtin` provides the correct command word.
 //!
-//! # Optional dependencies
-//!
-//! The `yash-builtin` crate has an optional dependency on the `yash-semantics`
-//! crate, which is enabled by default. If you disable the `yash-semantics`
-//! feature, the following built-ins will be unavailable:
-//!
-//! - `command`
-//! - `eval`
-//! - `exec`
-//! - `read`
-//! - `source`
-//! - `type`
-//! - `wait`
-//!
 //! # Dependencies to be injected
 //!
 //! Some built-ins in this crate require certain dependencies to be injected
@@ -71,13 +57,10 @@ pub mod bg;
 pub mod r#break;
 pub mod cd;
 pub mod colon;
-#[cfg(feature = "yash-semantics")]
 pub mod command;
 pub mod common;
 pub mod r#continue;
-#[cfg(feature = "yash-semantics")]
 pub mod eval;
-#[cfg(feature = "yash-semantics")]
 pub mod exec;
 pub mod exit;
 pub mod export;
@@ -87,25 +70,21 @@ pub mod getopts;
 pub mod jobs;
 pub mod kill;
 pub mod pwd;
-#[cfg(feature = "yash-semantics")]
 pub mod read;
 pub mod readonly;
 pub mod r#return;
 pub mod set;
 pub mod shift;
-#[cfg(feature = "yash-semantics")]
 pub mod source;
 pub mod times;
 pub mod trap;
 pub mod r#true;
-#[cfg(feature = "yash-semantics")]
 pub mod r#type;
 pub mod typeset;
 pub mod ulimit;
 pub mod umask;
 pub mod unalias;
 pub mod unset;
-#[cfg(feature = "yash-semantics")]
 pub mod wait;
 
 #[cfg(doc)]
@@ -122,7 +101,6 @@ use std::future::ready;
 ///
 /// The array items are ordered alphabetically.
 pub const BUILTINS: &[(&str, Builtin)] = &[
-    #[cfg(feature = "yash-semantics")]
     (
         ".",
         Builtin::new(Special, |env, args| Box::pin(source::main(env, args))),
@@ -147,7 +125,6 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         "cd",
         Builtin::new(Mandatory, |env, args| Box::pin(cd::main(env, args))),
     ),
-    #[cfg(feature = "yash-semantics")]
     ("command", {
         let mut builtin = Builtin::new(Mandatory, |env, args| Box::pin(command::main(env, args)));
         builtin.is_declaration_utility = None;
@@ -157,12 +134,10 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         "continue",
         Builtin::new(Special, |env, args| Box::pin(r#continue::main(env, args))),
     ),
-    #[cfg(feature = "yash-semantics")]
     (
         "eval",
         Builtin::new(Special, |env, args| Box::pin(eval::main(env, args))),
     ),
-    #[cfg(feature = "yash-semantics")]
     (
         "exec",
         Builtin::new(Special, |env, args| Box::pin(exec::main(env, args))),
@@ -200,7 +175,6 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         "pwd",
         Builtin::new(Substitutive, |env, args| Box::pin(pwd::main(env, args))),
     ),
-    #[cfg(feature = "yash-semantics")]
     (
         "read",
         Builtin::new(Mandatory, |env, args| Box::pin(read::main(env, args))),
@@ -222,7 +196,6 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         "shift",
         Builtin::new(Special, |env, args| Box::pin(shift::main(env, args))),
     ),
-    #[cfg(feature = "yash-semantics")]
     (
         "source",
         Builtin::new(Special, |env, args| Box::pin(source::main(env, args))),
@@ -239,7 +212,6 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         "true",
         Builtin::new(Substitutive, |env, args| Box::pin(r#true::main(env, args))),
     ),
-    #[cfg(feature = "yash-semantics")]
     (
         "type",
         Builtin::new(Mandatory, |env, args| Box::pin(r#type::main(env, args))),
@@ -265,7 +237,6 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         "unset",
         Builtin::new(Special, |env, args| Box::pin(unset::main(env, args))),
     ),
-    #[cfg(feature = "yash-semantics")]
     (
         "wait",
         Builtin::new(Mandatory, |env, args| Box::pin(wait::main(env, args))),

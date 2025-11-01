@@ -13,6 +13,11 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- The `BUILTINS` array now includes the `command`, `eval`, `exec`, `read`,
+  `source`, `type`, and `wait` built-ins regardless of whether the
+  `yash-semantics` feature is enabled. These built-ins now require certain
+  instances to be available in the environment's `any` storage to function
+  properly.
 - The `command` built-in now requires a `yash_env::semantics::command::RunFunction`
   instance to be available in the environment's `any` storage. This instance is
   used to invoke shell functions in the `command::Invoke::execute` method.
@@ -29,6 +34,7 @@ A _private dependency_ is used internally and not visible to downstream users.
   instance to be available in the environment's `any` storage. This instance is
   used to handle trapped signals while waiting for jobs in the
   `wait::core::wait_for_any_job_or_trap` function.
+- The `enumset` dependency is no longer optional and is always included.
 - Public dependency versions:
     - yash-env 0.9.0 → 0.9.2
     - yash-semantics (optional) 0.10.0 → 0.11.0
@@ -37,6 +43,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Removed
 
+- The `yash-semantics` feature flag is no longer enabled by default.
 - The `yash-prompt` feature flag has been removed. This crate no longer depends
   on the `yash-prompt` crate directly.
 - The `read::prompt` module has been removed. It was empty and unused.

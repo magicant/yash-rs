@@ -42,7 +42,7 @@ cargo build --package 'yash-syntax' --all-targets --features annotate-snippets
 # Test with non-default feature configurations.
 #cargo test --package 'yash-arith' -- $quiet
 #cargo test --package 'yash-builtin' -- $quiet
-cargo test --package 'yash-builtin' --no-default-features -- $quiet
+cargo test --package 'yash-builtin' --features yash-semantics -- $quiet
 #cargo test --package 'yash-cli' -- $quiet
 #cargo test --package 'yash-env' -- $quiet
 #cargo test --package 'yash-fnmatch' -- $quiet

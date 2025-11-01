@@ -18,12 +18,12 @@ publish = false
 all-features = true
 
 [features]
-default = ["yash-semantics"]
-yash-semantics = ["dep:yash-semantics", "dep:enumset"]
+default = []
+yash-semantics = ["dep:yash-semantics"]
 
 [dependencies]
 either = { workspace = true }
-enumset = { workspace = true, optional = true }
+enumset = { workspace = true }
 itertools = { workspace = true }
 thiserror = { workspace = true }
 yash-env = { workspace = true }
