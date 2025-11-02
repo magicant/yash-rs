@@ -27,6 +27,7 @@ use std::ffi::CString;
 use std::rc::Rc;
 use yash_env::Env;
 use yash_env::System;
+use yash_env::alias::Alias;
 use yash_env::builtin::{Builtin, Type};
 use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
@@ -37,7 +38,6 @@ use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::str::UnixStr;
 use yash_quote::quoted;
-use yash_syntax::alias::Alias;
 use yash_syntax::parser::lex::Keyword;
 
 /// Result of [categorizing](categorize) a command
@@ -351,10 +351,10 @@ impl Identify {
 mod tests {
     use super::*;
     use crate::command::Search;
+    use yash_env::alias::HashEntry;
     use yash_env::builtin::Builtin;
     use yash_env::function::Function;
     use yash_env::source::Location;
-    use yash_syntax::alias::HashEntry;
     use yash_syntax::syntax::FullCompoundCommand;
 
     #[test]

@@ -99,8 +99,8 @@ impl Command {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use yash_env::alias::HashEntry;
     use yash_env::source::Location;
-    use yash_syntax::alias::HashEntry;
 
     #[test]
     fn remove_all() {

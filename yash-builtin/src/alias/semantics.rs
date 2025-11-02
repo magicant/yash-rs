@@ -20,13 +20,13 @@ use super::Command;
 use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::Env;
+use yash_env::alias::Alias;
+use yash_env::alias::HashEntry;
 use yash_env::semantics::Field;
 #[allow(deprecated)]
 use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_quote::quoted;
-use yash_syntax::alias::Alias;
-use yash_syntax::alias::HashEntry;
 
 /// Error in executing the alias built-in
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -162,7 +162,6 @@ mod tests {
     use super::*;
     use futures_util::FutureExt as _;
     use yash_env::source::Location;
-    use yash_syntax::alias::Alias;
 
     #[test]
     fn defining_alias() {

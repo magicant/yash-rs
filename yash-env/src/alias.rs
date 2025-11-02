@@ -14,11 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Implementation of the environment about aliases
+//! Types for defining aliases
 
 use crate::Env;
 use std::rc::Rc;
-use yash_syntax::alias::{Alias, Glossary};
+
+#[doc(no_inline)]
+pub use yash_syntax::alias::{Alias, AliasSet, Glossary, HashEntry};
 
 /// Allows to look up aliases in the environment.
 ///
