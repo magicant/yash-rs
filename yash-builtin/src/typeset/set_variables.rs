@@ -90,8 +90,8 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use yash_env::option::Option::AllExport;
+    use yash_env::source::Location;
     use yash_env::variable::{Context, Variable};
-    use yash_syntax::source::Location;
 
     #[test]
     fn setting_local_variables() {

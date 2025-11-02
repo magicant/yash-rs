@@ -29,7 +29,7 @@ use crate::common::syntax::OptionSpec;
 use crate::common::syntax::parse_arguments;
 use yash_env::Env;
 use yash_env::semantics::Field;
-use yash_syntax::source::Location;
+use yash_env::source::Location;
 
 const OPTION_SPECS: &[OptionSpec] = &[
     // TODO: Non-standard options

@@ -27,10 +27,10 @@ use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::signal;
-use yash_syntax::source::Location;
+use yash_env::source::Location;
 #[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
-use yash_syntax::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
+use yash_env::source::pretty::{Annotation, AnnotationType, Message};
+use yash_env::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
 
 /// Error that may occur during parsing
 #[derive(Clone, Debug, Error, PartialEq, Eq)]

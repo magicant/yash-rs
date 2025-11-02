@@ -530,7 +530,7 @@ impl Env {
     }
 }
 
-mod alias;
+pub mod alias;
 pub mod any;
 pub mod builtin;
 mod decl_util;
@@ -543,6 +543,7 @@ pub mod prompt;
 pub mod pwd;
 pub mod semantics;
 pub mod signal;
+pub mod source;
 pub mod stack;
 pub mod subshell;
 pub mod system;

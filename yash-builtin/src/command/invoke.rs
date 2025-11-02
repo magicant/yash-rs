@@ -114,10 +114,10 @@ mod tests {
     use yash_env::builtin::Type::Special;
     use yash_env::function::Function;
     use yash_env::semantics::Field;
+    use yash_env::source::Location;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
     use yash_semantics::Divert::Return;
-    use yash_syntax::source::Location;
     use yash_syntax::syntax::FullCompoundCommand;
 
     #[test]

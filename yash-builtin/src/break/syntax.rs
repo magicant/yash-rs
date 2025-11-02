@@ -24,11 +24,11 @@ use std::num::ParseIntError;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
-use yash_syntax::source::pretty::Report;
-use yash_syntax::source::pretty::ReportType;
-use yash_syntax::source::pretty::Snippet;
+use yash_env::source::pretty::Report;
+use yash_env::source::pretty::ReportType;
+use yash_env::source::pretty::Snippet;
 #[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 
 /// Error in parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]

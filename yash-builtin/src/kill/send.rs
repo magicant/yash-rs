@@ -31,11 +31,11 @@ use yash_env::job::id::parse_tail;
 use yash_env::job::{JobList, id::FindError};
 use yash_env::semantics::Field;
 use yash_env::signal;
+#[allow(deprecated)]
+use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::Errno;
 use yash_env::system::System as _;
-#[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
-use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 /// Error that may occur while [sending](send) a signal.
 #[derive(Clone, Debug, Error, PartialEq, Eq)]

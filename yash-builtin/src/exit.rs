@@ -52,7 +52,7 @@ use yash_env::builtin::Result;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_syntax::source::Location;
+use yash_env::source::Location;
 
 // TODO Split into syntax and semantics submodules
 

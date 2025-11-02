@@ -22,13 +22,13 @@ use yash_env::Env;
 use yash_env::System;
 use yash_env::path::Path;
 use yash_env::path::PathBuf;
+use yash_env::source::pretty::{Report, ReportType, Snippet, Span, SpanRole};
 use yash_env::system::Errno;
 use yash_env::variable::AssignError;
 use yash_env::variable::OLDPWD;
 use yash_env::variable::PWD;
 use yash_env::variable::Scope::Global;
 use yash_env::variable::Value::Scalar;
-use yash_syntax::source::pretty::{Report, ReportType, Snippet, Span, SpanRole};
 
 /// Assigns the given value to `$OLDPWD`.
 ///
@@ -104,10 +104,10 @@ mod tests {
     use yash_env::VirtualSystem;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
+    use yash_env::source::Location;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env_test_helper::{assert_stderr, assert_stdout};
-    use yash_syntax::source::Location;
 
     #[test]
     fn set_oldpwd_new() {

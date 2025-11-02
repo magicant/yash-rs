@@ -25,13 +25,13 @@ use yash_env::Env;
 use yash_env::System;
 use yash_env::path::Path;
 use yash_env::semantics::Field;
+use yash_env::source::Location;
+use yash_env::source::pretty::{Report, ReportType, Snippet};
 #[cfg(doc)]
 use yash_env::stack::Stack;
 use yash_env::system::Errno;
 #[cfg(doc)]
 use yash_env::system::SharedSystem;
-use yash_syntax::source::Location;
-use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 /// Error invoking the underlying system call
 #[derive(Debug, Clone, Eq, Error, PartialEq)]

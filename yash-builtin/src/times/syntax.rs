@@ -22,8 +22,8 @@ use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
 #[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
-use yash_syntax::source::pretty::{Report, ReportType, Snippet};
+use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_env::source::pretty::{Report, ReportType, Snippet};
 
 /// Error in parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]

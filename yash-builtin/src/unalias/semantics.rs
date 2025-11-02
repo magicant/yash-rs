@@ -22,8 +22,8 @@ use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
 #[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
-use yash_syntax::source::pretty::{Report, ReportType, Snippet};
+use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_env::source::pretty::{Report, ReportType, Snippet};
 
 /// Errors that can occur while executing the `unalias` built-in
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -99,8 +99,8 @@ impl Command {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use yash_syntax::alias::HashEntry;
-    use yash_syntax::source::Location;
+    use yash_env::alias::HashEntry;
+    use yash_env::source::Location;
 
     #[test]
     fn remove_all() {

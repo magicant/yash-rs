@@ -33,9 +33,9 @@ use yash_env::job::id::FindError;
 use yash_env::job::id::parse;
 use yash_env::job::id::parse_tail;
 use yash_env::semantics::Field;
-use yash_syntax::source::pretty::Report;
-use yash_syntax::source::pretty::ReportType;
-use yash_syntax::source::pretty::Snippet;
+use yash_env::source::pretty::Report;
+use yash_env::source::pretty::ReportType;
+use yash_env::source::pretty::Snippet;
 
 // TODO Split into syntax and semantics submodules
 

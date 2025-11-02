@@ -65,9 +65,9 @@
 use std::iter::Peekable;
 use thiserror::Error;
 #[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
-use yash_syntax::source::pretty::{Report, ReportType, Snippet};
-use yash_syntax::source::{
+use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_env::source::pretty::{Report, ReportType, Snippet};
+use yash_env::source::{
     Location,
     pretty::{Span, SpanRole, add_span},
 };

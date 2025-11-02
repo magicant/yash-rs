@@ -24,12 +24,12 @@ use yash_env::Env;
 use yash_env::path::Path;
 use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
+use yash_env::source::Location;
+#[allow(deprecated)]
+use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::variable::HOME;
 use yash_env::variable::OLDPWD;
-use yash_syntax::source::Location;
-#[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
-use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 /// Indicates how the target directory was resolved.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]

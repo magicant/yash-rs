@@ -25,18 +25,18 @@ use super::verify::GetoptsState;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
+use yash_env::source::Location;
+#[allow(deprecated)]
+use yash_env::source::pretty::{Annotation, AnnotationType, Message};
+use yash_env::source::pretty::{
+    Footnote, FootnoteType, Report, ReportType, Snippet, Span, SpanRole, add_span,
+};
 use yash_env::variable::AssignError;
 use yash_env::variable::OPTARG;
 use yash_env::variable::OPTIND;
 use yash_env::variable::Scope;
 use yash_env::variable::UnsetError;
 use yash_env::variable::Value;
-use yash_syntax::source::Location;
-#[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
-use yash_syntax::source::pretty::{
-    Footnote, FootnoteType, Report, ReportType, Snippet, Span, SpanRole, add_span,
-};
 
 /// Error in reporting the result to the environment
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -324,11 +324,11 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use std::num::NonZeroUsize;
+    use yash_env::source::Location;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::variable::Value;
     use yash_env::variable::Variable;
-    use yash_syntax::source::Location;
 
     fn non_zero(i: usize) -> NonZeroUsize {
         NonZeroUsize::new(i).unwrap()

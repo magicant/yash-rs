@@ -104,10 +104,10 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use yash_env::semantics::expansion::attr::Origin;
+    use yash_env::source::Location;
     use yash_env::variable::Value;
     use yash_env::variable::Variable;
     use yash_env::variable::VariableSet;
-    use yash_syntax::source::Location;
 
     fn attr_chars(s: &str) -> Vec<AttrChar> {
         s.chars()

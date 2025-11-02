@@ -18,14 +18,14 @@
 
 use thiserror::Error;
 use yash_env::Env;
+use yash_env::io::Fd;
 use yash_env::prompt::GetPrompt;
 use yash_env::semantics::expansion::attr::AttrChar;
 use yash_env::semantics::expansion::attr::Origin;
-use yash_env::system::Errno;
 #[allow(deprecated)]
-use yash_syntax::source::pretty::{AnnotationType, Message};
-use yash_syntax::source::pretty::{Report, ReportType};
-use yash_syntax::syntax::Fd;
+use yash_env::source::pretty::{AnnotationType, Message};
+use yash_env::source::pretty::{Report, ReportType};
+use yash_env::system::Errno;
 
 /// Error reading from the standard input
 ///

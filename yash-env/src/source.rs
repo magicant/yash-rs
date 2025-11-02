@@ -1,5 +1,5 @@
 // This file is part of yash, an extended POSIX shell.
-// Copyright (C) 2024 WATANABE Yuki
+// Copyright (C) 2020 WATANABE Yuki
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,24 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Types for defining aliases
-
-use crate::Env;
-use std::rc::Rc;
+//! Types for representing source code
 
 #[doc(no_inline)]
-pub use yash_syntax::alias::{Alias, AliasSet, Glossary, HashEntry};
-
-/// Allows to look up aliases in the environment.
-///
-/// This implementation delegates to `self.aliases`.
-impl Glossary for Env {
-    #[inline(always)]
-    fn look_up(&self, name: &str) -> Option<Rc<Alias>> {
-        self.aliases.look_up(name)
-    }
-    #[inline(always)]
-    fn is_empty(&self) -> bool {
-        self.aliases.is_empty()
-    }
-}
+pub use yash_syntax::source::{Code, Location, Source, pretty};

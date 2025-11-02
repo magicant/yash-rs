@@ -27,9 +27,9 @@ use yash_env::path::Path;
 use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
+use yash_env::source::pretty::{Footnote, FootnoteType, Report, ReportType};
 use yash_env::system::Errno;
 use yash_env::variable::PWD;
-use yash_syntax::source::pretty::{Footnote, FootnoteType, Report, ReportType};
 
 /// Exit status when the built-in succeeds
 pub const EXIT_STATUS_SUCCESS: ExitStatus = ExitStatus(0);

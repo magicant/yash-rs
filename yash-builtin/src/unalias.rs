@@ -26,7 +26,7 @@ use crate::common::report::report_failure;
 use yash_env::Env;
 use yash_env::semantics::Field;
 #[allow(deprecated)]
-use yash_syntax::source::pretty::{Message, MessageBase};
+use yash_env::source::pretty::{Message, MessageBase};
 
 /// Parsed command arguments for the `unalias` built-in
 #[derive(Clone, Debug, Eq, PartialEq)]

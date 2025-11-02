@@ -42,8 +42,8 @@ use yash_env::builtin::Result;
 use yash_env::semantics::command::search::search_path;
 use yash_env::semantics::command::{ReplaceCurrentProcessError, replace_current_process};
 use yash_env::semantics::{Divert::Abort, ExitStatus, Field};
-use yash_syntax::source::Location;
-use yash_syntax::source::pretty::{Report, ReportType, Snippet};
+use yash_env::source::Location;
+use yash_env::source::pretty::{Report, ReportType, Snippet};
 
 // TODO Split into syntax and semantics submodules
 

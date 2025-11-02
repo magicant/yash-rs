@@ -23,11 +23,11 @@ use yash_env::job::id::FindError;
 use yash_env::job::id::JobId;
 use yash_env::job::id::ParseError;
 use yash_env::semantics::Field;
-use yash_syntax::source::pretty::Report;
-use yash_syntax::source::pretty::ReportType;
-use yash_syntax::source::pretty::Snippet;
+use yash_env::source::pretty::Report;
+use yash_env::source::pretty::ReportType;
+use yash_env::source::pretty::Snippet;
 #[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 
 /// Error returned when a job ID is ambiguous.
 #[derive(Clone, Debug, Eq, PartialEq)]
