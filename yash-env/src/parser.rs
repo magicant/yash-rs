@@ -28,7 +28,12 @@ use yash_syntax::parser::lex::Lexer;
 /// This struct holds various configuration options for the parser, including
 /// the input function to read source code and source information.
 ///
-/// Parser implementations are not provided in this crate (`yash-env`).
+/// Parser implementations are not provided in this crate (`yash-env`). The
+/// standard parser implementation is provided in the `yash-syntax` crate.
+/// `Config` is provided here so that other crates can use [`RunReadEvalLoop`]
+/// without depending on `yash-syntax`.
+///
+/// [`RunReadEvalLoop`]: crate::semantics::RunReadEvalLoop
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct Config<'a> {
