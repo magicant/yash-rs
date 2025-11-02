@@ -284,7 +284,7 @@ impl From<AssignReadOnlyError> for yash_env::variable::AssignError {
 }
 
 /// This conversion is available only when the optional `yash-semantics`
-/// dependency is enabled.
+/// feature is enabled.
 #[cfg(feature = "yash-semantics")]
 impl From<AssignReadOnlyError> for yash_semantics::expansion::AssignReadOnlyError {
     fn from(e: AssignReadOnlyError) -> Self {
