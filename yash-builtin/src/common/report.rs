@@ -110,7 +110,6 @@ pub fn prepare_report_message_and_divert<'e: 'r, 'r>(
 /// # use yash_env::builtin::Result;
 /// # use yash_env::semantics::ExitStatus;
 /// # use yash_env::source::pretty::{Report, ReportType, Snippet};
-/// # use yash_syntax::syntax::Fd;
 /// # async {
 /// # let mut env = yash_env::Env::new_virtual();
 /// # let mut report = Report::new();

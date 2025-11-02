@@ -115,7 +115,6 @@ pub fn arrange_message_and_divert<'e: 'm, 'm>(
 /// # use yash_env::builtin::Result;
 /// # use yash_env::semantics::ExitStatus;
 /// # use yash_env::source::pretty::{Annotation, AnnotationType, Message};
-/// # use yash_syntax::syntax::Fd;
 /// # async {
 /// # let mut env = yash_env::Env::new_virtual();
 /// # let message = Message { r#type: AnnotationType::Error, title: "".into(), annotations: vec![], footers: vec![] };

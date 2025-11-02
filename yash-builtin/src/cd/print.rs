@@ -19,10 +19,10 @@
 use super::target::Origin;
 use crate::common::report::prepare_report_message_and_divert;
 use yash_env::Env;
+use yash_env::io::Fd;
 use yash_env::path::Path;
 use yash_env::source::pretty::{Report, ReportType};
 use yash_env::system::Errno;
-use yash_syntax::syntax::Fd;
 
 impl Origin {
     /// Whether the built-in should print the target directory path.
