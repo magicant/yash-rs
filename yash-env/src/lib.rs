@@ -71,8 +71,6 @@ use std::task::Waker;
 pub use unix_path as path;
 pub use unix_str as str;
 use yash_syntax::alias::AliasSet;
-#[doc(no_inline)]
-pub use yash_syntax::source;
 
 /// Whole shell execution environment.
 ///
@@ -545,6 +543,7 @@ pub mod prompt;
 pub mod pwd;
 pub mod semantics;
 pub mod signal;
+pub mod source;
 pub mod stack;
 pub mod subshell;
 pub mod system;

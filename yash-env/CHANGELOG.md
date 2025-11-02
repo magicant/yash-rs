@@ -14,7 +14,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 ### Added
 
 - `source` module
-    - This is a re-export of the `yash_syntax::source` module.
+    - This module re-exports types from `yash_syntax::source`.
 - `job::add_job_if_suspended`
     - This function adds a job to the job list if the given process is
       suspended and job control is enabled.
