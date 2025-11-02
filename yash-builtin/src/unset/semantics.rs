@@ -21,11 +21,11 @@ use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
+use yash_env::source::Location;
+use yash_env::source::pretty::{Report, ReportType, Span, SpanRole, add_span};
 #[cfg(doc)]
 use yash_env::system::SharedSystem;
 use yash_env::variable::Scope::Global;
-use yash_syntax::source::Location;
-use yash_syntax::source::pretty::{Report, ReportType, Span, SpanRole, add_span};
 
 /// Error returned by [`unset_variables`].
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -294,8 +294,8 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use yash_env::function::Function;
+    use yash_env::source::Location;
     use yash_env::variable::Value;
-    use yash_syntax::source::Location;
     use yash_syntax::syntax::FullCompoundCommand;
 
     #[test]

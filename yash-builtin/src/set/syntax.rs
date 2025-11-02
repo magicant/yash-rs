@@ -25,10 +25,10 @@ use yash_env::option::canonicalize;
 use yash_env::option::parse_long;
 use yash_env::option::parse_short;
 use yash_env::semantics::Field;
-use yash_syntax::source::pretty::Snippet;
+use yash_env::source::pretty::Snippet;
 #[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
-use yash_syntax::source::pretty::{Report, ReportType};
+use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_env::source::pretty::{Report, ReportType};
 
 /// Error in command line parsing
 #[derive(Clone, Debug, Eq, Error, PartialEq)]

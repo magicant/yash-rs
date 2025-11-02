@@ -26,8 +26,8 @@ use crate::common::syntax::{Mode, parse_arguments};
 use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
-use yash_syntax::source::Location;
-use yash_syntax::source::pretty::{
+use yash_env::source::Location;
+use yash_env::source::pretty::{
     Footnote, FootnoteType, Report, ReportType, Snippet, Span, SpanRole, add_span,
 };
 
@@ -127,10 +127,10 @@ mod tests {
     use yash_env::VirtualSystem;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
+    use yash_env::source::Location;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env_test_helper::assert_stderr;
-    use yash_syntax::source::Location;
 
     #[test]
     fn shifting_without_operand() {

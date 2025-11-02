@@ -22,10 +22,10 @@ use itertools::Itertools;
 use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::semantics::Field;
-use yash_env::trap::Action;
 #[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, Footer, MessageBase};
-use yash_syntax::source::pretty::{Footnote, FootnoteType, Report, ReportType, Snippet};
+use yash_env::source::pretty::{Annotation, AnnotationType, Footer, MessageBase};
+use yash_env::source::pretty::{Footnote, FootnoteType, Report, ReportType, Snippet};
+use yash_env::trap::Action;
 
 /// Command line options for the trap built-in
 pub const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('p').long("print")];
@@ -200,7 +200,7 @@ mod tests {
     use super::super::CondSpec;
     use super::*;
     use yash_env::signal::Name;
-    use yash_syntax::source::Location;
+    use yash_env::source::Location;
 
     #[test]
     fn print_all_not_including_default() {

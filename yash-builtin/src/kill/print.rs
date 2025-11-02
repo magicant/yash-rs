@@ -30,11 +30,11 @@ use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::signal::{Name, Number};
+#[allow(deprecated)]
+use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::System;
 use yash_env::system::SystemEx;
-#[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
-use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 /// Returns an iterator over all supported signals.
 ///

@@ -29,6 +29,8 @@ use yash_env::input::FdReader;
 use yash_env::io::Fd;
 use yash_env::path::PathBuf;
 use yash_env::semantics::{Divert, ExitStatus, Field, RunReadEvalLoop};
+use yash_env::source::Source;
+use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::stack::Frame;
 use yash_env::system::Errno;
 use yash_env::system::Mode;
@@ -38,8 +40,6 @@ use yash_env::system::System;
 use yash_env::system::SystemEx as _;
 use yash_env::variable::PATH;
 use yash_syntax::parser::lex::Lexer;
-use yash_syntax::source::Source;
-use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 impl Command {
     /// Executes the `.` built-in.

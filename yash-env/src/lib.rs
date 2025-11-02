@@ -71,6 +71,8 @@ use std::task::Waker;
 pub use unix_path as path;
 pub use unix_str as str;
 use yash_syntax::alias::AliasSet;
+#[doc(no_inline)]
+pub use yash_syntax::source;
 
 /// Whole shell execution environment.
 ///

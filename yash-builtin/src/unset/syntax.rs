@@ -23,9 +23,9 @@ use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
-use yash_syntax::source::pretty::Report;
+use yash_env::source::pretty::Report;
 #[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, MessageBase};
+use yash_env::source::pretty::{Annotation, MessageBase};
 
 use super::Command;
 use super::Mode;

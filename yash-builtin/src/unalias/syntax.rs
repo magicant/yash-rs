@@ -23,10 +23,10 @@ use crate::common::syntax::parse_arguments;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
-use yash_syntax::source::Location;
+use yash_env::source::Location;
 #[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
-use yash_syntax::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
+use yash_env::source::pretty::{Annotation, AnnotationType, Message};
+use yash_env::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
 
 /// List of all options supported by the `unalias` built-in
 pub const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('a')];

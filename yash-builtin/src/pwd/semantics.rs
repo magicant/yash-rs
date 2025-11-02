@@ -18,9 +18,9 @@
 
 use super::Mode;
 use thiserror::Error;
+use yash_env::source::pretty::{Report, ReportType};
 use yash_env::system::Errno;
 use yash_env::{Env, System};
-use yash_syntax::source::pretty::{Report, ReportType};
 
 /// Error in running the pwd built-in
 #[derive(Debug, Clone, Eq, Error, PartialEq)]

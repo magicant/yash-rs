@@ -52,8 +52,8 @@ use yash_env::option::Option::Monitor;
 use yash_env::option::State::Off;
 use yash_env::semantics::Field;
 use yash_env::signal;
+use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::Errno;
-use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 // Some definitions in this module are shared with the `fg` built-in.
 

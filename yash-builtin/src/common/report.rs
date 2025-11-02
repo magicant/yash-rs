@@ -24,12 +24,12 @@ use yash_env::Env;
 #[cfg(doc)]
 use yash_env::SharedSystem;
 use yash_env::semantics::{Divert, ExitStatus};
-#[cfg(doc)]
-use yash_env::stack::Stack;
-use yash_syntax::source::Location;
-use yash_syntax::source::pretty::{
+use yash_env::source::Location;
+use yash_env::source::pretty::{
     Report, ReportType, Snippet, Span, SpanRole, add_span, snippet_for_code,
 };
+#[cfg(doc)]
+use yash_env::stack::Stack;
 
 /// Convenience function for constructing an error report and a divert value.
 ///
@@ -109,7 +109,7 @@ pub fn prepare_report_message_and_divert<'e: 'r, 'r>(
 /// # use yash_builtin::common::report::prepare_report_message_and_divert;
 /// # use yash_env::builtin::Result;
 /// # use yash_env::semantics::ExitStatus;
-/// # use yash_syntax::source::pretty::{Report, ReportType, Snippet};
+/// # use yash_env::source::pretty::{Report, ReportType, Snippet};
 /// # use yash_syntax::syntax::Fd;
 /// # async {
 /// # let mut env = yash_env::Env::new_virtual();

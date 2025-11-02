@@ -32,13 +32,13 @@ use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::command::search::{Target, search};
+#[allow(deprecated)]
+use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::str::UnixStr;
 use yash_quote::quoted;
 use yash_syntax::alias::Alias;
 use yash_syntax::parser::lex::Keyword;
-#[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
-use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 /// Result of [categorizing](categorize) a command
 ///
@@ -353,8 +353,8 @@ mod tests {
     use crate::command::Search;
     use yash_env::builtin::Builtin;
     use yash_env::function::Function;
+    use yash_env::source::Location;
     use yash_syntax::alias::HashEntry;
-    use yash_syntax::source::Location;
     use yash_syntax::syntax::FullCompoundCommand;
 
     #[test]

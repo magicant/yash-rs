@@ -35,9 +35,9 @@ use yash_env::Env;
 #[cfg(doc)]
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::{Field, RunReadEvalLoop};
+use yash_env::source::Source;
 use yash_syntax::input::Memory;
 use yash_syntax::parser::lex::Lexer;
-use yash_syntax::source::Source;
 
 /// Entry point of the `eval` built-in execution
 ///

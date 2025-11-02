@@ -46,6 +46,9 @@ use yash_env::option::State::On;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::signal::Name::{Kill, Stop};
+#[allow(deprecated)]
+use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::SharedSystem;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
@@ -53,9 +56,6 @@ use yash_env::trap::SetActionError;
 use yash_env::trap::SignalSystem;
 use yash_env::trap::TrapSet;
 use yash_quote::quoted;
-#[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
-use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 /// Interpretation of command line arguments that selects the behavior of the
 /// `trap` built-in

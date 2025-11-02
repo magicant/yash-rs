@@ -93,11 +93,11 @@ mod tests {
     use enumset::EnumSet;
     use yash_env::builtin::Type::Special;
     use yash_env::semantics::command::search::{ClassifyEnv as _, PathEnv as _};
+    use yash_env::source::Location;
     use yash_env::str::UnixString;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::variable::PATH;
     use yash_env::variable::Scope;
-    use yash_syntax::source::Location;
     use yash_syntax::syntax::FullCompoundCommand;
 
     #[test]

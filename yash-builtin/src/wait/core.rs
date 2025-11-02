@@ -117,12 +117,12 @@ mod tests {
     use yash_env::job::Job;
     use yash_env::job::ProcessState;
     use yash_env::semantics::ExitStatus;
+    use yash_env::source::Location;
     use yash_env::subshell::Subshell;
     use yash_env::system::r#virtual::{SIGSTOP, SIGTERM};
     use yash_env::trap::Action;
     use yash_env::variable::Value;
     use yash_env_test_helper::in_virtual_system;
-    use yash_syntax::source::Location;
 
     #[test]
     fn running_job() {

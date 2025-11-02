@@ -26,10 +26,10 @@ use yash_env::SharedSystem;
 use yash_env::io::Fd;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
+#[allow(deprecated)]
+use yash_env::source::pretty::{Annotation, AnnotationType, Message, MessageBase};
 #[cfg(doc)]
 use yash_env::stack::Stack;
-#[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, Message, MessageBase};
 
 pub mod report;
 pub mod syntax;
@@ -114,7 +114,7 @@ pub fn arrange_message_and_divert<'e: 'm, 'm>(
 /// # use yash_builtin::common::arrange_message_and_divert;
 /// # use yash_env::builtin::Result;
 /// # use yash_env::semantics::ExitStatus;
-/// # use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
+/// # use yash_env::source::pretty::{Annotation, AnnotationType, Message};
 /// # use yash_syntax::syntax::Fd;
 /// # async {
 /// # let mut env = yash_env::Env::new_virtual();

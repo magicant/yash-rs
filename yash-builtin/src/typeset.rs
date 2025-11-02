@@ -39,11 +39,11 @@ use yash_env::Env;
 use yash_env::function::Function;
 use yash_env::option::State;
 use yash_env::semantics::Field;
-use yash_env::variable::{Value, Variable};
-use yash_syntax::source::Location;
+use yash_env::source::Location;
 #[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
-use yash_syntax::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
+use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_env::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
+use yash_env::variable::{Value, Variable};
 
 mod print_functions;
 mod print_variables;

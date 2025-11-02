@@ -26,9 +26,9 @@ use std::iter::Peekable;
 use thiserror::Error;
 use yash_env::option::State;
 use yash_env::semantics::Field;
-use yash_syntax::source::Location;
+use yash_env::source::Location;
 #[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
+use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 
 /// Attribute that can be set on a variable or function
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

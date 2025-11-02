@@ -66,7 +66,7 @@ mod tests {
     use super::*;
     use futures_util::FutureExt as _;
     use yash_env::semantics::ExitStatus;
-    use yash_syntax::source::Source;
+    use yash_env::source::Source;
 
     #[test]
     fn builtin_defines_alias() {
