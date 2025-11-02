@@ -22,6 +22,8 @@ use derive_more::Debug;
 use std::num::NonZeroU64;
 use std::rc::Rc;
 use yash_syntax::parser::lex::Lexer;
+#[doc(no_inline)]
+pub use yash_syntax::parser::lex::is_name;
 
 /// Configuration for the parser
 ///
