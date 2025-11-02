@@ -14,7 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Types for using the shell language parser
+//! Shell language parser configuration and utilities
+//!
+//! This module provides configuration options for the shell language parser.
+//! It also re-exports certain items from the `yash-syntax` crate that are
+//! useful for working with the parser.
 
 use crate::input::InputObject;
 use crate::source::Source;
