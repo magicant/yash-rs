@@ -50,6 +50,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `yash-prompt` feature flag has been removed. This crate no longer depends
   on the `yash-prompt` crate directly.
 - The `read::prompt` module has been removed. It was empty and unused.
+- Public dependency:
+    - yash-syntax 0.16.0
 
 ## [0.11.0] - 2025-10-13
 
