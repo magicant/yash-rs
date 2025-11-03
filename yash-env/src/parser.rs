@@ -16,10 +16,15 @@
 
 //! Shell language parser configuration and utilities
 //!
-//! This module provides configuration options for the shell language parser.
-//! It also re-exports certain items from the `yash-syntax` crate that are
-//! useful for working with the parser.
+//! This module contains several items related to the shell language parser.
+//!
+//! - [`Config`] is a struct that holds configuration options for the parser.
+//! - [`IsKeyword`] is a wrapper for a function that checks if a string is a
+//!   reserved word.
+//! - [`is_name`] is a function that checks if a string is a valid variable
+//!   name.
 
+use crate::Env;
 use crate::input::InputObject;
 use crate::source::Source;
 use derive_more::Debug;
@@ -91,3 +96,14 @@ impl<'a> Config<'a> {
         config.input(self.input)
     }
 }
+
+/// Wrapper for a function that checks if a string is a keyword
+///
+/// This struct wraps a function that takes an environment and a string, and
+/// returns `true` if the string is a shell reserved word (keyword) in the given
+/// environment. An implementation of the function should be provided and stored
+/// in the environment's [`any`](Env::any) storage. This allows modules that
+/// need to check for keywords to do so without directly depending on the parser
+/// crate (`yash-syntax`).
+#[derive(Clone, Copy, Debug)]
+pub struct IsKeyword(pub fn(&Env, &str) -> bool);
