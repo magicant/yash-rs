@@ -33,11 +33,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use yash_env::Env;
 use yash_env::input::Memory;
+use yash_env::parser::Config;
 #[cfg(doc)]
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::{Field, RunReadEvalLoop};
 use yash_env::source::Source;
-use yash_syntax::parser::lex::Lexer;
 
 /// Entry point of the `eval` built-in execution
 ///
@@ -67,12 +67,11 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
         .any
         .get()
         .expect("`eval` built-in requires `RunReadEvalLoop` in `Env::any`");
-    let mut config = Lexer::config();
+    let mut config = Config::with_input(Box::new(Memory::new(&command.value)));
     config.source = Some(Rc::new(Source::Eval {
         original: command.origin,
     }));
-    let mut lexer = config.input(Box::new(Memory::new(&command.value)));
-    let divert = run_read_eval_loop(&RefCell::new(env), &mut lexer).await;
+    let divert = run_read_eval_loop(&RefCell::new(env), config).await;
     Result::with_exit_status_and_divert(env.exit_status, divert)
 }
 

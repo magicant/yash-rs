@@ -18,6 +18,7 @@
 
 use crate::Env;
 use crate::signal;
+use crate::source::Location;
 use crate::system::System;
 use std::cell::RefCell;
 use std::ffi::c_int;
@@ -25,8 +26,6 @@ use std::ops::ControlFlow;
 use std::pin::Pin;
 use std::process::ExitCode;
 use std::process::Termination;
-use yash_syntax::parser::lex::Lexer;
-use yash_syntax::source::Location;
 
 /// Resultant string of word expansion.
 ///
@@ -261,6 +260,8 @@ impl Divert {
 /// next.
 pub type Result<T = ()> = ControlFlow<Divert, T>;
 
+type PinFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
+
 /// Wrapper for running a read-eval-loop
 ///
 /// This struct declares a function type for running a read-eval-loop. An
@@ -269,13 +270,18 @@ pub type Result<T = ()> = ControlFlow<Divert, T>;
 /// depending on read-eval-loop execution.
 ///
 /// The function takes two arguments. The first argument is a mutable reference
-/// to an environment wrapped in a [`RefCell`]. The second argument is a mutable
-/// reference to a [`Lexer`] from which commands are read. The `RefCell` can be
-/// shared with the [`Input`](crate::input::Input) implementor used by the
-/// lexer, so that the implementor can access and modify the environment while
-/// reading commands. After reading a command, the `RefCell` should be borrowed
-/// mutably outside the lexer to execute the command. The `RefCell` should not
-/// be borrowed otherwise during the read-eval-loop execution.
+/// to an environment wrapped in a [`RefCell`]. The second argument is a
+/// [configuration](crate::parser::Config) for the parser, which contains the
+/// [input function](crate::input::Input) and source information. The
+/// configuration will be used by the function to create a lexer for reading
+/// commands.
+///
+/// Note that the `RefCell` is passed as a shared reference. It can be shared
+/// with the input function, allowing the input function to access and modify
+/// the environment while reading commands. The input function must release
+/// the borrow on the `RefCell` before returning control to the caller so that
+/// the caller can borrow the `RefCell` mutably to execute commands read from
+/// the parser.
 ///
 /// The function returns a future which resolves to a [`Result`] when awaited.
 /// The function should execute commands read from the lexer until the end of
@@ -295,17 +301,16 @@ pub type Result<T = ()> = ControlFlow<Divert, T>;
 /// ```
 /// # use yash_env::semantics::RunReadEvalLoop;
 /// let mut env = yash_env::Env::new_virtual();
-/// env.any.insert(Box::new(RunReadEvalLoop(|env, lexer| {
-///     Box::pin(async move { yash_semantics::read_eval_loop(env, lexer).await })
+/// env.any.insert(Box::new(RunReadEvalLoop(|env, config| {
+///     Box::pin(async move {
+///         let mut lexer = config.into_lexer();
+///         yash_semantics::read_eval_loop(env, &mut lexer).await
+///     })
 /// })));
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct RunReadEvalLoop(
-    #[allow(clippy::type_complexity)]
-    pub  for<'a> fn(
-        &'a RefCell<&mut Env>,
-        &'a mut Lexer,
-    ) -> Pin<Box<dyn Future<Output = Result> + 'a>>,
+    pub for<'a> fn(&'a RefCell<&mut Env>, crate::parser::Config<'a>) -> PinFuture<'a, Result>,
 );
 
 pub mod command;

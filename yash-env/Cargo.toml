@@ -20,6 +20,7 @@ all-features = true
 [dependencies]
 annotate-snippets = { workspace = true }
 bitflags = { workspace = true }
+derive_more = { workspace = true, features = ["debug"] }
 dyn-clone = { workspace = true }
 either = { workspace = true }
 enumset = { workspace = true }

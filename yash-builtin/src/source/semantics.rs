@@ -27,6 +27,7 @@ use yash_env::Env;
 use yash_env::input::Echo;
 use yash_env::input::FdReader;
 use yash_env::io::Fd;
+use yash_env::parser::Config;
 use yash_env::path::PathBuf;
 use yash_env::semantics::{Divert, ExitStatus, Field, RunReadEvalLoop};
 use yash_env::source::Source;
@@ -39,7 +40,6 @@ use yash_env::system::OpenFlag;
 use yash_env::system::System;
 use yash_env::system::SystemEx as _;
 use yash_env::variable::PATH;
-use yash_syntax::parser::lex::Lexer;
 
 impl Command {
     /// Executes the `.` built-in.
@@ -64,14 +64,13 @@ impl Command {
             .expect("`source` built-in requires `RunReadEvalLoop` in `Env::any`");
         let system = env.system.clone();
         let ref_env = RefCell::new(&mut *env);
-        let mut config = Lexer::config();
+        let input = Box::new(Echo::new(FdReader::new(fd, system), &ref_env));
+        let mut config = Config::with_input(input);
         config.source = Some(Rc::new(Source::DotScript {
             name: self.file.value,
             origin: self.file.origin,
         }));
-        let input = Box::new(Echo::new(FdReader::new(fd, system), &ref_env));
-        let mut lexer = config.input(input);
-        let divert = run_read_eval_loop.0(&ref_env, &mut { lexer }).await;
+        let divert = run_read_eval_loop.0(&ref_env, config).await;
 
         _ = env.system.close(fd);
 

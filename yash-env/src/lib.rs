@@ -539,6 +539,7 @@ pub mod input;
 pub mod io;
 pub mod job;
 pub mod option;
+pub mod parser;
 pub mod prompt;
 pub mod pwd;
 pub mod semantics;

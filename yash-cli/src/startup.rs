@@ -110,8 +110,11 @@ pub fn configure_environment(env: &mut Env, run: Run) -> Work {
 
 /// Inject dependencies into the environment.
 fn inject_dependencies(env: &mut Env) {
-    env.any.insert(Box::new(RunReadEvalLoop(|env, lexer| {
-        Box::pin(async move { yash_semantics::read_eval_loop(env, lexer).await })
+    env.any.insert(Box::new(RunReadEvalLoop(|env, config| {
+        Box::pin(async move {
+            let mut lexer = config.into_lexer();
+            yash_semantics::read_eval_loop(env, &mut lexer).await
+        })
     })));
 
     env.any.insert(Box::new(RunFunction(

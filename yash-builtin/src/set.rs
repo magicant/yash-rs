@@ -40,11 +40,11 @@ use yash_env::option::parse_long;
 #[cfg(doc)]
 use yash_env::option::parse_short;
 use yash_env::option::{Interactive, Monitor};
+use yash_env::parser::is_name;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::stack::Frame::Subshell;
 use yash_env::variable::Scope::Global;
-use yash_syntax::parser::lex::is_name;
 
 /// Interpretation of command-line arguments that determine the behavior of the
 /// set built-in

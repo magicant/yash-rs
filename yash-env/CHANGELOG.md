@@ -16,6 +16,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `source` module
     - This module re-exports `Code`, `Location`, `Source`, and `pretty` from
       `yash_syntax::source`.
+- `parser` module
+    - `Config`: Configuration for the parser.
+    - `is_name`: Function that checks if a string is a valid variable name.
 - `alias` module
     - This module re-exports `Alias`, `AliasSet`, `Glossary`, and `HashEntry`
       from `yash_syntax::alias`.
@@ -59,6 +62,8 @@ A _private dependency_ is used internally and not visible to downstream users.
             - `Ifs`: Collection of input field separator characters
             - `Ranges`: Iterator that yields index ranges of separated fields
             - `split_into` and `split`: Functions for performing field splitting
+- Private dependencies:
+    - derive_more 2.0.1
 
 ## [0.9.1] - 2025-10-18
 
