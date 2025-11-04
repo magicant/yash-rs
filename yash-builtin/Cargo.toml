@@ -29,7 +29,6 @@ thiserror = { workspace = true }
 yash-env = { workspace = true }
 yash-quote = { workspace = true }
 yash-semantics = { workspace = true, optional = true }
-yash-syntax = { workspace = true }
 
 [dev-dependencies]
 assert_matches = { workspace = true }
@@ -37,6 +36,7 @@ futures-executor = { workspace = true }
 futures-util = { workspace = true, features = ["channel"] }
 yash-env-test-helper = { workspace = true }
 yash-semantics = { workspace = true }
+yash-syntax = { workspace = true }
 
 [lints]
 workspace = true

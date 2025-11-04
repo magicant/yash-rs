@@ -17,12 +17,14 @@
 //! Shell startup
 
 use self::args::{Run, Source, Work};
+use std::str::FromStr as _;
 use yash_builtin::BUILTINS;
 use yash_env::Env;
 use yash_env::System;
 use yash_env::io::Fd;
 use yash_env::option::Option::{Interactive, Monitor, Stdin};
 use yash_env::option::State::On;
+use yash_env::parser::IsKeyword;
 use yash_env::prompt::GetPrompt;
 use yash_env::semantics::command::RunFunction;
 use yash_env::trap::RunSignalTrapIfCaught;
@@ -110,6 +112,10 @@ pub fn configure_environment(env: &mut Env, run: Run) -> Work {
 
 /// Inject dependencies into the environment.
 fn inject_dependencies(env: &mut Env) {
+    env.any.insert(Box::new(IsKeyword(|_env, word| {
+        yash_syntax::parser::lex::Keyword::from_str(word).is_ok()
+    })));
+
     env.any.insert(Box::new(RunReadEvalLoop(|env, config| {
         Box::pin(async move {
             let mut lexer = config.into_lexer();

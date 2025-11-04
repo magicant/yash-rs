@@ -41,16 +41,17 @@
 //! dependencies are not injected, the built-in may **panic** at runtime.
 //!
 //! - The `command` built-in requires a
-//!   [`RunFunction`](yash_env::semantics::command::RunFunction) instance in the
-//!   `any` storage to invoke shell functions.
+//!   [`RunFunction`](yash_env::semantics::command::RunFunction) instance to
+//!   invoke shell functions, and an [`IsKeyword`](yash_env::parser::IsKeyword)
+//!   instance to check for reserved words.
 //! - The `eval` and `source` built-ins require a
-//!   [`RunReadEvalLoop`](yash_env::semantics::RunReadEvalLoop) instance in the
-//!   `any` storage to run the read-eval loop for executing commands.
+//!   [`RunReadEvalLoop`](yash_env::semantics::RunReadEvalLoop) instance to run
+//!   the read-eval loop for executing commands.
 //! - The `read` built-in requires a [`GetPrompt`](yash_env::prompt::GetPrompt)
-//!   instance in the `any` storage to generate prompts when reading input.
+//!   instance to generate prompts when reading input.
 //! - The `wait` built-in requires a
 //!   [`RunSignalTrapIfCaught`](yash_env::trap::RunSignalTrapIfCaught) instance
-//!   in the `any` storage to handle trapped signals while waiting for jobs.
+//!   to handle trapped signals while waiting for jobs.
 
 pub mod alias;
 pub mod bg;

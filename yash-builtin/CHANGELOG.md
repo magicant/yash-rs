@@ -21,6 +21,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `command` built-in now requires a `yash_env::semantics::command::RunFunction`
   instance to be available in the environment's `any` storage. This instance is
   used to invoke shell functions in the `command::Invoke::execute` method.
+- The `command` built-in now requires a `yash_env::parser::IsKeyword` instance to
+  be available in the environment's `any` storage. This instance is used to
+  check if an argument word is a reserved word (keyword).
 - The `eval` built-in now requires a `yash_env::semantics::RunReadEvalLoop`
   instance to be available in the environment's `any` storage. This instance is
   used to run the read-eval loop in the `eval::main` function.
@@ -47,6 +50,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `yash-prompt` feature flag has been removed. This crate no longer depends
   on the `yash-prompt` crate directly.
 - The `read::prompt` module has been removed. It was empty and unused.
+- Public dependency:
+    - yash-syntax 0.16.0
 
 ## [0.11.0] - 2025-10-13
 

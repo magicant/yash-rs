@@ -27,13 +27,19 @@
 //! search path. See the source code of [`RealSystem::confstr_path`] for the
 //! platforms supported on the real system.
 //!
-//! Function invocation depends on an instance of [`RunFunction`] being present
-//! in the environment's [`any`](Env::any) storage. If no such instance is found,
-//! the built-in will **panic**.
+//! The built-in depends on some functions injected into the environment's
+//! [`any`](Env::any) storage to perform its operations:
+//!
+//! - An instance of [`RunFunction`] is required to invoke shell functions.
+//! - An instance of [`IsKeyword`] is required to check if an argument word is a
+//!   shell reserved word (keyword).
+//!
+//! If no such instance is found, the built-in will **panic**.
 //!
 //! The [`type`] built-in is equivalent to the `command` built-in with the `-V`
 //! option.
 //!
+//! [`IsKeyword`]: yash_env::parser::IsKeyword
 //! [`RunFunction`]: yash_env::semantics::command::RunFunction
 //! [`type`]: crate::type
 

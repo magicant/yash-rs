@@ -29,6 +29,7 @@ use yash_env::Env;
 use yash_env::System;
 use yash_env::alias::Alias;
 use yash_env::builtin::{Builtin, Type};
+use yash_env::parser::IsKeyword;
 use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -38,7 +39,6 @@ use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::str::UnixStr;
 use yash_quote::quoted;
-use yash_syntax::parser::lex::Keyword;
 
 /// Result of [categorizing](categorize) a command
 ///
@@ -176,12 +176,19 @@ fn normalize_target<E: NormalizeEnv>(env: &E, target: &mut Target) -> Result<(),
 }
 
 /// Determines the category of the given command name.
+///
+/// This function requires an instance of [`IsKeyword`] to be present in the
+/// environment's [`any`](Env::any) storage to check for keywords. If no such
+/// instance is found, this function will **panic**.
 pub fn categorize<'f>(
     name: &'f Field,
     env: &mut SearchEnv,
 ) -> Result<Categorization, NotFound<'f>> {
-    if env.params.categories.contains(Category::Keyword) && name.value.parse::<Keyword>().is_ok() {
-        return Ok(Categorization::Keyword);
+    if env.params.categories.contains(Category::Keyword) {
+        let IsKeyword(is_keyword) = env.env.any.get().expect("IsKeyword not found in env.any");
+        if is_keyword(env.env, &name.value) {
+            return Ok(Categorization::Keyword);
+        }
     }
 
     if env.params.categories.contains(Category::Alias) {
@@ -311,6 +318,10 @@ impl Identify {
     /// This function returns a string that should be printed to the standard
     /// output, as well as a list of errors that should be printed to the
     /// standard error.
+    ///
+    /// This function requires an instance of [`IsKeyword`] to be present in the
+    /// environment's [`any`](Env::any) storage to check for keywords. If no
+    /// such instance is found, this function will **panic**.
     pub fn result(&self, env: &mut Env) -> (String, Vec<NotFound<'_>>) {
         let params = &self.search;
         let env = &mut SearchEnv { env, params };
@@ -445,6 +456,10 @@ mod tests {
     fn categorize_keyword() {
         let name = &Field::dummy("if");
         let env = &mut Env::new_virtual();
+        env.any.insert(Box::new(IsKeyword(|_env, word| {
+            assert_eq!(word, "if");
+            true
+        })));
         let params = &Search::default_for_identify();
         let env = &mut SearchEnv { env, params };
 
@@ -456,6 +471,10 @@ mod tests {
     fn categorize_non_keyword() {
         let name = &Field::dummy("foo");
         let env = &mut Env::new_virtual();
+        env.any.insert(Box::new(IsKeyword(|_env, word| {
+            assert_eq!(word, "foo");
+            false
+        })));
         let params = &Search::default_for_identify();
         let env = &mut SearchEnv { env, params };
 
@@ -487,6 +506,7 @@ mod tests {
         );
         let alias = entry.0.clone();
         env.aliases.insert(entry);
+        env.any.insert(Box::new(IsKeyword(|_, _| false)));
         let params = &Search::default_for_identify();
         let env = &mut SearchEnv { env, params };
 
@@ -498,6 +518,7 @@ mod tests {
     fn categorize_non_alias() {
         let name = &Field::dummy("a");
         let env = &mut Env::new_virtual();
+        env.any.insert(Box::new(IsKeyword(|_, _| false)));
         let params = &Search::default_for_identify();
         let env = &mut SearchEnv { env, params };
 
@@ -515,6 +536,7 @@ mod tests {
             false,
             Location::dummy("a"),
         ));
+        env.any.insert(Box::new(IsKeyword(|_, _| false)));
         let params = &mut Search::default_for_identify();
         params.categories.remove(Category::Alias);
         let env = &mut SearchEnv { env, params };
@@ -646,6 +668,7 @@ mod tests {
     #[test]
     fn identify_result_without_error() {
         let env = &mut Env::new_virtual();
+        env.any.insert(Box::new(IsKeyword(|_, _| true)));
 
         let mut identify = Identify::default();
         let (result, errors) = identify.result(env);
@@ -671,6 +694,8 @@ mod tests {
     #[test]
     fn identify_result_with_error() {
         let env = &mut Env::new_virtual();
+        env.any
+            .insert(Box::new(IsKeyword(|_, word| word == "if" || word == "fi")));
         let identify = Identify {
             names: Field::dummies(["if", "oops", "fi", "bar"]),
             ..Identify::default()
