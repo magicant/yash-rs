@@ -43,8 +43,8 @@ yash-executor = { workspace = true }
 assert_matches = { workspace = true }
 futures-executor = { workspace = true }
 futures-util = { workspace = true, features = ["channel"] }
-yash-prompt = { workspace = true }
-yash-semantics = { workspace = true }
+yash-prompt = { path = "../yash-prompt" }
+yash-semantics = { path = "../yash-semantics" }
 
 [lints]
 workspace = true

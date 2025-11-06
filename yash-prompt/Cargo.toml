@@ -24,7 +24,7 @@ yash-semantics = { workspace = true }
 yash-syntax = { workspace = true }
 
 [dev-dependencies]
-yash-env-test-helper = { workspace = true }
+yash-env-test-helper = { path = "../yash-env-test-helper" }
 
 [lints]
 workspace = true

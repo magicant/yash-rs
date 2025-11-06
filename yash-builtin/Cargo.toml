@@ -34,9 +34,9 @@ yash-semantics = { workspace = true, optional = true }
 assert_matches = { workspace = true }
 futures-executor = { workspace = true }
 futures-util = { workspace = true, features = ["channel"] }
-yash-env-test-helper = { workspace = true }
-yash-semantics = { workspace = true }
-yash-syntax = { workspace = true }
+yash-env-test-helper = { path = "../yash-env-test-helper" }
+yash-semantics = { path = "../yash-semantics" }
+yash-syntax = { path = "../yash-syntax" }
 
 [lints]
 workspace = true

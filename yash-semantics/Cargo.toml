@@ -32,7 +32,7 @@ yash-syntax = { workspace = true }
 assert_matches = { workspace = true }
 futures-executor = { workspace = true }
 futures-util = { workspace = true, features = ["channel"] }
-yash-env-test-helper = { workspace = true }
+yash-env-test-helper = { path = "../yash-env-test-helper" }
 
 [lints]
 workspace = true
