@@ -33,7 +33,7 @@ done
 ## List all the direct dependencies of the packages being released
 for package do
     cargo metadata --format-version=1 --no-deps --all-features |
-        jq -r '.packages[] | select(.name == "'"$package"'") | .dependencies[] | select(.source == null) | "\(.name) \(.req)"'
+        jq -r '.packages[] | select(.name == "'"$package"'") | .dependencies[] | select(.kind == null and .source == null) | "\(.name) \(.req)"'
 done |
 ## Remove duplicates
 sort -u |
@@ -120,7 +120,7 @@ while [ $# -gt 0 ]; do
     # If the package has dependencies that are not yet released, skip it
     # so that we can release them first.
     for dependency in $(cargo metadata --format-version=1 --no-deps --all-features |
-        jq -r '.packages[] | select(.name == "'"$package"'") | .dependencies[] | select(.source == null) | .name')
+        jq -r '.packages[] | select(.name == "'"$package"'") | .dependencies[] | select(.kind == null and .source == null) | .name')
     do
         case " $* " in
             (*" $dependency "*)
