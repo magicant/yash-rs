@@ -9,6 +9,19 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.10.0] - Unreleased
+
+### Added
+
+- `parser::IsName`: Wrapper for a function that checks if a string is a valid
+  variable name. This allows modules to check variable names without directly
+  depending on the `yash-syntax` crate.
+
+### Removed
+
+- `parser::is_name`: This re-export of `yash_syntax::parser::lex::is_name` has
+  been removed in favor of the new `IsName` dependency injection pattern.
+
 ## [0.9.2] - 2025-11-07
 
 ### Added

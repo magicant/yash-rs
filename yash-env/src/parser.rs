@@ -21,8 +21,8 @@
 //! - [`Config`] is a struct that holds configuration options for the parser.
 //! - [`IsKeyword`] is a wrapper for a function that checks if a string is a
 //!   reserved word.
-//! - [`is_name`] is a function that checks if a string is a valid variable
-//!   name.
+//! - [`IsName`] is a wrapper for a function that checks if a string is a valid
+//!   variable name.
 
 use crate::Env;
 use crate::input::InputObject;
@@ -31,8 +31,6 @@ use derive_more::Debug;
 use std::num::NonZeroU64;
 use std::rc::Rc;
 use yash_syntax::parser::lex::Lexer;
-#[doc(no_inline)]
-pub use yash_syntax::parser::lex::is_name;
 
 /// Configuration for the parser
 ///
@@ -107,3 +105,14 @@ impl<'a> Config<'a> {
 /// crate (`yash-syntax`).
 #[derive(Clone, Copy, Debug)]
 pub struct IsKeyword(pub fn(&Env, &str) -> bool);
+
+/// Wrapper for a function that checks if a string is a valid variable name
+///
+/// This struct wraps a function that takes an environment and a string, and
+/// returns `true` if the string is a valid shell variable name in the given
+/// environment. An implementation of the function should be provided and stored
+/// in the environment's [`any`](Env::any) storage. This allows modules that
+/// need to check for variable names to do so without directly depending on the
+/// parser crate (`yash-syntax`).
+#[derive(Clone, Copy, Debug)]
+pub struct IsName(pub fn(&Env, &str) -> bool);
