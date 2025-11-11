@@ -40,7 +40,7 @@ use yash_env::option::parse_long;
 #[cfg(doc)]
 use yash_env::option::parse_short;
 use yash_env::option::{Interactive, Monitor};
-use yash_env::parser::is_name;
+use yash_env::parser::IsName;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::stack::Frame::Subshell;
@@ -122,13 +122,18 @@ fn modify(
 }
 
 /// Entry point for executing the `set` built-in
+///
+/// This function requires an instance of [`IsName`] to be present in the
+/// environment's [`any`](Env::any) storage to check for valid variable names.
+/// If no such instance is found, this function will **panic**.
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     match syntax::parse(args) {
         Ok(Command::PrintVariables) => {
+            let IsName(is_name) = env.any.get().expect("IsName not found in env.any");
             let mut vars: Vec<_> = env
                 .variables
                 .iter(Global)
-                .filter(|(name, _)| is_name(name))
+                .filter(|(name, _)| is_name(env, name))
                 .collect();
             // TODO apply current locale's collation
             vars.sort_unstable_by_key(|&(name, _)| name);
@@ -202,6 +207,9 @@ mod tests {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
+        env.any.insert(Box::new(IsName(|_env, name| {
+            yash_syntax::parser::lex::is_name(name)
+        })));
         let mut var = env.variables.get_or_new("foo", Scope::Global);
         var.assign("value", None).unwrap();
         var.export(true);

@@ -26,8 +26,8 @@ thiserror = "2.0.4"
 unix_path = "1.0.1"
 unix_str = "1.0.0"
 yash-arith = { path = "yash-arith", version = "0.2.1" }
-yash-builtin = { path = "yash-builtin", version = "0.12.0" }
-yash-env = { path = "yash-env", version = "0.9.2" }
+yash-builtin = { path = "yash-builtin", version = "0.12.1" }
+yash-env = { path = "yash-env", version = "0.10.0" }
 yash-env-test-helper = { path = "yash-env-test-helper", version = "0.7.0" }
 yash-executor = { path = "yash-executor", version = "1.0.0" }
 yash-fnmatch = { path = "yash-fnmatch", version = "1.1.1" }
