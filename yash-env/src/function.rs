@@ -27,6 +27,7 @@ use std::fmt::Display;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::iter::FusedIterator;
+use std::pin::Pin;
 use std::rc::Rc;
 use thiserror::Error;
 use yash_syntax::source::Location;
@@ -37,6 +38,29 @@ pub trait FunctionBody: Debug + Display {
     /// Executes the function body in the given environment.
     #[allow(async_fn_in_trait)] // We don't support Send
     async fn execute(&self, env: &mut Env) -> crate::semantics::Result<ExitStatus>;
+}
+
+/// Dyn-compatible adapter for the [`FunctionBody`] trait
+///
+/// This is a dyn-compatible version of the [`FunctionBody`] trait.
+///
+/// This trait is automatically implemented for all types that implement
+/// [`FunctionBody`].
+pub trait FunctionBodyObject: Debug + Display {
+    /// Executes the function body in the given environment.
+    fn execute<'a>(
+        &'a self,
+        env: &'a mut Env,
+    ) -> Pin<Box<dyn Future<Output = crate::semantics::Result<ExitStatus>> + 'a>>;
+}
+
+impl<T: FunctionBody + ?Sized> FunctionBodyObject for T {
+    fn execute<'a>(
+        &'a self,
+        env: &'a mut Env,
+    ) -> Pin<Box<dyn Future<Output = crate::semantics::Result<ExitStatus>> + 'a>> {
+        Box::pin(self.execute(env))
+    }
 }
 
 /// Definition of a function.
