@@ -13,6 +13,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Added
 
+- `function::FunctionBody`: Trait for the body of a shell function.
 - `parser::IsName`: Wrapper for a function that checks if a string is a valid
   variable name. This allows modules to check variable names without directly
   depending on the `yash-syntax` crate.

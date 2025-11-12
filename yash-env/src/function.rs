@@ -18,8 +18,12 @@
 //!
 //! This module provides data types for defining shell functions.
 
+use crate::Env;
+use crate::semantics::ExitStatus;
 use std::borrow::Borrow;
 use std::collections::HashSet;
+use std::fmt::Debug;
+use std::fmt::Display;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::iter::FusedIterator;
@@ -27,6 +31,13 @@ use std::rc::Rc;
 use thiserror::Error;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::FullCompoundCommand;
+
+/// Trait for the body of a [`Function`]
+pub trait FunctionBody: Debug + Display {
+    /// Executes the function body in the given environment.
+    #[allow(async_fn_in_trait)] // We don't support Send
+    async fn execute(&self, env: &mut Env) -> crate::semantics::Result<ExitStatus>;
+}
 
 /// Definition of a function.
 #[derive(Clone, Debug, Eq, PartialEq)]
