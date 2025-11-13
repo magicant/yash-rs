@@ -526,6 +526,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
+[0.12.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.12.1
 [0.12.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.12.0
 [0.11.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.11.0
 [0.10.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.10.0

@@ -305,6 +305,7 @@ later.
 
 - Initial release of the shell
 
+[3.0.5]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.0.5
 [3.0.4]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.0.4
 [3.0.3]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.0.3
 [3.0.2]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.0.2
