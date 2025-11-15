@@ -64,7 +64,7 @@ impl<T: FunctionBody + ?Sized> FunctionBodyObject for T {
 }
 
 /// Definition of a function.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Function {
     /// String that identifies the function.
     pub name: String,
@@ -124,6 +124,21 @@ impl Function {
         self.read_only_location.is_some()
     }
 }
+
+/// Compares two functions for equality.
+///
+/// Two functions are considered equal if all their members are equal.
+/// This includes comparing the `body` members by pointer equality.
+impl PartialEq for Function {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && Rc::ptr_eq(&self.body, &other.body)
+            && self.origin == other.origin
+            && self.read_only_location == other.read_only_location
+    }
+}
+
+impl Eq for Function {}
 
 /// Wrapper of [`Function`] for inserting into a hash set.
 ///
