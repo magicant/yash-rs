@@ -364,9 +364,26 @@ mod tests {
     use crate::command::Search;
     use yash_env::alias::HashEntry;
     use yash_env::builtin::Builtin;
-    use yash_env::function::Function;
+    use yash_env::function::{Function, FunctionBody, FunctionBodyObject};
     use yash_env::source::Location;
-    use yash_syntax::syntax::FullCompoundCommand;
+
+    #[derive(Clone, Debug)]
+    struct FunctionBodyStub;
+
+    impl std::fmt::Display for FunctionBodyStub {
+        fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            unreachable!()
+        }
+    }
+    impl FunctionBody for FunctionBodyStub {
+        async fn execute(&self, _: &mut Env) -> yash_env::semantics::Result {
+            unreachable!()
+        }
+    }
+
+    fn function_body_stub() -> Rc<dyn FunctionBodyObject> {
+        Rc::new(FunctionBodyStub)
+    }
 
     #[test]
     fn normalize_absolute_executable() {
@@ -582,9 +599,8 @@ mod tests {
     #[test]
     fn describe_function() {
         let name = &Field::dummy("f");
-        let command: FullCompoundCommand = "{ :; }".parse().unwrap();
         let location = Location::dummy("f");
-        let function = Function::new("f", command, location);
+        let function = Function::new("f", function_body_stub(), location);
         let target = &Target::Function(function.into());
 
         let mut output = String::new();

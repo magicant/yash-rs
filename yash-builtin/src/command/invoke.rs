@@ -112,13 +112,33 @@ mod tests {
     use yash_env::VirtualSystem;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
-    use yash_env::function::Function;
+    use yash_env::function::{Function, FunctionBody, FunctionBodyObject};
     use yash_env::semantics::Field;
     use yash_env::source::Location;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
     use yash_semantics::Divert::Return;
     use yash_syntax::syntax::FullCompoundCommand;
+
+    /// Test body wrapper that actually executes the command
+    #[derive(Clone, Debug)]
+    struct FunctionBodyImpl(FullCompoundCommand);
+
+    impl std::fmt::Display for FunctionBodyImpl {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    impl FunctionBody for FunctionBodyImpl {
+        async fn execute(&self, env: &mut Env) -> yash_env::semantics::Result {
+            use yash_semantics::command::Command as _;
+            self.0.execute(env).await
+        }
+    }
+
+    fn function_body_impl(src: &str) -> Rc<dyn FunctionBodyObject> {
+        Rc::new(FunctionBodyImpl(src.parse().unwrap()))
+    }
 
     #[test]
     fn empty_command_invocation() {
@@ -206,9 +226,12 @@ mod tests {
                 })
             }),
         );
-        let body: FullCompoundCommand = "{ : \"$@\"; }".parse().unwrap();
         let origin = Location::dummy("some location");
-        let target = Target::Function(Rc::new(Function::new("foo", body, origin)));
+        let target = Target::Function(Rc::new(Function::new(
+            "foo",
+            function_body_impl(r#"{ : "$@"; }"#),
+            origin,
+        )));
 
         let result = invoke_target(&mut env, target, Field::dummies(["foo", "bar", "baz"]))
             .now_or_never()

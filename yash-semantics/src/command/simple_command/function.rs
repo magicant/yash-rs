@@ -18,7 +18,6 @@
 
 use super::perform_assignments;
 use crate::Handle;
-use crate::command::Command;
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;
@@ -96,6 +95,8 @@ pub async fn execute_function_body(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::command::Command as _;
+    use crate::command::function_definition::BodyImpl;
     use crate::tests::echo_builtin;
     use crate::tests::local_builtin;
     use crate::tests::return_builtin;
@@ -104,6 +105,7 @@ mod tests {
     use std::rc::Rc;
     use std::str::from_utf8;
     use yash_env::VirtualSystem;
+    use yash_env::function::FunctionBodyObject;
     use yash_env::option::State::On;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::r#virtual::FileBody;
@@ -111,8 +113,11 @@ mod tests {
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
     use yash_syntax::source::Location;
-    use yash_syntax::syntax::FullCompoundCommand;
     use yash_syntax::syntax::SimpleCommand;
+
+    fn function_body_impl(src: &str) -> Rc<dyn FunctionBodyObject> {
+        Rc::new(BodyImpl(src.parse().unwrap()))
+    }
 
     #[test]
     fn simple_command_returns_exit_status_from_function() {
@@ -120,7 +125,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let function = Function::new(
             "foo",
-            "{ return -n 13; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_impl("{ return -n 13; }"),
             Location::dummy("dummy"),
         );
         env.functions.define(function).unwrap();
@@ -139,7 +144,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         let function = Function::new(
             "foo",
-            "{ echo ok; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_impl("{ echo ok; }"),
             Location::dummy("dummy"),
         );
         env.functions.define(function).unwrap();
@@ -161,7 +166,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         let function = Function::new(
             "foo",
-            "{ echo ok; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_impl("{ echo ok; }"),
             Location::dummy("dummy"),
         );
         env.functions.define(function).unwrap();
@@ -180,7 +185,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let function = Function::new(
             "foo",
-            "{ return; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_impl("{ return; }"),
             Location::dummy("dummy"),
         );
         env.functions.define(function).unwrap();
@@ -198,7 +203,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let function = Function::new(
             "foo",
-            "{ return 26; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_impl("{ return 26; }"),
             Location::dummy("dummy"),
         );
         env.functions.define(function).unwrap();
@@ -217,7 +222,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         let function = Function::new(
             "foo",
-            "{ echo $1-$2-$3; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_impl("{ echo $1-$2-$3; }"),
             Location::dummy("dummy"),
         );
         env.functions.define(function).unwrap();
@@ -237,9 +242,7 @@ mod tests {
         env.builtins.insert("local", local_builtin());
         let function = Function::new(
             "foo",
-            "{ local x=42; echo $x; }"
-                .parse::<FullCompoundCommand>()
-                .unwrap(),
+            function_body_impl("{ local x=42; echo $x; }"),
             Location::dummy("dummy"),
         );
         env.functions.define(function).unwrap();
@@ -258,7 +261,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         let function = Function::new(
             "foo",
-            "{ echo $x; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_impl("{ echo $x; }"),
             Location::dummy("dummy"),
         );
         env.functions.define(function).unwrap();
@@ -275,7 +278,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         let function = Function::new(
             "foo",
-            "{ echo; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_impl("{ echo; }"),
             Location::dummy("dummy"),
         );
         env.functions.define(function).unwrap();
@@ -297,9 +300,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let function = Function::new(
             "foo",
-            "for i in; do :; done"
-                .parse::<FullCompoundCommand>()
-                .unwrap(),
+            function_body_impl("for i in; do :; done"),
             Location::dummy("dummy"),
         );
         env.functions.define(function).unwrap();

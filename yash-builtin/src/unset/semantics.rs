@@ -293,10 +293,10 @@ pub async fn report_functions_error(
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use yash_env::function::Function;
+    use std::rc::Rc;
+    use yash_env::function::{Function, FunctionBody, FunctionBodyObject};
     use yash_env::source::Location;
     use yash_env::variable::Value;
-    use yash_syntax::syntax::FullCompoundCommand;
 
     #[test]
     fn unsetting_one_variable() {
@@ -382,12 +382,23 @@ mod tests {
         assert_eq!(env.variables.get("d"), None);
     }
 
+    #[derive(Clone, Debug)]
+    struct FunctionBodyStub;
+
+    impl std::fmt::Display for FunctionBodyStub {
+        fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            unreachable!()
+        }
+    }
+    impl FunctionBody for FunctionBodyStub {
+        async fn execute(&self, _: &mut yash_env::Env) -> yash_env::semantics::Result {
+            unreachable!()
+        }
+    }
+
     fn dummy_function(name: &str) -> Function {
-        Function::new(
-            name,
-            "{ :; }".parse::<FullCompoundCommand>().unwrap(),
-            Location::dummy(name),
-        )
+        let body = Rc::new(FunctionBodyStub) as Rc<dyn FunctionBodyObject>;
+        Function::new(name, body, Location::dummy(name))
     }
 
     #[test]

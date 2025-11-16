@@ -92,13 +92,31 @@ mod tests {
     use super::*;
     use enumset::EnumSet;
     use yash_env::builtin::Type::Special;
+    use yash_env::function::{FunctionBody, FunctionBodyObject};
     use yash_env::semantics::command::search::{ClassifyEnv as _, PathEnv as _};
     use yash_env::source::Location;
     use yash_env::str::UnixString;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::variable::PATH;
     use yash_env::variable::Scope;
-    use yash_syntax::syntax::FullCompoundCommand;
+
+    #[derive(Clone, Debug)]
+    struct FunctionBodyStub;
+
+    impl std::fmt::Display for FunctionBodyStub {
+        fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            unreachable!()
+        }
+    }
+    impl FunctionBody for FunctionBodyStub {
+        async fn execute(&self, _: &mut Env) -> yash_env::semantics::Result {
+            unreachable!()
+        }
+    }
+
+    fn function_body_stub() -> Rc<dyn FunctionBodyObject> {
+        Rc::new(FunctionBodyStub)
+    }
 
     #[test]
     fn standard_path() {
@@ -222,9 +240,8 @@ mod tests {
     #[test]
     fn function_on() {
         let env = &mut Env::new_virtual();
-        let command: FullCompoundCommand = "{ :; }".parse().unwrap();
         let location = Location::dummy("f");
-        let function = Rc::new(Function::new("f", command, location));
+        let function = Rc::new(Function::new("f", function_body_stub(), location));
         env.functions.define(Rc::clone(&function)).unwrap();
         let params = &Search {
             categories: Category::Function.into(),
@@ -239,10 +256,9 @@ mod tests {
     #[test]
     fn function_off() {
         let env = &mut Env::new_virtual();
-        let command: FullCompoundCommand = "{ :; }".parse().unwrap();
         let location = Location::dummy("f");
         env.functions
-            .define(Function::new("f", command, location))
+            .define(Function::new("f", function_body_stub(), location))
             .unwrap();
         let params = &Search {
             categories: EnumSet::empty(),

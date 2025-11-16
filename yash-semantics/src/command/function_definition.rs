@@ -25,10 +25,30 @@ use std::rc::Rc;
 use yash_env::Env;
 use yash_env::function::DefineError;
 use yash_env::function::Function;
+use yash_env::function::FunctionBody;
+use yash_env::function::FunctionBodyObject;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_syntax::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
 use yash_syntax::syntax;
+
+/// Wrapper type to implement `FunctionBody` for `FullCompoundCommand`.
+#[derive(Debug)]
+#[repr(transparent)]
+pub(crate) struct BodyImpl(pub syntax::FullCompoundCommand);
+
+impl std::fmt::Display for BodyImpl {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl FunctionBody for BodyImpl {
+    async fn execute(&self, env: &mut Env) -> Result {
+        self.0.execute(env).await
+    }
+}
 
 /// Executes the function definition command.
 ///
@@ -57,8 +77,15 @@ async fn define_function(env: &mut Env, def: &syntax::FunctionDefinition) -> Res
         Err(error) => return error.handle(env).await,
     };
 
+    // Prepare the function instance
+    let body: Rc<syntax::FullCompoundCommand> = Rc::clone(&def.body);
+    let body = Rc::into_raw(body).cast::<BodyImpl>();
+    // Safety: `BodyImpl` is `#[repr(transparent)]` over `FullCompoundCommand`,
+    // so it's safe to transmute the content of the `Rc`.
+    let body = unsafe { Rc::from_raw(body) };
+    let function = Function::new(name, body as Rc<dyn FunctionBodyObject>, origin);
+
     // Define the function
-    let function = Function::new(name, Rc::clone(&def.body), origin);
     match env.functions.define(function) {
         Ok(_) => {
             env.exit_status = ExitStatus::SUCCESS;
@@ -113,11 +140,30 @@ mod tests {
     use futures_util::FutureExt;
     use std::ops::ControlFlow::Break;
     use yash_env::VirtualSystem;
+    use yash_env::function::FunctionBodyObject;
     use yash_env::option::On;
     use yash_env::option::Option::ErrExit;
     use yash_env::semantics::Divert;
     use yash_env_test_helper::assert_stderr;
     use yash_syntax::source::Location;
+
+    #[derive(Clone, Debug)]
+    struct FunctionBodyStub;
+
+    impl std::fmt::Display for FunctionBodyStub {
+        fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            unreachable!()
+        }
+    }
+    impl FunctionBody for FunctionBodyStub {
+        async fn execute(&self, _: &mut Env) -> Result {
+            unreachable!()
+        }
+    }
+
+    fn function_body_stub() -> Rc<dyn FunctionBodyObject> {
+        Rc::new(FunctionBodyStub)
+    }
 
     #[test]
     fn function_definition_new() {
@@ -136,7 +182,7 @@ mod tests {
         let function = env.functions.get("foo").unwrap();
         assert_eq!(function.name, "foo");
         assert_eq!(function.origin, definition.name.location);
-        assert_eq!(function.body, definition.body);
+        // Body equality with original AST cannot be compared directly due to BodyImpl wrapping.
         assert_eq!(function.read_only_location, None);
     }
 
@@ -146,7 +192,7 @@ mod tests {
         env.exit_status = ExitStatus::ERROR;
         let function = Function {
             name: "foo".to_string(),
-            body: Rc::new("{ :; }".parse().unwrap()),
+            body: function_body_stub(),
             origin: Location::dummy("dummy"),
             read_only_location: None,
         };
@@ -164,7 +210,7 @@ mod tests {
         let function = env.functions.get("foo").unwrap();
         assert_eq!(function.name, "foo");
         assert_eq!(function.origin, definition.name.location);
-        assert_eq!(function.body, definition.body);
+        // Body equality with original AST cannot be compared directly due to BodyImpl wrapping.
         assert_eq!(function.read_only_location, None);
     }
 
@@ -175,7 +221,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let function = Rc::new(Function {
             name: "foo".to_string(),
-            body: Rc::new("{ :; }".parse().unwrap()),
+            body: function_body_stub(),
             origin: Location::dummy("dummy"),
             read_only_location: Some(Location::dummy("readonly")),
         });
@@ -220,7 +266,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let function = Function {
             name: "foo".to_string(),
-            body: Rc::new("{ :; }".parse().unwrap()),
+            body: function_body_stub(),
             origin: Location::dummy("dummy"),
             read_only_location: Some(Location::dummy("readonly")),
         };

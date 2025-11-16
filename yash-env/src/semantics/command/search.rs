@@ -287,14 +287,12 @@ pub fn search_path<E: PathEnv>(env: &mut E, name: &str) -> Option<CString> {
 mod tests {
     use super::*;
     use crate::builtin::Type::{Elective, Extension, Mandatory};
-    use crate::function::FunctionSet;
+    use crate::function::{FunctionBody, FunctionBodyObject, FunctionSet};
     use crate::variable::Value;
     use assert_matches::assert_matches;
     use std::collections::HashMap;
     use std::collections::HashSet;
     use yash_syntax::source::Location;
-    use yash_syntax::syntax::CompoundCommand;
-    use yash_syntax::syntax::FullCompoundCommand;
 
     #[derive(Default)]
     struct DummyEnv {
@@ -326,11 +324,22 @@ mod tests {
         }
     }
 
-    fn full_compound_command(s: &str) -> FullCompoundCommand {
-        FullCompoundCommand {
-            command: CompoundCommand::Grouping(s.parse().unwrap()),
-            redirs: vec![],
+    #[derive(Clone, Debug)]
+    struct FunctionBodyStub;
+
+    impl std::fmt::Display for FunctionBodyStub {
+        fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            unreachable!()
         }
+    }
+    impl FunctionBody for FunctionBodyStub {
+        async fn execute(&self, _: &mut Env) -> crate::semantics::Result {
+            unreachable!()
+        }
+    }
+
+    fn function_body_stub() -> Rc<dyn FunctionBodyObject> {
+        Rc::new(FunctionBodyStub)
     }
 
     #[test]
@@ -345,7 +354,7 @@ mod tests {
         let mut env = DummyEnv::default();
         env.builtins
             .insert("foo", Builtin::new(Special, |_, _| unreachable!()));
-        let function = Function::new("foo", full_compound_command(""), Location::dummy(""));
+        let function = Function::new("foo", function_body_stub(), Location::dummy(""));
         env.functions.define(function).unwrap();
 
         let target = search(&mut env, "bar");
@@ -393,7 +402,7 @@ mod tests {
         let mut env = DummyEnv::default();
         let function = Rc::new(Function::new(
             "foo",
-            full_compound_command("bar"),
+            function_body_stub(),
             Location::dummy("location"),
         ));
         env.functions.define(function.clone()).unwrap();
@@ -411,11 +420,7 @@ mod tests {
         let mut env = DummyEnv::default();
         let builtin = Builtin::new(Special, |_, _| unreachable!());
         env.builtins.insert("foo", builtin);
-        let function = Function::new(
-            "foo",
-            full_compound_command("bar"),
-            Location::dummy("location"),
-        );
+        let function = Function::new("foo", function_body_stub(), Location::dummy("location"));
         env.functions.define(function).unwrap();
 
         assert_matches!(
@@ -508,7 +513,7 @@ mod tests {
 
         let function = Rc::new(Function::new(
             "foo",
-            full_compound_command("bar"),
+            function_body_stub(),
             Location::dummy("location"),
         ));
         env.functions.define(function.clone()).unwrap();
@@ -529,7 +534,7 @@ mod tests {
 
         let function = Rc::new(Function::new(
             "foo",
-            full_compound_command("bar"),
+            function_body_stub(),
             Location::dummy("location"),
         ));
         env.functions.define(function.clone()).unwrap();
@@ -550,7 +555,7 @@ mod tests {
 
         let function = Rc::new(Function::new(
             "foo",
-            full_compound_command("bar"),
+            function_body_stub(),
             Location::dummy("location"),
         ));
         env.functions.define(function.clone()).unwrap();
@@ -622,7 +627,7 @@ mod tests {
 
         let function = Rc::new(Function::new(
             "foo",
-            full_compound_command("bar"),
+            function_body_stub(),
             Location::dummy("location"),
         ));
         env.functions.define(function.clone()).unwrap();

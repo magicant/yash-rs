@@ -22,6 +22,11 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- `function::Function::body`: Now has the type `Rc<dyn FunctionBodyObject>`
+  instead of `Rc<FullCompoundCommand>`.
+- `function::Function::new`: Now takes an `Into<Rc<dyn FunctionBodyObject>>`
+  implementor instead of `Into<Rc<FullCompoundCommand>>` for the function body
+  (the second parameter).
 - `impl PartialEq for function::Function`: Now compares the function bodies
   using pointer equality instead of deep equality.
 

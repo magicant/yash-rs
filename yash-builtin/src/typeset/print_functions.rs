@@ -105,21 +105,45 @@ fn print_one(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use yash_env::function::Function;
+    use std::rc::Rc;
+    use yash_env::Env;
+    use yash_env::function::{FunctionBody, FunctionBodyObject};
     use yash_env::option::State::{Off, On};
-    use yash_syntax::syntax::FullCompoundCommand;
+
+    #[derive(Clone, Debug)]
+    struct FunctionBodyStub(String);
+
+    impl FunctionBodyStub {
+        fn new<S: Into<String>>(s: S) -> Self {
+            FunctionBodyStub(s.into())
+        }
+    }
+    impl std::fmt::Display for FunctionBodyStub {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    impl FunctionBody for FunctionBodyStub {
+        async fn execute(&self, _: &mut Env) -> yash_env::semantics::Result {
+            unreachable!()
+        }
+    }
+
+    fn function_body_stub(src: &str) -> Rc<dyn FunctionBodyObject> {
+        Rc::new(FunctionBodyStub::new(src))
+    }
 
     #[test]
     fn printing_one_function() {
         let mut functions = FunctionSet::new();
         let foo = Function::new(
             "foo",
-            "{ echo; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_stub("{ echo; }"),
             Location::dummy("foo location"),
         );
         let bar = Function::new(
             "bar",
-            "{ ls; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_stub("{ ls; }"),
             Location::dummy("bar location"),
         );
         functions.define(foo).unwrap();
@@ -140,9 +164,7 @@ mod tests {
             functions
                 .define(Function::new(
                     format!("foo{i}"),
-                    format!("{{ echo {i}; }}")
-                        .parse::<FullCompoundCommand>()
-                        .unwrap(),
+                    function_body_stub(&format!("{{ echo {i}; }}")),
                     Location::dummy("foo location"),
                 ))
                 .unwrap();
@@ -165,9 +187,7 @@ mod tests {
             functions
                 .define(Function::new(
                     format!("foo{i}"),
-                    format!("{{ echo {i}; }}")
-                        .parse::<FullCompoundCommand>()
-                        .unwrap(),
+                    function_body_stub(&format!("{{ echo {i}; }}")),
                     Location::dummy("foo location"),
                 ))
                 .unwrap();
@@ -189,7 +209,7 @@ mod tests {
         let mut functions = FunctionSet::new();
         let function = Function::new(
             "a/b$",
-            "{ echo; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_stub("{ echo; }"),
             Location::dummy("location"),
         );
         functions.define(function).unwrap();
@@ -207,7 +227,7 @@ mod tests {
         let mut functions = FunctionSet::new();
         let foo = Function::new(
             "foo",
-            "{ echo; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_stub("{ echo; }"),
             Location::dummy("definition location"),
         )
         .make_read_only(Location::dummy("readonly location"));
@@ -226,7 +246,7 @@ mod tests {
         let mut functions = FunctionSet::new();
         let foo = Function::new(
             "-n",
-            "{ :; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_stub("{ :; }"),
             Location::dummy("definition location"),
         )
         .make_read_only(Location::dummy("readonly location"));
@@ -245,12 +265,12 @@ mod tests {
         let mut functions = FunctionSet::new();
         let foo = Function::new(
             "foo",
-            "{ echo; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_stub("{ echo; }"),
             Location::dummy("foo location"),
         );
         let bar = Function::new(
             "bar",
-            "{ ls; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_stub("{ ls; }"),
             Location::dummy("bar location"),
         )
         .make_read_only(Location::dummy("bar readonly location"));
@@ -270,12 +290,12 @@ mod tests {
         let mut functions = FunctionSet::new();
         let foo = Function::new(
             "foo",
-            "{ echo; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_stub("{ echo; }"),
             Location::dummy("foo location"),
         );
         let bar = Function::new(
             "bar",
-            "{ ls; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_stub("{ ls; }"),
             Location::dummy("bar location"),
         )
         .make_read_only(Location::dummy("bar readonly location"));
@@ -317,7 +337,7 @@ mod tests {
             let mut functions = FunctionSet::new();
             let foo = Function::new(
                 "foo",
-                "{ echo; }".parse::<FullCompoundCommand>().unwrap(),
+                function_body_stub("{ echo; }"),
                 Location::dummy("definition location"),
             )
             .make_read_only(Location::dummy("readonly location"));
@@ -340,7 +360,7 @@ mod tests {
             let mut functions = FunctionSet::new();
             let foo = Function::new(
                 "foo",
-                "{ echo; }".parse::<FullCompoundCommand>().unwrap(),
+                function_body_stub("{ echo; }"),
                 Location::dummy("definition location"),
             );
             functions.define(foo).unwrap();
@@ -369,7 +389,7 @@ mod tests {
             let mut functions = FunctionSet::new();
             let foo = Function::new(
                 "foo",
-                "{ echo; }".parse::<FullCompoundCommand>().unwrap(),
+                function_body_stub("{ echo; }"),
                 Location::dummy("definition location"),
             )
             .make_read_only(Location::dummy("readonly location"));
@@ -392,7 +412,7 @@ mod tests {
             let mut functions = FunctionSet::new();
             let foo = Function::new(
                 "foo",
-                "{ echo; }".parse::<FullCompoundCommand>().unwrap(),
+                function_body_stub("{ echo; }"),
                 Location::dummy("definition location"),
             )
             .make_read_only(Location::dummy("readonly location"));
