@@ -593,6 +593,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Initial implementation of the `yash-env` crate
 
+[0.10.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.10.0
 [0.9.2]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.9.2
 [0.9.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.9.1
 [0.9.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.9.0
