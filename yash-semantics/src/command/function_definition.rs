@@ -140,30 +140,12 @@ mod tests {
     use futures_util::FutureExt;
     use std::ops::ControlFlow::Break;
     use yash_env::VirtualSystem;
-    use yash_env::function::FunctionBodyObject;
     use yash_env::option::On;
     use yash_env::option::Option::ErrExit;
     use yash_env::semantics::Divert;
     use yash_env_test_helper::assert_stderr;
+    use yash_env_test_helper::function::FunctionBodyStub;
     use yash_syntax::source::Location;
-
-    #[derive(Clone, Debug)]
-    struct FunctionBodyStub;
-
-    impl std::fmt::Display for FunctionBodyStub {
-        fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            unreachable!()
-        }
-    }
-    impl FunctionBody for FunctionBodyStub {
-        async fn execute(&self, _: &mut Env) -> Result {
-            unreachable!()
-        }
-    }
-
-    fn function_body_stub() -> Rc<dyn FunctionBodyObject> {
-        Rc::new(FunctionBodyStub)
-    }
 
     #[test]
     fn function_definition_new() {
@@ -192,7 +174,7 @@ mod tests {
         env.exit_status = ExitStatus::ERROR;
         let function = Function {
             name: "foo".to_string(),
-            body: function_body_stub(),
+            body: FunctionBodyStub::rc_dyn(),
             origin: Location::dummy("dummy"),
             read_only_location: None,
         };
@@ -221,7 +203,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let function = Rc::new(Function {
             name: "foo".to_string(),
-            body: function_body_stub(),
+            body: FunctionBodyStub::rc_dyn(),
             origin: Location::dummy("dummy"),
             read_only_location: Some(Location::dummy("readonly")),
         });
@@ -266,7 +248,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let function = Function {
             name: "foo".to_string(),
-            body: function_body_stub(),
+            body: FunctionBodyStub::rc_dyn(),
             origin: Location::dummy("dummy"),
             read_only_location: Some(Location::dummy("readonly")),
         };

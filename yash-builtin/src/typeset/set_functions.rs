@@ -77,36 +77,23 @@ impl SetFunctions {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use std::ops::ControlFlow::Continue;
-    use yash_env::Env;
-    use yash_env::function::{Function, FunctionBody, FunctionBodyObject};
-    use yash_env::semantics::ExitStatus;
-
-    #[derive(Clone, Debug)]
-    struct FunctionBodyStub;
-
-    impl std::fmt::Display for FunctionBodyStub {
-        fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            unreachable!()
-        }
-    }
-    impl FunctionBody for FunctionBodyStub {
-        async fn execute(&self, env: &mut Env) -> yash_env::semantics::Result {
-            env.exit_status = ExitStatus::SUCCESS;
-            Continue(())
-        }
-    }
-
-    fn function_body_stub() -> Rc<dyn FunctionBodyObject> {
-        Rc::new(FunctionBodyStub)
-    }
+    use yash_env::function::Function;
+    use yash_env_test_helper::function::FunctionBodyStub;
 
     #[test]
     fn making_existing_functions_readonly() {
         let mut functions = FunctionSet::new();
-        let foo = Function::new("foo", function_body_stub(), Location::dummy("foo location"));
-        let bar = Function::new("bar", function_body_stub(), Location::dummy("bar location"))
-            .make_read_only(Location::dummy("bar readonly location"));
+        let foo = Function::new(
+            "foo",
+            FunctionBodyStub::rc_dyn(),
+            Location::dummy("foo location"),
+        );
+        let bar = Function::new(
+            "bar",
+            FunctionBodyStub::rc_dyn(),
+            Location::dummy("bar location"),
+        )
+        .make_read_only(Location::dummy("bar readonly location"));
         functions.define(foo.clone()).unwrap();
         functions.define(bar.clone()).unwrap();
         let sf = SetFunctions {
@@ -129,10 +116,18 @@ mod tests {
     #[test]
     fn unsetting_readonly_attribute_of_existing_functions() {
         let mut functions = FunctionSet::new();
-        let foo = Function::new("foo", function_body_stub(), Location::dummy("foo location"));
+        let foo = Function::new(
+            "foo",
+            FunctionBodyStub::rc_dyn(),
+            Location::dummy("foo location"),
+        );
         let bar_location = Location::dummy("bar readonly location");
-        let bar = Function::new("bar", function_body_stub(), Location::dummy("bar location"))
-            .make_read_only(bar_location.clone());
+        let bar = Function::new(
+            "bar",
+            FunctionBodyStub::rc_dyn(),
+            Location::dummy("bar location"),
+        )
+        .make_read_only(bar_location.clone());
         functions.define(foo.clone()).unwrap();
         functions.define(bar.clone()).unwrap();
         let sf = SetFunctions {

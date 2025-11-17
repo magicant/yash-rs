@@ -92,31 +92,13 @@ mod tests {
     use super::*;
     use enumset::EnumSet;
     use yash_env::builtin::Type::Special;
-    use yash_env::function::{FunctionBody, FunctionBodyObject};
     use yash_env::semantics::command::search::{ClassifyEnv as _, PathEnv as _};
     use yash_env::source::Location;
     use yash_env::str::UnixString;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::variable::PATH;
     use yash_env::variable::Scope;
-
-    #[derive(Clone, Debug)]
-    struct FunctionBodyStub;
-
-    impl std::fmt::Display for FunctionBodyStub {
-        fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            unreachable!()
-        }
-    }
-    impl FunctionBody for FunctionBodyStub {
-        async fn execute(&self, _: &mut Env) -> yash_env::semantics::Result {
-            unreachable!()
-        }
-    }
-
-    fn function_body_stub() -> Rc<dyn FunctionBodyObject> {
-        Rc::new(FunctionBodyStub)
-    }
+    use yash_env_test_helper::function::FunctionBodyStub;
 
     #[test]
     fn standard_path() {
@@ -241,7 +223,7 @@ mod tests {
     fn function_on() {
         let env = &mut Env::new_virtual();
         let location = Location::dummy("f");
-        let function = Rc::new(Function::new("f", function_body_stub(), location));
+        let function = Rc::new(Function::new("f", FunctionBodyStub::rc_dyn(), location));
         env.functions.define(Rc::clone(&function)).unwrap();
         let params = &Search {
             categories: Category::Function.into(),
@@ -258,7 +240,7 @@ mod tests {
         let env = &mut Env::new_virtual();
         let location = Location::dummy("f");
         env.functions
-            .define(Function::new("f", function_body_stub(), location))
+            .define(Function::new("f", FunctionBodyStub::rc_dyn(), location))
             .unwrap();
         let params = &Search {
             categories: EnumSet::empty(),

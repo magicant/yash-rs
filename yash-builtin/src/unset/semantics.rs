@@ -293,8 +293,7 @@ pub async fn report_functions_error(
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use std::rc::Rc;
-    use yash_env::function::{Function, FunctionBody, FunctionBodyObject};
+    use yash_env::function::Function;
     use yash_env::source::Location;
     use yash_env::variable::Value;
 
@@ -382,22 +381,8 @@ mod tests {
         assert_eq!(env.variables.get("d"), None);
     }
 
-    #[derive(Clone, Debug)]
-    struct FunctionBodyStub;
-
-    impl std::fmt::Display for FunctionBodyStub {
-        fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            unreachable!()
-        }
-    }
-    impl FunctionBody for FunctionBodyStub {
-        async fn execute(&self, _: &mut yash_env::Env) -> yash_env::semantics::Result {
-            unreachable!()
-        }
-    }
-
     fn dummy_function(name: &str) -> Function {
-        let body = Rc::new(FunctionBodyStub) as Rc<dyn FunctionBodyObject>;
+        let body = yash_env_test_helper::function::FunctionBodyStub::rc_dyn();
         Function::new(name, body, Location::dummy(name))
     }
 
