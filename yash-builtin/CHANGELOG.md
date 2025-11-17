@@ -9,13 +9,16 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
-## [0.12.1] - Unreleased
+## [0.13.0] - Unreleased
 
 ### Changed
 
 - `set` built-in now requires a `yash_env::parser::IsName` instance to be
   available in the environment's `any` storage. This instance is used to check
   if a variable name is valid when printing variables.
+- Public dependency versions:
+    - yash-env 0.9.2 → 0.10.0
+    - yash-semantics (optional) 0.11.0 → 0.12.0
 
 ## [0.12.0] - 2025-11-07
 
@@ -526,7 +529,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
-[0.12.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.12.1
+[0.13.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.13.0
 [0.12.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.12.0
 [0.11.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.11.0
 [0.10.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.10.0
