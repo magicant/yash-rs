@@ -528,7 +528,7 @@ dependencies = [
  "yash-env-test-helper",
  "yash-quote",
  "yash-semantics",
- "yash-syntax",
+ "yash-syntax 0.16.0",
 ]
 
 [[package]]
@@ -546,7 +546,7 @@ dependencies = [
  "yash-executor",
  "yash-prompt",
  "yash-semantics",
- "yash-syntax",
+ "yash-syntax 0.16.0",
 ]
 
 [[package]]
@@ -575,7 +575,7 @@ dependencies = [
  "yash-prompt",
  "yash-quote",
  "yash-semantics",
- "yash-syntax",
+ "yash-syntax 0.16.0",
 ]
 
 [[package]]
@@ -610,7 +610,7 @@ dependencies = [
  "yash-env",
  "yash-env-test-helper",
  "yash-semantics",
- "yash-syntax",
+ "yash-syntax 0.16.0",
 ]
 
 [[package]]
@@ -633,7 +633,7 @@ dependencies = [
  "yash-env-test-helper",
  "yash-fnmatch",
  "yash-quote",
- "yash-syntax",
+ "yash-syntax 0.16.0",
 ]
 
 [[package]]
@@ -643,6 +643,19 @@ dependencies = [
  "annotate-snippets",
  "assert_matches",
  "futures-executor",
+ "futures-util",
+ "itertools",
+ "thiserror",
+ "yash-syntax 0.16.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "yash-syntax"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e44eeaeb137fc88ba187c13dd9c6e1fe01eafd3dc89a973efefd1862b239d40"
+dependencies = [
+ "annotate-snippets",
  "futures-util",
  "itertools",
  "thiserror",

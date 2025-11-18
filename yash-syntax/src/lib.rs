@@ -38,9 +38,15 @@
 //! This crate also defines the [`alias`] module that can be used to define
 //! aliases that are recognized while parsing.
 
+// The current implementation temporarily re-exports the old yash-syntax crate
+// to allow dependency inversion refactoring.
+// TODO: Restore the original state
+/*
 pub mod alias;
 pub mod decl_util;
 pub mod input;
 pub mod parser;
 pub mod source;
 pub mod syntax;
+*/
+pub use old_yash_syntax::*;
