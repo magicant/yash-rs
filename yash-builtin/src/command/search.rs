@@ -98,7 +98,7 @@ mod tests {
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::variable::PATH;
     use yash_env::variable::Scope;
-    use yash_syntax::syntax::FullCompoundCommand;
+    use yash_env_test_helper::function::FunctionBodyStub;
 
     #[test]
     fn standard_path() {
@@ -222,9 +222,8 @@ mod tests {
     #[test]
     fn function_on() {
         let env = &mut Env::new_virtual();
-        let command: FullCompoundCommand = "{ :; }".parse().unwrap();
         let location = Location::dummy("f");
-        let function = Rc::new(Function::new("f", command, location));
+        let function = Rc::new(Function::new("f", FunctionBodyStub::rc_dyn(), location));
         env.functions.define(Rc::clone(&function)).unwrap();
         let params = &Search {
             categories: Category::Function.into(),
@@ -239,10 +238,9 @@ mod tests {
     #[test]
     fn function_off() {
         let env = &mut Env::new_virtual();
-        let command: FullCompoundCommand = "{ :; }".parse().unwrap();
         let location = Location::dummy("f");
         env.functions
-            .define(Function::new("f", command, location))
+            .define(Function::new("f", FunctionBodyStub::rc_dyn(), location))
             .unwrap();
         let params = &Search {
             categories: EnumSet::empty(),

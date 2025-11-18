@@ -13,9 +13,22 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Added
 
+- `function::FunctionBody`: Trait for the body of a shell function.
+- `function::FunctionBodyObject`: Dyn-compatible adapter for the `FunctionBody`
+  trait.
 - `parser::IsName`: Wrapper for a function that checks if a string is a valid
   variable name. This allows modules to check variable names without directly
   depending on the `yash-syntax` crate.
+
+### Changed
+
+- `function::Function::body`: Now has the type `Rc<dyn FunctionBodyObject>`
+  instead of `Rc<FullCompoundCommand>`.
+- `function::Function::new`: Now takes an `Into<Rc<dyn FunctionBodyObject>>`
+  implementor instead of `Into<Rc<FullCompoundCommand>>` for the function body
+  (the second parameter).
+- `impl PartialEq for function::Function`: Now compares the function bodies
+  using pointer equality instead of deep equality.
 
 ### Removed
 

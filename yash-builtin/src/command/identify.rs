@@ -366,7 +366,7 @@ mod tests {
     use yash_env::builtin::Builtin;
     use yash_env::function::Function;
     use yash_env::source::Location;
-    use yash_syntax::syntax::FullCompoundCommand;
+    use yash_env_test_helper::function::FunctionBodyStub;
 
     #[test]
     fn normalize_absolute_executable() {
@@ -582,9 +582,8 @@ mod tests {
     #[test]
     fn describe_function() {
         let name = &Field::dummy("f");
-        let command: FullCompoundCommand = "{ :; }".parse().unwrap();
         let location = Location::dummy("f");
-        let function = Function::new("f", command, location);
+        let function = Function::new("f", FunctionBodyStub::rc_dyn(), location);
         let target = &Target::Function(function.into());
 
         let mut output = String::new();

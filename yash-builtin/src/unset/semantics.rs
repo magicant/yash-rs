@@ -296,7 +296,6 @@ mod tests {
     use yash_env::function::Function;
     use yash_env::source::Location;
     use yash_env::variable::Value;
-    use yash_syntax::syntax::FullCompoundCommand;
 
     #[test]
     fn unsetting_one_variable() {
@@ -383,11 +382,8 @@ mod tests {
     }
 
     fn dummy_function(name: &str) -> Function {
-        Function::new(
-            name,
-            "{ :; }".parse::<FullCompoundCommand>().unwrap(),
-            Location::dummy(name),
-        )
+        let body = yash_env_test_helper::function::FunctionBodyStub::rc_dyn();
+        Function::new(name, body, Location::dummy(name))
     }
 
     #[test]

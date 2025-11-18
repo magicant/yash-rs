@@ -78,19 +78,19 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use yash_env::function::Function;
-    use yash_syntax::syntax::FullCompoundCommand;
+    use yash_env_test_helper::function::FunctionBodyStub;
 
     #[test]
     fn making_existing_functions_readonly() {
         let mut functions = FunctionSet::new();
         let foo = Function::new(
             "foo",
-            "{ echo; }".parse::<FullCompoundCommand>().unwrap(),
+            FunctionBodyStub::rc_dyn(),
             Location::dummy("foo location"),
         );
         let bar = Function::new(
             "bar",
-            "{ ls; }".parse::<FullCompoundCommand>().unwrap(),
+            FunctionBodyStub::rc_dyn(),
             Location::dummy("bar location"),
         )
         .make_read_only(Location::dummy("bar readonly location"));
@@ -118,13 +118,13 @@ mod tests {
         let mut functions = FunctionSet::new();
         let foo = Function::new(
             "foo",
-            "{ echo; }".parse::<FullCompoundCommand>().unwrap(),
+            FunctionBodyStub::rc_dyn(),
             Location::dummy("foo location"),
         );
         let bar_location = Location::dummy("bar readonly location");
         let bar = Function::new(
             "bar",
-            "{ ls; }".parse::<FullCompoundCommand>().unwrap(),
+            FunctionBodyStub::rc_dyn(),
             Location::dummy("bar location"),
         )
         .make_read_only(bar_location.clone());

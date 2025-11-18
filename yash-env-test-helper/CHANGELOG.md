@@ -11,6 +11,12 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.8.0] - Unreleased
 
+### Added
+
+- The `function` module:
+    - `FunctionBodyStub`: A stub implementation of
+      `yash_env::function::FunctionBody` for testing purposes.
+
 ### Changed
 
 - Public dependency versions:

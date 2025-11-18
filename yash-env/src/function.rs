@@ -18,18 +18,57 @@
 //!
 //! This module provides data types for defining shell functions.
 
+use crate::Env;
 use std::borrow::Borrow;
 use std::collections::HashSet;
+use std::fmt::Debug;
+use std::fmt::Display;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::iter::FusedIterator;
+use std::pin::Pin;
 use std::rc::Rc;
 use thiserror::Error;
 use yash_syntax::source::Location;
-use yash_syntax::syntax::FullCompoundCommand;
+
+/// Trait for the body of a [`Function`]
+pub trait FunctionBody: Debug + Display {
+    /// Executes the function body in the given environment.
+    ///
+    /// The implementation of this method is expected to update
+    /// `env.exit_status` reflecting the result of the function execution.
+    #[allow(async_fn_in_trait)] // We don't support Send
+    async fn execute(&self, env: &mut Env) -> crate::semantics::Result;
+}
+
+/// Dyn-compatible adapter for the [`FunctionBody`] trait
+///
+/// This is a dyn-compatible version of the [`FunctionBody`] trait.
+///
+/// This trait is automatically implemented for all types that implement
+/// [`FunctionBody`].
+pub trait FunctionBodyObject: Debug + Display {
+    /// Executes the function body in the given environment.
+    ///
+    /// The implementation of this method is expected to update
+    /// `env.exit_status` reflecting the result of the function execution.
+    fn execute<'a>(
+        &'a self,
+        env: &'a mut Env,
+    ) -> Pin<Box<dyn Future<Output = crate::semantics::Result> + 'a>>;
+}
+
+impl<T: FunctionBody + ?Sized> FunctionBodyObject for T {
+    fn execute<'a>(
+        &'a self,
+        env: &'a mut Env,
+    ) -> Pin<Box<dyn Future<Output = crate::semantics::Result> + 'a>> {
+        Box::pin(self.execute(env))
+    }
+}
 
 /// Definition of a function.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Function {
     /// String that identifies the function.
     pub name: String,
@@ -37,9 +76,10 @@ pub struct Function {
     /// Command that is executed when the function is called.
     ///
     /// This is wrapped in `Rc` so that we don't have to clone the entire
-    /// compound command when we define a function. The function definition
-    /// command only clones the `Rc` object from the abstract syntax tree.
-    pub body: Rc<FullCompoundCommand>,
+    /// command when we define a function. The function definition command only
+    /// clones the `Rc` object from the abstract syntax tree to create a
+    /// `Function` object.
+    pub body: Rc<dyn FunctionBodyObject>,
 
     /// Location of the function definition command that defined this function.
     pub origin: Location,
@@ -59,9 +99,9 @@ impl Function {
     /// The `read_only_location` is set to `None`.
     #[inline]
     #[must_use]
-    pub fn new<N: Into<String>, C: Into<Rc<FullCompoundCommand>>>(
+    pub fn new<N: Into<String>, B: Into<Rc<dyn FunctionBodyObject>>>(
         name: N,
-        body: C,
+        body: B,
         origin: Location,
     ) -> Self {
         Function {
@@ -89,6 +129,21 @@ impl Function {
         self.read_only_location.is_some()
     }
 }
+
+/// Compares two functions for equality.
+///
+/// Two functions are considered equal if all their members are equal.
+/// This includes comparing the `body` members by pointer equality.
+impl PartialEq for Function {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && Rc::ptr_eq(&self.body, &other.body)
+            && self.origin == other.origin
+            && self.read_only_location == other.read_only_location
+    }
+}
+
+impl Eq for Function {}
 
 /// Wrapper of [`Function`] for inserting into a hash set.
 ///
@@ -269,12 +324,30 @@ impl<'a> IntoIterator for &'a FunctionSet {
 mod tests {
     use super::*;
 
+    #[derive(Clone, Debug)]
+    struct FunctionBodyStub;
+
+    impl std::fmt::Display for FunctionBodyStub {
+        fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            unreachable!()
+        }
+    }
+    impl FunctionBody for FunctionBodyStub {
+        async fn execute(&self, _: &mut Env) -> crate::semantics::Result {
+            unreachable!()
+        }
+    }
+
+    fn function_body_stub() -> Rc<dyn FunctionBodyObject> {
+        Rc::new(FunctionBodyStub)
+    }
+
     #[test]
     fn defining_new_function() {
         let mut set = FunctionSet::new();
         let function = Rc::new(Function::new(
             "foo",
-            "{ :; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_stub(),
             Location::dummy("foo"),
         ));
 
@@ -288,12 +361,12 @@ mod tests {
         let mut set = FunctionSet::new();
         let function1 = Rc::new(Function::new(
             "foo",
-            "{ echo 1; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_stub(),
             Location::dummy("foo 1"),
         ));
         let function2 = Rc::new(Function::new(
             "foo",
-            "{ echo 2; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_stub(),
             Location::dummy("foo 2"),
         ));
         set.define(function1.clone()).unwrap();
@@ -307,16 +380,12 @@ mod tests {
     fn redefining_readonly_function() {
         let mut set = FunctionSet::new();
         let function1 = Rc::new(
-            Function::new(
-                "foo",
-                "{ echo 1; }".parse::<FullCompoundCommand>().unwrap(),
-                Location::dummy("foo 1"),
-            )
-            .make_read_only(Location::dummy("readonly")),
+            Function::new("foo", function_body_stub(), Location::dummy("foo 1"))
+                .make_read_only(Location::dummy("readonly")),
         );
         let function2 = Rc::new(Function::new(
             "foo",
-            "{ echo 2; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_stub(),
             Location::dummy("foo 2"),
         ));
         set.define(function1.clone()).unwrap();
@@ -332,7 +401,7 @@ mod tests {
         let mut set = FunctionSet::new();
         let function = Rc::new(Function::new(
             "foo",
-            "{ :; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_stub(),
             Location::dummy("foo"),
         ));
         set.define(function.clone()).unwrap();
@@ -355,12 +424,8 @@ mod tests {
     fn unsetting_readonly_function() {
         let mut set = FunctionSet::new();
         let function = Rc::new(
-            Function::new(
-                "foo",
-                "{ :; }".parse::<FullCompoundCommand>().unwrap(),
-                Location::dummy("foo"),
-            )
-            .make_read_only(Location::dummy("readonly")),
+            Function::new("foo", function_body_stub(), Location::dummy("foo"))
+                .make_read_only(Location::dummy("readonly")),
         );
         set.define(function.clone()).unwrap();
 
@@ -373,12 +438,12 @@ mod tests {
         let mut set = FunctionSet::new();
         let function1 = Rc::new(Function::new(
             "foo",
-            "{ echo 1; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_stub(),
             Location::dummy("foo"),
         ));
         let function2 = Rc::new(Function::new(
             "bar",
-            "{ echo 2; }".parse::<FullCompoundCommand>().unwrap(),
+            function_body_stub(),
             Location::dummy("bar"),
         ));
         set.define(function1.clone()).unwrap();

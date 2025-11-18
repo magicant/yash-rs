@@ -142,3 +142,5 @@ where
         f(from_utf8(content).unwrap())
     })
 }
+
+pub mod function;
