@@ -1,6 +1,6 @@
 [package]
 name = "yash-syntax"
-version = "0.16.0"
+version = "0.16.1"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2024"
 rust-version = "1.85.0"
@@ -26,6 +26,7 @@ old-yash-syntax = { package = "yash-syntax", version = "0.16.0", features = [
     "annotate-snippets",
 ] }
 thiserror = { workspace = true }
+yash-env = { workspace = true }
 
 [dev-dependencies]
 annotate-snippets = { workspace = true }
