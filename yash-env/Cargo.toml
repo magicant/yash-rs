@@ -33,7 +33,8 @@ thiserror = { workspace = true }
 unix_path = { workspace = true }
 unix_str = { workspace = true }
 yash-quote = { workspace = true }
-yash-syntax = { workspace = true, features = ["annotate-snippets"] }
+# TODO: Remove yash-syntax when refactoring is done
+yash-syntax = { version = "0.16.0", features = ["annotate-snippets"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true, default-features = false }
