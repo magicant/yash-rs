@@ -18,10 +18,9 @@
 
 use super::Value;
 use super::Variable;
+use crate::source::{Location, Source};
 use either::{Left, Right};
 use std::borrow::Cow;
-use yash_syntax::source::Location;
-use yash_syntax::source::Source;
 
 /// Special characteristics of a variable
 ///
@@ -258,10 +257,10 @@ pub fn expand<'a>(var: &'a Variable, mut location: &Location) -> Expansion<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::alias::Alias;
+    use crate::source::Code;
     use std::num::NonZeroU64;
     use std::rc::Rc;
-    use yash_syntax::alias::Alias;
-    use yash_syntax::source::Code;
 
     #[test]
     fn expand_no_quirk() {

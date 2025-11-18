@@ -288,11 +288,11 @@ mod tests {
     use super::*;
     use crate::builtin::Type::{Elective, Extension, Mandatory};
     use crate::function::{FunctionBody, FunctionBodyObject, FunctionSet};
+    use crate::source::Location;
     use crate::variable::Value;
     use assert_matches::assert_matches;
     use std::collections::HashMap;
     use std::collections::HashSet;
-    use yash_syntax::source::Location;
 
     #[derive(Default)]
     struct DummyEnv {

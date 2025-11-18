@@ -313,6 +313,7 @@ mod tests {
     use crate::option::Option::{Interactive, Monitor};
     use crate::option::State::On;
     use crate::semantics::ExitStatus;
+    use crate::source::Location;
     use crate::system::Disposition;
     use crate::system::Errno;
     use crate::system::r#virtual::Inode;
@@ -325,7 +326,6 @@ mod tests {
     use std::cell::Cell;
     use std::cell::RefCell;
     use std::rc::Rc;
-    use yash_syntax::source::Location;
 
     fn stub_tty(state: &RefCell<SystemState>) {
         state

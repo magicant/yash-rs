@@ -31,6 +31,7 @@
 //! the underlying system. [`VirtualSystem`] is a dummy for simulating the
 //! system's behavior without affecting the actual system.
 
+use self::alias::AliasSet;
 use self::any::DataSet;
 use self::builtin::Builtin;
 use self::function::FunctionSet;
@@ -70,7 +71,6 @@ use std::task::Poll;
 use std::task::Waker;
 pub use unix_path as path;
 pub use unix_str as str;
-use yash_syntax::alias::AliasSet;
 
 /// Whole shell execution environment.
 ///
@@ -556,6 +556,7 @@ mod tests {
     use super::*;
     use crate::io::MIN_INTERNAL_FD;
     use crate::job::Job;
+    use crate::source::Location;
     use crate::subshell::Subshell;
     use crate::system::r#virtual::FileBody;
     use crate::system::r#virtual::Inode;
@@ -568,7 +569,6 @@ mod tests {
     use futures_util::task::LocalSpawnExt as _;
     use std::cell::RefCell;
     use std::str::from_utf8;
-    use yash_syntax::source::Location;
 
     /// Helper function to perform a test in a virtual system with an executor.
     pub fn in_virtual_system<F, Fut, T>(f: F) -> T

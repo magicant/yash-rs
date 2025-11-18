@@ -19,6 +19,7 @@
 //! This module provides data types for defining shell functions.
 
 use crate::Env;
+use crate::source::Location;
 use std::borrow::Borrow;
 use std::collections::HashSet;
 use std::fmt::Debug;
@@ -29,7 +30,6 @@ use std::iter::FusedIterator;
 use std::pin::Pin;
 use std::rc::Rc;
 use thiserror::Error;
-use yash_syntax::source::Location;
 
 /// Trait for the body of a [`Function`]
 pub trait FunctionBody: Debug + Display {

@@ -19,11 +19,11 @@
 #[cfg(doc)]
 use super::TrapSet;
 use super::{Condition, SignalSystem};
+use crate::source::Location;
 use crate::system::{Disposition, Errno};
 use std::collections::btree_map::{Entry, VacantEntry};
 use std::rc::Rc;
 use thiserror::Error;
-use yash_syntax::source::Location;
 
 /// Action performed when a [`Condition`] is met
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]

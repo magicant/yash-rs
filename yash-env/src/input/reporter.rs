@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use super::{Context, Input, Result};
 use crate::Env;
+use crate::io::Fd;
 use crate::job::fmt::Accumulator;
 use crate::option::{Interactive, Monitor, Off};
 use std::cell::RefCell;
-use yash_syntax::input::{Context, Input, Result};
-use yash_syntax::syntax::Fd;
 
 /// `Input` decorator that reports job status changes before reading a line
 ///
@@ -83,6 +83,7 @@ async fn report(env: &mut Env) {
 
 #[cfg(test)]
 mod tests {
+    use super::super::Memory;
     use super::*;
     use crate::VirtualSystem;
     use crate::job::{Job, Pid, ProcessState};
@@ -91,7 +92,6 @@ mod tests {
     use crate::tests::assert_stderr;
     use futures_util::FutureExt as _;
     use std::rc::Rc;
-    use yash_syntax::input::Memory;
 
     #[test]
     fn reporter_reads_from_inner_input() {

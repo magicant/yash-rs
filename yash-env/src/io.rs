@@ -17,14 +17,14 @@
 //! Type definitions for I/O.
 
 use crate::Env;
+use crate::source::Location;
+#[allow(deprecated)]
+use crate::source::pretty::Message;
+use crate::source::pretty::{Report, ReportType, Snippet};
 #[cfg(doc)]
 use crate::system::SharedSystem;
 use annotate_snippets::Renderer;
 use std::borrow::Cow;
-use yash_syntax::source::Location;
-#[allow(deprecated)]
-use yash_syntax::source::pretty::Message;
-use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 #[doc(no_inline)]
 pub use yash_syntax::syntax::Fd;
 
