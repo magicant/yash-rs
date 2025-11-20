@@ -14,10 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// TODO Update this documentation
 //! Implementation of declaration utility glossary for the environment
 
 use crate::Env;
-use yash_syntax::decl_util::Glossary;
+#[doc(no_inline)]
+pub use yash_syntax::decl_util::Glossary;
 
 /// Determines whether a command name is a declaration utility.
 ///

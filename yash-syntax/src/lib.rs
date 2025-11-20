@@ -49,4 +49,31 @@ pub mod parser;
 pub mod source;
 pub mod syntax;
 */
-pub use old_yash_syntax::*;
+pub mod alias {
+    pub use yash_env::alias::*;
+}
+pub mod decl_util {
+    pub use yash_env::decl_util::*;
+}
+pub mod input {
+    pub use yash_env::input::*;
+}
+pub mod parser {
+    pub use old_yash_syntax::parser::*;
+}
+pub mod source {
+    pub use old_yash_syntax::source::{SourceChar, source_chars};
+    pub use yash_env::source::{Code, Location, Source, pretty};
+}
+pub mod syntax {
+    pub use old_yash_syntax::syntax::{
+        AndOr, AndOrList, Arith, Array, Assign, Backquote, BackquoteUnit, Backslashed, BracedParam,
+        CaseContinuation, CaseItem, Command, CommandSubst, CompoundCommand, DollarSingleQuote,
+        DoubleQuote, ElifThen, EscapeUnit, EscapedString, ExpansionMode, FullCompoundCommand,
+        FunctionDefinition, HereDoc, Item, List, Literal, MaybeLiteral, Modifier, NotLiteral,
+        NotSpecialParam, Param, ParamType, Pipeline, RawParam, Redir, RedirBody, RedirOp, Scalar,
+        SimpleCommand, SingleQuote, SpecialParam, Switch, SwitchAction, SwitchCondition, Text,
+        TextUnit, Tilde, Trim, TrimLength, TrimSide, Unquote, Unquoted, Value, Word, WordUnit,
+    };
+    pub use yash_env::io::Fd;
+}

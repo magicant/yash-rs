@@ -13,6 +13,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Added
 
+- `alias::EmptyGlossary`: An empty implementation of the `Glossary` trait.
+- `decl_util`: Contains utilities for parsing declaration utilities, moved from
+  the `yash-syntax` crate.
 - `function::FunctionBody`: Trait for the body of a shell function.
 - `function::FunctionBodyObject`: Dyn-compatible adapter for the `FunctionBody`
   trait.

@@ -533,7 +533,7 @@ impl Env {
 pub mod alias;
 pub mod any;
 pub mod builtin;
-mod decl_util;
+pub mod decl_util;
 pub mod function;
 pub mod input;
 pub mod io;

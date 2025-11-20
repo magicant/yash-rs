@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// TODO Update this documentation
 //! Methods about passing [source](yash_syntax::source) code to the
 //! [parser](yash_syntax::parser).
 //!
