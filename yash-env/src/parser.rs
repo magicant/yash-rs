@@ -23,6 +23,9 @@
 //!   reserved word.
 //! - [`IsName`] is a wrapper for a function that checks if a string is a valid
 //!   variable name.
+//!
+//! Parser implementations are not provided in this crate (`yash-env`). The
+//! standard parser implementation is provided in the `yash-syntax` crate.
 
 use crate::Env;
 use crate::input::InputObject;
