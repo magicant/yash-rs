@@ -25,8 +25,40 @@ use crate::source::pretty::{Report, ReportType, Snippet};
 use crate::system::SharedSystem;
 use annotate_snippets::Renderer;
 use std::borrow::Cow;
-#[doc(no_inline)]
-pub use yash_syntax::syntax::Fd;
+#[cfg(unix)]
+use std::os::unix::io::RawFd;
+
+#[cfg(not(unix))]
+type RawFd = i32;
+
+/// File descriptor
+///
+/// This is the `newtype` pattern applied to [`RawFd`], which is merely a type
+/// alias.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(transparent)]
+pub struct Fd(pub RawFd);
+
+impl Fd {
+    /// File descriptor for the standard input
+    pub const STDIN: Fd = Fd(0);
+    /// File descriptor for the standard output
+    pub const STDOUT: Fd = Fd(1);
+    /// File descriptor for the standard error
+    pub const STDERR: Fd = Fd(2);
+}
+
+impl From<RawFd> for Fd {
+    fn from(raw_fd: RawFd) -> Fd {
+        Fd(raw_fd)
+    }
+}
+
+impl std::fmt::Display for Fd {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 /// Minimum file descriptor the shell may occupy for its internal use
 ///

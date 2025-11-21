@@ -25,6 +25,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- `decl_util`: Now defines `Glossary`, `EmptyGlossary`, and `PosixGlossary`
+  in this crate instead of re-exporting them from `yash_syntax::decl_util`.
 - `function::Function::body`: Now has the type `Rc<dyn FunctionBodyObject>`
   instead of `Rc<FullCompoundCommand>`.
 - `function::Function::new`: Now takes an `Into<Rc<dyn FunctionBodyObject>>`
@@ -32,6 +34,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   (the second parameter).
 - `impl PartialEq for function::Function`: Now compares the function bodies
   using pointer equality instead of deep equality.
+- `io::Fd`: Now defined in this crate instead of re-exported from
+  `yash-syntax::io::Fd`.
 
 ### Removed
 
