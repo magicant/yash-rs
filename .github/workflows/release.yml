@@ -26,7 +26,7 @@ jobs:
             os: macos-latest
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Build and upload Rust binary to GitHub Releases
         uses: taiki-e/upload-rust-binary-action@v1.27.0
         with:
