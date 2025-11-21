@@ -43,16 +43,13 @@
 // TODO: Restore the original state
 /*
 pub mod alias;
-pub mod input;
 pub mod source;
 */
 pub mod alias {
     pub use yash_env::alias::*;
 }
 pub mod decl_util;
-pub mod input {
-    pub use yash_env::input::*;
-}
+pub mod input;
 pub mod parser;
 pub mod source {
     pub use old_yash_syntax::source::{SourceChar, source_chars};

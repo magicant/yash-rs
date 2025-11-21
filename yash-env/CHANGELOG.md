@@ -39,6 +39,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Removed
 
+- `parser::Config::into_lexer`: This method has been removed in favor of the new
+  `From<parser::Config> for yash_syntax::parser::lex::Lexer` implementation
+  available in the `yash-syntax` crate.
 - `parser::is_name`: This re-export of `yash_syntax::parser::lex::is_name` has
   been removed in favor of the new `IsName` dependency injection pattern.
 

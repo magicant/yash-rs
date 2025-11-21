@@ -15,14 +15,20 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - `impl<'a> From<yash_env::parser::Config<'a>> for parser::lex::Lexer<'a>`:
   Constructs a lexer from a configuration defined in the `yash-env` crate.
+- `input` module re-exports the following items from `yash_env::input`:
+    - `input::Echo`
+    - `input::FdReader`
+    - `input::IgnoreEof`
+    - `input::Reporter`
 - Public dependency:
     - yash-env 0.10.0
 
 ### Changed
 
-- `decl_util`: Now re-exports `Glossary`, `EmptyGlossary`, and
-  `PosixGlossary` from `yash_env::decl_util` instead of defining them in this
-  crate.
+- `decl_util`: Now re-exports items from `yash_env::decl_util` instead of
+  defining them in this crate.
+- `input`: Now re-exports items from `yash_env::input` instead of
+  defining them in this crate.
 - `syntax::Fd`: Now re-exported from `yash_env::io::Fd` instead of defined in
   this crate.
 
