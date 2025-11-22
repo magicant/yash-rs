@@ -25,6 +25,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- `alias`: Now defines `Alias`, `AliasSet`, `HashEntry`, and `Glossary`
+  in this crate instead of re-exporting them from `yash_syntax::alias`.
 - `decl_util`: Now defines `Glossary`, `EmptyGlossary`, and `PosixGlossary`
   in this crate instead of re-exporting them from `yash_syntax::decl_util`.
 - `function::Function::body`: Now has the type `Rc<dyn FunctionBodyObject>`
@@ -39,6 +41,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Removed
 
+- `io::message_to_string`: This function has been removed in favor of
+  `io::report_to_string`.
+- `io::print_message`: This function has been removed in favor of
+  `io::print_report`.
 - `parser::Config::into_lexer`: This method has been removed in favor of the new
   `From<parser::Config> for yash_syntax::parser::lex::Lexer` implementation
   available in the `yash-syntax` crate.

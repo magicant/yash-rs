@@ -25,6 +25,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- `alias`: Now re-exports items from `yash_env::alias` instead of
+  defining them in this crate.
 - `decl_util`: Now re-exports items from `yash_env::decl_util` instead of
   defining them in this crate.
 - `input`: Now re-exports items from `yash_env::input` instead of

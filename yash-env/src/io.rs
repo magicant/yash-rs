@@ -18,8 +18,6 @@
 
 use crate::Env;
 use crate::source::Location;
-#[allow(deprecated)]
-use crate::source::pretty::Message;
 use crate::source::pretty::{Report, ReportType, Snippet};
 #[cfg(doc)]
 use crate::system::SharedSystem;
@@ -90,26 +88,6 @@ pub fn report_to_string(env: &Env, report: &Report<'_>) -> String {
     format!("{}\n", renderer.render(&[report.into()]))
 }
 
-/// Convenience function for converting an error message into a string.
-///
-/// The returned string may contain ANSI color escape sequences if the given
-/// `env` allows it. The string will end with a newline.
-///
-/// To print the returned string to the standard error, you can use
-/// [`SharedSystem::print_error`].
-#[allow(deprecated)]
-#[deprecated(note = "Use `report_to_string` instead", since = "0.9.0")]
-#[must_use]
-pub fn message_to_string(env: &Env, message: &Message<'_>) -> String {
-    let group = annotate_snippets::Group::from(message);
-    let renderer = if env.should_print_error_in_color() {
-        Renderer::styled()
-    } else {
-        Renderer::plain()
-    };
-    format!("{}\n", renderer.render(&[group]))
-}
-
 /// Convenience function for printing a report.
 ///
 /// This function converts the `report` into a string by using
@@ -121,27 +99,8 @@ pub async fn print_report(env: &mut Env, report: &Report<'_>) {
 
 /// Convenience function for printing an error message.
 ///
-/// This function converts the `error` into a [`Message`] which in turn is
-/// converted into a string using [`message_to_string`].
-/// The result is printed to the standard error.
-#[allow(deprecated)]
-#[deprecated(note = "Use `print_report` instead", since = "0.9.0")]
-pub async fn print_message<'a, E>(env: &mut Env, error: E)
-where
-    E: Into<Message<'a>> + 'a,
-{
-    async fn inner(env: &mut Env, message: Message<'_>) {
-        env.system
-            .print_error(&message_to_string(env, &message))
-            .await
-    }
-    inner(env, error.into()).await;
-}
-
-/// Convenience function for printing an error message.
-///
-/// This function constructs a temporary [`Message`] based on the given `title`,
-/// `label`, and `location`. The message is printed using [`print_message`].
+/// This function constructs a temporary [`Report`] based on the given `title`,
+/// `label`, and `location`. The message is printed using [`print_report`].
 pub async fn print_error(
     env: &mut Env,
     title: Cow<'_, str>,

@@ -18,39 +18,34 @@
 //!
 //! This module defines some data types for constructing intermediate data
 //! structures for printing diagnostic messages referencing source code
-//! fragments.  When you have an [`Error`](crate::parser::Error), you can
-//! convert it to a [`Report`]. Then, you can in turn convert it into
-//! `annotate_snippets::Snippet`, for example, and finally format a printable
-//! diagnostic message string.
-//!
-//! When the `yash_syntax` crate is built with the `annotate-snippets` feature
-//! enabled, it supports conversion from [`Report`] to
-//! [`Group`](annotate_snippets::Group). If you would like to use another
-//! formatter instead, you can provide your own conversion for yourself.
+//! fragments. When you have an error object that can be converted to a
+//! [`Report`], you can then convert it to `annotate_snippets::Group`, which
+//! can be formatted into a human-readable diagnostic message string. If you
+//! want to use another formatter instead of `annotate_snippets`, you can
+//! provide your own conversion from `Report` to the formatter's data
+//! structures.
 //!
 //! ## Printing an error
 //!
-//! This example shows how to format an [`Error`](crate::parser::Error) instance
-//! into a human-readable string.
+//! This example shows how to format an
+//! [`StartSubshellError`](crate::semantics::command::StartSubshellError)
+//! instance into a human-readable string.
 //!
 //! ```
-//! # use yash_syntax::parser::{Error, ErrorCause, SyntaxError};
-//! # use yash_syntax::source::Location;
-//! # use yash_syntax::source::pretty::Report;
-//! let error = Error {
-//!     cause: ErrorCause::Syntax(SyntaxError::EmptyParam),
-//!     location: Location::dummy(""),
+//! # use yash_env::semantics::Field;
+//! # use yash_env::semantics::command::StartSubshellError;
+//! # use yash_env::source::pretty::Report;
+//! # use yash_env::system::Errno;
+//! let error = StartSubshellError {
+//!     utility: Field::dummy("foo"),
+//!     errno: Errno::EAGAIN,
 //! };
 //! let report = Report::from(&error);
-//! // The lines below require the `annotate-snippets` feature.
-//! # #[cfg(feature = "annotate-snippets")]
-//! # {
 //! let group = annotate_snippets::Group::from(&report);
 //! eprintln!("{}", annotate_snippets::Renderer::plain().render(&[group]));
-//! # }
 //! ```
 //!
-//! You can also implement conversion from your custom error object to a
+//! You can also implement conversion from your custom error object to
 //! [`Report`], which then can be used in the same way to format a diagnostic
 //! message. To do this, implement `From<YourError>` or `From<&YourError>` for
 //! `Report`.
@@ -638,7 +633,6 @@ impl<'a, T: MessageBase> From<&'a T> for Message<'a> {
     }
 }
 
-#[cfg(feature = "annotate-snippets")]
 mod annotate_snippets_support {
     use super::*;
 
