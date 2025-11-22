@@ -21,10 +21,6 @@ all-features = true
 annotate-snippets = { workspace = true, optional = true }
 futures-util = { workspace = true }
 itertools = { workspace = true }
-# TODO: Remove old-yash-syntax when refactoring is done
-old-yash-syntax = { package = "yash-syntax", version = "0.16.0", features = [
-    "annotate-snippets",
-] }
 thiserror = { workspace = true }
 yash-env = { workspace = true }
 
