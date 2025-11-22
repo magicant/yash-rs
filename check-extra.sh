@@ -21,7 +21,6 @@ cargo tomlfmt --dryrun --path yash-syntax/Cargo.toml
 RUSTFLAGS='-D unused_crate_dependencies' cargo check --lib --all-features
 RUSTFLAGS='-D unused_crate_dependencies' cargo check --package 'yash-builtin' --no-default-features
 RUSTFLAGS='-D unused_crate_dependencies' cargo check --package 'yash-builtin' --no-default-features --features yash-semantics
-RUSTFLAGS='-D unused_crate_dependencies' cargo check --package 'yash-syntax' --no-default-features
 
 # Make sure the crates can be built with all combinations of features.
 cargo build --package 'yash-arith' --all-targets
@@ -37,7 +36,6 @@ cargo build --package 'yash-prompt' --all-targets
 cargo build --package 'yash-quote' --all-targets
 cargo build --package 'yash-semantics' --all-targets
 cargo build --package 'yash-syntax' --all-targets
-cargo build --package 'yash-syntax' --all-targets --features annotate-snippets
 
 # Test with non-default feature configurations.
 #cargo test --package 'yash-arith' -- $quiet
@@ -50,7 +48,6 @@ cargo test --package 'yash-builtin' --features yash-semantics -- $quiet
 #cargo test --package 'yash-quote' -- $quiet
 #cargo test --package 'yash-semantics' -- $quiet
 #cargo test --package 'yash-syntax' -- $quiet
-cargo test --package 'yash-syntax' --features annotate-snippets -- $quiet
 
 # Make sure next releases have correct semantic versions.
 cargo semver-checks --package 'yash-arith'

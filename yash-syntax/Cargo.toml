@@ -18,14 +18,12 @@ publish = false
 all-features = true
 
 [dependencies]
-annotate-snippets = { workspace = true, optional = true }
 futures-util = { workspace = true }
 itertools = { workspace = true }
 thiserror = { workspace = true }
 yash-env = { workspace = true }
 
 [dev-dependencies]
-annotate-snippets = { workspace = true }
 assert_matches = { workspace = true }
 futures-executor = { workspace = true }
 

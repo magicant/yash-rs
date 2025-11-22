@@ -49,6 +49,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   implementing `From<&YourError> for Report`.
 - `source::Source::complement_annotations`: This method has been removed in
   favor of `extend_with_context`.
+- Public dependency:
+    - annotate-snippets (optional) 0.12.4
 
 ## [0.16.0] - 2025-10-13
 
