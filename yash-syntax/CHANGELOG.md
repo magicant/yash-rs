@@ -25,6 +25,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- Public dependency versions:
+    - Rust 1.85.0 → 1.86.0
 - `alias`: Now re-exports items from `yash_env::alias` instead of
   defining them in this crate.
 - `decl_util`: Now re-exports items from `yash_env::decl_util` instead of
