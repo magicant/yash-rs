@@ -26,8 +26,6 @@ use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, Message};
 use yash_env::source::pretty::{
     Footnote, FootnoteType, Report, ReportType, Snippet, Span, SpanRole, add_span,
 };
@@ -160,66 +158,6 @@ impl Error {
         }
 
         report
-    }
-
-    /// Converts this error to a printable message.
-    #[allow(deprecated)]
-    #[deprecated(note = "use `to_report` instead", since = "0.11.0")]
-    pub fn to_message(&self) -> Message<'_> {
-        let mut annotations = Vec::new();
-
-        match self {
-            Error::InvalidVariableName { name } => {
-                annotations.push(Annotation::new(
-                    AnnotationType::Error,
-                    format!("variable name {:?} is not valid", name.value).into(),
-                    &name.origin,
-                ));
-            }
-
-            Error::AssignReadOnlyError {
-                name,
-                new_value,
-                assigned_location,
-                read_only_location,
-            } => {
-                if let Some(location) = assigned_location {
-                    annotations.push(Annotation::new(
-                        AnnotationType::Info,
-                        format!(
-                            "the built-in needs to update the variable to {}",
-                            new_value.quote()
-                        )
-                        .into(),
-                        location,
-                    ));
-                }
-
-                annotations.push(Annotation::new(
-                    AnnotationType::Info,
-                    format!("`{name}` was made read-only here").into(),
-                    read_only_location,
-                ));
-            }
-
-            Error::UnsetReadOnlyError {
-                name,
-                read_only_location,
-            } => {
-                annotations.push(Annotation::new(
-                    AnnotationType::Info,
-                    format!("`{name}` was made read-only here").into(),
-                    read_only_location,
-                ));
-            }
-        }
-
-        Message {
-            r#type: AnnotationType::Error,
-            title: self.to_string().into(),
-            annotations,
-            footers: vec![],
-        }
     }
 }
 

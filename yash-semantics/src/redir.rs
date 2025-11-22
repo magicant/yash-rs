@@ -105,8 +105,6 @@ use yash_env::system::OfdAccess;
 use yash_env::system::OpenFlag;
 use yash_quote::quoted;
 use yash_syntax::source::Location;
-#[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 use yash_syntax::syntax::HereDoc;
 use yash_syntax::syntax::Redir;
@@ -252,17 +250,6 @@ impl<'a> From<&'a Error> for Report<'a> {
     #[inline(always)]
     fn from(error: &'a Error) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for Error {
-    fn message_title(&self) -> Cow<'_, str> {
-        self.cause.message().into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        Annotation::new(AnnotationType::Error, self.cause.label(), &self.location)
     }
 }
 

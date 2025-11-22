@@ -19,13 +19,10 @@
 use super::Command;
 use super::symbol::{ParseClausesError, parse_clauses};
 use crate::common::syntax::{Mode, OptionSpec, ParseError, parse_arguments};
-use std::borrow::Cow;
 use std::num::ParseIntError;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -81,34 +78,6 @@ impl<'a> From<&'a Error> for Report<'a> {
     #[inline]
     fn from(error: &'a Error) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for Error {
-    fn message_title(&self) -> Cow<'_, str> {
-        self.to_string().into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        match self {
-            Self::CommonError(e) => e.main_annotation(),
-            Self::TooManyOperands(operands) => Annotation::new(
-                AnnotationType::Error,
-                format!("{}: unexpected operand", operands[1].value).into(),
-                &operands[1].origin,
-            ),
-            Self::InvalidNumericMode(operand, e) => Annotation::new(
-                AnnotationType::Error,
-                format!("{}: {}", operand.value, e).into(),
-                &operand.origin,
-            ),
-            Self::InvalidSymbolicMode(operand, e) => Annotation::new(
-                AnnotationType::Error,
-                format!("{}: {}", operand.value, e).into(),
-                &operand.origin,
-            ),
-        }
     }
 }
 

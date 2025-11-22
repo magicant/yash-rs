@@ -22,8 +22,6 @@ use yash_env::io::Fd;
 use yash_env::prompt::GetPrompt;
 use yash_env::semantics::expansion::attr::AttrChar;
 use yash_env::semantics::expansion::attr::Origin;
-#[allow(deprecated)]
-use yash_env::source::pretty::{AnnotationType, Message};
 use yash_env::source::pretty::{Report, ReportType};
 use yash_env::system::Errno;
 
@@ -47,33 +45,12 @@ impl Error {
         report.title = self.to_string().into();
         report
     }
-
-    /// Converts this error to a message.
-    #[allow(deprecated)]
-    #[deprecated(note = "use `to_report` instead", since = "0.11.0")]
-    #[must_use]
-    pub fn to_message(&self) -> Message<'_> {
-        Message {
-            r#type: AnnotationType::Error,
-            title: self.to_string().into(),
-            annotations: vec![],
-            footers: vec![],
-        }
-    }
 }
 
 impl<'a> From<&'a Error> for Report<'a> {
     #[inline]
     fn from(error: &'a Error) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl<'a> From<&'a Error> for Message<'a> {
-    #[inline]
-    fn from(error: &'a Error) -> Self {
-        error.to_message()
     }
 }
 

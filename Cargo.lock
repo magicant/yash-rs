@@ -528,7 +528,7 @@ dependencies = [
  "yash-env-test-helper",
  "yash-quote",
  "yash-semantics",
- "yash-syntax 0.16.1",
+ "yash-syntax 0.17.0",
 ]
 
 [[package]]
@@ -546,7 +546,7 @@ dependencies = [
  "yash-executor",
  "yash-prompt",
  "yash-semantics",
- "yash-syntax 0.16.1",
+ "yash-syntax 0.17.0",
 ]
 
 [[package]]
@@ -610,7 +610,7 @@ dependencies = [
  "yash-env",
  "yash-env-test-helper",
  "yash-semantics",
- "yash-syntax 0.16.1",
+ "yash-syntax 0.17.0",
 ]
 
 [[package]]
@@ -633,7 +633,7 @@ dependencies = [
  "yash-env-test-helper",
  "yash-fnmatch",
  "yash-quote",
- "yash-syntax 0.16.1",
+ "yash-syntax 0.17.0",
 ]
 
 [[package]]
@@ -650,7 +650,7 @@ dependencies = [
 
 [[package]]
 name = "yash-syntax"
-version = "0.16.1"
+version = "0.17.0"
 dependencies = [
  "annotate-snippets",
  "assert_matches",

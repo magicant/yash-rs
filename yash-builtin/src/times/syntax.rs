@@ -17,12 +17,9 @@
 //! Command line syntax parsing for the times built-in
 
 use crate::common::syntax::{Mode, parse_arguments};
-use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 
 /// Error in parsing command line arguments
@@ -63,25 +60,6 @@ impl<'a> From<&'a Error> for Report<'a> {
     #[inline]
     fn from(error: &'a Error) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for Error {
-    fn message_title(&self) -> Cow<'_, str> {
-        self.to_string().into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        use Error::*;
-        match self {
-            CommonError(e) => e.main_annotation(),
-            UnexpectedOperands(operands) => Annotation::new(
-                AnnotationType::Error,
-                format!("{}: unexpected operand", operands[0].value).into(),
-                &operands[0].origin,
-            ),
-        }
     }
 }
 

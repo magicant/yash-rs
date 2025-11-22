@@ -50,6 +50,16 @@ A _private dependency_ is used internally and not visible to downstream users.
   available in the `yash-syntax` crate.
 - `parser::is_name`: This re-export of `yash_syntax::parser::lex::is_name` has
   been removed in favor of the new `IsName` dependency injection pattern.
+- `source::pretty::AnnotationType`: This enum has been removed in favor of
+  `ReportType` and `FootnoteType`.
+- `source::pretty::Annotation`: This struct has been removed in favor of
+  `Snippet` and `Span`.
+- `source::pretty::Footer`: This struct has been removed in favor of `Footnote`.
+- `source::pretty::Message`: This struct has been removed in favor of `Report`.
+- `source::pretty::MessageBase`: This trait has been removed in favor of
+  implementing `From<&YourError> for Report`.
+- `source::Source::complement_annotations`: This method has been removed in
+  favor of `extend_with_context`.
 
 ## [0.9.2] - 2025-11-07
 
