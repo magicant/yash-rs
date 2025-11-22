@@ -102,8 +102,6 @@ use yash_syntax::source::pretty::Snippet;
 use yash_syntax::source::pretty::Span;
 use yash_syntax::source::pretty::SpanRole;
 use yash_syntax::source::pretty::add_span;
-#[allow(deprecated)]
-use yash_syntax::source::pretty::{Annotation, AnnotationType, Footer, MessageBase};
 use yash_syntax::syntax::ExpansionMode;
 use yash_syntax::syntax::Param;
 use yash_syntax::syntax::Text;
@@ -305,69 +303,6 @@ impl<'a> From<&'a Error> for Report<'a> {
     #[inline(always)]
     fn from(error: &'a Error) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for Error {
-    fn message_title(&self) -> Cow<'_, str> {
-        self.cause.message().into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        Annotation::new(AnnotationType::Error, self.cause.label(), &self.location)
-    }
-
-    fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
-        if let Some((location, label)) = self.cause.related_location() {
-            // TODO Use Extend::extend_one
-            results.extend(std::iter::once(Annotation::new(
-                AnnotationType::Info,
-                label.into(),
-                location,
-            )))
-        }
-
-        // Report the vacancy that caused the assignment that led to the error.
-        let vacancy = match &self.cause {
-            ErrorCause::CommandSubstError(_) => None,
-            ErrorCause::ArithError(_) => None,
-            ErrorCause::AssignReadOnly(e) => e.vacancy,
-            ErrorCause::UnsetParameter { .. } => None,
-            ErrorCause::VacantExpansion(_) => None,
-            ErrorCause::NonassignableParameter(e) => Some(e.vacancy),
-        };
-        if let Some(vacancy) = vacancy {
-            let message = match vacancy {
-                Vacancy::Unset => "assignment was attempted because the parameter was not set",
-                Vacancy::EmptyScalar => {
-                    "assignment was attempted because the parameter was an empty string"
-                }
-                Vacancy::ValuelessArray => {
-                    "assignment was attempted because the parameter was an empty array"
-                }
-                Vacancy::EmptyValueArray => {
-                    "assignment was attempted because the parameter was an array of an empty string"
-                }
-            };
-            // TODO Use Extend::extend_one
-            results.extend(std::iter::once(Annotation::new(
-                AnnotationType::Info,
-                message.into(),
-                &self.location,
-            )));
-        }
-    }
-
-    fn footers(&self) -> Vec<Footer<'_>> {
-        self.cause
-            .footer()
-            .into_iter()
-            .map(|label| Footer {
-                r#type: AnnotationType::Info,
-                label: label.into(),
-            })
-            .collect()
     }
 }
 
@@ -575,8 +510,6 @@ mod tests {
     use futures_util::FutureExt;
     use yash_env::variable::Scope;
     use yash_env_test_helper::in_virtual_system;
-    #[allow(deprecated)]
-    use yash_syntax::source::pretty::Message;
 
     #[test]
     fn from_error_for_report() {
@@ -638,67 +571,6 @@ mod tests {
                 r#type: FootnoteType::Note,
                 label: "assignment was attempted because the parameter was an empty string".into(),
             }]
-        );
-    }
-
-    #[allow(deprecated)]
-    #[test]
-    fn from_error_for_message() {
-        let error = Error {
-            cause: ErrorCause::AssignReadOnly(AssignReadOnlyError {
-                name: "foo".into(),
-                new_value: "value".into(),
-                read_only_location: Location::dummy("ROL"),
-                vacancy: None,
-            }),
-            location: Location {
-                range: 2..4,
-                ..Location::dummy("hello")
-            },
-        };
-        let message = Message::from(&error);
-        assert_eq!(message.r#type, AnnotationType::Error);
-        assert_eq!(message.title, "error assigning to variable");
-        assert_eq!(message.annotations.len(), 2);
-        assert_eq!(message.annotations[0].r#type, AnnotationType::Error);
-        assert_eq!(
-            message.annotations[0].label,
-            "cannot assign to read-only variable \"foo\""
-        );
-        assert_eq!(message.annotations[0].location, &error.location);
-        assert_eq!(message.annotations[1].r#type, AnnotationType::Info);
-        assert_eq!(
-            message.annotations[1].label,
-            "the variable was made read-only here"
-        );
-        assert_eq!(message.annotations[1].location, &Location::dummy("ROL"));
-    }
-
-    #[allow(deprecated)]
-    #[test]
-    fn from_error_for_message_with_vacancy() {
-        let error = Error {
-            cause: ErrorCause::AssignReadOnly(AssignReadOnlyError {
-                name: "foo".into(),
-                new_value: "value".into(),
-                read_only_location: Location::dummy("ROL"),
-                vacancy: Some(Vacancy::EmptyScalar),
-            }),
-            location: Location {
-                range: 2..4,
-                ..Location::dummy("hello")
-            },
-        };
-
-        let message = Message::from(&error);
-        assert!(
-            message.annotations.iter().any(|a| {
-                a.r#type == AnnotationType::Info
-                    && a.label
-                        == "assignment was attempted because the parameter was an empty string"
-                    && a.location == &error.location
-            }),
-            "{message:?}"
         );
     }
 

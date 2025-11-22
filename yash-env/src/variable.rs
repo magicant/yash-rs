@@ -97,6 +97,7 @@
 #[cfg(doc)]
 use crate::Env;
 use crate::semantics::Field;
+use crate::source::Location;
 use itertools::Itertools;
 use std::borrow::Borrow;
 use std::collections::HashMap;
@@ -106,7 +107,6 @@ use std::fmt::Write;
 use std::hash::Hash;
 use std::iter::FusedIterator;
 use thiserror::Error;
-use yash_syntax::source::Location;
 
 mod value;
 

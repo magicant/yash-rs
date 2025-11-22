@@ -38,4 +38,4 @@ check yash-fnmatch
 check yash-prompt
 check yash-quote
 check yash-semantics
-check yash-syntax '' '--features annotate-snippets'
+check yash-syntax

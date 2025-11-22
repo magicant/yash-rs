@@ -16,6 +16,13 @@ A _private dependency_ is used internally and not visible to downstream users.
 - Public dependency versions:
     - yash-env 0.9.2 → 0.10.0
 
+### Removed
+
+- The following items depending on deprecated pretty-printing APIs have been
+  removed:
+    - `impl yash_env::source::pretty::MessageBase for expansion::Error`
+    - `impl yash_env::source::pretty::MessageBase for redir::Error`
+
 ## [0.11.0] - 2025-11-07
 
 ### Changed

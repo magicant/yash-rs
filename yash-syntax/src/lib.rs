@@ -32,11 +32,14 @@
 //! [lexer](parser::lex::Lexer) with source information and then pass it to a
 //! [parser](parser::Parser). See the [`parser`] module for details.
 //!
-//! The [`input`] module defines an abstract method for feeding the parser with
-//! source code.
+//! The following modules are re-exported from the [`yash-env`](yash_env) crate:
 //!
-//! This crate also defines the [`alias`] module that can be used to define
-//! aliases that are recognized while parsing.
+//! - The [`input`] module defines an abstract method for feeding the parser
+//!   with source code.
+//! - The [`alias`] module can be used to define aliases that are recognized
+//!   while parsing.
+//! - The [`decl_util`] module provides utilities for working with declaration
+//!   utilities.
 
 pub mod alias;
 pub mod decl_util;

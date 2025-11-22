@@ -519,12 +519,6 @@ impl TryFrom<Word> for Assign {
     }
 }
 
-impl From<RawFd> for Fd {
-    fn from(raw_fd: RawFd) -> Fd {
-        Fd(raw_fd)
-    }
-}
-
 impl TryFrom<Operator> for RedirOp {
     type Error = TryFromOperatorError;
     fn try_from(op: Operator) -> Result<RedirOp, TryFromOperatorError> {

@@ -20,7 +20,6 @@ use super::Mode;
 use crate::common::syntax::OptionOccurrence;
 use crate::common::syntax::OptionSpec;
 use crate::common::syntax::parse_arguments;
-use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
@@ -30,8 +29,6 @@ use yash_env::source::pretty::Snippet;
 use yash_env::source::pretty::Span;
 use yash_env::source::pretty::SpanRole;
 use yash_env::source::pretty::add_span;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 
 /// Error in parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -83,25 +80,6 @@ impl<'a> From<&'a Error> for Report<'a> {
     #[inline]
     fn from(error: &'a Error) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for Error {
-    fn message_title(&self) -> Cow<'_, str> {
-        self.to_string().into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        use Error::*;
-        match self {
-            CommonError(e) => e.main_annotation(),
-            UnexpectedOperands(operands) => Annotation::new(
-                AnnotationType::Error,
-                format!("{}: unexpected operand", operands[0].value).into(),
-                &operands[0].origin,
-            ),
-        }
     }
 }
 

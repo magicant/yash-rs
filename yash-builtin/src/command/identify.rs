@@ -21,7 +21,6 @@ use super::search::SearchEnv;
 use crate::command::Category;
 use crate::common::output;
 use crate::common::report::{merge_reports, report_failure};
-use std::borrow::Cow;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::rc::Rc;
@@ -34,8 +33,6 @@ use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::command::search::{Target, search};
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::str::UnixStr;
 use yash_quote::quoted;
@@ -104,19 +101,6 @@ impl<'a> From<&'a NotFound<'a>> for Report<'a> {
     #[inline]
     fn from(error: &'a NotFound<'a>) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for NotFound<'_> {
-    fn message_title(&self) -> Cow<'_, str> {
-        "command not found".into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        let label = format!("{}: not found", self.name.value).into();
-        let location = &self.name.origin;
-        Annotation::new(AnnotationType::Error, label, location)
     }
 }
 

@@ -22,7 +22,6 @@
 
 use super::Signal;
 use crate::common::report::{merge_reports, report_failure};
-use std::borrow::Cow;
 use std::num::ParseIntError;
 use thiserror::Error;
 use yash_env::Env;
@@ -31,8 +30,6 @@ use yash_env::job::id::parse_tail;
 use yash_env::job::{JobList, id::FindError};
 use yash_env::semantics::Field;
 use yash_env::signal;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::Errno;
 use yash_env::system::System as _;
@@ -121,21 +118,6 @@ impl<'a> From<&'a UnsupportedSignal<'a>> for Report<'a> {
     }
 }
 
-#[allow(deprecated)]
-impl MessageBase for UnsupportedSignal<'_> {
-    fn message_title(&self) -> Cow<'_, str> {
-        "unsupported signal".into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        Annotation::new(
-            AnnotationType::Error,
-            self.to_string().into(),
-            &self.origin.origin,
-        )
-    }
-}
-
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 #[error("{target}: {error}")]
 struct TargetError<'a> {
@@ -162,21 +144,6 @@ impl<'a> From<&'a TargetError<'a>> for Report<'a> {
     #[inline]
     fn from(error: &'a TargetError<'a>) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for TargetError<'_> {
-    fn message_title(&self) -> Cow<'_, str> {
-        "cannot send signal".into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        Annotation::new(
-            AnnotationType::Error,
-            self.to_string().into(),
-            &self.target.origin,
-        )
     }
 }
 

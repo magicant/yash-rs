@@ -19,13 +19,10 @@
 use crate::common::syntax::ConflictingOptionError;
 use crate::common::syntax::OptionSpec;
 use crate::common::syntax::parse_arguments;
-use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::Report;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, MessageBase};
 
 use super::Command;
 use super::Mode;
@@ -58,27 +55,6 @@ impl<'a> From<&'a Error> for Report<'a> {
     #[inline]
     fn from(error: &'a Error) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for Error {
-    fn message_title(&self) -> Cow<'_, str> {
-        self.to_string().into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        match self {
-            Error::CommonError(inner) => inner.main_annotation(),
-            Error::ConflictingOption(inner) => inner.main_annotation(),
-        }
-    }
-
-    fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
-        match self {
-            Error::CommonError(inner) => inner.additional_annotations(results),
-            Error::ConflictingOption(inner) => inner.additional_annotations(results),
-        }
     }
 }
 

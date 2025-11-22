@@ -13,6 +13,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Added
 
+- `alias::EmptyGlossary`: An empty implementation of the `Glossary` trait.
+- `decl_util`: Contains utilities for parsing declaration utilities, moved from
+  the `yash-syntax` crate.
 - `function::FunctionBody`: Trait for the body of a shell function.
 - `function::FunctionBodyObject`: Dyn-compatible adapter for the `FunctionBody`
   trait.
@@ -22,6 +25,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- `alias`: Now defines `Alias`, `AliasSet`, `HashEntry`, and `Glossary`
+  in this crate instead of re-exporting them from `yash_syntax::alias`.
+- `decl_util`: Now defines `Glossary`, `EmptyGlossary`, and `PosixGlossary`
+  in this crate instead of re-exporting them from `yash_syntax::decl_util`.
 - `function::Function::body`: Now has the type `Rc<dyn FunctionBodyObject>`
   instead of `Rc<FullCompoundCommand>`.
 - `function::Function::new`: Now takes an `Into<Rc<dyn FunctionBodyObject>>`
@@ -29,11 +36,30 @@ A _private dependency_ is used internally and not visible to downstream users.
   (the second parameter).
 - `impl PartialEq for function::Function`: Now compares the function bodies
   using pointer equality instead of deep equality.
+- `io::Fd`: Now defined in this crate instead of re-exported from
+  `yash-syntax::io::Fd`.
 
 ### Removed
 
+- `io::message_to_string`: This function has been removed in favor of
+  `io::report_to_string`.
+- `io::print_message`: This function has been removed in favor of
+  `io::print_report`.
+- `parser::Config::into_lexer`: This method has been removed in favor of the new
+  `From<parser::Config> for yash_syntax::parser::lex::Lexer` implementation
+  available in the `yash-syntax` crate.
 - `parser::is_name`: This re-export of `yash_syntax::parser::lex::is_name` has
   been removed in favor of the new `IsName` dependency injection pattern.
+- `source::pretty::AnnotationType`: This enum has been removed in favor of
+  `ReportType` and `FootnoteType`.
+- `source::pretty::Annotation`: This struct has been removed in favor of
+  `Snippet` and `Span`.
+- `source::pretty::Footer`: This struct has been removed in favor of `Footnote`.
+- `source::pretty::Message`: This struct has been removed in favor of `Report`.
+- `source::pretty::MessageBase`: This trait has been removed in favor of
+  implementing `From<&YourError> for Report`.
+- `source::Source::complement_annotations`: This method has been removed in
+  favor of `extend_with_context`.
 
 ## [0.9.2] - 2025-11-07
 

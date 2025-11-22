@@ -21,14 +21,11 @@
 //! operands, and the latter interprets them into a [`Command`].
 
 use super::*;
-use std::borrow::Cow;
 use std::iter::Peekable;
 use thiserror::Error;
 use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 
 /// Attribute that can be set on a variable or function
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -200,22 +197,6 @@ impl<'a> From<&'a ParseError> for Report<'a> {
     }
 }
 
-#[allow(deprecated)]
-impl MessageBase for ParseError {
-    fn message_title(&self) -> Cow<'_, str> {
-        self.to_string().into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        let field = self.field();
-        Annotation::new(
-            AnnotationType::Error,
-            field.value.as_str().into(),
-            &field.origin,
-        )
-    }
-}
-
 /// Tries to parse the next field in `args`.
 ///
 /// Returns `Ok(true)` if the next field contained a short option, in which case
@@ -374,35 +355,6 @@ impl<'a> From<&'a InterpretError<'a>> for Report<'a> {
     #[inline]
     fn from(error: &'a InterpretError) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for InterpretError<'_> {
-    fn message_title(&self) -> Cow<'_, str> {
-        self.to_string().into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        match self {
-            InterpretError::OptionInapplicableForFunction { clashing, .. } => Annotation::new(
-                AnnotationType::Error,
-                format!("the {} option ...", clashing.spec).into(),
-                &clashing.location,
-            ),
-        }
-    }
-
-    fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
-        match self {
-            InterpretError::OptionInapplicableForFunction { function, .. } => {
-                results.extend([Annotation::new(
-                    AnnotationType::Error,
-                    "... cannot be used for -f/--functions".into(),
-                    &function.location,
-                )])
-            }
-        }
     }
 }
 

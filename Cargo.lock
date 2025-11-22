@@ -575,7 +575,6 @@ dependencies = [
  "yash-prompt",
  "yash-quote",
  "yash-semantics",
- "yash-syntax",
 ]
 
 [[package]]
@@ -638,12 +637,12 @@ dependencies = [
 
 [[package]]
 name = "yash-syntax"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
- "annotate-snippets",
  "assert_matches",
  "futures-executor",
  "futures-util",
  "itertools",
  "thiserror",
+ "yash-env",
 ]

@@ -19,11 +19,8 @@
 use super::Command;
 use crate::common::syntax::{OptionOccurrence, OptionSpec};
 use itertools::Itertools;
-use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::semantics::Field;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, Footer, MessageBase};
 use yash_env::source::pretty::{Footnote, FootnoteType, Report, ReportType, Snippet};
 use yash_env::trap::Action;
 
@@ -81,45 +78,6 @@ impl<'a> From<&'a Error> for Report<'a> {
     #[inline]
     fn from(error: &'a Error) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for Error {
-    fn message_title(&self) -> Cow<'_, str> {
-        match self {
-            Error::UnknownCondition(_) => "cannot update trap",
-            Error::MissingCondition { action: _ } => "trap condition is missing",
-        }
-        .into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        let (label, location) = match self {
-            Error::UnknownCondition(field) => {
-                (format!("unknown condition `{field}`").into(), &field.origin)
-            }
-            Error::MissingCondition { action } => (
-                "trap action specified without condition".into(),
-                &action.origin,
-            ),
-        };
-
-        Annotation::new(AnnotationType::Error, label, location)
-    }
-
-    fn footers(&self) -> Vec<Footer<'_>> {
-        match self {
-            Error::UnknownCondition(_) => vec![],
-            Error::MissingCondition { action } => vec![Footer {
-                r#type: AnnotationType::Note,
-                label: format!(
-                    "the first operand `{action}` was not regarded as a condition \
-                     because it was not an unsigned integer"
-                )
-                .into(),
-            }],
-        }
     }
 }
 

@@ -16,10 +16,9 @@
 
 //! Command search
 //!
-//! The [command search](search) is part of the execution of a [simple
-//! command](yash_syntax::syntax::SimpleCommand). It determines a command target
-//! that is to be invoked. A [target](Target) can be a built-in utility,
-//! function, or external utility.
+//! The [command search], implemented by [`search`], is part of the execution of
+//! a [simple command]. It determines a command target that is to be invoked. A
+//! [target](Target) can be a built-in utility, function, or external utility.
 //!
 //! If the command name contains a slash, the target is always an external
 //! utility. Otherwise, the shell searches the following candidates for the
@@ -32,7 +31,10 @@
 //!
 //! For a [substitutive](Substitutive) built-in or external utility to be chosen
 //! as a target, a corresponding executable file must be present in a directory
-//! specified in the `$PATH` variable.
+//! specified in the `PATH` variable.
+//!
+//! [command search]: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_09_01_04
+//! [simple command]: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_09_01
 
 use crate::Env;
 use crate::System;
@@ -288,11 +290,11 @@ mod tests {
     use super::*;
     use crate::builtin::Type::{Elective, Extension, Mandatory};
     use crate::function::{FunctionBody, FunctionBodyObject, FunctionSet};
+    use crate::source::Location;
     use crate::variable::Value;
     use assert_matches::assert_matches;
     use std::collections::HashMap;
     use std::collections::HashSet;
-    use yash_syntax::source::Location;
 
     #[derive(Default)]
     struct DummyEnv {

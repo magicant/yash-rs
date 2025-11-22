@@ -39,9 +39,9 @@
 //! # Example
 //!
 //! ```
-//! use yash_syntax::source::Location;
 //! use yash_env::semantics::expansion::attr::{AttrChar, AttrField, Origin};
 //! use yash_env::semantics::expansion::split::{Ifs, split};
+//! use yash_env::source::Location;
 //!
 //! // We use this utility to prepare fields used in the examples below:
 //! fn field(s: &str) -> AttrField {
@@ -162,7 +162,7 @@ where
 mod tests {
     use super::super::attr::{AttrChar, Origin};
     use super::*;
-    use yash_syntax::source::Location;
+    use crate::source::Location;
 
     fn dummy_attr_field(s: &str) -> AttrField {
         let chars = s

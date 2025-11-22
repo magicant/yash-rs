@@ -111,7 +111,7 @@ impl Strip for &AttrField {
 mod tests {
     use super::super::attr::Origin;
     use super::*;
-    use yash_syntax::source::Location;
+    use crate::source::Location;
 
     #[test]
     fn attr_field_strip() {

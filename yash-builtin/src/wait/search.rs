@@ -17,7 +17,6 @@
 //! Resolving job specifications
 
 use super::JobSpec;
-use std::borrow::Cow;
 use yash_env::job::JobList;
 use yash_env::job::id::FindError;
 use yash_env::job::id::JobId;
@@ -26,8 +25,6 @@ use yash_env::semantics::Field;
 use yash_env::source::pretty::Report;
 use yash_env::source::pretty::ReportType;
 use yash_env::source::pretty::Snippet;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 
 /// Error returned when a job ID is ambiguous.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -52,21 +49,6 @@ impl<'a> From<&'a AmbiguousJobId> for Report<'a> {
     #[inline]
     fn from(error: &'a AmbiguousJobId) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for AmbiguousJobId {
-    fn message_title(&self) -> Cow<'_, str> {
-        "ambiguous job ID".into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        Annotation::new(
-            AnnotationType::Error,
-            format!("job ID `{}` matches more than one job", self.0.value).into(),
-            &self.0.origin,
-        )
     }
 }
 

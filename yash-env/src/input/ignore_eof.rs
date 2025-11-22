@@ -108,6 +108,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::super::Memory;
     use super::*;
     use crate::option::On;
     use crate::system::Mode;
@@ -116,7 +117,6 @@ mod tests {
     use enumset::EnumSet;
     use futures_util::FutureExt as _;
     use std::rc::Rc;
-    use yash_syntax::input::Memory;
 
     /// `Input` decorator that returns EOF for the first `count` calls
     /// and then reads from the inner input.

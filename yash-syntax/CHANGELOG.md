@@ -9,6 +9,51 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.17.0] - Unreleased
+
+### Added
+
+- `impl<'a> From<yash_env::parser::Config<'a>> for parser::lex::Lexer<'a>`:
+  Constructs a lexer from a configuration defined in the `yash-env` crate.
+- `input` module re-exports the following items from `yash_env::input`:
+    - `input::Echo`
+    - `input::FdReader`
+    - `input::IgnoreEof`
+    - `input::Reporter`
+- Public dependency:
+    - yash-env 0.10.0
+
+### Changed
+
+- Public dependency versions:
+    - Rust 1.85.0 → 1.86.0
+- `alias`: Now re-exports items from `yash_env::alias` instead of
+  defining them in this crate.
+- `decl_util`: Now re-exports items from `yash_env::decl_util` instead of
+  defining them in this crate.
+- `input`: Now re-exports items from `yash_env::input` instead of
+  defining them in this crate.
+- `source`: Now re-exports items (`Code`, `Location`, `Source` and `pretty`)
+  from `yash_env::source` instead of defining them in this crate.
+- `syntax::Fd`: Now re-exported from `yash_env::io::Fd` instead of defined in
+  this crate.
+
+### Removed
+
+- `impl source::pretty::MessageBase for parser::Error`
+- `source::pretty::AnnotationType`: This enum has been removed in favor of
+  `ReportType` and `FootnoteType`.
+- `source::pretty::Annotation`: This struct has been removed in favor of
+  `Snippet` and `Span`.
+- `source::pretty::Footer`: This struct has been removed in favor of `Footnote`.
+- `source::pretty::Message`: This struct has been removed in favor of `Report`.
+- `source::pretty::MessageBase`: This trait has been removed in favor of
+  implementing `From<&YourError> for Report`.
+- `source::Source::complement_annotations`: This method has been removed in
+  favor of `extend_with_context`.
+- Public dependency:
+    - annotate-snippets (optional) 0.12.4
+
 ## [0.16.0] - 2025-10-13
 
 The most changes in this version are related to the version bump of the
@@ -574,6 +619,7 @@ command.
 - Functionalities to parse POSIX shell scripts
 - Alias substitution support
 
+[0.17.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.17.0
 [0.16.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.16.0
 [0.15.2]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.15.2
 [0.15.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.15.1

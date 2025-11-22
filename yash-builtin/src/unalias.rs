@@ -25,8 +25,6 @@ use crate::common::report::report_error;
 use crate::common::report::report_failure;
 use yash_env::Env;
 use yash_env::semantics::Field;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Message, MessageBase};
 
 /// Parsed command arguments for the `unalias` built-in
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -39,26 +37,6 @@ pub enum Command {
 
 pub mod semantics;
 pub mod syntax;
-
-/// Converts a non-empty slice of errors to a message.
-///
-/// The first error's title is used as the message title. The other errors are
-/// added as annotations.
-///
-/// This is a utility for printing errors returned by [`Command::execute`].
-/// The returned message can be passed to [`report_failure`].
-#[allow(deprecated)]
-#[deprecated(
-    note = "use `crate::common::report::merge_reports` instead",
-    since = "0.11.0"
-)]
-#[must_use]
-pub fn to_message(errors: &[semantics::Error]) -> Option<Message<'_>> {
-    let mut message = Message::from(errors.first()?);
-    let other_errors = errors[1..].iter().map(MessageBase::main_annotation);
-    message.annotations.extend(other_errors);
-    Some(message)
-}
 
 /// Entry point for executing the `unalias` built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {

@@ -64,8 +64,6 @@
 
 use std::iter::Peekable;
 use thiserror::Error;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::source::{
     Location,
@@ -374,25 +372,6 @@ impl<'a> From<&'a ParseError<'a>> for Report<'a> {
     fn from(error: &'a ParseError<'a>) -> Self {
         error.to_report()
     }
-}
-
-#[allow(deprecated)]
-impl MessageBase for ParseError<'_> {
-    fn message_title(&self) -> std::borrow::Cow<'_, str> {
-        self.to_string().into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        let field = self.field();
-        Annotation::new(
-            AnnotationType::Error,
-            field.value.as_str().into(),
-            &field.origin,
-        )
-    }
-
-    // TODO provide more info about the erroneous option
-    // fn footers(&self) -> Vec<Footer> {}
 }
 
 /// Parses short options in an argument.
@@ -709,27 +688,6 @@ impl<'a> From<&'a ConflictingOptionError<'a>> for Report<'a> {
     #[inline]
     fn from(error: &'a ConflictingOptionError<'a>) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for ConflictingOptionError<'_> {
-    fn message_title(&self) -> std::borrow::Cow<'_, str> {
-        self.to_string().into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        let label = format!("the {} option ...", &self.options[0].spec).into();
-        let location = &self.options[0].location;
-        Annotation::new(AnnotationType::Error, label, location)
-    }
-
-    fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
-        results.extend(self.options[1..].iter().map(|option| {
-            let label = format!("... cannot be used with the {} option", &option.spec).into();
-            let location = &option.location;
-            Annotation::new(AnnotationType::Error, label, location)
-        }))
     }
 }
 

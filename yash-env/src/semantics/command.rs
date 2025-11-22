@@ -24,6 +24,8 @@ use crate::Env;
 use crate::function::Function;
 use crate::job::add_job_if_suspended;
 use crate::semantics::{ExitStatus, Field, Result};
+use crate::source::Location;
+use crate::source::pretty::{Report, ReportType, Snippet};
 use crate::subshell::{JobControl, Subshell};
 use crate::system::{Errno, System};
 use itertools::Itertools as _;
@@ -33,8 +35,6 @@ use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
 use std::rc::Rc;
 use thiserror::Error;
-use yash_syntax::source::Location;
-use yash_syntax::source::pretty::{Report, ReportType, Snippet};
 
 type EnvPrepHook = fn(&mut Env) -> Pin<Box<dyn Future<Output = ()>>>;
 

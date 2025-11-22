@@ -78,13 +78,11 @@ use crate::parser::lex::Operator;
 use crate::parser::lex::TryFromOperatorError;
 use crate::source::Location;
 use std::cell::OnceCell;
-#[cfg(unix)]
-use std::os::unix::io::RawFd;
 use std::rc::Rc;
 use std::str::FromStr;
 
-#[cfg(not(unix))]
-type RawFd = i32;
+#[doc(no_inline)]
+pub use yash_env::io::Fd;
 
 /// Special parameter
 ///
@@ -474,22 +472,6 @@ pub struct Assign {
     pub value: Value,
     /// Location of the assignment word
     pub location: Location,
-}
-
-/// File descriptor
-///
-/// This is the `newtype` pattern applied to [`RawFd`], which is merely a type
-/// alias.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Fd(pub RawFd);
-
-impl Fd {
-    /// File descriptor for the standard input
-    pub const STDIN: Fd = Fd(0);
-    /// File descriptor for the standard output
-    pub const STDOUT: Fd = Fd(1);
-    /// File descriptor for the standard error
-    pub const STDERR: Fd = Fd(2);
 }
 
 /// Redirection operators

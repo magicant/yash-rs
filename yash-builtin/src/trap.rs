@@ -36,7 +36,6 @@ use crate::common::report::report_failure;
 use crate::common::syntax::Mode;
 use crate::common::syntax::parse_arguments;
 use itertools::Itertools as _;
-use std::borrow::Cow;
 use std::fmt::Write;
 use thiserror::Error;
 use yash_env::Env;
@@ -46,8 +45,6 @@ use yash_env::option::State::On;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::signal::Name::{Kill, Stop};
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::SharedSystem;
 use yash_env::trap::Action;
@@ -197,24 +194,6 @@ impl<'a> From<&'a Error> for Report<'a> {
     #[inline]
     fn from(error: &'a Error) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for Error {
-    fn message_title(&self) -> Cow<'_, str> {
-        match &self.cause {
-            ErrorCause::UnsupportedSignal => "invalid trap condition".into(),
-            ErrorCause::SetAction(_) => "cannot update trap".into(),
-        }
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        Annotation::new(
-            AnnotationType::Error,
-            self.cause.to_string().into(),
-            &self.field.origin,
-        )
     }
 }
 

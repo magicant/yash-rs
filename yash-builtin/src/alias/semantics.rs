@@ -17,14 +17,11 @@
 //! Core runtime behavior of the alias built-in
 
 use super::Command;
-use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::alias::Alias;
 use yash_env::alias::HashEntry;
 use yash_env::semantics::Field;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_quote::quoted;
 
@@ -56,21 +53,6 @@ impl<'a> From<&'a Error> for Report<'a> {
     #[inline]
     fn from(error: &'a Error) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for Error {
-    fn message_title(&self) -> Cow<'_, str> {
-        "cannot print alias definition".into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        match self {
-            Error::NonExistentAlias { name } => {
-                Annotation::new(AnnotationType::Error, self.to_string().into(), &name.origin)
-            }
-        }
     }
 }
 

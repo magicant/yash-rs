@@ -18,15 +18,12 @@
 
 use super::{Command, ResourceExt as _, SetLimitType, SetLimitValue, ShowLimitType};
 use crate::common::syntax::{Mode, OptionSpec, ParseError, parse_arguments};
-use std::borrow::Cow;
 use std::num::ParseIntError;
 use std::str::FromStr;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_env::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
 use yash_env::system::resource::Resource;
 
@@ -110,52 +107,6 @@ impl<'a> From<&'a Error> for Report<'a> {
     #[inline]
     fn from(error: &'a Error) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for Error {
-    fn message_title(&self) -> Cow<'_, str> {
-        self.to_string().into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        match self {
-            Self::CommonError(e) => e.main_annotation(),
-            Self::AllWithOperand(operand) => Annotation::new(
-                AnnotationType::Error,
-                format!("{}: unexpected operand", operand.value).into(),
-                &operand.origin,
-            ),
-            Self::ShowingBoth { soft, .. } => Annotation::new(
-                AnnotationType::Error,
-                "soft limit required here".into(),
-                soft,
-            ),
-            Self::TooManyResources(location) => {
-                Annotation::new(AnnotationType::Error, "unexpected option".into(), location)
-            }
-            Self::TooManyOperands(operands) => Annotation::new(
-                AnnotationType::Error,
-                format!("{}: unexpected operand", operands[1].value).into(),
-                &operands[1].origin,
-            ),
-            Self::InvalidLimit(operand, e) => Annotation::new(
-                AnnotationType::Error,
-                format!("{}: invalid limit ({})", operand.value, e).into(),
-                &operand.origin,
-            ),
-        }
-    }
-
-    fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
-        if let Self::ShowingBoth { soft: _, hard } = self {
-            results.extend(std::iter::once(Annotation::new(
-                AnnotationType::Error,
-                "hard limit required here".into(),
-                hard,
-            )));
-        }
     }
 }
 

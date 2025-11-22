@@ -23,15 +23,12 @@
 
 use super::Signal;
 use crate::common::report::{merge_reports, report_failure};
-use std::borrow::Cow;
 use std::fmt::Write;
 use std::num::NonZero;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::signal::{Name, Number};
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::System;
 use yash_env::system::SystemEx;
@@ -112,21 +109,6 @@ impl<'a> From<&'a InvalidSignal<'a>> for Report<'a> {
     #[inline]
     fn from(error: &'a InvalidSignal<'a>) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for InvalidSignal<'_> {
-    fn message_title(&self) -> Cow<'_, str> {
-        "unrecognized operand".into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        Annotation::new(
-            AnnotationType::Error,
-            self.to_string().into(),
-            &self.origin.origin,
-        )
     }
 }
 

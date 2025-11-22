@@ -20,6 +20,59 @@ A _private dependency_ is used internally and not visible to downstream users.
     - yash-env 0.9.2 → 0.10.0
     - yash-semantics (optional) 0.11.0 → 0.12.0
 
+### Removed
+
+- The following deprecated items in the `common` module have been removed in
+  favor of the corresponding functions in the `common::report` module:
+    - `prepare_report_message_and_divert`
+    - `report`
+    - `report_failure`
+    - `report_error`
+    - `report_simple`
+    - `report_simple_error`
+    - `report_simple_failure`
+    - `syntax_error`
+    - `to_single_message`
+- The following deprecated methods have been removed in favor of the `to_report`
+  method:
+    - `getopts::report::Error::to_message` method
+    - `kill::syntax::Error::to_message` method
+    - `read::input::Error::to_message` method
+    - `read::syntax::Error::to_message` method
+    - `unalias::syntax::Error::to_message` method
+- `unalias::to_message` has been removed in favor of `merge_reports`.
+- The following implementations have been removed in favor of the `Report`-based
+  error reporting:
+    - `impl<'a> From<&'a command::syntax::Error> for yash_env::source::pretty::Message<'a>`
+    - `impl<'a> From<&'a read::input::Error> for yash_env::source::pretty::Message<'a>`
+    - `impl<'a> From<&'a read::syntax::Error> for yash_env::source::pretty::Message<'a>`
+    - `impl<'a> From<&'a unalias::syntax::Error> for yash_env::source::pretty::Message<'a>`
+    - `impl yash_env::source::pretty::MessageBase for alias::semantics::Error`
+    - `impl yash_env::source::pretty::MessageBase for break::syntax::Error`
+    - `impl yash_env::source::pretty::MessageBase for cd::syntax::Error`
+    - `impl yash_env::source::pretty::MessageBase for cd::target::TargetError`
+    - `impl yash_env::source::pretty::MessageBase for command::identify::NotFound`
+    - `impl yash_env::source::pretty::MessageBase for common::syntax::ConflictingOptionError`
+    - `impl yash_env::source::pretty::MessageBase for common::syntax::ParseError`
+    - `impl yash_env::source::pretty::MessageBase for kill::print::InvalidSignal`
+    - `impl yash_env::source::pretty::MessageBase for kill::send::TargetError`
+    - `impl yash_env::source::pretty::MessageBase for kill::send::UnsupportedSignal`
+    - `impl yash_env::source::pretty::MessageBase for pwd::syntax::Error`
+    - `impl yash_env::source::pretty::MessageBase for set::syntax::Error`
+    - `impl yash_env::source::pretty::MessageBase for times::syntax::Error`
+    - `impl yash_env::source::pretty::MessageBase for trap::Error`
+    - `impl yash_env::source::pretty::MessageBase for trap::syntax::Error`
+    - `impl yash_env::source::pretty::MessageBase for typeset::AssignReadOnlyError`
+    - `impl yash_env::source::pretty::MessageBase for typeset::ExecuteError`
+    - `impl yash_env::source::pretty::MessageBase for typeset::syntax::InterpretError`
+    - `impl yash_env::source::pretty::MessageBase for typeset::syntax::ParseError`
+    - `impl yash_env::source::pretty::MessageBase for ulimit::syntax::Error`
+    - `impl yash_env::source::pretty::MessageBase for umask::syntax::Error`
+    - `impl yash_env::source::pretty::MessageBase for unalias::semantics::Error`
+    - `impl yash_env::source::pretty::MessageBase for unset::syntax::Error`
+    - `impl yash_env::source::pretty::MessageBase for wait::search::AmbiguousJobId`
+    - `impl yash_env::source::pretty::MessageBase for wait::syntax::Error`
+
 ## [0.12.0] - 2025-11-07
 
 ### Changed

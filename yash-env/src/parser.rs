@@ -23,6 +23,9 @@
 //!   reserved word.
 //! - [`IsName`] is a wrapper for a function that checks if a string is a valid
 //!   variable name.
+//!
+//! Parser implementations are not provided in this crate (`yash-env`). The
+//! standard parser implementation is provided in the `yash-syntax` crate.
 
 use crate::Env;
 use crate::input::InputObject;
@@ -30,7 +33,6 @@ use crate::source::Source;
 use derive_more::Debug;
 use std::num::NonZeroU64;
 use std::rc::Rc;
-use yash_syntax::parser::lex::Lexer;
 
 /// Configuration for the parser
 ///
@@ -81,17 +83,6 @@ impl<'a> Config<'a> {
             start_line_number: NonZeroU64::new(1).unwrap(),
             source: None,
         }
-    }
-
-    /// Creates a lexer using this configuration.
-    ///
-    /// **Breaking change notice**: This method is provided only temporarily to
-    /// ease the migration to the new parser API. It will be removed soon.
-    pub fn into_lexer(self) -> Lexer<'a> {
-        let mut config = yash_syntax::parser::lex::Config::new();
-        config.start_line_number = self.start_line_number;
-        config.source = self.source;
-        config.input(self.input)
     }
 }
 

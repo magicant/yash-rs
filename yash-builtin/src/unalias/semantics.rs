@@ -17,12 +17,9 @@
 //! Core runtime behavior of the `unalias` built-in
 
 use super::Command;
-use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 
 /// Errors that can occur while executing the `unalias` built-in
@@ -56,23 +53,6 @@ impl<'a> From<&'a Error> for Report<'a> {
     #[inline]
     fn from(error: &'a Error) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for Error {
-    fn message_title(&self) -> Cow<'_, str> {
-        "cannot remove alias".into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        match self {
-            Error::UndefinedAlias(alias) => Annotation::new(
-                AnnotationType::Error,
-                format!("no such alias `{alias}`").into(),
-                &alias.origin,
-            ),
-        }
     }
 }
 

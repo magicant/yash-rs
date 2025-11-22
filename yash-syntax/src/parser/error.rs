@@ -17,8 +17,6 @@
 //! Definition of errors that happen in the parser
 
 use crate::source::Location;
-#[allow(deprecated)]
-use crate::source::pretty::{Annotation, AnnotationType, MessageBase};
 use crate::source::pretty::{
     Footnote, FootnoteType, Report, ReportType, Snippet, Span, SpanRole, add_span,
 };
@@ -531,46 +529,11 @@ impl<'a> From<&'a Error> for Report<'a> {
     }
 }
 
-#[allow(deprecated)]
-impl MessageBase for Error {
-    fn message_title(&self) -> Cow<'_, str> {
-        self.cause.message()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        Annotation::new(
-            AnnotationType::Error,
-            self.cause.label().into(),
-            &self.location,
-        )
-    }
-
-    fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
-        // TODO Use Extend::extend_one
-        if let Some((location, label)) = self.cause.related_location() {
-            results.extend(std::iter::once(Annotation::new(
-                AnnotationType::Info,
-                label.into(),
-                location,
-            )));
-        }
-        if let ErrorCause::Syntax(SyntaxError::BangAfterBar) = &self.cause {
-            results.extend(std::iter::once(Annotation::new(
-                AnnotationType::Help,
-                "surround this in a grouping: `{ ! ...; }`".into(),
-                &self.location,
-            )));
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::source::Code;
     use crate::source::Source;
-    #[allow(deprecated)]
-    use crate::source::pretty::Message;
     use assert_matches::assert_matches;
     use std::num::NonZeroU64;
     use std::rc::Rc;
@@ -621,30 +584,5 @@ mod tests {
             SpanRole::Primary { label } if label == "expected a delimiter word"
         );
         assert_eq!(report.footnotes, []);
-    }
-
-    #[allow(deprecated)]
-    #[test]
-    fn from_error_for_message() {
-        let code = Rc::new(Code {
-            value: "".to_string().into(),
-            start_line_number: NonZeroU64::new(1).unwrap(),
-            source: Source::Unknown.into(),
-        });
-        let location = Location { code, range: 0..42 };
-        let error = Error {
-            cause: SyntaxError::MissingHereDocDelimiter.into(),
-            location,
-        };
-        let message = Message::from(&error);
-        assert_eq!(message.r#type, AnnotationType::Error);
-        assert_eq!(
-            message.title,
-            "the here-document operator is missing its delimiter"
-        );
-        assert_eq!(message.annotations.len(), 1);
-        assert_eq!(message.annotations[0].r#type, AnnotationType::Error);
-        assert_eq!(message.annotations[0].label, "expected a delimiter word");
-        assert_eq!(message.annotations[0].location, &error.location);
     }
 }

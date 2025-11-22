@@ -40,8 +40,6 @@ use yash_env::function::Function;
 use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_env::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
 use yash_env::variable::{Value, Variable};
 
@@ -327,30 +325,6 @@ impl<'a> From<&'a AssignReadOnlyError> for Report<'a> {
     }
 }
 
-#[allow(deprecated)]
-impl MessageBase for AssignReadOnlyError {
-    fn message_title(&self) -> std::borrow::Cow<'_, str> {
-        "cannot assign to read-only variable".into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        Annotation::new(
-            AnnotationType::Error,
-            self.to_string().into(),
-            &self.assigned_location,
-        )
-    }
-
-    fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
-        // TODO Use extend_one
-        results.extend(std::iter::once(Annotation::new(
-            AnnotationType::Info,
-            "the variable was made read-only here".into(),
-            &self.read_only_location,
-        )))
-    }
-}
-
 /// Error that occurs when trying to cancel the read-only attribute of a
 /// variable or function
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
@@ -470,56 +444,6 @@ impl<'a> From<&'a ExecuteError> for Report<'a> {
     #[inline]
     fn from(error: &'a ExecuteError) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for ExecuteError {
-    fn message_title(&self) -> std::borrow::Cow<'_, str> {
-        self.to_string().into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        let (message, location) = match self {
-            Self::AssignReadOnlyVariable(error) => return error.main_annotation(),
-            Self::UndoReadOnlyVariable(error) => (
-                format!("read-only variable `{}`", error.name),
-                &error.name.origin,
-            ),
-            Self::UndoReadOnlyFunction(error) => (
-                format!("read-only function `{}`", error.name),
-                &error.name.origin,
-            ),
-            Self::PrintUnsetVariable(field) => {
-                (format!("non-existing variable `{field}`"), &field.origin)
-            }
-            Self::ModifyUnsetFunction(field) | Self::PrintUnsetFunction(field) => {
-                (format!("non-existing function `{field}`"), &field.origin)
-            }
-        };
-        Annotation::new(AnnotationType::Error, message.into(), location)
-    }
-
-    fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
-        match self {
-            Self::AssignReadOnlyVariable(error) => error.additional_annotations(results),
-
-            Self::UndoReadOnlyVariable(error) => results.extend(std::iter::once(Annotation::new(
-                AnnotationType::Info,
-                "the variable was made read-only here".into(),
-                &error.read_only_location,
-            ))),
-
-            Self::UndoReadOnlyFunction(error) => results.extend(std::iter::once(Annotation::new(
-                AnnotationType::Info,
-                "the function was made read-only here".into(),
-                &error.read_only_location,
-            ))),
-
-            Self::ModifyUnsetFunction(_)
-            | Self::PrintUnsetVariable(_)
-            | Self::PrintUnsetFunction(_) => {}
-        }
     }
 }
 

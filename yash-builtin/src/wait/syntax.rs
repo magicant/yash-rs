@@ -17,14 +17,11 @@
 //! Command line argument parser for the wait built-in
 
 use super::{Command, JobSpec};
-use std::borrow::Cow;
 use std::num::ParseIntError;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::job::Pid;
 use yash_env::semantics::Field;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 
 use crate::common::syntax::{Mode, ParseError, parse_arguments};
@@ -68,25 +65,6 @@ impl<'a> From<&'a Error> for Report<'a> {
     #[inline]
     fn from(error: &'a Error) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for Error {
-    fn message_title(&self) -> Cow<'_, str> {
-        "invalid job specification".into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        let field = match self {
-            Self::CommonError(e) => return e.main_annotation(),
-            Self::ParseInt(field, _) | Self::NonPositive(field) => field,
-        };
-        Annotation::new(
-            AnnotationType::Error,
-            self.to_string().into(),
-            &field.origin,
-        )
     }
 }
 

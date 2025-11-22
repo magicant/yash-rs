@@ -24,8 +24,6 @@ use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, Message};
 use yash_env::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
 
 /// List of all options supported by the `unalias` built-in
@@ -85,57 +83,12 @@ impl Error {
         report.snippets = snippets;
         report
     }
-
-    /// Converts the error into a [`Message`].
-    #[allow(deprecated)]
-    #[deprecated(note = "use `to_report` instead", since = "0.11.0")]
-    pub fn to_message(&self) -> Message<'_> {
-        let (title, annotations) = match self {
-            Error::CommonError(e) => return e.into(),
-
-            Error::ConflictingOptionAndOperand {
-                option_location,
-                operand_location,
-            } => (
-                "cannot specify `-a` with other operands".into(),
-                vec![
-                    Annotation::new(
-                        AnnotationType::Error,
-                        "cannot specify `-a` with other operands".into(),
-                        option_location,
-                    ),
-                    Annotation::new(
-                        AnnotationType::Error,
-                        "operand specified here".into(),
-                        operand_location,
-                    ),
-                ],
-            ),
-
-            Error::MissingArgument => ("no option or operand specified".into(), vec![]),
-        };
-
-        Message {
-            r#type: AnnotationType::Error,
-            title,
-            annotations,
-            footers: vec![],
-        }
-    }
 }
 
 impl<'a> From<&'a Error> for Report<'a> {
     #[inline]
     fn from(error: &'a Error) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl<'a> From<&'a Error> for Message<'a> {
-    #[inline]
-    fn from(e: &'a Error) -> Self {
-        e.to_message()
     }
 }
 

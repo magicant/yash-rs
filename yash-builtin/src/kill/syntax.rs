@@ -28,8 +28,6 @@ use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::signal;
 use yash_env::source::Location;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, Message};
 use yash_env::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
 
 /// Error that may occur during parsing
@@ -148,77 +146,6 @@ impl Error {
             Self::MissingTarget => vec![],
         };
         report
-    }
-
-    /// Converts this error to a printable message
-    #[allow(deprecated)]
-    #[deprecated(note = "Use `report::to_message` instead", since = "0.11.0")]
-    pub fn to_message(&self) -> Message<'_> {
-        let title = self.to_string().into();
-        let annotations = match self {
-            Error::UnknownOption(field) => vec![Annotation::new(
-                AnnotationType::Error,
-                format!("{:?} is not a valid option", field.value).into(),
-                &field.origin,
-            )],
-
-            Error::ConflictingOptions {
-                signal_arg,
-                list_option_name,
-                list_option_location,
-            } => vec![
-                Annotation::new(
-                    AnnotationType::Error,
-                    "signal to send is specified here".into(),
-                    &signal_arg.origin,
-                ),
-                Annotation::new(
-                    AnnotationType::Error,
-                    format!("option `{list_option_name}` is incompatible").into(),
-                    list_option_location,
-                ),
-            ],
-
-            Error::MissingSignal {
-                signal_option_name,
-                signal_option_location,
-            } => {
-                vec![Annotation::new(
-                    AnnotationType::Error,
-                    format!("option `{signal_option_name}` requires a signal name or number")
-                        .into(),
-                    signal_option_location,
-                )]
-            }
-
-            Error::MultipleSignals(field_1, field_2) => vec![
-                Annotation::new(
-                    AnnotationType::Error,
-                    format!("first signal {:?}", field_1.value).into(),
-                    &field_1.origin,
-                ),
-                Annotation::new(
-                    AnnotationType::Error,
-                    format!("second signal {:?}", field_2.value).into(),
-                    &field_2.origin,
-                ),
-            ],
-
-            Error::InvalidSignal(field) => vec![Annotation::new(
-                AnnotationType::Error,
-                format!("{:?} is not a valid signal name or number", field.value).into(),
-                &field.origin,
-            )],
-
-            Error::MissingTarget => vec![],
-        };
-
-        Message {
-            r#type: AnnotationType::Error,
-            title,
-            annotations,
-            footers: vec![],
-        }
     }
 }
 
