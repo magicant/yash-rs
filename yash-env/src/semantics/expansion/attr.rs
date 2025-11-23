@@ -25,7 +25,7 @@
 //! associated with the location of the originating word.
 
 use crate::semantics::Field;
-use yash_syntax::source::Location;
+use crate::source::Location;
 
 /// Category of syntactic elements from which expansion originates
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

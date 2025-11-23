@@ -191,12 +191,6 @@ impl fmt::Display for Assign {
     }
 }
 
-impl fmt::Display for Fd {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
 impl fmt::Display for RedirOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         Operator::from(*self).fmt(f)

@@ -16,11 +16,11 @@
 
 //! `Echo` definition
 
+use super::{Context, Input, Result};
 use crate::Env;
 use crate::option::Option::Verbose;
 use crate::option::State::On;
 use std::cell::RefCell;
-use yash_syntax::input::{Context, Input, Result};
 
 /// `Input` decorator that echoes the input.
 ///
@@ -70,12 +70,12 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::super::Memory;
     use super::*;
     use crate::system::r#virtual::VirtualSystem;
     use crate::tests::assert_stderr;
     use futures_util::FutureExt;
     use std::rc::Rc;
-    use yash_syntax::input::Memory;
 
     #[test]
     fn verbose_off() {

@@ -41,13 +41,13 @@ pub use self::state::{Action, Origin, SetActionError, TrapState};
 use self::state::{EnterSubshellOption, GrandState};
 use crate::Env;
 use crate::signal;
+use crate::source::Location;
 use crate::system::{Disposition, Errno};
 #[cfg(doc)]
 use crate::system::{SharedSystem, System};
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use std::pin::Pin;
-use yash_syntax::source::Location;
 
 /// System interface for signal handling configuration
 pub trait SignalSystem {

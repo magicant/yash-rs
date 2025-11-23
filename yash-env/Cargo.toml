@@ -33,7 +33,6 @@ thiserror = { workspace = true }
 unix_path = { workspace = true }
 unix_str = { workspace = true }
 yash-quote = { workspace = true }
-yash-syntax = { workspace = true, features = ["annotate-snippets"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true, default-features = false }

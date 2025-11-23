@@ -537,6 +537,17 @@ pub struct Lexer<'a> {
     line_continuation_enabled: bool,
 }
 
+/// Creates a lexer from a configuration defined in the [`yash-env`](yash_env)
+/// crate.
+impl<'a> From<yash_env::parser::Config<'a>> for Lexer<'a> {
+    fn from(config: yash_env::parser::Config<'a>) -> Self {
+        let mut config2 = Config::new();
+        config2.start_line_number = config.start_line_number;
+        config2.source = config.source;
+        config2.input(config.input)
+    }
+}
+
 impl<'a> Lexer<'a> {
     /// Creates a new configuration with default settings.
     ///

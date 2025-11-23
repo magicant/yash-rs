@@ -17,10 +17,10 @@
 //! Items about file systems
 
 use super::{Gid, Result, Uid};
+use crate::io::Fd;
 use crate::str::UnixStr;
 use bitflags::bitflags;
 use std::fmt::Debug;
-use yash_syntax::syntax::Fd;
 
 #[cfg(unix)]
 const RAW_AT_FDCWD: i32 = libc::AT_FDCWD;

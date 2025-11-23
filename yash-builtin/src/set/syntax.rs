@@ -26,8 +26,6 @@ use yash_env::option::parse_long;
 use yash_env::option::parse_short;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::Snippet;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_env::source::pretty::{Report, ReportType};
 
 /// Error in command line parsing
@@ -89,22 +87,6 @@ impl<'a> From<&'a Error> for Report<'a> {
     #[inline]
     fn from(value: &'a Error) -> Self {
         value.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for Error {
-    fn message_title(&self) -> std::borrow::Cow<'_, str> {
-        self.to_string().into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        let field = self.field();
-        Annotation::new(
-            AnnotationType::Error,
-            field.value.as_str().into(),
-            &field.origin,
-        )
     }
 }
 

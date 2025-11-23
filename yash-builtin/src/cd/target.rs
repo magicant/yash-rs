@@ -18,15 +18,12 @@
 
 use super::Command;
 use super::Mode;
-use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::path::Path;
 use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::source::Location;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::variable::HOME;
 use yash_env::variable::OLDPWD;
@@ -125,61 +122,6 @@ impl<'a> From<&'a TargetError> for Report<'a> {
     #[inline]
     fn from(error: &'a TargetError) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl MessageBase for TargetError {
-    fn message_title(&self) -> Cow<'_, str> {
-        self.to_string().into()
-    }
-
-    fn main_annotation(&self) -> Annotation<'_> {
-        use TargetError::*;
-        match self {
-            UnsetHome { location } => Annotation::new(
-                AnnotationType::Error,
-                "cd built-in used without operand requires non-empty $HOME".into(),
-                location,
-            ),
-
-            UnsetOldpwd { location } => Annotation::new(
-                AnnotationType::Error,
-                "'-' operand requires non-empty $OLDPWD".into(),
-                location,
-            ),
-
-            NonExistingDirectory {
-                missing,
-                target: _,
-                location,
-            } => Annotation::new(
-                AnnotationType::Error,
-                format!("intermediate directory '{}' not found", missing.display()).into(),
-                location,
-            ),
-        }
-    }
-
-    fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
-        use TargetError::*;
-        match self {
-            UnsetHome { location: _ } | UnsetOldpwd { location: _ } => {}
-
-            NonExistingDirectory {
-                missing: _,
-                target,
-                location,
-            } => results.extend(std::iter::once(Annotation::new(
-                AnnotationType::Info,
-                format!(
-                    "while resolving '..' in target directory '{}'",
-                    target.display()
-                )
-                .into(),
-                location,
-            ))),
-        }
     }
 }
 

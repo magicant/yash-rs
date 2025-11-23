@@ -260,11 +260,12 @@ pub struct Builtin {
 
     /// Whether the built-in is a declaration utility
     ///
-    /// The [`yash_syntax::decl_util::Glossary`] implementation for [`Env`] uses
-    /// this field to determine whether a command name is a declaration utility.
-    /// See the [method description] for the value this field should have.
+    /// The [`decl_util::Glossary`](crate::decl_util::Glossary) implementation
+    /// for [`Env`] uses this field to determine whether a command name is a
+    /// declaration utility. See the [method description] for the value this
+    /// field should have.
     ///
-    /// [method description]: yash_syntax::decl_util::Glossary::is_declaration_utility
+    /// [method description]: crate::decl_util::Glossary::is_declaration_utility
     pub is_declaration_utility: Option<bool>,
 }
 

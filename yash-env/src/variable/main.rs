@@ -19,9 +19,9 @@
 use super::Expansion;
 use super::Quirk;
 use super::Value;
+use crate::source::Location;
 use std::ops::Deref;
 use thiserror::Error;
-use yash_syntax::source::Location;
 
 /// Definition of a variable.
 ///

@@ -16,15 +16,13 @@
 
 // `FdReader` definition
 
+use super::{Context, Input, Result};
 use crate::io::Fd;
 use crate::option::State;
 use crate::system::SharedSystem;
 use std::cell::Cell;
 use std::rc::Rc;
 use std::slice::from_mut;
-use yash_syntax::input::Context;
-use yash_syntax::input::Input;
-use yash_syntax::input::Result;
 
 /// Input function that reads from a file descriptor.
 ///

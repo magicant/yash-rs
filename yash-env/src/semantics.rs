@@ -303,8 +303,7 @@ type PinFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 /// let mut env = yash_env::Env::new_virtual();
 /// env.any.insert(Box::new(RunReadEvalLoop(|env, config| {
 ///     Box::pin(async move {
-///         let mut lexer = config.into_lexer();
-///         yash_semantics::read_eval_loop(env, &mut lexer).await
+///         yash_semantics::read_eval_loop(env, &mut config.into()).await
 ///     })
 /// })));
 /// ```

@@ -30,6 +30,7 @@ use yash_env::prompt::GetPrompt;
 use yash_env::semantics::command::RunFunction;
 use yash_env::trap::RunSignalTrapIfCaught;
 use yash_semantics::RunReadEvalLoop;
+use yash_syntax::parser::lex::Lexer;
 
 pub mod args;
 pub mod init_file;
@@ -123,7 +124,7 @@ fn inject_dependencies(env: &mut Env) {
 
     env.any.insert(Box::new(RunReadEvalLoop(|env, config| {
         Box::pin(async move {
-            let mut lexer = config.into_lexer();
+            let mut lexer = Lexer::from(config);
             yash_semantics::read_eval_loop(env, &mut lexer).await
         })
     })));

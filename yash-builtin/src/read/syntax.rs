@@ -25,8 +25,6 @@ use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::Snippet;
-#[allow(deprecated)]
-use yash_env::source::pretty::{Annotation, AnnotationType, Message};
 use yash_env::source::pretty::{Report, ReportType};
 
 /// Error in parsing command line arguments
@@ -81,63 +79,12 @@ impl Error {
         report.snippets = snippets;
         report
     }
-
-    /// Converts this error into a message.
-    #[allow(deprecated)]
-    #[deprecated(note = "use `to_report` instead", since = "0.11.0")]
-    pub fn to_message(&self) -> Message<'_> {
-        match self {
-            Error::CommonError(e) => e.into(),
-
-            Error::MultibyteDelimiter { delimiter } => Message {
-                r#type: AnnotationType::Error,
-                title: self.to_string().into(),
-                annotations: vec![Annotation::new(
-                    AnnotationType::Error,
-                    format!(
-                        "delimiter {:?} is {}-byte long",
-                        delimiter.value,
-                        delimiter.value.len()
-                    )
-                    .into(),
-                    &delimiter.origin,
-                )],
-                footers: vec![],
-            },
-
-            Error::MissingOperand => Message {
-                r#type: AnnotationType::Error,
-                title: self.to_string().into(),
-                annotations: vec![],
-                footers: vec![],
-            },
-
-            Error::InvalidVariableName { name } => Message {
-                r#type: AnnotationType::Error,
-                title: self.to_string().into(),
-                annotations: vec![Annotation::new(
-                    AnnotationType::Error,
-                    format!("variable name {:?} is not valid", name.value).into(),
-                    &name.origin,
-                )],
-                footers: vec![],
-            },
-        }
-    }
 }
 
 impl<'a> From<&'a Error> for Report<'a> {
     #[inline]
     fn from(error: &'a Error) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl<'a> From<&'a Error> for Message<'a> {
-    #[inline]
-    fn from(e: &'a Error) -> Self {
-        e.to_message()
     }
 }
 

@@ -28,8 +28,6 @@ use crate::common::syntax::parse_arguments;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
-#[allow(deprecated)]
-use yash_env::source::pretty::Message;
 use yash_env::source::pretty::Report;
 
 /// Error in parsing command line arguments
@@ -58,15 +56,6 @@ impl<'a> From<&'a Error> for Report<'a> {
     #[inline]
     fn from(error: &'a Error) -> Self {
         error.to_report()
-    }
-}
-
-#[allow(deprecated)]
-impl<'a> From<&'a Error> for Message<'a> {
-    fn from(error: &'a Error) -> Self {
-        match error {
-            Error::CommonError(error) => error.into(),
-        }
     }
 }
 
