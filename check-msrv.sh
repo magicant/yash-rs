@@ -29,7 +29,7 @@ check() {
 }
 
 check yash-arith
-check yash-builtin
+check yash-builtin --no-default-features --all-features
 check yash-cli
 check yash-env
 check yash-env-test-helper
