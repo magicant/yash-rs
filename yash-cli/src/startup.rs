@@ -29,7 +29,9 @@ use yash_env::parser::IsName;
 use yash_env::prompt::GetPrompt;
 use yash_env::semantics::command::RunFunction;
 use yash_env::trap::RunSignalTrapIfCaught;
+use yash_prompt::ExpandText;
 use yash_semantics::RunReadEvalLoop;
+use yash_semantics::expansion::expand_text;
 use yash_syntax::parser::lex::Lexer;
 
 pub mod args;
@@ -147,6 +149,10 @@ fn inject_dependencies(env: &mut Env) {
         .insert(Box::new(RunSignalTrapIfCaught(|env, signal| {
             Box::pin(async move { yash_semantics::trap::run_trap_if_caught(env, signal).await })
         })));
+
+    env.any.insert(Box::new(ExpandText(|env, text| {
+        Box::pin(async move { expand_text(env, text).await.ok() })
+    })));
 
     env.any.insert(Box::new(GetPrompt(|env, context| {
         Box::pin(async move {
