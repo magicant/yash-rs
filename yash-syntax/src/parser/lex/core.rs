@@ -442,6 +442,11 @@ impl fmt::Debug for LexerCore<'_> {
 /// with default settings. You can then customize the settings by modifying the
 /// corresponding fields. Finally, you can pass an input object to the
 /// [`input`](Self::input) method to create a lexer.
+///
+/// # Deprecation
+///
+/// This struct is deprecated. Use [`yash_env::parser::Config`] instead.
+#[deprecated(since = "0.17.0", note = "use `yash_env::parser::Config` instead")]
 #[derive(Debug)]
 #[must_use = "you must call `input` to create a lexer"]
 #[non_exhaustive]
@@ -471,10 +476,14 @@ pub struct Config {
     pub source: Option<Rc<Source>>,
 }
 
+#[allow(deprecated)]
 impl Config {
     /// Creates a new configuration with default settings.
     ///
-    /// You can also call [`Lexer::config`] to create a new configuration.
+    /// # Deprecation
+    ///
+    /// This struct is deprecated. Use [`yash_env::parser::Config`] instead.
+    #[deprecated(since = "0.17.0", note = "use `yash_env::parser::Config` instead")]
     pub fn new() -> Self {
         Config {
             start_line_number: NonZeroU64::MIN,
@@ -484,15 +493,14 @@ impl Config {
 
     /// Creates a lexer with the given input object.
     pub fn input<'a>(self, input: Box<dyn InputObject + 'a>) -> Lexer<'a> {
-        let start_line_number = self.start_line_number;
-        let source = self.source.unwrap_or_else(|| Rc::new(Source::Unknown));
-        Lexer {
-            core: LexerCore::new(input, start_line_number, source),
-            line_continuation_enabled: true,
-        }
+        let mut config = yash_env::parser::Config::with_input(input);
+        config.start_line_number = self.start_line_number;
+        config.source = self.source;
+        config.into()
     }
 }
 
+#[allow(deprecated)]
 impl Default for Config {
     fn default() -> Self {
         Self::new()
@@ -512,18 +520,22 @@ impl Default for Config {
 /// [parser](super::super::Parser) to read the source code and produce a syntax
 /// tree, so you don't need to call these functions directly.
 ///
-/// To construct a lexer, you can use the [`Lexer::new`] function with an input object.
-/// You can also use the [`Lexer::config`] function to create a configuration that allows you to
-/// customize the settings before creating a lexer.
+/// To construct a lexer, create a configuration object
+/// ([`yash_env::parser::Config`]), set the desired fields, and then call
+/// `into()` or [`Lexer::from`].
+/// `Lexer` has several convenience functions such as [`new`](Self::new) and
+/// [`with_code`](Self::with_code) for creating a lexer with minimal
+/// configuration.
 ///
 /// ```
+/// # use yash_env::parser::Config;
 /// # use yash_syntax::input::Memory;
 /// # use yash_syntax::parser::{lex::Lexer, Parser};
 /// # use yash_syntax::source::Source;
-/// let mut config = Lexer::config();
+/// let mut config = Config::with_input(Box::new(Memory::new("echo hello\n")));
 /// config.start_line_number = 10.try_into().unwrap();
 /// config.source = Some(Source::CommandString.into());
-/// let mut lexer = config.input(Box::new(Memory::new("echo hello\n")));
+/// let mut lexer = Lexer::from(config);
 /// let mut parser = Parser::new(&mut lexer);
 /// _ = parser.command_line();
 /// ```
@@ -541,10 +553,13 @@ pub struct Lexer<'a> {
 /// crate.
 impl<'a> From<yash_env::parser::Config<'a>> for Lexer<'a> {
     fn from(config: yash_env::parser::Config<'a>) -> Self {
-        let mut config2 = Config::new();
-        config2.start_line_number = config.start_line_number;
-        config2.source = config.source;
-        config2.input(config.input)
+        let input = config.input;
+        let start_line_number = config.start_line_number;
+        let source = config.source.unwrap_or_else(|| Rc::new(Source::Unknown));
+        Lexer {
+            core: LexerCore::new(input, start_line_number, source),
+            line_continuation_enabled: true,
+        }
     }
 }
 
@@ -553,6 +568,13 @@ impl<'a> Lexer<'a> {
     ///
     /// This is a synonym for [`Config::new`]. You can modify the settings and
     /// then create a lexer with the [`input`](Config::input) method.
+    ///
+    /// # Deprecation
+    ///
+    /// The `Config` struct defined in this module is deprecated. Use
+    /// [`yash_env::parser::Config`] instead.
+    #[allow(deprecated)]
+    #[deprecated(since = "0.17.0", note = "use `yash_env::parser::Config` instead")]
     #[inline(always)]
     pub fn config() -> Config {
         Config::new()
@@ -562,15 +584,14 @@ impl<'a> Lexer<'a> {
     ///
     /// This is a convenience function that creates a lexer with the given input
     /// object and the default configuration. To customize the configuration,
-    /// use the [`config`](Self::config) function.
+    /// instantiate a [`yash_env::parser::Config`] object instead.
     ///
     /// This function is best used for testing or for simple cases where you
     /// don't need to customize the lexer. For practical use, it is recommended
-    /// to use the [`config`](Self::config) function to create a configuration
-    /// and provide it with supplementary information, especially
-    /// [`source`](Config::source), before creating a lexer.
+    /// to provide supplementary information with a configuration before
+    /// creating a lexer.
     pub fn new(input: Box<dyn InputObject + 'a>) -> Lexer<'a> {
-        Self::config().input(input)
+        yash_env::parser::Config::with_input(input).into()
     }
 
     /// Creates a new lexer with a fixed source code.
@@ -580,9 +601,8 @@ impl<'a> Lexer<'a> {
     ///
     /// This function is best used for testing or for simple cases where you
     /// don't need to customize the lexer. For practical use, it is recommended
-    /// to use the [`config`](Self::config) function to create a configuration
-    /// and provide it with supplementary information, especially
-    /// [`source`](Config::source), before creating a lexer.
+    /// to provide supplementary information with a configuration before
+    /// creating a lexer.
     pub fn with_code(code: &'a str) -> Lexer<'a> {
         Self::new(Box::new(Memory::new(code)))
     }
@@ -595,13 +615,13 @@ impl<'a> Lexer<'a> {
     ///
     /// This function is soft-deprecated. Use [`with_code`](Self::with_code)
     /// instead if the source is `Unknown`. Otherwise, use
-    /// [`config`](Self::config) to set the source and [`input`](Config::input)
-    /// to create a lexer, which is more descriptive.
+    /// [`yash_env::parser::Config`] to create a lexer with a customized
+    /// configuration.
     pub fn from_memory<S: Into<Rc<Source>>>(code: &'a str, source: S) -> Lexer<'a> {
         fn inner(code: &str, source: Rc<Source>) -> Lexer<'_> {
-            let mut config = Lexer::config();
+            let mut config = yash_env::parser::Config::with_input(Box::new(Memory::new(code)));
             config.source = Some(source);
-            config.input(Box::new(Memory::new(code)))
+            config.into()
         }
         inner(code, source.into())
     }

@@ -44,6 +44,10 @@ use std::rc::Rc;
 /// `Config` is provided here so that other crates can use [`RunReadEvalLoop`]
 /// without depending on `yash-syntax`.
 ///
+/// Since this struct is marked as `#[non_exhaustive]`, you cannot construct it
+/// directly. Instead, use the [`with_input`](Self::with_input) function to
+/// create a `Config` instance, and then modify its fields as necessary.
+///
 /// [`RunReadEvalLoop`]: crate::semantics::RunReadEvalLoop
 #[derive(Debug)]
 #[non_exhaustive]

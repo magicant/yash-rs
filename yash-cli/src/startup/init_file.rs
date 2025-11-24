@@ -38,6 +38,7 @@ use yash_env::input::{Echo, FdReader};
 use yash_env::io::Fd;
 use yash_env::option::Option::Interactive;
 use yash_env::option::State::Off;
+use yash_env::parser::Config;
 use yash_env::stack::Frame;
 use yash_env::system::{Errno, Mode, OfdAccess, OpenFlag, SystemEx};
 use yash_env::variable::ENV;
@@ -170,12 +171,12 @@ pub async fn run_init_file(env: &mut Env, path: &str) {
     let env = &mut *env.push_frame(Frame::InitFile);
     let system = env.system.clone();
     let ref_env = RefCell::new(&mut *env);
-    let mut config = Lexer::config();
+    let input = Box::new(Echo::new(FdReader::new(fd, system), &ref_env));
+    let mut config = Config::with_input(input);
     config.source = Some(Rc::new(Source::InitFile {
         path: path.to_owned(),
     }));
-    let input = Box::new(Echo::new(FdReader::new(fd, system), &ref_env));
-    let mut lexer = config.input(input);
+    let mut lexer = config.into();
     _ = read_eval_loop(&ref_env, &mut { lexer }).await;
 
     if let Err(errno) = env.system.close(fd) {
