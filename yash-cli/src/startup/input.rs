@@ -37,6 +37,7 @@ use yash_env::input::Reporter;
 use yash_env::io::Fd;
 use yash_env::option::Option::Interactive;
 use yash_env::option::State::{Off, On};
+use yash_env::parser::Config;
 use yash_env::system::Errno;
 use yash_env::system::Mode;
 use yash_env::system::OfdAccess;
@@ -88,9 +89,9 @@ pub fn prepare_input<'s: 'i + 'e, 'i, 'e>(
         input: Box<dyn InputObject + 'a>,
         source: SyntaxSource,
     ) -> Lexer<'a> {
-        let mut config = Lexer::config();
+        let mut config = Config::with_input(input);
         config.source = Some(source.into());
-        config.input(input)
+        config.into()
     }
 
     match source {

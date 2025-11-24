@@ -54,6 +54,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 - Public dependency:
     - annotate-snippets (optional) 0.12.4
 
+### Deprecated
+
+- `parser::lex::Config` is now deprecated. Use `yash_env::parser::Config` instead.
+
 ## [0.16.0] - 2025-10-13
 
 The most changes in this version are related to the version bump of the
