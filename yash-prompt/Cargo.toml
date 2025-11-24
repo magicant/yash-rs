@@ -20,11 +20,11 @@ all-features = true
 [dependencies]
 futures-util = { workspace = true }
 yash-env = { workspace = true }
-yash-semantics = { workspace = true }
 yash-syntax = { workspace = true }
 
 [dev-dependencies]
 yash-env-test-helper = { path = "../yash-env-test-helper" }
+yash-semantics = { path = "../yash-semantics" }
 
 [lints]
 workspace = true

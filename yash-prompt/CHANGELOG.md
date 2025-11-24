@@ -11,13 +11,24 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.8.0] - Unreleased
 
+### Added
+
+- `ExpandText`: Declares the function type for text expansion in prompts.
+
 ### Changed
 
+- `expand_posix` now requires an `ExpandText` function injected through the
+  environment's `any` storage to perform text expansion.
 - Public dependency versions:
     - yash-env 0.9.0 → 0.10.0
 - yash-syntax is now a private dependency.
 - Private dependency versions:
     - yash-syntax 0.16.0 → 0.17.0
+
+### Removed
+
+- Private dependencies:
+    - yash-semantics 0.11.0
 
 ## [0.7.1] - 2025-11-07
 

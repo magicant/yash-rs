@@ -17,11 +17,44 @@
 //! Prompt string expansion (POSIX-compatible)
 
 use futures_util::FutureExt as _;
+use std::pin::Pin;
 use yash_env::Env;
-use yash_semantics::expansion::expand_text;
+use yash_env::semantics::ExitStatus;
 use yash_syntax::parser::lex::Lexer;
 use yash_syntax::syntax::Text;
 use yash_syntax::syntax::TextUnit::{self, Literal};
+
+type PinFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
+type ExpandTextResult = Option<(String, Option<ExitStatus>)>;
+
+/// Wrapper for a text expansion function
+///
+/// This struct declares a function type for expanding a [`Text`].
+/// An implementation of this function type should be provided and stored in the
+/// environment's [`any`](Env::any) storage to be used for prompt string
+/// expansion ([`expand_posix`]).
+///
+/// The function takes a mutable reference to the environment and a reference
+/// to the [`Text`] to be expanded, and returns a future that resolves to an
+/// optional tuple containing the expanded string and an optional exit status.
+/// The exit status indicates that of the last command substitution performed
+/// during the expansion, if any. If no command substitution was performed,
+/// the exit status is `None`. If the expansion fails, the entire result is
+/// `None`. The function should not modify the current exit status
+/// ([`Env::exit_status`]) of the environment.
+///
+/// The most standard implementation of this function type is provided in the
+/// [`yash-semantics` crate](https://crates.io/crates/yash-semantics):
+///
+/// ```
+/// # use yash_prompt::ExpandText;
+/// let mut env = yash_env::Env::new_virtual();
+/// env.any.insert(Box::new(ExpandText(|env, text| {
+///     Box::pin(async move { yash_semantics::expansion::expand_text(env, text).await.ok() })
+/// })));
+/// ```
+#[derive(Clone, Copy, Debug)]
+pub struct ExpandText(pub for<'a> fn(&'a mut Env, &'a Text) -> PinFuture<'a, ExpandTextResult>);
 
 /// Expands the prompt string according to the POSIX standard.
 ///
@@ -32,7 +65,13 @@ use yash_syntax::syntax::TextUnit::{self, Literal};
 /// (TODO: Currently, the history feature is not implemented, so `!` simply
 /// expands to `0`.)
 ///
-/// The [expansion](expand_text) of the text is returned.
+/// The expansion of the text is returned.
+///
+/// # Dependency
+///
+/// This function relies on the [`ExpandText`] function stored in the
+/// environment's [`any`](Env::any) storage to perform the actual text
+/// expansion. If no such function is found, this function will **panic**.
 ///
 /// # Portability
 ///
@@ -54,9 +93,13 @@ pub async fn expand_posix(env: &mut Env, prompt: &str, excl: bool) -> String {
         replace_exclamation_marks(&mut text.0);
     }
 
+    let ExpandText(expand_text) = env
+        .any
+        .get()
+        .expect("`yash-prompt::expand_posix` requires `ExpandText` in `Env::any`");
     match expand_text(env, &text).await {
-        Ok((expansion, _exit_status)) => expansion,
-        Err(_) => text.to_string(),
+        Some((expansion, _exit_status)) => expansion,
+        None => text.to_string(),
     }
 }
 
@@ -79,6 +122,7 @@ fn replace_exclamation_marks(text: &mut Vec<TextUnit>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::env_with_expand_text;
     use yash_env::option::{Off, Unset};
     use yash_env::variable::Scope::Global;
 
@@ -86,7 +130,7 @@ mod tests {
     fn plain_prompt() {
         // If the prompt string contains no special characters, it should be
         // returned as is.
-        let mut env = Env::new_virtual();
+        let mut env = env_with_expand_text();
         let prompt = "my prompt > ";
         let result = expand_posix(&mut env, prompt, false)
             .now_or_never()
@@ -98,7 +142,7 @@ mod tests {
     fn parameter_expansion() {
         // If the prompt string contains a parameter expansion, it should be
         // expanded.
-        let mut env = Env::new_virtual();
+        let mut env = env_with_expand_text();
         env.variables
             .get_or_new("FOO", Global)
             .assign("bar", None)
@@ -113,7 +157,7 @@ mod tests {
     #[test]
     fn malformed_parameter_expansion() {
         // If a parameter expansion is malformed, we treat it as a literal.
-        let mut env = Env::new_virtual();
+        let mut env = env_with_expand_text();
         env.variables
             .get_or_new("FOO", Global)
             .assign("bar", None)
@@ -128,7 +172,7 @@ mod tests {
     #[test]
     fn failed_parameter_expansion() {
         // If a parameter expansion fails, we treat it a literal.
-        let mut env = Env::new_virtual();
+        let mut env = env_with_expand_text();
         env.options.set(Unset, Off);
         let prompt = "my $FOO > ";
         let result = expand_posix(&mut env, prompt, false)
@@ -139,7 +183,7 @@ mod tests {
 
     #[test]
     fn single_exclamation_mark_expands_to_history_number() {
-        let mut env = Env::new_virtual();
+        let mut env = env_with_expand_text();
         let prompt = "my prompt ! > ";
         let result = expand_posix(&mut env, prompt, true).now_or_never().unwrap();
         assert_eq!(result, "my prompt 0 > ");
@@ -147,7 +191,7 @@ mod tests {
 
     #[test]
     fn double_exclamation_mark_expands_to_single_exclamation_mark() {
-        let mut env = Env::new_virtual();
+        let mut env = env_with_expand_text();
         let prompt = "my prompt !! > ";
         let result = expand_posix(&mut env, prompt, true).now_or_never().unwrap();
         assert_eq!(result, "my prompt ! > ");
@@ -157,7 +201,7 @@ mod tests {
     fn trailing_consecutive_exclamation_marks() {
         // The first two exclamation marks are expanded to a single exclamation
         // mark, and the third exclamation mark to the history number.
-        let mut env = Env::new_virtual();
+        let mut env = env_with_expand_text();
         let prompt = "my prompt > !!!";
         let result = expand_posix(&mut env, prompt, true).now_or_never().unwrap();
         assert_eq!(result, "my prompt > !0");
@@ -167,7 +211,7 @@ mod tests {
     fn no_excl_option() {
         // If the excl option is false, exclamation marks are treated as
         // literals.
-        let mut env = Env::new_virtual();
+        let mut env = env_with_expand_text();
         let prompt = "my prompt ! > !!!";
         let result = expand_posix(&mut env, prompt, false)
             .now_or_never()

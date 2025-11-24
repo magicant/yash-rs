@@ -47,19 +47,26 @@
 //! use yash_env::Env;
 //! use yash_env::input::FdReader;
 //! use yash_env::io::Fd;
+//! use yash_env::parser::Config;
 //! use yash_env::semantics::ExitStatus;
-//! use yash_prompt::Prompter;
+//! use yash_env::source::Source;
+//! use yash_prompt::{ExpandText, Prompter};
+//! use yash_semantics::expansion::expand_text;
 //! use yash_semantics::read_eval_loop;
 //! use yash_syntax::parser::lex::Lexer;
-//! use yash_syntax::source::Source;
 //!
 //! let mut env = Env::new_virtual();
+//! env.any.insert(Box::new(ExpandText(|env, text| {
+//!     Box::pin(async move { expand_text(env, text).await.ok() })
+//! })));
+//!
 //! let reader = FdReader::new(Fd::STDIN, env.system.clone());
 //! let mut ref_env = RefCell::new(&mut env);
 //! let input = Box::new(Prompter::new(reader, &ref_env));
-//! let mut config = Lexer::config();
+//! let mut config = Config::with_input(input);
 //! config.source = Some(Source::Stdin.into());
-//! let mut lexer = config.input(input);
+//! let mut lexer = Lexer::from(config);
+//!
 //! let result = read_eval_loop(&ref_env, &mut lexer).await;
 //! drop(lexer);
 //! assert_eq!(result, Continue(()));
@@ -68,6 +75,7 @@
 //! ```
 
 mod expand_posix;
+pub use expand_posix::ExpandText;
 pub use expand_posix::expand_posix;
 
 // TODO Yash-specific prompt expansion
@@ -75,3 +83,21 @@ pub use expand_posix::expand_posix;
 mod prompter;
 pub use prompter::Prompter;
 pub use prompter::fetch_posix;
+
+#[cfg(test)]
+mod tests {
+    use super::ExpandText;
+    use yash_env::{Env, System, VirtualSystem};
+
+    pub(crate) fn env_with_expand_text_and_system(system: Box<dyn System>) -> Env {
+        let mut env = Env::with_system(system);
+        env.any.insert(Box::new(ExpandText(|env, text| {
+            Box::pin(async move { yash_semantics::expansion::expand_text(env, text).await.ok() })
+        })));
+        env
+    }
+
+    pub(crate) fn env_with_expand_text() -> Env {
+        env_with_expand_text_and_system(Box::new(VirtualSystem::new()))
+    }
+}
