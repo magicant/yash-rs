@@ -94,12 +94,15 @@ impl<T> Rec<T> {
     }
 }
 
-/// Set of parameters for constructing a [parser](Parser)
+/// Set of parameters for constructing a [`Parser`]
 ///
 /// `Config` is a builder for constructing a parser. A [new](Self::new)
 /// configuration starts with default settings. You can customize them by
 /// calling methods that can be chained. Finally, you can create a parser by
 /// providing the lexer to the [`input`](Self::input) method.
+///
+/// Note that this struct is for configuring a parser. To configure the
+/// [`Lexer`], use [`yash_env::parser::Config`].
 #[derive(Debug)]
 #[must_use = "Config must be used to create a parser"]
 pub struct Config<'a> {
