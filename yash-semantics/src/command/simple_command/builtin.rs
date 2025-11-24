@@ -18,7 +18,7 @@
 
 use super::perform_assignments;
 use crate::Handle;
-use crate::command_search::search_path;
+use crate::command::search::search_path;
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;

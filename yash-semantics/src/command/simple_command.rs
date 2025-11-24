@@ -23,7 +23,7 @@
 
 use crate::Handle;
 use crate::command::Command;
-use crate::command_search::classify;
+use crate::command::search::classify;
 use crate::expansion::expand_word_with_mode;
 use crate::xtrace::XTrace;
 use std::ops::ControlFlow::Continue;
@@ -46,10 +46,10 @@ use yash_syntax::syntax::Word;
 /// # Outline
 ///
 /// The execution starts with the [expansion](crate::expansion) of the command
-/// words. Next, the [command search](crate::command_search) is performed to
-/// find an execution [target](crate::command_search::Target) named by the first
-/// [field](Field) of the expansion results. The target type defines how the
-/// target is executed. After the execution, the `ErrExit` option is applied
+/// words. Next, the [command search](crate::command::search) is performed to
+/// find an execution [target](crate::command::search::Target) named by the
+/// first [field](Field) of the expansion results. The target type defines how
+/// the target is executed. After the execution, the `ErrExit` option is applied
 /// with [`Env::apply_errexit`].
 ///
 /// # Target types and their semantics
@@ -167,7 +167,7 @@ impl Command for syntax::SimpleCommand {
             Err(error) => return error.handle(env).await,
         };
 
-        use crate::command_search::Target::{Builtin, External, Function};
+        use crate::command::search::Target::{Builtin, External, Function};
         if let Some(name) = fields.first() {
             match classify(env, &name.value) {
                 Builtin { builtin, path: _ } => {

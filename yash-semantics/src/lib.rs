@@ -25,6 +25,11 @@
 //!
 //! The [`read_eval_loop`] reads, parses, and executes commands from an input.
 //! It is a utility for running a shell script.
+//!
+//! # Deprecation
+//!
+//! The re-export of [`yash_env::semantics::command::search`] as
+//! `command_search` is now deprecated. Please use `command::search` instead.
 
 pub mod assign;
 pub mod command;

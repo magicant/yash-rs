@@ -11,6 +11,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.12.0] - Unreleased
 
+### Added
+
+- `command::search`: Re-export of the `yash_env::semantics::command::search` module
+
 ### Changed
 
 - Public dependency versions:
@@ -23,6 +27,12 @@ A _private dependency_ is used internally and not visible to downstream users.
   removed:
     - `impl yash_env::source::pretty::MessageBase for expansion::Error`
     - `impl yash_env::source::pretty::MessageBase for redir::Error`
+
+### Deprecated
+
+- The re-export of `yash_env::semantics::command::search` as `command_search`
+  has been deprecated. Users should import it from `yash_env` directly or use
+  the `command::search` module in this crate.
 
 ## [0.11.0] - 2025-11-07
 
