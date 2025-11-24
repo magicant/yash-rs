@@ -57,6 +57,7 @@ use yash_syntax::parser::lex::Lexer;
 /// # use yash_syntax::parser::lex::Lexer;
 /// let mut env = Env::new_virtual();
 /// let mut lexer = Lexer::with_code("case foo in (bar) ;; esac");
+/// #[allow(deprecated)]
 /// let result = ReadEvalLoop::new(&mut env, &mut lexer).run().await;
 /// assert_eq!(result, Continue(()));
 /// assert_eq!(env.exit_status, ExitStatus::SUCCESS);
@@ -95,6 +96,7 @@ impl<'a, 'b> ReadEvalLoop<'a, 'b> {
     /// standard error. That achieves the effect of the `Verbose` shell option.
     ///
     /// ```
+    /// #![allow(deprecated)]
     /// # futures_executor::block_on(async {
     /// # use std::cell::Cell;
     /// # use std::rc::Rc;
