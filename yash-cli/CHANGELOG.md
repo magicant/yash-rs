@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Internal: Updated dependency injection to include `IsName` for variable name validation.
+- Internal: Updated library dependencies (yash-env 0.11.0, yash-builtin 0.14.0, yash-semantics 0.13.0).
 
 ## [3.0.4] - 2025-11-07
 
