@@ -177,7 +177,7 @@ where
                             JobControl::Foreground => {
                                 if let Some(tty) = tty {
                                     let pgid = env.system.getpgrp();
-                                    let _ = env.system.tcsetpgrp_with_block(tty, pgid);
+                                    env.system.tcsetpgrp_with_block(tty, pgid).await.ok();
                                 }
                             }
                         }
@@ -244,7 +244,10 @@ where
 
         if job_control == Some(JobControl::Foreground) {
             if let Some(tty) = env.tty {
-                env.system.tcsetpgrp_with_block(tty, env.main_pgid).ok();
+                env.system
+                    .tcsetpgrp_with_block(tty, env.main_pgid)
+                    .await
+                    .ok();
             }
         }
 
