@@ -9,6 +9,15 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.11.0] - Unreleased
+
+### Changed
+
+- `System::tcsetpgrp`: Now returns a `FlexFuture<Result<()>>` instead of a
+  synchronous `Result<()>`. This change allows virtual systems to simulate the
+  blocking behavior of `tcsetpgrp` when called from a background process group,
+  though the current virtual system implementation does not yet do so.
+
 ## [0.10.0] - 2025-11-26
 
 ### Added
@@ -619,6 +628,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Initial implementation of the `yash-env` crate
 
+[0.11.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.11.0
 [0.10.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.10.0
 [0.9.2]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.9.2
 [0.9.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.9.1

@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Internal: Updated dependency injection to include `IsName` for variable name validation.
+- Internal improvements only; no user-visible changes.
 
 ## [3.0.4] - 2025-11-07
 

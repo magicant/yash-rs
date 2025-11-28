@@ -9,6 +9,13 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.9.0] - Unreleased
+
+### Changed
+
+- Public dependency versions:
+    - yash-env 0.10.0 → 0.11.0
+
 ## [0.8.0] - 2025-11-26
 
 ### Added
@@ -77,6 +84,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Initial implementation of the `yash-env-test-helper` crate
 
+[0.9.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-test-helper-0.9.0
 [0.8.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-test-helper-0.8.0
 [0.7.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-test-helper-0.7.0
 [0.6.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-test-helper-0.6.0
