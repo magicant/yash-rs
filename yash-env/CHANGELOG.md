@@ -9,6 +9,15 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.10.1] - Unreleased
+
+### Fixed
+
+- `system::SystemEx::tcsetpgrp_with_block` and
+  `system::SystemEx::tcsetpgrp_without_block` now correctly return errors if
+  any underlying system calls fail. Previously, it may return `Ok(())` even if
+  some system calls failed.
+
 ## [0.10.0] - 2025-11-26
 
 ### Added
@@ -619,6 +628,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Initial implementation of the `yash-env` crate
 
+[0.10.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.10.1
 [0.10.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.10.0
 [0.9.2]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.9.2
 [0.9.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.9.1
