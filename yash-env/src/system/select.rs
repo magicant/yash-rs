@@ -44,9 +44,9 @@ use std::time::Instant;
 /// appropriate arguments and wake up the wakers when the corresponding events
 /// occur.
 #[derive(Debug)]
-pub struct SelectSystem {
+pub struct SelectSystem<S> {
     /// System instance that performs actual system calls
-    system: Box<dyn System>,
+    system: S,
     /// Helper for `select`ing on file descriptors
     io: AsyncIo,
     /// Helper for `select`ing on time
