@@ -66,7 +66,7 @@ async fn run_as_shell_process(env: &mut Env) {
     // Import environment variables
     env.variables.extend_env(std::env::vars());
 
-    let work = self::startup::configure_environment(env, run);
+    let work = self::startup::configure_environment(env, run).await;
 
     let is_interactive = env.options.get(Interactive) == On;
 

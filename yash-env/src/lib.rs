@@ -347,13 +347,15 @@ impl Env {
     /// shell into the foreground if the shell is in the same process group as
     /// the session leader because it is unlikely that there is another
     /// job-controlling process that can bring the shell into the foreground.
-    pub fn ensure_foreground(&mut self) -> Result<(), Errno> {
+    pub async fn ensure_foreground(&mut self) -> Result<(), Errno> {
         let fd = self.get_tty()?;
 
         if self.system.getsid(Pid(0)) == Ok(self.main_pgid) {
-            self.system.tcsetpgrp_with_block(fd, self.main_pgid)
+            self.system.tcsetpgrp_with_block(fd, self.main_pgid).await
         } else {
-            self.system.tcsetpgrp_without_block(fd, self.main_pgid)
+            self.system
+                .tcsetpgrp_without_block(fd, self.main_pgid)
+                .await
         }
     }
 

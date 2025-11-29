@@ -65,7 +65,7 @@ pub fn auto_interactive<S: System>(system: &S, run: &Run) -> bool {
 ///
 /// This function is _pure_ in that all system calls are performed by the
 /// `System` trait object (`env.system`).
-pub fn configure_environment(env: &mut Env, run: Run) -> Work {
+pub async fn configure_environment(env: &mut Env, run: Run) -> Work {
     // Apply the parsed options to the environment
     if auto_interactive(&env.system, &run) {
         env.options.set(Interactive, On);
@@ -99,7 +99,7 @@ pub fn configure_environment(env: &mut Env, run: Run) -> Work {
     // Make sure the shell is in the foreground if job control is enabled
     if env.options.get(Monitor) == On {
         // Ignore failures as we can still proceed even if we can't get into the foreground
-        env.ensure_foreground().ok();
+        env.ensure_foreground().await.ok();
     }
 
     // Prepare built-ins

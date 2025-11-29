@@ -86,14 +86,14 @@ fn update_internal_dispositions_for_stoppers(env: &mut Env) {
 
 /// Ensures that the shell is in the foreground process group if the `Monitor`
 /// option is enabled.
-fn ensure_foreground(env: &mut Env) {
+async fn ensure_foreground(env: &mut Env) {
     if env.options.get(Monitor) == State::On {
-        env.ensure_foreground().ok();
+        env.ensure_foreground().await.ok();
     }
 }
 
 /// Modifies shell options and positional parameters.
-fn modify(
+async fn modify(
     env: &mut Env,
     options: Vec<(yash_env::option::Option, State)>,
     positional_params: Option<Vec<Field>>,
@@ -110,7 +110,7 @@ fn modify(
         // We ignore errors in theses functions because they are not essential
         // for updating the options.
         update_internal_dispositions_for_stoppers(env);
-        ensure_foreground(env);
+        ensure_foreground(env).await;
     }
 
     // Modify positional parameters
@@ -173,7 +173,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             options,
             positional_params,
         }) => {
-            modify(env, options, positional_params);
+            modify(env, options, positional_params).await;
             Result::new(ExitStatus::SUCCESS)
         }
 

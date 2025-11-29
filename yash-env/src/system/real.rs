@@ -654,9 +654,9 @@ impl System for RealSystem {
         unsafe { libc::tcgetpgrp(fd.0) }.errno_if_m1().map(Pid)
     }
 
-    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> Result<()> {
+    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
         let result = unsafe { libc::tcsetpgrp(fd.0, pgid.0) };
-        result.errno_if_m1().map(drop)
+        result.errno_if_m1().map(drop).into()
     }
 
     /// Creates a new child process.

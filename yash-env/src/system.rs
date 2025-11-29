@@ -402,7 +402,10 @@ pub trait System: Debug {
     /// Switches the foreground process group.
     ///
     /// This is a thin wrapper around the `tcsetpgrp` system call.
-    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> Result<()>;
+    ///
+    /// The virtual system version of this function may block the calling thread
+    /// if called in a background process group, hence returning a future.
+    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>>;
 
     /// Creates a new child process.
     ///
@@ -645,19 +648,21 @@ pub trait SystemEx: System {
     /// Use [`tcsetpgrp_without_block`](Self::tcsetpgrp_without_block) if you
     /// need to make sure the shell is in the foreground before changing the
     /// foreground job.
-    fn tcsetpgrp_with_block(&mut self, fd: Fd, pgid: Pid) -> Result<()> {
-        let sigttou = self
-            .signal_number_from_name(signal::Name::Ttou)
-            .ok_or(Errno::EINVAL)?;
-        let mut old_mask = Vec::new();
+    fn tcsetpgrp_with_block(&mut self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> {
+        async move {
+            let sigttou = self
+                .signal_number_from_name(signal::Name::Ttou)
+                .ok_or(Errno::EINVAL)?;
+            let mut old_mask = Vec::new();
 
-        self.sigmask(Some((SigmaskOp::Add, &[sigttou])), Some(&mut old_mask))?;
+            self.sigmask(Some((SigmaskOp::Add, &[sigttou])), Some(&mut old_mask))?;
 
-        let result = self.tcsetpgrp(fd, pgid);
+            let result = self.tcsetpgrp(fd, pgid).await;
 
-        let result_2 = self.sigmask(Some((SigmaskOp::Set, &old_mask)), None);
+            let result_2 = self.sigmask(Some((SigmaskOp::Set, &old_mask)), None);
 
-        result.and(result_2)
+            result.and(result_2)
+        }
     }
 
     /// Switches the foreground process group with the default SIGTTOU settings.
@@ -679,30 +684,32 @@ pub trait SystemEx: System {
     ///
     /// Use [`tcsetpgrp_with_block`](Self::tcsetpgrp_with_block) to change the
     /// job even if the current shell is not in the foreground.
-    fn tcsetpgrp_without_block(&mut self, fd: Fd, pgid: Pid) -> Result<()> {
-        let sigttou = self
-            .signal_number_from_name(signal::Name::Ttou)
-            .ok_or(Errno::EINVAL)?;
-        match self.sigaction(sigttou, Disposition::Default) {
-            Err(e) => Err(e),
-            Ok(old_handling) => {
-                let mut old_mask = Vec::new();
-                let result = match self
-                    .sigmask(Some((SigmaskOp::Remove, &[sigttou])), Some(&mut old_mask))
-                {
-                    Err(e) => Err(e),
-                    Ok(()) => {
-                        let result = self.tcsetpgrp(fd, pgid);
+    fn tcsetpgrp_without_block(&mut self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> {
+        async move {
+            let sigttou = self
+                .signal_number_from_name(signal::Name::Ttou)
+                .ok_or(Errno::EINVAL)?;
+            match self.sigaction(sigttou, Disposition::Default) {
+                Err(e) => Err(e),
+                Ok(old_handling) => {
+                    let mut old_mask = Vec::new();
+                    let result = match self
+                        .sigmask(Some((SigmaskOp::Remove, &[sigttou])), Some(&mut old_mask))
+                    {
+                        Err(e) => Err(e),
+                        Ok(()) => {
+                            let result = self.tcsetpgrp(fd, pgid).await;
 
-                        let result_2 = self.sigmask(Some((SigmaskOp::Set, &old_mask)), None);
+                            let result_2 = self.sigmask(Some((SigmaskOp::Set, &old_mask)), None);
 
-                        result.and(result_2)
-                    }
-                };
+                            result.and(result_2)
+                        }
+                    };
 
-                let result_2 = self.sigaction(sigttou, old_handling).map(drop);
+                    let result_2 = self.sigaction(sigttou, old_handling).map(drop);
 
-                result.and(result_2)
+                    result.and(result_2)
+                }
             }
         }
     }

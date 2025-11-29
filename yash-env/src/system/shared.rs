@@ -430,7 +430,7 @@ impl System for &SharedSystem {
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
         self.0.borrow().tcgetpgrp(fd)
     }
-    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> Result<()> {
+    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
         self.0.borrow_mut().tcsetpgrp(fd, pgid)
     }
     fn new_child_process(&mut self) -> Result<ChildProcessStarter> {
@@ -658,7 +658,7 @@ impl System for SharedSystem {
         (&self).tcgetpgrp(fd)
     }
     #[inline]
-    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> Result<()> {
+    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
         (&mut &*self).tcsetpgrp(fd, pgid)
     }
     #[inline]
