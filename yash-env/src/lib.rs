@@ -279,7 +279,7 @@ impl Env {
     /// should contain ANSI color escape sequences. The result is true only if
     /// the standard error is a terminal.
     ///
-    /// The current implementaion simply checks if the standard error is a
+    /// The current implementation simply checks if the standard error is a
     /// terminal. This will be changed in the future to support user
     /// configuration.
     #[must_use]

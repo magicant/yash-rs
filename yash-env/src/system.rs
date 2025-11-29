@@ -661,7 +661,7 @@ pub trait SystemEx: System {
 
             let result_2 = self.sigmask(Some((SigmaskOp::Set, &old_mask)), None);
 
-            result.or(result_2)
+            result.and(result_2)
         }
     }
 
@@ -702,13 +702,13 @@ pub trait SystemEx: System {
 
                             let result_2 = self.sigmask(Some((SigmaskOp::Set, &old_mask)), None);
 
-                            result.or(result_2)
+                            result.and(result_2)
                         }
                     };
 
                     let result_2 = self.sigaction(sigttou, old_handling).map(drop);
 
-                    result.or(result_2)
+                    result.and(result_2)
                 }
             }
         }
