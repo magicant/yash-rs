@@ -16,6 +16,12 @@ A _private dependency_ is used internally and not visible to downstream users.
 - Public dependency versions:
     - yash-env 0.10.0 → 0.11.0
 
+### Removed
+
+- The re-export of `yash_env::semantics::command::search` as `command_search`
+  has been removed. Users should import it from `yash_env` directly or use
+  the `command::search` module in this crate.
+
 ## [0.12.0] - 2025-11-26
 
 ### Added

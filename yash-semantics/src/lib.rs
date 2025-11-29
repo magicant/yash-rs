@@ -40,8 +40,6 @@ pub mod trap;
 pub mod xtrace;
 
 #[doc(no_inline)]
-pub use yash_env::semantics::command::search as command_search;
-#[doc(no_inline)]
 pub use yash_env::semantics::*;
 
 mod handle;
