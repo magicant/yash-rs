@@ -60,15 +60,15 @@ pub struct SelectSystem<S> {
     wait_mask: Option<Vec<signal::Number>>,
 }
 
-impl Deref for SelectSystem {
-    type Target = Box<dyn System>;
-    fn deref(&self) -> &Box<dyn System> {
+impl<S> Deref for SelectSystem<S> {
+    type Target = S;
+    fn deref(&self) -> &S {
         &self.system
     }
 }
 
-impl DerefMut for SelectSystem {
-    fn deref_mut(&mut self) -> &mut Box<dyn System> {
+impl<S> DerefMut for SelectSystem<S> {
+    fn deref_mut(&mut self) -> &mut S {
         &mut self.system
     }
 }
