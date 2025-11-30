@@ -122,16 +122,17 @@ use std::time::Instant;
 /// When you clone a virtual system, the clone will have the same `process_id`
 /// as the original. To simulate the `fork` system call, you would probably want
 /// to assign a new process ID and add a new [`Process`] to the system state.
-#[derive(Clone, Debug)]
-pub struct VirtualSystem {
+// TODO: Describe the type parameter
+#[derive(Debug)]
+pub struct VirtualSystem<S> {
     /// State of the system.
-    pub state: Rc<RefCell<SystemState>>,
+    pub state: Rc<RefCell<SystemState<S>>>,
 
     /// Process ID of the process that is interacting with the system.
     pub process_id: Pid,
 }
 
-impl VirtualSystem {
+impl<S> VirtualSystem<S> {
     /// Creates a virtual system with an almost empty state.
     ///
     /// The `process_id` of the returned `VirtualSystem` will be 2.
@@ -144,7 +145,7 @@ impl VirtualSystem {
     /// `/dev/stderr` that are opened in the process with file descriptor 0, 1,
     /// and 2, respectively. The file system also contains an empty directory
     /// `/tmp`.
-    pub fn new() -> VirtualSystem {
+    pub fn new() -> Self {
         let mut state = SystemState::default();
         let mut process = Process::with_parent_and_group(Pid(1), Pid(1));
 
@@ -193,7 +194,7 @@ impl VirtualSystem {
     ///
     /// This function will panic if it cannot find a process having
     /// `self.process_id`.
-    pub fn current_process(&self) -> Ref<'_, Process> {
+    pub fn current_process(&self) -> Ref<'_, Process<S>> {
         Ref::map(self.state.borrow(), |state| {
             &state.processes[&self.process_id]
         })
@@ -205,7 +206,7 @@ impl VirtualSystem {
     ///
     /// This function will panic if it cannot find a process having
     /// `self.process_id`.
-    pub fn current_process_mut(&mut self) -> RefMut<'_, Process> {
+    pub fn current_process_mut(&mut self) -> RefMut<'_, Process<S>> {
         RefMut::map(self.state.borrow_mut(), |state| {
             state.processes.get_mut(&self.process_id).unwrap()
         })
@@ -303,13 +304,24 @@ impl VirtualSystem {
     }
 }
 
-impl Default for VirtualSystem {
+impl<S> Clone for VirtualSystem<S> {
+    fn clone(&self) -> Self {
+        Self {
+            state: self.state.clone(),
+            process_id: self.process_id,
+        }
+    }
+}
+
+impl<S> Default for VirtualSystem<S> {
     fn default() -> Self {
         VirtualSystem::new()
     }
 }
 
-impl System for VirtualSystem {
+// TODO: Can we remove the 'static bound if we eliminate FlexFuture or add a
+// lifetime parameter to it?
+impl<S: System + 'static> System for VirtualSystem<S> {
     /// Retrieves metadata of a file.
     ///
     /// The current implementation fills only some values of the returned
@@ -836,7 +848,7 @@ impl System for VirtualSystem {
     /// The current implementation does not yet support the concept of
     /// controlling terminals and sessions. It accepts any open file descriptor.
     fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
-        fn inner(system: &mut VirtualSystem, fd: Fd, pgid: Pid) -> Result<()> {
+        fn inner<S>(system: &mut VirtualSystem<S>, fd: Fd, pgid: Pid) -> Result<()> {
             // Make sure the FD is open
             system.with_open_file_description(fd, |_| Ok(()))?;
 
@@ -1080,8 +1092,8 @@ impl System for VirtualSystem {
     }
 }
 
-fn send_signal_to_processes(
-    state: &mut SystemState,
+fn send_signal_to_processes<S>(
+    state: &mut SystemState<S>,
     target_pgid: Option<Pid>,
     signal: Option<signal::Number>,
 ) -> Result<()> {
@@ -1108,7 +1120,7 @@ fn send_signal_to_processes(
     }
 }
 
-fn raise_sigchld(state: &mut SystemState, target_pid: Pid) {
+fn raise_sigchld<S>(state: &mut SystemState<S>, target_pid: Pid) {
     if let Some(target) = state.processes.get_mut(&target_pid) {
         let result = target.raise_signal(signal::SIGCHLD);
         assert!(!result.process_state_changed);
@@ -1116,8 +1128,9 @@ fn raise_sigchld(state: &mut SystemState, target_pid: Pid) {
 }
 
 /// State of the virtual system.
-#[derive(Clone, Debug, Default)]
-pub struct SystemState {
+// TODO: Describe the type parameter
+#[derive(Clone, Debug)]
+pub struct SystemState<S> {
     /// Current time
     pub now: Option<Instant>,
 
@@ -1131,7 +1144,7 @@ pub struct SystemState {
     pub executor: Option<Rc<dyn Executor>>,
 
     /// Processes running in the system
-    pub processes: BTreeMap<Pid, Process>,
+    pub processes: BTreeMap<Pid, Process<S>>,
 
     /// Process group ID of the foreground process group
     ///
@@ -1153,7 +1166,22 @@ pub struct SystemState {
     pub path: UnixString,
 }
 
-impl SystemState {
+impl<S> Default for SystemState<S> {
+    fn default() -> Self {
+        Self {
+            now: Default::default(),
+            times: Default::default(),
+            executor: Default::default(),
+            processes: Default::default(),
+            foreground: Default::default(),
+            file_system: Default::default(),
+            home_dirs: Default::default(),
+            path: Default::default(),
+        }
+    }
+}
+
+impl<S> SystemState<S> {
     /// Performs [`select`](crate::system::SharedSystem::select) on all
     /// processes in the system.
     ///
@@ -1161,7 +1189,10 @@ impl SystemState {
     ///
     /// The `RefCell` must not have been borrowed, or this function will panic
     /// with a double borrow.
-    pub fn select_all(this: &RefCell<Self>) {
+    pub fn select_all(this: &RefCell<Self>)
+    where
+        S: System,
+    {
         let mut selectors = Vec::new();
         for process in this.borrow().processes.values() {
             if let Some(selector) = process.selector.upgrade() {
@@ -1179,7 +1210,11 @@ impl SystemState {
     /// Finds a child process to wait for.
     ///
     /// This is a helper function for `VirtualSystem::wait`.
-    fn child_to_wait_for(&mut self, parent_pid: Pid, target: Pid) -> Option<(Pid, &mut Process)> {
+    fn child_to_wait_for(
+        &mut self,
+        parent_pid: Pid,
+        target: Pid,
+    ) -> Option<(Pid, &mut Process<S>)> {
         match target.0 {
             0 => todo!("wait target {}", target),
             -1 => {
@@ -1232,15 +1267,15 @@ pub trait Executor: Debug {
 /// This struct is a helper for [`VirtualSystem::new_child_process`].
 /// It basically runs the given task, but pauses or cancels it depending on
 /// the state of the process.
-struct ProcessRunner<'a> {
+struct ProcessRunner<'a, S> {
     task: Pin<Box<dyn Future<Output = Infallible> + 'a>>,
-    system: VirtualSystem,
+    system: VirtualSystem<S>,
 
     /// Waker that is woken up when the process is resumed.
     waker: Rc<Cell<Option<Waker>>>,
 }
 
-impl Future for ProcessRunner<'_> {
+impl<S> Future for ProcessRunner<'_, S> {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
