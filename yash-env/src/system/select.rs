@@ -73,9 +73,9 @@ impl<S> DerefMut for SelectSystem<S> {
     }
 }
 
-impl SelectSystem {
+impl<S: System> SelectSystem<S> {
     /// Creates a new `SelectSystem` that wraps the given `System`.
-    pub fn new(system: Box<dyn System>) -> Self {
+    pub fn new(system: S) -> Self {
         SelectSystem {
             system,
             io: AsyncIo::new(),
