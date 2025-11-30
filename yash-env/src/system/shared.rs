@@ -121,11 +121,11 @@ use std::time::Instant;
 ///
 /// [`VirtualSystem`]: crate::system::virtual::VirtualSystem
 #[derive(Clone, Debug)]
-pub struct SharedSystem(pub(super) Rc<RefCell<SelectSystem>>);
+pub struct SharedSystem<S>(pub(super) Rc<RefCell<SelectSystem<S>>>);
 
-impl SharedSystem {
+impl<S: System> SharedSystem<S> {
     /// Creates a new shared system.
-    pub fn new(system: Box<dyn System>) -> Self {
+    pub fn new(system: S) -> Self {
         SharedSystem(Rc::new(RefCell::new(SelectSystem::new(system))))
     }
 
@@ -299,7 +299,7 @@ impl SharedSystem {
 ///
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
-impl System for &SharedSystem {
+impl<S: System> System for &SharedSystem<S> {
     fn fstat(&self, fd: Fd) -> Result<Stat> {
         self.0.borrow().fstat(fd)
     }
@@ -486,7 +486,7 @@ impl System for &SharedSystem {
 }
 
 /// Delegates `System` methods to the contained system instance.
-impl System for SharedSystem {
+impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
     // which in turn delegates to the contained system instance.
     #[inline]
@@ -728,7 +728,7 @@ impl System for SharedSystem {
     }
 }
 
-impl SignalSystem for &SharedSystem {
+impl<S: System> SignalSystem for &SharedSystem<S> {
     #[inline]
     fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
         SystemEx::signal_name_from_number(*self, number)
@@ -752,7 +752,7 @@ impl SignalSystem for &SharedSystem {
     }
 }
 
-impl SignalSystem for SharedSystem {
+impl<S: System> SignalSystem for SharedSystem<S> {
     #[inline]
     fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
         SystemEx::signal_name_from_number(self, number)
