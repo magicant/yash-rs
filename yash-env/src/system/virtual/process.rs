@@ -46,8 +46,9 @@ use std::rc::Weak;
 use std::task::Waker;
 
 /// Process in a virtual system
+// TODO: Describe the type parameter
 #[derive(Clone, Debug)]
-pub struct Process {
+pub struct Process<S> {
     /// Process ID of the parent process
     pub(crate) ppid: Pid,
 
@@ -111,7 +112,7 @@ pub struct Process {
     /// This weak reference is empty for the initial process of a
     /// `VirtualSystem`.  When a new child process is created, a weak reference
     /// to the `SelectSystem` for the child is set.
-    pub(crate) selector: Weak<RefCell<SelectSystem>>,
+    pub(crate) selector: Weak<RefCell<SelectSystem<S>>>,
 
     /// Copy of arguments passed to [`execve`](crate::System::execve)
     pub(crate) last_exec: Option<(CString, Vec<CString>, Vec<CString>)>,
@@ -136,9 +137,9 @@ fn min_unused_fd<'a, I: IntoIterator<Item = &'a Fd>>(min: Fd, existings: I) -> F
         .unwrap()
 }
 
-impl Process {
+impl<S> Process<S> {
     /// Creates a new running process.
-    pub fn with_parent_and_group(ppid: Pid, pgid: Pid) -> Process {
+    pub fn with_parent_and_group(ppid: Pid, pgid: Pid) -> Self {
         Process {
             ppid,
             pgid,
@@ -165,7 +166,7 @@ impl Process {
     /// Creates a new running process as a child of the given parent.
     ///
     /// Some part of the parent process state is copied to the new process.
-    pub fn fork_from(ppid: Pid, parent: &Process) -> Process {
+    pub fn fork_from(ppid: Pid, parent: &Self) -> Self {
         let mut child = Self::with_parent_and_group(ppid, parent.pgid);
         child.uid = parent.uid;
         child.euid = parent.euid;
