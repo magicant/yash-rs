@@ -87,7 +87,7 @@ pub use unix_str as str;
 /// [`clone_with_system`](Self::clone_with_system).
 #[derive(Clone, Debug)]
 #[non_exhaustive]
-pub struct Env {
+pub struct Env<S> {
     /// Aliases defined in the environment
     pub aliases: AliasSet,
 
@@ -138,7 +138,7 @@ pub struct Env {
     pub any: DataSet,
 
     /// Interface to the system-managed parts of the environment
-    pub system: SharedSystem,
+    pub system: SharedSystem<S>,
 }
 
 impl Env {
