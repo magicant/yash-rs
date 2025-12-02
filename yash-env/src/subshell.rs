@@ -260,13 +260,13 @@ where
 /// This object blocks SIGINT and SIGQUIT and remembers the previous signal
 /// blocking mask, which is restored when the object is dropped.
 #[derive(Debug)]
-struct MaskGuard<'a> {
-    env: &'a mut Env,
+struct MaskGuard<'a, S: System> {
+    env: &'a mut Env<S>,
     old_mask: Option<Vec<signal::Number>>,
 }
 
-impl<'a> MaskGuard<'a> {
-    fn new(env: &'a mut Env) -> Self {
+impl<'a, S: System> MaskGuard<'a, S> {
+    fn new(env: &'a mut Env<S>) -> Self {
         let old_mask = None;
         Self { env, old_mask }
     }
@@ -298,7 +298,7 @@ impl<'a> MaskGuard<'a> {
     }
 }
 
-impl Drop for MaskGuard<'_> {
+impl<S: System> Drop for MaskGuard<'_, S> {
     fn drop(&mut self) {
         if let Some(old_mask) = &self.old_mask {
             self.env
