@@ -44,7 +44,7 @@ pub enum PreparePwdError {
     GetCwdError(#[from] Errno),
 }
 
-impl Env {
+impl<S: System> Env<S> {
     /// Returns the value of the `$PWD` variable if it is correct.
     ///
     /// The variable is correct if:
