@@ -141,14 +141,14 @@ pub struct Env<S> {
     pub system: SharedSystem<S>,
 }
 
-impl Env {
+impl<S: System> Env<S> {
     /// Creates a new environment with the given system.
     ///
     /// Members of the new environments are default-constructed except that:
     /// - `main_pid` is initialized as `system.getpid()`
     /// - `system` is initialized as `SharedSystem::new(system)`
     #[must_use]
-    pub fn with_system(system: Box<dyn System>) -> Env {
+    pub fn with_system(system: S) -> Self {
         Env {
             aliases: Default::default(),
             arg0: Default::default(),
@@ -168,19 +168,13 @@ impl Env {
         }
     }
 
-    /// Creates a new environment with a default-constructed [`VirtualSystem`].
-    #[must_use]
-    pub fn new_virtual() -> Env {
-        Env::with_system(Box::<VirtualSystem>::default())
-    }
-
     /// Clones this environment.
     ///
     /// The application-managed parts of the environment are cloned normally.
     /// The system-managed parts are replaced with the provided `System`
     /// instance.
     #[must_use]
-    pub fn clone_with_system(&self, system: Box<dyn System>) -> Env {
+    pub fn clone_with_system(&self, system: S) -> Self {
         Env {
             aliases: self.aliases.clone(),
             arg0: self.arg0.clone(),
@@ -199,7 +193,17 @@ impl Env {
             system: SharedSystem::new(system),
         }
     }
+}
 
+impl Env<VirtualSystem> {
+    /// Creates a new environment with a default-constructed [`VirtualSystem`].
+    #[must_use]
+    pub fn new_virtual() -> Self {
+        Env::with_system(VirtualSystem::default())
+    }
+}
+
+impl<S: System> Env<S> {
     /// Initializes default variables.
     ///
     /// This function assigns the following variables to `self`:
@@ -359,28 +363,6 @@ impl Env {
         }
     }
 
-    /// Tests whether the current environment is an interactive shell.
-    ///
-    /// This function returns true if and only if:
-    ///
-    /// - the [`Interactive`] option is `On` in `self.options`, and
-    /// - the current context is not in a subshell (no `Frame::Subshell` in `self.stack`).
-    #[must_use]
-    pub fn is_interactive(&self) -> bool {
-        self.options.get(Interactive) == On && !self.stack.contains(&Frame::Subshell)
-    }
-
-    /// Tests whether the shell is performing job control.
-    ///
-    /// This function returns true if and only if:
-    ///
-    /// - the [`Monitor`] option is `On` in `self.options`, and
-    /// - the current context is not in a subshell (no `Frame::Subshell` in `self.stack`).
-    #[must_use]
-    pub fn controls_jobs(&self) -> bool {
-        self.options.get(Monitor) == On && !self.stack.contains(&Frame::Subshell)
-    }
-
     /// Waits for a subshell to terminate, suspend, or resume.
     ///
     /// This function waits for a subshell to change its execution state. The
@@ -470,6 +452,30 @@ impl Env {
             self.jobs.update_status(pid, state);
         }
     }
+}
+
+impl<S> Env<S> {
+    /// Tests whether the current environment is an interactive shell.
+    ///
+    /// This function returns true if and only if:
+    ///
+    /// - the [`Interactive`] option is `On` in `self.options`, and
+    /// - the current context is not in a subshell (no `Frame::Subshell` in `self.stack`).
+    #[must_use]
+    pub fn is_interactive(&self) -> bool {
+        self.options.get(Interactive) == On && !self.stack.contains(&Frame::Subshell)
+    }
+
+    /// Tests whether the shell is performing job control.
+    ///
+    /// This function returns true if and only if:
+    ///
+    /// - the [`Monitor`] option is `On` in `self.options`, and
+    /// - the current context is not in a subshell (no `Frame::Subshell` in `self.stack`).
+    #[must_use]
+    pub fn controls_jobs(&self) -> bool {
+        self.options.get(Monitor) == On && !self.stack.contains(&Frame::Subshell)
+    }
 
     /// Get an existing variable or create a new one.
     ///
@@ -480,9 +486,9 @@ impl Env {
     ///
     /// You should prefer using this method over [`VariableSet::get_or_new`] to
     /// make sure that the [`AllExport`] option is applied.
-    pub fn get_or_create_variable<S>(&mut self, name: S, scope: Scope) -> VariableRefMut<'_>
+    pub fn get_or_create_variable<N>(&mut self, name: N, scope: Scope) -> VariableRefMut<'_>
     where
-        S: Into<String>,
+        N: Into<String>,
     {
         let mut variable = self.variables.get_or_new(name, scope);
         if self.options.get(AllExport) == On {
