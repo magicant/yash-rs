@@ -143,7 +143,7 @@ pub trait PathEnv {
     // TODO Cache the results of external utility search
 }
 
-impl PathEnv for Env {
+impl<S: System> PathEnv for Env<S> {
     /// Returns the value of the `$PATH` variable.
     ///
     /// This function assumes that the `$PATH` variable has no quirks. If the
@@ -163,7 +163,7 @@ impl PathEnv for Env {
     }
 }
 
-impl ClassifyEnv for Env {
+impl<S: System> ClassifyEnv for Env<S> {
     fn builtin(&self, name: &str) -> Option<Builtin> {
         self.builtins.get(name).copied()
     }
