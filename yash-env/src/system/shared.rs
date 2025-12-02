@@ -120,7 +120,7 @@ use std::time::Instant;
 /// (TBD code example)
 ///
 /// [`VirtualSystem`]: crate::system::virtual::VirtualSystem
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct SharedSystem<S>(pub(super) Rc<RefCell<SelectSystem<S>>>);
 
 impl<S: System> SharedSystem<S> {
@@ -292,6 +292,12 @@ impl<S: System> SharedSystem<S> {
     /// has not yet been met.
     pub fn select(&self, poll: bool) -> Result<()> {
         self.0.borrow_mut().select(poll)
+    }
+}
+
+impl<S> Clone for SharedSystem<S> {
+    fn clone(&self) -> Self {
+        SharedSystem(self.0.clone())
     }
 }
 
