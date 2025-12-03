@@ -33,7 +33,7 @@ use std::slice::from_mut;
 /// keep a copy of a `FdReader` instance to replay the input later. Since both
 /// the original and clone share the same `SharedSystem`, reading a line from
 /// one instance will affect the next read from the other.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[must_use = "FdReader does nothing unless used by a parser"]
 pub struct FdReader<S> {
     /// File descriptor to read from
@@ -76,6 +76,17 @@ impl<S> FdReader<S> {
     #[deprecated = "use Echo instead"]
     pub fn set_echo(&mut self, echo: Option<Rc<Cell<State>>>) {
         self.echo = echo;
+    }
+}
+
+// Not derived automatically because S may not implement Clone
+impl<S> Clone for FdReader<S> {
+    fn clone(&self) -> Self {
+        Self {
+            fd: self.fd.clone(),
+            system: self.system.clone(),
+            echo: self.echo.clone(),
+        }
     }
 }
 
