@@ -103,7 +103,7 @@ pub struct Env<S> {
     pub exit_status: ExitStatus,
 
     /// Functions defined in the environment
-    pub functions: FunctionSet,
+    pub functions: FunctionSet<S>,
 
     /// Jobs managed in the environment
     pub jobs: JobList,

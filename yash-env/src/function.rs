@@ -32,13 +32,13 @@ use std::rc::Rc;
 use thiserror::Error;
 
 /// Trait for the body of a [`Function`]
-pub trait FunctionBody: Debug + Display {
+pub trait FunctionBody<S>: Debug + Display {
     /// Executes the function body in the given environment.
     ///
     /// The implementation of this method is expected to update
     /// `env.exit_status` reflecting the result of the function execution.
     #[allow(async_fn_in_trait)] // We don't support Send
-    async fn execute(&self, env: &mut Env) -> crate::semantics::Result;
+    async fn execute(&self, env: &mut Env<S>) -> crate::semantics::Result;
 }
 
 /// Dyn-compatible adapter for the [`FunctionBody`] trait
@@ -47,29 +47,29 @@ pub trait FunctionBody: Debug + Display {
 ///
 /// This trait is automatically implemented for all types that implement
 /// [`FunctionBody`].
-pub trait FunctionBodyObject: Debug + Display {
+pub trait FunctionBodyObject<S>: Debug + Display {
     /// Executes the function body in the given environment.
     ///
     /// The implementation of this method is expected to update
     /// `env.exit_status` reflecting the result of the function execution.
     fn execute<'a>(
         &'a self,
-        env: &'a mut Env,
+        env: &'a mut Env<S>,
     ) -> Pin<Box<dyn Future<Output = crate::semantics::Result> + 'a>>;
 }
 
-impl<T: FunctionBody + ?Sized> FunctionBodyObject for T {
+impl<S, T: FunctionBody<S> + ?Sized> FunctionBodyObject<S> for T {
     fn execute<'a>(
         &'a self,
-        env: &'a mut Env,
+        env: &'a mut Env<S>,
     ) -> Pin<Box<dyn Future<Output = crate::semantics::Result> + 'a>> {
         Box::pin(self.execute(env))
     }
 }
 
 /// Definition of a function.
-#[derive(Clone, Debug)]
-pub struct Function {
+#[derive(Debug)]
+pub struct Function<S> {
     /// String that identifies the function.
     pub name: String,
 
@@ -79,7 +79,7 @@ pub struct Function {
     /// command when we define a function. The function definition command only
     /// clones the `Rc` object from the abstract syntax tree to create a
     /// `Function` object.
-    pub body: Rc<dyn FunctionBodyObject>,
+    pub body: Rc<dyn FunctionBodyObject<S>>,
 
     /// Location of the function definition command that defined this function.
     pub origin: Location,
@@ -92,14 +92,14 @@ pub struct Function {
     pub read_only_location: Option<Location>,
 }
 
-impl Function {
+impl<S> Function<S> {
     /// Creates a new function.
     ///
     /// This is a convenience function for constructing a `Function` object.
     /// The `read_only_location` is set to `None`.
     #[inline]
     #[must_use]
-    pub fn new<N: Into<String>, B: Into<Rc<dyn FunctionBodyObject>>>(
+    pub fn new<N: Into<String>, B: Into<Rc<dyn FunctionBodyObject<S>>>>(
         name: N,
         body: B,
         origin: Location,
@@ -130,11 +130,23 @@ impl Function {
     }
 }
 
+// Not derived automatically because S may not implement Clone
+impl<S> Clone for Function<S> {
+    fn clone(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            body: self.body.clone(),
+            origin: self.origin.clone(),
+            read_only_location: self.read_only_location.clone(),
+        }
+    }
+}
+
 /// Compares two functions for equality.
 ///
 /// Two functions are considered equal if all their members are equal.
 /// This includes comparing the `body` members by pointer equality.
-impl PartialEq for Function {
+impl<S> PartialEq for Function<S> {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
             && Rc::ptr_eq(&self.body, &other.body)
@@ -143,7 +155,7 @@ impl PartialEq for Function {
     }
 }
 
-impl Eq for Function {}
+impl<S> Eq for Function<S> {}
 
 /// Wrapper of [`Function`] for inserting into a hash set.
 ///
@@ -155,20 +167,30 @@ impl Eq for Function {}
 ///
 /// The `Hash` and `PartialEq` implementation for `HashEntry` only compares
 /// the names of the functions.
-#[derive(Clone, Debug, Eq)]
-struct HashEntry(Rc<Function>);
+#[derive(Debug)]
+struct HashEntry<S>(Rc<Function<S>>);
 
-impl PartialEq for HashEntry {
+// Not derived automatically because S may not implement Clone
+impl<S> Clone for HashEntry<S> {
+    fn clone(&self) -> Self {
+        HashEntry(Rc::clone(&self.0))
+    }
+}
+
+impl<S> PartialEq for HashEntry<S> {
     /// Compares the names of two hash entries.
     ///
     /// Members of [`Function`] other than `name` are not considered in this
     /// function.
-    fn eq(&self, other: &HashEntry) -> bool {
+    fn eq(&self, other: &HashEntry<S>) -> bool {
         self.0.name == other.0.name
     }
 }
 
-impl Hash for HashEntry {
+// Not derived automatically because S may not implement Eq
+impl<S> Eq for HashEntry<S> {}
+
+impl<S> Hash for HashEntry<S> {
     /// Hashes the name of the function.
     ///
     /// Members of [`Function`] other than `name` are not considered in this
@@ -178,47 +200,91 @@ impl Hash for HashEntry {
     }
 }
 
-impl Borrow<str> for HashEntry {
+impl<S> Borrow<str> for HashEntry<S> {
     fn borrow(&self) -> &str {
         &self.0.name
     }
 }
 
 /// Collection of functions.
-#[derive(Clone, Debug, Default)]
-pub struct FunctionSet {
-    entries: HashSet<HashEntry>,
+#[derive(Debug)]
+pub struct FunctionSet<S> {
+    entries: HashSet<HashEntry<S>>,
+}
+
+// Not derived automatically because S may not implement Clone
+impl<S> Clone for FunctionSet<S> {
+    fn clone(&self) -> Self {
+        let entries = self.entries.clone();
+        Self { entries }
+    }
+}
+
+// Not derived automatically because S may not implement Default
+impl<S> Default for FunctionSet<S> {
+    fn default() -> Self {
+        let entries = HashSet::default();
+        Self { entries }
+    }
 }
 
 /// Error redefining a read-only function.
-#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[derive(Debug, Eq, Error, PartialEq)]
 #[error("cannot redefine read-only function `{}`", .existing.name)]
 #[non_exhaustive]
-pub struct DefineError {
+pub struct DefineError<S> {
     /// Existing read-only function
-    pub existing: Rc<Function>,
+    pub existing: Rc<Function<S>>,
     /// New function that tried to redefine the existing function
-    pub new: Rc<Function>,
+    pub new: Rc<Function<S>>,
+}
+
+// Not derived automatically because S may not implement Clone
+impl<S> Clone for DefineError<S> {
+    fn clone(&self) -> Self {
+        Self {
+            existing: self.existing.clone(),
+            new: self.new.clone(),
+        }
+    }
 }
 
 /// Error unsetting a read-only function.
-#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[derive(Debug, Eq, Error, PartialEq)]
 #[error("cannot unset read-only function `{}`", .existing.name)]
 #[non_exhaustive]
-pub struct UnsetError {
+pub struct UnsetError<S> {
     /// Existing read-only function
-    pub existing: Rc<Function>,
+    pub existing: Rc<Function<S>>,
+}
+
+// Not derived automatically because S may not implement Clone
+impl<S> Clone for UnsetError<S> {
+    fn clone(&self) -> Self {
+        Self {
+            existing: self.existing.clone(),
+        }
+    }
 }
 
 /// Unordered iterator over functions in a function set.
 ///
 /// This iterator is created by [`FunctionSet::iter`].
-#[derive(Clone, Debug)]
-pub struct Iter<'a> {
-    inner: std::collections::hash_set::Iter<'a, HashEntry>,
+#[derive(Debug)]
+pub struct Iter<'a, S> {
+    inner: std::collections::hash_set::Iter<'a, HashEntry<S>>,
 }
 
-impl FunctionSet {
+// Not derived automatically because S may not implement Clone
+impl<S> Clone for Iter<'_, S> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<S> FunctionSet<S> {
     /// Creates a new empty function set.
     #[must_use]
     pub fn new() -> Self {
@@ -227,7 +293,7 @@ impl FunctionSet {
 
     /// Returns the function with the given name.
     #[must_use]
-    pub fn get(&self, name: &str) -> Option<&Rc<Function>> {
+    pub fn get(&self, name: &str) -> Option<&Rc<Function<S>>> {
         self.entries.get(name).map(|entry| &entry.0)
     }
 
@@ -250,15 +316,15 @@ impl FunctionSet {
     /// If a function with the same name already exists, it is replaced and
     /// returned unless it is read-only, in which case `DefineError` is
     /// returned.
-    pub fn define<F: Into<Rc<Function>>>(
+    pub fn define<F: Into<Rc<Function<S>>>>(
         &mut self,
         function: F,
-    ) -> Result<Option<Rc<Function>>, DefineError> {
+    ) -> Result<Option<Rc<Function<S>>>, DefineError<S>> {
         #[allow(clippy::mutable_key_type)]
-        fn inner(
-            entries: &mut HashSet<HashEntry>,
-            new: Rc<Function>,
-        ) -> Result<Option<Rc<Function>>, DefineError> {
+        fn inner<S>(
+            entries: &mut HashSet<HashEntry<S>>,
+            new: Rc<Function<S>>,
+        ) -> Result<Option<Rc<Function<S>>>, DefineError<S>> {
             match entries.get(new.name.as_str()) {
                 Some(existing) if existing.0.is_read_only() => Err(DefineError {
                     existing: Rc::clone(&existing.0),
@@ -275,7 +341,7 @@ impl FunctionSet {
     ///
     /// This function returns the previously defined function if it exists.
     /// However, if the function is read-only, `UnsetError` is returned.
-    pub fn unset(&mut self, name: &str) -> Result<Option<Rc<Function>>, UnsetError> {
+    pub fn unset(&mut self, name: &str) -> Result<Option<Rc<Function<S>>>, UnsetError<S>> {
         match self.entries.get(name) {
             Some(entry) if entry.0.is_read_only() => Err(UnsetError {
                 existing: Rc::clone(&entry.0),
@@ -288,33 +354,32 @@ impl FunctionSet {
     /// Returns an iterator over functions in the set.
     ///
     /// The order of iteration is not specified.
-    pub fn iter(&self) -> Iter<'_> {
+    pub fn iter(&self) -> Iter<'_, S> {
         let inner = self.entries.iter();
         Iter { inner }
     }
 }
 
-impl<'a> Iterator for Iter<'a> {
-    type Item = &'a Rc<Function>;
+impl<'a, S> Iterator for Iter<'a, S> {
+    type Item = &'a Rc<Function<S>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().map(|entry| &entry.0)
     }
 }
 
-impl ExactSizeIterator for Iter<'_> {
+impl<S> ExactSizeIterator for Iter<'_, S> {
     #[inline]
     fn len(&self) -> usize {
         self.inner.len()
     }
 }
 
-impl FusedIterator for Iter<'_> {}
+impl<S> FusedIterator for Iter<'_, S> {}
 
-impl<'a> IntoIterator for &'a FunctionSet {
-    type Item = &'a Rc<Function>;
-    type IntoIter = Iter<'a>;
-
+impl<'a, S> IntoIterator for &'a FunctionSet<S> {
+    type Item = &'a Rc<Function<S>>;
+    type IntoIter = Iter<'a, S>;
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
