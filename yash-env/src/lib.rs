@@ -97,7 +97,7 @@ pub struct Env<S> {
     pub arg0: String,
 
     /// Built-in utilities available in the environment
-    pub builtins: HashMap<&'static str, Builtin>,
+    pub builtins: HashMap<&'static str, Builtin<S>>,
 
     /// Exit status of the last executed command
     pub exit_status: ExitStatus,
