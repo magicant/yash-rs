@@ -36,10 +36,10 @@ use std::pin::Pin;
 use std::rc::Rc;
 use thiserror::Error;
 
-type EnvPrepHook = fn(&mut Env) -> Pin<Box<dyn Future<Output = ()>>>;
-
 type PinFuture<'a, T = ()> = Pin<Box<dyn Future<Output = T> + 'a>>;
 type FutureResult<'a, T = ()> = PinFuture<'a, Result<T>>;
+
+type EnvPrepHook<S> = fn(&mut Env<S>) -> PinFuture<'_, ()>;
 
 /// Wrapper for a function that runs a shell function
 ///
@@ -77,10 +77,24 @@ type FutureResult<'a, T = ()> = PinFuture<'a, Result<T>>;
 ///     })
 /// })));
 /// ```
-#[derive(Clone, Copy, Debug)]
-pub struct RunFunction(
-    pub for<'a> fn(&'a mut Env, Rc<Function>, Vec<Field>, Option<EnvPrepHook>) -> FutureResult<'a>,
+#[derive(Debug)]
+pub struct RunFunction<S>(
+    pub  for<'a> fn(
+        &'a mut Env<S>,
+        Rc<Function<S>>,
+        Vec<Field>,
+        Option<EnvPrepHook<S>>,
+    ) -> FutureResult<'a>,
 );
+
+// Not derived automatically because S may not implement Clone or Copy.
+impl<S> Clone for RunFunction<S> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<S> Copy for RunFunction<S> {}
 
 /// Error returned when [replacing the current process](replace_current_process) fails
 #[derive(Clone, Debug, Error)]
@@ -111,8 +125,8 @@ pub struct ReplaceCurrentProcessError {
 ///
 /// This function is for implementing the simple command execution semantics and
 /// the `exec` built-in utility.
-pub async fn replace_current_process(
-    env: &mut Env,
+pub async fn replace_current_process<S: System>(
+    env: &mut Env<S>,
     path: CString,
     args: Vec<Field>,
 ) -> std::result::Result<Infallible, ReplaceCurrentProcessError> {
@@ -214,13 +228,13 @@ impl<'a> From<&'a StartSubshellError> for Report<'a> {
 /// This function is for implementing the simple command execution semantics and
 /// the `command` built-in utility. This function internally uses
 /// [`replace_current_process`] to execute the utility in the subshell.
-pub async fn run_external_utility_in_subshell(
-    env: &mut Env,
+pub async fn run_external_utility_in_subshell<S: System>(
+    env: &mut Env<S>,
     path: CString,
     args: Vec<Field>,
-    handle_start_subshell_error: fn(&mut Env, StartSubshellError) -> PinFuture<'_>,
+    handle_start_subshell_error: fn(&mut Env<S>, StartSubshellError) -> PinFuture<'_>,
     handle_replace_current_process_error: fn(
-        &mut Env,
+        &mut Env<S>,
         ReplaceCurrentProcessError,
         Location,
     ) -> PinFuture<'_>,
