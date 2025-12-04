@@ -33,6 +33,8 @@ use crate::Env;
 use crate::input::Context;
 use std::pin::Pin;
 
+type PinFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
+
 /// Wrapper around the function that retrieves a prompt string
 ///
 /// The wrapped function is expected to be injected into the environment (via
@@ -58,8 +60,14 @@ use std::pin::Pin;
 ///     })
 /// })));
 /// ```
-#[derive(Clone, Copy, Debug)]
-pub struct GetPrompt(
-    #[allow(clippy::type_complexity)]
-    pub  for<'a> fn(&'a mut Env, &'a Context) -> Pin<Box<dyn Future<Output = String> + 'a>>,
-);
+#[derive(Debug)]
+pub struct GetPrompt<S>(pub for<'a> fn(&'a mut Env<S>, &'a Context) -> PinFuture<'a, String>);
+
+// Not derived automatically because S may not implement Clone or Copy.
+impl<S> Clone for GetPrompt<S> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<S> Copy for GetPrompt<S> {}

@@ -307,10 +307,19 @@ type PinFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 ///     })
 /// })));
 /// ```
-#[derive(Clone, Copy, Debug)]
-pub struct RunReadEvalLoop(
-    pub for<'a> fn(&'a RefCell<&mut Env>, crate::parser::Config<'a>) -> PinFuture<'a, Result>,
+#[derive(Debug)]
+pub struct RunReadEvalLoop<S>(
+    pub for<'a> fn(&'a RefCell<&mut Env<S>>, crate::parser::Config<'a>) -> PinFuture<'a, Result>,
 );
+
+// Not derived automatically because S may not implement Clone or Copy.
+impl<S> Clone for RunReadEvalLoop<S> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<S> Copy for RunReadEvalLoop<S> {}
 
 pub mod command;
 pub mod expansion;
