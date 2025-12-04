@@ -20,7 +20,7 @@ use super::{Context, Input, Result};
 use crate::Env;
 use crate::io::Fd;
 use crate::option::{IgnoreEof as IgnoreEofOption, Interactive, Off};
-use crate::system::System as _;
+use crate::system::System;
 use std::cell::RefCell;
 
 /// `Input` decorator that ignores EOF on a terminal
@@ -41,19 +41,19 @@ use std::cell::RefCell;
 /// is obtained, an error occurs, or this process is repeated 20 times.
 ///
 /// [`Interactive`]: crate::option::Interactive
-#[derive(Clone, Debug)]
-pub struct IgnoreEof<'a, 'b, T> {
+#[derive(Debug)]
+pub struct IgnoreEof<'a, 'b, S, T> {
     /// Inner input to read from
     inner: T,
     /// File descriptor to be checked if it is a terminal
     fd: Fd,
     /// Environment to check the shell options and interact with the system
-    env: &'a RefCell<&'b mut Env>,
+    env: &'a RefCell<&'b mut Env<S>>,
     /// Text to be displayed when EOF is ignored
     message: String,
 }
 
-impl<'a, 'b, T> IgnoreEof<'a, 'b, T> {
+impl<'a, 'b, S, T> IgnoreEof<'a, 'b, S, T> {
     /// Creates a new `IgnoreEof` decorator.
     ///
     /// The first argument is the inner `Input` that performs the actual input
@@ -68,7 +68,7 @@ impl<'a, 'b, T> IgnoreEof<'a, 'b, T> {
     /// input reads from. If the inner input reads from a different file
     /// descriptor, the `IgnoreEof` decorator may not detect the terminal
     /// correctly.
-    pub fn new(inner: T, fd: Fd, env: &'a RefCell<&'b mut Env>, message: String) -> Self {
+    pub fn new(inner: T, fd: Fd, env: &'a RefCell<&'b mut Env<S>>, message: String) -> Self {
         Self {
             inner,
             fd,
@@ -78,10 +78,19 @@ impl<'a, 'b, T> IgnoreEof<'a, 'b, T> {
     }
 }
 
-impl<T> Input for IgnoreEof<'_, '_, T>
-where
-    T: Input,
-{
+// Not derived automatically because S may not implement Clone.
+impl<S, T: Clone> Clone for IgnoreEof<'_, '_, S, T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            fd: self.fd,
+            env: self.env,
+            message: self.message.clone(),
+        }
+    }
+}
+
+impl<S: System, T: Input> Input for IgnoreEof<'_, '_, S, T> {
     #[allow(clippy::await_holding_refcell_ref)]
     async fn next_line(&mut self, context: &Context) -> Result {
         let mut remaining_tries = 50;
