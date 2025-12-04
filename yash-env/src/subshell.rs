@@ -36,6 +36,7 @@ use crate::system::Errno;
 use crate::system::SigmaskOp;
 use crate::system::System;
 use crate::system::SystemEx as _;
+use std::marker::PhantomData;
 use std::pin::Pin;
 
 /// Job state of a newly created subshell
@@ -51,21 +52,23 @@ pub enum JobControl {
 ///
 /// See the [module documentation](self) for details.
 #[must_use = "a subshell is not started unless you call `Subshell::start`"]
-pub struct Subshell<F> {
+pub struct Subshell<S, F> {
     task: F,
     job_control: Option<JobControl>,
     ignores_sigint_sigquit: bool,
+    phantom_data: PhantomData<fn(&mut Env<S>)>,
 }
 
-impl<F> std::fmt::Debug for Subshell<F> {
+impl<S, F> std::fmt::Debug for Subshell<S, F> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Subshell").finish_non_exhaustive()
     }
 }
 
-impl<F> Subshell<F>
+impl<S, F> Subshell<S, F>
 where
-    F: for<'a> FnOnce(&'a mut Env, Option<JobControl>) -> Pin<Box<dyn Future<Output = ()> + 'a>>
+    S: System,
+    F: for<'a> FnOnce(&'a mut Env<S>, Option<JobControl>) -> Pin<Box<dyn Future<Output = ()> + 'a>>
         + 'static,
     // TODO Revisit to simplify this function type when impl Future is allowed in return type
 {
@@ -87,6 +90,7 @@ where
             task,
             job_control: None,
             ignores_sigint_sigquit: false,
+            phantom_data: PhantomData,
         }
     }
 
@@ -146,7 +150,7 @@ where
     /// If the subshell started successfully, the return value is a pair of the
     /// child process ID and the actual job control. Otherwise, it indicates the
     /// error.
-    pub async fn start(self, env: &mut Env) -> Result<(Pid, Option<JobControl>), Errno> {
+    pub async fn start(self, env: &mut Env<S>) -> Result<(Pid, Option<JobControl>), Errno> {
         // Do some preparation before starting a child process
         let job_control = env.controls_jobs().then_some(self.job_control).flatten();
         let tty = match job_control {
@@ -233,7 +237,7 @@ where
     ///
     /// When a job-controlled subshell suspends, this function does not add it
     /// to `env.jobs`. You have to do it for yourself if necessary.
-    pub async fn start_and_wait(self, env: &mut Env) -> Result<(Pid, ProcessResult), Errno> {
+    pub async fn start_and_wait(self, env: &mut Env<S>) -> Result<(Pid, ProcessResult), Errno> {
         let (pid, job_control) = self.start(env).await?;
         let result = loop {
             let result = env.wait_for_subshell_to_halt(pid).await?.1;
