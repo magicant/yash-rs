@@ -284,7 +284,7 @@ impl FdSpec {
 
 const MODE: Mode = Mode::ALL_READ.union(Mode::ALL_WRITE);
 
-fn is_cloexec(env: &Env, fd: Fd) -> bool {
+fn is_cloexec<S: System>(env: &Env<S>, fd: Fd) -> bool {
     matches!(env.system.fcntl_getfd(fd), Ok(flags) if flags.contains(FdFlag::CloseOnExec))
 }
 
@@ -299,8 +299,8 @@ fn into_c_string_value_and_origin(field: Field) -> Result<(CString, Location), E
 }
 
 /// Opens a file for redirection.
-fn open_file(
-    env: &mut Env,
+fn open_file<S: System>(
+    env: &mut Env<S>,
     access: OfdAccess,
     flags: EnumSet<OpenFlag>,
     path: Field,
@@ -317,7 +317,10 @@ fn open_file(
 }
 
 /// Opens a file for writing with the `noclobber` option.
-fn open_file_noclobber(env: &mut Env, path: Field) -> Result<(FdSpec, Location), Error> {
+fn open_file_noclobber<S: System>(
+    env: &mut Env<S>,
+    path: Field,
+) -> Result<(FdSpec, Location), Error> {
     let system = &mut env.system;
     let (path, origin) = into_c_string_value_and_origin(path)?;
 
@@ -373,8 +376,8 @@ fn open_file_noclobber(env: &mut Env, path: Field) -> Result<(FdSpec, Location),
 }
 
 /// Parses the target of `<&` and `>&`.
-fn copy_fd(
-    env: &mut Env,
+fn copy_fd<S: System>(
+    env: &mut Env<S>,
     target: Field,
     expected_access: OfdAccess,
 ) -> Result<(FdSpec, Location), Error> {
@@ -428,8 +431,8 @@ fn copy_fd(
 }
 
 /// Opens the file for a normal redirection.
-async fn open_normal(
-    env: &mut Env,
+async fn open_normal<S: System>(
+    env: &mut Env<S>,
     operator: RedirOp,
     operand: Field,
 ) -> Result<(FdSpec, Location), Error> {
@@ -490,8 +493,8 @@ mod here_doc;
 
 /// Performs a redirection.
 #[allow(clippy::await_holding_refcell_ref)]
-async fn perform(
-    env: &mut Env,
+async fn perform<S: System>(
+    env: &mut Env<S>,
     redir: &Redir,
     xtrace: Option<&mut XTrace>,
 ) -> Result<(SavedFd, Option<ExitStatus>), Error> {
@@ -582,35 +585,35 @@ async fn perform(
 /// called. That means you need to call `preserve_redirs` explicitly to preserve
 /// the redirections' effect.
 #[derive(Debug)]
-pub struct RedirGuard<'e> {
+pub struct RedirGuard<'e, S: System> {
     /// Environment in which redirections are performed.
-    env: &'e mut yash_env::Env,
+    env: &'e mut yash_env::Env<S>,
     /// Records of file descriptors that have been modified by redirections.
     saved_fds: Vec<SavedFd>,
 }
 
-impl Deref for RedirGuard<'_> {
-    type Target = yash_env::Env;
-    fn deref(&self) -> &yash_env::Env {
+impl<S: System> Deref for RedirGuard<'_, S> {
+    type Target = yash_env::Env<S>;
+    fn deref(&self) -> &yash_env::Env<S> {
         self.env
     }
 }
 
-impl DerefMut for RedirGuard<'_> {
-    fn deref_mut(&mut self) -> &mut yash_env::Env {
+impl<S: System> DerefMut for RedirGuard<'_, S> {
+    fn deref_mut(&mut self) -> &mut yash_env::Env<S> {
         self.env
     }
 }
 
-impl std::ops::Drop for RedirGuard<'_> {
+impl<S: System> std::ops::Drop for RedirGuard<'_, S> {
     fn drop(&mut self) {
         self.undo_redirs()
     }
 }
 
-impl<'e> RedirGuard<'e> {
+impl<'e, S: System> RedirGuard<'e, S> {
     /// Creates a new `RedirGuard`.
-    pub fn new(env: &'e mut yash_env::Env) -> Self {
+    pub fn new(env: &'e mut yash_env::Env<S>) -> Self {
         let saved_fds = Vec::new();
         RedirGuard { env, saved_fds }
     }

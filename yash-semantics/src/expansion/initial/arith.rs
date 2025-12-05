@@ -201,13 +201,13 @@ fn convert_error_cause(
     }
 }
 
-struct VarEnv<'a> {
-    env: &'a mut yash_env::Env,
+struct VarEnv<'a, S> {
+    env: &'a mut yash_env::Env<S>,
     expression: &'a str,
     expansion_location: &'a Location,
 }
 
-impl yash_arith::Env for VarEnv<'_> {
+impl<S> yash_arith::Env for VarEnv<'_, S> {
     type GetVariableError = UnsetVariable;
     type AssignVariableError = AssignReadOnlyError;
 
@@ -252,7 +252,11 @@ impl yash_arith::Env for VarEnv<'_> {
     }
 }
 
-pub async fn expand(text: &Text, location: &Location, env: &mut Env<'_>) -> Result<Phrase, Error> {
+pub async fn expand<S>(
+    text: &Text,
+    location: &Location,
+    env: &mut Env<'_, S>,
+) -> Result<Phrase, Error> {
     let (expression, exit_status) = expand_text(env.inner, text).await?;
     if exit_status.is_some() {
         env.last_command_subst_exit_status = exit_status;

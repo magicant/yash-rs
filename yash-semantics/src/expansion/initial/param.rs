@@ -59,9 +59,9 @@ pub use switch::NonassignableError;
 pub use switch::Vacancy;
 pub use switch::VacantError;
 
-impl Expand for ParamRef<'_> {
+impl<S> Expand<S> for ParamRef<'_> {
     /// Performs parameter expansion.
-    async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
+    async fn expand(&self, env: &mut Env<'_, S>) -> Result<Phrase, Error> {
         // TODO Expand and parse Index
 
         // Lookup //

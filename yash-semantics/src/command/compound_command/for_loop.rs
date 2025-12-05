@@ -34,14 +34,15 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
+use yash_env::system::System;
 use yash_env::variable::Scope;
 use yash_quote::quoted;
 use yash_syntax::syntax::List;
 use yash_syntax::syntax::Word;
 
 /// Executes the for loop.
-pub async fn execute(
-    env: &mut Env,
+pub async fn execute<S: System>(
+    env: &mut Env<S>,
     name: &Word,
     values: &Option<Vec<Word>>,
     body: &List,
@@ -106,7 +107,7 @@ pub async fn execute(
     Continue(())
 }
 
-async fn trace_values(env: &mut Env, name: &Field, values: &[Field]) {
+async fn trace_values<S: System>(env: &mut Env<S>, name: &Field, values: &[Field]) {
     if let Some(mut xtrace) = XTrace::from_options(&env.options) {
         write!(xtrace.words(), "for {} in ", quoted(&name.value)).unwrap();
         trace_fields(Some(&mut xtrace), values);

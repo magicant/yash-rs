@@ -75,8 +75,8 @@ use yash_syntax::syntax;
 ///
 /// if `self.negation` is true, [`Frame::Condition`] is pushed to the
 /// environment's stack while the pipeline is executed.
-impl Command for syntax::Pipeline {
-    async fn execute(&self, env: &mut Env) -> Result {
+impl<S: System> Command<S> for syntax::Pipeline {
+    async fn execute(&self, env: &mut Env<S>) -> Result {
         if env.options.get(Exec) == Off && env.options.get(Interactive) == Off {
             return Continue(());
         }
@@ -96,7 +96,10 @@ impl Command for syntax::Pipeline {
     }
 }
 
-async fn execute_commands_in_pipeline(env: &mut Env, commands: &[Rc<syntax::Command>]) -> Result {
+async fn execute_commands_in_pipeline<S: System>(
+    env: &mut Env<S>,
+    commands: &[Rc<syntax::Command>],
+) -> Result {
     match commands.len() {
         0 => {
             env.exit_status = ExitStatus::SUCCESS;
@@ -116,8 +119,8 @@ async fn execute_commands_in_pipeline(env: &mut Env, commands: &[Rc<syntax::Comm
     }
 }
 
-async fn execute_job_controlled_pipeline(
-    env: &mut Env,
+async fn execute_job_controlled_pipeline<S: System>(
+    env: &mut Env<S>,
     commands: &[Rc<syntax::Command>],
 ) -> Result {
     let commands_2 = commands.to_vec();
@@ -151,7 +154,10 @@ fn to_job_name(commands: &[Rc<syntax::Command>]) -> String {
         .to_string()
 }
 
-async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Command>]) -> Result {
+async fn execute_multi_command_pipeline<S: System>(
+    env: &mut Env<S>,
+    commands: &[Rc<syntax::Command>],
+) -> Result {
     // Start commands
     let mut commands = commands.iter().cloned();
     let mut pipes = PipeSet::new();
@@ -192,7 +198,7 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
     Continue(())
 }
 
-async fn shift_or_fail(env: &mut Env, pipes: &mut PipeSet, has_next: bool) -> Result {
+async fn shift_or_fail<S: System>(env: &mut Env<S>, pipes: &mut PipeSet, has_next: bool) -> Result {
     match pipes.shift(env, has_next) {
         Ok(()) => Continue(()),
         Err(errno) => {
@@ -204,8 +210,8 @@ async fn shift_or_fail(env: &mut Env, pipes: &mut PipeSet, has_next: bool) -> Re
     }
 }
 
-async fn connect_pipe_and_execute_command(
-    env: &mut Env,
+async fn connect_pipe_and_execute_command<S: System>(
+    env: &mut Env<S>,
     pipes: PipeSet,
     command: Rc<syntax::Command>,
 ) -> Result {
@@ -222,8 +228,8 @@ async fn connect_pipe_and_execute_command(
     command.execute(env).await
 }
 
-async fn pid_or_fail(
-    env: &mut Env,
+async fn pid_or_fail<S: System>(
+    env: &mut Env<S>,
     start_result: std::result::Result<(Pid, Option<JobControl>), Errno>,
 ) -> Result<Pid> {
     match start_result {
@@ -260,7 +266,11 @@ impl PipeSet {
     ///
     /// Closes FDs that are no longer necessary and opens a new pipe if there is
     /// a next command.
-    fn shift(&mut self, env: &mut Env, has_next: bool) -> std::result::Result<(), Errno> {
+    fn shift<S: System>(
+        &mut self,
+        env: &mut Env<S>,
+        has_next: bool,
+    ) -> std::result::Result<(), Errno> {
         if let Some(fd) = self.read_previous {
             let _ = env.system.close(fd);
         }
@@ -282,7 +292,10 @@ impl PipeSet {
 
     /// Moves the pipe FDs to stdin/stdout and closes the FDs that are no longer
     /// necessary.
-    fn move_to_stdin_stdout(mut self, env: &mut Env) -> std::result::Result<(), Errno> {
+    fn move_to_stdin_stdout<S: System>(
+        mut self,
+        env: &mut Env<S>,
+    ) -> std::result::Result<(), Errno> {
         if let Some((reader, writer)) = self.next {
             assert_ne!(reader, writer);
             assert_ne!(self.read_previous, Some(reader));

@@ -33,6 +33,7 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
+use yash_env::system::System;
 #[cfg(doc)]
 use yash_env::variable::Context;
 use yash_env::variable::Scope;
@@ -100,9 +101,9 @@ use yash_syntax::syntax::Word;
 ///
 /// If the target is an external utility, a subshell is created.  Redirections
 /// and assignments, if any, are performed in the subshell. The assigned
-/// variables are exported. The subshell calls the
-/// [`execve`](yash_env::System::execve) function to invoke the external utility
-/// with all the fields passed as arguments.
+/// variables are exported. The subshell calls the [`execve`](System::execve)
+/// function to invoke the external utility with all the fields passed as
+/// arguments.
 ///
 /// If `execve` fails with an `ENOEXEC` error, it is re-called with the current
 /// executable file so that the restarted shell executes the external utility as
@@ -160,8 +161,8 @@ use yash_syntax::syntax::Word;
 ///
 /// POSIX leaves many aspects of the simple command execution unspecified. The
 /// detail semantics may differ in other shell implementations.
-impl Command for syntax::SimpleCommand {
-    async fn execute(&self, env: &mut Env) -> Result {
+impl<S: System> Command<S> for syntax::SimpleCommand {
+    async fn execute(&self, env: &mut Env<S>) -> Result {
         let (fields, exit_status) = match expand_words(env, &self.words).await {
             Ok(result) => result,
             Err(error) => return error.handle(env).await,
@@ -189,8 +190,8 @@ impl Command for syntax::SimpleCommand {
     }
 }
 
-async fn expand_words(
-    env: &mut Env,
+async fn expand_words<S: System>(
+    env: &mut Env<S>,
     words: &[(Word, ExpansionMode)],
 ) -> crate::expansion::Result<(Vec<Field>, Option<ExitStatus>)> {
     let mut fields = Vec::new();
@@ -204,8 +205,8 @@ async fn expand_words(
     Ok((fields, last_exit_status))
 }
 
-async fn perform_assignments(
-    env: &mut Env,
+async fn perform_assignments<S: System>(
+    env: &mut Env<S>,
     assigns: &[Assign],
     export: bool,
     xtrace: Option<&mut XTrace>,

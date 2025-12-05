@@ -39,8 +39,8 @@ pub use yash_syntax::syntax::Assign;
 ///
 /// If `xtrace` is `Some` instance of `XTrace`, the expanded assignment word is
 /// written to its assignments buffer.
-pub async fn perform_assignment(
-    env: &mut Env,
+pub async fn perform_assignment<S>(
+    env: &mut Env<S>,
     assign: &Assign,
     scope: Scope,
     export: bool,
@@ -85,8 +85,8 @@ pub async fn perform_assignment(
 ///
 /// If `xtrace` is `Some` instance of `XTrace`, the expanded assignment words
 /// are written to its assignments buffer.
-pub async fn perform_assignments(
-    env: &mut Env,
+pub async fn perform_assignments<S>(
+    env: &mut Env<S>,
     assigns: &[Assign],
     scope: Scope,
     export: bool,

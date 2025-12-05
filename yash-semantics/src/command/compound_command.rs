@@ -28,12 +28,13 @@ use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 #[cfg(doc)]
 use yash_env::subshell::Subshell;
+use yash_env::system::System;
 use yash_syntax::syntax;
 use yash_syntax::syntax::Redir;
 
 /// Performs redirections, printing their trace if required.
-async fn perform_redirs(
-    env: &mut RedirGuard<'_>,
+async fn perform_redirs<S: System>(
+    env: &mut RedirGuard<'_, S>,
     redirs: &[Redir],
 ) -> std::result::Result<Option<ExitStatus>, crate::redir::Error> {
     let mut xtrace = XTrace::from_options(&env.options);
@@ -44,7 +45,7 @@ async fn perform_redirs(
 }
 
 /// Executes the condition of an if/while/until command.
-async fn evaluate_condition(env: &mut Env, condition: &syntax::List) -> Result<bool> {
+async fn evaluate_condition<S: System>(env: &mut Env<S>, condition: &syntax::List) -> Result<bool> {
     let mut env = env.push_frame(Frame::Condition);
     condition.execute(&mut env).await?;
     Continue(env.exit_status.is_successful())
@@ -61,8 +62,8 @@ mod while_loop;
 /// The redirections are performed, if any, before executing the command body.
 /// Redirection errors are subject to the `ErrExit` option
 /// (`Env::apply_errexit`).
-impl Command for syntax::FullCompoundCommand {
-    async fn execute(&self, env: &mut Env) -> Result {
+impl<S: System> Command<S> for syntax::FullCompoundCommand {
+    async fn execute(&self, env: &mut Env<S>) -> Result {
         let mut env = RedirGuard::new(env);
         match perform_redirs(&mut env, &self.redirs).await {
             Ok(_) => self.command.execute(&mut env).await,
@@ -127,8 +128,8 @@ impl Command for syntax::FullCompoundCommand {
 ///
 /// After executing the body of the matching item, the case command may process
 /// the next item depending on the continuation.
-impl Command for syntax::CompoundCommand {
-    async fn execute(&self, env: &mut Env) -> Result {
+impl<S: System> Command<S> for syntax::CompoundCommand {
+    async fn execute(&self, env: &mut Env<S>) -> Result {
         use syntax::CompoundCommand::*;
         match self {
             Grouping(list) => list.execute(env).await,

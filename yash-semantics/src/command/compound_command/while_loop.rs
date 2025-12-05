@@ -22,18 +22,19 @@ use yash_env::Env;
 use yash_env::semantics::Divert;
 use yash_env::semantics::{ExitStatus, Result};
 use yash_env::stack::Frame;
+use yash_env::system::System;
 use yash_syntax::syntax::List;
 
 /// Execution context for loops
-struct Loop<'a> {
-    env: &'a mut Env,
+struct Loop<'a, S> {
+    env: &'a mut Env<S>,
     condition_command: &'a List,
     expected_condition: bool,
     body: &'a List,
     exit_status: ExitStatus,
 }
 
-impl Loop<'_> {
+impl<S: System> Loop<'_, S> {
     async fn iterate(&mut self) -> Result {
         while super::evaluate_condition(self.env, self.condition_command).await?
             == self.expected_condition
@@ -62,8 +63,8 @@ impl Loop<'_> {
     }
 }
 
-async fn execute_common(
-    env: &mut Env,
+async fn execute_common<S: System>(
+    env: &mut Env<S>,
     condition_command: &List,
     expected_condition: bool,
     body: &List,
@@ -82,12 +83,12 @@ async fn execute_common(
 }
 
 /// Executes the while loop.
-pub async fn execute_while(env: &mut Env, condition: &List, body: &List) -> Result {
+pub async fn execute_while<S: System>(env: &mut Env<S>, condition: &List, body: &List) -> Result {
     execute_common(env, condition, true, body).await
 }
 
 /// Executes the until loop.
-pub async fn execute_until(env: &mut Env, condition: &List, body: &List) -> Result {
+pub async fn execute_until<S: System>(env: &mut Env<S>, condition: &List, body: &List) -> Result {
     execute_common(env, condition, false, body).await
 }
 

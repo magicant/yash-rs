@@ -29,16 +29,17 @@ use yash_env::Env;
 use yash_env::semantics::Result;
 #[doc(no_inline)]
 pub use yash_env::semantics::command::search;
+use yash_env::system::System;
 use yash_syntax::syntax;
 
 /// Syntactic construct that can be executed.
-pub trait Command {
+pub trait Command<S> {
     /// Executes this command.
     ///
     /// Implementations of this method is expected to update `env.exit_status`
     /// reflecting the result of the command execution.
     #[allow(async_fn_in_trait)] // We don't support Send
-    async fn execute(&self, env: &mut Env) -> Result;
+    async fn execute(&self, env: &mut Env<S>) -> Result;
 }
 
 /// Executes the command.
@@ -46,8 +47,8 @@ pub trait Command {
 /// After executing the command body, the `execute` function [runs
 /// traps](run_traps_for_caught_signals) if any caught signals are pending, and
 /// [updates subshell statuses](Env::update_all_subshell_statuses).
-impl Command for syntax::Command {
-    async fn execute(&self, env: &mut Env) -> Result {
+impl<S: System> Command<S> for syntax::Command {
+    async fn execute(&self, env: &mut Env<S>) -> Result {
         use syntax::Command::*;
         let main_result = match self {
             Simple(command) => command.execute(env).await,
@@ -71,8 +72,8 @@ impl Command for syntax::Command {
 /// The list is executed by executing each item in sequence. If any item results
 /// in a [`Divert`](yash_env::semantics::Divert), the remaining items are not
 /// executed.
-impl Command for syntax::List {
-    async fn execute(&self, env: &mut Env) -> Result {
+impl<S: System> Command<S> for syntax::List {
+    async fn execute(&self, env: &mut Env<S>) -> Result {
         // Boxing needed for recursion
         Box::pin(async move {
             for item in &self.0 {

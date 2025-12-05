@@ -82,7 +82,7 @@ impl From<Field> for Inner {
 ///
 /// This iterator is created with the [`glob`] function.
 #[derive(Debug)]
-pub struct Glob<'a> {
+pub struct Glob<'a, S> {
     /// Dummy to allow retaining a mutable reference to `Env` in the future
     ///
     /// The current [`glob`] implementation pre-computes all results before
@@ -90,12 +90,12 @@ pub struct Glob<'a> {
     /// [generator], which will need a real reference to `Env`.
     ///
     /// [generator]: https://github.com/rust-lang/rust/issues/43122
-    env: PhantomData<&'a mut Env>,
+    env: PhantomData<&'a mut Env<S>>,
 
     inner: Inner,
 }
 
-impl From<Inner> for Glob<'_> {
+impl<S> From<Inner> for Glob<'_, S> {
     fn from(inner: Inner) -> Self {
         Glob {
             env: PhantomData,
@@ -104,7 +104,7 @@ impl From<Inner> for Glob<'_> {
     }
 }
 
-impl Iterator for Glob<'_> {
+impl<S: System> Iterator for Glob<'_, S> {
     type Item = Field;
     fn next(&mut self) -> Option<Field> {
         match &mut self.inner {
@@ -157,14 +157,14 @@ fn remove_quotes_and_strip(chars: &[AttrChar]) -> impl Iterator<Item = char> + '
 }
 
 #[derive(Debug)]
-struct SearchEnv<'e> {
-    env: &'e mut Env,
+struct SearchEnv<'e, S> {
+    env: &'e mut Env<S>,
     prefix: String,
     origin: Location,
     results: Vec<Field>,
 }
 
-impl SearchEnv<'_> {
+impl<S: System> SearchEnv<'_, S> {
     /// Recursively searches directories for matching pathnames.
     fn search_dir(&mut self, suffix: &[AttrChar]) {
         let (this, new_suffix) = match suffix.iter().position(|c| c.value == '/') {
@@ -255,7 +255,7 @@ impl SearchEnv<'_> {
 /// expansion.
 ///
 /// If the `Glob` option is `Off` in `env.options`, the expansion is skipped.
-pub fn glob(env: &mut Env, field: AttrField) -> Glob<'_> {
+pub fn glob<S: System>(env: &mut Env<S>, field: AttrField) -> Glob<'_, S> {
     if env.options.get(yash_env::option::Option::Glob) == Off {
         return Glob::from(Inner::from(field.remove_quotes_and_strip()));
     }

@@ -25,13 +25,13 @@ use yash_syntax::syntax::ParamType::*;
 use yash_syntax::syntax::SpecialParam::*;
 
 /// Resolves a parameter name to its value.
-pub fn resolve<'a>(env: &'a Env, param: &Param, location: &Location) -> Expansion<'a> {
-    fn variable<'a>(env: &'a Env, name: &str, location: &Location) -> Expansion<'a> {
+pub fn resolve<'a, S>(env: &'a Env<S>, param: &Param, location: &Location) -> Expansion<'a> {
+    fn variable<'a, S>(env: &'a Env<S>, name: &str, location: &Location) -> Expansion<'a> {
         env.variables
             .get(name)
             .map_or(Expansion::Unset, |v| v.expand(location))
     }
-    fn options(env: &Env) -> Expansion<'_> {
+    fn options<S>(env: &Env<S>) -> Expansion<'_> {
         let mut value = String::new();
         for option in yash_env::option::Option::iter() {
             if let Some((name, state)) = option.short_name() {
@@ -49,7 +49,7 @@ pub fn resolve<'a>(env: &'a Env, param: &Param, location: &Location) -> Expansio
             Expansion::Unset
         }
     }
-    fn positional(env: &Env) -> &[String] {
+    fn positional<S>(env: &Env<S>) -> &[String] {
         &env.variables.positional_params().values
     }
 

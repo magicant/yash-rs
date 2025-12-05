@@ -91,6 +91,7 @@ use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::semantics::ExitStatus;
 use yash_env::system::Errno;
+use yash_env::system::System;
 use yash_env::variable::IFS;
 use yash_env::variable::Value;
 use yash_syntax::source::Location;
@@ -315,8 +316,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// stripping.
 /// The second field of the result tuple is the exit status of the last command
 /// substitution performed during the expansion, if any.
-pub async fn expand_text(
-    env: &mut yash_env::Env,
+pub async fn expand_text<S>(
+    env: &mut yash_env::Env<S>,
     text: &Text,
 ) -> Result<(String, Option<ExitStatus>)> {
     let mut env = initial::Env::new(env);
@@ -337,8 +338,8 @@ pub async fn expand_text(
 ///
 /// Compare [`expand_word`] that performs not only initial expansion but also
 /// quote removal and attribute stripping.
-pub async fn expand_word_attr(
-    env: &mut yash_env::Env,
+pub async fn expand_word_attr<S>(
+    env: &mut yash_env::Env<S>,
     word: &Word,
 ) -> Result<(AttrField, Option<ExitStatus>)> {
     let mut env = initial::Env::new(env);
@@ -363,8 +364,8 @@ pub async fn expand_word_attr(
 /// attribute stripping, use [`expand_word_attr`].
 /// To expand a word to multiple fields, use [`expand_word_multiple`].
 /// To expand multiple words to multiple fields, use [`expand_words`].
-pub async fn expand_word(
-    env: &mut yash_env::Env,
+pub async fn expand_word<S>(
+    env: &mut yash_env::Env<S>,
     word: &Word,
 ) -> Result<(Field, Option<ExitStatus>)> {
     let (field, exit_status) = expand_word_attr(env, word).await?;
@@ -381,12 +382,13 @@ pub async fn expand_word(
 ///
 /// To expand a single word to a single field, use [`expand_word`].
 /// To expand multiple words to fields, use [`expand_words`].
-pub async fn expand_word_multiple<R>(
-    env: &mut yash_env::Env,
+pub async fn expand_word_multiple<S, R>(
+    env: &mut yash_env::Env<S>,
     word: &Word,
     results: &mut R,
 ) -> Result<Option<ExitStatus>>
 where
+    S: System,
     R: Extend<Field>,
 {
     let mut env = initial::Env::new(env);
@@ -432,13 +434,14 @@ where
 /// [`expand_word`]).
 ///
 /// The results are appended to the given collection.
-pub async fn expand_word_with_mode<R>(
-    env: &mut yash_env::Env,
+pub async fn expand_word_with_mode<S, R>(
+    env: &mut yash_env::Env<S>,
     word: &Word,
     mode: ExpansionMode,
     results: &mut R,
 ) -> Result<Option<ExitStatus>>
 where
+    S: System,
     R: Extend<Field>,
 {
     match mode {
@@ -460,10 +463,14 @@ where
 ///
 /// To expand a single word to a single field, use [`expand_word`].
 /// To expand a single word to multiple fields, use [`expand_word_multiple`].
-pub async fn expand_words<'a, I: IntoIterator<Item = &'a Word>>(
-    env: &mut yash_env::Env,
+pub async fn expand_words<'a, S, I>(
+    env: &mut yash_env::Env<S>,
     words: I,
-) -> Result<(Vec<Field>, Option<ExitStatus>)> {
+) -> Result<(Vec<Field>, Option<ExitStatus>)>
+where
+    S: System,
+    I: IntoIterator<Item = &'a Word>,
+{
     let mut fields = Vec::new();
     let mut last_exit_status = None;
 
@@ -484,8 +491,8 @@ pub async fn expand_words<'a, I: IntoIterator<Item = &'a Word>>(
 /// [`expand_word`] and [`expand_words`], respectively.
 /// The second field of the result tuple is the exit status of the last command
 /// substitution performed during the expansion, if any.
-pub async fn expand_value(
-    env: &mut yash_env::Env,
+pub async fn expand_value<S: System>(
+    env: &mut yash_env::Env<S>,
     value: &yash_syntax::syntax::Value,
 ) -> Result<(yash_env::variable::Value, Option<ExitStatus>)> {
     match value {

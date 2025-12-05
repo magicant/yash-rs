@@ -28,11 +28,12 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
+use yash_env::system::System;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::List;
 
 /// Executes a subshell command
-pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Result {
+pub async fn execute<S: System>(env: &mut Env<S>, body: Rc<List>, location: &Location) -> Result {
     let body_2 = Rc::clone(&body);
     let subshell = Subshell::new(|sub_env, _job_control| Box::pin(subshell_main(sub_env, body_2)));
     let subshell = subshell.job_control(JobControl::Foreground);
@@ -55,7 +56,7 @@ pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Resu
 }
 
 /// Executes the content of the shell.
-async fn subshell_main(env: &mut Env, body: Rc<List>) {
+async fn subshell_main<S: System>(env: &mut Env<S>, body: Rc<List>) {
     let result = body.execute(env).await;
     env.apply_result(result);
 
