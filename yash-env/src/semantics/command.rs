@@ -228,7 +228,7 @@ impl<'a> From<&'a StartSubshellError> for Report<'a> {
 /// This function is for implementing the simple command execution semantics and
 /// the `command` built-in utility. This function internally uses
 /// [`replace_current_process`] to execute the utility in the subshell.
-pub async fn run_external_utility_in_subshell<S: System>(
+pub async fn run_external_utility_in_subshell<S: System + 'static>(
     env: &mut Env<S>,
     path: CString,
     args: Vec<Field>,
