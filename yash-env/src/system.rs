@@ -419,7 +419,9 @@ pub trait System: Debug {
     /// a [`ChildProcessStarter`] function that takes the parent environment and
     /// the child task. The caller must call the starter to make sure the parent
     /// and child processes perform correctly after forking.
-    fn new_child_process(&mut self) -> Result<ChildProcessStarter>;
+    fn new_child_process(&mut self) -> Result<ChildProcessStarter<Self>>
+    where
+        Self: Sized;
 
     /// Reports updated status of a child process.
     ///
@@ -569,8 +571,8 @@ pub enum Disposition {
 /// Note that the output type of the task is `Infallible`. This is to ensure that
 /// the task [exits](System::exit) cleanly or [kills](System::kill) itself with
 /// a signal.
-pub type ChildProcessTask =
-    Box<dyn for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = Infallible> + 'a>>>;
+pub type ChildProcessTask<S> =
+    Box<dyn for<'a> FnOnce(&'a mut Env<S>) -> Pin<Box<dyn Future<Output = Infallible> + 'a>>>;
 
 /// Abstract function that starts a child process
 ///
@@ -594,7 +596,7 @@ pub type ChildProcessTask =
 /// This function only starts the child, which continues to run asynchronously
 /// after the function returns its PID. To wait for the child to finish and
 /// obtain its exit status, use [`System::wait`].
-pub type ChildProcessStarter = Box<dyn FnOnce(&mut Env, ChildProcessTask) -> Pid>;
+pub type ChildProcessStarter<S> = Box<dyn FnOnce(&mut Env<S>, ChildProcessTask<S>) -> Pid>;
 
 /// Extension for [`System`]
 ///

@@ -169,7 +169,7 @@ where
 
         // Define the child process task
         const ME: Pid = Pid(0);
-        let task: ChildProcessTask = Box::new(move |env| {
+        let task: ChildProcessTask<S> = Box::new(move |env| {
             Box::pin(async move {
                 let mut env = env.push_frame(Frame::Subshell);
                 let env = &mut *env;

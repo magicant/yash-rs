@@ -666,7 +666,7 @@ impl System for RealSystem {
     /// `ChildProcessStarter` ignores any arguments and returns the child
     /// process ID. In the child, the starter runs the task and exits the
     /// process.
-    fn new_child_process(&mut self) -> Result<ChildProcessStarter> {
+    fn new_child_process(&mut self) -> Result<ChildProcessStarter<Self>> {
         let raw_pid = unsafe { libc::fork() }.errno_if_m1()?;
         if raw_pid != 0 {
             // Parent process

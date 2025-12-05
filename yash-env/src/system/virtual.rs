@@ -868,7 +868,7 @@ impl System for VirtualSystem {
     ///
     /// The process ID of the child will be the maximum of existing process IDs
     /// plus 1. If there are no other processes, it will be 2.
-    fn new_child_process(&mut self) -> Result<ChildProcessStarter> {
+    fn new_child_process(&mut self) -> Result<ChildProcessStarter<Self>> {
         let mut state = self.state.borrow_mut();
         let executor = state.executor.clone().ok_or(Errno::ENOSYS)?;
         let process_id = state
@@ -884,7 +884,7 @@ impl System for VirtualSystem {
         let state = Rc::clone(&self.state);
         Ok(Box::new(move |parent_env, task| {
             let mut system = VirtualSystem { state, process_id };
-            let mut child_env = parent_env.clone_with_system(Box::new(system.clone()));
+            let mut child_env = parent_env.clone_with_system(system.clone());
 
             {
                 let mut process = system.current_process_mut();

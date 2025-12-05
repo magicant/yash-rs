@@ -293,6 +293,13 @@ impl<S: System> SharedSystem<S> {
     pub fn select(&self, poll: bool) -> Result<()> {
         self.0.borrow_mut().select(poll)
     }
+
+    /// Creates a new child process.
+    ///
+    /// See [`System::new_child_process`] for details.
+    pub fn new_child_process(&self) -> Result<ChildProcessStarter<S>> {
+        self.0.borrow_mut().new_child_process()
+    }
 }
 
 impl<S> Clone for SharedSystem<S> {
@@ -439,8 +446,15 @@ impl<S: System> System for &SharedSystem<S> {
     fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
         self.0.borrow_mut().tcsetpgrp(fd, pgid)
     }
-    fn new_child_process(&mut self) -> Result<ChildProcessStarter> {
-        self.0.borrow_mut().new_child_process()
+    /// This method is not supported for `SharedSystem` because types do not match.
+    ///
+    /// You should call the inherent method [`SharedSystem::new_child_process`] instead.
+    /// If you call this trait method, it will panic.
+    fn new_child_process(&mut self) -> Result<ChildProcessStarter<Self>> {
+        // self.0.borrow_mut().new_child_process()
+        unimplemented!(
+            "new_child_process is not supported for SharedSystem because types do not match"
+        )
     }
     fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         self.0.borrow_mut().wait(target)
@@ -667,9 +681,16 @@ impl<S: System> System for SharedSystem<S> {
     fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
         (&mut &*self).tcsetpgrp(fd, pgid)
     }
+    /// This method is not supported for `SharedSystem` because types do not match.
+    ///
+    /// You should call the inherent method [`SharedSystem::new_child_process`] instead.
+    /// If you call this trait method, it will panic.
     #[inline]
-    fn new_child_process(&mut self) -> Result<ChildProcessStarter> {
-        (&mut &*self).new_child_process()
+    fn new_child_process(&mut self) -> Result<ChildProcessStarter<Self>> {
+        // (&mut &*self).new_child_process()
+        unimplemented!(
+            "new_child_process is not supported for SharedSystem because types do not match"
+        )
     }
     #[inline]
     fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
