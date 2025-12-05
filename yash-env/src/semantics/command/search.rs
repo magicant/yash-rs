@@ -61,11 +61,11 @@ use std::rc::Rc;
 /// <https://doc.rust-lang.org/std/ptr/fn.fn_addr_eq.html> for the
 /// characteristics of function pointer comparisons.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Target {
+pub enum Target<S> {
     /// Built-in utility
     Builtin {
         /// Definition of the built-in
-        builtin: Builtin,
+        builtin: Builtin<S>,
 
         /// Path to the external utility that is shadowed by the substitutive
         /// built-in
@@ -80,7 +80,7 @@ pub enum Target {
     },
 
     /// Function
-    Function(Rc<Function>),
+    Function(Rc<Function<S>>),
 
     /// External utility
     External {
@@ -98,16 +98,16 @@ pub enum Target {
     },
 }
 
-impl From<Rc<Function>> for Target {
+impl<S> From<Rc<Function<S>>> for Target<S> {
     #[inline]
-    fn from(function: Rc<Function>) -> Target {
+    fn from(function: Rc<Function<S>>) -> Target<S> {
         Target::Function(function)
     }
 }
 
-impl From<Function> for Target {
+impl<S> From<Function<S>> for Target<S> {
     #[inline]
-    fn from(function: Function) -> Target {
+    fn from(function: Function<S>) -> Target<S> {
         Target::Function(function.into())
     }
 }
@@ -117,14 +117,14 @@ impl From<Function> for Target {
 // external utilities
 
 /// Collection of data used in [classifying](classify) command names
-pub trait ClassifyEnv {
+pub trait ClassifyEnv<S> {
     /// Retrieves the built-in by name.
     #[must_use]
-    fn builtin(&self, name: &str) -> Option<Builtin>;
+    fn builtin(&self, name: &str) -> Option<Builtin<S>>;
 
     /// Retrieves the function by name.
     #[must_use]
-    fn function(&self, name: &str) -> Option<&Rc<Function>>;
+    fn function(&self, name: &str) -> Option<&Rc<Function<S>>>;
 }
 
 /// Part of the shell execution environment command path search depends on
@@ -163,13 +163,13 @@ impl<S: System> PathEnv for Env<S> {
     }
 }
 
-impl<S: System> ClassifyEnv for Env<S> {
-    fn builtin(&self, name: &str) -> Option<Builtin> {
+impl<S> ClassifyEnv<S> for Env<S> {
+    fn builtin(&self, name: &str) -> Option<Builtin<S>> {
         self.builtins.get(name).copied()
     }
 
     #[inline]
-    fn function(&self, name: &str) -> Option<&Rc<Function>> {
+    fn function(&self, name: &str) -> Option<&Rc<Function<S>>> {
         self.functions.get(name)
     }
 }
@@ -185,7 +185,7 @@ impl<S: System> ClassifyEnv for Env<S> {
 /// See the [module documentation](self) for details of the command search
 /// process.
 #[must_use]
-pub fn search<E: ClassifyEnv + PathEnv>(env: &mut E, name: &str) -> Option<Target> {
+pub fn search<S, E: ClassifyEnv<S> + PathEnv>(env: &mut E, name: &str) -> Option<Target<S>> {
     let mut target = classify(env, name);
 
     'fill_path: {
@@ -233,7 +233,7 @@ pub fn search<E: ClassifyEnv + PathEnv>(env: &mut E, name: &str) -> Option<Targe
 /// searching for an external utility would succeed and returns a target with
 /// an empty path in such cases.
 #[must_use]
-pub fn classify<E: ClassifyEnv>(env: &E, name: &str) -> Target {
+pub fn classify<S, E: ClassifyEnv<S>>(env: &E, name: &str) -> Target<S> {
     if name.contains('/') {
         return Target::External {
             path: CString::default(),
