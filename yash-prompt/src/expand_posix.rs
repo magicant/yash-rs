@@ -54,7 +54,9 @@ type ExpandTextResult = Option<(String, Option<ExitStatus>)>;
 /// })));
 /// ```
 #[derive(Clone, Copy, Debug)]
-pub struct ExpandText(pub for<'a> fn(&'a mut Env, &'a Text) -> PinFuture<'a, ExpandTextResult>);
+pub struct ExpandText<S>(
+    pub for<'a> fn(&'a mut Env<S>, &'a Text) -> PinFuture<'a, ExpandTextResult>,
+);
 
 /// Expands the prompt string according to the POSIX standard.
 ///
@@ -79,7 +81,10 @@ pub struct ExpandText(pub for<'a> fn(&'a mut Env, &'a Text) -> PinFuture<'a, Exp
 /// text since the POSIX standard does not specify any. However, other shell
 /// implementations support backslash escapes in the prompt string. This
 /// discrepancy may be reconsidered in the future.
-pub async fn expand_posix(env: &mut Env, prompt: &str, excl: bool) -> String {
+pub async fn expand_posix<S>(env: &mut Env<S>, prompt: &str, excl: bool) -> String
+where
+    S: 'static,
+{
     let mut lexer = Lexer::with_code(prompt);
     let text_result = lexer.text(|_| false, |_| false).now_or_never().unwrap();
 
@@ -93,7 +98,7 @@ pub async fn expand_posix(env: &mut Env, prompt: &str, excl: bool) -> String {
         replace_exclamation_marks(&mut text.0);
     }
 
-    let ExpandText(expand_text) = env
+    let ExpandText(expand_text) = *env
         .any
         .get()
         .expect("`yash-prompt::expand_posix` requires `ExpandText` in `Env::any`");

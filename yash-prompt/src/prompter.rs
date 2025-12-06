@@ -20,6 +20,7 @@ use super::expand_posix;
 use std::cell::RefCell;
 use yash_env::Env;
 use yash_env::input::{Context, Input, Result};
+use yash_env::system::System;
 use yash_env::variable::{PS1, PS2, VariableSet};
 
 /// [`Input`] decorator that shows a command prompt
@@ -33,12 +34,12 @@ use yash_env::variable::{PS1, PS2, VariableSet};
 /// [`any`](Env::any) storage for `expand_posix` to work correctly.
 #[derive(Clone, Debug)]
 #[must_use = "Prompter does nothing unless used by a parser"]
-pub struct Prompter<'a, 'b, T> {
+pub struct Prompter<'a, 'b, S, T> {
     inner: T,
-    env: &'a RefCell<&'b mut Env>,
+    env: &'a RefCell<&'b mut Env<S>>,
 }
 
-impl<'a, 'b, T> Prompter<'a, 'b, T> {
+impl<'a, 'b, S, T> Prompter<'a, 'b, S, T> {
     /// Creates a new `Prompter` decorator.
     ///
     /// The first argument is the inner `Input` that performs the actual input
@@ -46,13 +47,14 @@ impl<'a, 'b, T> Prompter<'a, 'b, T> {
     /// the prompt variable and the system interface to print to the standard
     /// error. It is wrapped in a `RefCell` so that it can be shared with other
     /// decorators and the parser.
-    pub fn new(inner: T, env: &'a RefCell<&'b mut Env>) -> Self {
+    pub fn new(inner: T, env: &'a RefCell<&'b mut Env<S>>) -> Self {
         Self { inner, env }
     }
 }
 
-impl<T> Input for Prompter<'_, '_, T>
+impl<S, T> Input for Prompter<'_, '_, S, T>
 where
+    S: System + 'static,
     T: Input,
 {
     #[allow(clippy::await_holding_refcell_ref)]
@@ -62,7 +64,10 @@ where
     }
 }
 
-async fn print_prompt(env: &mut Env, context: &Context) {
+async fn print_prompt<S>(env: &mut Env<S>, context: &Context)
+where
+    S: System + 'static,
+{
     // Obtain the prompt string
     let prompt = fetch_posix(&env.variables, context);
 
