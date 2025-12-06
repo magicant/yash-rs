@@ -21,6 +21,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The re-export of `yash_env::semantics::command::search` as `command_search`
   has been removed. Users should import it from `yash_env` directly or use
   the `command::search` module in this crate.
+- The deprecated `ReadEvalLoop` struct has been removed.
 
 ## [0.12.0] - 2025-11-26
 

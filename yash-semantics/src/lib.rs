@@ -49,9 +49,5 @@ mod runner;
 pub use runner::interactive_read_eval_loop;
 pub use runner::read_eval_loop;
 
-mod runner_legacy;
-#[allow(deprecated)]
-pub use runner_legacy::ReadEvalLoop;
-
 #[cfg(test)]
 pub(crate) mod tests;
