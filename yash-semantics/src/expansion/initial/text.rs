@@ -35,7 +35,7 @@ use yash_syntax::syntax::Unquote;
 ///   followed by its quoted character value.
 /// - `RawParam` and `BracedParam` perform parameter expansion, detailed below.
 /// - `CommandSubst` and `Backquote` perform command substitution: The `content`
-///   string is [parsed and executed](crate::ReadEvalLoop) in a subshell where
+///   string is [parsed and executed](crate::read_eval_loop) in a subshell where
 ///   its standard output is redirected to a pipe read by the shell. The
 ///   substitution expands to the output with trailing newlines removed.
 /// - `Arith` performs arithmetic expansion: The content text is expanded,
