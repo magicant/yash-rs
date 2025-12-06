@@ -22,6 +22,7 @@ use crate::xtrace::XTrace;
 use std::fmt::Write;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
+use yash_env::system::System;
 
 #[doc(no_inline)]
 pub use crate::expansion::{Error, ErrorCause, Result};
@@ -39,7 +40,7 @@ pub use yash_syntax::syntax::Assign;
 ///
 /// If `xtrace` is `Some` instance of `XTrace`, the expanded assignment word is
 /// written to its assignments buffer.
-pub async fn perform_assignment<S>(
+pub async fn perform_assignment<S: System + 'static>(
     env: &mut Env<S>,
     assign: &Assign,
     scope: Scope,
@@ -85,7 +86,7 @@ pub async fn perform_assignment<S>(
 ///
 /// If `xtrace` is `Some` instance of `XTrace`, the expanded assignment words
 /// are written to its assignments buffer.
-pub async fn perform_assignments<S>(
+pub async fn perform_assignments<S: System + 'static>(
     env: &mut Env<S>,
     assigns: &[Assign],
     scope: Scope,

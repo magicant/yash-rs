@@ -19,6 +19,7 @@
 use super::run_trap;
 use std::rc::Rc;
 use yash_env::Env;
+use yash_env::system::System;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
 use yash_env::trap::Origin;
@@ -32,7 +33,7 @@ use yash_env::trap::Origin;
 /// this function and restored when finished. However, if the trap terminates
 /// with a `Break(divert)` where `divert.exit_status()` is `Some` exit status,
 /// that exit status is set to `env.exit_status`.
-pub async fn run_exit_trap(env: &mut Env) {
+pub async fn run_exit_trap<S: System + 'static>(env: &mut Env<S>) {
     let Some(state) = env.traps.get_state(Condition::Exit).0 else {
         return;
     };

@@ -25,7 +25,7 @@ use yash_env::System;
 use yash_env::variable::HOME;
 
 /// Computes the main result of tilde expansion.
-fn expand_body<'n: 'r, 'e: 'r, 'r>(name: &'n str, env: &'e Env) -> Cow<'r, str> {
+fn expand_body<'n: 'r, 'e: 'r, 'r, S: System>(name: &'n str, env: &'e Env<S>) -> Cow<'r, str> {
     if name.is_empty() {
         return Cow::Borrowed(env.variables.get_scalar(HOME).unwrap_or("~"));
     }
@@ -71,7 +71,7 @@ fn finish(mut chars: &str, followed_by_slash: bool) -> Vec<AttrChar> {
 }
 
 /// Performs tilde expansion.
-pub fn expand(name: &str, followed_by_slash: bool, env: &Env) -> Vec<AttrChar> {
+pub fn expand<S: System>(name: &str, followed_by_slash: bool, env: &Env<S>) -> Vec<AttrChar> {
     let chars = expand_body(name, env);
     finish(&chars, followed_by_slash)
 }

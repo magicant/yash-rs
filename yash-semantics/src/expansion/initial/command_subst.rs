@@ -44,7 +44,7 @@ pub async fn expand<C, S>(
 ) -> Result<Phrase, Error>
 where
     C: AsRef<str> + 'static,
-    S: System,
+    S: System + 'static,
 {
     let original = location.clone();
 
@@ -81,7 +81,7 @@ async fn subshell_body<C, S>(
 ) -> yash_env::semantics::Result
 where
     C: AsRef<str>,
-    S: System,
+    S: System + 'static,
 {
     // Arrange the file descriptors
     env.system.close(reader).ok();

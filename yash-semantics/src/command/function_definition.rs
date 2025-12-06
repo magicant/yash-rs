@@ -45,7 +45,7 @@ impl std::fmt::Display for BodyImpl {
     }
 }
 
-impl<S: System> FunctionBody<S> for BodyImpl {
+impl<S: System + 'static> FunctionBody<S> for BodyImpl {
     async fn execute(&self, env: &mut Env<S>) -> Result {
         self.0.execute(env).await
     }
@@ -61,14 +61,17 @@ impl<S: System> FunctionBody<S> for BodyImpl {
 /// execution ends with an exit status of zero.
 ///
 /// The `ErrExit` shell option is [applied](Env::apply_errexit) on error.
-impl<S: System> Command<S> for syntax::FunctionDefinition {
+impl<S: System + 'static> Command<S> for syntax::FunctionDefinition {
     async fn execute(&self, env: &mut Env<S>) -> Result {
         define_function(env, self).await?;
         env.apply_errexit()
     }
 }
 
-async fn define_function<S: System>(env: &mut Env<S>, def: &syntax::FunctionDefinition) -> Result {
+async fn define_function<S: System + 'static>(
+    env: &mut Env<S>,
+    def: &syntax::FunctionDefinition,
+) -> Result {
     // Expand the function name
     let Field {
         value: name,

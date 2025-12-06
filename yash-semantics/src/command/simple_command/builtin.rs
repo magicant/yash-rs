@@ -33,13 +33,14 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::stack::Builtin as FrameBuiltin;
+use yash_env::system::System;
 use yash_env::variable::Context;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
 
-pub async fn execute_builtin(
-    env: &mut Env,
-    builtin: Builtin,
+pub async fn execute_builtin<S: System + 'static>(
+    env: &mut Env<S>,
+    builtin: Builtin<S>,
     assigns: &[Assign],
     mut fields: Vec<Field>,
     redirs: &[Redir],

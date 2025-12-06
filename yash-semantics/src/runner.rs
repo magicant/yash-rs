@@ -25,6 +25,7 @@ use yash_env::Env;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
+use yash_env::system::System;
 use yash_syntax::parser::lex::Lexer;
 use yash_syntax::parser::{ErrorCause, Parser};
 use yash_syntax::syntax::List;
@@ -98,7 +99,10 @@ use yash_syntax::syntax::List;
 ///
 /// [`Echo`]: yash_env::input::Echo
 /// [`Input`]: yash_syntax::input::Input
-pub async fn read_eval_loop(env: &RefCell<&mut Env>, lexer: &mut Lexer<'_>) -> Result {
+pub async fn read_eval_loop<S: System + 'static>(
+    env: &RefCell<&mut Env<S>>,
+    lexer: &mut Lexer<'_>,
+) -> Result {
     read_eval_loop_impl(env, lexer, /* is_interactive */ false).await
 }
 
@@ -124,15 +128,18 @@ pub async fn read_eval_loop(env: &RefCell<&mut Env>, lexer: &mut Lexer<'_>) -> R
 /// [`Interrupt`]: crate::Divert::Interrupt
 /// [`Reporter`]: yash_env::input::Reporter
 /// [`IgnoreEof`]: yash_env::input::IgnoreEof
-pub async fn interactive_read_eval_loop(env: &RefCell<&mut Env>, lexer: &mut Lexer<'_>) -> Result {
+pub async fn interactive_read_eval_loop<S: System + 'static>(
+    env: &RefCell<&mut Env<S>>,
+    lexer: &mut Lexer<'_>,
+) -> Result {
     read_eval_loop_impl(env, lexer, /* is_interactive */ true).await
 }
 
 // The RefCell should be local to the loop, so it is safe to keep the mutable
 // borrow across await points.
 #[allow(clippy::await_holding_refcell_ref)]
-async fn read_eval_loop_impl(
-    env: &RefCell<&mut Env>,
+async fn read_eval_loop_impl<S: System + 'static>(
+    env: &RefCell<&mut Env<S>>,
     lexer: &mut Lexer<'_>,
     is_interactive: bool,
 ) -> Result {
@@ -190,7 +197,7 @@ async fn read_eval_loop_impl(
     }
 }
 
-async fn run_command(env: &mut Env, command: &List) -> Result {
+async fn run_command<S: System + 'static>(env: &mut Env<S>, command: &List) -> Result {
     run_traps_for_caught_signals(env).await?;
     env.update_all_subshell_statuses();
     command.execute(env).await

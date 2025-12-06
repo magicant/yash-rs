@@ -161,7 +161,7 @@ use yash_syntax::syntax::Word;
 ///
 /// POSIX leaves many aspects of the simple command execution unspecified. The
 /// detail semantics may differ in other shell implementations.
-impl<S: System> Command<S> for syntax::SimpleCommand {
+impl<S: System + 'static> Command<S> for syntax::SimpleCommand {
     async fn execute(&self, env: &mut Env<S>) -> Result {
         let (fields, exit_status) = match expand_words(env, &self.words).await {
             Ok(result) => result,
@@ -190,7 +190,7 @@ impl<S: System> Command<S> for syntax::SimpleCommand {
     }
 }
 
-async fn expand_words<S: System>(
+async fn expand_words<S: System + 'static>(
     env: &mut Env<S>,
     words: &[(Word, ExpansionMode)],
 ) -> crate::expansion::Result<(Vec<Field>, Option<ExitStatus>)> {
@@ -205,7 +205,7 @@ async fn expand_words<S: System>(
     Ok((fields, last_exit_status))
 }
 
-async fn perform_assignments<S: System>(
+async fn perform_assignments<S: System + 'static>(
     env: &mut Env<S>,
     assigns: &[Assign],
     export: bool,

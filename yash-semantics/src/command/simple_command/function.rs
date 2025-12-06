@@ -30,14 +30,15 @@ use yash_env::function::Function;
 use yash_env::semantics::Divert;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
+use yash_env::system::System;
 use yash_env::variable::Context;
 use yash_env::variable::PositionalParams;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
 
-pub async fn execute_function(
-    env: &mut Env,
-    function: Rc<Function>,
+pub async fn execute_function<S: System + 'static>(
+    env: &mut Env<S>,
+    function: Rc<Function<S>>,
     assigns: &[Assign],
     fields: Vec<Field>,
     redirs: &[Redir],
@@ -57,7 +58,7 @@ pub async fn execute_function(
     execute_function_body(&mut env, function, fields, None).await
 }
 
-type EnvPrepHook = fn(&mut Env) -> Pin<Box<dyn Future<Output = ()>>>;
+type EnvPrepHook<S> = fn(&mut Env<S>) -> Pin<Box<dyn Future<Output = ()>>>;
 
 /// Executes the body of the function.
 ///
@@ -68,11 +69,11 @@ type EnvPrepHook = fn(&mut Env) -> Pin<Box<dyn Future<Output = ()>>>;
 /// `env_prep_hook` is called after the new variable context is pushed to the
 /// environment. This is useful for assigning custom local variables before the
 /// function body is executed.
-pub async fn execute_function_body(
-    env: &mut Env,
-    function: Rc<Function>,
+pub async fn execute_function_body<S: System>(
+    env: &mut Env<S>,
+    function: Rc<Function<S>>,
     fields: Vec<Field>,
-    env_prep_hook: Option<EnvPrepHook>,
+    env_prep_hook: Option<EnvPrepHook<S>>,
 ) -> Result {
     let positional_params = PositionalParams::from_fields(fields);
     let mut env = env.push_context(Context::Regular { positional_params });

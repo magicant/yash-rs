@@ -41,7 +41,7 @@ use yash_syntax::syntax::List;
 use yash_syntax::syntax::Word;
 
 /// Executes the for loop.
-pub async fn execute<S: System>(
+pub async fn execute<S: System + 'static>(
     env: &mut Env<S>,
     name: &Word,
     values: &Option<Vec<Word>>,
@@ -107,7 +107,7 @@ pub async fn execute<S: System>(
     Continue(())
 }
 
-async fn trace_values<S: System>(env: &mut Env<S>, name: &Field, values: &[Field]) {
+async fn trace_values<S: System + 'static>(env: &mut Env<S>, name: &Field, values: &[Field]) {
     if let Some(mut xtrace) = XTrace::from_options(&env.options) {
         write!(xtrace.words(), "for {} in ", quoted(&name.value)).unwrap();
         trace_fields(Some(&mut xtrace), values);

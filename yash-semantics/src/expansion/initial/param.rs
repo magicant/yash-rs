@@ -25,6 +25,7 @@ use super::Env;
 use super::Expand;
 use yash_env::option::Option::Unset;
 use yash_env::option::State::Off;
+use yash_env::system::System;
 use yash_env::variable::Value;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::BracedParam;
@@ -59,7 +60,7 @@ pub use switch::NonassignableError;
 pub use switch::Vacancy;
 pub use switch::VacantError;
 
-impl<S> Expand<S> for ParamRef<'_> {
+impl<S: System + 'static> Expand<S> for ParamRef<'_> {
     /// Performs parameter expansion.
     async fn expand(&self, env: &mut Env<'_, S>) -> Result<Phrase, Error> {
         // TODO Expand and parse Index

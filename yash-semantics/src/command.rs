@@ -47,7 +47,7 @@ pub trait Command<S> {
 /// After executing the command body, the `execute` function [runs
 /// traps](run_traps_for_caught_signals) if any caught signals are pending, and
 /// [updates subshell statuses](Env::update_all_subshell_statuses).
-impl<S: System> Command<S> for syntax::Command {
+impl<S: System + 'static> Command<S> for syntax::Command {
     async fn execute(&self, env: &mut Env<S>) -> Result {
         use syntax::Command::*;
         let main_result = match self {
@@ -72,7 +72,7 @@ impl<S: System> Command<S> for syntax::Command {
 /// The list is executed by executing each item in sequence. If any item results
 /// in a [`Divert`](yash_env::semantics::Divert), the remaining items are not
 /// executed.
-impl<S: System> Command<S> for syntax::List {
+impl<S: System + 'static> Command<S> for syntax::List {
     async fn execute(&self, env: &mut Env<S>) -> Result {
         // Boxing needed for recursion
         Box::pin(async move {

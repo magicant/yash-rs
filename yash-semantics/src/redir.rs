@@ -493,7 +493,7 @@ mod here_doc;
 
 /// Performs a redirection.
 #[allow(clippy::await_holding_refcell_ref)]
-async fn perform<S: System>(
+async fn perform<S: System + 'static>(
     env: &mut Env<S>,
     redir: &Redir,
     xtrace: Option<&mut XTrace>,
@@ -630,7 +630,10 @@ impl<'e, S: System> RedirGuard<'e, S> {
         &mut self,
         redir: &Redir,
         xtrace: Option<&mut XTrace>,
-    ) -> Result<Option<ExitStatus>, Error> {
+    ) -> Result<Option<ExitStatus>, Error>
+    where
+        S: 'static,
+    {
         let (saved_fd, exit_status) = perform(self, redir, xtrace).await?;
         self.saved_fds.push(saved_fd);
         Ok(exit_status)
@@ -652,6 +655,7 @@ impl<'e, S: System> RedirGuard<'e, S> {
         mut xtrace: Option<&mut XTrace>,
     ) -> Result<Option<ExitStatus>, Error>
     where
+        S: 'static,
         I: IntoIterator<Item = &'a Redir>,
     {
         let mut exit_status = None;

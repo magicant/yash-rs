@@ -39,7 +39,7 @@ use yash_syntax::syntax::Pipeline;
 ///
 /// [`Frame::Condition`] is pushed to the environment's stack while the
 /// execution of the pipelines except for the last.
-impl<S: System> Command<S> for AndOrList {
+impl<S: System + 'static> Command<S> for AndOrList {
     async fn execute(&self, env: &mut Env<S>) -> Result {
         if self.rest.is_empty() {
             return self.first.execute(env).await;
@@ -66,7 +66,7 @@ impl<S: System> Command<S> for AndOrList {
     }
 }
 
-async fn execute_conditional_pipeline<S: System>(
+async fn execute_conditional_pipeline<S: System + 'static>(
     env: &mut Env<S>,
     (and_or, pipeline): &(AndOr, Pipeline),
 ) -> Result {

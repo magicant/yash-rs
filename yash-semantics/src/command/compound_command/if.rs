@@ -27,7 +27,7 @@ use yash_syntax::syntax::ElifThen;
 use yash_syntax::syntax::List;
 
 /// Executes the if command.
-pub async fn execute<S: System>(
+pub async fn execute<S: System + 'static>(
     env: &mut Env<S>,
     condition: &List,
     body: &List,

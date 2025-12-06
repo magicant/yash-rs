@@ -41,11 +41,12 @@ use yash_env::Env;
 use yash_env::option::OptionSet;
 use yash_env::option::State;
 use yash_env::semantics::Field;
+use yash_env::system::System;
 use yash_env::variable::PS4;
 use yash_quote::quoted;
 use yash_syntax::syntax::Text;
 
-async fn expand_ps4(env: &mut Env) -> String {
+async fn expand_ps4<S: System + 'static>(env: &mut Env<S>) -> String {
     let value = env.variables.get_scalar(PS4).unwrap_or_default().to_owned();
 
     let text = match value.parse::<Text>() {
@@ -78,27 +79,27 @@ struct ExpandingPs4(bool);
 /// Guard that sets the [`ExpandingPs4`] flag to true while it is alive
 /// and resets it to false when dropped
 #[derive(Debug)]
-struct ExpandingGuard<'a>(&'a mut Env);
+struct ExpandingGuard<'a, S>(&'a mut Env<S>);
 
-impl Deref for ExpandingGuard<'_> {
-    type Target = Env;
+impl<S> Deref for ExpandingGuard<'_, S> {
+    type Target = Env<S>;
     fn deref(&self) -> &Self::Target {
         self.0
     }
 }
 
-impl DerefMut for ExpandingGuard<'_> {
+impl<S> DerefMut for ExpandingGuard<'_, S> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.0
     }
 }
 
-impl<'a> ExpandingGuard<'a> {
+impl<'a, S> ExpandingGuard<'a, S> {
     /// Creates a new guard that sets the [`ExpandingPs4`] flag to true.
     ///
     /// If the flag is already true, this function returns `None`.
     #[must_use]
-    fn new(env: &'a mut Env) -> Option<Self> {
+    fn new(env: &'a mut Env<S>) -> Option<Self> {
         let expanding_ps4 = env.any.get_or_insert_with(Box::<ExpandingPs4>::default);
         if expanding_ps4.0 {
             None
@@ -109,7 +110,7 @@ impl<'a> ExpandingGuard<'a> {
     }
 }
 
-impl Drop for ExpandingGuard<'_> {
+impl<S> Drop for ExpandingGuard<'_, S> {
     fn drop(&mut self) {
         if let Some(expanding_ps4) = self.any.get_mut::<ExpandingPs4>() {
             expanding_ps4.0 = false;
@@ -235,7 +236,7 @@ impl XTrace {
     /// function, the expansion of `$PS4` is skipped and an empty string is
     /// returned. This prevents infinite recursion when `$PS4` contains a
     /// command substitution that causes `XTrace::finish` to be called again.
-    pub async fn finish(&self, env: &mut Env) -> String {
+    pub async fn finish<S: System + 'static>(&self, env: &mut Env<S>) -> String {
         let len = self.assigns.len()
             + self.words.len()
             + self.redirs.len()
@@ -278,7 +279,7 @@ pub fn trace_fields(xtrace: Option<&mut XTrace>, fields: &[Field]) {
 }
 
 /// Convenience function for calling [`XTrace::finish`] on an optional `XTrace`.
-pub async fn finish(env: &mut Env, xtrace: Option<XTrace>) -> String {
+pub async fn finish<S: System + 'static>(env: &mut Env<S>, xtrace: Option<XTrace>) -> String {
     if let Some(xtrace) = xtrace {
         xtrace.finish(env).await
     } else {
@@ -288,8 +289,12 @@ pub async fn finish(env: &mut Env, xtrace: Option<XTrace>) -> String {
 
 /// Convenience function for [finish]ing and
 /// [print](yash_env::SharedSystem::print_error)ing an (optional) `XTrace`.
-pub async fn print<X: Into<Option<XTrace>>>(env: &mut Env, xtrace: X) {
-    async fn inner(env: &mut Env, xtrace: Option<XTrace>) {
+pub async fn print<S, X>(env: &mut Env<S>, xtrace: X)
+where
+    S: System + 'static,
+    X: Into<Option<XTrace>>,
+{
+    async fn inner<S: System + 'static>(env: &mut Env<S>, xtrace: Option<XTrace>) {
         let s = finish(env, xtrace).await;
         env.system.print_error(&s).await;
     }

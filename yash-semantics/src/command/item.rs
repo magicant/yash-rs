@@ -58,7 +58,7 @@ use yash_syntax::syntax::AndOrList;
 /// and-or list is implicitly redirected to `/dev/null`.
 ///
 /// [`Monitor`]: yash_env::option::Option::Monitor
-impl<S: System> Command<S> for syntax::Item {
+impl<S: System + 'static> Command<S> for syntax::Item {
     async fn execute(&self, env: &mut Env<S>) -> Result {
         match &self.async_flag {
             None => self.and_or.execute(env).await,
@@ -67,7 +67,11 @@ impl<S: System> Command<S> for syntax::Item {
     }
 }
 
-async fn execute_async<S: System>(env: &mut Env<S>, and_or: &Rc<AndOrList>, async_flag: &Location) -> Result {
+async fn execute_async<S: System + 'static>(
+    env: &mut Env<S>,
+    and_or: &Rc<AndOrList>,
+    async_flag: &Location,
+) -> Result {
     let and_or_2 = Rc::clone(and_or);
     let subshell = Subshell::new(|env_2, job_control| {
         Box::pin(async move { async_body(env_2, job_control, &and_or_2).await })
@@ -112,7 +116,11 @@ async fn execute_async<S: System>(env: &mut Env<S>, and_or: &Rc<AndOrList>, asyn
     }
 }
 
-async fn async_body<S: System>(env: &mut Env<S>, job_control: Option<JobControl>, and_or: &AndOrList) {
+async fn async_body<S: System + 'static>(
+    env: &mut Env<S>,
+    job_control: Option<JobControl>,
+    and_or: &AndOrList,
+) {
     if job_control.is_none() {
         nullify_stdin(env).ok();
     }

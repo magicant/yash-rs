@@ -316,7 +316,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// stripping.
 /// The second field of the result tuple is the exit status of the last command
 /// substitution performed during the expansion, if any.
-pub async fn expand_text<S>(
+pub async fn expand_text<S: System + 'static>(
     env: &mut yash_env::Env<S>,
     text: &Text,
 ) -> Result<(String, Option<ExitStatus>)> {
@@ -338,7 +338,7 @@ pub async fn expand_text<S>(
 ///
 /// Compare [`expand_word`] that performs not only initial expansion but also
 /// quote removal and attribute stripping.
-pub async fn expand_word_attr<S>(
+pub async fn expand_word_attr<S: System + 'static>(
     env: &mut yash_env::Env<S>,
     word: &Word,
 ) -> Result<(AttrField, Option<ExitStatus>)> {
@@ -364,7 +364,7 @@ pub async fn expand_word_attr<S>(
 /// attribute stripping, use [`expand_word_attr`].
 /// To expand a word to multiple fields, use [`expand_word_multiple`].
 /// To expand multiple words to multiple fields, use [`expand_words`].
-pub async fn expand_word<S>(
+pub async fn expand_word<S: System + 'static>(
     env: &mut yash_env::Env<S>,
     word: &Word,
 ) -> Result<(Field, Option<ExitStatus>)> {
@@ -388,7 +388,7 @@ pub async fn expand_word_multiple<S, R>(
     results: &mut R,
 ) -> Result<Option<ExitStatus>>
 where
-    S: System,
+    S: System + 'static,
     R: Extend<Field>,
 {
     let mut env = initial::Env::new(env);
@@ -441,7 +441,7 @@ pub async fn expand_word_with_mode<S, R>(
     results: &mut R,
 ) -> Result<Option<ExitStatus>>
 where
-    S: System,
+    S: System + 'static,
     R: Extend<Field>,
 {
     match mode {
@@ -468,7 +468,7 @@ pub async fn expand_words<'a, S, I>(
     words: I,
 ) -> Result<(Vec<Field>, Option<ExitStatus>)>
 where
-    S: System,
+    S: System + 'static,
     I: IntoIterator<Item = &'a Word>,
 {
     let mut fields = Vec::new();
@@ -491,7 +491,7 @@ where
 /// [`expand_word`] and [`expand_words`], respectively.
 /// The second field of the result tuple is the exit status of the last command
 /// substitution performed during the expansion, if any.
-pub async fn expand_value<S: System>(
+pub async fn expand_value<S: System + 'static>(
     env: &mut yash_env::Env<S>,
     value: &yash_syntax::syntax::Value,
 ) -> Result<(yash_env::variable::Value, Option<ExitStatus>)> {

@@ -34,7 +34,7 @@ struct Loop<'a, S> {
     exit_status: ExitStatus,
 }
 
-impl<S: System> Loop<'_, S> {
+impl<S: System + 'static> Loop<'_, S> {
     async fn iterate(&mut self) -> Result {
         while super::evaluate_condition(self.env, self.condition_command).await?
             == self.expected_condition
@@ -63,7 +63,7 @@ impl<S: System> Loop<'_, S> {
     }
 }
 
-async fn execute_common<S: System>(
+async fn execute_common<S: System + 'static>(
     env: &mut Env<S>,
     condition_command: &List,
     expected_condition: bool,
@@ -83,12 +83,20 @@ async fn execute_common<S: System>(
 }
 
 /// Executes the while loop.
-pub async fn execute_while<S: System>(env: &mut Env<S>, condition: &List, body: &List) -> Result {
+pub async fn execute_while<S: System + 'static>(
+    env: &mut Env<S>,
+    condition: &List,
+    body: &List,
+) -> Result {
     execute_common(env, condition, true, body).await
 }
 
 /// Executes the until loop.
-pub async fn execute_until<S: System>(env: &mut Env<S>, condition: &List, body: &List) -> Result {
+pub async fn execute_until<S: System + 'static>(
+    env: &mut Env<S>,
+    condition: &List,
+    body: &List,
+) -> Result {
     execute_common(env, condition, false, body).await
 }
 

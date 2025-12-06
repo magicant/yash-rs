@@ -75,7 +75,7 @@ use yash_syntax::syntax;
 ///
 /// if `self.negation` is true, [`Frame::Condition`] is pushed to the
 /// environment's stack while the pipeline is executed.
-impl<S: System> Command<S> for syntax::Pipeline {
+impl<S: System + 'static> Command<S> for syntax::Pipeline {
     async fn execute(&self, env: &mut Env<S>) -> Result {
         if env.options.get(Exec) == Off && env.options.get(Interactive) == Off {
             return Continue(());
@@ -96,7 +96,7 @@ impl<S: System> Command<S> for syntax::Pipeline {
     }
 }
 
-async fn execute_commands_in_pipeline<S: System>(
+async fn execute_commands_in_pipeline<S: System + 'static>(
     env: &mut Env<S>,
     commands: &[Rc<syntax::Command>],
 ) -> Result {
@@ -119,7 +119,7 @@ async fn execute_commands_in_pipeline<S: System>(
     }
 }
 
-async fn execute_job_controlled_pipeline<S: System>(
+async fn execute_job_controlled_pipeline<S: System + 'static>(
     env: &mut Env<S>,
     commands: &[Rc<syntax::Command>],
 ) -> Result {
@@ -154,7 +154,7 @@ fn to_job_name(commands: &[Rc<syntax::Command>]) -> String {
         .to_string()
 }
 
-async fn execute_multi_command_pipeline<S: System>(
+async fn execute_multi_command_pipeline<S: System + 'static>(
     env: &mut Env<S>,
     commands: &[Rc<syntax::Command>],
 ) -> Result {
@@ -210,7 +210,7 @@ async fn shift_or_fail<S: System>(env: &mut Env<S>, pipes: &mut PipeSet, has_nex
     }
 }
 
-async fn connect_pipe_and_execute_command<S: System>(
+async fn connect_pipe_and_execute_command<S: System + 'static>(
     env: &mut Env<S>,
     pipes: PipeSet,
     command: Rc<syntax::Command>,

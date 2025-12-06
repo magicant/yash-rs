@@ -23,6 +23,7 @@ use yash_env::Env;
 use yash_env::semantics::Result;
 use yash_env::signal;
 use yash_env::stack::Frame;
+use yash_env::system::System;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
 use yash_env::trap::Origin;
@@ -39,7 +40,10 @@ use yash_env::trap::TrapSet;
 /// Returns `None` if the signal has not been caught. Otherwise, returns the
 /// result of running the trap action.
 #[must_use]
-pub async fn run_trap_if_caught(env: &mut Env, signal: signal::Number) -> Option<Result> {
+pub async fn run_trap_if_caught<S: System + 'static>(
+    env: &mut Env<S>,
+    signal: signal::Number,
+) -> Option<Result> {
     let trap_state = env.traps.take_signal_if_caught(signal)?;
     let Action::Command(command) = &trap_state.action else {
         return None;
@@ -52,7 +56,7 @@ pub async fn run_trap_if_caught(env: &mut Env, signal: signal::Number) -> Option
     Some(run_trap(env, signal.into(), code, origin).await)
 }
 
-fn in_trap(env: &Env) -> bool {
+fn in_trap<S>(env: &Env<S>) -> bool {
     env.stack
         .iter()
         .rev()
@@ -77,7 +81,7 @@ fn in_trap(env: &Env) -> bool {
 /// not care for the reentrance of trap actions, so we should not assume they
 /// are reentrant. As an exception, this function does run traps in a subshell
 /// executed in a trap.
-pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
+pub async fn run_traps_for_caught_signals<S: System + 'static>(env: &mut Env<S>) -> Result {
     env.poll_signals();
 
     if in_trap(env) {
