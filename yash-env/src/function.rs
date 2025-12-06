@@ -397,19 +397,19 @@ mod tests {
             unreachable!()
         }
     }
-    impl FunctionBody for FunctionBodyStub {
-        async fn execute(&self, _: &mut Env) -> crate::semantics::Result {
+    impl<S> FunctionBody<S> for FunctionBodyStub {
+        async fn execute(&self, _: &mut Env<S>) -> crate::semantics::Result {
             unreachable!()
         }
     }
 
-    fn function_body_stub() -> Rc<dyn FunctionBodyObject> {
+    fn function_body_stub<S>() -> Rc<dyn FunctionBodyObject<S>> {
         Rc::new(FunctionBodyStub)
     }
 
     #[test]
     fn defining_new_function() {
-        let mut set = FunctionSet::new();
+        let mut set = FunctionSet::<()>::new();
         let function = Rc::new(Function::new(
             "foo",
             function_body_stub(),
@@ -423,7 +423,7 @@ mod tests {
 
     #[test]
     fn redefining_existing_function() {
-        let mut set = FunctionSet::new();
+        let mut set = FunctionSet::<()>::new();
         let function1 = Rc::new(Function::new(
             "foo",
             function_body_stub(),
@@ -443,7 +443,7 @@ mod tests {
 
     #[test]
     fn redefining_readonly_function() {
-        let mut set = FunctionSet::new();
+        let mut set = FunctionSet::<()>::new();
         let function1 = Rc::new(
             Function::new("foo", function_body_stub(), Location::dummy("foo 1"))
                 .make_read_only(Location::dummy("readonly")),
@@ -463,7 +463,7 @@ mod tests {
 
     #[test]
     fn unsetting_existing_function() {
-        let mut set = FunctionSet::new();
+        let mut set = FunctionSet::<()>::new();
         let function = Rc::new(Function::new(
             "foo",
             function_body_stub(),
@@ -478,7 +478,7 @@ mod tests {
 
     #[test]
     fn unsetting_nonexisting_function() {
-        let mut set = FunctionSet::new();
+        let mut set = FunctionSet::<()>::new();
 
         let result = set.unset("foo").unwrap();
         assert_eq!(result, None);
@@ -487,7 +487,7 @@ mod tests {
 
     #[test]
     fn unsetting_readonly_function() {
-        let mut set = FunctionSet::new();
+        let mut set = FunctionSet::<()>::new();
         let function = Rc::new(
             Function::new("foo", function_body_stub(), Location::dummy("foo"))
                 .make_read_only(Location::dummy("readonly")),
@@ -500,7 +500,7 @@ mod tests {
 
     #[test]
     fn iteration() {
-        let mut set = FunctionSet::new();
+        let mut set = FunctionSet::<()>::new();
         let function1 = Rc::new(Function::new(
             "foo",
             function_body_stub(),

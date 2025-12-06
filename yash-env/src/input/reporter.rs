@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn reporter_shows_job_status_before_reading_input() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = system.state.clone();
         let mut env = Env::with_system(system);
         env.jobs.add({
@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn all_jobs_with_changed_status_are_reported() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = system.state.clone();
         let mut env = Env::with_system(system);
         env.jobs.add({
@@ -223,7 +223,7 @@ mod tests {
 
     #[test]
     fn no_report_if_not_interactive() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = system.state.clone();
         let mut env = Env::with_system(system);
         env.jobs.add({
@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn no_report_if_not_monitor() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = system.state.clone();
         let mut env = Env::with_system(system);
         env.jobs.add({

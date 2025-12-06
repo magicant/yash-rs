@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn decorator_reads_from_inner_input() {
-        let mut system = Box::new(VirtualSystem::new());
+        let mut system = VirtualSystem::new();
         set_stdin_to_tty(&mut system);
         let mut env = Env::with_system(system);
         env.options.set(Interactive, On);
@@ -219,7 +219,7 @@ mod tests {
 
     #[test]
     fn decorator_reads_input_again_on_eof() {
-        let mut system = Box::new(VirtualSystem::new());
+        let mut system = VirtualSystem::new();
         set_stdin_to_tty(&mut system);
         let state = system.state.clone();
         let mut env = Env::with_system(system);
@@ -246,7 +246,7 @@ mod tests {
 
     #[test]
     fn decorator_reads_input_up_to_50_times() {
-        let mut system = Box::new(VirtualSystem::new());
+        let mut system = VirtualSystem::new();
         set_stdin_to_tty(&mut system);
         let state = system.state.clone();
         let mut env = Env::with_system(system);
@@ -275,7 +275,7 @@ mod tests {
 
     #[test]
     fn decorator_returns_empty_line_after_reading_51_times() {
-        let mut system = Box::new(VirtualSystem::new());
+        let mut system = VirtualSystem::new();
         set_stdin_to_tty(&mut system);
         let state = system.state.clone();
         let mut env = Env::with_system(system);
@@ -304,7 +304,7 @@ mod tests {
 
     #[test]
     fn decorator_returns_immediately_if_not_interactive() {
-        let mut system = Box::new(VirtualSystem::new());
+        let mut system = VirtualSystem::new();
         set_stdin_to_tty(&mut system);
         let state = system.state.clone();
         let mut env = Env::with_system(system);
@@ -331,7 +331,7 @@ mod tests {
 
     #[test]
     fn decorator_returns_immediately_if_not_ignore_eof() {
-        let mut system = Box::new(VirtualSystem::new());
+        let mut system = VirtualSystem::new();
         set_stdin_to_tty(&mut system);
         let state = system.state.clone();
         let mut env = Env::with_system(system);
@@ -358,7 +358,7 @@ mod tests {
 
     #[test]
     fn decorator_returns_immediately_if_not_terminal() {
-        let mut system = Box::new(VirtualSystem::new());
+        let mut system = VirtualSystem::new();
         set_stdin_to_regular_file(&mut system);
         let state = system.state.clone();
         let mut env = Env::with_system(system);

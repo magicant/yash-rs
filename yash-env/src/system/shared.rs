@@ -820,7 +820,7 @@ mod tests {
 
     #[test]
     fn shared_system_read_async_ready() {
-        let mut system = SharedSystem::new(Box::new(VirtualSystem::new()));
+        let mut system = SharedSystem::new(VirtualSystem::new());
         let (reader, writer) = system.pipe().unwrap();
         system.write(writer, &[42]).unwrap();
 
@@ -835,7 +835,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(Box::new(system));
+        let mut system = SharedSystem::new(system);
         let system2 = system.clone();
         let (reader, writer) = system.pipe().unwrap();
 
@@ -864,7 +864,7 @@ mod tests {
 
     #[test]
     fn shared_system_write_all_ready() {
-        let mut system = SharedSystem::new(Box::new(VirtualSystem::new()));
+        let mut system = SharedSystem::new(VirtualSystem::new());
         let (reader, writer) = system.pipe().unwrap();
         let result = system.write_all(writer, &[17]).now_or_never().unwrap();
         assert_eq!(result, Ok(1));
@@ -879,7 +879,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(Box::new(system));
+        let mut system = SharedSystem::new(system);
         let (reader, writer) = system.pipe().unwrap();
 
         state.borrow_mut().processes[&process_id].fds[&writer]
@@ -939,7 +939,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(Box::new(system));
+        let mut system = SharedSystem::new(system);
         let (_reader, writer) = system.pipe().unwrap();
 
         state.borrow_mut().processes[&process_id].fds[&writer]
@@ -962,7 +962,7 @@ mod tests {
     fn shared_system_wait_until() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let system = SharedSystem::new(Box::new(system));
+        let system = SharedSystem::new(system);
         let start = Instant::now();
         state.borrow_mut().now = Some(start);
         let target = start + Duration::from_millis(1_125);
@@ -983,7 +983,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(Box::new(system));
+        let mut system = SharedSystem::new(system);
         system.set_disposition(SIGCHLD, Disposition::Catch).unwrap();
         system.set_disposition(SIGINT, Disposition::Catch).unwrap();
         system.set_disposition(SIGUSR1, Disposition::Catch).unwrap();
@@ -1019,7 +1019,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(Box::new(system));
+        let mut system = SharedSystem::new(system);
         system.set_disposition(SIGCHLD, Disposition::Catch).unwrap();
 
         let mut context = Context::from_waker(Waker::noop());
@@ -1046,7 +1046,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(Box::new(system));
+        let mut system = SharedSystem::new(system);
         system.set_disposition(SIGINT, Disposition::Catch).unwrap();
         system.set_disposition(SIGTERM, Disposition::Catch).unwrap();
 
@@ -1072,7 +1072,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(Box::new(system));
+        let mut system = SharedSystem::new(system);
         system.set_disposition(SIGINT, Disposition::Catch).unwrap();
         system.set_disposition(SIGTERM, Disposition::Catch).unwrap();
 
@@ -1097,7 +1097,7 @@ mod tests {
     #[test]
     fn shared_system_select_does_not_wake_signal_waiters_on_io() {
         let system = VirtualSystem::new();
-        let mut system_1 = SharedSystem::new(Box::new(system));
+        let mut system_1 = SharedSystem::new(system);
         let mut system_2 = system_1.clone();
         let mut system_3 = system_1.clone();
         let (reader, writer) = system_1.pipe().unwrap();
@@ -1126,7 +1126,7 @@ mod tests {
     fn shared_system_select_poll() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let system = SharedSystem::new(Box::new(system));
+        let system = SharedSystem::new(system);
         let start = Instant::now();
         state.borrow_mut().now = Some(start);
         let target = start + Duration::from_millis(1_125);

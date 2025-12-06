@@ -581,7 +581,7 @@ mod tests {
     /// Helper function to perform a test in a virtual system with an executor.
     pub fn in_virtual_system<F, Fut, T>(f: F) -> T
     where
-        F: FnOnce(Env, Rc<RefCell<SystemState>>) -> Fut,
+        F: FnOnce(Env<VirtualSystem>, Rc<RefCell<SystemState>>) -> Fut,
         Fut: Future<Output = T> + 'static,
         T: 'static,
     {
@@ -590,7 +590,7 @@ mod tests {
         let mut executor = futures_executor::LocalPool::new();
         state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
 
-        let env = Env::with_system(Box::new(system));
+        let env = Env::with_system(system);
         let shared_system = env.system.clone();
         let task = f(env, Rc::clone(&state));
         let mut task = executor.spawner().spawn_local_with_handle(task).unwrap();
@@ -641,10 +641,9 @@ mod tests {
         })
     }
 
-    fn poll_signals_env() -> (Env, VirtualSystem) {
+    fn poll_signals_env() -> (Env<VirtualSystem>, VirtualSystem) {
         let system = VirtualSystem::new();
-        let shared_system = SharedSystem::new(Box::new(system.clone()));
-        let mut env = Env::with_system(Box::new(shared_system));
+        let mut env = Env::with_system(system.clone());
         env.traps
             .set_action(
                 &mut env.system,
@@ -688,7 +687,7 @@ mod tests {
             .file_system
             .save("/dev/tty", Rc::clone(&tty))
             .unwrap();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
 
         let fd = env.get_tty().unwrap();
         assert!(
@@ -748,7 +747,7 @@ mod tests {
         let system = VirtualSystem::new();
         let mut executor = LocalPool::new();
         system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         executor.run_until(async move {
             let result = env.wait_for_subshell(Pid::ALL).await;
             assert_eq!(result, Err(Errno::ECHILD));
@@ -767,7 +766,7 @@ mod tests {
         let mut executor = futures_executor::LocalPool::new();
         system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
 
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
 
         let [job_1, job_2, job_3] = executor.run_until(async {
             // Run a subshell.

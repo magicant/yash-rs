@@ -87,7 +87,7 @@ mod tests {
 
     #[test]
     fn verbose_off() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let ref_env = RefCell::new(&mut env);
@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn verbose_on() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         env.options.set(Verbose, On);

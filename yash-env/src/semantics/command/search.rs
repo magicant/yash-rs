@@ -298,8 +298,8 @@ mod tests {
 
     #[derive(Default)]
     struct DummyEnv {
-        builtins: HashMap<&'static str, Builtin>,
-        functions: FunctionSet,
+        builtins: HashMap<&'static str, Builtin<()>>,
+        functions: FunctionSet<()>,
         path: Expansion<'static>,
         executables: HashSet<String>,
     }
@@ -317,11 +317,11 @@ mod tests {
         }
     }
 
-    impl ClassifyEnv for DummyEnv {
-        fn builtin(&self, name: &str) -> Option<Builtin> {
+    impl ClassifyEnv<()> for DummyEnv {
+        fn builtin(&self, name: &str) -> Option<Builtin<()>> {
             self.builtins.get(name).copied()
         }
-        fn function(&self, name: &str) -> Option<&Rc<Function>> {
+        fn function(&self, name: &str) -> Option<&Rc<Function<()>>> {
             self.functions.get(name)
         }
     }
@@ -334,13 +334,13 @@ mod tests {
             unreachable!()
         }
     }
-    impl FunctionBody for FunctionBodyStub {
-        async fn execute(&self, _: &mut Env) -> crate::semantics::Result {
+    impl<S> FunctionBody<S> for FunctionBodyStub {
+        async fn execute(&self, _: &mut Env<S>) -> crate::semantics::Result {
             unreachable!()
         }
     }
 
-    fn function_body_stub() -> Rc<dyn FunctionBodyObject> {
+    fn function_body_stub<S>() -> Rc<dyn FunctionBodyObject<S>> {
         Rc::new(FunctionBodyStub)
     }
 
