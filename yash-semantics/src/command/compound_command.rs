@@ -177,7 +177,7 @@ mod tests {
     #[test]
     fn stack_in_condition() {
         fn stub_builtin(
-            env: &mut Env,
+            env: &mut Env<VirtualSystem>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
@@ -204,7 +204,7 @@ mod tests {
     fn redirecting_compound_command() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         let command: syntax::FullCompoundCommand = "{ echo 1; echo 2; } > /file".parse().unwrap();
         let result = command.execute(&mut env).now_or_never().unwrap();
@@ -222,7 +222,7 @@ mod tests {
     fn tracing_redirections() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.options.set(yash_env::option::Option::XTrace, On);
         let command: syntax::FullCompoundCommand = "{ echo X; } > /file < /file".parse().unwrap();
@@ -236,7 +236,7 @@ mod tests {
     fn redirection_error_prevents_command_execution() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         let command: syntax::FullCompoundCommand =
             "{ echo not reached; } < /no/such/file".parse().unwrap();

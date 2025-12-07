@@ -204,7 +204,7 @@ mod tests {
     fn function_definition_read_only() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         let function = Rc::new(Function {
             name: "foo".to_string(),
             body: FunctionBodyStub::rc_dyn(),

@@ -102,7 +102,7 @@ mod tests {
     #[test]
     fn command_handles_traps() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         env.builtins.insert("echo", echo_builtin());
         env.traps
             .set_action(

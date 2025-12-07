@@ -65,10 +65,10 @@ mod tests {
     use yash_env_test_helper::assert_stdout;
     use yash_syntax::syntax::CompoundCommand;
 
-    fn fixture() -> (Env, Rc<RefCell<SystemState>>) {
+    fn fixture() -> (Env<VirtualSystem>, Rc<RefCell<SystemState>>) {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         (env, state)

@@ -124,9 +124,9 @@ mod tests {
     use yash_env_test_helper::assert_stdout;
     use yash_syntax::source::Location;
 
-    fn signal_env() -> (Env, VirtualSystem) {
+    fn signal_env() -> (Env<VirtualSystem>, VirtualSystem) {
         let system = VirtualSystem::default();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         env.builtins.insert("echo", echo_builtin());
         env.traps
             .set_action(
@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn stack_frame_in_trap_action() {
         fn execute(
-            env: &mut Env,
+            env: &mut Env<VirtualSystem>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
@@ -220,7 +220,7 @@ mod tests {
             })
         }
         let system = VirtualSystem::default();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         env.builtins.insert(
             "check",
             Builtin::new(yash_env::builtin::Type::Mandatory, execute),

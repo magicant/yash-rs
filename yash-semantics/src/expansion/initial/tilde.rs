@@ -156,7 +156,7 @@ mod tests {
 
     #[test]
     fn existing_user_home_directory() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         system
             .state
             .borrow_mut()

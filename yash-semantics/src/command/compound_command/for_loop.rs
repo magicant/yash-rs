@@ -149,7 +149,7 @@ mod tests {
     fn without_words_with_one_positional_parameters() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.variables.positional_params_mut().values = vec!["foo".to_string()];
         let command: CompoundCommand = "for v do echo :$v:; done".parse().unwrap();
@@ -164,7 +164,7 @@ mod tests {
     fn without_words_with_many_positional_parameters() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.variables.positional_params_mut().values =
             vec!["1".to_string(), "2".to_string(), "three".to_string()];
@@ -180,7 +180,7 @@ mod tests {
     fn with_one_word() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         let command: CompoundCommand = "for v in 1; do echo :$v:; done".parse().unwrap();
 
@@ -194,7 +194,7 @@ mod tests {
     fn with_many_words() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         let command: CompoundCommand = "for v in baz bar foo; do echo +$v+; done".parse().unwrap();
 
@@ -209,7 +209,7 @@ mod tests {
     #[test]
     fn stack_frame_in_loop() {
         fn execute(
-            env: &mut Env,
+            env: &mut Env<VirtualSystem>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
@@ -234,7 +234,7 @@ mod tests {
     fn xtrace_of_for_loop() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.options.set(yash_env::option::Option::XTrace, On);
         let command: CompoundCommand = r"for i in 1 \$ 3; do echo $i; done".parse().unwrap();
@@ -248,7 +248,7 @@ mod tests {
     fn return_from_loop() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         let command = "for i in 1; do return -n 5; return 2; echo X; done";
@@ -264,7 +264,7 @@ mod tests {
     fn break_for_loop() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("break", break_builtin());
         env.builtins.insert("echo", echo_builtin());
         env.exit_status = ExitStatus(123);
@@ -282,7 +282,7 @@ mod tests {
     fn break_outer_loop() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("break", break_builtin());
         env.builtins.insert("echo", echo_builtin());
         let command: CompoundCommand = "for i in 1 2 3; do echo a; break $n; echo b; done"
@@ -307,7 +307,7 @@ mod tests {
     fn continue_for_loop() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("continue", continue_builtin());
         env.builtins.insert("echo", echo_builtin());
         env.exit_status = ExitStatus(123);
@@ -325,7 +325,7 @@ mod tests {
     fn continue_outer_loop() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("continue", continue_builtin());
         env.builtins.insert("echo", echo_builtin());
         let command: CompoundCommand = "for i in 1 2 3; do echo a; continue $n; echo b; done"
@@ -350,7 +350,7 @@ mod tests {
     fn expansion_error_in_name() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         let command: CompoundCommand = "for $() do echo unreached; done".parse().unwrap();
 
@@ -364,7 +364,7 @@ mod tests {
     fn errexit_with_expansion_error_in_name() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.options.set(ErrExit, On);
         let command: CompoundCommand = "for $() do echo unreached; done".parse().unwrap();
@@ -379,7 +379,7 @@ mod tests {
     fn expansion_error_in_words() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         let command: CompoundCommand = "for x in $(); do echo unreached; done".parse().unwrap();
 
@@ -393,7 +393,7 @@ mod tests {
     fn errexit_with_expansion_error_in_words() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.options.set(ErrExit, On);
         let command: CompoundCommand = "for x in $(); do echo unreached; done".parse().unwrap();
@@ -408,7 +408,7 @@ mod tests {
     fn assignment_error_with_read_only_variable() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         let mut var = env.variables.get_or_new("x", Scope::Global);
         var.assign("", None).unwrap();
@@ -425,7 +425,7 @@ mod tests {
     fn errexit_with_assignment_error_with_read_only_variable() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.options.set(ErrExit, On);
         let mut var = env.variables.get_or_new("x", Scope::Global);

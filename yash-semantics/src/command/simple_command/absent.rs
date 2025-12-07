@@ -157,7 +157,7 @@ mod tests {
     fn simple_command_handles_subshell_error_with_absent_target() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         let command: syntax::SimpleCommand = ">/tmp/foo".parse().unwrap();
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
@@ -191,7 +191,7 @@ mod tests {
     fn simple_command_handles_assignment_error_with_absent_target() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         let mut var = env.variables.get_or_new("a", Scope::Global);
         var.assign("", None).unwrap();
         var.make_read_only(Location::dummy("ROL"));

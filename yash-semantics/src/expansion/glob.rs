@@ -309,7 +309,7 @@ mod tests {
         AttrField { chars, origin }
     }
 
-    fn env_with_dummy_files<I, P>(paths: I) -> Env
+    fn env_with_dummy_files<I, P>(paths: I) -> Env<VirtualSystem>
     where
         I: IntoIterator<Item = P>,
         P: AsRef<Path>,
@@ -320,7 +320,7 @@ mod tests {
             state.file_system.save(path, Rc::default()).unwrap();
         }
         drop(state);
-        Env::with_system(Box::new(system))
+        Env::with_system(system)
     }
 
     #[test]
@@ -490,7 +490,7 @@ mod tests {
             let dir = state.file_system.get("foo").unwrap();
             dir.borrow_mut().permissions = Mode::ALL_READ | Mode::ALL_WRITE;
         }
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         let f = dummy_attr_field("foo/*");
         let mut i = glob(&mut env, f);
         assert_eq!(i.next().unwrap().value, "foo/bar");

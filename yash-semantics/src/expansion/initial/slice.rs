@@ -69,8 +69,8 @@ mod tests {
         }
     }
 
-    impl Expand for Stub {
-        async fn expand(&self, _: &mut Env<'_>) -> Result<Phrase, Error> {
+    impl<S> Expand<S> for Stub {
+        async fn expand(&self, _: &mut Env<'_, S>) -> Result<Phrase, Error> {
             self.0.take().expect("expand should be called only once")
         }
     }

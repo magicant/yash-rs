@@ -75,7 +75,7 @@ mod tests {
 
     #[test]
     fn runs_exit_trap() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn stack_frame_in_trap_action() {
         fn execute(
-            env: &mut Env,
+            env: &mut Env<VirtualSystem>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
@@ -142,7 +142,7 @@ mod tests {
 
     #[test]
     fn exit_status_inside_trap() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());

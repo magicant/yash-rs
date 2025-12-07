@@ -105,7 +105,7 @@ mod tests {
     #[test]
     fn divert_in_subshell() {
         fn exit_builtin(
-            _env: &mut Env,
+            _env: &mut Env<VirtualSystem>,
             _args: Vec<yash_env::semantics::Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
@@ -133,7 +133,7 @@ mod tests {
     fn error_starting_subshell() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         let command: CompoundCommand = "(foo=bar; echo $foo; return -n 123)".parse().unwrap();
@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn exit_trap() {
         fn trap_builtin(
-            env: &mut Env,
+            env: &mut Env<VirtualSystem>,
             _args: Vec<yash_env::semantics::Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {

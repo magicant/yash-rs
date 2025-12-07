@@ -306,6 +306,7 @@ mod tests {
     use super::*;
     use crate::tests::echo_builtin;
     use futures_util::FutureExt;
+    use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::variable::Scope::Global;
     use yash_env_test_helper::in_virtual_system;
 
@@ -320,7 +321,7 @@ mod tests {
         assert_eq!(xtrace.here_doc_contents, "");
     }
 
-    fn fixture() -> Env {
+    fn fixture() -> Env<VirtualSystem> {
         let mut env = Env::new_virtual();
         env.variables
             .get_or_new(PS4, Global)

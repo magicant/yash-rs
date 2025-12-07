@@ -583,7 +583,7 @@ mod tests {
     #[test]
     fn stack_without_inversion() {
         fn stub_builtin(
-            env: &mut Env,
+            env: &mut Env<VirtualSystem>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
@@ -603,7 +603,7 @@ mod tests {
     #[test]
     fn stack_with_inversion() {
         fn stub_builtin(
-            env: &mut Env,
+            env: &mut Env<VirtualSystem>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
@@ -626,7 +626,7 @@ mod tests {
     #[test]
     fn process_group_id_of_job_controlled_pipeline() {
         fn stub_builtin(
-            env: &mut Env,
+            env: &mut Env<VirtualSystem>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             let pgid = env.system.getpgrp().0 as _;
@@ -677,7 +677,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         let mut pipes = PipeSet::new();
 
         let result = pipes.shift(&mut env, true);
@@ -695,7 +695,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         let mut pipes = PipeSet::new();
 
         let _ = pipes.shift(&mut env, true);
@@ -715,7 +715,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         let mut pipes = PipeSet::new();
 
         let _ = pipes.shift(&mut env, true);
