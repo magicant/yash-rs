@@ -11,10 +11,20 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.14.0] - Unreleased
 
+### Added
+
+- `iter`: This function returns an iterator over all built-in commands.
+
 ### Changed
 
 - Public dependency versions:
     - yash-env 0.10.0 → 0.11.0
+
+### Removed
+
+- `BUILTINS` has been removed because the `Builtin` struct now has a type
+  parameter that prevents declaration of the constant. Use the new `iter`
+  function to list all built-in commands instead.
 
 ## [0.13.0] - 2025-11-26
 
