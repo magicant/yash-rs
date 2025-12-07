@@ -15,6 +15,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Public dependency versions:
     - yash-env 0.10.0 → 0.11.0
+- The `env_prep_hook` parameter in the
+  `command::simple_command::execute_function_body` function no longer requires
+  the static lifetime for the returned future.
 
 ### Removed
 

@@ -57,7 +57,7 @@ pub async fn execute_function(
     execute_function_body(&mut env, function, fields, None).await
 }
 
-type EnvPrepHook = fn(&mut Env) -> Pin<Box<dyn Future<Output = ()>>>;
+type EnvPrepHook = fn(&mut Env) -> Pin<Box<dyn Future<Output = ()> + '_>>;
 
 /// Executes the body of the function.
 ///
