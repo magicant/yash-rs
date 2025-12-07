@@ -56,7 +56,7 @@ impl Executor for LocalExecutor {
 /// that need to be run concurrently with the main task.
 pub fn in_virtual_system<F, Fut, T>(f: F) -> T
 where
-    F: FnOnce(Env, Rc<RefCell<SystemState>>) -> Fut,
+    F: FnOnce(Env<VirtualSystem>, Rc<RefCell<SystemState>>) -> Fut,
     Fut: Future<Output = T> + 'static,
     T: 'static,
 {
@@ -65,7 +65,7 @@ where
     let mut executor = futures_executor::LocalPool::new();
     state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
 
-    let env = Env::with_system(Box::new(system));
+    let env = Env::with_system(system);
     let shared_system = env.system.clone();
     let task = f(env, Rc::clone(&state));
     let mut task = executor.spawner().spawn_local_with_handle(task).unwrap();
@@ -105,7 +105,7 @@ pub fn stub_tty(state: &RefCell<SystemState>) {
 /// # use yash_env::system::System;
 /// # use yash_env::system::r#virtual::VirtualSystem;
 /// # use yash_env_test_helper::assert_stdout;
-/// let system = Box::new(VirtualSystem::new());
+/// let system = VirtualSystem::new();
 /// let state = Rc::clone(&system.state);
 /// let mut env = Env::with_system(system);
 /// env.system.write(Fd::STDOUT, b"Hello, world!\n").unwrap();

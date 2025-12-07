@@ -37,7 +37,7 @@ impl FunctionBodyStub {
     /// Suitable for passing to [`yash_env::function::Function::new`].
     #[inline]
     #[must_use]
-    pub fn rc_dyn() -> Rc<dyn FunctionBodyObject> {
+    pub fn rc_dyn<S>() -> Rc<dyn FunctionBodyObject<S>> {
         Rc::new(Self::new())
     }
 }
@@ -50,8 +50,8 @@ impl std::fmt::Display for FunctionBodyStub {
 }
 
 /// Always panics when executed.
-impl FunctionBody for FunctionBodyStub {
-    async fn execute(&self, _: &mut Env) -> yash_env::semantics::Result {
+impl<S> FunctionBody<S> for FunctionBodyStub {
+    async fn execute(&self, _: &mut Env<S>) -> yash_env::semantics::Result {
         unreachable!("unexpected call to FunctionBodyStub::execute")
     }
 }
