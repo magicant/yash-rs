@@ -83,7 +83,7 @@ use std::time::Instant;
 /// ```
 /// # use yash_env::{SharedSystem, System, VirtualSystem};
 /// # use futures_util::task::LocalSpawnExt;
-/// let mut system = SharedSystem::new(Box::new(VirtualSystem::new()));
+/// let mut system = SharedSystem::new(VirtualSystem::new());
 /// let mut system2 = system.clone();
 /// let mut system3 = system.clone();
 /// let (reader, writer) = system.pipe().unwrap();

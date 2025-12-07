@@ -505,9 +505,9 @@ type PinFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 /// [`yash-semantics` crate](https://crates.io/crates/yash-semantics):
 ///
 /// ```
-/// # use yash_env::trap::RunSignalTrapIfCaught;
+/// # use yash_env::{VirtualSystem, trap::RunSignalTrapIfCaught};
 /// let mut env = yash_env::Env::new_virtual();
-/// env.any.insert(Box::new(RunSignalTrapIfCaught(|env, signal| {
+/// env.any.insert(Box::new(RunSignalTrapIfCaught::<VirtualSystem>(|env, signal| {
 ///     Box::pin(async move { yash_semantics::trap::run_trap_if_caught(env, signal).await })
 /// })));
 /// ```

@@ -51,9 +51,9 @@ type PinFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 /// expand the prompt string.
 ///
 /// ```
-/// # use yash_env::prompt::GetPrompt;
+/// # use yash_env::{VirtualSystem, prompt::GetPrompt};
 /// let mut env = yash_env::Env::new_virtual();
-/// env.any.insert(Box::new(GetPrompt(|env, context| {
+/// env.any.insert(Box::new(GetPrompt::<VirtualSystem>(|env, context| {
 ///     Box::pin(async move {
 ///         let prompt = yash_prompt::fetch_posix(&env.variables, &context);
 ///         yash_prompt::expand_posix(env, &prompt, false).await

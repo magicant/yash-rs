@@ -67,9 +67,9 @@ type EnvPrepHook<S> = fn(&mut Env<S>) -> PinFuture<'_, ()>;
 /// [`yash-semantics` crate](https://crates.io/crates/yash-semantics):
 ///
 /// ```
-/// # use yash_env::semantics::command::RunFunction;
+/// # use yash_env::{VirtualSystem, semantics::command::RunFunction};
 /// let mut env = yash_env::Env::new_virtual();
-/// env.any.insert(Box::new(RunFunction(|env, function, fields, env_prep_hook| {
+/// env.any.insert(Box::new(RunFunction::<VirtualSystem>(|env, function, fields, env_prep_hook| {
 ///     Box::pin(async move {
 ///         yash_semantics::command::simple_command::execute_function_body(
 ///             env, function, fields, env_prep_hook
