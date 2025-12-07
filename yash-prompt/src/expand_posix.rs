@@ -47,16 +47,26 @@ type ExpandTextResult = Option<(String, Option<ExitStatus>)>;
 /// [`yash-semantics` crate](https://crates.io/crates/yash-semantics):
 ///
 /// ```
+/// # use yash_env::{Env, VirtualSystem};
 /// # use yash_prompt::ExpandText;
-/// let mut env = yash_env::Env::new_virtual();
-/// env.any.insert(Box::new(ExpandText(|env, text| {
+/// let mut env = Env::new_virtual();
+/// env.any.insert(Box::new(ExpandText::<VirtualSystem>(|env, text| {
 ///     Box::pin(async move { yash_semantics::expansion::expand_text(env, text).await.ok() })
 /// })));
 /// ```
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 pub struct ExpandText<S>(
     pub for<'a> fn(&'a mut Env<S>, &'a Text) -> PinFuture<'a, ExpandTextResult>,
 );
+
+// Not derived automatically because S may not implement Clone or Copy.
+impl<S> Clone for ExpandText<S> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<S> Copy for ExpandText<S> {}
 
 /// Expands the prompt string according to the POSIX standard.
 ///

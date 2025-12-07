@@ -109,7 +109,7 @@ mod tests {
     use yash_env::variable::Value;
     use yash_env_test_helper::assert_stderr;
 
-    fn define_variable<N: Into<String>, V: Into<Value>>(env: &mut Env, name: N, value: V) {
+    fn define_variable<S, N: Into<String>, V: Into<Value>>(env: &mut Env<S>, name: N, value: V) {
         env.variables
             .get_or_new(name, yash_env::variable::Scope::Global)
             .assign(value, None)
@@ -130,7 +130,7 @@ mod tests {
 
     #[test]
     fn prompter_shows_prompt_before_reading() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = env_with_expand_text_and_system(system);
         define_variable(&mut env, PS1, PS1_INITIAL_VALUE_NON_ROOT);
@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn ps1_variable_defines_main_prompt() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = env_with_expand_text_and_system(system);
         define_variable(&mut env, PS1, "my_custom_prompt !! >");
@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn ps2_variable_defines_continuation_prompt() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = env_with_expand_text_and_system(system);
         define_variable(&mut env, PS2, "continuation ! >");
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn parameter_expansion_in_prompt_string() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = env_with_expand_text_and_system(system);
         define_variable(&mut env, PS1, "$X $ ");
