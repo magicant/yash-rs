@@ -249,7 +249,6 @@ pub type Main<S> = fn(&mut Env<S>, Vec<Field>) -> Pin<Box<dyn Future<Output = Re
 /// <https://doc.rust-lang.org/std/ptr/fn.fn_addr_eq.html> for the
 /// characteristics of function pointer comparisons.
 #[allow(unpredictable_function_pointer_comparisons)]
-#[derive(Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct Builtin<S> {
     /// Type of the built-in
@@ -284,6 +283,25 @@ impl<S> Debug for Builtin<S> {
             .field("type", &self.r#type)
             .field("is_declaration_utility", &self.is_declaration_utility)
             .finish_non_exhaustive()
+    }
+}
+
+// Not derived automatically because S may not implement PartialEq, Eq, or Hash.
+impl<S> PartialEq for Builtin<S> {
+    fn eq(&self, other: &Self) -> bool {
+        self.r#type == other.r#type
+            && std::ptr::fn_addr_eq(self.execute, other.execute)
+            && self.is_declaration_utility == other.is_declaration_utility
+    }
+}
+
+impl<S> Eq for Builtin<S> {}
+
+impl<S> std::hash::Hash for Builtin<S> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.r#type.hash(state);
+        self.execute.hash(state);
+        self.is_declaration_utility.hash(state);
     }
 }
 
