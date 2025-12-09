@@ -68,7 +68,6 @@ impl<S, T: FunctionBody<S> + ?Sized> FunctionBodyObject<S> for T {
 }
 
 /// Definition of a function.
-#[derive(Debug)]
 pub struct Function<S> {
     /// String that identifies the function.
     pub name: String,
@@ -156,6 +155,18 @@ impl<S> PartialEq for Function<S> {
 }
 
 impl<S> Eq for Function<S> {}
+
+// Not derived automatically because S may not implement Debug
+impl<S> std::fmt::Debug for Function<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Function")
+            .field("name", &self.name)
+            .field("body", &self.body)
+            .field("origin", &self.origin)
+            .field("read_only_location", &self.read_only_location)
+            .finish()
+    }
+}
 
 /// Wrapper of [`Function`] for inserting into a hash set.
 ///
