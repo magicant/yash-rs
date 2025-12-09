@@ -60,7 +60,6 @@ use std::rc::Rc;
 /// relying on equality comparisons for values of this type. See
 /// <https://doc.rust-lang.org/std/ptr/fn.fn_addr_eq.html> for the
 /// characteristics of function pointer comparisons.
-#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Target<S> {
     /// Built-in utility
     Builtin {
@@ -96,6 +95,56 @@ pub enum Target<S> {
         /// external utility actually exists.
         path: CString,
     },
+}
+
+// Not derived automatically because S may not implement Clone, PartialEq, or Debug.
+impl<S> Clone for Target<S> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Builtin { builtin, path } => Self::Builtin {
+                builtin: builtin.clone(),
+                path: path.clone(),
+            },
+            Self::Function(f) => Self::Function(f.clone()),
+            Self::External { path } => Self::External { path: path.clone() },
+        }
+    }
+}
+
+impl<S> PartialEq for Target<S> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Self::Builtin {
+                    builtin: l_builtin,
+                    path: l_path,
+                },
+                Self::Builtin {
+                    builtin: r_builtin,
+                    path: r_path,
+                },
+            ) => l_builtin == r_builtin && l_path == r_path,
+            (Self::Function(l), Self::Function(r)) => l == r,
+            (Self::External { path: l_path }, Self::External { path: r_path }) => l_path == r_path,
+            _ => false,
+        }
+    }
+}
+
+impl<S> Eq for Target<S> {}
+
+impl<S> std::fmt::Debug for Target<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Builtin { builtin, path } => f
+                .debug_struct("Builtin")
+                .field("builtin", builtin)
+                .field("path", path)
+                .finish(),
+            Self::Function(func) => f.debug_tuple("Function").field(func).finish(),
+            Self::External { path } => f.debug_struct("External").field("path", path).finish(),
+        }
+    }
 }
 
 impl<S> From<Rc<Function<S>>> for Target<S> {
