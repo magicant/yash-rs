@@ -33,6 +33,7 @@ use crate::system::SelectSystem;
 use crate::system::resource::INFINITY;
 use crate::system::resource::LimitPair;
 use crate::system::resource::Resource;
+use crate::system::r#virtual::VirtualSystem;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -111,7 +112,7 @@ pub struct Process {
     /// This weak reference is empty for the initial process of a
     /// `VirtualSystem`.  When a new child process is created, a weak reference
     /// to the `SelectSystem` for the child is set.
-    pub(crate) selector: Weak<RefCell<SelectSystem>>,
+    pub(crate) selector: Weak<RefCell<SelectSystem<VirtualSystem>>>,
 
     /// Copy of arguments passed to [`execve`](crate::System::execve)
     pub(crate) last_exec: Option<(CString, Vec<CString>, Vec<CString>)>,

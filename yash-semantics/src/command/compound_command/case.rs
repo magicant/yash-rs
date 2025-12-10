@@ -29,13 +29,14 @@ use std::ops::ControlFlow::Continue;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
+use yash_env::system::System;
 use yash_fnmatch::Config;
 use yash_fnmatch::Pattern;
 use yash_quote::quoted;
 use yash_syntax::syntax::CaseItem;
 use yash_syntax::syntax::Word;
 
-async fn trace_subject(env: &mut Env, value: &str) {
+async fn trace_subject<S: System + 'static>(env: &mut Env<S>, value: &str) {
     if let Some(mut xtrace) = XTrace::from_options(&env.options) {
         write!(xtrace.words(), "case {} in ", quoted(value)).unwrap();
         print(env, xtrace).await;
@@ -52,7 +53,11 @@ fn config() -> Config {
 }
 
 /// Executes the case command.
-pub async fn execute(env: &mut Env, subject: &Word, items: &[CaseItem]) -> Result {
+pub async fn execute<S: System + 'static>(
+    env: &mut Env<S>,
+    subject: &Word,
+    items: &[CaseItem],
+) -> Result {
     let subject = match expand_word(env, subject).await {
         Ok((expansion, _exit_status)) => expansion,
         Err(error) => return error.handle(env).await,
@@ -91,8 +96,8 @@ pub async fn execute(env: &mut Env, subject: &Word, items: &[CaseItem]) -> Resul
 ///
 /// Each pattern is expanded and matched against the subject.
 /// Returns the error if any expansion fails.
-async fn matches(
-    env: &mut Env,
+async fn matches<S: System + 'static>(
+    env: &mut Env<S>,
     subject: &str,
     patterns: &[Word],
 ) -> crate::expansion::Result<bool> {
@@ -135,10 +140,10 @@ mod tests {
     use yash_env_test_helper::in_virtual_system;
     use yash_syntax::syntax::CompoundCommand;
 
-    fn fixture() -> (Env, Rc<RefCell<SystemState>>) {
+    fn fixture() -> (Env<VirtualSystem>, Rc<RefCell<SystemState>>) {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         (env, state)

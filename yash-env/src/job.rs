@@ -940,8 +940,8 @@ impl JobList {
 ///
 /// Returns the exit status of the process that should be assigned to
 /// `env.exit_status`.
-pub fn add_job_if_suspended<F>(
-    env: &mut Env,
+pub fn add_job_if_suspended<S, F>(
+    env: &mut Env<S>,
     pid: Pid,
     result: ProcessResult,
     name: F,

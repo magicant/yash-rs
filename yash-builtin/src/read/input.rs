@@ -23,7 +23,7 @@ use yash_env::prompt::GetPrompt;
 use yash_env::semantics::expansion::attr::AttrChar;
 use yash_env::semantics::expansion::attr::Origin;
 use yash_env::source::pretty::{Report, ReportType};
-use yash_env::system::Errno;
+use yash_env::system::{Errno, System};
 
 /// Error reading from the standard input
 ///
@@ -101,8 +101,8 @@ fn plain(value: char) -> AttrChar {
 /// the line read and a boolean value indicating whether the line was terminated
 /// by a delimiter. If the end of the input is reached before finding a
 /// delimiter, the boolean value is `false`.
-pub async fn read(
-    env: &mut Env,
+pub async fn read<S: System + 'static>(
+    env: &mut Env<S>,
     delimiter: u8,
     is_raw: bool,
 ) -> Result<(Vec<AttrChar>, bool), Error> {
@@ -142,7 +142,7 @@ pub async fn read(
 /// This function reads a single UTF-8-encoded character from the standard
 /// input. If the standard input is empty, this function returns `Ok(None)`.
 /// If the input is not a valid UTF-8 sequence, this function returns an error.
-async fn read_char(env: &mut Env) -> Result<Option<char>, Error> {
+async fn read_char<S: System>(env: &mut Env<S>) -> Result<Option<char>, Error> {
     // Any character is at most 4 bytes in UTF-8.
     let mut buffer = [0; 4];
     let mut len = 0;
@@ -193,8 +193,7 @@ async fn read_char(env: &mut Env) -> Result<Option<char>, Error> {
 /// This function requires a [`GetPrompt`] instance to be in the environment's
 /// [`any`](Env::any) storage. If no such instance is found, this function
 /// **panics**.
-async fn print_prompt(env: &mut Env) {
-    use yash_env::System as _;
+async fn print_prompt<S: System + 'static>(env: &mut Env<S>) {
     if !env.is_interactive() || !env.system.isatty(Fd::STDIN) {
         return;
     }

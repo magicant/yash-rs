@@ -36,6 +36,7 @@ use yash_env::semantics::Field;
 use yash_env::source::pretty::Report;
 use yash_env::source::pretty::ReportType;
 use yash_env::source::pretty::Snippet;
+use yash_env::system::System;
 
 // TODO Split into syntax and semantics submodules
 
@@ -57,7 +58,7 @@ fn find_error_report(error: FindError, operand: &Field) -> Report<'_> {
 }
 
 /// Entry point for executing the `jobs` built-in
-pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
+pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> Result {
     let (options, operands) = match parse_arguments(OPTIONS, Mode::with_env(env), args) {
         Ok(result) => result,
         Err(error) => return report_error(env, &error).await,
@@ -139,7 +140,7 @@ mod tests {
 
     #[test]
     fn no_operands_no_jobs() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let result = main(&mut env, vec![]).now_or_never().unwrap();
@@ -149,7 +150,7 @@ mod tests {
 
     #[test]
     fn no_operands_some_jobs() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut job = Job::new(Pid(42));
@@ -222,7 +223,7 @@ mod tests {
 
     #[test]
     fn specifying_valid_job_ids() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut job = Job::new(Pid(42));
@@ -294,7 +295,7 @@ mod tests {
 
     #[test]
     fn specifying_job_ids_without_the_initial_percent() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut job = Job::new(Pid(2));
@@ -319,7 +320,7 @@ mod tests {
 
     #[test]
     fn specifying_job_ids_of_non_existing_jobs() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         env.jobs.add(Job::new(Pid(2)));
@@ -339,7 +340,7 @@ mod tests {
 
     #[test]
     fn specifying_ambiguous_job_id() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut job = Job::new(Pid(42));
@@ -366,7 +367,7 @@ mod tests {
 
     #[test]
     fn jobs_not_removed_in_case_of_error() {
-        let mut system = Box::new(VirtualSystem::new());
+        let mut system = VirtualSystem::new();
         system.current_process_mut().close_fd(Fd::STDOUT);
         let mut env = Env::with_system(system);
 
@@ -407,7 +408,7 @@ mod tests {
 
     #[test]
     fn state_changed_flag_not_cleared_in_case_of_error() {
-        let mut system = Box::new(VirtualSystem::new());
+        let mut system = VirtualSystem::new();
         system.current_process_mut().close_fd(Fd::STDOUT);
         let mut env = Env::with_system(system);
         let i72 = env.jobs.add(Job::new(Pid(72)));
@@ -423,7 +424,7 @@ mod tests {
 
     #[test]
     fn l_option() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut job = Job::new(Pid(42));
@@ -450,7 +451,7 @@ mod tests {
     #[test]
     #[ignore] // TODO Support parsing long option
     fn verbose_option() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut job = Job::new(Pid(42));
@@ -471,7 +472,7 @@ mod tests {
 
     #[test]
     fn p_option() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut job = Job::new(Pid(42));
@@ -490,7 +491,7 @@ mod tests {
 
     #[test]
     fn p_option_cancels_l_option() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut job = Job::new(Pid(42));
@@ -510,7 +511,7 @@ mod tests {
     #[test]
     #[ignore] // TODO Support parsing long option
     fn pgid_only_option() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut job = Job::new(Pid(42));

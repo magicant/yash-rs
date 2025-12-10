@@ -28,11 +28,16 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
+use yash_env::system::System;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::List;
 
 /// Executes a subshell command
-pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Result {
+pub async fn execute<S: System + 'static>(
+    env: &mut Env<S>,
+    body: Rc<List>,
+    location: &Location,
+) -> Result {
     let body_2 = Rc::clone(&body);
     let subshell = Subshell::new(|sub_env, _job_control| Box::pin(subshell_main(sub_env, body_2)));
     let subshell = subshell.job_control(JobControl::Foreground);
@@ -55,7 +60,7 @@ pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Resu
 }
 
 /// Executes the content of the shell.
-async fn subshell_main(env: &mut Env, body: Rc<List>) {
+async fn subshell_main<S: System + 'static>(env: &mut Env<S>, body: Rc<List>) {
     let result = body.execute(env).await;
     env.apply_result(result);
 
@@ -100,7 +105,7 @@ mod tests {
     #[test]
     fn divert_in_subshell() {
         fn exit_builtin(
-            _env: &mut Env,
+            _env: &mut Env<VirtualSystem>,
             _args: Vec<yash_env::semantics::Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
@@ -128,7 +133,7 @@ mod tests {
     fn error_starting_subshell() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         let command: CompoundCommand = "(foo=bar; echo $foo; return -n 123)".parse().unwrap();
@@ -202,7 +207,7 @@ mod tests {
     #[test]
     fn exit_trap() {
         fn trap_builtin(
-            env: &mut Env,
+            env: &mut Env<VirtualSystem>,
             _args: Vec<yash_env::semantics::Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {

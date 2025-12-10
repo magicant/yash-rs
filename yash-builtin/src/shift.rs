@@ -30,8 +30,9 @@ use yash_env::source::Location;
 use yash_env::source::pretty::{
     Footnote, FootnoteType, Report, ReportType, Snippet, Span, SpanRole, add_span,
 };
+use yash_env::system::System;
 
-pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
+pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> Result {
     // TODO Support non-POSIX options
     let args = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok((_options, operands)) => operands,
@@ -205,7 +206,7 @@ mod tests {
 
     #[test]
     fn shifting_without_operand_without_params() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Builtin(Builtin {
@@ -229,7 +230,7 @@ mod tests {
 
     #[test]
     fn shifting_more_than_the_number_of_params() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Builtin(Builtin {
@@ -256,7 +257,7 @@ mod tests {
 
     #[test]
     fn non_integral_operand_in_posix_mode() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         // TODO Enable POSIX mode
@@ -280,7 +281,7 @@ mod tests {
 
     #[test]
     fn too_many_operands() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Builtin(Builtin {

@@ -46,7 +46,7 @@ impl Command {
     ///
     /// If the file is not found or cannot be read, this method reports an error
     /// to the standard error and returns `ExitStatus::FAILURE.into()`.
-    pub async fn execute(self, env: &mut Env) -> crate::Result {
+    pub async fn execute<S: System + 'static>(self, env: &mut Env<S>) -> crate::Result {
         let env = &mut *env.push_frame(Frame::DotScript);
 
         let fd = match find_and_open_file(env, &self.file.value) {
@@ -59,7 +59,7 @@ impl Command {
         // Parse and execute the command script
         let run_read_eval_loop = env
             .any
-            .get::<RunReadEvalLoop>()
+            .get::<RunReadEvalLoop<S>>()
             .cloned()
             .expect("`source` built-in requires `RunReadEvalLoop` in `Env::any`");
         let system = env.system.clone();
@@ -84,7 +84,7 @@ impl Command {
 ///
 /// If the name does not contain a slash, this function searches the file in the
 /// `$PATH` variable.
-fn find_and_open_file(env: &mut Env, filename: &str) -> Result<Fd, Errno> {
+fn find_and_open_file<S: System>(env: &mut Env<S>, filename: &str) -> Result<Fd, Errno> {
     let dirs: Box<dyn Iterator<Item = &str>> = if filename.contains('/') {
         Box::new(std::iter::once("."))
     } else {
@@ -138,8 +138,8 @@ fn consume_return(divert: ControlFlow<Divert>) -> (Option<ExitStatus>, ControlFl
 
 /// Reports an error that occurred while preparing the file descriptor to read
 /// from.
-async fn report_find_and_open_file_failure(
-    env: &mut Env,
+async fn report_find_and_open_file_failure<S: System>(
+    env: &mut Env<S>,
     name: &Field,
     errno: Errno,
 ) -> crate::Result {
@@ -187,7 +187,7 @@ mod tests {
             let content = Rc::clone(&inode);
             state.file_system.save("/file", content).unwrap();
         }
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         env.variables
             .get_or_new(PATH, Scope::Global)
             .assign("/foo:/bar:/baz", None)
@@ -219,7 +219,7 @@ mod tests {
             let content = Rc::new(RefCell::new(Inode::new("")));
             state.file_system.save("/file", content).unwrap();
         }
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         env.variables
             .get_or_new(PATH, Scope::Global)
             .assign("/foo:/bar:/baz", None)
@@ -257,10 +257,10 @@ mod tests {
     #[test]
     fn fd_is_closed_after_execute() {
         let system = system_with_file("/foo/file", "");
-        let mut env = Env::with_system(Box::new(system.clone()));
-        env.any.insert(Box::new(RunReadEvalLoop(|_env, _lexer| {
-            Box::pin(async { ControlFlow::Continue(()) })
-        })));
+        let mut env = Env::with_system(system.clone());
+        env.any.insert(Box::new(RunReadEvalLoop::<VirtualSystem>(
+            |_env, _lexer| Box::pin(async { ControlFlow::Continue(()) }),
+        )));
         let command = Command {
             file: Field::dummy("/foo/file"),
             params: vec![],

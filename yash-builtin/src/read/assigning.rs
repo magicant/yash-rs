@@ -38,8 +38,8 @@ pub use crate::typeset::AssignReadOnlyError as Error;
 ///
 /// The return value is a vector of errors that occurred while assigning the
 /// variables. The vector is empty if no error occurred.
-pub fn assign(
-    env: &mut Env,
+pub fn assign<S>(
+    env: &mut Env<S>,
     text: &[AttrChar],
     variables: Vec<Field>,
     last_variable: Field,
@@ -84,7 +84,7 @@ pub fn assign(
 }
 
 /// Assigns one field to a variable.
-fn assign_one(env: &mut Env, name: Field, value: &[AttrChar]) -> Result<(), Error> {
+fn assign_one<S>(env: &mut Env<S>, name: Field, value: &[AttrChar]) -> Result<(), Error> {
     let value = value.iter().copied();
     let value = skip_quotes(value).strip().collect::<String>();
     let mut var = env.get_or_create_variable(name.value.clone(), Scope::Global);

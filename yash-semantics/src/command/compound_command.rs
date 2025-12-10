@@ -28,12 +28,13 @@ use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 #[cfg(doc)]
 use yash_env::subshell::Subshell;
+use yash_env::system::System;
 use yash_syntax::syntax;
 use yash_syntax::syntax::Redir;
 
 /// Performs redirections, printing their trace if required.
-async fn perform_redirs(
-    env: &mut RedirGuard<'_>,
+async fn perform_redirs<S: System + 'static>(
+    env: &mut RedirGuard<'_, S>,
     redirs: &[Redir],
 ) -> std::result::Result<Option<ExitStatus>, crate::redir::Error> {
     let mut xtrace = XTrace::from_options(&env.options);
@@ -44,7 +45,10 @@ async fn perform_redirs(
 }
 
 /// Executes the condition of an if/while/until command.
-async fn evaluate_condition(env: &mut Env, condition: &syntax::List) -> Result<bool> {
+async fn evaluate_condition<S: System + 'static>(
+    env: &mut Env<S>,
+    condition: &syntax::List,
+) -> Result<bool> {
     let mut env = env.push_frame(Frame::Condition);
     condition.execute(&mut env).await?;
     Continue(env.exit_status.is_successful())
@@ -61,8 +65,8 @@ mod while_loop;
 /// The redirections are performed, if any, before executing the command body.
 /// Redirection errors are subject to the `ErrExit` option
 /// (`Env::apply_errexit`).
-impl Command for syntax::FullCompoundCommand {
-    async fn execute(&self, env: &mut Env) -> Result {
+impl<S: System + 'static> Command<S> for syntax::FullCompoundCommand {
+    async fn execute(&self, env: &mut Env<S>) -> Result {
         let mut env = RedirGuard::new(env);
         match perform_redirs(&mut env, &self.redirs).await {
             Ok(_) => self.command.execute(&mut env).await,
@@ -127,8 +131,8 @@ impl Command for syntax::FullCompoundCommand {
 ///
 /// After executing the body of the matching item, the case command may process
 /// the next item depending on the continuation.
-impl Command for syntax::CompoundCommand {
-    async fn execute(&self, env: &mut Env) -> Result {
+impl<S: System + 'static> Command<S> for syntax::CompoundCommand {
+    async fn execute(&self, env: &mut Env<S>) -> Result {
         use syntax::CompoundCommand::*;
         match self {
             Grouping(list) => list.execute(env).await,
@@ -173,7 +177,7 @@ mod tests {
     #[test]
     fn stack_in_condition() {
         fn stub_builtin(
-            env: &mut Env,
+            env: &mut Env<VirtualSystem>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
@@ -200,7 +204,7 @@ mod tests {
     fn redirecting_compound_command() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         let command: syntax::FullCompoundCommand = "{ echo 1; echo 2; } > /file".parse().unwrap();
         let result = command.execute(&mut env).now_or_never().unwrap();
@@ -218,7 +222,7 @@ mod tests {
     fn tracing_redirections() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.options.set(yash_env::option::Option::XTrace, On);
         let command: syntax::FullCompoundCommand = "{ echo X; } > /file < /file".parse().unwrap();
@@ -232,7 +236,7 @@ mod tests {
     fn redirection_error_prevents_command_execution() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         let command: syntax::FullCompoundCommand =
             "{ echo not reached; } < /no/such/file".parse().unwrap();

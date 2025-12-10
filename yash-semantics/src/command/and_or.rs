@@ -21,6 +21,7 @@ use std::ops::ControlFlow::Continue;
 use yash_env::Env;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
+use yash_env::system::System;
 use yash_syntax::syntax::AndOr::{self, AndThen, OrElse};
 use yash_syntax::syntax::AndOrList;
 use yash_syntax::syntax::Pipeline;
@@ -38,8 +39,8 @@ use yash_syntax::syntax::Pipeline;
 ///
 /// [`Frame::Condition`] is pushed to the environment's stack while the
 /// execution of the pipelines except for the last.
-impl Command for AndOrList {
-    async fn execute(&self, env: &mut Env) -> Result {
+impl<S: System + 'static> Command<S> for AndOrList {
+    async fn execute(&self, env: &mut Env<S>) -> Result {
         if self.rest.is_empty() {
             return self.first.execute(env).await;
         }
@@ -65,8 +66,8 @@ impl Command for AndOrList {
     }
 }
 
-async fn execute_conditional_pipeline(
-    env: &mut Env,
+async fn execute_conditional_pipeline<S: System + 'static>(
+    env: &mut Env<S>,
     (and_or, pipeline): &(AndOr, Pipeline),
 ) -> Result {
     let success = env.exit_status.is_successful();
@@ -113,7 +114,7 @@ mod tests {
     fn true_and_true() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         let list: AndOrList = "echo one && echo two".parse().unwrap();
 
@@ -137,7 +138,7 @@ mod tests {
     fn false_and_true() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 1 && echo !".parse().unwrap();
@@ -152,7 +153,7 @@ mod tests {
     fn true_and_true_and_true() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         let list: AndOrList = "echo 1 && echo 2 && echo 3".parse().unwrap();
 
@@ -166,7 +167,7 @@ mod tests {
     fn true_and_false_and_true() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 0 && return -n 2 && echo !".parse().unwrap();
@@ -191,7 +192,7 @@ mod tests {
     fn true_or_false() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "echo + || return -n 100".parse().unwrap();
@@ -206,7 +207,7 @@ mod tests {
     fn false_or_true() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "{ echo one; return -n 1; } || { echo two; }"
@@ -223,7 +224,7 @@ mod tests {
     fn false_or_false() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "{ echo one; return -n 1; } || { echo two; return -n 2; }"
@@ -251,7 +252,7 @@ mod tests {
     fn false_or_true_or_false() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 3 || echo + || return -n 4".parse().unwrap();
@@ -296,7 +297,7 @@ mod tests {
     #[test]
     fn stack_in_list() {
         fn stub_builtin_condition(
-            env: &mut Env,
+            env: &mut Env<VirtualSystem>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
@@ -308,7 +309,7 @@ mod tests {
             })
         }
         fn stub_builtin_no_condition(
-            env: &mut Env,
+            env: &mut Env<VirtualSystem>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {

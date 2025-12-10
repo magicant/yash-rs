@@ -22,6 +22,7 @@ use super::super::attr::Origin;
 use super::Env;
 use super::Expand;
 use super::Phrase;
+use yash_env::system::System;
 use yash_syntax::syntax::Unquote as _;
 use yash_syntax::syntax::Word;
 use yash_syntax::syntax::WordUnit::{self, *};
@@ -130,8 +131,8 @@ fn double_quote(phrase: &mut Phrase) {
 /// In all cases, if the result would be empty, it expands to a dummy quote to
 /// prevent it from being removed in field splitting. The quote is expected to
 /// be removed by quote removal.
-impl Expand for WordUnit {
-    async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
+impl<S: System + 'static> Expand<S> for WordUnit {
+    async fn expand(&self, env: &mut Env<'_, S>) -> Result<Phrase, Error> {
         match self {
             Unquoted(text_unit) => text_unit.expand(env).await,
             SingleQuote(value) => Ok(single_quote(value)),
@@ -156,9 +157,9 @@ impl Expand for WordUnit {
 /// Expands a word.
 ///
 /// This implementation delegates to `[WordUnit] as Expand`.
-impl Expand for Word {
+impl<S: System + 'static> Expand<S> for Word {
     #[inline]
-    async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
+    async fn expand(&self, env: &mut Env<'_, S>) -> Result<Phrase, Error> {
         self.units.expand(env).await
     }
 }

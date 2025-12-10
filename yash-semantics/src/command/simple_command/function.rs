@@ -30,14 +30,15 @@ use yash_env::function::Function;
 use yash_env::semantics::Divert;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
+use yash_env::system::System;
 use yash_env::variable::Context;
 use yash_env::variable::PositionalParams;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
 
-pub async fn execute_function(
-    env: &mut Env,
-    function: Rc<Function>,
+pub async fn execute_function<S: System + 'static>(
+    env: &mut Env<S>,
+    function: Rc<Function<S>>,
     assigns: &[Assign],
     fields: Vec<Field>,
     redirs: &[Redir],
@@ -57,7 +58,7 @@ pub async fn execute_function(
     execute_function_body(&mut env, function, fields, None).await
 }
 
-type EnvPrepHook = fn(&mut Env) -> Pin<Box<dyn Future<Output = ()> + '_>>;
+type EnvPrepHook<S> = fn(&mut Env<S>) -> Pin<Box<dyn Future<Output = ()> + '_>>;
 
 /// Executes the body of the function.
 ///
@@ -68,11 +69,11 @@ type EnvPrepHook = fn(&mut Env) -> Pin<Box<dyn Future<Output = ()> + '_>>;
 /// `env_prep_hook` is called after the new variable context is pushed to the
 /// environment. This is useful for assigning custom local variables before the
 /// function body is executed.
-pub async fn execute_function_body(
-    env: &mut Env,
-    function: Rc<Function>,
+pub async fn execute_function_body<S: System>(
+    env: &mut Env<S>,
+    function: Rc<Function<S>>,
     fields: Vec<Field>,
-    env_prep_hook: Option<EnvPrepHook>,
+    env_prep_hook: Option<EnvPrepHook<S>>,
 ) -> Result {
     let positional_params = PositionalParams::from_fields(fields);
     let mut env = env.push_context(Context::Regular { positional_params });
@@ -115,7 +116,7 @@ mod tests {
     use yash_syntax::source::Location;
     use yash_syntax::syntax::SimpleCommand;
 
-    fn function_body_impl(src: &str) -> Rc<dyn FunctionBodyObject> {
+    fn function_body_impl(src: &str) -> Rc<dyn FunctionBodyObject<VirtualSystem>> {
         Rc::new(BodyImpl(src.parse().unwrap()))
     }
 
@@ -140,7 +141,7 @@ mod tests {
     fn simple_command_applies_redirections_to_function() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         let function = Function::new(
             "foo",
@@ -162,7 +163,7 @@ mod tests {
     fn simple_command_skips_running_function_on_redirection_error() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         let function = Function::new(
             "foo",
@@ -218,7 +219,7 @@ mod tests {
     fn simple_command_passes_arguments_to_function() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         let function = Function::new(
             "foo",
@@ -237,7 +238,7 @@ mod tests {
     fn simple_command_creates_temporary_context_executing_function() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("local", local_builtin());
         let function = Function::new(
@@ -257,7 +258,7 @@ mod tests {
     fn simple_command_performs_function_assignment_in_temporary_context() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         let function = Function::new(
             "foo",
@@ -297,7 +298,7 @@ mod tests {
     fn xtrace_for_function() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         let function = Function::new(
             "foo",
             function_body_impl("for i in; do :; done"),

@@ -486,6 +486,8 @@ impl<'a> IntoIterator for &'a TrapSet {
     }
 }
 
+type PinFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
+
 /// Wrapper for running signal trap if caught
 ///
 /// This struct declares a function type that runs a signal trap if the signal
@@ -503,20 +505,28 @@ impl<'a> IntoIterator for &'a TrapSet {
 /// [`yash-semantics` crate](https://crates.io/crates/yash-semantics):
 ///
 /// ```
-/// # use yash_env::trap::RunSignalTrapIfCaught;
+/// # use yash_env::{VirtualSystem, trap::RunSignalTrapIfCaught};
 /// let mut env = yash_env::Env::new_virtual();
-/// env.any.insert(Box::new(RunSignalTrapIfCaught(|env, signal| {
+/// env.any.insert(Box::new(RunSignalTrapIfCaught::<VirtualSystem>(|env, signal| {
 ///     Box::pin(async move { yash_semantics::trap::run_trap_if_caught(env, signal).await })
 /// })));
 /// ```
-#[derive(Clone, Copy, Debug)]
-pub struct RunSignalTrapIfCaught(
-    #[allow(clippy::type_complexity)]
+#[derive(Debug)]
+pub struct RunSignalTrapIfCaught<S>(
     pub  for<'a> fn(
-        env: &'a mut Env,
+        env: &'a mut Env<S>,
         signal: signal::Number,
-    ) -> Pin<Box<dyn Future<Output = Option<crate::semantics::Result>> + 'a>>,
+    ) -> PinFuture<'a, Option<crate::semantics::Result>>,
 );
+
+// Not derived automatically because S may not implement Clone or Copy.
+impl<S> Clone for RunSignalTrapIfCaught<S> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<S> Copy for RunSignalTrapIfCaught<S> {}
 
 #[cfg(test)]
 mod tests {

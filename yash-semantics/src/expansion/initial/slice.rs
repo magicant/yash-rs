@@ -29,8 +29,8 @@ use super::Phrase;
 ///
 /// If the slice has no item, the result is [one empty
 /// field](Phrase::one_empty_field).
-impl<T: Expand> Expand for [T] {
-    async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
+impl<S, T: Expand<S>> Expand<S> for [T] {
+    async fn expand(&self, env: &mut Env<'_, S>) -> Result<Phrase, Error> {
         if self.is_empty() {
             return Ok(Phrase::one_empty_field());
         }
@@ -69,8 +69,8 @@ mod tests {
         }
     }
 
-    impl Expand for Stub {
-        async fn expand(&self, _: &mut Env<'_>) -> Result<Phrase, Error> {
+    impl<S> Expand<S> for Stub {
+        async fn expand(&self, _: &mut Env<'_, S>) -> Result<Phrase, Error> {
             self.0.take().expect("expand should be called only once")
         }
     }

@@ -22,12 +22,13 @@ use std::ops::ControlFlow::Continue;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
+use yash_env::system::System;
 use yash_syntax::syntax::ElifThen;
 use yash_syntax::syntax::List;
 
 /// Executes the if command.
-pub async fn execute(
-    env: &mut Env,
+pub async fn execute<S: System + 'static>(
+    env: &mut Env<S>,
     condition: &List,
     body: &List,
     elifs: &[ElifThen],
@@ -64,10 +65,10 @@ mod tests {
     use yash_env_test_helper::assert_stdout;
     use yash_syntax::syntax::CompoundCommand;
 
-    fn fixture() -> (Env, Rc<RefCell<SystemState>>) {
+    fn fixture() -> (Env<VirtualSystem>, Rc<RefCell<SystemState>>) {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         (env, state)

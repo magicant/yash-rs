@@ -94,164 +94,175 @@ use yash_env::Env;
 pub use yash_env::builtin::*;
 #[cfg(doc)]
 use yash_env::stack::{Frame, Stack};
+use yash_env::system::System;
 
 use Type::{Elective, Mandatory, Special, Substitutive};
 use std::future::ready;
 
-/// Array of all the implemented built-in utilities.
+/// Returns an iterator over all the implemented built-in utilities.
 ///
-/// The array items are ordered alphabetically.
-pub const BUILTINS: &[(&str, Builtin)] = &[
-    (
-        ".",
-        Builtin::new(Special, |env, args| Box::pin(source::main(env, args))),
-    ),
-    (
-        ":",
-        Builtin::new(Special, |env, args| Box::pin(ready(colon::main(env, args)))),
-    ),
-    (
-        "alias",
-        Builtin::new(Mandatory, |env, args| Box::pin(alias::main(env, args))),
-    ),
-    (
-        "bg",
-        Builtin::new(Mandatory, |env, args| Box::pin(bg::main(env, args))),
-    ),
-    (
-        "break",
-        Builtin::new(Special, |env, args| Box::pin(r#break::main(env, args))),
-    ),
-    (
-        "cd",
-        Builtin::new(Mandatory, |env, args| Box::pin(cd::main(env, args))),
-    ),
-    ("command", {
-        let mut builtin = Builtin::new(Mandatory, |env, args| Box::pin(command::main(env, args)));
-        builtin.is_declaration_utility = None;
-        builtin
-    }),
-    (
-        "continue",
-        Builtin::new(Special, |env, args| Box::pin(r#continue::main(env, args))),
-    ),
-    (
-        "eval",
-        Builtin::new(Special, |env, args| Box::pin(eval::main(env, args))),
-    ),
-    (
-        "exec",
-        Builtin::new(Special, |env, args| Box::pin(exec::main(env, args))),
-    ),
-    (
-        "exit",
-        Builtin::new(Special, |env, args| Box::pin(exit::main(env, args))),
-    ),
-    ("export", {
-        let mut builtin = Builtin::new(Special, |env, args| Box::pin(export::main(env, args)));
-        builtin.is_declaration_utility = Some(true);
-        builtin
-    }),
-    (
-        "false",
-        Builtin::new(Substitutive, |env, args| Box::pin(r#false::main(env, args))),
-    ),
-    (
-        "fg",
-        Builtin::new(Mandatory, |env, args| Box::pin(fg::main(env, args))),
-    ),
-    (
-        "getopts",
-        Builtin::new(Mandatory, |env, args| Box::pin(getopts::main(env, args))),
-    ),
-    (
-        "jobs",
-        Builtin::new(Mandatory, |env, args| Box::pin(jobs::main(env, args))),
-    ),
-    (
-        "kill",
-        Builtin::new(Mandatory, |env, args| Box::pin(kill::main(env, args))),
-    ),
-    (
-        "pwd",
-        Builtin::new(Substitutive, |env, args| Box::pin(pwd::main(env, args))),
-    ),
-    (
-        "read",
-        Builtin::new(Mandatory, |env, args| Box::pin(read::main(env, args))),
-    ),
-    ("readonly", {
-        let mut builtin = Builtin::new(Special, |env, args| Box::pin(readonly::main(env, args)));
-        builtin.is_declaration_utility = Some(true);
-        builtin
-    }),
-    (
-        "return",
-        Builtin::new(Special, |env, args| Box::pin(r#return::main(env, args))),
-    ),
-    (
-        "set",
-        Builtin::new(Special, |env, args| Box::pin(set::main(env, args))),
-    ),
-    (
-        "shift",
-        Builtin::new(Special, |env, args| Box::pin(shift::main(env, args))),
-    ),
-    (
-        "source",
-        Builtin::new(Special, |env, args| Box::pin(source::main(env, args))),
-    ),
-    (
-        "times",
-        Builtin::new(Special, |env, args| Box::pin(times::main(env, args))),
-    ),
-    (
-        "trap",
-        Builtin::new(Special, |env, args| Box::pin(trap::main(env, args))),
-    ),
-    (
-        "true",
-        Builtin::new(Substitutive, |env, args| Box::pin(r#true::main(env, args))),
-    ),
-    (
-        "type",
-        Builtin::new(Mandatory, |env, args| Box::pin(r#type::main(env, args))),
-    ),
-    ("typeset", {
-        let mut builtin = Builtin::new(Elective, |env, args| Box::pin(typeset::main(env, args)));
-        builtin.is_declaration_utility = Some(true);
-        builtin
-    }),
-    (
-        "ulimit",
-        Builtin::new(Mandatory, |env, args| Box::pin(ulimit::main(env, args))),
-    ),
-    (
-        "umask",
-        Builtin::new(Mandatory, |env, args| Box::pin(umask::main(env, args))),
-    ),
-    (
-        "unalias",
-        Builtin::new(Mandatory, |env, args| Box::pin(unalias::main(env, args))),
-    ),
-    (
-        "unset",
-        Builtin::new(Special, |env, args| Box::pin(unset::main(env, args))),
-    ),
-    (
-        "wait",
-        Builtin::new(Mandatory, |env, args| Box::pin(wait::main(env, args))),
-    ),
-];
+/// Each item yielded by the iterator is a tuple of the built-in name and
+/// corresponding [`Builtin`] instance. The items are sorted by the built-in
+/// names in ascending order.
+pub fn iter<S>() -> impl Iterator<Item = (&'static str, Builtin<S>)>
+where
+    S: System + 'static,
+{
+    [
+        (
+            ".",
+            Builtin::new(Special, |env, args| Box::pin(source::main(env, args))),
+        ),
+        (
+            ":",
+            Builtin::new(Special, |env, args| Box::pin(ready(colon::main(env, args)))),
+        ),
+        (
+            "alias",
+            Builtin::new(Mandatory, |env, args| Box::pin(alias::main(env, args))),
+        ),
+        (
+            "bg",
+            Builtin::new(Mandatory, |env, args| Box::pin(bg::main(env, args))),
+        ),
+        (
+            "break",
+            Builtin::new(Special, |env, args| Box::pin(r#break::main(env, args))),
+        ),
+        (
+            "cd",
+            Builtin::new(Mandatory, |env, args| Box::pin(cd::main(env, args))),
+        ),
+        ("command", {
+            let mut builtin =
+                Builtin::new(Mandatory, |env, args| Box::pin(command::main(env, args)));
+            builtin.is_declaration_utility = None;
+            builtin
+        }),
+        (
+            "continue",
+            Builtin::new(Special, |env, args| Box::pin(r#continue::main(env, args))),
+        ),
+        (
+            "eval",
+            Builtin::new(Special, |env, args| Box::pin(eval::main(env, args))),
+        ),
+        (
+            "exec",
+            Builtin::new(Special, |env, args| Box::pin(exec::main(env, args))),
+        ),
+        (
+            "exit",
+            Builtin::new(Special, |env, args| Box::pin(exit::main(env, args))),
+        ),
+        ("export", {
+            let mut builtin = Builtin::new(Special, |env, args| Box::pin(export::main(env, args)));
+            builtin.is_declaration_utility = Some(true);
+            builtin
+        }),
+        (
+            "false",
+            Builtin::new(Substitutive, |env, args| Box::pin(r#false::main(env, args))),
+        ),
+        (
+            "fg",
+            Builtin::new(Mandatory, |env, args| Box::pin(fg::main(env, args))),
+        ),
+        (
+            "getopts",
+            Builtin::new(Mandatory, |env, args| Box::pin(getopts::main(env, args))),
+        ),
+        (
+            "jobs",
+            Builtin::new(Mandatory, |env, args| Box::pin(jobs::main(env, args))),
+        ),
+        (
+            "kill",
+            Builtin::new(Mandatory, |env, args| Box::pin(kill::main(env, args))),
+        ),
+        (
+            "pwd",
+            Builtin::new(Substitutive, |env, args| Box::pin(pwd::main(env, args))),
+        ),
+        (
+            "read",
+            Builtin::new(Mandatory, |env, args| Box::pin(read::main(env, args))),
+        ),
+        ("readonly", {
+            let mut builtin =
+                Builtin::new(Special, |env, args| Box::pin(readonly::main(env, args)));
+            builtin.is_declaration_utility = Some(true);
+            builtin
+        }),
+        (
+            "return",
+            Builtin::new(Special, |env, args| Box::pin(r#return::main(env, args))),
+        ),
+        (
+            "set",
+            Builtin::new(Special, |env, args| Box::pin(set::main(env, args))),
+        ),
+        (
+            "shift",
+            Builtin::new(Special, |env, args| Box::pin(shift::main(env, args))),
+        ),
+        (
+            "source",
+            Builtin::new(Special, |env, args| Box::pin(source::main(env, args))),
+        ),
+        (
+            "times",
+            Builtin::new(Special, |env, args| Box::pin(times::main(env, args))),
+        ),
+        (
+            "trap",
+            Builtin::new(Special, |env, args| Box::pin(trap::main(env, args))),
+        ),
+        (
+            "true",
+            Builtin::new(Substitutive, |env, args| Box::pin(r#true::main(env, args))),
+        ),
+        (
+            "type",
+            Builtin::new(Mandatory, |env, args| Box::pin(r#type::main(env, args))),
+        ),
+        ("typeset", {
+            let mut builtin =
+                Builtin::new(Elective, |env, args| Box::pin(typeset::main(env, args)));
+            builtin.is_declaration_utility = Some(true);
+            builtin
+        }),
+        (
+            "ulimit",
+            Builtin::new(Mandatory, |env, args| Box::pin(ulimit::main(env, args))),
+        ),
+        (
+            "umask",
+            Builtin::new(Mandatory, |env, args| Box::pin(umask::main(env, args))),
+        ),
+        (
+            "unalias",
+            Builtin::new(Mandatory, |env, args| Box::pin(unalias::main(env, args))),
+        ),
+        (
+            "unset",
+            Builtin::new(Special, |env, args| Box::pin(unset::main(env, args))),
+        ),
+        (
+            "wait",
+            Builtin::new(Mandatory, |env, args| Box::pin(wait::main(env, args))),
+        ),
+    ]
+    .iter()
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use yash_env::system::r#virtual::VirtualSystem;
 
     #[test]
-    fn builtins_are_sorted() {
-        BUILTINS
-            .windows(2)
-            .for_each(|pair| assert!(pair[0].0 < pair[1].0, "disordered pair: {pair:?}"))
+    fn iter_is_sorted() {
+        assert!(iter::<VirtualSystem>().is_sorted_by_key(|pair| pair.0));
     }
 }

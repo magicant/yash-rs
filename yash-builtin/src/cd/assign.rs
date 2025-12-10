@@ -37,7 +37,7 @@ use yash_env::variable::Value::Scalar;
 ///
 /// This function examines the stack to find the command location that invoked
 /// the cd built-in.
-pub async fn set_oldpwd(env: &mut Env, value: String) -> crate::Result {
+pub async fn set_oldpwd<S: System>(env: &mut Env<S>, value: String) -> crate::Result {
     set_variable(env, OLDPWD, value).await
 }
 
@@ -49,12 +49,12 @@ pub async fn set_oldpwd(env: &mut Env, value: String) -> crate::Result {
 ///
 /// This function examines the stack to find the command location that invoked
 /// the cd built-in.
-pub async fn set_pwd(env: &mut Env, path: PathBuf) -> crate::Result {
+pub async fn set_pwd<S: System>(env: &mut Env<S>, path: PathBuf) -> crate::Result {
     let value = path.into_unix_string().into_string().unwrap_or_default();
     set_variable(env, PWD, value).await
 }
 
-async fn set_variable(env: &mut Env, name: &str, value: String) -> crate::Result {
+async fn set_variable<S: System>(env: &mut Env<S>, name: &str, value: String) -> crate::Result {
     let current_builtin = env.stack.current_builtin();
     let current_location = current_builtin.map(|builtin| builtin.name.origin.clone());
     let var = &mut env.get_or_create_variable(name, Global);
@@ -67,7 +67,11 @@ async fn set_variable(env: &mut Env, name: &str, value: String) -> crate::Result
 }
 
 /// Prints an error message for a read-only variable.
-async fn handle_assign_error(env: &mut Env, name: &str, error: AssignError) -> crate::Result {
+async fn handle_assign_error<S: System>(
+    env: &mut Env<S>,
+    name: &str,
+    error: AssignError,
+) -> crate::Result {
     let mut report = Report::new();
     report.r#type = ReportType::Error;
     report.title = format!("cannot update read-only variable `{name}`").into();
@@ -89,7 +93,7 @@ async fn handle_assign_error(env: &mut Env, name: &str, error: AssignError) -> c
 /// modification. If `mode` is `Physical`, this function uses [`System::getcwd`]
 /// to obtain the working directory path. If `System::getcwd` fails, the error
 /// code is returned.
-pub fn new_pwd(env: &Env, mode: Mode, path: &Path) -> Result<PathBuf, Errno> {
+pub fn new_pwd<S: System>(env: &Env<S>, mode: Mode, path: &Path) -> Result<PathBuf, Errno> {
     match mode {
         Mode::Logical => Ok(path.to_owned()),
         Mode::Physical => env.system.getcwd(),
@@ -111,7 +115,7 @@ mod tests {
 
     #[test]
     fn set_oldpwd_new() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let cd = Field::dummy("cd");
@@ -137,7 +141,7 @@ mod tests {
 
     #[test]
     fn set_oldpwd_overwrites_existing_variable() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let cd = Field::dummy("cd");
@@ -166,7 +170,7 @@ mod tests {
 
     #[test]
     fn set_oldpwd_read_only_error() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Builtin(Builtin {
@@ -192,7 +196,7 @@ mod tests {
 
     #[test]
     fn set_pwd_new() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let cd = Field::dummy("cd");
@@ -218,7 +222,7 @@ mod tests {
 
     #[test]
     fn set_pwd_overwrites_existing_variable() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let cd = Field::dummy("cd");
@@ -247,7 +251,7 @@ mod tests {
 
     #[test]
     fn set_pwd_read_only_error() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let cd = Field::dummy("cd");
@@ -274,7 +278,7 @@ mod tests {
 
     #[test]
     fn new_pwd_physical() {
-        let mut system = Box::new(VirtualSystem::new());
+        let mut system = VirtualSystem::new();
         system
             .current_process_mut()
             .chdir(PathBuf::from("/some/path"));
@@ -286,7 +290,7 @@ mod tests {
 
     #[test]
     fn new_pwd_logical() {
-        let mut system = Box::new(VirtualSystem::new());
+        let mut system = VirtualSystem::new();
         system
             .current_process_mut()
             .chdir(PathBuf::from("/some/path"));

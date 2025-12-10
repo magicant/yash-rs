@@ -187,7 +187,7 @@ impl<T: Glossary> Glossary for RefCell<T> {
 /// Allows to look up aliases in the environment.
 ///
 /// This implementation delegates to `self.aliases`.
-impl Glossary for Env {
+impl<S: Debug> Glossary for Env<S> {
     #[inline(always)]
     fn look_up(&self, name: &str) -> Option<Rc<Alias>> {
         self.aliases.look_up(name)

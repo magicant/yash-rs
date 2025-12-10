@@ -258,7 +258,7 @@ fn parse_list_case<I: Iterator<Item = Field>>(
 }
 
 /// Parses command line arguments.
-pub fn parse(_env: &Env, args: Vec<Field>) -> Result<Command, Error> {
+pub fn parse<S>(_env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
     let allow_sig_prefix = false; // TODO true depending on the shell option
     let mut args = args.into_iter().peekable();
     let mut signal = Signal::Name(signal::Name::Term);

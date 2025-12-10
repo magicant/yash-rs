@@ -28,9 +28,9 @@ use yash_env::semantics::ExitStatus;
 ///
 /// This sturct extends [`yash_env::Env`] with some properties.
 #[derive(Debug)]
-pub struct Env<'a> {
+pub struct Env<'a, S> {
     /// Main part of the environment
-    pub inner: &'a mut yash_env::Env,
+    pub inner: &'a mut yash_env::Env<S>,
 
     /// Exit status of the last executed command substitution
     ///
@@ -45,12 +45,12 @@ pub struct Env<'a> {
     pub will_split: bool,
 }
 
-impl<'a> Env<'a> {
+impl<'a, S> Env<'a, S> {
     /// Creates a new `Env` instance.
     ///
     /// The `last_command_subst_exit_status` and `will_split` field are
     /// initialized to be `None` and `true`, respectively.
-    pub fn new(inner: &'a mut yash_env::Env) -> Self {
+    pub fn new(inner: &'a mut yash_env::Env<S>) -> Self {
         Env {
             inner,
             last_command_subst_exit_status: None,
@@ -64,10 +64,10 @@ impl<'a> Env<'a> {
 /// Syntactic elements like [`TextUnit`](yash_syntax::syntax::TextUnit) and
 /// [`Word`](yash_syntax::syntax::Word) implement this trait to
 /// [`expand`](Self::expand) themselves to a [`Phrase`].
-pub trait Expand {
+pub trait Expand<S> {
     /// Performs initial expansion.
     #[allow(async_fn_in_trait)] // We don't support Send
-    async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error>;
+    async fn expand(&self, env: &mut Env<'_, S>) -> Result<Phrase, Error>;
 }
 
 mod arith;

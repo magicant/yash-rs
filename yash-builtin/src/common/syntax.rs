@@ -259,7 +259,7 @@ impl Mode {
     ///
     /// This function returns `Self::default()` or `Self::with_extensions()`
     /// depending on `env.options.get(PosixlyCorrect)`.
-    pub fn with_env(env: &yash_env::Env) -> Self {
+    pub fn with_env<S>(env: &yash_env::Env<S>) -> Self {
         use yash_env::option::{Off, On, PosixlyCorrect};
         match env.options.get(PosixlyCorrect) {
             On => Self::default(),

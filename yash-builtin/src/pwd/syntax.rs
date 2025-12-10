@@ -100,7 +100,7 @@ fn mode_for_option(option: &OptionOccurrence) -> Mode {
 }
 
 /// Parses command line arguments for the pwd built-in.
-pub fn parse(env: &Env, args: Vec<Field>) -> Result {
+pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
     let parser_mode = crate::common::syntax::Mode::with_env(env);
     let (options, operands) = parse_arguments(OPTION_SPECS, parser_mode, args)?;
 

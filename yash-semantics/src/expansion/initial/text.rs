@@ -23,6 +23,7 @@ use super::Env;
 use super::Expand;
 use super::Phrase;
 use super::param::ParamRef;
+use yash_env::system::System;
 use yash_syntax::syntax::Text;
 use yash_syntax::syntax::TextUnit::{self, *};
 use yash_syntax::syntax::Unquote;
@@ -77,8 +78,8 @@ use yash_syntax::syntax::Unquote;
 ///   ([`Env::arg0`](yash_env::Env::arg0)).
 ///
 /// TODO Elaborate on index and modifiers
-impl Expand for TextUnit {
-    async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
+impl<S: System + 'static> Expand<S> for TextUnit {
+    async fn expand(&self, env: &mut Env<'_, S>) -> Result<Phrase, Error> {
         match self {
             &Literal(value) => Ok(Phrase::Char(AttrChar {
                 value,
@@ -138,8 +139,8 @@ impl Expand for TextUnit {
 /// Expands a text.
 ///
 /// This implementation delegates to `[TextUnit] as Expand`.
-impl Expand for Text {
-    async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
+impl<S: System + 'static> Expand<S> for Text {
+    async fn expand(&self, env: &mut Env<'_, S>) -> Result<Phrase, Error> {
         self.0.expand(env).await
     }
 }

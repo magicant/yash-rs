@@ -47,7 +47,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::signal;
 use yash_env::system::Errno;
-use yash_env::system::System as _;
+use yash_env::system::System;
 use yash_env::system::SystemEx as _;
 
 /// Resumes the job at the specified index.
@@ -56,7 +56,10 @@ use yash_env::system::SystemEx as _;
 /// signal to it. It then waits for the job to finish (or suspend again).
 ///
 /// This function panics if there is no job at the specified index.
-async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<ProcessResult, ResumeError> {
+async fn resume_job_by_index<S: System>(
+    env: &mut Env<S>,
+    index: usize,
+) -> Result<ProcessResult, ResumeError> {
     let tty = env.get_tty().ok();
 
     let job = &env.jobs[index];
@@ -113,14 +116,17 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<ProcessResul
 }
 
 /// Resumes the job specified by the operand.
-async fn resume_job_by_id(env: &mut Env, job_id: &str) -> Result<ProcessResult, OperandErrorKind> {
+async fn resume_job_by_id<S: System>(
+    env: &mut Env<S>,
+    job_id: &str,
+) -> Result<ProcessResult, OperandErrorKind> {
     let job_id = parse(job_id)?;
     let index = job_id.find(&env.jobs)?;
     Ok(resume_job_by_index(env, index).await?)
 }
 
 /// Entry point of the `fg` built-in
-pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
+pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result {
     let (options, operands) = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok(result) => result,
         Err(error) => return report_error(env, &error).await,
@@ -175,7 +181,7 @@ mod tests {
     use yash_env_test_helper::in_virtual_system;
     use yash_env_test_helper::stub_tty;
 
-    async fn suspend(env: &mut Env) {
+    async fn suspend<S: System>(env: &mut Env<S>) {
         let target = env.system.getpid();
         env.system.kill(target, Some(SIGSTOP)).await.unwrap();
     }
@@ -338,7 +344,7 @@ mod tests {
     #[test]
     fn resume_job_by_index_sends_no_sigcont_to_dead_process() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         env.options.set(Monitor, On);
         let pid = Pid(123);
         let mut job = Job::new(pid);
@@ -369,8 +375,7 @@ mod tests {
 
     #[test]
     fn resume_job_by_index_rejects_unowned_job() {
-        let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::new_virtual();
         env.options.set(Monitor, On);
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
@@ -383,8 +388,7 @@ mod tests {
 
     #[test]
     fn resume_job_by_index_rejects_unmonitored_job() {
-        let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::new_virtual();
         env.options.set(Monitor, On);
         let index = env.jobs.add(Job::new(Pid(123)));
 
@@ -436,7 +440,7 @@ mod tests {
     #[test]
     fn main_without_operands_fails_if_there_is_no_current_job() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         env.options.set(Monitor, On);
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
@@ -491,7 +495,7 @@ mod tests {
     #[test]
     fn main_with_operand_fails_if_jobs_is_not_found() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         env.options.set(Monitor, On);
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;

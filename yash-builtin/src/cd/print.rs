@@ -22,7 +22,7 @@ use yash_env::Env;
 use yash_env::io::Fd;
 use yash_env::path::Path;
 use yash_env::source::pretty::{Report, ReportType};
-use yash_env::system::Errno;
+use yash_env::system::{Errno, System};
 
 impl Origin {
     /// Whether the built-in should print the target directory path.
@@ -36,7 +36,7 @@ impl Origin {
 }
 
 /// Prints the new working directory path if needed.
-pub async fn print_path(env: &mut Env, path: &Path, origin: &Origin) {
+pub async fn print_path<S: System>(env: &mut Env<S>, path: &Path, origin: &Origin) {
     if !origin.should_print_path() {
         return;
     }
@@ -51,7 +51,7 @@ pub async fn print_path(env: &mut Env, path: &Path, origin: &Origin) {
 /// Prints a warning message for a failed print.
 ///
 /// The message is only a warning because it does not affect the exit status.
-async fn handle_print_error(env: &mut Env, errno: Errno) {
+async fn handle_print_error<S: System>(env: &mut Env<S>, errno: Errno) {
     let mut report = Report::new();
     report.r#type = ReportType::Warning;
     report.title = format!("cannot print new $PWD: {errno}").into();

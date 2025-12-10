@@ -21,6 +21,7 @@ use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
 use yash_env::io::print_report;
 use yash_env::semantics::Divert;
+use yash_env::system::System;
 use yash_syntax::source::Source;
 
 /// Error handler.
@@ -28,10 +29,10 @@ use yash_syntax::source::Source;
 /// Most errors in the shell are handled by printing an error message to the
 /// standard error and returning a non-zero exit status. This trait provides a
 /// standard interface for implementing that behavior.
-pub trait Handle {
+pub trait Handle<S> {
     /// Handles the argument error.
     #[allow(async_fn_in_trait)] // We don't support Send
-    async fn handle(&self, env: &mut Env) -> super::Result;
+    async fn handle(&self, env: &mut Env<S>) -> super::Result;
 }
 
 /// Prints an error message.
@@ -43,8 +44,8 @@ pub trait Handle {
 /// [`ExitStatus::READ_ERROR`] otherwise.
 /// Note that other POSIX-compliant implementations may use different non-zero
 /// exit statuses instead of `ExitStatus::ERROR`.
-impl Handle for yash_syntax::parser::Error {
-    async fn handle(&self, env: &mut Env) -> super::Result {
+impl<S: System> Handle<S> for yash_syntax::parser::Error {
+    async fn handle(&self, env: &mut Env<S>) -> super::Result {
         print_report(env, &self.to_report()).await;
 
         use yash_syntax::parser::ErrorCause::*;
@@ -68,8 +69,8 @@ impl Handle for yash_syntax::parser::Error {
 /// exit statuses.
 ///
 /// [`ErrExit`]: yash_env::option::Option::ErrExit
-impl Handle for crate::expansion::Error {
-    async fn handle(&self, env: &mut Env) -> super::Result {
+impl<S: System> Handle<S> for crate::expansion::Error {
+    async fn handle(&self, env: &mut Env<S>) -> super::Result {
         print_report(env, &self.to_report()).await;
 
         if env.errexit_is_applicable() {
@@ -92,8 +93,8 @@ impl Handle for crate::expansion::Error {
 /// interrupt only on a redirection error during the execution of a special
 /// built-in. The caller is responsible for checking the condition and
 /// interrupting accordingly.
-impl Handle for crate::redir::Error {
-    async fn handle(&self, env: &mut Env) -> super::Result {
+impl<S: System> Handle<S> for crate::redir::Error {
+    async fn handle(&self, env: &mut Env<S>) -> super::Result {
         print_report(env, &self.to_report()).await;
         env.exit_status = ExitStatus::ERROR;
         Continue(())

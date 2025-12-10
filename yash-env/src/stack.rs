@@ -212,24 +212,24 @@ impl DerefMut for StackFrameGuard<'_> {
 /// The guard object is created by [`Env::push_frame`].
 #[derive(Debug)]
 #[must_use = "The frame is popped when the guard is dropped"]
-pub struct EnvFrameGuard<'a> {
-    env: &'a mut Env,
+pub struct EnvFrameGuard<'a, S> {
+    env: &'a mut Env<S>,
 }
 
-impl Env {
+impl<S> Env<S> {
     /// Pushes a new frame to the runtime execution context stack.
     ///
     /// This function is equivalent to `self.stack.push(frame)`, but returns an
     /// `EnvFrameGuard` that allows re-borrowing the `Env`.
     #[inline]
-    pub fn push_frame(&mut self, frame: Frame) -> EnvFrameGuard<'_> {
+    pub fn push_frame(&mut self, frame: Frame) -> EnvFrameGuard<'_, S> {
         self.stack.inner.push(frame);
         EnvFrameGuard { env: self }
     }
 
     /// Pops the topmost frame from the runtime execution context stack.
     #[inline]
-    pub fn pop_frame(guard: EnvFrameGuard<'_>) -> Frame {
+    pub fn pop_frame(guard: EnvFrameGuard<'_, S>) -> Frame {
         let frame = guard.env.stack.inner.pop().unwrap();
         std::mem::forget(guard);
         frame
@@ -238,21 +238,21 @@ impl Env {
 
 /// When the guard is dropped, the stack frame that was pushed when creating the
 /// guard is popped.
-impl Drop for EnvFrameGuard<'_> {
+impl<S> Drop for EnvFrameGuard<'_, S> {
     fn drop(&mut self) {
         self.env.stack.inner.pop().unwrap();
     }
 }
 
-impl Deref for EnvFrameGuard<'_> {
-    type Target = Env;
-    fn deref(&self) -> &Env {
+impl<S> Deref for EnvFrameGuard<'_, S> {
+    type Target = Env<S>;
+    fn deref(&self) -> &Env<S> {
         self.env
     }
 }
 
-impl DerefMut for EnvFrameGuard<'_> {
-    fn deref_mut(&mut self) -> &mut Env {
+impl<S> DerefMut for EnvFrameGuard<'_, S> {
+    fn deref_mut(&mut self) -> &mut Env<S> {
         self.env
     }
 }

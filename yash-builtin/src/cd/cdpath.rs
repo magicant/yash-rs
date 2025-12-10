@@ -40,7 +40,7 @@ use yash_env::variable::CDPATH;
 ///
 /// If the given path is absolute or starts with a "." or ".." component, this
 /// function just returns `None` without any search.
-pub fn search(env: &Env, path: &Path) -> Option<PathBuf> {
+pub fn search<S: System>(env: &Env<S>, path: &Path) -> Option<PathBuf> {
     if path.is_absolute() || path.starts_with(".") || path.starts_with("..") {
         return None;
     }
@@ -110,7 +110,7 @@ mod tests {
 
     #[test]
     fn directory_found_from_scalar_cdpath() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         create_dummy_file(&system, "/foo/one/file");
         create_dummy_file(&system, "/bar/two/file");
         let mut env = Env::with_system(system);
@@ -130,7 +130,7 @@ mod tests {
 
     #[test]
     fn directory_found_from_array_cdpath() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         create_dummy_file(&system, "/foo/one/file");
         create_dummy_file(&system, "/bar/two/file");
         let mut env = Env::with_system(system);
@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn empty_directory_name_in_cdpath() {
-        let mut system = Box::new(VirtualSystem::new());
+        let mut system = VirtualSystem::new();
         create_dummy_file(&system, "/foo/one/file");
         create_dummy_file(&system, "/bar/two/file");
         system.current_process_mut().chdir("/bar".into());
@@ -164,7 +164,7 @@ mod tests {
 
     #[test]
     fn path_starting_with_dot() {
-        let mut system = Box::new(VirtualSystem::new());
+        let mut system = VirtualSystem::new();
         create_dummy_file(&system, "/foo/one/file");
         create_dummy_file(&system, "/bar/two/file");
         system.current_process_mut().chdir("/".into());
@@ -178,7 +178,7 @@ mod tests {
 
     #[test]
     fn path_starting_with_dot_dot() {
-        let mut system = Box::new(VirtualSystem::new());
+        let mut system = VirtualSystem::new();
         create_dummy_file(&system, "/foo/one/file");
         create_dummy_file(&system, "/bar/two/file");
         system.current_process_mut().chdir("/bar/two".into());
@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn absolute_path() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         create_dummy_file(&system, "/foo/one/file");
         let mut env = Env::with_system(system);
         env.get_or_create_variable(CDPATH, Global)

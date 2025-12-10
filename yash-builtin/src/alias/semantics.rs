@@ -60,7 +60,7 @@ impl<'a> From<&'a Error> for Report<'a> {
 ///
 /// If `name_value` is of the form `name=value`, defines an alias named `name`
 /// that expands to `value`. Otherwise, returns `Err(name_value)`.
-fn define(env: &mut Env, name_value: Field) -> Result<(), Field> {
+fn define<S>(env: &mut Env<S>, name_value: Field) -> Result<(), Field> {
     let Some(equal) = name_value.value.find('=') else {
         return Err(name_value);
     };
@@ -85,7 +85,7 @@ fn define(env: &mut Env, name_value: Field) -> Result<(), Field> {
 ///
 /// This function appends a string of the form `name=value\n` to `result`.
 /// If the named alias does not exist, returns an error.
-fn find_and_print(env: &Env, name: Field, result: &mut String) -> Result<(), Error> {
+fn find_and_print<S>(env: &Env<S>, name: Field, result: &mut String) -> Result<(), Error> {
     let alias = env
         .aliases
         .get(name.value.as_str())
@@ -114,7 +114,7 @@ impl Command {
     ///
     /// Returns a string that contains the alias definitions to be printed and a
     /// list of errors that occurred during the execution.
-    pub async fn execute(self, env: &mut Env) -> (String, Vec<Error>) {
+    pub async fn execute<S>(self, env: &mut Env<S>) -> (String, Vec<Error>) {
         let mut output = String::new();
         let mut errors = Vec::new();
 

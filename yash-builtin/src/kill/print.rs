@@ -148,7 +148,11 @@ pub fn print<'a, S: SystemEx>(
 }
 
 /// Executes the `Print` command.
-pub async fn execute(env: &mut Env, signals: &[(Signal, Field)], verbose: bool) -> crate::Result {
+pub async fn execute<S: System>(
+    env: &mut Env<S>,
+    signals: &[(Signal, Field)],
+    verbose: bool,
+) -> crate::Result {
     match print(&env.system, signals, verbose) {
         Ok(output) => crate::common::output(env, &output).await,
         Err(errors) => report_failure(env, merge_reports(&errors).unwrap()).await,

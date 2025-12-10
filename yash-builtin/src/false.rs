@@ -28,6 +28,6 @@ use yash_env::semantics::Field;
 /// Executes the `false` built-in.
 ///
 /// This is the main entry point for the `false` built-in.
-pub async fn main(_env: &mut Env, _args: Vec<Field>) -> Result {
+pub async fn main<S>(_env: &mut Env<S>, _args: Vec<Field>) -> Result {
     Result::new(ExitStatus::FAILURE)
 }

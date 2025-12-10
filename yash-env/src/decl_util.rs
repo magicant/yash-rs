@@ -194,7 +194,7 @@ impl<T: Glossary> Glossary for RefCell<T> {
 /// This implementation looks up the command name in `self.builtins` and returns
 /// the value of `is_declaration_utility` if the built-in is found. Otherwise,
 /// the command is not a declaration utility.
-impl Glossary for Env {
+impl<S: Debug> Glossary for Env<S> {
     fn is_declaration_utility(&self, name: &str) -> Option<bool> {
         match self.builtins.get(name) {
             Some(builtin) => builtin.is_declaration_utility,

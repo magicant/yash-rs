@@ -25,6 +25,7 @@ use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
+use yash_env::system::System;
 use yash_env::variable::HOME;
 use yash_env::variable::OLDPWD;
 
@@ -126,7 +127,7 @@ impl<'a> From<&'a TargetError> for Report<'a> {
 }
 
 /// Returns the variable value if it is a non-empty scalar.
-fn get_scalar<'a>(env: &'a Env, name: &str) -> Option<&'a str> {
+fn get_scalar<'a, S>(env: &'a Env<S>, name: &str) -> Option<&'a str> {
     env.variables
         .get_scalar(name)
         .filter(|value| !value.is_empty())
@@ -140,7 +141,14 @@ fn get_scalar<'a>(env: &'a Env, name: &str) -> Option<&'a str> {
 ///
 /// The `pwd` parameter should be the current value of `$PWD`. This is used to
 /// resolve a logical path.
-pub fn target(env: &Env, command: &Command, pwd: &str) -> Result<(PathBuf, Origin), TargetError> {
+pub fn target<S>(
+    env: &Env<S>,
+    command: &Command,
+    pwd: &str,
+) -> Result<(PathBuf, Origin), TargetError>
+where
+    S: System,
+{
     // Step 1 & 2: substitute $HOME and $OLDPWD
     let (mut curpath, mut origin) = match &command.operand {
         None => {

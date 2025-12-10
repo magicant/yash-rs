@@ -20,6 +20,7 @@ use super::{Context, Input, Result};
 use crate::Env;
 use crate::option::Option::Verbose;
 use crate::option::State::On;
+use crate::system::System;
 use std::cell::RefCell;
 
 /// `Input` decorator that echoes the input.
@@ -28,15 +29,15 @@ use std::cell::RefCell;
 /// shell option to the input. If the option is enabled, the input is echoed to
 /// the standard error before it is returned to the caller. Otherwise, the input
 /// is returned as is.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[doc(alias = "Verbose")]
 #[must_use = "Echo does nothing unless used by a parser"]
-pub struct Echo<'a, 'b, T> {
+pub struct Echo<'a, 'b, S, T> {
     inner: T,
-    env: &'a RefCell<&'b mut Env>,
+    env: &'a RefCell<&'b mut Env<S>>,
 }
 
-impl<'a, 'b, T> Echo<'a, 'b, T> {
+impl<'a, 'b, S, T> Echo<'a, 'b, S, T> {
     /// Creates a new `Echo` decorator.
     ///
     /// The first argument is the inner `Input` that performs the actual input
@@ -44,15 +45,22 @@ impl<'a, 'b, T> Echo<'a, 'b, T> {
     /// the shell option state and the system interface to print to the standard
     /// error. It is wrapped in a `RefCell` so that it can be shared with other
     /// decorators and the parser.
-    pub fn new(inner: T, env: &'a RefCell<&'b mut Env>) -> Self {
+    pub fn new(inner: T, env: &'a RefCell<&'b mut Env<S>>) -> Self {
         Self { inner, env }
     }
 }
 
-impl<T> Input for Echo<'_, '_, T>
-where
-    T: Input,
-{
+// Not derived automatically because S may not implement Clone.
+impl<S, T: Clone> Clone for Echo<'_, '_, S, T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            env: self.env,
+        }
+    }
+}
+
+impl<S: System, T: Input> Input for Echo<'_, '_, S, T> {
     // The RefCell should be local to the calling read-eval loop, so it is safe
     // to keep the mutable borrow across await points.
     #[allow(clippy::await_holding_refcell_ref)]
@@ -79,7 +87,7 @@ mod tests {
 
     #[test]
     fn verbose_off() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let ref_env = RefCell::new(&mut env);
@@ -97,7 +105,7 @@ mod tests {
 
     #[test]
     fn verbose_on() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         env.options.set(Verbose, On);

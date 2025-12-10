@@ -37,9 +37,14 @@ use yash_syntax::source::Location;
 use yash_syntax::source::Source;
 
 /// Performs command substitution
-pub async fn expand<C>(command: C, location: Location, env: &mut Env<'_>) -> Result<Phrase, Error>
+pub async fn expand<C, S>(
+    command: C,
+    location: Location,
+    env: &mut Env<'_, S>,
+) -> Result<Phrase, Error>
 where
     C: AsRef<str> + 'static,
+    S: System + 'static,
 {
     let original = location.clone();
 
@@ -67,15 +72,16 @@ where
     expand_common(reader, writer, subshell_result, location, env).await
 }
 
-async fn subshell_body<C>(
-    env: &mut yash_env::Env,
+async fn subshell_body<C, S>(
+    env: &mut yash_env::Env<S>,
     reader: Fd,
     writer: Fd,
     original: Location,
     command: C,
 ) -> yash_env::semantics::Result
 where
-    C: AsRef<str> + 'static,
+    C: AsRef<str>,
+    S: System + 'static,
 {
     // Arrange the file descriptors
     env.system.close(reader).ok();
@@ -96,13 +102,16 @@ where
 }
 
 /// The second half of [`expand`] that does not depend on type parameter `C`.
-async fn expand_common(
+async fn expand_common<S>(
     reader: Fd,
     writer: Fd,
     subshell_result: Result<(Pid, Option<JobControl>), Errno>,
     location: Location,
-    env: &mut Env<'_>,
-) -> Result<Phrase, Error> {
+    env: &mut Env<'_, S>,
+) -> Result<Phrase, Error>
+where
+    S: System,
+{
     // See if the subshell has successfully started
     let pid = match subshell_result {
         Ok((pid, job_control)) => {

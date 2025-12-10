@@ -30,6 +30,7 @@ use yash_env::source::pretty::{
 };
 #[cfg(doc)]
 use yash_env::stack::Stack;
+use yash_env::system::System;
 
 /// Convenience function for constructing an error report and a divert value.
 ///
@@ -52,10 +53,14 @@ use yash_env::stack::Stack;
 /// [`crate::Result::with_exit_status_and_divert`] to return the divert value
 /// along with an exit status.
 #[must_use = "returned message should be printed"]
-pub fn prepare_report_message_and_divert<'e: 'r, 'r>(
-    env: &'e Env,
+pub fn prepare_report_message_and_divert<'e, 'r, S>(
+    env: &'e Env<S>,
     mut report: Report<'r>,
-) -> (String, yash_env::semantics::Result) {
+) -> (String, yash_env::semantics::Result)
+where
+    'e: 'r,
+    S: System,
+{
     let is_special_builtin;
 
     if let Some(builtin) = env.stack.current_builtin() {
@@ -121,16 +126,17 @@ pub fn prepare_report_message_and_divert<'e: 'r, 'r>(
 /// # }.now_or_never().unwrap();
 /// ```
 #[inline]
-pub async fn report<'a, R>(
-    env: &mut Env,
+pub async fn report<'a, S, R>(
+    env: &mut Env<S>,
     report: R,
     exit_status: ExitStatus,
 ) -> yash_env::builtin::Result
 where
+    S: System,
     R: Into<Report<'a>> + 'a,
 {
-    async fn inner(
-        env: &mut Env,
+    async fn inner<S: System>(
+        env: &mut Env<S>,
         report: Report<'_>,
         exit_status: ExitStatus,
     ) -> yash_env::builtin::Result {
@@ -145,8 +151,9 @@ where
 ///
 /// This is a simple shortcut for calling [`report`] with [`ExitStatus::FAILURE`].
 #[inline]
-pub async fn report_failure<'a, R>(env: &mut Env, report: R) -> yash_env::builtin::Result
+pub async fn report_failure<'a, S, R>(env: &mut Env<S>, report: R) -> yash_env::builtin::Result
 where
+    S: System,
     R: Into<Report<'a>> + 'a,
 {
     self::report(env, report, ExitStatus::FAILURE).await
@@ -156,8 +163,9 @@ where
 ///
 /// This is a simple shortcut for calling [`report`] with [`ExitStatus::ERROR`].
 #[inline]
-pub async fn report_error<'a, R>(env: &mut Env, report: R) -> yash_env::builtin::Result
+pub async fn report_error<'a, S, R>(env: &mut Env<S>, report: R) -> yash_env::builtin::Result
 where
+    S: System,
     R: Into<Report<'a>> + 'a,
 {
     self::report(env, report, ExitStatus::ERROR).await
@@ -172,8 +180,8 @@ where
 /// When the exit status is [`ExitStatus::FAILURE`] or [`ExitStatus::ERROR`],
 /// you can use [`report_simple_failure`] or [`report_simple_error`] instead of
 /// this function, respectively.
-pub async fn report_simple(
-    env: &mut Env,
+pub async fn report_simple<S: System>(
+    env: &mut Env<S>,
     title: &str,
     exit_status: ExitStatus,
 ) -> yash_env::builtin::Result {
@@ -186,14 +194,20 @@ pub async fn report_simple(
 /// Prints a simple failure message.
 ///
 /// This is a simple shortcut for calling [`report_simple`] with [`ExitStatus::FAILURE`].
-pub async fn report_simple_failure(env: &mut Env, title: &str) -> yash_env::builtin::Result {
+pub async fn report_simple_failure<S: System>(
+    env: &mut Env<S>,
+    title: &str,
+) -> yash_env::builtin::Result {
     report_simple(env, title, ExitStatus::FAILURE).await
 }
 
 /// Prints a simple error message.
 ///
 /// This is a simple shortcut for calling [`report_simple`] with [`ExitStatus::ERROR`].
-pub async fn report_simple_error(env: &mut Env, title: &str) -> yash_env::builtin::Result {
+pub async fn report_simple_error<S: System>(
+    env: &mut Env<S>,
+    title: &str,
+) -> yash_env::builtin::Result {
     report_simple(env, title, ExitStatus::ERROR).await
 }
 
@@ -201,8 +215,8 @@ pub async fn report_simple_error(env: &mut Env, title: &str) -> yash_env::builti
 ///
 /// This function constructs a [`Report`] with a predefined title and a [`Span`]
 /// created from the given label and location, and calls [`report_error`].
-pub async fn syntax_error(
-    env: &mut Env,
+pub async fn syntax_error<S: System>(
+    env: &mut Env<S>,
     label: &str,
     location: &Location,
 ) -> yash_env::builtin::Result {
