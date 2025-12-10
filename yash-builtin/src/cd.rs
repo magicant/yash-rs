@@ -29,6 +29,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::{Footnote, FootnoteType, Report, ReportType};
 use yash_env::system::Errno;
+use yash_env::system::System;
 use yash_env::variable::PWD;
 
 /// Exit status when the built-in succeeds
@@ -93,13 +94,13 @@ pub mod shorten;
 pub mod syntax;
 pub mod target;
 
-fn get_pwd(env: &Env) -> String {
+fn get_pwd<S>(env: &Env<S>) -> String {
     env.variables.get_scalar(PWD).unwrap_or_default().to_owned()
 }
 
 /// Reports that the new `$PWD` value cannot be determined, and returns the
 /// corresponding exit status.
-async fn report_pwd_error(env: &mut Env, errno: Errno, ensure_pwd: bool) -> Result {
+async fn report_pwd_error<S: System>(env: &mut Env<S>, errno: Errno, ensure_pwd: bool) -> Result {
     let (r#type, exit_status) = if ensure_pwd {
         (ReportType::Error, EXIT_STATUS_STALE_PWD)
     } else {
@@ -119,7 +120,7 @@ async fn report_pwd_error(env: &mut Env, errno: Errno, ensure_pwd: bool) -> Resu
 /// Entry point for executing the `cd` built-in
 ///
 /// This function uses functions in the submodules to execute the built-in.
-pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
+pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> Result {
     let command = match syntax::parse(env, args) {
         Ok(command) => command,
         Err(e) => return report(env, &e, EXIT_STATUS_SYNTAX_ERROR).await,
@@ -165,7 +166,7 @@ mod tests {
 
     #[test]
     fn report_pwd_error_with_ensure_pwd() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
 
@@ -181,7 +182,7 @@ mod tests {
 
     #[test]
     fn report_pwd_error_without_ensure_pwd() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
 

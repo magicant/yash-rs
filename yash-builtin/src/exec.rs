@@ -44,11 +44,12 @@ use yash_env::semantics::command::{ReplaceCurrentProcessError, replace_current_p
 use yash_env::semantics::{Divert::Abort, ExitStatus, Field};
 use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
+use yash_env::system::System;
 
 // TODO Split into syntax and semantics submodules
 
 /// Entry point for executing the `exec` built-in
-pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
+pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> Result {
     // TODO Support non-POSIX options
     let args = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok((_options, operands)) => operands,
@@ -162,7 +163,7 @@ mod tests {
     #[test]
     fn executes_external_utility_when_given_operand() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
 
         // Prepare the external utility file
         system
@@ -190,7 +191,7 @@ mod tests {
     #[test]
     fn accepts_double_hyphen_separator() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
 
         // Prepare the external utility file
         system
@@ -212,7 +213,7 @@ mod tests {
     #[test]
     fn passing_argument_to_external_utility() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
 
         // Prepare the external utility file
         system
@@ -240,7 +241,7 @@ mod tests {
     #[test]
     fn utility_name_with_slash() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
 
         // Prepare the external utility file
         system
@@ -263,7 +264,7 @@ mod tests {
     #[test]
     fn utility_not_found() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
 
         // Prepare the external utility file
         system
@@ -287,7 +288,7 @@ mod tests {
     #[test]
     fn utility_not_executable() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
 
         // Prepare the file without executable permission
         let content = non_executable_file();
@@ -307,7 +308,7 @@ mod tests {
     #[test]
     fn utility_not_executable_interactive_no_abort() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         env.options.set(Interactive, On);
 
         // Prepare the file without executable permission

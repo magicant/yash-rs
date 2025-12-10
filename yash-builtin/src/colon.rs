@@ -25,6 +25,6 @@ use yash_env::Env;
 use yash_env::semantics::Field;
 
 /// Entry point for executing the `:` built-in
-pub fn main(_env: &mut Env, _args: Vec<Field>) -> Result {
+pub fn main<S>(_env: &mut Env<S>, _args: Vec<Field>) -> Result {
     Result::default()
 }

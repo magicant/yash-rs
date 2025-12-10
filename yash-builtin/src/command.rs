@@ -48,7 +48,6 @@ use enumset::EnumSet;
 use enumset::EnumSetType;
 use yash_env::Env;
 use yash_env::semantics::Field;
-#[cfg(doc)]
 use yash_env::system::System;
 #[cfg(all(doc, unix))]
 use yash_env::system::real::RealSystem;
@@ -166,7 +165,7 @@ impl From<Identify> for Command {
 }
 
 impl Command {
-    pub async fn execute(self, env: &mut Env) -> crate::Result {
+    pub async fn execute<S: System + 'static>(self, env: &mut Env<S>) -> crate::Result {
         match self {
             Self::Invoke(invoke) => invoke.execute(env).await,
             Self::Identify(identify) => identify.execute(env).await,
@@ -182,7 +181,7 @@ pub mod syntax;
 /// Entry point of the `command` built-in
 ///
 /// This function parses the arguments into [`Command`] and executes it.
-pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
+pub async fn main<S: System + 'static>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result {
     match syntax::parse(env, args) {
         Ok(command) => command.execute(env).await,
         Err(error) => report_error(env, &error).await,

@@ -47,19 +47,24 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
+use yash_env::system::System;
 
 // TODO Split into syntax and semantics submodules
 
 const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('n').long("no-return")];
 
-async fn operand_parse_error(env: &mut Env, location: &Location, error: ParseIntError) -> Result {
+async fn operand_parse_error<S: System>(
+    env: &mut Env<S>,
+    location: &Location,
+    error: ParseIntError,
+) -> Result {
     syntax_error(env, &error.to_string(), location).await
 }
 
 /// Entry point for executing the `return` built-in
 ///
 /// See the [module-level documentation](self) for details.
-pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
+pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> Result {
     let (options, operands) = match parse_arguments(OPTION_SPECS, Mode::with_env(env), args) {
         Ok(result) => result,
         Err(error) => return report_error(env, &error).await,
@@ -166,7 +171,7 @@ mod tests {
 
     #[test]
     fn return_with_negative_exit_status_operand() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Builtin(Builtin {
@@ -186,7 +191,7 @@ mod tests {
 
     #[test]
     fn exit_with_non_integer_exit_status_operand() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Builtin(Builtin {
@@ -206,7 +211,7 @@ mod tests {
 
     #[test]
     fn return_with_too_large_exit_status_operand() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Builtin(Builtin {
@@ -237,7 +242,7 @@ mod tests {
 
     #[test]
     fn return_with_too_many_operands() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Builtin(Builtin {
@@ -257,7 +262,7 @@ mod tests {
 
     #[test]
     fn return_with_invalid_option() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Builtin(Builtin {

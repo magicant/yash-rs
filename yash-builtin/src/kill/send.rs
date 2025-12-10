@@ -18,7 +18,7 @@
 //!
 //! [`execute`] calls [`send`] for each target and reports all errors.
 //! [`send`] uses [`resolve_target`] to determine the argument to the
-//! [`kill`](yash_env::System::kill) system call.
+//! [`kill`](System::kill) system call.
 
 use super::Signal;
 use crate::common::report::{merge_reports, report_failure};
@@ -32,7 +32,7 @@ use yash_env::semantics::Field;
 use yash_env::signal;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::Errno;
-use yash_env::system::System as _;
+use yash_env::system::System;
 
 /// Error that may occur while [sending](send) a signal.
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -81,8 +81,8 @@ pub fn resolve_target(jobs: &JobList, target: &str) -> Result<Pid, Error> {
 }
 
 /// Sends the specified signal to the specified target.
-pub async fn send(
-    env: &mut Env,
+pub async fn send<S: System>(
+    env: &mut Env<S>,
     signal: Option<signal::Number>,
     target: &Field,
 ) -> Result<(), Error> {
@@ -156,8 +156,8 @@ impl<'a> From<&'a TargetError<'a>> for Report<'a> {
 /// `signal_origin` is the field that specified the signal. It is used to report
 /// the error location if the signal is not supported on the current system. If
 /// it is `None` and the `signal` is not supported, the function panics.
-pub async fn execute(
-    env: &mut Env,
+pub async fn execute<S: System>(
+    env: &mut Env<S>,
     signal: Signal,
     signal_origin: Option<&Field>,
     targets: &[Field],
@@ -279,7 +279,7 @@ mod tests {
     fn execute_unsupported_signal() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         let result = execute(&mut env, Signal::Number(-1), Some(&Field::dummy("-1")), &[])
             .now_or_never()
             .unwrap();

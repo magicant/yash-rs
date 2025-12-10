@@ -43,6 +43,7 @@ use crate::typeset::syntax::parse;
 use yash_env::Env;
 use yash_env::option::State::On;
 use yash_env::semantics::Field;
+use yash_env::system::System;
 
 /// List of portable options applicable to the export built-in
 pub const PORTABLE_OPTIONS: &[OptionSpec<'static>] = &[PRINT_OPTION];
@@ -55,7 +56,7 @@ pub const PRINT_CONTEXT: PrintContext<'static> = PrintContext {
 };
 
 /// Entry point of the export built-in
-pub async fn main(env: &mut Env, args: Vec<Field>) -> yash_env::builtin::Result {
+pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> yash_env::builtin::Result {
     match parse(PORTABLE_OPTIONS, args) {
         Ok((options, operands)) => match interpret(options, operands) {
             Ok(mut command) => {

@@ -53,17 +53,18 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
+use yash_env::system::System;
 
 // TODO Split into syntax and semantics submodules
 
-async fn operand_parse_error(env: &mut Env, location: &Location, error: ParseIntError) -> Result {
+async fn operand_parse_error<S: System>(env: &mut Env<S>, location: &Location, error: ParseIntError) -> Result {
     syntax_error(env, &error.to_string(), location).await
 }
 
 /// Entry point for executing the `exit` built-in
 ///
 /// See the [module-level documentation](self) for details.
-pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
+pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> Result {
     // TODO Support non-POSIX options
     let args = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok((_options, operands)) => operands,
@@ -128,7 +129,7 @@ mod tests {
 
     #[test]
     fn exit_with_negative_exit_status_operand() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Builtin(Builtin {
@@ -148,7 +149,7 @@ mod tests {
 
     #[test]
     fn exit_with_non_integer_exit_status_operand() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Builtin(Builtin {
@@ -168,7 +169,7 @@ mod tests {
 
     #[test]
     fn exit_with_too_large_exit_status_operand() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Builtin(Builtin {
@@ -191,7 +192,7 @@ mod tests {
 
     #[test]
     fn exit_with_too_many_arguments() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Builtin(Builtin {

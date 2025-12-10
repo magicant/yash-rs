@@ -58,7 +58,7 @@ pub type Result = std::result::Result<String, Error>;
 ///
 /// If successful, the result is the working directory path to be printed,
 /// including the trailing newline.
-pub fn compute(env: &Env, mode: Mode) -> Result {
+pub fn compute<S: System>(env: &Env<S>, mode: Mode) -> Result {
     match mode {
         Mode::Logical => {
             if let Some(pwd) = env.get_pwd_if_correct() {
@@ -91,8 +91,8 @@ mod tests {
     use yash_env::variable::PWD;
     use yash_env::variable::Scope::Global;
 
-    fn env_with_symlink_to_dir() -> Env {
-        let mut system = Box::new(VirtualSystem::new());
+    fn env_with_symlink_to_dir() -> Env<VirtualSystem> {
+        let mut system = VirtualSystem::new();
         let mut state = system.state.borrow_mut();
         state
             .file_system

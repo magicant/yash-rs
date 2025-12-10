@@ -44,6 +44,7 @@ use yash_env::parser::IsName;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::stack::Frame::Subshell;
+use yash_env::system::System;
 use yash_env::variable::Scope::Global;
 
 /// Interpretation of command-line arguments that determine the behavior of the
@@ -73,7 +74,7 @@ pub mod syntax;
 
 /// Enables or disables the internal dispositions for the "stopper" signals
 /// depending on the `Interactive` and `Monitor` option states.
-fn update_internal_dispositions_for_stoppers(env: &mut Env) {
+fn update_internal_dispositions_for_stoppers<S: System>(env: &mut Env<S>) {
     if env.options.get(Interactive) == State::On && env.options.get(Monitor) == State::On {
         env.traps
             .enable_internal_dispositions_for_stoppers(&mut env.system)
@@ -86,15 +87,15 @@ fn update_internal_dispositions_for_stoppers(env: &mut Env) {
 
 /// Ensures that the shell is in the foreground process group if the `Monitor`
 /// option is enabled.
-async fn ensure_foreground(env: &mut Env) {
+async fn ensure_foreground<S: System>(env: &mut Env<S>) {
     if env.options.get(Monitor) == State::On {
         env.ensure_foreground().await.ok();
     }
 }
 
 /// Modifies shell options and positional parameters.
-async fn modify(
-    env: &mut Env,
+async fn modify<S: System>(
+    env: &mut Env<S>,
     options: Vec<(yash_env::option::Option, State)>,
     positional_params: Option<Vec<Field>>,
 ) {
@@ -126,7 +127,7 @@ async fn modify(
 /// This function requires an instance of [`IsName`] to be present in the
 /// environment's [`any`](Env::any) storage to check for valid variable names.
 /// If no such instance is found, this function will **panic**.
-pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
+pub async fn main<S: System + 'static>(env: &mut Env<S>, args: Vec<Field>) -> Result {
     match syntax::parse(args) {
         Ok(Command::PrintVariables) => {
             let IsName(is_name) = env.any.get().expect("IsName not found in env.any");
@@ -206,10 +207,11 @@ mod tests {
     fn printing_variables() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
-        env.any.insert(Box::new(IsName(|_env, name| {
-            yash_syntax::parser::lex::is_name(name)
-        })));
+        let mut env = Env::with_system(system);
+        env.any
+            .insert(Box::new(IsName::<VirtualSystem>(|_env, name| {
+                yash_syntax::parser::lex::is_name(name)
+            })));
         let mut var = env.variables.get_or_new("foo", Scope::Global);
         var.assign("value", None).unwrap();
         var.export(true);
@@ -232,7 +234,7 @@ mod tests {
     fn printing_options_human_readable() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.options.set(AllExport, On);
         env.options.set(Unset, Off);
 
@@ -271,7 +273,7 @@ xtrace           off
     fn printing_options_machine_readable() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.options.set(Clobber, Off);
         env.options.set(Verbose, On);
         let options = env.options;
@@ -336,7 +338,7 @@ xtrace           off
     fn enabling_monitor_option() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.options.set(Interactive, On);
         let args = Field::dummies(["-m"]);
 
@@ -354,7 +356,7 @@ xtrace           off
     fn disabling_monitor_option() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.options.set(Interactive, On);
         let args = Field::dummies(["-m"]);
         _ = main(&mut env, args).now_or_never().unwrap();
@@ -374,7 +376,7 @@ xtrace           off
     fn internal_dispositions_not_enabled_for_stoppers_in_non_interactive_shell() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         let args = Field::dummies(["-m"]);
 
         let result = main(&mut env, args).now_or_never().unwrap();
@@ -391,7 +393,7 @@ xtrace           off
     fn internal_dispositions_not_enabled_for_stoppers_in_subshell() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         let mut env = env.push_frame(Subshell);
         env.options.set(Interactive, On);
         let args = Field::dummies(["-m"]);

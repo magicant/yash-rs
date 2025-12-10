@@ -38,12 +38,12 @@ use yash_env::variable::Expansion;
 /// results from an underlying [`yash_env::Env`] according to the [`Search`]
 /// parameters.
 #[derive(Debug)]
-pub struct SearchEnv<'a> {
-    pub env: &'a mut Env,
+pub struct SearchEnv<'a, S> {
+    pub env: &'a mut Env<S>,
     pub params: &'a Search,
 }
 
-impl yash_env::semantics::command::search::PathEnv for SearchEnv<'_> {
+impl<S: System> yash_env::semantics::command::search::PathEnv for SearchEnv<'_, S> {
     /// Returns the path.
     ///
     /// If [`Search::standard_path`] is `true`, this function retrieves the
@@ -69,8 +69,8 @@ impl yash_env::semantics::command::search::PathEnv for SearchEnv<'_> {
     }
 }
 
-impl yash_env::semantics::command::search::ClassifyEnv for SearchEnv<'_> {
-    fn builtin(&self, name: &str) -> Option<Builtin> {
+impl<S: System> yash_env::semantics::command::search::ClassifyEnv<S> for SearchEnv<'_, S> {
+    fn builtin(&self, name: &str) -> Option<Builtin<S>> {
         if self.params.categories.contains(Category::Builtin) {
             self.env.builtin(name)
         } else {
@@ -78,7 +78,7 @@ impl yash_env::semantics::command::search::ClassifyEnv for SearchEnv<'_> {
         }
     }
 
-    fn function(&self, name: &str) -> Option<&Rc<Function>> {
+    fn function(&self, name: &str) -> Option<&Rc<Function<S>>> {
         if self.params.categories.contains(Category::Function) {
             self.env.function(name)
         } else {
@@ -102,7 +102,7 @@ mod tests {
 
     #[test]
     fn standard_path() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         system.state.borrow_mut().path = "/bin:/usr/bin:/std".into();
         let env = &mut Env::with_system(system);
         env.variables
@@ -121,7 +121,7 @@ mod tests {
 
     #[test]
     fn standard_path_with_confstr_error() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         system.state.borrow_mut().path = "".into();
         let env = &mut Env::with_system(system);
         let params = &Search {
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn standard_path_with_invalid_utf8() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         system.state.borrow_mut().path = UnixString::from_vec(vec![0x80]);
         let env = &mut Env::with_system(system);
         let params = &Search {
@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn non_standard_path_scalar() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         system.state.borrow_mut().path = "/bin:/usr/bin:/std".into();
         let env = &mut Env::with_system(system);
         env.variables
@@ -172,7 +172,7 @@ mod tests {
     fn non_standard_path_array() {
         let array = vec!["/usr/local/bin".to_owned(), "/bin".to_owned()];
 
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         system.state.borrow_mut().path = "/bin:/usr/bin:/std".into();
         let env = &mut Env::with_system(system);
         env.variables

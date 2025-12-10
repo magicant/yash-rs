@@ -35,6 +35,7 @@ use crate::common::report::{report_error, report_simple_failure};
 use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
+use yash_env::system::System;
 
 // pub mod display;
 pub mod semantics;
@@ -43,7 +44,7 @@ pub use super::r#break::syntax;
 /// Entry point for executing the `continue` built-in
 ///
 /// This function uses the [`syntax`] and [`semantics`] modules to execute the built-in.
-pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
+pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> Result {
     match syntax::parse(env, args) {
         Ok(count) => match semantics::run(&env.stack, count) {
             Ok(result) => result,
@@ -79,7 +80,7 @@ mod tests {
 
     #[test]
     fn no_enclosing_loop() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Builtin(Builtin {
@@ -101,7 +102,7 @@ mod tests {
 
     #[test]
     fn omitted_operand_with_one_enclosing_loop() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Loop);
@@ -121,7 +122,7 @@ mod tests {
 
     #[test]
     fn omitted_operand_with_many_enclosing_loops() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Loop);
@@ -143,7 +144,7 @@ mod tests {
 
     #[test]
     fn explicit_operand_1_with_many_enclosing_loops() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Loop);
@@ -166,7 +167,7 @@ mod tests {
 
     #[test]
     fn explicit_operand_3_with_many_enclosing_loops() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Loop);
@@ -189,7 +190,7 @@ mod tests {
 
     #[test]
     fn explicit_operand_greater_than_number_of_loops() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Loop);
@@ -213,7 +214,7 @@ mod tests {
 
     #[test]
     fn explicit_operand_0() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Loop);
@@ -239,7 +240,7 @@ mod tests {
 
     #[test]
     fn explicit_operand_too_large() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Loop);
@@ -260,7 +261,7 @@ mod tests {
 
     #[test]
     fn too_many_operands() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Loop);
@@ -283,7 +284,7 @@ mod tests {
 
     #[test]
     fn argument_separator() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Loop);

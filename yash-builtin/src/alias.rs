@@ -30,6 +30,7 @@ use crate::common::syntax::parse_arguments;
 use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
+use yash_env::system::System;
 
 /// Parsed command line arguments
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -42,7 +43,7 @@ pub struct Command {
 pub mod semantics;
 
 /// Entry point for executing the `alias` built-in
-pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
+pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> Result {
     let mode = Mode::with_env(env);
     // TODO support options
     match parse_arguments(&[], mode, args) {

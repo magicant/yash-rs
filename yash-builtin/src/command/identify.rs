@@ -47,30 +47,63 @@ use yash_quote::quoted;
 /// relying on equality comparisons for values of this type. See
 /// <https://doc.rust-lang.org/std/ptr/fn.fn_addr_eq.html> for the
 /// characteristics of function pointer comparisons.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Categorization {
+pub enum Categorization<S> {
     /// Shell reserved word
     Keyword,
     /// Alias
     Alias(Rc<Alias>),
     /// Target program that can be executed
-    Target(Target),
+    Target(Target<S>),
 }
 
-impl From<Rc<Alias>> for Categorization {
+// Not derived automatically because S may not implement Clone, PartialEq, or Debug.
+impl<S> Clone for Categorization<S> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Keyword => Self::Keyword,
+            Self::Alias(alias) => Self::Alias(alias.clone()),
+            Self::Target(target) => Self::Target(target.clone()),
+        }
+    }
+}
+
+impl<S> PartialEq for Categorization<S> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Keyword, Self::Keyword) => true,
+            (Self::Alias(l), Self::Alias(r)) => l == r,
+            (Self::Target(l), Self::Target(r)) => l == r,
+            _ => false,
+        }
+    }
+}
+
+impl<S> Eq for Categorization<S> {}
+
+impl<S> std::fmt::Debug for Categorization<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Keyword => write!(f, "Keyword"),
+            Self::Alias(alias) => f.debug_tuple("Alias").field(alias).finish(),
+            Self::Target(target) => f.debug_tuple("Target").field(target).finish(),
+        }
+    }
+}
+
+impl<S> From<Rc<Alias>> for Categorization<S> {
     fn from(alias: Rc<Alias>) -> Self {
         Self::Alias(alias)
     }
 }
 
-impl From<&Rc<Alias>> for Categorization {
+impl<S> From<&Rc<Alias>> for Categorization<S> {
     fn from(alias: &Rc<Alias>) -> Self {
         Self::Alias(Rc::clone(alias))
     }
 }
 
-impl From<Target> for Categorization {
-    fn from(target: Target) -> Self {
+impl<S> From<Target<S>> for Categorization<S> {
+    fn from(target: Target<S>) -> Self {
         Self::Target(target)
     }
 }
@@ -110,7 +143,7 @@ trait NormalizeEnv {
     fn pwd(&self) -> Result<PathBuf, ()>;
 }
 
-impl NormalizeEnv for Env {
+impl<S: System> NormalizeEnv for Env<S> {
     #[inline]
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.system.is_executable_file(path)
@@ -133,7 +166,7 @@ impl NormalizeEnv for Env {
 /// The error returned from this function does not contain any message because
 /// this function is used only by [`categorize`], which only need to report
 /// that the target is not found.
-fn normalize_target<E: NormalizeEnv>(env: &E, target: &mut Target) -> Result<(), ()> {
+fn normalize_target<E: NormalizeEnv, S>(env: &E, target: &mut Target<S>) -> Result<(), ()> {
     match target {
         Target::External { path }
         | Target::Builtin {
@@ -164,10 +197,13 @@ fn normalize_target<E: NormalizeEnv>(env: &E, target: &mut Target) -> Result<(),
 /// This function requires an instance of [`IsKeyword`] to be present in the
 /// environment's [`any`](Env::any) storage to check for keywords. If no such
 /// instance is found, this function will **panic**.
-pub fn categorize<'f>(
+pub fn categorize<'f, S>(
     name: &'f Field,
-    env: &mut SearchEnv,
-) -> Result<Categorization, NotFound<'f>> {
+    env: &mut SearchEnv<S>,
+) -> Result<Categorization<S>, NotFound<'f>>
+where
+    S: System + 'static,
+{
     if env.params.categories.contains(Category::Keyword) {
         let IsKeyword(is_keyword) = env.env.any.get().expect("IsKeyword not found in env.any");
         if is_keyword(env.env, &name.value) {
@@ -191,8 +227,8 @@ pub fn categorize<'f>(
 /// This function is a specialized helper for [`describe`]. It produces the
 /// description of the command search result that is to be printed to the
 /// standard output.
-pub fn describe_target<W>(
-    target: &Target,
+pub fn describe_target<S, W>(
+    target: &Target<S>,
     name: &Field,
     verbose: bool,
     result: &mut W,
@@ -257,8 +293,8 @@ where
 ///
 /// This function produces the description of the command search result that is
 /// to be printed to the standard output.
-pub fn describe<W>(
-    categorization: &Categorization,
+pub fn describe<S, W>(
+    categorization: &Categorization<S>,
     name: &Field,
     verbose: bool,
     result: &mut W,
@@ -306,7 +342,7 @@ impl Identify {
     /// This function requires an instance of [`IsKeyword`] to be present in the
     /// environment's [`any`](Env::any) storage to check for keywords. If no
     /// such instance is found, this function will **panic**.
-    pub fn result(&self, env: &mut Env) -> (String, Vec<NotFound<'_>>) {
+    pub fn result<S: System + 'static>(&self, env: &mut Env<S>) -> (String, Vec<NotFound<'_>>) {
         let params = &self.search;
         let env = &mut SearchEnv { env, params };
         let mut result = String::new();
@@ -323,7 +359,7 @@ impl Identify {
     }
 
     /// Performs the identifying semantics.
-    pub async fn execute(&self, env: &mut Env) -> crate::Result {
+    pub async fn execute<S: System + 'static>(&self, env: &mut Env<S>) -> crate::Result {
         let (result, errors) = self.result(env);
 
         let output_result = output(env, &result).await;
@@ -350,6 +386,7 @@ mod tests {
     use yash_env::builtin::Builtin;
     use yash_env::function::Function;
     use yash_env::source::Location;
+    use yash_env::system::r#virtual::VirtualSystem;
     use yash_env_test_helper::function::FunctionBodyStub;
 
     #[test]
@@ -364,7 +401,7 @@ mod tests {
             }
         }
 
-        let mut external_target = Target::External {
+        let mut external_target = Target::<TestEnv>::External {
             path: c"/bin/sh".to_owned(),
         };
         let result = normalize_target(&TestEnv, &mut external_target);
@@ -376,7 +413,7 @@ mod tests {
             }
         );
 
-        let builtin = Builtin::new(Type::Substitutive, |_, _| unreachable!());
+        let builtin = Builtin::<TestEnv>::new(Type::Substitutive, |_, _| unreachable!());
         let mut builtin_target = Target::Builtin {
             builtin,
             path: c"/usr/bin/echo".to_owned(),
@@ -404,7 +441,7 @@ mod tests {
             }
         }
 
-        let mut external_target = Target::External {
+        let mut external_target = Target::<TestEnv>::External {
             path: c"foo/sh".to_owned(),
         };
         let result = normalize_target(&TestEnv, &mut external_target);
@@ -429,7 +466,7 @@ mod tests {
             }
         }
 
-        let mut external_target = Target::External {
+        let mut external_target = Target::<TestEnv>::External {
             path: c"/bin/sh".to_owned(),
         };
         let result = normalize_target(&TestEnv, &mut external_target);
@@ -440,10 +477,11 @@ mod tests {
     fn categorize_keyword() {
         let name = &Field::dummy("if");
         let env = &mut Env::new_virtual();
-        env.any.insert(Box::new(IsKeyword(|_env, word| {
-            assert_eq!(word, "if");
-            true
-        })));
+        env.any
+            .insert(Box::new(IsKeyword::<VirtualSystem>(|_env, word| {
+                assert_eq!(word, "if");
+                true
+            })));
         let params = &Search::default_for_identify();
         let env = &mut SearchEnv { env, params };
 
@@ -455,10 +493,11 @@ mod tests {
     fn categorize_non_keyword() {
         let name = &Field::dummy("foo");
         let env = &mut Env::new_virtual();
-        env.any.insert(Box::new(IsKeyword(|_env, word| {
-            assert_eq!(word, "foo");
-            false
-        })));
+        env.any
+            .insert(Box::new(IsKeyword::<VirtualSystem>(|_env, word| {
+                assert_eq!(word, "foo");
+                false
+            })));
         let params = &Search::default_for_identify();
         let env = &mut SearchEnv { env, params };
 
@@ -490,7 +529,8 @@ mod tests {
         );
         let alias = entry.0.clone();
         env.aliases.insert(entry);
-        env.any.insert(Box::new(IsKeyword(|_, _| false)));
+        env.any
+            .insert(Box::new(IsKeyword::<VirtualSystem>(|_, _| false)));
         let params = &Search::default_for_identify();
         let env = &mut SearchEnv { env, params };
 
@@ -502,7 +542,8 @@ mod tests {
     fn categorize_non_alias() {
         let name = &Field::dummy("a");
         let env = &mut Env::new_virtual();
-        env.any.insert(Box::new(IsKeyword(|_, _| false)));
+        env.any
+            .insert(Box::new(IsKeyword::<VirtualSystem>(|_, _| false)));
         let params = &Search::default_for_identify();
         let env = &mut SearchEnv { env, params };
 
@@ -520,7 +561,8 @@ mod tests {
             false,
             Location::dummy("a"),
         ));
-        env.any.insert(Box::new(IsKeyword(|_, _| false)));
+        env.any
+            .insert(Box::new(IsKeyword::<VirtualSystem>(|_, _| false)));
         let params = &mut Search::default_for_identify();
         params.categories.remove(Category::Alias);
         let env = &mut SearchEnv { env, params };
@@ -533,7 +575,7 @@ mod tests {
     fn describe_builtin_without_path() {
         let name = &Field::dummy(":");
         let target = &Target::Builtin {
-            builtin: Builtin::new(Type::Special, |_, _| unreachable!()),
+            builtin: Builtin::<()>::new(Type::Special, |_, _| unreachable!()),
             path: CString::default(),
         };
 
@@ -550,7 +592,7 @@ mod tests {
     fn describe_builtin_with_path() {
         let name = &Field::dummy("echo");
         let target = &Target::Builtin {
-            builtin: Builtin::new(Type::Substitutive, |_, _| unreachable!()),
+            builtin: Builtin::<()>::new(Type::Substitutive, |_, _| unreachable!()),
             path: c"/bin/echo".to_owned(),
         };
 
@@ -567,7 +609,7 @@ mod tests {
     fn describe_function() {
         let name = &Field::dummy("f");
         let location = Location::dummy("f");
-        let function = Function::new("f", FunctionBodyStub::rc_dyn(), location);
+        let function = Function::<()>::new("f", FunctionBodyStub::rc_dyn(), location);
         let target = &Target::Function(function.into());
 
         let mut output = String::new();
@@ -582,7 +624,7 @@ mod tests {
     #[test]
     fn describe_external() {
         let name = &Field::dummy("ls");
-        let target = &Target::External {
+        let target = &Target::<()>::External {
             path: c"/bin/ls".to_owned(),
         };
 
@@ -597,7 +639,7 @@ mod tests {
 
     #[test]
     fn describe_keyword() {
-        let categorization = &Categorization::Keyword;
+        let categorization = &Categorization::<()>::Keyword;
         let name = &Field::dummy("if");
 
         let mut output = String::new();
@@ -613,7 +655,7 @@ mod tests {
 
     #[test]
     fn describe_alias() {
-        let categorization = &Categorization::Alias(Rc::new(Alias {
+        let categorization = &Categorization::<()>::Alias(Rc::new(Alias {
             name: "foo".to_string(),
             replacement: "bar".to_string(),
             global: false,
@@ -634,7 +676,7 @@ mod tests {
 
     #[test]
     fn describe_alias_starting_with_hyphen() {
-        let categorization = &Categorization::Alias(Rc::new(Alias {
+        let categorization = &Categorization::<()>::Alias(Rc::new(Alias {
             name: "-foo".to_string(),
             replacement: "bar".to_string(),
             global: false,
@@ -651,7 +693,8 @@ mod tests {
     #[test]
     fn identify_result_without_error() {
         let env = &mut Env::new_virtual();
-        env.any.insert(Box::new(IsKeyword(|_, _| true)));
+        env.any
+            .insert(Box::new(IsKeyword::<VirtualSystem>(|_, _| true)));
 
         let mut identify = Identify::default();
         let (result, errors) = identify.result(env);
@@ -678,7 +721,9 @@ mod tests {
     fn identify_result_with_error() {
         let env = &mut Env::new_virtual();
         env.any
-            .insert(Box::new(IsKeyword(|_, word| word == "if" || word == "fi")));
+            .insert(Box::new(IsKeyword::<VirtualSystem>(|_, word| {
+                word == "if" || word == "fi"
+            })));
         let identify = Identify {
             names: Field::dummies(["if", "oops", "fi", "bar"]),
             ..Identify::default()

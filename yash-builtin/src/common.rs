@@ -21,6 +21,7 @@
 
 use yash_env::Env;
 use yash_env::io::Fd;
+use yash_env::system::System;
 
 pub mod report;
 pub mod syntax;
@@ -32,7 +33,10 @@ pub mod syntax;
 /// the standard error and the returned result has
 /// [`ExitStatus::FAILURE`](yash_env::semantics::ExitStatus::FAILURE). Any
 /// errors that occur while printing the error message are ignored.
-pub async fn output(env: &mut Env, content: &str) -> yash_env::builtin::Result {
+pub async fn output<S>(env: &mut Env<S>, content: &str) -> yash_env::builtin::Result
+where
+    S: System,
+{
     match env.system.write_all(Fd::STDOUT, content.as_bytes()).await {
         Ok(_) => Default::default(),
         Err(errno) => {

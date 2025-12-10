@@ -104,7 +104,7 @@ pub fn interpret(
 }
 
 /// Parses command line arguments of the `command` built-in
-pub fn parse(env: &Env, args: Vec<Field>) -> Result<Command, Error> {
+pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
     let (options, operands) = parse_arguments(OPTION_SPECS, Mode::with_env(env), args)?;
     interpret(options, operands)
 }
