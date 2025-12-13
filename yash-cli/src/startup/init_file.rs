@@ -169,9 +169,10 @@ pub async fn run_init_file(env: &mut Env, path: &str) {
     };
 
     let env = &mut *env.push_frame(Frame::InitFile);
-    let system = env.system.clone();
+    let system1 = env.system.clone();
+    let system2 = env.system.clone();
     let ref_env = RefCell::new(&mut *env);
-    let input = Box::new(Echo::new(FdReader::new(fd, system), &ref_env));
+    let input = Box::new(Echo::new(FdReader::new(fd, system1), &ref_env, system2));
     let mut config = Config::with_input(input);
     config.source = Some(Rc::new(Source::InitFile {
         path: path.to_owned(),
