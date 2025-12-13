@@ -18,6 +18,13 @@ A _private dependency_ is used internally and not visible to downstream users.
   blocking behavior of `tcsetpgrp` when called from a background process group,
   though the current virtual system implementation does not yet do so.
 
+### Deprecated
+
+- `Env::system`: This field is deprecated and will be removed in a future
+  release. `System` should be managed outside of `Env`. Functions that depend
+  on `System` should receive it as an argument instead of accessing it through
+  `Env`.
+
 ## [0.10.1] - 2025-11-29
 
 ### Fixed

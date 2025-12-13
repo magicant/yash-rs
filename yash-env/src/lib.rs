@@ -138,6 +138,12 @@ pub struct Env {
     pub any: DataSet,
 
     /// Interface to the system-managed parts of the environment
+    ///
+    /// This field is deprecated and will be removed in a future release.
+    /// `System` should be managed outside of `Env`.  Functions that depend on
+    /// `System` should receive it as an argument instead of accessing it
+    /// through `Env`.
+    #[deprecated(since = "0.11.0", note = "`System` should be managed outside of `Env`")]
     pub system: SharedSystem,
 }
 
@@ -164,6 +170,7 @@ impl Env {
             tty: Default::default(),
             variables: Default::default(),
             any: Default::default(),
+            #[allow(deprecated)]
             system: SharedSystem::new(system),
         }
     }
@@ -196,6 +203,7 @@ impl Env {
             tty: self.tty,
             variables: self.variables.clone(),
             any: self.any.clone(),
+            #[allow(deprecated)]
             system: SharedSystem::new(system),
         }
     }
