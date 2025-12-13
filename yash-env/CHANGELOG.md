@@ -17,6 +17,16 @@ A _private dependency_ is used internally and not visible to downstream users.
   synchronous `Result<()>`. This change allows virtual systems to simulate the
   blocking behavior of `tcsetpgrp` when called from a background process group,
   though the current virtual system implementation does not yet do so.
+- An additional parameter has been added to the following functions to pass
+  the `System` implementation explicitly instead of accessing it through `Env`:
+    - `input::Echo::new`
+
+### Deprecated
+
+- `Env::system`: This field is deprecated and will be removed in a future
+  release. `System` should be managed outside of `Env`. Functions that depend
+  on `System` should receive it as an argument instead of accessing it through
+  `Env`.
 
 ## [0.10.1] - 2025-11-29
 

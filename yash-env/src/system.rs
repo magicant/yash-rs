@@ -27,6 +27,7 @@ pub mod real;
 pub mod resource;
 mod select;
 mod shared;
+pub(crate) mod unusable;
 pub mod r#virtual;
 
 pub use self::errno::Errno;

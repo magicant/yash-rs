@@ -86,8 +86,9 @@ use yash_syntax::syntax::List;
 /// # use yash_syntax::input::Memory;
 /// # use yash_syntax::parser::lex::Lexer;
 /// let mut env = Env::new_virtual();
+/// let system = env.system.clone();
 /// let mut ref_env = RefCell::new(&mut env);
-/// let input = Box::new(Echo::new(Memory::new("case foo in (bar) ;; esac"), &ref_env));
+/// let input = Box::new(Echo::new(Memory::new("case foo in (bar) ;; esac"), &ref_env, system));
 /// let mut lexer = Lexer::new(input);
 /// let result = read_eval_loop(&ref_env, &mut lexer).await;
 /// drop(lexer);
@@ -286,8 +287,9 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.options.set(Verbose, On);
+        let system = env.system.clone();
         let ref_env = RefCell::new(&mut env);
-        let input = Box::new(Echo::new(Memory::new("case _ in esac"), &ref_env));
+        let input = Box::new(Echo::new(Memory::new("case _ in esac"), &ref_env, system));
         let mut lexer = Lexer::new(input);
 
         let result = read_eval_loop(&ref_env, &mut lexer).now_or_never().unwrap();

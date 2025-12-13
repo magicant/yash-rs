@@ -156,9 +156,10 @@ pub fn prepare_input<'s: 'i + 'e, 'i, 'e>(
 /// applied to the input object.
 fn prepare_fd_input<'i>(fd: Fd, ref_env: &'i RefCell<&mut Env>) -> Box<dyn InputObject + 'i> {
     let env = ref_env.borrow();
-    let system = env.system.clone();
+    let system1 = env.system.clone();
+    let system2 = env.system.clone();
 
-    let basic_input = Echo::new(FdReader::new(fd, system), ref_env);
+    let basic_input = Echo::new(FdReader::new(fd, system1), ref_env, system2);
 
     if env.options.get(Interactive) == Off {
         Box::new(basic_input)

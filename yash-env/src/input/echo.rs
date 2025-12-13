@@ -17,9 +17,9 @@
 //! `Echo` definition
 
 use super::{Context, Input, Result};
-use crate::Env;
 use crate::option::Option::Verbose;
 use crate::option::State::On;
+use crate::{Env, SharedSystem};
 use std::cell::RefCell;
 
 /// `Input` decorator that echoes the input.
@@ -34,6 +34,7 @@ use std::cell::RefCell;
 pub struct Echo<'a, 'b, T> {
     inner: T,
     env: &'a RefCell<&'b mut Env>,
+    system: SharedSystem,
 }
 
 impl<'a, 'b, T> Echo<'a, 'b, T> {
@@ -41,11 +42,10 @@ impl<'a, 'b, T> Echo<'a, 'b, T> {
     ///
     /// The first argument is the inner `Input` that performs the actual input
     /// operation. The second argument is the shell environment that contains
-    /// the shell option state and the system interface to print to the standard
-    /// error. It is wrapped in a `RefCell` so that it can be shared with other
-    /// decorators and the parser.
-    pub fn new(inner: T, env: &'a RefCell<&'b mut Env>) -> Self {
-        Self { inner, env }
+    /// the shell option state. The third argument is the system interface to
+    /// print to the standard error.
+    pub fn new(inner: T, env: &'a RefCell<&'b mut Env>, system: SharedSystem) -> Self {
+        Self { inner, env, system }
     }
 }
 
@@ -59,9 +59,8 @@ where
     async fn next_line(&mut self, context: &Context) -> Result {
         let line = self.inner.next_line(context).await?;
 
-        let env = &mut **self.env.borrow_mut();
-        if env.options.get(Verbose) == On {
-            env.system.print_error(&line).await;
+        if self.env.borrow().options.get(Verbose) == On {
+            self.system.print_error(&line).await;
         }
 
         Ok(line)
@@ -82,9 +81,10 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
+        let system = env.system.clone();
         let ref_env = RefCell::new(&mut env);
         let memory = Memory::new("echo test\n");
-        let mut echo = Echo::new(memory, &ref_env);
+        let mut echo = Echo::new(memory, &ref_env, system);
 
         let line = echo
             .next_line(&Context::default())
@@ -101,9 +101,10 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         env.options.set(Verbose, On);
+        let system = env.system.clone();
         let ref_env = RefCell::new(&mut env);
         let memory = Memory::new("echo test\nfoo");
-        let mut echo = Echo::new(memory, &ref_env);
+        let mut echo = Echo::new(memory, &ref_env, system);
 
         let line = echo
             .next_line(&Context::default())
