@@ -59,7 +59,7 @@ pub struct Command {
 }
 
 /// Entry point of the `.` built-in execution
-pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> Result {
+pub async fn main<S: System + 'static>(env: &mut Env<S>, args: Vec<Field>) -> Result {
     match syntax::parse(env, args) {
         Ok(command) => command.execute(env).await,
         Err(error) => error.report(env).await,
