@@ -27,8 +27,6 @@
 use crate::common::output;
 use crate::common::report::{report_error, report_failure};
 use yash_env::Env;
-#[cfg(doc)]
-use yash_env::System;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
 use yash_env::system::System;

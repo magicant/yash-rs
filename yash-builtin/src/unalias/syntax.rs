@@ -93,7 +93,7 @@ impl<'a> From<&'a Error> for Report<'a> {
 }
 
 /// Parses command line arguments for the `unalias` built-in.
-pub fn parse(env: &Env, args: Vec<Field>) -> Result<Command, Error> {
+pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
     let mode = Mode::with_env(env);
     let (mut options, operands) = parse_arguments(OPTION_SPECS, mode, args)?;
 

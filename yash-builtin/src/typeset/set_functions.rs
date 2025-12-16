@@ -20,7 +20,7 @@ use yash_env::function::FunctionSet;
 
 impl SetFunctions {
     /// Executes the command.
-    pub fn execute(self, functions: &mut FunctionSet) -> Result<String, Vec<ExecuteError>> {
+    pub fn execute<S>(self, functions: &mut FunctionSet<S>) -> Result<String, Vec<ExecuteError>> {
         let mut errors = Vec::new();
 
         for name in self.functions {
@@ -82,7 +82,7 @@ mod tests {
 
     #[test]
     fn making_existing_functions_readonly() {
-        let mut functions = FunctionSet::new();
+        let mut functions = FunctionSet::<()>::new();
         let foo = Function::new(
             "foo",
             FunctionBodyStub::rc_dyn(),
@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn unsetting_readonly_attribute_of_existing_functions() {
-        let mut functions = FunctionSet::new();
+        let mut functions = FunctionSet::<()>::new();
         let foo = Function::new(
             "foo",
             FunctionBodyStub::rc_dyn(),
@@ -148,7 +148,7 @@ mod tests {
 
     #[test]
     fn making_non_existing_function_readonly() {
-        let mut functions = FunctionSet::new();
+        let mut functions = FunctionSet::<()>::new();
         let sf = SetFunctions {
             functions: Field::dummies(["foo"]),
             attrs: vec![(FunctionAttr::ReadOnly, State::On)],
@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn unsetting_readonly_attribute_of_non_existing_functions() {
-        let mut functions = FunctionSet::new();
+        let mut functions = FunctionSet::<()>::new();
         let sf = SetFunctions {
             functions: Field::dummies(["foo"]),
             attrs: vec![(FunctionAttr::ReadOnly, State::Off)],

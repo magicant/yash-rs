@@ -41,6 +41,7 @@ use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
+use yash_env::system::System;
 use yash_env::variable::{Value, Variable};
 
 mod print_functions;
@@ -129,7 +130,7 @@ pub enum FunctionAttr {
 impl FunctionAttr {
     /// Tests if the attribute is set on a function.
     #[must_use]
-    fn test(&self, function: &Function) -> State {
+    fn test<S>(&self, function: &Function<S>) -> State {
         let is_on = match self {
             Self::ReadOnly => function.is_read_only(),
         };
@@ -243,9 +244,9 @@ impl Command {
     /// If there are no errors, the method returns a string that should be
     /// printed to the standard output.
     /// Otherwise, the method returns a non-empty vector of errors.
-    pub fn execute(
+    pub fn execute<S>(
         self,
-        env: &mut Env,
+        env: &mut Env<S>,
         print_context: &PrintContext,
     ) -> Result<String, Vec<ExecuteError>> {
         match self {
@@ -448,7 +449,7 @@ impl<'a> From<&'a ExecuteError> for Report<'a> {
 }
 
 /// Entry point of the typeset built-in
-pub async fn main(env: &mut Env, args: Vec<Field>) -> yash_env::builtin::Result {
+pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> yash_env::builtin::Result {
     match syntax::parse(syntax::ALL_OPTIONS, args) {
         Ok((options, operands)) => match syntax::interpret(options, operands) {
             Ok(command) => match command.execute(env, &PRINT_CONTEXT) {

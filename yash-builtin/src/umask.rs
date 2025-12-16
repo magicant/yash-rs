@@ -73,7 +73,7 @@ impl Command {
     /// 1. Set the new mask. ([`System::umask`])
     ///
     /// Returns the string that should be printed to the standard output.
-    pub fn execute(&self, env: &mut Env) -> String {
+    pub fn execute<S: System>(&self, env: &mut Env<S>) -> String {
         let current = !env.system.umask(Mode::empty()).bits();
         let new_mask = eval::new_mask(current as _, self);
         env.system.umask(Mode::from_bits_retain(!new_mask as _));
@@ -91,7 +91,7 @@ impl Command {
 }
 
 /// Entry point of the `umask` built-in
-pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
+pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result {
     match syntax::parse(env, args) {
         Ok(command) => {
             let result = command.execute(env);

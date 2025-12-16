@@ -240,7 +240,7 @@ impl<S> Default for FunctionSet<S> {
 }
 
 /// Error redefining a read-only function.
-#[derive(Debug, Eq, Error, PartialEq)]
+#[derive(Error)]
 #[error("cannot redefine read-only function `{}`", .existing.name)]
 #[non_exhaustive]
 pub struct DefineError<S> {
@@ -250,7 +250,7 @@ pub struct DefineError<S> {
     pub new: Rc<Function<S>>,
 }
 
-// Not derived automatically because S may not implement Clone
+// Not derived automatically because S may not implement Clone, Debug, or PartialEq
 impl<S> Clone for DefineError<S> {
     fn clone(&self) -> Self {
         Self {
@@ -260,8 +260,25 @@ impl<S> Clone for DefineError<S> {
     }
 }
 
+impl<S> Debug for DefineError<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DefineError")
+            .field("existing", &self.existing)
+            .field("new", &self.new)
+            .finish()
+    }
+}
+
+impl<S> PartialEq for DefineError<S> {
+    fn eq(&self, other: &Self) -> bool {
+        self.existing == other.existing && self.new == other.new
+    }
+}
+
+impl<S> Eq for DefineError<S> {}
+
 /// Error unsetting a read-only function.
-#[derive(Debug, Eq, Error, PartialEq)]
+#[derive(Error)]
 #[error("cannot unset read-only function `{}`", .existing.name)]
 #[non_exhaustive]
 pub struct UnsetError<S> {
@@ -269,7 +286,7 @@ pub struct UnsetError<S> {
     pub existing: Rc<Function<S>>,
 }
 
-// Not derived automatically because S may not implement Clone
+// Not derived automatically because S may not implement Clone, Debug, or PartialEq
 impl<S> Clone for UnsetError<S> {
     fn clone(&self) -> Self {
         Self {
@@ -277,6 +294,22 @@ impl<S> Clone for UnsetError<S> {
         }
     }
 }
+
+impl<S> Debug for UnsetError<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UnsetError")
+            .field("existing", &self.existing)
+            .finish()
+    }
+}
+
+impl<S> PartialEq for UnsetError<S> {
+    fn eq(&self, other: &Self) -> bool {
+        self.existing == other.existing
+    }
+}
+
+impl<S> Eq for UnsetError<S> {}
 
 /// Unordered iterator over functions in a function set.
 ///

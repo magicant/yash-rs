@@ -88,7 +88,7 @@ pub type Result = std::result::Result<Command, Error>;
 const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('S')];
 
 /// Parses command line arguments.
-pub fn parse(env: &Env, args: Vec<Field>) -> Result {
+pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
     let (options, operands) = parse_arguments(OPTION_SPECS, Mode::with_env(env), args)?;
 
     match operands.len() {

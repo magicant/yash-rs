@@ -25,6 +25,7 @@ use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Span, SpanRole, add_span};
 #[cfg(doc)]
 use yash_env::system::SharedSystem;
+use yash_env::system::System;
 use yash_env::variable::Scope::Global;
 
 /// Error returned by [`unset_variables`].
@@ -91,7 +92,10 @@ impl<'a> From<&'a UnsetVariablesError<'_>> for Report<'a> {
 /// all the variables are unset successfully.
 ///
 /// TODO Allow unsetting local variables only.
-pub fn unset_variables<'a>(env: &mut Env, names: &'a [Field]) -> Vec<UnsetVariablesError<'a>> {
+pub fn unset_variables<'a, S>(
+    env: &mut Env<S>,
+    names: &'a [Field],
+) -> Vec<UnsetVariablesError<'a>> {
     let mut errors = Vec::new();
     for name in names {
         match env.variables.unset(&name.value, Global) {
@@ -113,8 +117,8 @@ pub fn unset_variables<'a>(env: &mut Env, names: &'a [Field]) -> Vec<UnsetVariab
     since = "0.11.0"
 )]
 #[must_use = "returned message should be printed"]
-pub fn unset_variables_error_message(
-    env: &Env,
+pub fn unset_variables_error_message<S: System>(
+    env: &Env<S>,
     errors: &[UnsetVariablesError],
 ) -> (String, yash_env::semantics::Result) {
     let mut report = Report::new();
@@ -153,8 +157,8 @@ pub fn unset_variables_error_message(
     note = "use `merge_reports` and `report_failure` directly",
     since = "0.11.0"
 )]
-pub async fn report_variables_error(
-    env: &mut Env,
+pub async fn report_variables_error<S: System>(
+    env: &mut Env<S>,
     errors: &[UnsetVariablesError<'_>],
 ) -> crate::Result {
     #[allow(deprecated)]
@@ -217,7 +221,10 @@ impl<'a> From<&'a UnsetFunctionsError<'_>> for Report<'a> {
 /// unsetting a function is reported in the returned vector and the function
 /// continues to unset the remaining functions. The returned vector is empty if
 /// all the functions are unset successfully.
-pub fn unset_functions<'a>(env: &mut Env, names: &'a [Field]) -> Vec<UnsetFunctionsError<'a>> {
+pub fn unset_functions<'a, S>(
+    env: &mut Env<S>,
+    names: &'a [Field],
+) -> Vec<UnsetFunctionsError<'a>> {
     let mut errors = Vec::new();
     for name in names {
         match env.functions.unset(&name.value) {
@@ -239,8 +246,8 @@ pub fn unset_functions<'a>(env: &mut Env, names: &'a [Field]) -> Vec<UnsetFuncti
     since = "0.11.0"
 )]
 #[must_use = "returned message should be printed"]
-pub fn unset_functions_error_message(
-    env: &mut Env,
+pub fn unset_functions_error_message<S: System>(
+    env: &mut Env<S>,
     errors: &[UnsetFunctionsError<'_>],
 ) -> (String, yash_env::semantics::Result) {
     let mut report = Report::new();
@@ -279,8 +286,8 @@ pub fn unset_functions_error_message(
     note = "use `merge_reports` and `report_failure` directly",
     since = "0.11.0"
 )]
-pub async fn report_functions_error(
-    env: &mut Env,
+pub async fn report_functions_error<S: System>(
+    env: &mut Env<S>,
     errors: &[UnsetFunctionsError<'_>],
 ) -> crate::Result {
     #[allow(deprecated)]
@@ -381,7 +388,7 @@ mod tests {
         assert_eq!(env.variables.get("d"), None);
     }
 
-    fn dummy_function(name: &str) -> Function {
+    fn dummy_function<S>(name: &str) -> Function<S> {
         let body = yash_env_test_helper::function::FunctionBodyStub::rc_dyn();
         Function::new(name, body, Location::dummy(name))
     }

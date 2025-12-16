@@ -253,7 +253,7 @@ where
             Builtin::new(Mandatory, |env, args| Box::pin(wait::main(env, args))),
         ),
     ]
-    .iter()
+    .into_iter()
 }
 
 #[cfg(test)]
