@@ -24,7 +24,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - `BUILTINS` has been removed because the `Builtin` struct now has a type
   parameter that prevents declaration of the constant. Use the new `iter`
-  function to list all built-in commands instead.
+  function to list all built-in utilities instead.
 
 ## [0.13.0] - 2025-11-26
 
