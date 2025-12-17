@@ -77,7 +77,6 @@ type EnvPrepHook<S> = fn(&mut Env<S>) -> PinFuture<'_, ()>;
 ///     })
 /// })));
 /// ```
-#[derive(Debug)]
 pub struct RunFunction<S>(
     #[allow(clippy::type_complexity)]
     pub  for<'a> fn(
@@ -88,7 +87,7 @@ pub struct RunFunction<S>(
     ) -> FutureResult<'a>,
 );
 
-// Not derived automatically because S may not implement Clone or Copy.
+// Not derived automatically because S may not implement Clone, Copy or Debug.
 impl<S> Clone for RunFunction<S> {
     fn clone(&self) -> Self {
         *self
@@ -96,6 +95,12 @@ impl<S> Clone for RunFunction<S> {
 }
 
 impl<S> Copy for RunFunction<S> {}
+
+impl<S> std::fmt::Debug for RunFunction<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("RunFunction").field(&self.0).finish()
+    }
+}
 
 /// Error returned when [replacing the current process](replace_current_process) fails
 #[derive(Clone, Debug, Error)]
