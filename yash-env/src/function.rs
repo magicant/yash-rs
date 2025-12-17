@@ -226,6 +226,7 @@ pub struct FunctionSet<S> {
 // Not derived automatically because S may not implement Clone
 impl<S> Clone for FunctionSet<S> {
     fn clone(&self) -> Self {
+        #[allow(clippy::mutable_key_type)]
         let entries = self.entries.clone();
         Self { entries }
     }
@@ -234,6 +235,7 @@ impl<S> Clone for FunctionSet<S> {
 // Not derived automatically because S may not implement Default
 impl<S> Default for FunctionSet<S> {
     fn default() -> Self {
+        #[allow(clippy::mutable_key_type)]
         let entries = HashSet::default();
         Self { entries }
     }

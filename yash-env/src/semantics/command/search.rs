@@ -102,7 +102,7 @@ impl<S> Clone for Target<S> {
     fn clone(&self) -> Self {
         match self {
             Self::Builtin { builtin, path } => Self::Builtin {
-                builtin: builtin.clone(),
+                builtin: *builtin,
                 path: path.clone(),
             },
             Self::Function(f) => Self::Function(f.clone()),

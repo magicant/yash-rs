@@ -315,7 +315,7 @@ pub struct RunReadEvalLoop<S>(
 // Not derived automatically because S may not implement Clone or Copy.
 impl<S> Clone for RunReadEvalLoop<S> {
     fn clone(&self) -> Self {
-        Self(self.0.clone())
+        *self
     }
 }
 

@@ -522,7 +522,7 @@ pub struct RunSignalTrapIfCaught<S>(
 // Not derived automatically because S may not implement Clone or Copy.
 impl<S> Clone for RunSignalTrapIfCaught<S> {
     fn clone(&self) -> Self {
-        Self(self.0.clone())
+        *self
     }
 }
 

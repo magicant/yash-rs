@@ -104,7 +104,7 @@ pub struct IsKeyword<S>(pub fn(&Env<S>, &str) -> bool);
 // Not derived automatically because S may not implement Clone or Copy.
 impl<S> Clone for IsKeyword<S> {
     fn clone(&self) -> Self {
-        Self(self.0.clone())
+        *self
     }
 }
 
@@ -124,7 +124,7 @@ pub struct IsName<S>(pub fn(&Env<S>, &str) -> bool);
 // Not derived automatically because S may not implement Clone or Copy.
 impl<S> Clone for IsName<S> {
     fn clone(&self) -> Self {
-        Self(self.0.clone())
+        *self
     }
 }
 

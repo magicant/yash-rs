@@ -79,6 +79,7 @@ type EnvPrepHook<S> = fn(&mut Env<S>) -> PinFuture<'_, ()>;
 /// ```
 #[derive(Debug)]
 pub struct RunFunction<S>(
+    #[allow(clippy::type_complexity)]
     pub  for<'a> fn(
         &'a mut Env<S>,
         Rc<Function<S>>,
@@ -90,7 +91,7 @@ pub struct RunFunction<S>(
 // Not derived automatically because S may not implement Clone or Copy.
 impl<S> Clone for RunFunction<S> {
     fn clone(&self) -> Self {
-        Self(self.0.clone())
+        *self
     }
 }
 

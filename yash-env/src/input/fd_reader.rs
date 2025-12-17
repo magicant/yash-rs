@@ -83,7 +83,7 @@ impl<S> FdReader<S> {
 impl<S> Clone for FdReader<S> {
     fn clone(&self) -> Self {
         Self {
-            fd: self.fd.clone(),
+            fd: self.fd,
             system: self.system.clone(),
             echo: self.echo.clone(),
         }
