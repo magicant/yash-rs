@@ -57,7 +57,11 @@ use yash_env::system::System;
 
 // TODO Split into syntax and semantics submodules
 
-async fn operand_parse_error<S: System>(env: &mut Env<S>, location: &Location, error: ParseIntError) -> Result {
+async fn operand_parse_error<S: System>(
+    env: &mut Env<S>,
+    location: &Location,
+    error: ParseIntError,
+) -> Result {
     syntax_error(env, &error.to_string(), location).await
 }
 
