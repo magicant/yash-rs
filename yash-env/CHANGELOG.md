@@ -17,6 +17,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   synchronous `Result<()>`. This change allows virtual systems to simulate the
   blocking behavior of `tcsetpgrp` when called from a background process group,
   though the current virtual system implementation does not yet do so.
+- `impl<S> std::fmt::Debug for builtin::Builtin<S>` now prints the `execute`
+  field as well.
 
 ## [0.10.1] - 2025-11-29
 

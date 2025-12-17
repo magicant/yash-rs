@@ -281,8 +281,9 @@ impl<S> Debug for Builtin<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Builtin")
             .field("type", &self.r#type)
+            .field("execute", &self.execute)
             .field("is_declaration_utility", &self.is_declaration_utility)
-            .finish_non_exhaustive()
+            .finish()
     }
 }
 
