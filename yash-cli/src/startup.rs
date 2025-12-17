@@ -18,7 +18,6 @@
 
 use self::args::{Run, Source, Work};
 use std::str::FromStr as _;
-use yash_builtin::BUILTINS;
 use yash_env::Env;
 use yash_env::System;
 use yash_env::io::Fd;
@@ -65,7 +64,7 @@ pub fn auto_interactive<S: System>(system: &S, run: &Run) -> bool {
 ///
 /// This function is _pure_ in that all system calls are performed by the
 /// `System` trait object (`env.system`).
-pub async fn configure_environment(env: &mut Env, run: Run) -> Work {
+pub async fn configure_environment<S: System + 'static>(env: &mut Env<S>, run: Run) -> Work {
     // Apply the parsed options to the environment
     if auto_interactive(&env.system, &run) {
         env.options.set(Interactive, On);
@@ -103,7 +102,7 @@ pub async fn configure_environment(env: &mut Env, run: Run) -> Work {
     }
 
     // Prepare built-ins
-    env.builtins.extend(BUILTINS.iter().cloned());
+    env.builtins.extend(yash_builtin::iter());
 
     // Prepare variables
     env.init_variables();
@@ -115,23 +114,23 @@ pub async fn configure_environment(env: &mut Env, run: Run) -> Work {
 }
 
 /// Inject dependencies into the environment.
-fn inject_dependencies(env: &mut Env) {
-    env.any.insert(Box::new(IsKeyword(|_env, word| {
+fn inject_dependencies<S: System + 'static>(env: &mut Env<S>) {
+    env.any.insert(Box::new(IsKeyword::<S>(|_env, word| {
         yash_syntax::parser::lex::Keyword::from_str(word).is_ok()
     })));
 
-    env.any.insert(Box::new(IsName(|_env, name| {
+    env.any.insert(Box::new(IsName::<S>(|_env, name| {
         yash_syntax::parser::lex::is_name(name)
     })));
 
-    env.any.insert(Box::new(RunReadEvalLoop(|env, config| {
+    env.any.insert(Box::new(RunReadEvalLoop::<S>(|env, config| {
         Box::pin(async move {
             let mut lexer = Lexer::from(config);
             yash_semantics::read_eval_loop(env, &mut lexer).await
         })
     })));
 
-    env.any.insert(Box::new(RunFunction(
+    env.any.insert(Box::new(RunFunction::<S>(
         |env, function, fields, env_prep_hook| {
             Box::pin(async move {
                 yash_semantics::command::simple_command::execute_function_body(
@@ -146,15 +145,15 @@ fn inject_dependencies(env: &mut Env) {
     )));
 
     env.any
-        .insert(Box::new(RunSignalTrapIfCaught(|env, signal| {
+        .insert(Box::new(RunSignalTrapIfCaught::<S>(|env, signal| {
             Box::pin(async move { yash_semantics::trap::run_trap_if_caught(env, signal).await })
         })));
 
-    env.any.insert(Box::new(ExpandText(|env, text| {
+    env.any.insert(Box::new(ExpandText::<S>(|env, text| {
         Box::pin(async move { expand_text(env, text).await.ok() })
     })));
 
-    env.any.insert(Box::new(GetPrompt(|env, context| {
+    env.any.insert(Box::new(GetPrompt::<S>(|env, context| {
         Box::pin(async move {
             let prompt = yash_prompt::fetch_posix(&env.variables, context);
             yash_prompt::expand_posix(env, &prompt, false).await

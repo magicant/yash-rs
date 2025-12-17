@@ -41,7 +41,7 @@ use yash_semantics::trap::run_exit_trap;
 use yash_semantics::{Divert, ExitStatus};
 use yash_semantics::{interactive_read_eval_loop, read_eval_loop};
 
-async fn print_version(env: &mut Env) {
+async fn print_version<S: System>(env: &mut Env<S>) {
     let version = env!("CARGO_PKG_VERSION");
     let result = yash_builtin::common::output(env, &format!("yash {version}\n")).await;
     env.exit_status = result.exit_status();
@@ -49,7 +49,7 @@ async fn print_version(env: &mut Env) {
 
 // The RefCell is local to this function, so it is safe to keep borrows across await points.
 #[allow(clippy::await_holding_refcell_ref)]
-async fn run_as_shell_process(env: &mut Env) {
+async fn run_as_shell_process<S: System + 'static>(env: &mut Env<S>) {
     // Parse the command-line arguments
     let run = match self::startup::args::parse(std::env::args()) {
         Ok(Parse::Help) => todo!("print help"),
@@ -120,7 +120,7 @@ pub fn main() -> ! {
     // SAFETY: This is the only instance of RealSystem we create in the whole
     // process.
     let system = unsafe { RealSystem::new() };
-    let mut env = Env::with_system(Box::new(system));
+    let mut env = Env::with_system(system);
 
     // Rust by default sets SIGPIPE to SIG_IGN, which is not desired.
     // As an imperfect workaround, we set SIGPIPE to SIG_DFL here.
