@@ -60,10 +60,9 @@ type PinFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 ///     })
 /// })));
 /// ```
-#[derive(Debug)]
 pub struct GetPrompt<S>(pub for<'a> fn(&'a mut Env<S>, &'a Context) -> PinFuture<'a, String>);
 
-// Not derived automatically because S may not implement Clone or Copy.
+// Not derived automatically because S may not implement Clone, Copy, or Debug
 impl<S> Clone for GetPrompt<S> {
     fn clone(&self) -> Self {
         *self
@@ -71,3 +70,9 @@ impl<S> Clone for GetPrompt<S> {
 }
 
 impl<S> Copy for GetPrompt<S> {}
+
+impl<S> std::fmt::Debug for GetPrompt<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("GetPrompt").field(&self.0).finish()
+    }
+}
