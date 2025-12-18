@@ -157,7 +157,7 @@ impl<S> PartialEq for Function<S> {
 impl<S> Eq for Function<S> {}
 
 // Not derived automatically because S may not implement Debug
-impl<S> std::fmt::Debug for Function<S> {
+impl<S> Debug for Function<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Function")
             .field("name", &self.name)
@@ -178,7 +178,6 @@ impl<S> std::fmt::Debug for Function<S> {
 ///
 /// The `Hash` and `PartialEq` implementation for `HashEntry` only compares
 /// the names of the functions.
-#[derive(Debug)]
 struct HashEntry<S>(Rc<Function<S>>);
 
 // Not derived automatically because S may not implement Clone
@@ -217,10 +216,25 @@ impl<S> Borrow<str> for HashEntry<S> {
     }
 }
 
+// Not derived automatically because S may not implement Debug
+impl<S> Debug for HashEntry<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("HashEntry").field(&self.0).finish()
+    }
+}
+
 /// Collection of functions.
-#[derive(Debug)]
 pub struct FunctionSet<S> {
     entries: HashSet<HashEntry<S>>,
+}
+
+// Not derived automatically because S may not implement Debug
+impl<S> Debug for FunctionSet<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FunctionSet")
+            .field("entries", &self.entries)
+            .finish()
+    }
 }
 
 // Not derived automatically because S may not implement Clone
@@ -316,17 +330,22 @@ impl<S> Eq for UnsetError<S> {}
 /// Unordered iterator over functions in a function set.
 ///
 /// This iterator is created by [`FunctionSet::iter`].
-#[derive(Debug)]
 pub struct Iter<'a, S> {
     inner: std::collections::hash_set::Iter<'a, HashEntry<S>>,
 }
 
-// Not derived automatically because S may not implement Clone
+// Not derived automatically because S may not implement Clone or Debug
 impl<S> Clone for Iter<'_, S> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
         }
+    }
+}
+
+impl<S> Debug for Iter<'_, S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Iter").field("inner", &self.inner).finish()
     }
 }
 
