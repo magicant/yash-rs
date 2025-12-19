@@ -77,7 +77,7 @@ pub use unix_str as str;
 /// The shell execution environment consists of application-managed parts and
 /// system-managed parts. Application-managed parts are directly implemented in
 /// the `Env` instance. System-managed parts are managed by a [`SharedSystem`]
-/// that contains an instance of [`System`].
+/// that contains an instance of `S` that implements [`System`].
 ///
 /// # Cloning
 ///

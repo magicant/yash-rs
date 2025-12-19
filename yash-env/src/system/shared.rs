@@ -72,8 +72,8 @@ use std::time::Instant;
 /// instance sharing the same state.
 ///
 /// `SharedSystem` implements [`System`] by delegating to the contained system
-/// instance. You should avoid calling some of the `System` methods, however.
-/// Prefer `async` functions provided by `SharedSystem` (e.g.,
+/// instance of type `S`. You should avoid calling some of the `System` methods,
+/// however. Prefer `async` functions provided by `SharedSystem` (e.g.,
 /// [`read_async`](Self::read_async)) over raw system functions (e.g.,
 /// [`read`](System::read)).
 ///
