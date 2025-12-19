@@ -19,6 +19,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Public dependency versions:
     - yash-env 0.10.0 → 0.11.0
+- Many types and functions now take type parameters representing the concrete
+  `System` type due to changes in the `yash-env` crate.
 
 ### Removed
 
