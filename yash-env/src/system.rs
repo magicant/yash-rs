@@ -21,6 +21,7 @@ mod fd_flag;
 mod file_system;
 mod future;
 mod id;
+mod io;
 mod open_flag;
 #[cfg(unix)]
 pub mod real;
@@ -41,6 +42,7 @@ pub use self::id::Gid;
 pub use self::id::RawGid;
 pub use self::id::RawUid;
 pub use self::id::Uid;
+pub use self::io::Pipe;
 pub use self::open_flag::OfdAccess;
 pub use self::open_flag::OpenFlag;
 #[cfg(all(doc, unix))]
@@ -84,13 +86,7 @@ use r#virtual::SignalEffect;
 /// substantial implementors for this trait: [`RealSystem`] and
 /// [`VirtualSystem`]. Another implementor is [`SharedSystem`], which wraps a
 /// `System` instance to extend the interface with asynchronous methods.
-pub trait System: Debug + Fstat + IsExecutableFile {
-    /// Creates an unnamed pipe.
-    ///
-    /// This is a thin wrapper around the `pipe` system call.
-    /// If successful, returns the reading and writing ends of the pipe.
-    fn pipe(&mut self) -> Result<(Fd, Fd)>;
-
+pub trait System: Debug + Fstat + IsExecutableFile + Pipe {
     /// Duplicates a file descriptor.
     ///
     /// This is a thin wrapper around the `fcntl` system call that opens a new

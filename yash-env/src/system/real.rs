@@ -44,6 +44,7 @@ use super::IsExecutableFile;
 use super::Mode;
 use super::OfdAccess;
 use super::OpenFlag;
+use super::Pipe;
 use super::Result;
 use super::SigmaskOp;
 use super::Stat;
@@ -252,7 +253,7 @@ impl IsExecutableFile for RealSystem {
     }
 }
 
-impl System for RealSystem {
+impl Pipe for RealSystem {
     fn pipe(&mut self) -> Result<(Fd, Fd)> {
         let mut fds = MaybeUninit::<[c_int; 2]>::uninit();
         // TODO Use as_mut_ptr rather than cast when array_ptr_get is stabilized
@@ -260,7 +261,9 @@ impl System for RealSystem {
         let fds = unsafe { fds.assume_init() };
         Ok((Fd(fds[0]), Fd(fds[1])))
     }
+}
 
+impl System for RealSystem {
     fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
         let command = if flags.contains(FdFlag::CloseOnExec) {
             libc::F_DUPFD_CLOEXEC

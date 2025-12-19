@@ -64,6 +64,7 @@ use super::Gid;
 use super::IsExecutableFile;
 use super::OfdAccess;
 use super::OpenFlag;
+use super::Pipe;
 use super::Result;
 use super::SigmaskOp;
 use super::Stat;
@@ -335,7 +336,7 @@ impl IsExecutableFile for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
+impl Pipe for VirtualSystem {
     fn pipe(&mut self) -> Result<(Fd, Fd)> {
         let file = Rc::new(RefCell::new(Inode {
             body: FileBody::Fifo {
@@ -377,7 +378,9 @@ impl System for VirtualSystem {
         })?;
         Ok((reader, writer))
     }
+}
 
+impl System for VirtualSystem {
     fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
         let mut process = self.current_process_mut();
         let mut body = process.fds.get(&from).ok_or(Errno::EBADF)?.clone();

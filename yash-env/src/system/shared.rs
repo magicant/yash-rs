@@ -31,6 +31,7 @@ use super::OfdAccess;
 use super::OpenFlag;
 use super::Path;
 use super::PathBuf;
+use super::Pipe;
 use super::Resource;
 use super::Result;
 use super::SelectSystem;
@@ -84,6 +85,7 @@ use std::time::Instant;
 ///
 /// ```
 /// # use yash_env::{SharedSystem, System, VirtualSystem};
+/// # use yash_env::system::Pipe;
 /// # use futures_util::task::LocalSpawnExt;
 /// let mut system = SharedSystem::new(VirtualSystem::new());
 /// let mut system2 = system.clone();
@@ -327,14 +329,18 @@ impl<T: IsExecutableFile> IsExecutableFile for &SharedSystem<T> {
     }
 }
 
+/// Delegates `Pipe` methods to the contained implementor.
+impl<T: Pipe> Pipe for &SharedSystem<T> {
+    fn pipe(&mut self) -> Result<(Fd, Fd)> {
+        self.0.borrow_mut().pipe()
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl<S: System> System for &SharedSystem<S> {
-    fn pipe(&mut self) -> Result<(Fd, Fd)> {
-        self.0.borrow_mut().pipe()
-    }
     fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
         self.0.borrow_mut().dup(from, to_min, flags)
     }
@@ -532,14 +538,18 @@ impl<T: IsExecutableFile> IsExecutableFile for SharedSystem<T> {
     }
 }
 
-/// Delegates `System` methods to the contained system instance.
-impl<S: System> System for SharedSystem<S> {
-    // All methods are delegated to `impl System for &SharedSystem`,
-    // which in turn delegates to the contained system instance.
+/// Delegates `Pipe` methods to the contained implementor.
+impl<T: Pipe> Pipe for SharedSystem<T> {
     #[inline]
     fn pipe(&mut self) -> Result<(Fd, Fd)> {
         (&mut &*self).pipe()
     }
+}
+
+/// Delegates `System` methods to the contained system instance.
+impl<S: System> System for SharedSystem<S> {
+    // All methods are delegated to `impl System for &SharedSystem`,
+    // which in turn delegates to the contained system instance.
     #[inline]
     fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
         (&mut &*self).dup(from, to_min, flags)
