@@ -250,10 +250,6 @@ impl System for RealSystem {
         self.file_has_type(path, FileType::Regular) && self.has_execute_permission(path)
     }
 
-    fn is_directory(&self, path: &CStr) -> bool {
-        self.file_has_type(path, FileType::Directory)
-    }
-
     fn pipe(&mut self) -> Result<(Fd, Fd)> {
         let mut fds = MaybeUninit::<[c_int; 2]>::uninit();
         // TODO Use as_mut_ptr rather than cast when array_ptr_get is stabilized

@@ -17,8 +17,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   workaround for the now non-functional
   `<system::SharedSystem as System>::new_child_process`.
 - The following traits have been added to the `system` module:
-    - `Fstat`: Provides `fstat` and `fstatat` methods for getting file
-      metadata.
+    - `Fstat`: Declares `fstat` and `fstatat` methods for getting file
+      metadata and provides a default implementation of `is_directory`.
 - Implementations of these traits are provided for those types that implement
   `System`.
 

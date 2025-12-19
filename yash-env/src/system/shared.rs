@@ -327,9 +327,6 @@ impl<S: System> System for &SharedSystem<S> {
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.0.borrow().is_executable_file(path)
     }
-    fn is_directory(&self, path: &CStr) -> bool {
-        self.0.borrow().is_directory(path)
-    }
     fn pipe(&mut self) -> Result<(Fd, Fd)> {
         self.0.borrow_mut().pipe()
     }
@@ -529,10 +526,6 @@ impl<S: System> System for SharedSystem<S> {
     #[inline]
     fn is_executable_file(&self, path: &CStr) -> bool {
         (&self).is_executable_file(path)
-    }
-    #[inline]
-    fn is_directory(&self, path: &CStr) -> bool {
-        (&self).is_directory(path)
     }
     #[inline]
     fn pipe(&mut self) -> Result<(Fd, Fd)> {

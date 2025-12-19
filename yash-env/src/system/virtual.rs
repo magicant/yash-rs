@@ -333,12 +333,6 @@ impl System for VirtualSystem {
             .is_ok_and(|inode| inode.borrow().permissions.intersects(Mode::ALL_EXEC))
     }
 
-    fn is_directory(&self, path: &CStr) -> bool {
-        let path = Path::new(UnixStr::from_bytes(path.to_bytes()));
-        self.resolve_existing_file(AT_FDCWD, path, /* follow symlinks */ true)
-            .is_ok_and(|inode| matches!(inode.borrow().body, FileBody::Directory { .. }))
-    }
-
     fn pipe(&mut self) -> Result<(Fd, Fd)> {
         let file = Rc::new(RefCell::new(Inode {
             body: FileBody::Fifo {

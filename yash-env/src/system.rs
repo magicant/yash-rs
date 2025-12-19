@@ -87,10 +87,6 @@ pub trait System: Debug + Fstat {
     #[must_use]
     fn is_executable_file(&self, path: &CStr) -> bool;
 
-    /// Whether there is a directory at the specified path.
-    #[must_use]
-    fn is_directory(&self, path: &CStr) -> bool;
-
     /// Creates an unnamed pipe.
     ///
     /// This is a thin wrapper around the `pipe` system call.

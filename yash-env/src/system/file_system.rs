@@ -226,4 +226,11 @@ pub trait Fstat {
     /// the file metadata. The file path is interpreted relative to the
     /// directory represented by the directory file descriptor.
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat>;
+
+    /// Whether there is a directory at the specified path.
+    #[must_use]
+    fn is_directory(&self, path: &CStr) -> bool {
+        self.fstatat(AT_FDCWD, path, /* follow_symlinks */ true)
+            .is_ok_and(|stat| stat.r#type == FileType::Directory)
+    }
 }
