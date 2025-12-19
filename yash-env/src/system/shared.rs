@@ -24,6 +24,7 @@ use super::FdFlag;
 use super::FlexFuture;
 use super::Fstat;
 use super::Gid;
+use super::IsExecutableFile;
 use super::LimitPair;
 use super::Mode;
 use super::OfdAccess;
@@ -319,14 +320,18 @@ impl<T: Fstat> Fstat for &SharedSystem<T> {
     }
 }
 
+/// Delegates `IsExecutableFile` methods to the contained implementor.
+impl<T: IsExecutableFile> IsExecutableFile for &SharedSystem<T> {
+    fn is_executable_file(&self, path: &CStr) -> bool {
+        self.0.borrow().is_executable_file(path)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl<S: System> System for &SharedSystem<S> {
-    fn is_executable_file(&self, path: &CStr) -> bool {
-        self.0.borrow().is_executable_file(path)
-    }
     fn pipe(&mut self) -> Result<(Fd, Fd)> {
         self.0.borrow_mut().pipe()
     }
@@ -519,14 +524,18 @@ impl<T: Fstat> Fstat for SharedSystem<T> {
     }
 }
 
-/// Delegates `System` methods to the contained system instance.
-impl<S: System> System for SharedSystem<S> {
-    // All methods are delegated to `impl System for &SharedSystem`,
-    // which in turn delegates to the contained system instance.
+/// Delegates `IsExecutableFile` methods to the contained implementor.
+impl<T: IsExecutableFile> IsExecutableFile for SharedSystem<T> {
     #[inline]
     fn is_executable_file(&self, path: &CStr) -> bool {
         (&self).is_executable_file(path)
     }
+}
+
+/// Delegates `System` methods to the contained system instance.
+impl<S: System> System for SharedSystem<S> {
+    // All methods are delegated to `impl System for &SharedSystem`,
+    // which in turn delegates to the contained system instance.
     #[inline]
     fn pipe(&mut self) -> Result<(Fd, Fd)> {
         (&mut &*self).pipe()

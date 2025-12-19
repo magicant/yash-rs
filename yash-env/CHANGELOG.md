@@ -19,6 +19,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The following traits have been added to the `system` module:
     - `Fstat`: Declares `fstat` and `fstatat` methods for getting file
       metadata and provides a default implementation of `is_directory`.
+    - `IsExecutableFile`: Declares the `is_executable_file` method for checking
+      if a file is executable.
 - Implementations of these traits are provided for those types that implement
   `System`.
 
@@ -39,7 +41,7 @@ A _private dependency_ is used internally and not visible to downstream users.
       results of `new_child_process` calls on the inner `System` instance. Use
       the new `system::SharedSystem::new_child_process` inherent method instead.
 - The `System` trait has been split into smaller, more specialized traits. It
-  is now a supertrait of those decomposed traits.
+  is now a supertrait of those new traits declared in the `system` module.
 - `System::tcsetpgrp` now returns a `FlexFuture<Result<()>>` instead of a
   synchronous `Result<()>`. This change allows virtual systems to simulate the
   blocking behavior of `tcsetpgrp` when called from a background process group,

@@ -33,7 +33,9 @@ pub use self::errno::Errno;
 pub use self::errno::RawErrno;
 pub use self::errno::Result;
 pub use self::fd_flag::FdFlag;
-pub use self::file_system::{AT_FDCWD, Dir, DirEntry, FileType, Fstat, Mode, RawMode, Stat};
+pub use self::file_system::{
+    AT_FDCWD, Dir, DirEntry, FileType, Fstat, IsExecutableFile, Mode, RawMode, Stat,
+};
 pub use self::future::FlexFuture;
 pub use self::id::Gid;
 pub use self::id::RawGid;
@@ -82,11 +84,7 @@ use r#virtual::SignalEffect;
 /// substantial implementors for this trait: [`RealSystem`] and
 /// [`VirtualSystem`]. Another implementor is [`SharedSystem`], which wraps a
 /// `System` instance to extend the interface with asynchronous methods.
-pub trait System: Debug + Fstat {
-    /// Whether there is an executable file at the specified path.
-    #[must_use]
-    fn is_executable_file(&self, path: &CStr) -> bool;
-
+pub trait System: Debug + Fstat + IsExecutableFile {
     /// Creates an unnamed pipe.
     ///
     /// This is a thin wrapper around the `pipe` system call.

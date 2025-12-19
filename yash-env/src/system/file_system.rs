@@ -208,6 +208,8 @@ impl Stat {
 }
 
 /// Trait for retrieving file metadata
+///
+/// See also [`IsExecutableFile`].
 pub trait Fstat {
     /// Retrieves metadata of a file.
     ///
@@ -233,4 +235,16 @@ pub trait Fstat {
         self.fstatat(AT_FDCWD, path, /* follow_symlinks */ true)
             .is_ok_and(|stat| stat.r#type == FileType::Directory)
     }
+}
+
+/// Trait for checking if a file is executable
+///
+/// This trait declares the `is_executable_file` method, which checks whether a
+/// filepath points to an executable regular file. This trait is separate from
+/// the [`Fstat`] trait because the implementation depends on the `faccessat`
+/// system call.
+pub trait IsExecutableFile {
+    /// Whether there is an executable regular file at the specified path.
+    #[must_use]
+    fn is_executable_file(&self, path: &CStr) -> bool;
 }

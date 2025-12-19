@@ -40,6 +40,7 @@ use super::FileType;
 use super::FlexFuture;
 use super::Fstat;
 use super::Gid;
+use super::IsExecutableFile;
 use super::Mode;
 use super::OfdAccess;
 use super::OpenFlag;
@@ -245,11 +246,13 @@ impl Fstat for RealSystem {
     }
 }
 
-impl System for RealSystem {
+impl IsExecutableFile for RealSystem {
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.file_has_type(path, FileType::Regular) && self.has_execute_permission(path)
     }
+}
 
+impl System for RealSystem {
     fn pipe(&mut self) -> Result<(Fd, Fd)> {
         let mut fds = MaybeUninit::<[c_int; 2]>::uninit();
         // TODO Use as_mut_ptr rather than cast when array_ptr_get is stabilized

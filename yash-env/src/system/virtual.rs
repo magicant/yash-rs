@@ -61,6 +61,7 @@ use super::FdFlag;
 use super::FlexFuture;
 use super::Fstat;
 use super::Gid;
+use super::IsExecutableFile;
 use super::OfdAccess;
 use super::OpenFlag;
 use super::Result;
@@ -322,7 +323,7 @@ impl Fstat for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
+impl IsExecutableFile for VirtualSystem {
     /// Tests whether the specified file is executable or not.
     ///
     /// The current implementation only checks if the file has any executable
@@ -332,7 +333,9 @@ impl System for VirtualSystem {
         self.resolve_existing_file(AT_FDCWD, path, /* follow symlinks */ true)
             .is_ok_and(|inode| inode.borrow().permissions.intersects(Mode::ALL_EXEC))
     }
+}
 
+impl System for VirtualSystem {
     fn pipe(&mut self) -> Result<(Fd, Fd)> {
         let file = Rc::new(RefCell::new(Inode {
             body: FileBody::Fifo {
