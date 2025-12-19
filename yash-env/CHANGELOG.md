@@ -11,12 +11,34 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.11.0] - Unreleased
 
+### Added
+
+- `system::SharedSystem::new_child_process`: This method has been added as a
+  workaround for the now non-functional
+  `<system::SharedSystem as System>::new_child_process`.
+
 ### Changed
 
-- `System::tcsetpgrp`: Now returns a `FlexFuture<Result<()>>` instead of a
+- `system::SharedSystem` now directly holds an instance of `System` rather than
+  being trait-objectified as a `Box<dyn System>`. Type parameters `S`
+  representing the concrete type of `System` have been added to `Env` and
+  `system::SharedSystem`. To match this change, many other types and functions
+  have been updated to take type parameters representing the concrete `System`
+  type.
+    - `Env::with_system`, `Env::clone_with_system`, and
+      `system::SharedSystem::new` now take a concrete `System` instance instead
+      of a `Box<dyn System>`.
+    - `<system::SharedSystem as System>::new_child_process` and
+      `<&system::SharedSystem as System>::new_child_process` now panic because
+      they cannot create `ChildProcessStarter<SharedSystem>` by wrapping the
+      results of `new_child_process` calls on the inner `System` instance. Use
+      the new `system::SharedSystem::new_child_process` inherent method instead.
+- `System::tcsetpgrp` now returns a `FlexFuture<Result<()>>` instead of a
   synchronous `Result<()>`. This change allows virtual systems to simulate the
   blocking behavior of `tcsetpgrp` when called from a background process group,
   though the current virtual system implementation does not yet do so.
+- `impl<S> std::fmt::Debug for builtin::Builtin<S>` now prints the `execute`
+  field as well.
 
 ## [0.10.1] - 2025-11-29
 

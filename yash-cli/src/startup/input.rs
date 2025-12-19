@@ -81,10 +81,14 @@ pub struct PrepareInputError<'a> {
 /// consumes the input and executes the parsed commands.
 ///
 /// [`Verbose`]: yash_env::option::Verbose
-pub fn prepare_input<'s: 'i + 'e, 'i, 'e>(
-    env: &'i RefCell<&mut Env>,
+pub fn prepare_input<'s, 'i, 'e, S>(
+    env: &'i RefCell<&mut Env<S>>,
     source: &'s Source,
-) -> Result<Lexer<'i>, PrepareInputError<'e>> {
+) -> Result<Lexer<'i>, PrepareInputError<'e>>
+where
+    's: 'i + 'e,
+    S: System + 'static,
+{
     fn lexer_with_input_and_source<'a>(
         input: Box<dyn InputObject + 'a>,
         source: SyntaxSource,
@@ -154,7 +158,10 @@ pub fn prepare_input<'s: 'i + 'e, 'i, 'e>(
 /// and wraps it with the [`Echo`] decorator. If the [`Interactive`] option is
 /// enabled, the [`Prompter`], [`Reporter`], and [`IgnoreEof`] decorators are
 /// applied to the input object.
-fn prepare_fd_input<'i>(fd: Fd, ref_env: &'i RefCell<&mut Env>) -> Box<dyn InputObject + 'i> {
+fn prepare_fd_input<'i, S>(fd: Fd, ref_env: &'i RefCell<&mut Env<S>>) -> Box<dyn InputObject + 'i>
+where
+    S: System + 'static,
+{
     let env = ref_env.borrow();
     let system = env.system.clone();
 

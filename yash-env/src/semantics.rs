@@ -299,18 +299,35 @@ type PinFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 /// [`yash-semantics` crate](https://crates.io/crates/yash-semantics):
 ///
 /// ```
+/// # use yash_env::{Env, System};
 /// # use yash_env::semantics::RunReadEvalLoop;
-/// let mut env = yash_env::Env::new_virtual();
-/// env.any.insert(Box::new(RunReadEvalLoop(|env, config| {
-///     Box::pin(async move {
-///         yash_semantics::read_eval_loop(env, &mut config.into()).await
-///     })
-/// })));
+/// fn register_read_eval_loop<S: System + 'static>(env: &mut Env<S>) {
+///     env.any.insert(Box::new(RunReadEvalLoop::<S>(|env, config| {
+///         Box::pin(async move {
+///             yash_semantics::read_eval_loop(env, &mut config.into()).await
+///         })
+///     })));
+/// }
+/// # register_read_eval_loop(&mut Env::new_virtual());
 /// ```
-#[derive(Clone, Copy, Debug)]
-pub struct RunReadEvalLoop(
-    pub for<'a> fn(&'a RefCell<&mut Env>, crate::parser::Config<'a>) -> PinFuture<'a, Result>,
+pub struct RunReadEvalLoop<S>(
+    pub for<'a> fn(&'a RefCell<&mut Env<S>>, crate::parser::Config<'a>) -> PinFuture<'a, Result>,
 );
+
+// Not derived automatically because S may not implement Clone, Copy, or Debug
+impl<S> Clone for RunReadEvalLoop<S> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<S> Copy for RunReadEvalLoop<S> {}
+
+impl<S> std::fmt::Debug for RunReadEvalLoop<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("RunReadEvalLoop").field(&self.0).finish()
+    }
+}
 
 pub mod command;
 pub mod expansion;

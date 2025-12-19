@@ -27,6 +27,7 @@ use crate::expansion::attr_strip::Strip;
 use crate::expansion::expand_word;
 use crate::expansion::initial::Expand as _;
 use crate::expansion::quote_removal::skip_quotes;
+use yash_env::system::System;
 use yash_env::variable::Scope;
 use yash_env::variable::Value;
 use yash_syntax::source::Location;
@@ -192,8 +193,8 @@ fn attribute(mut phrase: Phrase) -> Phrase {
 /// As specified in the POSIX standard, this function expands the `value` and
 /// performs quote removal. The result is assigned to the variable `name` in the
 /// global scope and returned as a [`Phrase`].
-async fn assign(
-    env: &mut Env<'_>,
+async fn assign<S: System + 'static>(
+    env: &mut Env<'_, S>,
     param: &Param,
     vacancy: Vacancy,
     value: &Word,
@@ -227,8 +228,8 @@ async fn assign(
 }
 
 /// Expands a word to be used as a vacant expansion error message.
-async fn vacant_expansion_error_message(
-    env: &mut Env<'_>,
+async fn vacant_expansion_error_message<S: System + 'static>(
+    env: &mut Env<'_, S>,
     message_word: &Word,
 ) -> Result<Option<String>, Error> {
     if message_word.units.is_empty() {
@@ -243,8 +244,8 @@ async fn vacant_expansion_error_message(
 }
 
 /// Constructs a vacant expansion error.
-async fn vacant_expansion_error(
-    env: &mut Env<'_>,
+async fn vacant_expansion_error<S: System + 'static>(
+    env: &mut Env<'_, S>,
     param: &Param,
     vacancy: Vacancy,
     message_word: &Word,
@@ -267,8 +268,8 @@ async fn vacant_expansion_error(
 /// If this function returns `Some(_)`, that should be the result of the whole
 /// parameter expansion containing the switch. Otherwise, the parameter
 /// expansion should continue processing other modifiers.
-pub async fn apply(
-    env: &mut Env<'_>,
+pub async fn apply<S: System + 'static>(
+    env: &mut Env<'_, S>,
     switch: &Switch,
     param: &Param,
     value: Option<&Value>,

@@ -32,7 +32,7 @@ mod format;
 mod syntax;
 
 /// Entry point of the `times` built-in
-pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
+pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result {
     match syntax::parse(env, args) {
         Ok(()) => match env.system.times() {
             Ok(times) => {

@@ -30,12 +30,13 @@ use crate::common::syntax::parse_arguments;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
+use yash_env::system::System;
 
 const OPTION_SPECS: &[OptionSpec] = &[
     // TODO: Non-standard options
 ];
 
-fn parse(env: &mut Env, args: Vec<Field>) -> Result<Command, crate::command::syntax::Error> {
+fn parse<S>(env: &mut Env<S>, args: Vec<Field>) -> Result<Command, crate::command::syntax::Error> {
     let (mut options, operands) = parse_arguments(OPTION_SPECS, Mode::with_env(env), args)?;
 
     // `type` is equivalent to `command -V`, so add the `-V` option and delegate
@@ -55,7 +56,7 @@ fn parse(env: &mut Env, args: Vec<Field>) -> Result<Command, crate::command::syn
 }
 
 /// Entry point of the `type` built-in
-pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
+pub async fn main<S: System + 'static>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result {
     match parse(env, args) {
         Ok(command) => command.execute(env).await,
         Err(error) => report_error(env, &error).await,

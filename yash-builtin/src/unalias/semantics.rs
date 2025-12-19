@@ -61,7 +61,7 @@ impl Command {
     ///
     /// Returns a list of errors that occurred while executing the built-in.
     #[must_use]
-    pub fn execute(self, env: &mut Env) -> Vec<Error> {
+    pub fn execute<S>(self, env: &mut Env<S>) -> Vec<Error> {
         match self {
             Command::RemoveAll => {
                 env.aliases.clear();

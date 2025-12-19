@@ -29,6 +29,7 @@ use yash_env::function::FunctionBody;
 use yash_env::function::FunctionBodyObject;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
+use yash_env::system::System;
 use yash_syntax::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
 use yash_syntax::syntax;
 
@@ -44,8 +45,8 @@ impl std::fmt::Display for BodyImpl {
     }
 }
 
-impl FunctionBody for BodyImpl {
-    async fn execute(&self, env: &mut Env) -> Result {
+impl<S: System + 'static> FunctionBody<S> for BodyImpl {
+    async fn execute(&self, env: &mut Env<S>) -> Result {
         self.0.execute(env).await
     }
 }
@@ -60,14 +61,17 @@ impl FunctionBody for BodyImpl {
 /// execution ends with an exit status of zero.
 ///
 /// The `ErrExit` shell option is [applied](Env::apply_errexit) on error.
-impl Command for syntax::FunctionDefinition {
-    async fn execute(&self, env: &mut Env) -> Result {
+impl<S: System + 'static> Command<S> for syntax::FunctionDefinition {
+    async fn execute(&self, env: &mut Env<S>) -> Result {
         define_function(env, self).await?;
         env.apply_errexit()
     }
 }
 
-async fn define_function(env: &mut Env, def: &syntax::FunctionDefinition) -> Result {
+async fn define_function<S: System + 'static>(
+    env: &mut Env<S>,
+    def: &syntax::FunctionDefinition,
+) -> Result {
     // Expand the function name
     let Field {
         value: name,
@@ -83,7 +87,7 @@ async fn define_function(env: &mut Env, def: &syntax::FunctionDefinition) -> Res
     // Safety: `BodyImpl` is `#[repr(transparent)]` over `FullCompoundCommand`,
     // so it's safe to transmute the content of the `Rc`.
     let body = unsafe { Rc::from_raw(body) };
-    let function = Function::new(name, body as Rc<dyn FunctionBodyObject>, origin);
+    let function = Function::new(name, body as Rc<dyn FunctionBodyObject<S>>, origin);
 
     // Define the function
     match env.functions.define(function) {
@@ -101,7 +105,7 @@ async fn define_function(env: &mut Env, def: &syntax::FunctionDefinition) -> Res
 /// Reports a function definition error.
 ///
 /// This function assumes `error.existing.read_only_location.is_some()`.
-async fn report_define_error(env: &mut Env, error: &DefineError) {
+async fn report_define_error<S: System>(env: &mut Env<S>, error: &DefineError<S>) {
     let mut report = Report::new();
     report.r#type = ReportType::Error;
     report.title = error.to_string().into();
@@ -200,7 +204,7 @@ mod tests {
     fn function_definition_read_only() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         let function = Rc::new(Function {
             name: "foo".to_string(),
             body: FunctionBodyStub::rc_dyn(),

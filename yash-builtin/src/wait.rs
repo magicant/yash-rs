@@ -35,6 +35,7 @@ use yash_env::job::Pid;
 use yash_env::option::State::Off;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
+use yash_env::system::System;
 
 /// Job specification (job ID or process ID)
 ///
@@ -66,8 +67,9 @@ impl Command {
     /// Waits for jobs specified by the indexes.
     ///
     /// If `indexes` is empty, waits for all jobs.
-    async fn await_jobs<I>(env: &mut Env, indexes: I) -> Result<ExitStatus, core::Error>
+    async fn await_jobs<S, I>(env: &mut Env<S>, indexes: I) -> Result<ExitStatus, core::Error>
     where
+        S: System + 'static,
         I: IntoIterator<Item = Option<usize>>,
     {
         // Currently, we ignore the job control option as required by POSIX.
@@ -94,7 +96,7 @@ impl Command {
     }
 
     /// Executes the `wait` built-in.
-    pub async fn execute(self, env: &mut Env) -> crate::Result {
+    pub async fn execute<S: System + 'static>(self, env: &mut Env<S>) -> crate::Result {
         // Resolve job specifications to indexes
         let jobs = self.jobs.into_iter();
         let (indexes, errors): (Vec<_>, Vec<_>) = jobs
@@ -116,7 +118,7 @@ impl Command {
 }
 
 /// Entry point for executing the `wait` built-in
-pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
+pub async fn main<S: System + 'static>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result {
     match syntax::parse(env, args) {
         Ok(command) => command.execute(env).await,
         Err(error) => report_error(env, &error).await,
@@ -129,7 +131,6 @@ mod tests {
     use futures_util::poll;
     use std::pin::pin;
     use std::task::Poll;
-    use yash_env::System as _;
     use yash_env::job::{Job, ProcessResult};
     use yash_env::option::{Monitor, On};
     use yash_env::subshell::{JobControl, Subshell};
@@ -137,18 +138,18 @@ mod tests {
     use yash_env::trap::RunSignalTrapIfCaught;
     use yash_env_test_helper::{in_virtual_system, stub_tty};
 
-    pub(super) fn stub_run_signal_trap_if_caught(env: &mut Env) {
-        env.any.insert(Box::new(RunSignalTrapIfCaught(|_, _| {
+    pub(super) fn stub_run_signal_trap_if_caught<S: 'static>(env: &mut Env<S>) {
+        env.any.insert(Box::new(RunSignalTrapIfCaught::<S>(|_, _| {
             Box::pin(std::future::ready(None))
         })));
     }
 
-    async fn suspend(env: &mut Env) {
+    async fn suspend<S: System>(env: &mut Env<S>) {
         let target = env.system.getpid();
         env.system.kill(target, Some(SIGSTOP)).await.unwrap();
     }
 
-    async fn start_self_suspending_job(env: &mut Env) {
+    async fn start_self_suspending_job<S: System>(env: &mut Env<S>) {
         let subshell =
             Subshell::new(|env, _| Box::pin(suspend(env))).job_control(JobControl::Foreground);
         let (pid, subshell_result) = subshell.start_and_wait(env).await.unwrap();

@@ -64,7 +64,7 @@ impl<'a> From<&'a Error> for Report<'a> {
 }
 
 /// Parses command line arguments for the times built-in.
-pub fn parse(env: &Env, args: Vec<Field>) -> Result<(), Error> {
+pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<(), Error> {
     let (options, operands) = parse_arguments(&[], Mode::with_env(env), args)?;
     debug_assert_eq!(options, []);
 

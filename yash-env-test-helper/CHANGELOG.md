@@ -15,6 +15,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Public dependency versions:
     - yash-env 0.10.0 → 0.11.0
+- `function::FunctionBodyStub::rc_dyn`: Now takes a type parameter representing
+  the concrete `System` type due to changes in the `yash-env` crate.
 
 ## [0.8.0] - 2025-11-26
 

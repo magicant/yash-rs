@@ -51,7 +51,7 @@ impl From<NulError> for Error {
     }
 }
 
-pub fn chdir(env: &mut Env, path: &Path) -> Result<(), Error> {
+pub fn chdir<S: System>(env: &mut Env<S>, path: &Path) -> Result<(), Error> {
     let c_path = CString::new(path.as_unix_str().as_bytes())?;
     Ok(env.system.chdir(&c_path)?)
 }
@@ -65,8 +65,8 @@ pub fn chdir(env: &mut Env, path: &Path) -> Result<(), Error> {
 ///
 /// See [`prepare_report_message_and_divert`] for the second return value.
 #[must_use = "returned message should be printed"]
-pub fn failure_message(
-    env: &Env,
+pub fn failure_message<S: System>(
+    env: &Env<S>,
     operand: Option<&Field>,
     path: &Path,
     error: &Error,
@@ -87,8 +87,8 @@ pub fn failure_message(
 ///
 /// This function constructs a message with [`failure_message`] and prints it
 /// with [`SharedSystem::print_error`].
-pub async fn report_failure(
-    env: &mut Env,
+pub async fn report_failure<S: System>(
+    env: &mut Env<S>,
     operand: Option<&Field>,
     path: &Path,
     error: &Error,

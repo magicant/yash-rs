@@ -50,13 +50,14 @@
 //! use yash_env::parser::Config;
 //! use yash_env::semantics::ExitStatus;
 //! use yash_env::source::Source;
+//! use yash_env::system::r#virtual::VirtualSystem;
 //! use yash_prompt::{ExpandText, Prompter};
 //! use yash_semantics::expansion::expand_text;
 //! use yash_semantics::read_eval_loop;
 //! use yash_syntax::parser::lex::Lexer;
 //!
 //! let mut env = Env::new_virtual();
-//! env.any.insert(Box::new(ExpandText(|env, text| {
+//! env.any.insert(Box::new(ExpandText::<VirtualSystem>(|env, text| {
 //!     Box::pin(async move { expand_text(env, text).await.ok() })
 //! })));
 //!
@@ -89,15 +90,18 @@ mod tests {
     use super::ExpandText;
     use yash_env::{Env, System, VirtualSystem};
 
-    pub(crate) fn env_with_expand_text_and_system(system: Box<dyn System>) -> Env {
+    pub(crate) fn env_with_expand_text_and_system<S>(system: S) -> Env<S>
+    where
+        S: System + 'static,
+    {
         let mut env = Env::with_system(system);
-        env.any.insert(Box::new(ExpandText(|env, text| {
+        env.any.insert(Box::new(ExpandText::<S>(|env, text| {
             Box::pin(async move { yash_semantics::expansion::expand_text(env, text).await.ok() })
         })));
         env
     }
 
-    pub(crate) fn env_with_expand_text() -> Env {
-        env_with_expand_text_and_system(Box::new(VirtualSystem::new()))
+    pub(crate) fn env_with_expand_text() -> Env<VirtualSystem> {
+        env_with_expand_text_and_system(VirtualSystem::new())
     }
 }

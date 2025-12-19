@@ -60,12 +60,11 @@ use std::rc::Rc;
 /// relying on equality comparisons for values of this type. See
 /// <https://doc.rust-lang.org/std/ptr/fn.fn_addr_eq.html> for the
 /// characteristics of function pointer comparisons.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Target {
+pub enum Target<S> {
     /// Built-in utility
     Builtin {
         /// Definition of the built-in
-        builtin: Builtin,
+        builtin: Builtin<S>,
 
         /// Path to the external utility that is shadowed by the substitutive
         /// built-in
@@ -80,7 +79,7 @@ pub enum Target {
     },
 
     /// Function
-    Function(Rc<Function>),
+    Function(Rc<Function<S>>),
 
     /// External utility
     External {
@@ -98,16 +97,66 @@ pub enum Target {
     },
 }
 
-impl From<Rc<Function>> for Target {
+// Not derived automatically because S may not implement Clone, PartialEq, or Debug.
+impl<S> Clone for Target<S> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Builtin { builtin, path } => Self::Builtin {
+                builtin: *builtin,
+                path: path.clone(),
+            },
+            Self::Function(f) => Self::Function(f.clone()),
+            Self::External { path } => Self::External { path: path.clone() },
+        }
+    }
+}
+
+impl<S> PartialEq for Target<S> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Self::Builtin {
+                    builtin: l_builtin,
+                    path: l_path,
+                },
+                Self::Builtin {
+                    builtin: r_builtin,
+                    path: r_path,
+                },
+            ) => l_builtin == r_builtin && l_path == r_path,
+            (Self::Function(l), Self::Function(r)) => l == r,
+            (Self::External { path: l_path }, Self::External { path: r_path }) => l_path == r_path,
+            _ => false,
+        }
+    }
+}
+
+impl<S> Eq for Target<S> {}
+
+impl<S> std::fmt::Debug for Target<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Builtin { builtin, path } => f
+                .debug_struct("Builtin")
+                .field("builtin", builtin)
+                .field("path", path)
+                .finish(),
+            Self::Function(func) => f.debug_tuple("Function").field(func).finish(),
+            Self::External { path } => f.debug_struct("External").field("path", path).finish(),
+        }
+    }
+}
+
+impl<S> From<Rc<Function<S>>> for Target<S> {
     #[inline]
-    fn from(function: Rc<Function>) -> Target {
+    fn from(function: Rc<Function<S>>) -> Target<S> {
         Target::Function(function)
     }
 }
 
-impl From<Function> for Target {
+impl<S> From<Function<S>> for Target<S> {
     #[inline]
-    fn from(function: Function) -> Target {
+    fn from(function: Function<S>) -> Target<S> {
         Target::Function(function.into())
     }
 }
@@ -117,14 +166,14 @@ impl From<Function> for Target {
 // external utilities
 
 /// Collection of data used in [classifying](classify) command names
-pub trait ClassifyEnv {
+pub trait ClassifyEnv<S> {
     /// Retrieves the built-in by name.
     #[must_use]
-    fn builtin(&self, name: &str) -> Option<Builtin>;
+    fn builtin(&self, name: &str) -> Option<Builtin<S>>;
 
     /// Retrieves the function by name.
     #[must_use]
-    fn function(&self, name: &str) -> Option<&Rc<Function>>;
+    fn function(&self, name: &str) -> Option<&Rc<Function<S>>>;
 }
 
 /// Part of the shell execution environment command path search depends on
@@ -143,7 +192,7 @@ pub trait PathEnv {
     // TODO Cache the results of external utility search
 }
 
-impl PathEnv for Env {
+impl<S: System> PathEnv for Env<S> {
     /// Returns the value of the `$PATH` variable.
     ///
     /// This function assumes that the `$PATH` variable has no quirks. If the
@@ -163,13 +212,13 @@ impl PathEnv for Env {
     }
 }
 
-impl ClassifyEnv for Env {
-    fn builtin(&self, name: &str) -> Option<Builtin> {
+impl<S> ClassifyEnv<S> for Env<S> {
+    fn builtin(&self, name: &str) -> Option<Builtin<S>> {
         self.builtins.get(name).copied()
     }
 
     #[inline]
-    fn function(&self, name: &str) -> Option<&Rc<Function>> {
+    fn function(&self, name: &str) -> Option<&Rc<Function<S>>> {
         self.functions.get(name)
     }
 }
@@ -185,7 +234,7 @@ impl ClassifyEnv for Env {
 /// See the [module documentation](self) for details of the command search
 /// process.
 #[must_use]
-pub fn search<E: ClassifyEnv + PathEnv>(env: &mut E, name: &str) -> Option<Target> {
+pub fn search<S, E: ClassifyEnv<S> + PathEnv>(env: &mut E, name: &str) -> Option<Target<S>> {
     let mut target = classify(env, name);
 
     'fill_path: {
@@ -233,7 +282,7 @@ pub fn search<E: ClassifyEnv + PathEnv>(env: &mut E, name: &str) -> Option<Targe
 /// searching for an external utility would succeed and returns a target with
 /// an empty path in such cases.
 #[must_use]
-pub fn classify<E: ClassifyEnv>(env: &E, name: &str) -> Target {
+pub fn classify<S, E: ClassifyEnv<S>>(env: &E, name: &str) -> Target<S> {
     if name.contains('/') {
         return Target::External {
             path: CString::default(),
@@ -298,8 +347,8 @@ mod tests {
 
     #[derive(Default)]
     struct DummyEnv {
-        builtins: HashMap<&'static str, Builtin>,
-        functions: FunctionSet,
+        builtins: HashMap<&'static str, Builtin<()>>,
+        functions: FunctionSet<()>,
         path: Expansion<'static>,
         executables: HashSet<String>,
     }
@@ -317,11 +366,11 @@ mod tests {
         }
     }
 
-    impl ClassifyEnv for DummyEnv {
-        fn builtin(&self, name: &str) -> Option<Builtin> {
+    impl ClassifyEnv<()> for DummyEnv {
+        fn builtin(&self, name: &str) -> Option<Builtin<()>> {
             self.builtins.get(name).copied()
         }
-        fn function(&self, name: &str) -> Option<&Rc<Function>> {
+        fn function(&self, name: &str) -> Option<&Rc<Function<()>>> {
             self.functions.get(name)
         }
     }
@@ -334,13 +383,13 @@ mod tests {
             unreachable!()
         }
     }
-    impl FunctionBody for FunctionBodyStub {
-        async fn execute(&self, _: &mut Env) -> crate::semantics::Result {
+    impl<S> FunctionBody<S> for FunctionBodyStub {
+        async fn execute(&self, _: &mut Env<S>) -> crate::semantics::Result {
             unreachable!()
         }
     }
 
-    fn function_body_stub() -> Rc<dyn FunctionBodyObject> {
+    fn function_body_stub<S>() -> Rc<dyn FunctionBodyObject<S>> {
         Rc::new(FunctionBodyStub)
     }
 

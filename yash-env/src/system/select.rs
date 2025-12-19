@@ -44,9 +44,9 @@ use std::time::Instant;
 /// appropriate arguments and wake up the wakers when the corresponding events
 /// occur.
 #[derive(Debug)]
-pub struct SelectSystem {
+pub struct SelectSystem<S> {
     /// System instance that performs actual system calls
-    system: Box<dyn System>,
+    system: S,
     /// Helper for `select`ing on file descriptors
     io: AsyncIo,
     /// Helper for `select`ing on time
@@ -60,22 +60,22 @@ pub struct SelectSystem {
     wait_mask: Option<Vec<signal::Number>>,
 }
 
-impl Deref for SelectSystem {
-    type Target = Box<dyn System>;
-    fn deref(&self) -> &Box<dyn System> {
+impl<S> Deref for SelectSystem<S> {
+    type Target = S;
+    fn deref(&self) -> &S {
         &self.system
     }
 }
 
-impl DerefMut for SelectSystem {
-    fn deref_mut(&mut self) -> &mut Box<dyn System> {
+impl<S> DerefMut for SelectSystem<S> {
+    fn deref_mut(&mut self) -> &mut S {
         &mut self.system
     }
 }
 
-impl SelectSystem {
+impl<S: System> SelectSystem<S> {
     /// Creates a new `SelectSystem` that wraps the given `System`.
-    pub fn new(system: Box<dyn System>) -> Self {
+    pub fn new(system: S) -> Self {
         SelectSystem {
             system,
             io: AsyncIo::new(),

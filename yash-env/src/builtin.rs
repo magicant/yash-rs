@@ -236,7 +236,7 @@ impl From<ExitStatus> for Result {
 /// The first is an environment in which the built-in is executed.
 /// The second is arguments to the built-in
 /// (not including the leading command name word).
-pub type Main = fn(&mut Env, Vec<Field>) -> Pin<Box<dyn Future<Output = Result> + '_>>;
+pub type Main<S> = fn(&mut Env<S>, Vec<Field>) -> Pin<Box<dyn Future<Output = Result> + '_>>;
 
 /// Built-in utility definition
 ///
@@ -249,14 +249,13 @@ pub type Main = fn(&mut Env, Vec<Field>) -> Pin<Box<dyn Future<Output = Result> 
 /// <https://doc.rust-lang.org/std/ptr/fn.fn_addr_eq.html> for the
 /// characteristics of function pointer comparisons.
 #[allow(unpredictable_function_pointer_comparisons)]
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub struct Builtin {
+pub struct Builtin<S> {
     /// Type of the built-in
     pub r#type: Type,
 
     /// Function that implements the behavior of the built-in
-    pub execute: Main,
+    pub execute: Main<S>,
 
     /// Whether the built-in is a declaration utility
     ///
@@ -269,22 +268,51 @@ pub struct Builtin {
     pub is_declaration_utility: Option<bool>,
 }
 
-impl Debug for Builtin {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Builtin")
-            .field("type", &self.r#type)
-            .field("is_declaration_utility", &self.is_declaration_utility)
-            .finish_non_exhaustive()
+// Not derived automatically because S may not implement Clone or Copy.
+impl<S> Clone for Builtin<S> {
+    fn clone(&self) -> Self {
+        *self
     }
 }
 
-impl Builtin {
+impl<S> Copy for Builtin<S> {}
+
+impl<S> Debug for Builtin<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Builtin")
+            .field("type", &self.r#type)
+            .field("execute", &self.execute)
+            .field("is_declaration_utility", &self.is_declaration_utility)
+            .finish()
+    }
+}
+
+// Not derived automatically because S may not implement PartialEq, Eq, or Hash.
+impl<S> PartialEq for Builtin<S> {
+    fn eq(&self, other: &Self) -> bool {
+        self.r#type == other.r#type
+            && std::ptr::fn_addr_eq(self.execute, other.execute)
+            && self.is_declaration_utility == other.is_declaration_utility
+    }
+}
+
+impl<S> Eq for Builtin<S> {}
+
+impl<S> std::hash::Hash for Builtin<S> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.r#type.hash(state);
+        self.execute.hash(state);
+        self.is_declaration_utility.hash(state);
+    }
+}
+
+impl<S> Builtin<S> {
     /// Creates a new built-in utility definition.
     ///
     /// The `type` and `execute` fields are set to the given arguments.
     /// The `is_declaration_utility` field is set to `Some(false)`, indicating
     /// that the built-in is not a declaration utility.
-    pub const fn new(r#type: Type, execute: Main) -> Self {
+    pub const fn new(r#type: Type, execute: Main<S>) -> Self {
         Self {
             r#type,
             execute,

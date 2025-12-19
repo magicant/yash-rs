@@ -81,49 +81,49 @@ impl std::ops::DerefMut for ContextGuard<'_> {
 /// The guard object is created by [`Env::push_context`].
 #[derive(Debug)]
 #[must_use = "The context is popped when the guard is dropped"]
-pub struct EnvContextGuard<'a> {
-    env: &'a mut Env,
+pub struct EnvContextGuard<'a, S> {
+    env: &'a mut Env<S>,
 }
 
-impl Env {
+impl<S> Env<S> {
     /// Pushes a new context to the variable set.
     ///
     /// This function is equivalent to
     /// `self.variables.push_context(context_type)`, but returns an
     /// `EnvContextGuard` that allows re-borrowing the `Env`.
     #[inline]
-    pub fn push_context(&mut self, context: Context) -> EnvContextGuard<'_> {
+    pub fn push_context(&mut self, context: Context) -> EnvContextGuard<'_, S> {
         self.variables.push_context_impl(context);
         EnvContextGuard { env: self }
     }
 
     /// Pops the topmost context from the variable set.
     #[inline]
-    pub fn pop_context(guard: EnvContextGuard<'_>) {
+    pub fn pop_context(guard: EnvContextGuard<'_, S>) {
         drop(guard)
     }
 }
 
 /// When the guard is dropped, the context that was pushed when creating the
 /// guard is [popped](VariableSet::pop_context).
-impl Drop for EnvContextGuard<'_> {
+impl<S> Drop for EnvContextGuard<'_, S> {
     #[inline]
     fn drop(&mut self) {
         self.env.variables.pop_context_impl()
     }
 }
 
-impl Deref for EnvContextGuard<'_> {
-    type Target = Env;
+impl<S> Deref for EnvContextGuard<'_, S> {
+    type Target = Env<S>;
     #[inline]
-    fn deref(&self) -> &Env {
+    fn deref(&self) -> &Env<S> {
         self.env
     }
 }
 
-impl DerefMut for EnvContextGuard<'_> {
+impl<S> DerefMut for EnvContextGuard<'_, S> {
     #[inline]
-    fn deref_mut(&mut self) -> &mut Env {
+    fn deref_mut(&mut self) -> &mut Env<S> {
         self.env
     }
 }

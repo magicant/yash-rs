@@ -58,8 +58,8 @@ use yash_syntax::syntax::AndOrList;
 /// and-or list is implicitly redirected to `/dev/null`.
 ///
 /// [`Monitor`]: yash_env::option::Option::Monitor
-impl Command for syntax::Item {
-    async fn execute(&self, env: &mut Env) -> Result {
+impl<S: System + 'static> Command<S> for syntax::Item {
+    async fn execute(&self, env: &mut Env<S>) -> Result {
         match &self.async_flag {
             None => self.and_or.execute(env).await,
             Some(async_flag) => execute_async(env, &self.and_or, async_flag).await,
@@ -67,7 +67,11 @@ impl Command for syntax::Item {
     }
 }
 
-async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Location) -> Result {
+async fn execute_async<S: System + 'static>(
+    env: &mut Env<S>,
+    and_or: &Rc<AndOrList>,
+    async_flag: &Location,
+) -> Result {
     let and_or_2 = Rc::clone(and_or);
     let subshell = Subshell::new(|env_2, job_control| {
         Box::pin(async move { async_body(env_2, job_control, &and_or_2).await })
@@ -112,7 +116,11 @@ async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Locat
     }
 }
 
-async fn async_body(env: &mut Env, job_control: Option<JobControl>, and_or: &AndOrList) {
+async fn async_body<S: System + 'static>(
+    env: &mut Env<S>,
+    job_control: Option<JobControl>,
+    and_or: &AndOrList,
+) {
     if job_control.is_none() {
         nullify_stdin(env).ok();
     }
@@ -122,7 +130,7 @@ async fn async_body(env: &mut Env, job_control: Option<JobControl>, and_or: &And
     run_exit_trap(env).await;
 }
 
-fn nullify_stdin(env: &mut Env) -> std::result::Result<(), yash_env::system::Errno> {
+fn nullify_stdin<S: System>(env: &mut Env<S>) -> std::result::Result<(), yash_env::system::Errno> {
     env.system.close(Fd::STDIN)?;
 
     let path = c"/dev/null";
@@ -192,7 +200,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut executor = futures_executor::LocalPool::new();
         state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
 
         let and_or: syntax::AndOrList = "echo foo".parse().unwrap();
@@ -285,7 +293,7 @@ mod tests {
     fn item_execute_async_fail() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("return", return_builtin());
 
         let and_or: syntax::AndOrList = "return -n 42".parse().unwrap();
@@ -324,7 +332,7 @@ mod tests {
         })
     }
 
-    fn ignore_sigttin(env: &mut Env) {
+    fn ignore_sigttin(env: &mut Env<VirtualSystem>) {
         let signal = env
             .system
             .signal_number_from_name(yash_env::signal::Name::Ttin)

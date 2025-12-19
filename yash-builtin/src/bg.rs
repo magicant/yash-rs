@@ -115,7 +115,10 @@ impl<'a> From<&'a OperandError> for Report<'a> {
 /// Resumes the job at the specified index.
 ///
 /// This function panics if there is no job at the specified index.
-async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<(), ResumeError> {
+async fn resume_job_by_index<S>(env: &mut Env<S>, index: usize) -> Result<(), ResumeError>
+where
+    S: System,
+{
     let mut job = env.jobs.get_mut(index).unwrap();
     if !job.is_owned {
         return Err(ResumeError::Unowned);
@@ -151,7 +154,10 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<(), ResumeEr
 }
 
 /// Resumes the job specified by the operand.
-async fn resume_job_by_id(env: &mut Env, job_id: &str) -> Result<(), OperandErrorKind> {
+async fn resume_job_by_id<S>(env: &mut Env<S>, job_id: &str) -> Result<(), OperandErrorKind>
+where
+    S: System,
+{
     let job_id = parse(job_id)?;
     let index = job_id.find(&env.jobs)?;
     resume_job_by_index(env, index).await?;
@@ -159,7 +165,10 @@ async fn resume_job_by_id(env: &mut Env, job_id: &str) -> Result<(), OperandErro
 }
 
 /// Entry point of the `bg` built-in
-pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
+where
+    S: System,
+{
     let (options, operands) = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok(result) => result,
         Err(error) => return report_error(env, &error).await,
@@ -212,7 +221,7 @@ mod tests {
     #[test]
     fn resume_job_by_index_sends_sigcont() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         let pgid = Pid(123);
         let child_id = Pid(124);
         let orphan_id = Pid(456);
@@ -255,7 +264,7 @@ mod tests {
     #[test]
     fn resume_job_by_index_prints_job_name() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.name = "echo my job".into();
@@ -272,7 +281,7 @@ mod tests {
     #[test]
     fn resume_job_by_index_sets_expected_state() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         let pid = Pid(123);
         let mut job = Job::new(pid);
         job.job_controlled = true;
@@ -292,7 +301,7 @@ mod tests {
     #[test]
     fn resume_job_by_index_makes_target_current_job() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         let pgid = Pid(123);
         let orphan_id = Pid(456);
         let mut job = Job::new(pgid);
@@ -323,7 +332,7 @@ mod tests {
     #[test]
     fn resume_job_by_index_sends_no_sigcont_to_dead_process() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         let pid = Pid(123);
         let mut job = Job::new(pid);
         job.job_controlled = true;
@@ -353,7 +362,7 @@ mod tests {
     #[test]
     fn resume_job_by_index_sets_last_async_pid() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.state = ProcessState::exited(ExitStatus::SUCCESS);
@@ -388,7 +397,7 @@ mod tests {
     #[test]
     fn main_without_operands_resumes_current_job() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         env.options.set(Monitor, On);
         let pgid = Pid(100);
         let orphan_id = Pid(200);
@@ -427,7 +436,7 @@ mod tests {
     #[test]
     fn main_without_operands_fails_if_there_is_no_current_job() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         env.options.set(Monitor, On);
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
@@ -441,7 +450,7 @@ mod tests {
     #[test]
     fn main_with_operands_resumes_specified_jobs() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         env.options.set(Monitor, On);
         let pgid1 = Pid(100);
         let pgid2 = Pid(200);
@@ -492,7 +501,7 @@ mod tests {
         // function fails on the first operand, but it should try to handle the
         // remaining operands.
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::with_system(system.clone());
         env.options.set(Monitor, On);
         let pgid = Pid(100);
         let mut job = Job::new(pgid);

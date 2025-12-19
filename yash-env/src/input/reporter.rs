@@ -19,6 +19,7 @@ use crate::Env;
 use crate::io::Fd;
 use crate::job::fmt::Accumulator;
 use crate::option::{Interactive, Monitor, Off};
+use crate::system::System;
 use std::cell::RefCell;
 
 /// `Input` decorator that reports job status changes before reading a line
@@ -26,13 +27,13 @@ use std::cell::RefCell;
 /// This decorator prints the status of jobs that have changed since the last
 /// report. The status is printed to the standard error before the input is read.
 /// This is done only if the [`Interactive`] and [`Monitor`] options are enabled.
-#[derive(Clone, Debug)]
-pub struct Reporter<'a, 'b, T> {
+#[derive(Debug)]
+pub struct Reporter<'a, 'b, S, T> {
     inner: T,
-    env: &'a RefCell<&'b mut Env>,
+    env: &'a RefCell<&'b mut Env<S>>,
 }
 
-impl<'a, 'b, T> Reporter<'a, 'b, T> {
+impl<'a, 'b, S, T> Reporter<'a, 'b, S, T> {
     /// Creates a new `Reporter` decorator.
     ///
     /// The first argument is the inner `Input` that performs the actual input
@@ -40,15 +41,22 @@ impl<'a, 'b, T> Reporter<'a, 'b, T> {
     /// the shell option state and the system interface to print to the standard
     /// error. It is wrapped in a `RefCell` so that it can be shared with other
     /// decorators and the parser.
-    pub fn new(inner: T, env: &'a RefCell<&'b mut Env>) -> Self {
+    pub fn new(inner: T, env: &'a RefCell<&'b mut Env<S>>) -> Self {
         Self { inner, env }
     }
 }
 
-impl<T> Input for Reporter<'_, '_, T>
-where
-    T: Input,
-{
+// Not derived automatically because S may not implement Clone.
+impl<S, T: Clone> Clone for Reporter<'_, '_, S, T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            env: self.env,
+        }
+    }
+}
+
+impl<S: System, T: Input> Input for Reporter<'_, '_, S, T> {
     #[allow(clippy::await_holding_refcell_ref)]
     async fn next_line(&mut self, context: &Context) -> Result {
         report(&mut self.env.borrow_mut()).await;
@@ -56,7 +64,7 @@ where
     }
 }
 
-async fn report(env: &mut Env) {
+async fn report<S: System>(env: &mut Env<S>) {
     if env.options.get(Interactive) == Off || env.options.get(Monitor) == Off {
         return;
     }
@@ -107,7 +115,7 @@ mod tests {
 
     #[test]
     fn reporter_shows_job_status_before_reading_input() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = system.state.clone();
         let mut env = Env::with_system(system);
         env.jobs.add({
@@ -143,7 +151,7 @@ mod tests {
 
     #[test]
     fn all_jobs_with_changed_status_are_reported() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = system.state.clone();
         let mut env = Env::with_system(system);
         env.jobs.add({
@@ -215,7 +223,7 @@ mod tests {
 
     #[test]
     fn no_report_if_not_interactive() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = system.state.clone();
         let mut env = Env::with_system(system);
         env.jobs.add({
@@ -239,7 +247,7 @@ mod tests {
 
     #[test]
     fn no_report_if_not_monitor() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = system.state.clone();
         let mut env = Env::with_system(system);
         env.jobs.add({

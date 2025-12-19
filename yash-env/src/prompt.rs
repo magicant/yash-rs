@@ -33,6 +33,8 @@ use crate::Env;
 use crate::input::Context;
 use std::pin::Pin;
 
+type PinFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
+
 /// Wrapper around the function that retrieves a prompt string
 ///
 /// The wrapped function is expected to be injected into the environment (via
@@ -49,17 +51,30 @@ use std::pin::Pin;
 /// expand the prompt string.
 ///
 /// ```
-/// # use yash_env::prompt::GetPrompt;
-/// let mut env = yash_env::Env::new_virtual();
-/// env.any.insert(Box::new(GetPrompt(|env, context| {
-///     Box::pin(async move {
-///         let prompt = yash_prompt::fetch_posix(&env.variables, &context);
-///         yash_prompt::expand_posix(env, &prompt, false).await
-///     })
-/// })));
+/// # use yash_env::{Env, prompt::GetPrompt};
+/// fn register_get_prompt<S: 'static>(env: &mut Env<S>) {
+///     env.any.insert(Box::new(GetPrompt::<S>(|env, context| {
+///         Box::pin(async move {
+///             let prompt = yash_prompt::fetch_posix(&env.variables, &context);
+///             yash_prompt::expand_posix(env, &prompt, false).await
+///         })
+///     })));
+/// }
+/// # register_get_prompt(&mut Env::new_virtual());
 /// ```
-#[derive(Clone, Copy, Debug)]
-pub struct GetPrompt(
-    #[allow(clippy::type_complexity)]
-    pub  for<'a> fn(&'a mut Env, &'a Context) -> Pin<Box<dyn Future<Output = String> + 'a>>,
-);
+pub struct GetPrompt<S>(pub for<'a> fn(&'a mut Env<S>, &'a Context) -> PinFuture<'a, String>);
+
+// Not derived automatically because S may not implement Clone, Copy, or Debug
+impl<S> Clone for GetPrompt<S> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<S> Copy for GetPrompt<S> {}
+
+impl<S> std::fmt::Debug for GetPrompt<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("GetPrompt").field(&self.0).finish()
+    }
+}

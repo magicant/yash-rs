@@ -21,9 +21,9 @@ use yash_env::function::FunctionSet;
 
 impl PrintFunctions {
     /// Executes the command.
-    pub fn execute(
+    pub fn execute<S>(
         self,
-        functions: &FunctionSet,
+        functions: &FunctionSet<S>,
         context: &PrintContext,
     ) -> Result<String, Vec<ExecuteError>> {
         let mut output = String::new();
@@ -53,8 +53,8 @@ impl PrintFunctions {
     }
 }
 
-fn print_one(
-    function: &Function,
+fn print_one<S>(
+    function: &Function<S>,
     filter_attrs: &[(FunctionAttr, State)],
     context: &PrintContext,
     output: &mut String,
@@ -123,19 +123,19 @@ mod tests {
             self.0.fmt(f)
         }
     }
-    impl FunctionBody for FunctionBodyStub {
-        async fn execute(&self, _: &mut Env) -> yash_env::semantics::Result {
+    impl<S> FunctionBody<S> for FunctionBodyStub {
+        async fn execute(&self, _: &mut Env<S>) -> yash_env::semantics::Result {
             unreachable!()
         }
     }
 
-    fn function_body_stub(src: &str) -> Rc<dyn FunctionBodyObject> {
+    fn function_body_stub<S>(src: &str) -> Rc<dyn FunctionBodyObject<S>> {
         Rc::new(FunctionBodyStub::new(src))
     }
 
     #[test]
     fn printing_one_function() {
-        let mut functions = FunctionSet::new();
+        let mut functions = FunctionSet::<()>::new();
         let foo = Function::new(
             "foo",
             function_body_stub("{ echo; }"),
@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn printing_multiple_functions() {
-        let mut functions = FunctionSet::new();
+        let mut functions = FunctionSet::<()>::new();
         for i in 1..=4 {
             functions
                 .define(Function::new(
@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn printing_all_functions() {
-        let mut functions = FunctionSet::new();
+        let mut functions = FunctionSet::<()>::new();
         for i in [2, 4, 3, 1] {
             functions
                 .define(Function::new(
@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn quoting_function_name() {
-        let mut functions = FunctionSet::new();
+        let mut functions = FunctionSet::<()>::new();
         let function = Function::new(
             "a/b$",
             function_body_stub("{ echo; }"),
@@ -224,7 +224,7 @@ mod tests {
 
     #[test]
     fn printing_readonly_functions() {
-        let mut functions = FunctionSet::new();
+        let mut functions = FunctionSet::<()>::new();
         let foo = Function::new(
             "foo",
             function_body_stub("{ echo; }"),
@@ -243,7 +243,7 @@ mod tests {
 
     #[test]
     fn printing_function_name_starting_with_hyphen() {
-        let mut functions = FunctionSet::new();
+        let mut functions = FunctionSet::<()>::new();
         let foo = Function::new(
             "-n",
             function_body_stub("{ :; }"),
@@ -262,7 +262,7 @@ mod tests {
 
     #[test]
     fn selecting_readonly_functions() {
-        let mut functions = FunctionSet::new();
+        let mut functions = FunctionSet::<()>::new();
         let foo = Function::new(
             "foo",
             function_body_stub("{ echo; }"),
@@ -287,7 +287,7 @@ mod tests {
 
     #[test]
     fn selecting_non_readonly_functions() {
-        let mut functions = FunctionSet::new();
+        let mut functions = FunctionSet::<()>::new();
         let foo = Function::new(
             "foo",
             function_body_stub("{ echo; }"),
@@ -319,8 +319,11 @@ mod tests {
             attrs: vec![],
         };
 
+        let errors = pf
+            .execute(&FunctionSet::<()>::new(), &PRINT_CONTEXT)
+            .unwrap_err();
         assert_eq!(
-            pf.execute(&FunctionSet::new(), &PRINT_CONTEXT).unwrap_err(),
+            errors,
             [
                 ExecuteError::PrintUnsetFunction(foo),
                 ExecuteError::PrintUnsetFunction(bar),
@@ -334,7 +337,7 @@ mod tests {
 
         #[test]
         fn builtin_name() {
-            let mut functions = FunctionSet::new();
+            let mut functions = FunctionSet::<()>::new();
             let foo = Function::new(
                 "foo",
                 function_body_stub("{ echo; }"),
@@ -357,7 +360,7 @@ mod tests {
 
         #[test]
         fn builtin_is_significant() {
-            let mut functions = FunctionSet::new();
+            let mut functions = FunctionSet::<()>::new();
             let foo = Function::new(
                 "foo",
                 function_body_stub("{ echo; }"),
@@ -386,7 +389,7 @@ mod tests {
 
         #[test]
         fn insignificant_builtin_with_attributed_function() {
-            let mut functions = FunctionSet::new();
+            let mut functions = FunctionSet::<()>::new();
             let foo = Function::new(
                 "foo",
                 function_body_stub("{ echo; }"),
@@ -409,7 +412,7 @@ mod tests {
 
         #[test]
         fn options_allowed() {
-            let mut functions = FunctionSet::new();
+            let mut functions = FunctionSet::<()>::new();
             let foo = Function::new(
                 "foo",
                 function_body_stub("{ echo; }"),

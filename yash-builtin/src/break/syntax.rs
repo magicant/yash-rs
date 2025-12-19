@@ -80,7 +80,7 @@ impl<'a> From<&'a Error> for Report<'a> {
 pub type Result = std::result::Result<NonZeroUsize, Error>;
 
 /// Parses command line arguments for the break/continue built-in.
-pub fn parse(env: &Env, args: Vec<Field>) -> Result {
+pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
     let (_options, mut operands) = parse_arguments(&[], Mode::with_env(env), args)?;
 
     if operands.len() > 1 {

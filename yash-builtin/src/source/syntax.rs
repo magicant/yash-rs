@@ -25,6 +25,7 @@ use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::{Report, ReportType};
+use yash_env::system::System;
 
 /// Error in parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -56,7 +57,7 @@ impl Error {
 
     /// Reports the error to the standard error.
     #[inline(always)]
-    pub async fn report(&self, env: &mut Env) -> crate::Result {
+    pub async fn report<S: System>(&self, env: &mut Env<S>) -> crate::Result {
         report_error(env, self).await
     }
 }
@@ -69,7 +70,7 @@ impl<'a> From<&'a Error> for Report<'a> {
 }
 
 /// Parses command line arguments to the source built-in.
-pub fn parse(env: &Env, args: Vec<Field>) -> Result<Command, Error> {
+pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
     let mode = Mode::with_env(env);
     let (_options, mut operands) = parse_arguments(&[], mode, args)?;
     if operands.is_empty() {

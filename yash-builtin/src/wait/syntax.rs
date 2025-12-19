@@ -84,7 +84,7 @@ impl TryFrom<Field> for JobSpec {
 }
 
 /// Parses command line arguments for the wait built-in.
-pub fn parse(env: &Env, args: Vec<Field>) -> Result<Command, Error> {
+pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
     let (_, operands) = parse_arguments(&[], Mode::with_env(env), args)?;
     let jobs = operands
         .into_iter()

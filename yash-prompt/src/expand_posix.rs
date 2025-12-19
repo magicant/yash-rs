@@ -47,14 +47,33 @@ type ExpandTextResult = Option<(String, Option<ExitStatus>)>;
 /// [`yash-semantics` crate](https://crates.io/crates/yash-semantics):
 ///
 /// ```
+/// # use yash_env::{Env, System};
 /// # use yash_prompt::ExpandText;
-/// let mut env = yash_env::Env::new_virtual();
-/// env.any.insert(Box::new(ExpandText(|env, text| {
-///     Box::pin(async move { yash_semantics::expansion::expand_text(env, text).await.ok() })
-/// })));
+/// fn register_expand_text<S: System + 'static>(env: &mut Env<S>) {
+///     env.any.insert(Box::new(ExpandText::<S>(|env, text| {
+///         Box::pin(async move { yash_semantics::expansion::expand_text(env, text).await.ok() })
+///     })));
+/// }
+/// # register_expand_text(&mut Env::new_virtual());
 /// ```
-#[derive(Clone, Copy, Debug)]
-pub struct ExpandText(pub for<'a> fn(&'a mut Env, &'a Text) -> PinFuture<'a, ExpandTextResult>);
+pub struct ExpandText<S>(
+    pub for<'a> fn(&'a mut Env<S>, &'a Text) -> PinFuture<'a, ExpandTextResult>,
+);
+
+// Not derived automatically because S may not implement Clone, Copy, or Debug.
+impl<S> Clone for ExpandText<S> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<S> Copy for ExpandText<S> {}
+
+impl<S> std::fmt::Debug for ExpandText<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("ExpandText").field(&self.0).finish()
+    }
+}
 
 /// Expands the prompt string according to the POSIX standard.
 ///
@@ -79,7 +98,10 @@ pub struct ExpandText(pub for<'a> fn(&'a mut Env, &'a Text) -> PinFuture<'a, Exp
 /// text since the POSIX standard does not specify any. However, other shell
 /// implementations support backslash escapes in the prompt string. This
 /// discrepancy may be reconsidered in the future.
-pub async fn expand_posix(env: &mut Env, prompt: &str, excl: bool) -> String {
+pub async fn expand_posix<S>(env: &mut Env<S>, prompt: &str, excl: bool) -> String
+where
+    S: 'static,
+{
     let mut lexer = Lexer::with_code(prompt);
     let text_result = lexer.text(|_| false, |_| false).now_or_never().unwrap();
 
@@ -93,7 +115,7 @@ pub async fn expand_posix(env: &mut Env, prompt: &str, excl: bool) -> String {
         replace_exclamation_marks(&mut text.0);
     }
 
-    let ExpandText(expand_text) = env
+    let ExpandText(expand_text) = *env
         .any
         .get()
         .expect("`yash-prompt::expand_posix` requires `ExpandText` in `Env::any`");

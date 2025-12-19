@@ -98,8 +98,17 @@ impl<'a> Config<'a> {
 /// in the environment's [`any`](Env::any) storage. This allows modules that
 /// need to check for keywords to do so without directly depending on the parser
 /// crate (`yash-syntax`).
-#[derive(Clone, Copy, Debug)]
-pub struct IsKeyword(pub fn(&Env, &str) -> bool);
+#[derive(Debug)]
+pub struct IsKeyword<S>(pub fn(&Env<S>, &str) -> bool);
+
+// Not derived automatically because S may not implement Clone or Copy.
+impl<S> Clone for IsKeyword<S> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<S> Copy for IsKeyword<S> {}
 
 /// Wrapper for a function that checks if a string is a valid variable name
 ///
@@ -109,5 +118,14 @@ pub struct IsKeyword(pub fn(&Env, &str) -> bool);
 /// in the environment's [`any`](Env::any) storage. This allows modules that
 /// need to check for variable names to do so without directly depending on the
 /// parser crate (`yash-syntax`).
-#[derive(Clone, Copy, Debug)]
-pub struct IsName(pub fn(&Env, &str) -> bool);
+#[derive(Debug)]
+pub struct IsName<S>(pub fn(&Env<S>, &str) -> bool);
+
+// Not derived automatically because S may not implement Clone or Copy.
+impl<S> Clone for IsName<S> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<S> Copy for IsName<S> {}

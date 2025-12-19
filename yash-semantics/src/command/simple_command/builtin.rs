@@ -33,13 +33,14 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::stack::Builtin as FrameBuiltin;
+use yash_env::system::System;
 use yash_env::variable::Context;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
 
-pub async fn execute_builtin(
-    env: &mut Env,
-    builtin: Builtin,
+pub async fn execute_builtin<S: System + 'static>(
+    env: &mut Env<S>,
+    builtin: Builtin<S>,
     assigns: &[Assign],
     mut fields: Vec<Field>,
     redirs: &[Redir],
@@ -161,7 +162,7 @@ mod tests {
     fn simple_command_applies_redirections_to_builtin() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         let command: syntax::SimpleCommand = "echo hello >/tmp/file".parse().unwrap();
         _ = command.execute(&mut env).now_or_never().unwrap();
@@ -177,7 +178,7 @@ mod tests {
     fn simple_command_by_default_reverts_redirections_to_builtin() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         let command: syntax::SimpleCommand = "echo hello >/tmp/file".parse().unwrap();
         _ = command.execute(&mut env).now_or_never().unwrap();
@@ -191,7 +192,7 @@ mod tests {
     fn simple_command_retains_redirections_to_builtin_if_requested() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert(
             "exec",
@@ -219,7 +220,7 @@ mod tests {
     fn simple_command_skips_running_builtin_on_redirection_error() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         let command: syntax::SimpleCommand = "echo X </no/such/file >/tmp/file".parse().unwrap();
 
@@ -236,7 +237,7 @@ mod tests {
     #[test]
     fn special_builtin_interrupts_on_redirection_error() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("return", return_builtin());
         let command: syntax::SimpleCommand = "return </no/such/file".parse().unwrap();
 
@@ -260,7 +261,7 @@ mod tests {
     fn substitutive_builtin_must_be_found_in_path_after_assignments() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         // Register `echo` as a substitutive built-in
         let mut echo_builtin = echo_builtin();
         echo_builtin.r#type = Substitutive;
@@ -319,7 +320,7 @@ mod tests {
     fn simple_command_assigns_temporarily_for_regular_builtin() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("local", local_builtin());
         let command: syntax::SimpleCommand = "v=42 local v".parse().unwrap();
         _ = command.execute(&mut env).now_or_never().unwrap();
@@ -330,7 +331,7 @@ mod tests {
     #[test]
     fn simple_command_pushes_stack_frame_for_builtin() {
         fn builtin_main(
-            env: &mut Env,
+            env: &mut Env<VirtualSystem>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async {
@@ -342,7 +343,7 @@ mod tests {
             })
         }
         fn special_main(
-            env: &mut Env,
+            env: &mut Env<VirtualSystem>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async {
@@ -370,7 +371,7 @@ mod tests {
     fn xtrace_for_builtin() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
         env.options.set(yash_env::option::XTrace, On);
         let command: syntax::SimpleCommand = "foo=bar echo hello >/dev/null".parse().unwrap();

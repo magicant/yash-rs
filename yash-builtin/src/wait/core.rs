@@ -22,7 +22,7 @@
 
 use thiserror::Error;
 use yash_env::Env;
-use yash_env::System as _;
+use yash_env::System;
 use yash_env::job::Pid;
 use yash_env::signal;
 use yash_env::system::Errno;
@@ -61,7 +61,7 @@ pub enum Error {
 ///
 /// If there is no job to wait for, this function returns
 /// `Err(Error::NothingToWait)` immediately.
-pub async fn wait_for_any_job_or_trap(env: &mut Env) -> Result<(), Error> {
+pub async fn wait_for_any_job_or_trap<S: System + 'static>(env: &mut Env<S>) -> Result<(), Error> {
     let RunSignalTrapIfCaught(run_trap_if_caught) = *env
         .any
         .get()
@@ -184,11 +184,13 @@ mod tests {
     fn trap() {
         in_virtual_system(|mut env, state| async move {
             env.any
-                .insert(Box::new(RunSignalTrapIfCaught(|env, signal| {
-                    Box::pin(
-                        async move { yash_semantics::trap::run_trap_if_caught(env, signal).await },
-                    )
-                })));
+                .insert(Box::new(RunSignalTrapIfCaught::<VirtualSystem>(
+                    |env, signal| {
+                        Box::pin(async move {
+                            yash_semantics::trap::run_trap_if_caught(env, signal).await
+                        })
+                    },
+                )));
 
             let mut system = VirtualSystem {
                 state,

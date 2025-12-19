@@ -185,9 +185,9 @@ impl model::Result {
     ///
     /// If `env.getopts_state` is `Some`, this method also updates the `optind`
     /// field of the state to match the new `$OPTIND` value.
-    pub fn report(
+    pub fn report<S>(
         self,
-        env: &mut Env,
+        env: &mut Env<S>,
         colon: bool,
         var_name: Field,
     ) -> Result<Option<String>, Error> {
@@ -265,6 +265,7 @@ mod tests {
     use yash_env::source::Location;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
+    use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::variable::Value;
     use yash_env::variable::Variable;
 
@@ -272,7 +273,7 @@ mod tests {
         NonZeroUsize::new(i).unwrap()
     }
 
-    fn env_with_dummy_arg0_and_optarg() -> Env {
+    fn env_with_dummy_arg0_and_optarg() -> Env<VirtualSystem> {
         let mut env = Env::new_virtual();
         env.arg0 = "some/arg0".to_string();
         env.get_or_create_variable(OPTARG, Scope::Global)
@@ -281,7 +282,7 @@ mod tests {
         env
     }
 
-    fn assert_variable_scalar(env: &Env, name: &str, value: &str) {
+    fn assert_variable_scalar<S>(env: &Env<S>, name: &str, value: &str) {
         assert_matches!(
             &env.variables.get(name),
             Some(Variable { value: Some(Value::Scalar(s)), .. }) if s == value,
@@ -289,7 +290,7 @@ mod tests {
         );
     }
 
-    fn assert_variable_none(env: &Env, name: &str) {
+    fn assert_variable_none<S>(env: &Env<S>, name: &str) {
         assert_matches!(env.variables.get(name), None, "expected ${name} unset");
     }
 

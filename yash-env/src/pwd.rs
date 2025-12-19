@@ -44,7 +44,7 @@ pub enum PreparePwdError {
     GetCwdError(#[from] Errno),
 }
 
-impl Env {
+impl<S: System> Env<S> {
     /// Returns the value of the `$PWD` variable if it is correct.
     ///
     /// The variable is correct if:
@@ -141,8 +141,8 @@ mod tests {
         assert!(has_dot_or_dot_dot("/foo//../bar"));
     }
 
-    fn env_with_symlink_to_dir() -> Env {
-        let mut system = Box::new(VirtualSystem::new());
+    fn env_with_symlink_to_dir() -> Env<VirtualSystem> {
+        let mut system = VirtualSystem::new();
         let mut state = system.state.borrow_mut();
         state
             .file_system
@@ -245,7 +245,7 @@ mod tests {
 
     #[test]
     fn prepare_pwd_with_non_absolute_path() {
-        let mut system = Box::new(VirtualSystem::new());
+        let mut system = VirtualSystem::new();
         let mut state = system.state.borrow_mut();
         state
             .file_system

@@ -25,6 +25,7 @@ use super::Env;
 use super::Expand;
 use yash_env::option::Option::Unset;
 use yash_env::option::State::Off;
+use yash_env::system::System;
 use yash_env::variable::Value;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::BracedParam;
@@ -59,9 +60,9 @@ pub use switch::NonassignableError;
 pub use switch::Vacancy;
 pub use switch::VacantError;
 
-impl Expand for ParamRef<'_> {
+impl<S: System + 'static> Expand<S> for ParamRef<'_> {
     /// Performs parameter expansion.
-    async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
+    async fn expand(&self, env: &mut Env<'_, S>) -> Result<Phrase, Error> {
         // TODO Expand and parse Index
 
         // Lookup //
@@ -153,10 +154,11 @@ fn to_field(value: &str) -> Vec<AttrChar> {
 pub mod tests {
     use super::*;
     use futures_util::FutureExt;
+    use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::variable::{IFS, Scope};
     use yash_syntax::syntax::{Switch, SwitchAction, SwitchCondition};
 
-    pub fn env_with_positional_params_and_ifs() -> yash_env::Env {
+    pub fn env_with_positional_params_and_ifs() -> yash_env::Env<VirtualSystem> {
         let mut env = yash_env::Env::new_virtual();
         env.variables.positional_params_mut().values = vec!["a".to_string(), "c".to_string()];
         env.variables

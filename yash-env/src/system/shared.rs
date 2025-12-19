@@ -72,8 +72,8 @@ use std::time::Instant;
 /// instance sharing the same state.
 ///
 /// `SharedSystem` implements [`System`] by delegating to the contained system
-/// instance. You should avoid calling some of the `System` methods, however.
-/// Prefer `async` functions provided by `SharedSystem` (e.g.,
+/// instance of type `S`. You should avoid calling some of the `System` methods,
+/// however. Prefer `async` functions provided by `SharedSystem` (e.g.,
 /// [`read_async`](Self::read_async)) over raw system functions (e.g.,
 /// [`read`](System::read)).
 ///
@@ -83,7 +83,7 @@ use std::time::Instant;
 /// ```
 /// # use yash_env::{SharedSystem, System, VirtualSystem};
 /// # use futures_util::task::LocalSpawnExt;
-/// let mut system = SharedSystem::new(Box::new(VirtualSystem::new()));
+/// let mut system = SharedSystem::new(VirtualSystem::new());
 /// let mut system2 = system.clone();
 /// let mut system3 = system.clone();
 /// let (reader, writer) = system.pipe().unwrap();
@@ -120,12 +120,12 @@ use std::time::Instant;
 /// (TBD code example)
 ///
 /// [`VirtualSystem`]: crate::system::virtual::VirtualSystem
-#[derive(Clone, Debug)]
-pub struct SharedSystem(pub(super) Rc<RefCell<SelectSystem>>);
+#[derive(Debug)]
+pub struct SharedSystem<S>(pub(super) Rc<RefCell<SelectSystem<S>>>);
 
-impl SharedSystem {
+impl<S: System> SharedSystem<S> {
     /// Creates a new shared system.
-    pub fn new(system: Box<dyn System>) -> Self {
+    pub fn new(system: S) -> Self {
         SharedSystem(Rc::new(RefCell::new(SelectSystem::new(system))))
     }
 
@@ -293,13 +293,26 @@ impl SharedSystem {
     pub fn select(&self, poll: bool) -> Result<()> {
         self.0.borrow_mut().select(poll)
     }
+
+    /// Creates a new child process.
+    ///
+    /// See [`System::new_child_process`] for details.
+    pub fn new_child_process(&self) -> Result<ChildProcessStarter<S>> {
+        self.0.borrow_mut().new_child_process()
+    }
+}
+
+impl<S> Clone for SharedSystem<S> {
+    fn clone(&self) -> Self {
+        SharedSystem(self.0.clone())
+    }
 }
 
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
-impl System for &SharedSystem {
+impl<S: System> System for &SharedSystem<S> {
     fn fstat(&self, fd: Fd) -> Result<Stat> {
         self.0.borrow().fstat(fd)
     }
@@ -433,8 +446,15 @@ impl System for &SharedSystem {
     fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
         self.0.borrow_mut().tcsetpgrp(fd, pgid)
     }
-    fn new_child_process(&mut self) -> Result<ChildProcessStarter> {
-        self.0.borrow_mut().new_child_process()
+    /// This method is not supported for `SharedSystem` because types do not match.
+    ///
+    /// You should call the inherent method [`SharedSystem::new_child_process`] instead.
+    /// If you call this trait method, it will panic.
+    fn new_child_process(&mut self) -> Result<ChildProcessStarter<Self>> {
+        // self.0.borrow_mut().new_child_process()
+        unimplemented!(
+            "new_child_process is not supported for SharedSystem because types do not match"
+        )
     }
     fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         self.0.borrow_mut().wait(target)
@@ -486,7 +506,7 @@ impl System for &SharedSystem {
 }
 
 /// Delegates `System` methods to the contained system instance.
-impl System for SharedSystem {
+impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
     // which in turn delegates to the contained system instance.
     #[inline]
@@ -661,9 +681,16 @@ impl System for SharedSystem {
     fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
         (&mut &*self).tcsetpgrp(fd, pgid)
     }
+    /// This method is not supported for `SharedSystem` because types do not match.
+    ///
+    /// You should call the inherent method [`SharedSystem::new_child_process`] instead.
+    /// If you call this trait method, it will panic.
     #[inline]
-    fn new_child_process(&mut self) -> Result<ChildProcessStarter> {
-        (&mut &*self).new_child_process()
+    fn new_child_process(&mut self) -> Result<ChildProcessStarter<Self>> {
+        // (&mut &*self).new_child_process()
+        unimplemented!(
+            "new_child_process is not supported for SharedSystem because types do not match"
+        )
     }
     #[inline]
     fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
@@ -728,7 +755,7 @@ impl System for SharedSystem {
     }
 }
 
-impl SignalSystem for &SharedSystem {
+impl<S: System> SignalSystem for &SharedSystem<S> {
     #[inline]
     fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
         SystemEx::signal_name_from_number(*self, number)
@@ -752,7 +779,7 @@ impl SignalSystem for &SharedSystem {
     }
 }
 
-impl SignalSystem for SharedSystem {
+impl<S: System> SignalSystem for SharedSystem<S> {
     #[inline]
     fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
         SystemEx::signal_name_from_number(self, number)
@@ -793,7 +820,7 @@ mod tests {
 
     #[test]
     fn shared_system_read_async_ready() {
-        let mut system = SharedSystem::new(Box::new(VirtualSystem::new()));
+        let mut system = SharedSystem::new(VirtualSystem::new());
         let (reader, writer) = system.pipe().unwrap();
         system.write(writer, &[42]).unwrap();
 
@@ -808,7 +835,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(Box::new(system));
+        let mut system = SharedSystem::new(system);
         let system2 = system.clone();
         let (reader, writer) = system.pipe().unwrap();
 
@@ -837,7 +864,7 @@ mod tests {
 
     #[test]
     fn shared_system_write_all_ready() {
-        let mut system = SharedSystem::new(Box::new(VirtualSystem::new()));
+        let mut system = SharedSystem::new(VirtualSystem::new());
         let (reader, writer) = system.pipe().unwrap();
         let result = system.write_all(writer, &[17]).now_or_never().unwrap();
         assert_eq!(result, Ok(1));
@@ -852,7 +879,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(Box::new(system));
+        let mut system = SharedSystem::new(system);
         let (reader, writer) = system.pipe().unwrap();
 
         state.borrow_mut().processes[&process_id].fds[&writer]
@@ -912,7 +939,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(Box::new(system));
+        let mut system = SharedSystem::new(system);
         let (_reader, writer) = system.pipe().unwrap();
 
         state.borrow_mut().processes[&process_id].fds[&writer]
@@ -935,7 +962,7 @@ mod tests {
     fn shared_system_wait_until() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let system = SharedSystem::new(Box::new(system));
+        let system = SharedSystem::new(system);
         let start = Instant::now();
         state.borrow_mut().now = Some(start);
         let target = start + Duration::from_millis(1_125);
@@ -956,7 +983,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(Box::new(system));
+        let mut system = SharedSystem::new(system);
         system.set_disposition(SIGCHLD, Disposition::Catch).unwrap();
         system.set_disposition(SIGINT, Disposition::Catch).unwrap();
         system.set_disposition(SIGUSR1, Disposition::Catch).unwrap();
@@ -992,7 +1019,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(Box::new(system));
+        let mut system = SharedSystem::new(system);
         system.set_disposition(SIGCHLD, Disposition::Catch).unwrap();
 
         let mut context = Context::from_waker(Waker::noop());
@@ -1019,7 +1046,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(Box::new(system));
+        let mut system = SharedSystem::new(system);
         system.set_disposition(SIGINT, Disposition::Catch).unwrap();
         system.set_disposition(SIGTERM, Disposition::Catch).unwrap();
 
@@ -1045,7 +1072,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(Box::new(system));
+        let mut system = SharedSystem::new(system);
         system.set_disposition(SIGINT, Disposition::Catch).unwrap();
         system.set_disposition(SIGTERM, Disposition::Catch).unwrap();
 
@@ -1070,7 +1097,7 @@ mod tests {
     #[test]
     fn shared_system_select_does_not_wake_signal_waiters_on_io() {
         let system = VirtualSystem::new();
-        let mut system_1 = SharedSystem::new(Box::new(system));
+        let mut system_1 = SharedSystem::new(system);
         let mut system_2 = system_1.clone();
         let mut system_3 = system_1.clone();
         let (reader, writer) = system_1.pipe().unwrap();
@@ -1099,7 +1126,7 @@ mod tests {
     fn shared_system_select_poll() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let system = SharedSystem::new(Box::new(system));
+        let system = SharedSystem::new(system);
         let start = Instant::now();
         state.borrow_mut().now = Some(start);
         let target = start + Duration::from_millis(1_125);

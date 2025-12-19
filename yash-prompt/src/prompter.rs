@@ -20,6 +20,7 @@ use super::expand_posix;
 use std::cell::RefCell;
 use yash_env::Env;
 use yash_env::input::{Context, Input, Result};
+use yash_env::system::System;
 use yash_env::variable::{PS1, PS2, VariableSet};
 
 /// [`Input`] decorator that shows a command prompt
@@ -31,14 +32,14 @@ use yash_env::variable::{PS1, PS2, VariableSet};
 /// to obtain and expand the prompt string. Note that an instance of
 /// [`ExpandText`](super::ExpandText) must be provided in the environment's
 /// [`any`](Env::any) storage for `expand_posix` to work correctly.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[must_use = "Prompter does nothing unless used by a parser"]
-pub struct Prompter<'a, 'b, T> {
+pub struct Prompter<'a, 'b, S, T> {
     inner: T,
-    env: &'a RefCell<&'b mut Env>,
+    env: &'a RefCell<&'b mut Env<S>>,
 }
 
-impl<'a, 'b, T> Prompter<'a, 'b, T> {
+impl<'a, 'b, S, T> Prompter<'a, 'b, S, T> {
     /// Creates a new `Prompter` decorator.
     ///
     /// The first argument is the inner `Input` that performs the actual input
@@ -46,13 +47,24 @@ impl<'a, 'b, T> Prompter<'a, 'b, T> {
     /// the prompt variable and the system interface to print to the standard
     /// error. It is wrapped in a `RefCell` so that it can be shared with other
     /// decorators and the parser.
-    pub fn new(inner: T, env: &'a RefCell<&'b mut Env>) -> Self {
+    pub fn new(inner: T, env: &'a RefCell<&'b mut Env<S>>) -> Self {
         Self { inner, env }
     }
 }
 
-impl<T> Input for Prompter<'_, '_, T>
+// Not derived automatically because S may not implement Clone.
+impl<S, T: Clone> Clone for Prompter<'_, '_, S, T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            env: self.env,
+        }
+    }
+}
+
+impl<S, T> Input for Prompter<'_, '_, S, T>
 where
+    S: System + 'static,
     T: Input,
 {
     #[allow(clippy::await_holding_refcell_ref)]
@@ -62,7 +74,10 @@ where
     }
 }
 
-async fn print_prompt(env: &mut Env, context: &Context) {
+async fn print_prompt<S>(env: &mut Env<S>, context: &Context)
+where
+    S: System + 'static,
+{
     // Obtain the prompt string
     let prompt = fetch_posix(&env.variables, context);
 
@@ -104,7 +119,7 @@ mod tests {
     use yash_env::variable::Value;
     use yash_env_test_helper::assert_stderr;
 
-    fn define_variable<N: Into<String>, V: Into<Value>>(env: &mut Env, name: N, value: V) {
+    fn define_variable<S, N: Into<String>, V: Into<Value>>(env: &mut Env<S>, name: N, value: V) {
         env.variables
             .get_or_new(name, yash_env::variable::Scope::Global)
             .assign(value, None)
@@ -125,7 +140,7 @@ mod tests {
 
     #[test]
     fn prompter_shows_prompt_before_reading() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = env_with_expand_text_and_system(system);
         define_variable(&mut env, PS1, PS1_INITIAL_VALUE_NON_ROOT);
@@ -154,7 +169,7 @@ mod tests {
 
     #[test]
     fn ps1_variable_defines_main_prompt() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = env_with_expand_text_and_system(system);
         define_variable(&mut env, PS1, "my_custom_prompt !! >");
@@ -172,7 +187,7 @@ mod tests {
 
     #[test]
     fn ps2_variable_defines_continuation_prompt() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = env_with_expand_text_and_system(system);
         define_variable(&mut env, PS2, "continuation ! >");
@@ -188,7 +203,7 @@ mod tests {
 
     #[test]
     fn parameter_expansion_in_prompt_string() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = env_with_expand_text_and_system(system);
         define_variable(&mut env, PS1, "$X $ ");

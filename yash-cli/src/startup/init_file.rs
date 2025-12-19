@@ -60,8 +60,8 @@ pub enum DefaultFilePathError {
     ExpansionError(#[from] yash_semantics::expansion::Error),
 }
 
-impl Handle for DefaultFilePathError {
-    async fn handle(&self, env: &mut Env) -> yash_semantics::Result {
+impl<S: System> Handle<S> for DefaultFilePathError {
+    async fn handle(&self, env: &mut Env<S>) -> yash_semantics::Result {
         match self {
             DefaultFilePathError::ParseError(e) => e.handle(env).await,
             DefaultFilePathError::ExpansionError(e) => e.handle(env).await,
@@ -87,7 +87,9 @@ impl Handle for DefaultFilePathError {
 /// [`ENV`]: yash_env::variable::ENV
 /// [`Text`]: yash_syntax::syntax::Text
 /// [initial expansion]: yash_semantics::expansion::initial
-pub async fn default_rcfile_path(env: &mut Env) -> Result<String, DefaultFilePathError> {
+pub async fn default_rcfile_path<S: System + 'static>(
+    env: &mut Env<S>,
+) -> Result<String, DefaultFilePathError> {
     let raw_value = env.variables.get_scalar(ENV).unwrap_or_default();
 
     let text = {
@@ -113,8 +115,8 @@ pub async fn default_rcfile_path(env: &mut Env) -> Result<String, DefaultFilePat
 /// - the `Interactive` shell option is off,
 /// - the real user ID of the process is not the same as the effective user ID, or
 /// - the real group ID of the process is not the same as the effective group ID.
-pub async fn resolve_rcfile_path(
-    env: &mut Env,
+pub async fn resolve_rcfile_path<S: System + 'static>(
+    env: &mut Env<S>,
     file: InitFile,
 ) -> Result<String, DefaultFilePathError> {
     if file == InitFile::None
@@ -139,7 +141,7 @@ pub async fn resolve_rcfile_path(
 /// argument.
 ///
 /// If `path` is an empty string, the function returns immediately.
-pub async fn run_init_file(env: &mut Env, path: &str) {
+pub async fn run_init_file<S: System + 'static>(env: &mut Env<S>, path: &str) {
     if path.is_empty() {
         return;
     }
@@ -194,7 +196,7 @@ pub async fn run_init_file(env: &mut Env, path: &str) {
 /// This function resolves the path to the rcfile using [`resolve_rcfile_path`]
 /// and then runs the rcfile using [`run_init_file`]. Any errors resolving the
 /// path are reported to the standard error.
-pub async fn run_rcfile(env: &mut Env, file: InitFile) {
+pub async fn run_rcfile<S: System + 'static>(env: &mut Env<S>, file: InitFile) {
     match resolve_rcfile_path(env, file).await {
         Ok(path) => run_init_file(env, &path).await,
         Err(e) => drop(e.handle(env).await),
@@ -308,7 +310,7 @@ mod tests {
 
     #[test]
     fn resolve_rcfile_path_non_real_user() {
-        let mut system = Box::new(VirtualSystem::new());
+        let mut system = VirtualSystem::new();
         system.current_process_mut().set_uid(Uid(0));
         system.current_process_mut().set_euid(Uid(10));
         let mut env = Env::with_system(system);
@@ -321,7 +323,7 @@ mod tests {
 
     #[test]
     fn resolve_rcfile_path_non_real_group() {
-        let mut system = Box::new(VirtualSystem::new());
+        let mut system = VirtualSystem::new();
         system.current_process_mut().set_gid(Gid(0));
         system.current_process_mut().set_egid(Gid(10));
         let mut env = Env::with_system(system);

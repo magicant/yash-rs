@@ -36,10 +36,10 @@ use std::pin::Pin;
 use std::rc::Rc;
 use thiserror::Error;
 
-type EnvPrepHook = fn(&mut Env) -> Pin<Box<dyn Future<Output = ()>>>;
-
 type PinFuture<'a, T = ()> = Pin<Box<dyn Future<Output = T> + 'a>>;
 type FutureResult<'a, T = ()> = PinFuture<'a, Result<T>>;
+
+type EnvPrepHook<S> = fn(&mut Env<S>) -> PinFuture<'_, ()>;
 
 /// Wrapper for a function that runs a shell function
 ///
@@ -67,20 +67,43 @@ type FutureResult<'a, T = ()> = PinFuture<'a, Result<T>>;
 /// [`yash-semantics` crate](https://crates.io/crates/yash-semantics):
 ///
 /// ```
+/// # use yash_env::{Env, System};
 /// # use yash_env::semantics::command::RunFunction;
-/// let mut env = yash_env::Env::new_virtual();
-/// env.any.insert(Box::new(RunFunction(|env, function, fields, env_prep_hook| {
-///     Box::pin(async move {
-///         yash_semantics::command::simple_command::execute_function_body(
-///             env, function, fields, env_prep_hook
-///         ).await
-///     })
-/// })));
+/// fn register_run_function<S: System + 'static>(env: &mut Env<S>) {
+///     env.any.insert(Box::new(RunFunction::<S>(|env, function, fields, env_prep_hook| {
+///         Box::pin(async move {
+///             yash_semantics::command::simple_command::execute_function_body(
+///                 env, function, fields, env_prep_hook
+///             ).await
+///         })
+///     })));
+/// }
+/// # register_run_function(&mut Env::new_virtual());
 /// ```
-#[derive(Clone, Copy, Debug)]
-pub struct RunFunction(
-    pub for<'a> fn(&'a mut Env, Rc<Function>, Vec<Field>, Option<EnvPrepHook>) -> FutureResult<'a>,
+pub struct RunFunction<S>(
+    #[allow(clippy::type_complexity)]
+    pub  for<'a> fn(
+        &'a mut Env<S>,
+        Rc<Function<S>>,
+        Vec<Field>,
+        Option<EnvPrepHook<S>>,
+    ) -> FutureResult<'a>,
 );
+
+// Not derived automatically because S may not implement Clone, Copy or Debug.
+impl<S> Clone for RunFunction<S> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<S> Copy for RunFunction<S> {}
+
+impl<S> std::fmt::Debug for RunFunction<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("RunFunction").field(&self.0).finish()
+    }
+}
 
 /// Error returned when [replacing the current process](replace_current_process) fails
 #[derive(Clone, Debug, Error)]
@@ -111,8 +134,8 @@ pub struct ReplaceCurrentProcessError {
 ///
 /// This function is for implementing the simple command execution semantics and
 /// the `exec` built-in utility.
-pub async fn replace_current_process(
-    env: &mut Env,
+pub async fn replace_current_process<S: System>(
+    env: &mut Env<S>,
     path: CString,
     args: Vec<Field>,
 ) -> std::result::Result<Infallible, ReplaceCurrentProcessError> {
@@ -214,13 +237,13 @@ impl<'a> From<&'a StartSubshellError> for Report<'a> {
 /// This function is for implementing the simple command execution semantics and
 /// the `command` built-in utility. This function internally uses
 /// [`replace_current_process`] to execute the utility in the subshell.
-pub async fn run_external_utility_in_subshell(
-    env: &mut Env,
+pub async fn run_external_utility_in_subshell<S: System + 'static>(
+    env: &mut Env<S>,
     path: CString,
     args: Vec<Field>,
-    handle_start_subshell_error: fn(&mut Env, StartSubshellError) -> PinFuture<'_>,
+    handle_start_subshell_error: fn(&mut Env<S>, StartSubshellError) -> PinFuture<'_>,
     handle_replace_current_process_error: fn(
-        &mut Env,
+        &mut Env<S>,
         ReplaceCurrentProcessError,
         Location,
     ) -> PinFuture<'_>,

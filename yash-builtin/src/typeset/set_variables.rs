@@ -28,7 +28,7 @@ impl From<Scope> for yash_env::variable::Scope {
 
 impl SetVariables {
     /// Executes the command.
-    pub fn execute(self, env: &mut Env) -> Result<String, Vec<ExecuteError>> {
+    pub fn execute<S>(self, env: &mut Env<S>) -> Result<String, Vec<ExecuteError>> {
         let mut errors = Vec::new();
 
         'field: for mut field in self.variables {

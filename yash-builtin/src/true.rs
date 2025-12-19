@@ -27,6 +27,6 @@ use yash_env::semantics::Field;
 /// Executes the `true` built-in.
 ///
 /// This is the main entry point for the `true` built-in.
-pub async fn main(_env: &mut Env, _args: Vec<Field>) -> Result {
+pub async fn main<S>(_env: &mut Env<S>, _args: Vec<Field>) -> Result {
     Result::default()
 }

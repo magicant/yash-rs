@@ -28,10 +28,11 @@ use yash_env::semantics::Field;
 use yash_env::semantics::command::RunFunction;
 use yash_env::semantics::command::run_external_utility_in_subshell;
 use yash_env::semantics::command::search::{Target, search};
+use yash_env::system::System;
 
 impl Invoke {
     /// Execute the command
-    pub async fn execute(self, env: &mut Env) -> crate::Result {
+    pub async fn execute<S: System + 'static>(self, env: &mut Env<S>) -> crate::Result {
         let Some(name) = self.fields.first() else {
             return crate::Result::default();
         };
@@ -57,7 +58,11 @@ impl Invoke {
 /// This function requires an instance of [`RunFunction`] to be present in
 /// [`env.any`](Env::any), which is used to invoke shell functions. If no such
 /// instance is found, this function will **panic**.
-async fn invoke_target(env: &mut Env, target: Target, mut fields: Vec<Field>) -> crate::Result {
+async fn invoke_target<S: System + 'static>(
+    env: &mut Env<S>,
+    target: Target<S>,
+    mut fields: Vec<Field>,
+) -> crate::Result {
     match target {
         Target::Builtin { builtin, .. } => {
             let frame = yash_env::stack::Builtin {
@@ -129,14 +134,14 @@ mod tests {
             self.0.fmt(f)
         }
     }
-    impl FunctionBody for FunctionBodyImpl {
-        async fn execute(&self, env: &mut Env) -> yash_env::semantics::Result {
+    impl<S: System + 'static> FunctionBody<S> for FunctionBodyImpl {
+        async fn execute(&self, env: &mut Env<S>) -> yash_env::semantics::Result {
             use yash_semantics::command::Command as _;
             self.0.execute(env).await
         }
     }
 
-    fn function_body_impl(src: &str) -> Rc<dyn FunctionBodyObject> {
+    fn function_body_impl<S: System + 'static>(src: &str) -> Rc<dyn FunctionBodyObject<S>> {
         Rc::new(FunctionBodyImpl(src.parse().unwrap()))
     }
 
@@ -150,7 +155,7 @@ mod tests {
 
     #[test]
     fn command_not_found() {
-        let system = Box::new(VirtualSystem::new());
+        let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         env.builtins
@@ -201,7 +206,7 @@ mod tests {
     #[test]
     fn invoking_function() {
         let mut env = Env::new_virtual();
-        env.any.insert(Box::new(RunFunction(
+        env.any.insert(Box::new(RunFunction::<VirtualSystem>(
             |env, function, fields, env_prep_hook| {
                 Box::pin(async move {
                     yash_semantics::command::simple_command::execute_function_body(
