@@ -299,13 +299,16 @@ type PinFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 /// [`yash-semantics` crate](https://crates.io/crates/yash-semantics):
 ///
 /// ```
-/// # use yash_env::{VirtualSystem, semantics::RunReadEvalLoop};
-/// let mut env = yash_env::Env::new_virtual();
-/// env.any.insert(Box::new(RunReadEvalLoop::<VirtualSystem>(|env, config| {
-///     Box::pin(async move {
-///         yash_semantics::read_eval_loop(env, &mut config.into()).await
-///     })
-/// })));
+/// # use yash_env::{Env, System};
+/// # use yash_env::semantics::RunReadEvalLoop;
+/// fn register_read_eval_loop<S: System + 'static>(env: &mut Env<S>) {
+///     env.any.insert(Box::new(RunReadEvalLoop::<S>(|env, config| {
+///         Box::pin(async move {
+///             yash_semantics::read_eval_loop(env, &mut config.into()).await
+///         })
+///     })));
+/// }
+/// # register_read_eval_loop(&mut Env::new_virtual());
 /// ```
 pub struct RunReadEvalLoop<S>(
     pub for<'a> fn(&'a RefCell<&mut Env<S>>, crate::parser::Config<'a>) -> PinFuture<'a, Result>,

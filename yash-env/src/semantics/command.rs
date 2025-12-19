@@ -67,15 +67,18 @@ type EnvPrepHook<S> = fn(&mut Env<S>) -> PinFuture<'_, ()>;
 /// [`yash-semantics` crate](https://crates.io/crates/yash-semantics):
 ///
 /// ```
-/// # use yash_env::{VirtualSystem, semantics::command::RunFunction};
-/// let mut env = yash_env::Env::new_virtual();
-/// env.any.insert(Box::new(RunFunction::<VirtualSystem>(|env, function, fields, env_prep_hook| {
-///     Box::pin(async move {
-///         yash_semantics::command::simple_command::execute_function_body(
-///             env, function, fields, env_prep_hook
-///         ).await
-///     })
-/// })));
+/// # use yash_env::{Env, System};
+/// # use yash_env::semantics::command::RunFunction;
+/// fn register_run_function<S: System + 'static>(env: &mut Env<S>) {
+///     env.any.insert(Box::new(RunFunction::<S>(|env, function, fields, env_prep_hook| {
+///         Box::pin(async move {
+///             yash_semantics::command::simple_command::execute_function_body(
+///                 env, function, fields, env_prep_hook
+///             ).await
+///         })
+///     })));
+/// }
+/// # register_run_function(&mut Env::new_virtual());
 /// ```
 pub struct RunFunction<S>(
     #[allow(clippy::type_complexity)]

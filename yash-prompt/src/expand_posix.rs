@@ -47,12 +47,14 @@ type ExpandTextResult = Option<(String, Option<ExitStatus>)>;
 /// [`yash-semantics` crate](https://crates.io/crates/yash-semantics):
 ///
 /// ```
-/// # use yash_env::{Env, VirtualSystem};
+/// # use yash_env::{Env, System};
 /// # use yash_prompt::ExpandText;
-/// let mut env = Env::new_virtual();
-/// env.any.insert(Box::new(ExpandText::<VirtualSystem>(|env, text| {
-///     Box::pin(async move { yash_semantics::expansion::expand_text(env, text).await.ok() })
-/// })));
+/// fn register_expand_text<S: System + 'static>(env: &mut Env<S>) {
+///     env.any.insert(Box::new(ExpandText::<S>(|env, text| {
+///         Box::pin(async move { yash_semantics::expansion::expand_text(env, text).await.ok() })
+///     })));
+/// }
+/// # register_expand_text(&mut Env::new_virtual());
 /// ```
 pub struct ExpandText<S>(
     pub for<'a> fn(&'a mut Env<S>, &'a Text) -> PinFuture<'a, ExpandTextResult>,
