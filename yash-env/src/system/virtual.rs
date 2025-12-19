@@ -59,6 +59,7 @@ use super::Disposition;
 use super::Errno;
 use super::FdFlag;
 use super::FlexFuture;
+use super::Fstat;
 use super::Gid;
 use super::OfdAccess;
 use super::OpenFlag;
@@ -309,25 +310,19 @@ impl Default for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
-    /// Retrieves metadata of a file.
-    ///
-    /// The current implementation fills only some values of the returned
-    /// `FileStat`. See [`Inode::stat`] for details.
+impl Fstat for VirtualSystem {
     fn fstat(&self, fd: Fd) -> Result<Stat> {
         self.with_open_file_description(fd, |ofd| Ok(ofd.file.borrow().stat()))
     }
 
-    /// Retrieves metadata of a file.
-    ///
-    /// The current implementation fills only some values of the returned
-    /// `FileStat`. See [`Inode::stat`] for details.
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
         let path = Path::new(UnixStr::from_bytes(path.to_bytes()));
         let inode = self.resolve_existing_file(dir_fd, path, follow_symlinks)?;
         Ok(inode.borrow().stat())
     }
+}
 
+impl System for VirtualSystem {
     /// Tests whether the specified file is executable or not.
     ///
     /// The current implementation only checks if the file has any executable

@@ -33,13 +33,7 @@ pub use self::errno::Errno;
 pub use self::errno::RawErrno;
 pub use self::errno::Result;
 pub use self::fd_flag::FdFlag;
-pub use self::file_system::AT_FDCWD;
-pub use self::file_system::Dir;
-pub use self::file_system::DirEntry;
-pub use self::file_system::FileType;
-pub use self::file_system::Mode;
-pub use self::file_system::RawMode;
-pub use self::file_system::Stat;
+pub use self::file_system::{AT_FDCWD, Dir, DirEntry, FileType, Fstat, Mode, RawMode, Stat};
 pub use self::future::FlexFuture;
 pub use self::id::Gid;
 pub use self::id::RawGid;
@@ -88,13 +82,7 @@ use r#virtual::SignalEffect;
 /// substantial implementors for this trait: [`RealSystem`] and
 /// [`VirtualSystem`]. Another implementor is [`SharedSystem`], which wraps a
 /// `System` instance to extend the interface with asynchronous methods.
-pub trait System: Debug {
-    /// Retrieves metadata of a file.
-    fn fstat(&self, fd: Fd) -> Result<Stat>;
-
-    /// Retrieves metadata of a file.
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat>;
-
+pub trait System: Debug + Fstat {
     /// Whether there is an executable file at the specified path.
     #[must_use]
     fn is_executable_file(&self, path: &CStr) -> bool;

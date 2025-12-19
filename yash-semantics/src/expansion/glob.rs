@@ -60,7 +60,7 @@ use yash_env::Env;
 use yash_env::System;
 use yash_env::option::State::Off;
 use yash_env::semantics::Field;
-use yash_env::system::AT_FDCWD;
+use yash_env::system::{AT_FDCWD, Fstat};
 use yash_fnmatch::Config;
 use yash_fnmatch::Pattern;
 use yash_fnmatch::PatternChar;

@@ -16,6 +16,11 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `system::SharedSystem::new_child_process`: This method has been added as a
   workaround for the now non-functional
   `<system::SharedSystem as System>::new_child_process`.
+- The following traits have been added to the `system` module:
+    - `Fstat`: Provides `fstat` and `fstatat` methods for getting file
+      metadata.
+- Implementations of these traits are provided for those types that implement
+  `System`.
 
 ### Changed
 
@@ -33,6 +38,8 @@ A _private dependency_ is used internally and not visible to downstream users.
       they cannot create `ChildProcessStarter<SharedSystem>` by wrapping the
       results of `new_child_process` calls on the inner `System` instance. Use
       the new `system::SharedSystem::new_child_process` inherent method instead.
+- The `System` trait has been split into smaller, more specialized traits. It
+  is now a supertrait of those decomposed traits.
 - `System::tcsetpgrp` now returns a `FlexFuture<Result<()>>` instead of a
   synchronous `Result<()>`. This change allows virtual systems to simulate the
   blocking behavior of `tcsetpgrp` when called from a background process group,

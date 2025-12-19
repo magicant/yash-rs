@@ -20,6 +20,7 @@ use super::{Gid, Result, Uid};
 use crate::io::Fd;
 use crate::str::UnixStr;
 use bitflags::bitflags;
+use std::ffi::CStr;
 use std::fmt::Debug;
 
 #[cfg(unix)]
@@ -30,7 +31,7 @@ const RAW_AT_FDCWD: i32 = -100;
 /// Sentinel for the current working directory
 ///
 /// This value can be passed to system calls named "*at" such as
-/// [`fstatat`](super::System::fstatat).
+/// [`fstatat`](super::Fstat::fstatat).
 pub const AT_FDCWD: Fd = Fd(RAW_AT_FDCWD);
 
 /// Metadata of a file contained in a directory
@@ -204,4 +205,25 @@ impl Stat {
     pub const fn identity(&self) -> (u64, u64) {
         (self.dev, self.ino)
     }
+}
+
+/// Trait for retrieving file metadata
+pub trait Fstat {
+    /// Retrieves metadata of a file.
+    ///
+    /// This method wraps the [`fstat` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/fstat.html).
+    /// It takes a file descriptor and returns a `Stat` object containing the
+    /// file metadata.
+    fn fstat(&self, fd: Fd) -> Result<Stat>;
+
+    /// Retrieves metadata of a file.
+    ///
+    /// This method wraps the [`fstatat` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/fstatat.html).
+    /// It takes a directory file descriptor, a file path, and a flag indicating
+    /// whether to follow symbolic links. It returns a `Stat` object containing
+    /// the file metadata. The file path is interpreted relative to the
+    /// directory represented by the directory file descriptor.
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat>;
 }

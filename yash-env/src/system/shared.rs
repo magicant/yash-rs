@@ -22,6 +22,7 @@ use super::Disposition;
 use super::Errno;
 use super::FdFlag;
 use super::FlexFuture;
+use super::Fstat;
 use super::Gid;
 use super::LimitPair;
 use super::Mode;
@@ -308,17 +309,21 @@ impl<S> Clone for SharedSystem<S> {
     }
 }
 
-/// Delegates `System` methods to the contained system instance.
-///
-/// This implementation only requires a non-mutable reference to the shared
-/// system because it uses `RefCell` to access the contained system instance.
-impl<S: System> System for &SharedSystem<S> {
+/// Delegates `Fstat` methods to the contained implementor.
+impl<T: Fstat> Fstat for &SharedSystem<T> {
     fn fstat(&self, fd: Fd) -> Result<Stat> {
         self.0.borrow().fstat(fd)
     }
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
         self.0.borrow().fstatat(dir_fd, path, follow_symlinks)
     }
+}
+
+/// Delegates `System` methods to the contained system instance.
+///
+/// This implementation only requires a non-mutable reference to the shared
+/// system because it uses `RefCell` to access the contained system instance.
+impl<S: System> System for &SharedSystem<S> {
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.0.borrow().is_executable_file(path)
     }
@@ -505,10 +510,8 @@ impl<S: System> System for &SharedSystem<S> {
     }
 }
 
-/// Delegates `System` methods to the contained system instance.
-impl<S: System> System for SharedSystem<S> {
-    // All methods are delegated to `impl System for &SharedSystem`,
-    // which in turn delegates to the contained system instance.
+/// Delegates `Fstat` methods to the contained implementor.
+impl<T: Fstat> Fstat for SharedSystem<T> {
     #[inline]
     fn fstat(&self, fd: Fd) -> Result<Stat> {
         (&self).fstat(fd)
@@ -517,6 +520,12 @@ impl<S: System> System for SharedSystem<S> {
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
         (&self).fstatat(dir_fd, path, follow_symlinks)
     }
+}
+
+/// Delegates `System` methods to the contained system instance.
+impl<S: System> System for SharedSystem<S> {
+    // All methods are delegated to `impl System for &SharedSystem`,
+    // which in turn delegates to the contained system instance.
     #[inline]
     fn is_executable_file(&self, path: &CStr) -> bool {
         (&self).is_executable_file(path)

@@ -38,6 +38,7 @@ use super::Errno;
 use super::FdFlag;
 use super::FileType;
 use super::FlexFuture;
+use super::Fstat;
 use super::Gid;
 use super::Mode;
 use super::OfdAccess;
@@ -221,7 +222,7 @@ impl RealSystem {
     }
 }
 
-impl System for RealSystem {
+impl Fstat for RealSystem {
     fn fstat(&self, fd: Fd) -> Result<Stat> {
         let mut stat = MaybeUninit::<libc::stat>::uninit();
         unsafe { libc::fstat(fd.0, stat.as_mut_ptr()) }.errno_if_m1()?;
@@ -242,7 +243,9 @@ impl System for RealSystem {
         let stat = unsafe { Stat::from_raw(&stat) };
         Ok(stat)
     }
+}
 
+impl System for RealSystem {
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.file_has_type(path, FileType::Regular) && self.has_execute_permission(path)
     }
