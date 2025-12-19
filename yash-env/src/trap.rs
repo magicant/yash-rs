@@ -511,7 +511,6 @@ type PinFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 ///     Box::pin(async move { yash_semantics::trap::run_trap_if_caught(env, signal).await })
 /// })));
 /// ```
-#[derive(Debug)]
 pub struct RunSignalTrapIfCaught<S>(
     pub  for<'a> fn(
         env: &'a mut Env<S>,
@@ -519,7 +518,7 @@ pub struct RunSignalTrapIfCaught<S>(
     ) -> PinFuture<'a, Option<crate::semantics::Result>>,
 );
 
-// Not derived automatically because S may not implement Clone or Copy.
+// Not derived automatically because S may not implement Clone, Copy, or Debug.
 impl<S> Clone for RunSignalTrapIfCaught<S> {
     fn clone(&self) -> Self {
         *self
@@ -527,6 +526,14 @@ impl<S> Clone for RunSignalTrapIfCaught<S> {
 }
 
 impl<S> Copy for RunSignalTrapIfCaught<S> {}
+
+impl<S> std::fmt::Debug for RunSignalTrapIfCaught<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("RunSignalTrapIfCaught")
+            .field(&self.0)
+            .finish()
+    }
+}
 
 #[cfg(test)]
 mod tests {

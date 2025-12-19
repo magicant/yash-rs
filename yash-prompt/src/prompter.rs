@@ -32,7 +32,7 @@ use yash_env::variable::{PS1, PS2, VariableSet};
 /// to obtain and expand the prompt string. Note that an instance of
 /// [`ExpandText`](super::ExpandText) must be provided in the environment's
 /// [`any`](Env::any) storage for `expand_posix` to work correctly.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[must_use = "Prompter does nothing unless used by a parser"]
 pub struct Prompter<'a, 'b, S, T> {
     inner: T,
@@ -49,6 +49,16 @@ impl<'a, 'b, S, T> Prompter<'a, 'b, S, T> {
     /// decorators and the parser.
     pub fn new(inner: T, env: &'a RefCell<&'b mut Env<S>>) -> Self {
         Self { inner, env }
+    }
+}
+
+// Not derived automatically because S may not implement Clone.
+impl<S, T: Clone> Clone for Prompter<'_, '_, S, T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            env: self.env,
+        }
     }
 }
 

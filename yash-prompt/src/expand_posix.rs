@@ -54,12 +54,11 @@ type ExpandTextResult = Option<(String, Option<ExitStatus>)>;
 ///     Box::pin(async move { yash_semantics::expansion::expand_text(env, text).await.ok() })
 /// })));
 /// ```
-#[derive(Debug)]
 pub struct ExpandText<S>(
     pub for<'a> fn(&'a mut Env<S>, &'a Text) -> PinFuture<'a, ExpandTextResult>,
 );
 
-// Not derived automatically because S may not implement Clone or Copy.
+// Not derived automatically because S may not implement Clone, Copy, or Debug.
 impl<S> Clone for ExpandText<S> {
     fn clone(&self) -> Self {
         *self
@@ -67,6 +66,12 @@ impl<S> Clone for ExpandText<S> {
 }
 
 impl<S> Copy for ExpandText<S> {}
+
+impl<S> std::fmt::Debug for ExpandText<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("ExpandText").field(&self.0).finish()
+    }
+}
 
 /// Expands the prompt string according to the POSIX standard.
 ///
