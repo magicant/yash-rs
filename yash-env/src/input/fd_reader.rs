@@ -253,7 +253,7 @@ mod tests {
 
     #[test]
     fn reader_error() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system.current_process_mut().close_fd(Fd::STDIN);
         let system = SharedSystem::new(system);
         let mut reader = FdReader::new(Fd::STDIN, system);

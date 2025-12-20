@@ -207,7 +207,7 @@ impl VirtualSystem {
     ///
     /// This function will panic if it cannot find a process having
     /// `self.process_id`.
-    pub fn current_process_mut(&mut self) -> RefMut<'_, Process> {
+    pub fn current_process_mut(&self) -> RefMut<'_, Process> {
         RefMut::map(self.state.borrow_mut(), |state| {
             state.processes.get_mut(&self.process_id).unwrap()
         })
@@ -875,7 +875,7 @@ impl System for VirtualSystem {
 
         let state = Rc::clone(&self.state);
         Ok(Box::new(move |parent_env, task| {
-            let mut system = VirtualSystem { state, process_id };
+            let system = VirtualSystem { state, process_id };
             let mut child_env = parent_env.clone_with_system(system.clone());
 
             {

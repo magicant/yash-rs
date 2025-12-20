@@ -92,7 +92,7 @@ mod tests {
     use yash_env::variable::Scope::Global;
 
     fn env_with_symlink_to_dir() -> Env<VirtualSystem> {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let mut state = system.state.borrow_mut();
         state
             .file_system

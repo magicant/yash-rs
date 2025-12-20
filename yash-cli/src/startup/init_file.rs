@@ -310,7 +310,7 @@ mod tests {
 
     #[test]
     fn resolve_rcfile_path_non_real_user() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system.current_process_mut().set_uid(Uid(0));
         system.current_process_mut().set_euid(Uid(10));
         let mut env = Env::with_system(system);
@@ -323,7 +323,7 @@ mod tests {
 
     #[test]
     fn resolve_rcfile_path_non_real_group() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system.current_process_mut().set_gid(Gid(0));
         system.current_process_mut().set_egid(Gid(10));
         let mut env = Env::with_system(system);

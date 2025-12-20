@@ -192,7 +192,7 @@ mod tests {
                     },
                 )));
 
-            let mut system = VirtualSystem {
+            let system = VirtualSystem {
                 state,
                 process_id: env.main_pid,
             };
