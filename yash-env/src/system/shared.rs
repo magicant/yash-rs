@@ -331,8 +331,8 @@ impl<T: IsExecutableFile> IsExecutableFile for &SharedSystem<T> {
 
 /// Delegates `Pipe` methods to the contained implementor.
 impl<T: Pipe> Pipe for &SharedSystem<T> {
-    fn pipe(&mut self) -> Result<(Fd, Fd)> {
-        self.0.borrow_mut().pipe()
+    fn pipe(&self) -> Result<(Fd, Fd)> {
+        self.0.borrow().pipe()
     }
 }
 
@@ -542,7 +542,7 @@ impl<T: IsExecutableFile> IsExecutableFile for SharedSystem<T> {
 impl<T: Pipe> Pipe for SharedSystem<T> {
     #[inline]
     fn pipe(&mut self) -> Result<(Fd, Fd)> {
-        (&mut &*self).pipe()
+        (&self).pipe()
     }
 }
 

@@ -337,7 +337,7 @@ impl IsExecutableFile for VirtualSystem {
 }
 
 impl Pipe for VirtualSystem {
-    fn pipe(&mut self) -> Result<(Fd, Fd)> {
+    fn pipe(&self) -> Result<(Fd, Fd)> {
         let file = Rc::new(RefCell::new(Inode {
             body: FileBody::Fifo {
                 content: VecDeque::new(),

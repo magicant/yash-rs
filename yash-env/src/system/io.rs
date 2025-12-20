@@ -28,5 +28,5 @@ pub trait Pipe {
     ///
     /// This is a thin wrapper around the `pipe` system call.
     /// If successful, returns the reading and writing ends of the pipe.
-    fn pipe(&mut self) -> Result<(Fd, Fd)>;
+    fn pipe(&self) -> Result<(Fd, Fd)>;
 }

@@ -254,7 +254,7 @@ impl IsExecutableFile for RealSystem {
 }
 
 impl Pipe for RealSystem {
-    fn pipe(&mut self) -> Result<(Fd, Fd)> {
+    fn pipe(&self) -> Result<(Fd, Fd)> {
         let mut fds = MaybeUninit::<[c_int; 2]>::uninit();
         // TODO Use as_mut_ptr rather than cast when array_ptr_get is stabilized
         unsafe { libc::pipe(fds.as_mut_ptr().cast()) }.errno_if_m1()?;
