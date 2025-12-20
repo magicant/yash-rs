@@ -21,6 +21,7 @@ A _private dependency_ is used internally and not visible to downstream users.
       metadata and provides a default implementation of `is_directory`.
     - `IsExecutableFile`: Declares the `is_executable_file` method for checking
       if a file is executable.
+    - `Pipe`: Declares the `pipe` method for creating pipes.
 - Implementations of these traits are provided for those types that implement
   `System`.
 

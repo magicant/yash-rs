@@ -36,6 +36,7 @@ use yash_env::stack::Frame;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
+use yash_env::system::Pipe as _;
 use yash_syntax::syntax;
 
 /// Executes the pipeline.

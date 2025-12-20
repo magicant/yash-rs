@@ -31,6 +31,7 @@ use super::OfdAccess;
 use super::OpenFlag;
 use super::Path;
 use super::PathBuf;
+use super::Pipe;
 use super::Resource;
 use super::Result;
 use super::SelectSystem;
@@ -84,6 +85,7 @@ use std::time::Instant;
 ///
 /// ```
 /// # use yash_env::{SharedSystem, System, VirtualSystem};
+/// # use yash_env::system::Pipe as _;
 /// # use futures_util::task::LocalSpawnExt;
 /// let mut system = SharedSystem::new(VirtualSystem::new());
 /// let mut system2 = system.clone();
@@ -327,14 +329,18 @@ impl<T: IsExecutableFile> IsExecutableFile for &SharedSystem<T> {
     }
 }
 
+/// Delegates `Pipe` methods to the contained implementor.
+impl<T: Pipe> Pipe for &SharedSystem<T> {
+    fn pipe(&self) -> Result<(Fd, Fd)> {
+        self.0.borrow().pipe()
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl<S: System> System for &SharedSystem<S> {
-    fn pipe(&mut self) -> Result<(Fd, Fd)> {
-        self.0.borrow_mut().pipe()
-    }
     fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
         self.0.borrow_mut().dup(from, to_min, flags)
     }
@@ -532,14 +538,18 @@ impl<T: IsExecutableFile> IsExecutableFile for SharedSystem<T> {
     }
 }
 
+/// Delegates `Pipe` methods to the contained implementor.
+impl<T: Pipe> Pipe for SharedSystem<T> {
+    #[inline]
+    fn pipe(&self) -> Result<(Fd, Fd)> {
+        (&self).pipe()
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
     // which in turn delegates to the contained system instance.
-    #[inline]
-    fn pipe(&mut self) -> Result<(Fd, Fd)> {
-        (&mut &*self).pipe()
-    }
     #[inline]
     fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
         (&mut &*self).dup(from, to_min, flags)
@@ -846,7 +856,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(system);
+        let system = SharedSystem::new(system);
         let system2 = system.clone();
         let (reader, writer) = system.pipe().unwrap();
 
@@ -890,7 +900,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(system);
+        let system = SharedSystem::new(system);
         let (reader, writer) = system.pipe().unwrap();
 
         state.borrow_mut().processes[&process_id].fds[&writer]
@@ -950,7 +960,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(system);
+        let system = SharedSystem::new(system);
         let (_reader, writer) = system.pipe().unwrap();
 
         state.borrow_mut().processes[&process_id].fds[&writer]
@@ -1108,7 +1118,7 @@ mod tests {
     #[test]
     fn shared_system_select_does_not_wake_signal_waiters_on_io() {
         let system = VirtualSystem::new();
-        let mut system_1 = SharedSystem::new(system);
+        let system_1 = SharedSystem::new(system);
         let mut system_2 = system_1.clone();
         let mut system_3 = system_1.clone();
         let (reader, writer) = system_1.pipe().unwrap();
