@@ -21,6 +21,7 @@ use super::Dir;
 use super::Disposition;
 use super::Dup;
 use super::Errno;
+use super::Fcntl;
 use super::FdFlag;
 use super::FlexFuture;
 use super::Fstat;
@@ -141,7 +142,7 @@ impl<S: System> SharedSystem<S> {
     /// This function waits for one or more bytes to be available for reading.
     /// If successful, returns the number of bytes read.
     pub async fn read_async(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
-        let was_nonblocking = (&mut &*self).get_and_set_nonblocking(fd, true)?;
+        let was_nonblocking = (*self).get_and_set_nonblocking(fd, true)?;
 
         // We need to retain a strong reference to the waker outside the poll_fn
         // function because SelectSystem only retains a weak reference to it.
@@ -162,7 +163,7 @@ impl<S: System> SharedSystem<S> {
         })
         .await;
 
-        _ = (&mut &*self).get_and_set_nonblocking(fd, was_nonblocking);
+        _ = (*self).get_and_set_nonblocking(fd, was_nonblocking);
 
         result
     }
@@ -180,7 +181,7 @@ impl<S: System> SharedSystem<S> {
             return Ok(0);
         }
 
-        let was_nonblocking = (&mut &*self).get_and_set_nonblocking(fd, true)?;
+        let was_nonblocking = (*self).get_and_set_nonblocking(fd, true)?;
         let mut written = 0;
 
         // We need to retain a strong reference to the waker outside the poll_fn
@@ -209,7 +210,7 @@ impl<S: System> SharedSystem<S> {
         })
         .await;
 
-        _ = (&mut &*self).get_and_set_nonblocking(fd, was_nonblocking);
+        _ = (*self).get_and_set_nonblocking(fd, was_nonblocking);
 
         result
     }
@@ -370,23 +371,27 @@ impl<T: Close> Close for &SharedSystem<T> {
     }
 }
 
+/// Delegates `Fcntl` methods to the contained implementor.
+impl<T: Fcntl> Fcntl for &SharedSystem<T> {
+    fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
+        self.0.borrow().ofd_access(fd)
+    }
+    fn get_and_set_nonblocking(&self, fd: Fd, nonblocking: bool) -> Result<bool> {
+        self.0.borrow().get_and_set_nonblocking(fd, nonblocking)
+    }
+    fn fcntl_getfd(&self, fd: Fd) -> Result<EnumSet<FdFlag>> {
+        self.0.borrow().fcntl_getfd(fd)
+    }
+    fn fcntl_setfd(&self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
+        self.0.borrow().fcntl_setfd(fd, flags)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl<S: System> System for &SharedSystem<S> {
-    fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
-        self.0.borrow().ofd_access(fd)
-    }
-    fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
-        self.0.borrow_mut().get_and_set_nonblocking(fd, nonblocking)
-    }
-    fn fcntl_getfd(&self, fd: Fd) -> Result<EnumSet<FdFlag>> {
-        self.0.borrow().fcntl_getfd(fd)
-    }
-    fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
-        self.0.borrow_mut().fcntl_setfd(fd, flags)
-    }
     fn isatty(&self, fd: Fd) -> bool {
         self.0.borrow().isatty(fd)
     }
@@ -597,26 +602,30 @@ impl<T: Close> Close for SharedSystem<T> {
     }
 }
 
-/// Delegates `System` methods to the contained system instance.
-impl<S: System> System for SharedSystem<S> {
-    // All methods are delegated to `impl System for &SharedSystem`,
-    // which in turn delegates to the contained system instance.
+/// Delegates `Fcntl` methods to the contained implementor.
+impl<T: Fcntl> Fcntl for SharedSystem<T> {
     #[inline]
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
         (&self).ofd_access(fd)
     }
     #[inline]
-    fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
-        (&mut &*self).get_and_set_nonblocking(fd, nonblocking)
+    fn get_and_set_nonblocking(&self, fd: Fd, nonblocking: bool) -> Result<bool> {
+        (&self).get_and_set_nonblocking(fd, nonblocking)
     }
     #[inline]
     fn fcntl_getfd(&self, fd: Fd) -> Result<EnumSet<FdFlag>> {
         (&self).fcntl_getfd(fd)
     }
     #[inline]
-    fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
-        (&mut &*self).fcntl_setfd(fd, flags)
+    fn fcntl_setfd(&self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
+        (&self).fcntl_setfd(fd, flags)
     }
+}
+
+/// Delegates `System` methods to the contained system instance.
+impl<S: System> System for SharedSystem<S> {
+    // All methods are delegated to `impl System for &SharedSystem`,
+    // which in turn delegates to the contained system instance.
     #[inline]
     fn isatty(&self, fd: Fd) -> bool {
         (&self).isatty(fd)

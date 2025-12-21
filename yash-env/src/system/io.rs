@@ -18,6 +18,7 @@
 
 use super::Result;
 use super::fd_flag::FdFlag;
+use super::file_system::OfdAccess;
 use crate::io::Fd;
 use enumset::EnumSet;
 
@@ -69,4 +70,33 @@ pub trait Dup {
     /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/dup.html).
     /// If successful, returns `Ok(to)`. On error, returns `Err(_)`.
     fn dup2(&self, from: Fd, to: Fd) -> Result<Fd>;
+}
+
+/// Trait for `fcntl`-related operations
+///
+/// This trait declares methods related to the `fcntl` system call for
+/// manipulating file descriptors and open file descriptions.
+pub trait Fcntl {
+    /// Returns the open file description access mode.
+    fn ofd_access(&self, fd: Fd) -> Result<OfdAccess>;
+
+    /// Gets and sets the non-blocking mode for the open file description.
+    ///
+    /// This is a wrapper around the [`fcntl` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/fcntl.html).
+    /// This function sets the non-blocking mode to the given value and returns
+    /// the previous mode.
+    fn get_and_set_nonblocking(&self, fd: Fd, nonblocking: bool) -> Result<bool>;
+
+    /// Returns the attributes for the file descriptor.
+    ///
+    /// This is a thin wrapper around the [`fcntl` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/fcntl.html).
+    fn fcntl_getfd(&self, fd: Fd) -> Result<EnumSet<FdFlag>>;
+
+    /// Sets attributes for the file descriptor.
+    ///
+    /// This is a thin wrapper around the [`fcntl` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/fcntl.html).
+    fn fcntl_setfd(&self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()>;
 }

@@ -37,6 +37,7 @@ use super::Dup;
 #[cfg(doc)]
 use super::Env;
 use super::Errno;
+use super::Fcntl;
 use super::FdFlag;
 use super::FileType;
 use super::FlexFuture;
@@ -338,13 +339,13 @@ impl Close for RealSystem {
     }
 }
 
-impl System for RealSystem {
+impl Fcntl for RealSystem {
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
         let flags = unsafe { libc::fcntl(fd.0, libc::F_GETFL) }.errno_if_m1()?;
         Ok(OfdAccess::from_real_flag(flags))
     }
 
-    fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
+    fn get_and_set_nonblocking(&self, fd: Fd, nonblocking: bool) -> Result<bool> {
         let old_flags = unsafe { libc::fcntl(fd.0, libc::F_GETFL) }.errno_if_m1()?;
         let new_flags = if nonblocking {
             old_flags | libc::O_NONBLOCK
@@ -367,7 +368,7 @@ impl System for RealSystem {
         Ok(flags)
     }
 
-    fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
+    fn fcntl_setfd(&self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
         let mut bits = 0 as c_int;
         if flags.contains(FdFlag::CloseOnExec) {
             bits |= libc::FD_CLOEXEC;
@@ -376,7 +377,9 @@ impl System for RealSystem {
             .errno_if_m1()
             .map(drop)
     }
+}
 
+impl System for RealSystem {
     fn isatty(&self, fd: Fd) -> bool {
         (unsafe { libc::isatty(fd.0) } != 0)
     }

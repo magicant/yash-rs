@@ -42,7 +42,7 @@ pub use self::id::Gid;
 pub use self::id::RawGid;
 pub use self::id::RawUid;
 pub use self::id::Uid;
-pub use self::io::{Close, Dup, Pipe};
+pub use self::io::{Close, Dup, Fcntl, Pipe};
 #[cfg(all(doc, unix))]
 use self::real::RealSystem;
 use self::resource::LimitPair;
@@ -65,7 +65,6 @@ use crate::str::UnixString;
 #[cfg(doc)]
 use crate::subshell::Subshell;
 use crate::trap::SignalSystem;
-use enumset::EnumSet;
 use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
@@ -84,27 +83,7 @@ use r#virtual::SignalEffect;
 /// substantial implementors for this trait: [`RealSystem`] and
 /// [`VirtualSystem`]. Another implementor is [`SharedSystem`], which wraps a
 /// `System` instance to extend the interface with asynchronous methods.
-pub trait System: Close + Debug + Dup + Fstat + IsExecutableFile + Open + Pipe {
-    /// Returns the open file description access mode.
-    fn ofd_access(&self, fd: Fd) -> Result<OfdAccess>;
-
-    /// Gets and sets the non-blocking mode for the open file description.
-    ///
-    /// This is a wrapper around the `fcntl` system call.
-    /// This function sets the non-blocking mode to the given value and returns
-    /// the previous mode.
-    fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool>;
-
-    /// Returns the attributes for the file descriptor.
-    ///
-    /// This is a thin wrapper around the `fcntl` system call.
-    fn fcntl_getfd(&self, fd: Fd) -> Result<EnumSet<FdFlag>>;
-
-    /// Sets attributes for the file descriptor.
-    ///
-    /// This is a thin wrapper around the `fcntl` system call.
-    fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()>;
-
+pub trait System: Close + Debug + Dup + Fcntl + Fstat + IsExecutableFile + Open + Pipe {
     /// Tests if a file descriptor is associated with a terminal device.
     ///
     /// On error, this function simply returns `false` and no detailed error
