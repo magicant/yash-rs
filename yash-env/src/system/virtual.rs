@@ -59,6 +59,7 @@ use super::Dir;
 use super::Disposition;
 use super::Dup;
 use super::Errno;
+use super::Fcntl;
 use super::FdFlag;
 use super::FlexFuture;
 use super::Fstat;
@@ -503,7 +504,7 @@ impl Close for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
+impl Fcntl for VirtualSystem {
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
         fn is_directory(file_body: &FileBody) -> bool {
             matches!(file_body, FileBody::Directory { .. })
@@ -523,8 +524,8 @@ impl System for VirtualSystem {
         })
     }
 
-    fn get_and_set_nonblocking(&mut self, fd: Fd, _nonblocking: bool) -> Result<bool> {
-        self.with_open_file_description_mut(fd, |_ofd| {
+    fn get_and_set_nonblocking(&self, fd: Fd, _nonblocking: bool) -> Result<bool> {
+        self.with_open_file_description(fd, |_ofd| {
             // TODO Implement non-blocking I/O
             Ok(false)
         })
@@ -536,13 +537,15 @@ impl System for VirtualSystem {
         Ok(body.flags)
     }
 
-    fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
+    fn fcntl_setfd(&self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
         let mut process = self.current_process_mut();
         let body = process.get_fd_mut(fd).ok_or(Errno::EBADF)?;
         body.flags = flags;
         Ok(())
     }
+}
 
+impl System for VirtualSystem {
     fn isatty(&self, fd: Fd) -> bool {
         self.with_open_file_description(fd, |ofd| {
             Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
@@ -1778,7 +1781,7 @@ mod tests {
 
     #[test]
     fn fcntl_getfd_and_setfd() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         let flags = system.fcntl_getfd(Fd::STDIN).unwrap();
         assert_eq!(flags, EnumSet::empty());

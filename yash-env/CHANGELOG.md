@@ -20,6 +20,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `Close`: Declares the `close` method for closing file descriptors.
     - `Dup`: Declares the `dup` and `dup2` methods for duplicating file
       descriptors.
+    - `Fcntl`: Declares the `ofd_access`, `get_and_set_nonblocking`,
+      `fcntl_getfd`, and `fcntl_setfd` methods for `fcntl`-related operations.
     - `Fstat`: Declares `fstat` and `fstatat` methods for getting file
       metadata and provides a default implementation of `is_directory`.
     - `IsExecutableFile`: Declares the `is_executable_file` method for checking

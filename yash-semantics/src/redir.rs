@@ -99,6 +99,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::Close as _;
 use yash_env::system::Dup as _;
+use yash_env::system::Fcntl as _;
 use yash_env::system::Open as _;
 use yash_env::system::{Errno, FdFlag, FileType, Fstat, Mode, OfdAccess, OpenFlag};
 use yash_quote::quoted;
