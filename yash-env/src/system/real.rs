@@ -32,6 +32,7 @@ use super::ChildProcessStarter;
 use super::Dir;
 use super::DirEntry;
 use super::Disposition;
+use super::Dup;
 #[cfg(doc)]
 use super::Env;
 use super::Errno;
@@ -263,8 +264,8 @@ impl Pipe for RealSystem {
     }
 }
 
-impl System for RealSystem {
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
+impl Dup for RealSystem {
+    fn dup(&self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
         let command = if flags.contains(FdFlag::CloseOnExec) {
             libc::F_DUPFD_CLOEXEC
         } else {
@@ -275,7 +276,7 @@ impl System for RealSystem {
             .map(Fd)
     }
 
-    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
+    fn dup2(&self, from: Fd, to: Fd) -> Result<Fd> {
         loop {
             let result = unsafe { libc::dup2(from.0, to.0) }.errno_if_m1().map(Fd);
             if result != Err(Errno::EINTR) {
@@ -283,7 +284,9 @@ impl System for RealSystem {
             }
         }
     }
+}
 
+impl System for RealSystem {
     fn open(
         &mut self,
         path: &CStr,

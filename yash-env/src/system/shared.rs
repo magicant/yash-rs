@@ -19,6 +19,7 @@
 use super::ChildProcessStarter;
 use super::Dir;
 use super::Disposition;
+use super::Dup;
 use super::Errno;
 use super::FdFlag;
 use super::FlexFuture;
@@ -336,17 +337,21 @@ impl<T: Pipe> Pipe for &SharedSystem<T> {
     }
 }
 
+/// Delegates `Dup` methods to the contained implementor.
+impl<T: Dup> Dup for &SharedSystem<T> {
+    fn dup(&self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
+        self.0.borrow().dup(from, to_min, flags)
+    }
+    fn dup2(&self, from: Fd, to: Fd) -> Result<Fd> {
+        self.0.borrow().dup2(from, to)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl<S: System> System for &SharedSystem<S> {
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
-        self.0.borrow_mut().dup(from, to_min, flags)
-    }
-    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
-        self.0.borrow_mut().dup2(from, to)
-    }
     fn open(
         &mut self,
         path: &CStr,
@@ -546,18 +551,22 @@ impl<T: Pipe> Pipe for SharedSystem<T> {
     }
 }
 
+/// Delegates `Dup` methods to the contained implementor.
+impl<T: Dup> Dup for SharedSystem<T> {
+    #[inline]
+    fn dup(&self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
+        (&self).dup(from, to_min, flags)
+    }
+    #[inline]
+    fn dup2(&self, from: Fd, to: Fd) -> Result<Fd> {
+        (&self).dup2(from, to)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
     // which in turn delegates to the contained system instance.
-    #[inline]
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
-        (&mut &*self).dup(from, to_min, flags)
-    }
-    #[inline]
-    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
-        (&mut &*self).dup2(from, to)
-    }
     #[inline]
     fn open(
         &mut self,

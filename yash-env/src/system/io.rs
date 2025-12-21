@@ -17,7 +17,9 @@
 //! Items about I/O operations
 
 use super::Result;
+use super::fd_flag::FdFlag;
 use crate::io::Fd;
+use enumset::EnumSet;
 
 /// Trait for creating pipes
 ///
@@ -26,7 +28,32 @@ use crate::io::Fd;
 pub trait Pipe {
     /// Creates an unnamed pipe.
     ///
-    /// This is a thin wrapper around the `pipe` system call.
+    /// This is a thin wrapper around the [`pipe` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/pipe.html).
     /// If successful, returns the reading and writing ends of the pipe.
     fn pipe(&self) -> Result<(Fd, Fd)>;
+}
+
+/// Trait for duplicating file descriptors
+///
+/// This trait declares the `dup` and `dup2` methods, which duplicate file
+/// descriptors.
+pub trait Dup {
+    /// Duplicates a file descriptor.
+    ///
+    /// This is a thin wrapper around the [`fcntl` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/fcntl.html)
+    /// that opens a new FD that shares the open file description with `from`.
+    /// The new FD will be the minimum unused FD not less than `to_min`. The
+    /// `flags` are set to the new FD.
+    ///
+    /// If successful, returns `Ok(new_fd)`. On error, returns `Err(_)`.
+    fn dup(&self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd>;
+
+    /// Duplicates a file descriptor.
+    ///
+    /// This is a thin wrapper around the [`dup2` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/dup.html).
+    /// If successful, returns `Ok(to)`. On error, returns `Err(_)`.
+    fn dup2(&self, from: Fd, to: Fd) -> Result<Fd>;
 }

@@ -56,6 +56,7 @@ pub use self::signal::*;
 use super::AT_FDCWD;
 use super::Dir;
 use super::Disposition;
+use super::Dup;
 use super::Errno;
 use super::FdFlag;
 use super::FlexFuture;
@@ -380,22 +381,24 @@ impl Pipe for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
+impl Dup for VirtualSystem {
+    fn dup(&self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
         let mut process = self.current_process_mut();
         let mut body = process.fds.get(&from).ok_or(Errno::EBADF)?.clone();
         body.flags = flags;
         process.open_fd_ge(to_min, body).map_err(|_| Errno::EMFILE)
     }
 
-    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
+    fn dup2(&self, from: Fd, to: Fd) -> Result<Fd> {
         let mut process = self.current_process_mut();
         let mut body = process.fds.get(&from).ok_or(Errno::EBADF)?.clone();
         body.flags = EnumSet::empty();
         process.set_fd(to, body).map_err(|_| Errno::EBADF)?;
         Ok(to)
     }
+}
 
+impl System for VirtualSystem {
     fn open(
         &mut self,
         path: &CStr,
@@ -1439,7 +1442,7 @@ mod tests {
 
     #[test]
     fn dup_shares_open_file_description() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.dup(Fd::STDOUT, Fd::STDERR, EnumSet::empty());
         assert_eq!(result, Ok(Fd(3)));
 
@@ -1451,7 +1454,7 @@ mod tests {
 
     #[test]
     fn dup_can_set_cloexec() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.dup(Fd::STDOUT, Fd::STDERR, FdFlag::CloseOnExec.into());
         assert_eq!(result, Ok(Fd(3)));
 
@@ -1462,7 +1465,7 @@ mod tests {
 
     #[test]
     fn dup2_shares_open_file_description() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.dup2(Fd::STDOUT, Fd(5));
         assert_eq!(result, Ok(Fd(5)));
 
@@ -1474,7 +1477,7 @@ mod tests {
 
     #[test]
     fn dup2_clears_cloexec() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let mut process = system.current_process_mut();
         process.fds.get_mut(&Fd::STDOUT).unwrap().flags = FdFlag::CloseOnExec.into();
         drop(process);

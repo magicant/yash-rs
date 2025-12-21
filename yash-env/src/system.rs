@@ -42,6 +42,7 @@ pub use self::id::Gid;
 pub use self::id::RawGid;
 pub use self::id::RawUid;
 pub use self::id::Uid;
+pub use self::io::Dup;
 pub use self::io::Pipe;
 pub use self::open_flag::OfdAccess;
 pub use self::open_flag::OpenFlag;
@@ -86,23 +87,7 @@ use r#virtual::SignalEffect;
 /// substantial implementors for this trait: [`RealSystem`] and
 /// [`VirtualSystem`]. Another implementor is [`SharedSystem`], which wraps a
 /// `System` instance to extend the interface with asynchronous methods.
-pub trait System: Debug + Fstat + IsExecutableFile + Pipe {
-    /// Duplicates a file descriptor.
-    ///
-    /// This is a thin wrapper around the `fcntl` system call that opens a new
-    /// FD that shares the open file description with `from`. The new FD will be
-    /// the minimum unused FD not less than `to_min`. The `flags` are set to the
-    /// new FD.
-    ///
-    /// If successful, returns `Ok(new_fd)`. On error, returns `Err(_)`.
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd>;
-
-    /// Duplicates a file descriptor.
-    ///
-    /// This is a thin wrapper around the `dup2` system call. If successful,
-    /// returns `Ok(to)`. On error, returns `Err(_)`.
-    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd>;
-
+pub trait System: Debug + Dup + Fstat + IsExecutableFile + Pipe {
     /// Opens a file descriptor.
     ///
     /// This is a thin wrapper around the `open` system call.
@@ -589,7 +574,7 @@ pub trait SystemEx: System {
     /// larger than or equal to [`MIN_INTERNAL_FD`].
     ///
     /// If the given file descriptor is less than [`MIN_INTERNAL_FD`], this
-    /// function duplicates the file descriptor with [`System::dup`] and closes
+    /// function duplicates the file descriptor with [`Dup::dup`] and closes
     /// the original one. Otherwise, this function does nothing.
     ///
     /// The new file descriptor will have the CLOEXEC flag set when it is

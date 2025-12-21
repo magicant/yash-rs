@@ -31,6 +31,7 @@ use yash_env::io::Fd;
 use yash_env::job::Pid;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
+use yash_env::system::Dup as _;
 use yash_env::system::Errno;
 use yash_env::system::Pipe as _;
 use yash_syntax::parser::lex::Lexer;

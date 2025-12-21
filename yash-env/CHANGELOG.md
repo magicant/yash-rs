@@ -17,6 +17,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   workaround for the now non-functional
   `<system::SharedSystem as System>::new_child_process`.
 - The following traits have been added to the `system` module:
+    - `Dup`: Declares the `dup` and `dup2` methods for duplicating file
+      descriptors.
     - `Fstat`: Declares `fstat` and `fstatat` methods for getting file
       metadata and provides a default implementation of `is_directory`.
     - `IsExecutableFile`: Declares the `is_executable_file` method for checking
