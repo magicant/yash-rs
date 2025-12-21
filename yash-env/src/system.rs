@@ -42,8 +42,7 @@ pub use self::id::Gid;
 pub use self::id::RawGid;
 pub use self::id::RawUid;
 pub use self::id::Uid;
-pub use self::io::Dup;
-pub use self::io::Pipe;
+pub use self::io::{Close, Dup, Pipe};
 #[cfg(all(doc, unix))]
 use self::real::RealSystem;
 use self::resource::LimitPair;
@@ -85,14 +84,7 @@ use r#virtual::SignalEffect;
 /// substantial implementors for this trait: [`RealSystem`] and
 /// [`VirtualSystem`]. Another implementor is [`SharedSystem`], which wraps a
 /// `System` instance to extend the interface with asynchronous methods.
-pub trait System: Debug + Dup + Fstat + IsExecutableFile + Open + Pipe {
-    /// Closes a file descriptor.
-    ///
-    /// This is a thin wrapper around the `close` system call.
-    ///
-    /// This function returns `Ok(())` when the FD is already closed.
-    fn close(&mut self, fd: Fd) -> Result<()>;
-
+pub trait System: Close + Debug + Dup + Fstat + IsExecutableFile + Open + Pipe {
     /// Returns the open file description access mode.
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess>;
 

@@ -30,6 +30,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
+use yash_env::system::Close as _;
 use yash_env::system::Mode;
 use yash_env::system::OfdAccess;
 use yash_env::system::Open as _;

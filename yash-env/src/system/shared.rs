@@ -53,6 +53,7 @@ use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessState;
 use crate::semantics::ExitStatus;
+use crate::system::Close;
 use enumset::EnumSet;
 use std::cell::RefCell;
 use std::convert::Infallible;
@@ -363,14 +364,17 @@ impl<T: Open> Open for &SharedSystem<T> {
     }
 }
 
+impl<T: Close> Close for &SharedSystem<T> {
+    fn close(&self, fd: Fd) -> Result<()> {
+        self.0.borrow().close(fd)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl<S: System> System for &SharedSystem<S> {
-    fn close(&mut self, fd: Fd) -> Result<()> {
-        self.0.borrow_mut().close(fd)
-    }
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
         self.0.borrow().ofd_access(fd)
     }
@@ -585,14 +589,18 @@ impl<T: Open> Open for SharedSystem<T> {
     }
 }
 
+/// Delegates `Close` methods to the contained implementor.
+impl<T: Close> Close for SharedSystem<T> {
+    #[inline]
+    fn close(&self, fd: Fd) -> Result<()> {
+        (&self).close(fd)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
     // which in turn delegates to the contained system instance.
-    #[inline]
-    fn close(&mut self, fd: Fd) -> Result<()> {
-        (&mut &*self).close(fd)
-    }
     #[inline]
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
         (&self).ofd_access(fd)

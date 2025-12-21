@@ -54,6 +54,7 @@ pub use self::io::*;
 pub use self::process::*;
 pub use self::signal::*;
 use super::AT_FDCWD;
+use super::Close;
 use super::Dir;
 use super::Disposition;
 use super::Dup;
@@ -495,12 +496,14 @@ impl Open for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
-    fn close(&mut self, fd: Fd) -> Result<()> {
+impl Close for VirtualSystem {
+    fn close(&self, fd: Fd) -> Result<()> {
         self.current_process_mut().close_fd(fd);
         Ok(())
     }
+}
 
+impl System for VirtualSystem {
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
         fn is_directory(file_body: &FileBody) -> bool {
             matches!(file_body, FileBody::Directory { .. })
@@ -1763,7 +1766,7 @@ mod tests {
 
     #[test]
     fn close() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         let result = system.close(Fd::STDERR);
         assert_eq!(result, Ok(()));

@@ -21,6 +21,19 @@ use super::fd_flag::FdFlag;
 use crate::io::Fd;
 use enumset::EnumSet;
 
+/// Trait for closing file descriptors
+pub trait Close {
+    /// Closes a file descriptor.
+    ///
+    /// This is a thin wrapper around the [`close` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/close.html).
+    ///
+    /// If successful, returns `Ok(())`. On error, returns `Err(_)`.
+    /// This function returns `Ok(())` when the FD is already closed, which is
+    /// different from the behavior of the underlying system call.
+    fn close(&self, fd: Fd) -> Result<()>;
+}
+
 /// Trait for creating pipes
 ///
 /// This trait declares the `pipe` method, which creates an unnamed pipe. This

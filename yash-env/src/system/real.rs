@@ -29,6 +29,7 @@ mod signal;
 
 use super::AT_FDCWD;
 use super::ChildProcessStarter;
+use super::Close;
 use super::Dir;
 use super::DirEntry;
 use super::Disposition;
@@ -323,8 +324,9 @@ impl Open for RealSystem {
     }
 }
 
-impl System for RealSystem {
-    fn close(&mut self, fd: Fd) -> Result<()> {
+impl Close for RealSystem {
+    fn close(&self, fd: Fd) -> Result<()> {
+        // TODO: Use posix_close when available
         loop {
             let result = unsafe { libc::close(fd.0) }.errno_if_m1().map(drop);
             match result {
@@ -334,7 +336,9 @@ impl System for RealSystem {
             }
         }
     }
+}
 
+impl System for RealSystem {
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
         let flags = unsafe { libc::fcntl(fd.0, libc::F_GETFL) }.errno_if_m1()?;
         Ok(OfdAccess::from_real_flag(flags))

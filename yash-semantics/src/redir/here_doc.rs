@@ -21,6 +21,7 @@ use yash_env::Env;
 use yash_env::System;
 use yash_env::io::Fd;
 use yash_env::path::Path;
+use yash_env::system::Close as _;
 use yash_env::system::Errno;
 use yash_env::system::Open as _;
 

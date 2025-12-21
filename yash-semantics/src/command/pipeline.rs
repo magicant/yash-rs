@@ -35,6 +35,7 @@ use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
+use yash_env::system::Close as _;
 use yash_env::system::Dup as _;
 use yash_env::system::Errno;
 use yash_env::system::Pipe as _;

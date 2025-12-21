@@ -40,6 +40,7 @@ use yash_env::option::Option::Interactive;
 use yash_env::option::State::Off;
 use yash_env::parser::Config;
 use yash_env::stack::Frame;
+use yash_env::system::Close as _;
 use yash_env::system::{Errno, Mode, OfdAccess, OpenFlag, SystemEx};
 use yash_env::variable::ENV;
 use yash_semantics::Handle;
