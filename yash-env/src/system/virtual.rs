@@ -64,6 +64,7 @@ use super::Fstat;
 use super::Gid;
 use super::IsExecutableFile;
 use super::OfdAccess;
+use super::Open;
 use super::OpenFlag;
 use super::Pipe;
 use super::Result;
@@ -398,7 +399,7 @@ impl Dup for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
+impl Open for VirtualSystem {
     fn open(
         &mut self,
         path: &CStr,
@@ -492,7 +493,9 @@ impl System for VirtualSystem {
         let process = state.processes.get_mut(&self.process_id).unwrap();
         process.open_fd(body).map_err(|_| Errno::EMFILE)
     }
+}
 
+impl System for VirtualSystem {
     fn close(&mut self, fd: Fd) -> Result<()> {
         self.current_process_mut().close_fd(fd);
         Ok(())

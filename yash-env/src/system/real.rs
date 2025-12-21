@@ -44,6 +44,7 @@ use super::Gid;
 use super::IsExecutableFile;
 use super::Mode;
 use super::OfdAccess;
+use super::Open;
 use super::OpenFlag;
 use super::Pipe;
 use super::Result;
@@ -286,7 +287,7 @@ impl Dup for RealSystem {
     }
 }
 
-impl System for RealSystem {
+impl Open for RealSystem {
     fn open(
         &mut self,
         path: &CStr,
@@ -320,7 +321,9 @@ impl System for RealSystem {
 
         Ok(fd)
     }
+}
 
+impl System for RealSystem {
     fn close(&mut self, fd: Fd) -> Result<()> {
         loop {
             let result = unsafe { libc::close(fd.0) }.errno_if_m1().map(drop);

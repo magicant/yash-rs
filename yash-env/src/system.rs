@@ -22,7 +22,6 @@ mod file_system;
 mod future;
 mod id;
 mod io;
-mod open_flag;
 #[cfg(unix)]
 pub mod real;
 pub mod resource;
@@ -35,7 +34,8 @@ pub use self::errno::RawErrno;
 pub use self::errno::Result;
 pub use self::fd_flag::FdFlag;
 pub use self::file_system::{
-    AT_FDCWD, Dir, DirEntry, FileType, Fstat, IsExecutableFile, Mode, RawMode, Stat,
+    AT_FDCWD, Dir, DirEntry, FileType, Fstat, IsExecutableFile, Mode, OfdAccess, Open, OpenFlag,
+    RawMode, Stat,
 };
 pub use self::future::FlexFuture;
 pub use self::id::Gid;
@@ -44,8 +44,6 @@ pub use self::id::RawUid;
 pub use self::id::Uid;
 pub use self::io::Dup;
 pub use self::io::Pipe;
-pub use self::open_flag::OfdAccess;
-pub use self::open_flag::OpenFlag;
 #[cfg(all(doc, unix))]
 use self::real::RealSystem;
 use self::resource::LimitPair;
@@ -87,24 +85,7 @@ use r#virtual::SignalEffect;
 /// substantial implementors for this trait: [`RealSystem`] and
 /// [`VirtualSystem`]. Another implementor is [`SharedSystem`], which wraps a
 /// `System` instance to extend the interface with asynchronous methods.
-pub trait System: Debug + Dup + Fstat + IsExecutableFile + Pipe {
-    /// Opens a file descriptor.
-    ///
-    /// This is a thin wrapper around the `open` system call.
-    fn open(
-        &mut self,
-        path: &CStr,
-        access: OfdAccess,
-        flags: EnumSet<OpenFlag>,
-        mode: Mode,
-    ) -> Result<Fd>;
-
-    /// Opens a file descriptor associated with an anonymous temporary file.
-    ///
-    /// This function works similarly to the `O_TMPFILE` flag specified to the
-    /// `open` function.
-    fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd>;
-
+pub trait System: Debug + Dup + Fstat + IsExecutableFile + Open + Pipe {
     /// Closes a file descriptor.
     ///
     /// This is a thin wrapper around the `close` system call.

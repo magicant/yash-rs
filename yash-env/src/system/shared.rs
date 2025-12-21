@@ -29,6 +29,7 @@ use super::IsExecutableFile;
 use super::LimitPair;
 use super::Mode;
 use super::OfdAccess;
+use super::Open;
 use super::OpenFlag;
 use super::Path;
 use super::PathBuf;
@@ -347,11 +348,7 @@ impl<T: Dup> Dup for &SharedSystem<T> {
     }
 }
 
-/// Delegates `System` methods to the contained system instance.
-///
-/// This implementation only requires a non-mutable reference to the shared
-/// system because it uses `RefCell` to access the contained system instance.
-impl<S: System> System for &SharedSystem<S> {
+impl<T: Open> Open for &SharedSystem<T> {
     fn open(
         &mut self,
         path: &CStr,
@@ -364,6 +361,13 @@ impl<S: System> System for &SharedSystem<S> {
     fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
         self.0.borrow_mut().open_tmpfile(parent_dir)
     }
+}
+
+/// Delegates `System` methods to the contained system instance.
+///
+/// This implementation only requires a non-mutable reference to the shared
+/// system because it uses `RefCell` to access the contained system instance.
+impl<S: System> System for &SharedSystem<S> {
     fn close(&mut self, fd: Fd) -> Result<()> {
         self.0.borrow_mut().close(fd)
     }
@@ -563,10 +567,8 @@ impl<T: Dup> Dup for SharedSystem<T> {
     }
 }
 
-/// Delegates `System` methods to the contained system instance.
-impl<S: System> System for SharedSystem<S> {
-    // All methods are delegated to `impl System for &SharedSystem`,
-    // which in turn delegates to the contained system instance.
+/// Delegates `Open` methods to the contained implementor.
+impl<T: Open> Open for SharedSystem<T> {
     #[inline]
     fn open(
         &mut self,
@@ -581,6 +583,12 @@ impl<S: System> System for SharedSystem<S> {
     fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
         (&mut &*self).open_tmpfile(parent_dir)
     }
+}
+
+/// Delegates `System` methods to the contained system instance.
+impl<S: System> System for SharedSystem<S> {
+    // All methods are delegated to `impl System for &SharedSystem`,
+    // which in turn delegates to the contained system instance.
     #[inline]
     fn close(&mut self, fd: Fd) -> Result<()> {
         (&mut &*self).close(fd)

@@ -16,7 +16,7 @@
 
 //! Extension to [`crate::system::open_flag`] for the real system
 
-use crate::system::open_flag::*;
+use crate::system::file_system::{OfdAccess, OpenFlag};
 use std::ffi::c_int;
 
 impl OfdAccess {

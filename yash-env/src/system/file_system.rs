@@ -18,8 +18,10 @@
 
 use super::{Gid, Result, Uid};
 use crate::io::Fd;
+use crate::path::Path;
 use crate::str::UnixStr;
 use bitflags::bitflags;
+use enumset::{EnumSet, EnumSetType};
 use std::ffi::CStr;
 use std::fmt::Debug;
 
@@ -247,4 +249,74 @@ pub trait IsExecutableFile {
     /// Whether there is an executable regular file at the specified path.
     #[must_use]
     fn is_executable_file(&self, path: &CStr) -> bool;
+}
+
+/// File access mode of open file descriptions
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum OfdAccess {
+    /// Open for reading only
+    ReadOnly,
+    /// Open for writing only
+    WriteOnly,
+    /// Open for reading and writing
+    ReadWrite,
+    /// Open for executing only (non-directory files)
+    Exec,
+    /// Open for searching only (directories)
+    Search,
+}
+
+/// Options for opening file descriptors
+///
+/// A set of `OpenFlag` values can be passed to [`open`] to configure how the
+/// file descriptor is opened. Some of the flags become the attributes of the
+/// open file description created by the `open` function.
+///
+/// [`open`]: Open::open
+#[derive(Debug, EnumSetType, Hash)]
+#[non_exhaustive]
+pub enum OpenFlag {
+    /// Always write to the end of the file
+    Append,
+    /// Close the file descriptor upon execution of an exec family function
+    CloseOnExec,
+    /// Create the file if it does not exist
+    Create,
+    /// Fail if the file is not a directory
+    Directory,
+    /// Atomically create the file if it does not exist
+    Exclusive,
+    /// Do not make the opened terminal the controlling terminal for the process
+    NoCtty,
+    /// Do not follow symbolic links
+    NoFollow,
+    /// Open the file in non-blocking mode
+    NonBlock,
+    /// Wait until the written data is physically stored on the underlying
+    /// storage device on each write
+    Sync,
+    /// Truncate the file to zero length
+    Truncate,
+}
+
+/// Trait for opening files
+pub trait Open {
+    /// Opens a file descriptor.
+    ///
+    /// This is a thin wrapper around the [`open` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/open.html).
+    fn open(
+        &mut self,
+        path: &CStr,
+        access: OfdAccess,
+        flags: EnumSet<OpenFlag>,
+        mode: Mode,
+    ) -> Result<Fd>;
+
+    /// Opens a file descriptor associated with an anonymous temporary file.
+    ///
+    /// This function works similarly to the `O_TMPFILE` flag specified to the
+    /// `open` function.
+    fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd>;
 }

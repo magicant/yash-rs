@@ -22,6 +22,7 @@ use yash_env::System;
 use yash_env::io::Fd;
 use yash_env::path::Path;
 use yash_env::system::Errno;
+use yash_env::system::Open as _;
 
 async fn fill_content<S: System>(env: &mut Env<S>, fd: Fd, content: &str) -> Result<(), Errno> {
     env.system.write_all(fd, content.as_bytes()).await?;

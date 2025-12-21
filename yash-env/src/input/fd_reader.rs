@@ -130,10 +130,10 @@ impl<S: System> Input for FdReader<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::System;
     use crate::system::Errno;
     use crate::system::Mode;
     use crate::system::OfdAccess;
+    use crate::system::Open as _;
     use crate::system::OpenFlag;
     use crate::system::r#virtual::FileBody;
     use crate::system::r#virtual::Inode;

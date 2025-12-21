@@ -41,6 +41,7 @@ use yash_env::parser::Config;
 use yash_env::system::Errno;
 use yash_env::system::Mode;
 use yash_env::system::OfdAccess;
+use yash_env::system::Open as _;
 use yash_env::system::OpenFlag;
 use yash_env::system::SystemEx as _;
 use yash_prompt::Prompter;

@@ -16,9 +16,8 @@
 
 //! Implementation for Item.
 
-use crate::trap::run_exit_trap;
-
 use super::Command;
+use crate::trap::run_exit_trap;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::Env;
@@ -33,6 +32,7 @@ use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Mode;
 use yash_env::system::OfdAccess;
+use yash_env::system::Open as _;
 use yash_syntax::source::Location;
 use yash_syntax::syntax;
 use yash_syntax::syntax::AndOrList;
