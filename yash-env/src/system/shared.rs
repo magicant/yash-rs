@@ -366,6 +366,14 @@ impl<T: Open> Open for &SharedSystem<T> {
     fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
         self.0.borrow_mut().open_tmpfile(parent_dir)
     }
+    #[allow(refining_impl_trait)]
+    fn fdopendir(&mut self, fd: Fd) -> Result<impl Dir + use<T>> {
+        self.0.borrow_mut().fdopendir(fd)
+    }
+    #[allow(refining_impl_trait)]
+    fn opendir(&mut self, path: &CStr) -> Result<impl Dir + use<T>> {
+        self.0.borrow_mut().opendir(path)
+    }
 }
 
 impl<T: Close> Close for &SharedSystem<T> {
@@ -418,12 +426,6 @@ impl<T: Seek> Seek for &SharedSystem<T> {
 impl<S: System> System for &SharedSystem<S> {
     fn isatty(&self, fd: Fd) -> bool {
         self.0.borrow().isatty(fd)
-    }
-    fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
-        self.0.borrow_mut().fdopendir(fd)
-    }
-    fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
-        self.0.borrow_mut().opendir(path)
     }
     fn umask(&mut self, mask: Mode) -> Mode {
         self.0.borrow_mut().umask(mask)
@@ -607,6 +609,14 @@ impl<T: Open> Open for SharedSystem<T> {
     fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
         (&mut &*self).open_tmpfile(parent_dir)
     }
+    #[inline]
+    fn fdopendir(&mut self, fd: Fd) -> Result<impl Dir + use<T>> {
+        (&mut &*self).fdopendir(fd)
+    }
+    #[inline]
+    fn opendir(&mut self, path: &CStr) -> Result<impl Dir + use<T>> {
+        (&mut &*self).opendir(path)
+    }
 }
 
 /// Delegates `Close` methods to the contained implementor.
@@ -668,14 +678,6 @@ impl<S: System> System for SharedSystem<S> {
     #[inline]
     fn isatty(&self, fd: Fd) -> bool {
         (&self).isatty(fd)
-    }
-    #[inline]
-    fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
-        (&mut &*self).fdopendir(fd)
-    }
-    #[inline]
-    fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
-        (&mut &*self).opendir(path)
     }
     #[inline]
     fn umask(&mut self, mask: Mode) -> Mode {

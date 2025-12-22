@@ -92,12 +92,6 @@ pub trait System:
     /// function to set `errno`.
     fn isatty(&self, fd: Fd) -> bool;
 
-    /// Opens a directory for enumerating entries.
-    fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>>;
-
-    /// Opens a directory for enumerating entries.
-    fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>>;
-
     /// Gets and sets the file creation mode mask.
     ///
     /// This is a thin wrapper around the `umask` system call. It sets the mask

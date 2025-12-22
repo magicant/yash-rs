@@ -326,6 +326,18 @@ impl Open for RealSystem {
 
         Ok(fd)
     }
+
+    fn fdopendir(&mut self, fd: Fd) -> Result<impl Dir + use<>> {
+        let dir = unsafe { libc::fdopendir(fd.0) };
+        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
+        Ok(RealDir(dir))
+    }
+
+    fn opendir(&mut self, path: &CStr) -> Result<impl Dir + use<>> {
+        let dir = unsafe { libc::opendir(path.as_ptr()) };
+        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
+        Ok(RealDir(dir))
+    }
 }
 
 impl Close for RealSystem {
@@ -424,18 +436,6 @@ impl Seek for RealSystem {
 impl System for RealSystem {
     fn isatty(&self, fd: Fd) -> bool {
         (unsafe { libc::isatty(fd.0) } != 0)
-    }
-
-    fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
-        let dir = unsafe { libc::fdopendir(fd.0) };
-        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
-        Ok(Box::new(RealDir(dir)))
-    }
-
-    fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
-        let dir = unsafe { libc::opendir(path.as_ptr()) };
-        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
-        Ok(Box::new(RealDir(dir)))
     }
 
     fn umask(&mut self, new_mask: Mode) -> Mode {

@@ -498,6 +498,24 @@ impl Open for VirtualSystem {
         let process = state.processes.get_mut(&self.process_id).unwrap();
         process.open_fd(body).map_err(|_| Errno::EMFILE)
     }
+
+    fn fdopendir(&mut self, fd: Fd) -> Result<impl Dir + use<>> {
+        self.with_open_file_description(fd, |ofd| {
+            let inode = ofd.inode();
+            let dir = VirtualDir::try_from(&inode.borrow().body)?;
+            Ok(dir)
+        })
+    }
+
+    fn opendir(&mut self, path: &CStr) -> Result<impl Dir + use<>> {
+        let fd = self.open(
+            path,
+            OfdAccess::ReadOnly,
+            OpenFlag::Directory.into(),
+            Mode::empty(),
+        )?;
+        self.fdopendir(fd)
+    }
 }
 
 impl Close for VirtualSystem {
@@ -573,24 +591,6 @@ impl System for VirtualSystem {
             Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
         })
         .unwrap_or(false)
-    }
-
-    fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
-        self.with_open_file_description(fd, |ofd| {
-            let inode = ofd.inode();
-            let dir = VirtualDir::try_from(&inode.borrow().body)?;
-            Ok(Box::new(dir) as Box<dyn Dir>)
-        })
-    }
-
-    fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
-        let fd = self.open(
-            path,
-            OfdAccess::ReadOnly,
-            OpenFlag::Directory.into(),
-            Mode::empty(),
-        )?;
-        self.fdopendir(fd)
     }
 
     fn umask(&mut self, new_mask: Mode) -> Mode {

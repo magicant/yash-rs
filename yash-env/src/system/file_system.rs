@@ -320,6 +320,18 @@ pub trait Open {
     /// This function works similarly to the `O_TMPFILE` flag specified to the
     /// `open` function.
     fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd>;
+
+    /// Opens a directory for enumerating entries.
+    ///
+    /// This is a thin wrapper around the [`fdopendir` system
+    /// function](https://pubs.opengroup.org/onlinepubs/9799919799/functions/fdopendir.html).
+    fn fdopendir(&mut self, fd: Fd) -> Result<impl Dir + use<Self>>;
+
+    /// Opens a directory for enumerating entries.
+    ///
+    /// This is a thin wrapper around the [`opendir` system
+    /// function](https://pubs.opengroup.org/onlinepubs/9799919799/functions/fdopendir.html).
+    fn opendir(&mut self, path: &CStr) -> Result<impl Dir + use<Self>>;
 }
 
 /// Trait for seeking within file descriptors
