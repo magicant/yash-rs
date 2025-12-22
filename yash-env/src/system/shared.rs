@@ -35,6 +35,7 @@ use super::OpenFlag;
 use super::Path;
 use super::PathBuf;
 use super::Pipe;
+use super::Read;
 use super::Resource;
 use super::Result;
 use super::SelectSystem;
@@ -82,7 +83,7 @@ use std::time::Instant;
 /// instance of type `S`. You should avoid calling some of the `System` methods,
 /// however. Prefer `async` functions provided by `SharedSystem` (e.g.,
 /// [`read_async`](Self::read_async)) over raw system functions (e.g.,
-/// [`read`](System::read)).
+/// [`read`](Read::read)).
 ///
 /// The following example illustrates how multiple concurrent tasks are run in a
 /// single-threaded pool:
@@ -387,6 +388,13 @@ impl<T: Fcntl> Fcntl for &SharedSystem<T> {
     }
 }
 
+/// Delegates `Read` methods to the contained implementor.
+impl<T: Read> Read for &SharedSystem<T> {
+    fn read(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
+        self.0.borrow().read(fd, buffer)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
@@ -394,9 +402,6 @@ impl<T: Fcntl> Fcntl for &SharedSystem<T> {
 impl<S: System> System for &SharedSystem<S> {
     fn isatty(&self, fd: Fd) -> bool {
         self.0.borrow().isatty(fd)
-    }
-    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
-        self.0.borrow_mut().read(fd, buffer)
     }
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {
         self.0.borrow_mut().write(fd, buffer)
@@ -622,6 +627,14 @@ impl<T: Fcntl> Fcntl for SharedSystem<T> {
     }
 }
 
+/// Delegates `Read` methods to the contained implementor.
+impl<T: Read> Read for SharedSystem<T> {
+    #[inline]
+    fn read(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
+        (&self).read(fd, buffer)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
@@ -629,10 +642,6 @@ impl<S: System> System for SharedSystem<S> {
     #[inline]
     fn isatty(&self, fd: Fd) -> bool {
         (&self).isatty(fd)
-    }
-    #[inline]
-    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
-        (&mut &*self).read(fd, buffer)
     }
     #[inline]
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {
@@ -919,7 +928,7 @@ mod tests {
 
     #[test]
     fn shared_system_write_all_ready() {
-        let mut system = SharedSystem::new(VirtualSystem::new());
+        let system = SharedSystem::new(VirtualSystem::new());
         let (reader, writer) = system.pipe().unwrap();
         let result = system.write_all(writer, &[17]).now_or_never().unwrap();
         assert_eq!(result, Ok(1));

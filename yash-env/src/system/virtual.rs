@@ -69,6 +69,7 @@ use super::OfdAccess;
 use super::Open;
 use super::OpenFlag;
 use super::Pipe;
+use super::Read;
 use super::Result;
 use super::SigmaskOp;
 use super::Stat;
@@ -234,7 +235,7 @@ impl VirtualSystem {
     /// Calls the given closure passing the open file description for the FD.
     ///
     /// Returns `Err(Errno::EBADF)` if the FD is not open.
-    pub fn with_open_file_description_mut<F, R>(&mut self, fd: Fd, f: F) -> Result<R>
+    pub fn with_open_file_description_mut<F, R>(&self, fd: Fd, f: F) -> Result<R>
     where
         F: FnOnce(&mut OpenFileDescription) -> Result<R>,
     {
@@ -545,16 +546,18 @@ impl Fcntl for VirtualSystem {
     }
 }
 
+impl Read for VirtualSystem {
+    fn read(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
+        self.with_open_file_description_mut(fd, |ofd| ofd.read(buffer))
+    }
+}
+
 impl System for VirtualSystem {
     fn isatty(&self, fd: Fd) -> bool {
         self.with_open_file_description(fd, |ofd| {
             Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
         })
         .unwrap_or(false)
-    }
-
-    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
-        self.with_open_file_description_mut(fd, |ofd| ofd.read(buffer))
     }
 
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {

@@ -57,8 +57,8 @@ pub(super) async fn open_fd<S: System>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::FutureExt;
-    use yash_env::System;
+    use futures_util::FutureExt as _;
+    use yash_env::system::Read as _;
 
     #[test]
     fn open_fd_and_read_from_it() {

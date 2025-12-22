@@ -49,6 +49,7 @@ use super::OfdAccess;
 use super::Open;
 use super::OpenFlag;
 use super::Pipe;
+use super::Read;
 use super::Result;
 use super::SigmaskOp;
 use super::Stat;
@@ -379,12 +380,8 @@ impl Fcntl for RealSystem {
     }
 }
 
-impl System for RealSystem {
-    fn isatty(&self, fd: Fd) -> bool {
-        (unsafe { libc::isatty(fd.0) } != 0)
-    }
-
-    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
+impl Read for RealSystem {
+    fn read(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
         loop {
             let result =
                 unsafe { libc::read(fd.0, buffer.as_mut_ptr().cast(), buffer.len()) }.errno_if_m1();
@@ -392,6 +389,12 @@ impl System for RealSystem {
                 return Ok(result?.try_into().unwrap());
             }
         }
+    }
+}
+
+impl System for RealSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        (unsafe { libc::isatty(fd.0) } != 0)
     }
 
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {

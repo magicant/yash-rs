@@ -28,6 +28,7 @@ A _private dependency_ is used internally and not visible to downstream users.
       if a file is executable.
     - `Open`: Declares the `open` method for opening files.
     - `Pipe`: Declares the `pipe` method for creating pipes.
+    - `Read`: Declares the `read` method for reading from file descriptors.
 - Implementations of these traits are provided for those types that implement
   `System`.
 
@@ -56,6 +57,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `system::virtual::VirtualSystem::current_process_mut` now takes `&self`
   instead of `&mut self` because it returns a `std::cell::RefMut` out of a
   `RefCell`.
+- `system::virtual::VirtualSystem::with_open_file_description_mut` now takes
+  `&self` instead of `&mut self` as it internally depends on
+  `current_process_mut`.
 - `impl<S> std::fmt::Debug for builtin::Builtin<S>` now prints the `execute`
   field as well.
 

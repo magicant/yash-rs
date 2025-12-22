@@ -42,7 +42,7 @@ pub use self::id::Gid;
 pub use self::id::RawGid;
 pub use self::id::RawUid;
 pub use self::id::Uid;
-pub use self::io::{Close, Dup, Fcntl, Pipe};
+pub use self::io::{Close, Dup, Fcntl, Pipe, Read};
 #[cfg(all(doc, unix))]
 use self::real::RealSystem;
 use self::resource::LimitPair;
@@ -83,23 +83,15 @@ use r#virtual::SignalEffect;
 /// substantial implementors for this trait: [`RealSystem`] and
 /// [`VirtualSystem`]. Another implementor is [`SharedSystem`], which wraps a
 /// `System` instance to extend the interface with asynchronous methods.
-pub trait System: Close + Debug + Dup + Fcntl + Fstat + IsExecutableFile + Open + Pipe {
+pub trait System:
+    Close + Debug + Dup + Fcntl + Fstat + IsExecutableFile + Open + Pipe + Read
+{
     /// Tests if a file descriptor is associated with a terminal device.
     ///
     /// On error, this function simply returns `false` and no detailed error
     /// information is provided because POSIX does not require the `isatty`
     /// function to set `errno`.
     fn isatty(&self, fd: Fd) -> bool;
-
-    /// Reads from the file descriptor.
-    ///
-    /// This is a thin wrapper around the `read` system call.
-    /// If successful, returns the number of bytes read.
-    ///
-    /// This function may perform blocking I/O, especially if the `O_NONBLOCK`
-    /// flag is not set for the FD. Use [`SharedSystem::read_async`] to support
-    /// concurrent I/O in an `async` function context.
-    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize>;
 
     /// Writes to the file descriptor.
     ///

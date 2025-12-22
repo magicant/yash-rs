@@ -93,3 +93,22 @@ pub trait Fcntl {
     /// Sets attributes for the file descriptor.
     fn fcntl_setfd(&self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()>;
 }
+
+/// Trait for reading from file descriptors
+pub trait Read {
+    /// Reads from the file descriptor.
+    ///
+    /// This is a thin wrapper around the [`read` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/read.html).
+    /// If successful, returns the number of bytes read.
+    ///
+    /// This function may perform blocking I/O, especially if the `O_NONBLOCK`
+    /// flag is not set for the FD. Use [`SharedSystem::read_async`] to support
+    /// concurrent I/O in an `async` function context.
+    ///
+    /// [`SharedSystem::read_async`]: super::SharedSystem::read_async
+    ///
+    /// TODO: This function should return a `Future` to support simulating
+    /// blocking I/O in virtual systems.
+    fn read(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize>;
+}
