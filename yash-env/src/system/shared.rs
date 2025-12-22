@@ -38,6 +38,7 @@ use super::Pipe;
 use super::Read;
 use super::Resource;
 use super::Result;
+use super::Seek;
 use super::SelectSystem;
 use super::SigmaskOp;
 use super::SignalStatus;
@@ -403,6 +404,13 @@ impl<T: Write> Write for &SharedSystem<T> {
     }
 }
 
+/// Delegates `Seek` methods to the contained implementor.
+impl<T: Seek> Seek for &SharedSystem<T> {
+    fn lseek(&self, fd: Fd, position: SeekFrom) -> Result<u64> {
+        self.0.borrow().lseek(fd, position)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
@@ -410,9 +418,6 @@ impl<T: Write> Write for &SharedSystem<T> {
 impl<S: System> System for &SharedSystem<S> {
     fn isatty(&self, fd: Fd) -> bool {
         self.0.borrow().isatty(fd)
-    }
-    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
-        self.0.borrow_mut().lseek(fd, position)
     }
     fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
         self.0.borrow_mut().fdopendir(fd)
@@ -648,6 +653,14 @@ impl<T: Write> Write for SharedSystem<T> {
     }
 }
 
+/// Delegates `Seek` methods to the contained implementor.
+impl<T: Seek> Seek for SharedSystem<T> {
+    #[inline]
+    fn lseek(&self, fd: Fd, position: SeekFrom) -> Result<u64> {
+        (&self).lseek(fd, position)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
@@ -655,10 +668,6 @@ impl<S: System> System for SharedSystem<S> {
     #[inline]
     fn isatty(&self, fd: Fd) -> bool {
         (&self).isatty(fd)
-    }
-    #[inline]
-    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
-        (&mut &*self).lseek(fd, position)
     }
     #[inline]
     fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {

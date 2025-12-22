@@ -24,6 +24,7 @@ use bitflags::bitflags;
 use enumset::{EnumSet, EnumSetType};
 use std::ffi::CStr;
 use std::fmt::Debug;
+use std::io::SeekFrom;
 
 #[cfg(unix)]
 const RAW_AT_FDCWD: i32 = libc::AT_FDCWD;
@@ -319,4 +320,14 @@ pub trait Open {
     /// This function works similarly to the `O_TMPFILE` flag specified to the
     /// `open` function.
     fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd>;
+}
+
+/// Trait for seeking within file descriptors
+pub trait Seek {
+    /// Moves the position of the open file description.
+    ///
+    /// This is a thin wrapper around the [`lseek` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/lseek.html).
+    /// If successful, returns the new position from the beginning of the file.
+    fn lseek(&self, fd: Fd, position: SeekFrom) -> Result<u64>;
 }

@@ -29,6 +29,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `Open`: Declares the `open` method for opening files.
     - `Pipe`: Declares the `pipe` method for creating pipes.
     - `Read`: Declares the `read` method for reading from file descriptors.
+    - `Seek`: Declares the `lseek` method for seeking within file
+      descriptors.
     - `Write`: Declares the `write` method for writing to file
       descriptors.
 - Implementations of these traits are provided for those types that implement

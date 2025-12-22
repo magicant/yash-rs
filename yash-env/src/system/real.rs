@@ -51,6 +51,7 @@ use super::OpenFlag;
 use super::Pipe;
 use super::Read;
 use super::Result;
+use super::Seek;
 use super::SigmaskOp;
 use super::Stat;
 use super::System;
@@ -405,12 +406,8 @@ impl Write for RealSystem {
     }
 }
 
-impl System for RealSystem {
-    fn isatty(&self, fd: Fd) -> bool {
-        (unsafe { libc::isatty(fd.0) } != 0)
-    }
-
-    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
+impl Seek for RealSystem {
+    fn lseek(&self, fd: Fd, position: SeekFrom) -> Result<u64> {
         let (offset, whence) = match position {
             SeekFrom::Start(offset) => {
                 let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
@@ -421,6 +418,12 @@ impl System for RealSystem {
         };
         let new_offset = unsafe { libc::lseek(fd.0, offset, whence) }.errno_if_m1()?;
         Ok(new_offset.try_into().unwrap())
+    }
+}
+
+impl System for RealSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        (unsafe { libc::isatty(fd.0) } != 0)
     }
 
     fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {

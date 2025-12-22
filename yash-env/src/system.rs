@@ -35,7 +35,7 @@ pub use self::errno::Result;
 pub use self::fd_flag::FdFlag;
 pub use self::file_system::{
     AT_FDCWD, Dir, DirEntry, FileType, Fstat, IsExecutableFile, Mode, OfdAccess, Open, OpenFlag,
-    RawMode, Stat,
+    RawMode, Seek, Stat,
 };
 pub use self::future::FlexFuture;
 pub use self::id::Gid;
@@ -70,7 +70,6 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::c_int;
 use std::fmt::Debug;
-use std::io::SeekFrom;
 use std::pin::Pin;
 use std::time::Duration;
 use std::time::Instant;
@@ -84,7 +83,7 @@ use r#virtual::SignalEffect;
 /// [`VirtualSystem`]. Another implementor is [`SharedSystem`], which wraps a
 /// `System` instance to extend the interface with asynchronous methods.
 pub trait System:
-    Close + Debug + Dup + Fcntl + Fstat + IsExecutableFile + Open + Pipe + Read + Write
+    Close + Debug + Dup + Fcntl + Fstat + IsExecutableFile + Open + Pipe + Read + Seek + Write
 {
     /// Tests if a file descriptor is associated with a terminal device.
     ///
@@ -92,9 +91,6 @@ pub trait System:
     /// information is provided because POSIX does not require the `isatty`
     /// function to set `errno`.
     fn isatty(&self, fd: Fd) -> bool;
-
-    /// Moves the position of the open file description.
-    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64>;
 
     /// Opens a directory for enumerating entries.
     fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>>;

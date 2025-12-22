@@ -71,6 +71,7 @@ use super::OpenFlag;
 use super::Pipe;
 use super::Read;
 use super::Result;
+use super::Seek;
 use super::SigmaskOp;
 use super::Stat;
 use super::Times;
@@ -559,17 +560,19 @@ impl Write for VirtualSystem {
     }
 }
 
+impl Seek for VirtualSystem {
+    fn lseek(&self, fd: Fd, position: SeekFrom) -> Result<u64> {
+        self.with_open_file_description_mut(fd, |ofd| ofd.seek(position))
+            .and_then(|new_offset| new_offset.try_into().map_err(|_| Errno::EOVERFLOW))
+    }
+}
+
 impl System for VirtualSystem {
     fn isatty(&self, fd: Fd) -> bool {
         self.with_open_file_description(fd, |ofd| {
             Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
         })
         .unwrap_or(false)
-    }
-
-    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
-        self.with_open_file_description_mut(fd, |ofd| ofd.seek(position))
-            .and_then(|new_offset| new_offset.try_into().map_err(|_| Errno::EOVERFLOW))
     }
 
     fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
