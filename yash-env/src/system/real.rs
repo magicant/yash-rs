@@ -56,6 +56,7 @@ use super::Stat;
 use super::System;
 use super::Times;
 use super::Uid;
+use super::Write;
 use super::resource::LimitPair;
 use super::resource::Resource;
 use crate::io::Fd;
@@ -392,12 +393,8 @@ impl Read for RealSystem {
     }
 }
 
-impl System for RealSystem {
-    fn isatty(&self, fd: Fd) -> bool {
-        (unsafe { libc::isatty(fd.0) } != 0)
-    }
-
-    fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {
+impl Write for RealSystem {
+    fn write(&self, fd: Fd, buffer: &[u8]) -> Result<usize> {
         loop {
             let result =
                 unsafe { libc::write(fd.0, buffer.as_ptr().cast(), buffer.len()) }.errno_if_m1();
@@ -405,6 +402,12 @@ impl System for RealSystem {
                 return Ok(result?.try_into().unwrap());
             }
         }
+    }
+}
+
+impl System for RealSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        (unsafe { libc::isatty(fd.0) } != 0)
     }
 
     fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {

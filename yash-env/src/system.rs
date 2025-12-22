@@ -42,7 +42,7 @@ pub use self::id::Gid;
 pub use self::id::RawGid;
 pub use self::id::RawUid;
 pub use self::id::Uid;
-pub use self::io::{Close, Dup, Fcntl, Pipe, Read};
+pub use self::io::{Close, Dup, Fcntl, Pipe, Read, Write};
 #[cfg(all(doc, unix))]
 use self::real::RealSystem;
 use self::resource::LimitPair;
@@ -84,7 +84,7 @@ use r#virtual::SignalEffect;
 /// [`VirtualSystem`]. Another implementor is [`SharedSystem`], which wraps a
 /// `System` instance to extend the interface with asynchronous methods.
 pub trait System:
-    Close + Debug + Dup + Fcntl + Fstat + IsExecutableFile + Open + Pipe + Read
+    Close + Debug + Dup + Fcntl + Fstat + IsExecutableFile + Open + Pipe + Read + Write
 {
     /// Tests if a file descriptor is associated with a terminal device.
     ///
@@ -92,17 +92,6 @@ pub trait System:
     /// information is provided because POSIX does not require the `isatty`
     /// function to set `errno`.
     fn isatty(&self, fd: Fd) -> bool;
-
-    /// Writes to the file descriptor.
-    ///
-    /// This is a thin wrapper around the `write` system call.
-    /// If successful, returns the number of bytes written.
-    ///
-    /// This function may write only part of the `buffer` and block if the
-    /// `O_NONBLOCK` flag is not set for the FD. Use [`SharedSystem::write_all`]
-    /// to support concurrent I/O in an `async` function context and ensure the
-    /// whole `buffer` is written.
-    fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize>;
 
     /// Moves the position of the open file description.
     fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64>;

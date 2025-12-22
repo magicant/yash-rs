@@ -75,6 +75,7 @@ use super::SigmaskOp;
 use super::Stat;
 use super::Times;
 use super::Uid;
+use super::Write;
 use super::resource::INFINITY;
 use super::resource::LimitPair;
 use super::resource::Resource;
@@ -552,16 +553,18 @@ impl Read for VirtualSystem {
     }
 }
 
+impl Write for VirtualSystem {
+    fn write(&self, fd: Fd, buffer: &[u8]) -> Result<usize> {
+        self.with_open_file_description_mut(fd, |ofd| ofd.write(buffer))
+    }
+}
+
 impl System for VirtualSystem {
     fn isatty(&self, fd: Fd) -> bool {
         self.with_open_file_description(fd, |ofd| {
             Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
         })
         .unwrap_or(false)
-    }
-
-    fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {
-        self.with_open_file_description_mut(fd, |ofd| ofd.write(buffer))
     }
 
     fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
@@ -1435,7 +1438,7 @@ mod tests {
 
     #[test]
     fn pipe_read_write() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let (reader, writer) = system.pipe().unwrap();
         let result = system.write(writer, &[5, 42, 29]);
         assert_eq!(result, Ok(3));

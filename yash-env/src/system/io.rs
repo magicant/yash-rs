@@ -112,3 +112,23 @@ pub trait Read {
     /// blocking I/O in virtual systems.
     fn read(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize>;
 }
+
+/// Trait for writing to file descriptors
+pub trait Write {
+    /// Writes to the file descriptor.
+    ///
+    /// This is a thin wrapper around the [`write` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/write.html).
+    /// If successful, returns the number of bytes written.
+    ///
+    /// This function may write only part of the `buffer` and block if the
+    /// `O_NONBLOCK` flag is not set for the FD. Use [`SharedSystem::write_all`]
+    /// to support concurrent I/O in an `async` function context and ensure the
+    /// whole `buffer` is written.
+    ///
+    /// [`SharedSystem::write_all`]: super::SharedSystem::write_all
+    ///
+    /// TODO: This function should return a `Future` to support simulating
+    /// blocking I/O in virtual systems.
+    fn write(&self, fd: Fd, buffer: &[u8]) -> Result<usize>;
+}

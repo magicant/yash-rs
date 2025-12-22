@@ -48,6 +48,7 @@ use super::SystemEx;
 use super::Times;
 use super::Uid;
 use super::UnixString;
+use super::Write;
 use super::signal;
 #[cfg(doc)]
 use crate::Env;
@@ -171,7 +172,7 @@ impl<S: System> SharedSystem<S> {
 
     /// Writes to the file descriptor.
     ///
-    /// This function calls [`System::write`] repeatedly until the whole
+    /// This function calls [`write`](Write::write) repeatedly until the whole
     /// `buffer` is written to the FD. If the `buffer` is empty, `write` is not
     /// called at all, so any error that would be returned from `write` is not
     /// returned.
@@ -395,6 +396,13 @@ impl<T: Read> Read for &SharedSystem<T> {
     }
 }
 
+/// Delegates `Write` methods to the contained implementor.
+impl<T: Write> Write for &SharedSystem<T> {
+    fn write(&self, fd: Fd, buffer: &[u8]) -> Result<usize> {
+        self.0.borrow().write(fd, buffer)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
@@ -402,9 +410,6 @@ impl<T: Read> Read for &SharedSystem<T> {
 impl<S: System> System for &SharedSystem<S> {
     fn isatty(&self, fd: Fd) -> bool {
         self.0.borrow().isatty(fd)
-    }
-    fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {
-        self.0.borrow_mut().write(fd, buffer)
     }
     fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
         self.0.borrow_mut().lseek(fd, position)
@@ -635,6 +640,14 @@ impl<T: Read> Read for SharedSystem<T> {
     }
 }
 
+/// Delegates `Write` methods to the contained implementor.
+impl<T: Write> Write for SharedSystem<T> {
+    #[inline]
+    fn write(&self, fd: Fd, buffer: &[u8]) -> Result<usize> {
+        (&self).write(fd, buffer)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
@@ -642,10 +655,6 @@ impl<S: System> System for SharedSystem<S> {
     #[inline]
     fn isatty(&self, fd: Fd) -> bool {
         (&self).isatty(fd)
-    }
-    #[inline]
-    fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {
-        (&mut &*self).write(fd, buffer)
     }
     #[inline]
     fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
@@ -884,7 +893,7 @@ mod tests {
 
     #[test]
     fn shared_system_read_async_ready() {
-        let mut system = SharedSystem::new(VirtualSystem::new());
+        let system = SharedSystem::new(VirtualSystem::new());
         let (reader, writer) = system.pipe().unwrap();
         system.write(writer, &[42]).unwrap();
 
@@ -1163,7 +1172,7 @@ mod tests {
         let system = VirtualSystem::new();
         let system_1 = SharedSystem::new(system);
         let mut system_2 = system_1.clone();
-        let mut system_3 = system_1.clone();
+        let system_3 = system_1.clone();
         let (reader, writer) = system_1.pipe().unwrap();
         system_2
             .set_disposition(SIGCHLD, Disposition::Catch)

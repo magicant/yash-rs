@@ -707,6 +707,7 @@ mod tests {
     use yash_env::Env;
     use yash_env::VirtualSystem;
     use yash_env::system::Read as _;
+    use yash_env::system::Write as _;
     use yash_env::system::resource::LimitPair;
     use yash_env::system::resource::Resource;
     use yash_env::system::r#virtual::FileBody;
