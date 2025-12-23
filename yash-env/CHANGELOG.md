@@ -38,6 +38,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- Public dependency versions:
+    - Rust 1.86.0 → 1.87.0
 - `system::SharedSystem` now directly holds an instance of `System` rather than
   being trait-objectified as a `Box<dyn System>`. Type parameters `S`
   representing the concrete type of `System` have been added to `Env` and
