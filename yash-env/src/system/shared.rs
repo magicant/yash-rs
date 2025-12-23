@@ -48,6 +48,7 @@ use super::System;
 use super::SystemEx;
 use super::Times;
 use super::Uid;
+use super::Umask;
 use super::UnixString;
 use super::Write;
 use super::signal;
@@ -419,6 +420,13 @@ impl<T: Seek> Seek for &SharedSystem<T> {
     }
 }
 
+/// Delegates `Umask` methods to the contained implementor.
+impl<T: Umask> Umask for &SharedSystem<T> {
+    fn umask(&self, new_mask: Mode) -> Mode {
+        self.0.borrow().umask(new_mask)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
@@ -426,9 +434,6 @@ impl<T: Seek> Seek for &SharedSystem<T> {
 impl<S: System> System for &SharedSystem<S> {
     fn isatty(&self, fd: Fd) -> bool {
         self.0.borrow().isatty(fd)
-    }
-    fn umask(&mut self, mask: Mode) -> Mode {
-        self.0.borrow_mut().umask(mask)
     }
     fn now(&self) -> Instant {
         self.0.borrow().now()
@@ -671,6 +676,14 @@ impl<T: Seek> Seek for SharedSystem<T> {
     }
 }
 
+/// Delegates `Umask` methods to the contained implementor.
+impl<T: Umask> Umask for SharedSystem<T> {
+    #[inline]
+    fn umask(&self, new_mask: Mode) -> Mode {
+        (&self).umask(new_mask)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
@@ -678,10 +691,6 @@ impl<S: System> System for SharedSystem<S> {
     #[inline]
     fn isatty(&self, fd: Fd) -> bool {
         (&self).isatty(fd)
-    }
-    #[inline]
-    fn umask(&mut self, mask: Mode) -> Mode {
-        (&mut &*self).umask(mask)
     }
     #[inline]
     fn now(&self) -> Instant {

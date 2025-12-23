@@ -57,6 +57,7 @@ use super::Stat;
 use super::System;
 use super::Times;
 use super::Uid;
+use super::Umask;
 use super::Write;
 use super::resource::LimitPair;
 use super::resource::Resource;
@@ -433,13 +434,15 @@ impl Seek for RealSystem {
     }
 }
 
+impl Umask for RealSystem {
+    fn umask(&self, new_mask: Mode) -> Mode {
+        Mode::from_bits_retain(unsafe { libc::umask(new_mask.bits()) })
+    }
+}
+
 impl System for RealSystem {
     fn isatty(&self, fd: Fd) -> bool {
         (unsafe { libc::isatty(fd.0) } != 0)
-    }
-
-    fn umask(&mut self, new_mask: Mode) -> Mode {
-        Mode::from_bits_retain(unsafe { libc::umask(new_mask.bits()) })
     }
 
     fn now(&self) -> Instant {

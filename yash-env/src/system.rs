@@ -35,7 +35,7 @@ pub use self::errno::Result;
 pub use self::fd_flag::FdFlag;
 pub use self::file_system::{
     AT_FDCWD, Dir, DirEntry, FileType, Fstat, IsExecutableFile, Mode, OfdAccess, Open, OpenFlag,
-    RawMode, Seek, Stat,
+    RawMode, Seek, Stat, Umask,
 };
 pub use self::future::FlexFuture;
 pub use self::id::Gid;
@@ -83,7 +83,7 @@ use r#virtual::SignalEffect;
 /// [`VirtualSystem`]. Another implementor is [`SharedSystem`], which wraps a
 /// `System` instance to extend the interface with asynchronous methods.
 pub trait System:
-    Close + Debug + Dup + Fcntl + Fstat + IsExecutableFile + Open + Pipe + Read + Seek + Write
+    Close + Debug + Dup + Fcntl + Fstat + IsExecutableFile + Open + Pipe + Read + Seek + Umask + Write
 {
     /// Tests if a file descriptor is associated with a terminal device.
     ///
@@ -91,16 +91,6 @@ pub trait System:
     /// information is provided because POSIX does not require the `isatty`
     /// function to set `errno`.
     fn isatty(&self, fd: Fd) -> bool;
-
-    /// Gets and sets the file creation mode mask.
-    ///
-    /// This is a thin wrapper around the `umask` system call. It sets the mask
-    /// to the given value and returns the previous mask.
-    ///
-    /// You cannot tell the current mask without setting a new one. If you only
-    /// want to get the current mask, you need to set it back to the original
-    /// value after getting it.
-    fn umask(&mut self, new_mask: Mode) -> Mode;
 
     /// Returns the current time.
     #[must_use]

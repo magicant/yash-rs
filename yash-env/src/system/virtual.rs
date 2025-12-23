@@ -76,6 +76,7 @@ use super::SigmaskOp;
 use super::Stat;
 use super::Times;
 use super::Uid;
+use super::Umask;
 use super::Write;
 use super::resource::INFINITY;
 use super::resource::LimitPair;
@@ -585,16 +586,18 @@ impl Seek for VirtualSystem {
     }
 }
 
+impl Umask for VirtualSystem {
+    fn umask(&self, new_mask: Mode) -> Mode {
+        std::mem::replace(&mut self.current_process_mut().umask, new_mask)
+    }
+}
+
 impl System for VirtualSystem {
     fn isatty(&self, fd: Fd) -> bool {
         self.with_open_file_description(fd, |ofd| {
             Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
         })
         .unwrap_or(false)
-    }
-
-    fn umask(&mut self, new_mask: Mode) -> Mode {
-        std::mem::replace(&mut self.current_process_mut().umask, new_mask)
     }
 
     /// Returns `now` in [`SystemState`].

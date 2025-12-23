@@ -343,3 +343,17 @@ pub trait Seek {
     /// If successful, returns the new position from the beginning of the file.
     fn lseek(&self, fd: Fd, position: SeekFrom) -> Result<u64>;
 }
+
+/// Trait for getting and setting the file creation mask
+pub trait Umask {
+    /// Gets and sets the file creation mode mask.
+    ///
+    /// This is a thin wrapper around the [`umask` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/umask.html).
+    /// It sets the mask to the given value and returns the previous mask.
+    ///
+    /// You cannot tell the current mask without setting a new one. If you only
+    /// want to get the current mask, you need to set it back to the original
+    /// value after getting it.
+    fn umask(&self, new_mask: Mode) -> Mode;
+}
