@@ -31,6 +31,7 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `Read`: Declares the `read` method for reading from file descriptors.
     - `Seek`: Declares the `lseek` method for seeking within file
       descriptors.
+    - `Time`: Declares the `now` method for getting the current time.
     - `Umask`: Declares the `umask` method for setting the file mode
       creation mask.
     - `Write`: Declares the `write` method for writing to file
