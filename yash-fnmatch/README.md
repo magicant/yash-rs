@@ -9,7 +9,7 @@ defined in POSIX. However, this crate does not (yet) support any
 locale-dependent behaviors.
 
 [![yash-fnmatch at crates.io](https://img.shields.io/crates/v/yash-fnmatch.svg)](https://crates.io/crates/yash-fnmatch)
-[![yash-fnmatch at docs.rs](https://docs.rs/yash-fnmatch/badge.svg)](https://docs.rs/yash-fnmatch)
+[![yash-fnmatch at docs.rs](https://img.shields.io/docsrs/yash-fnmatch/latest)](https://docs.rs/yash-fnmatch)
 [![Build status](https://github.com/magicant/yash-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/magicant/yash-rs/actions/workflows/ci.yml)
 
 - [Changelog](CHANGELOG.md)

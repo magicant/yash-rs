@@ -5,7 +5,7 @@ It provides utilities for testing crates that depend on the shell execution
 environment defined in `yash-env`.
 
 [![yash-env-test-helper at crates.io](https://img.shields.io/crates/v/yash-env-test-helper.svg)](https://crates.io/crates/yash-env-test-helper)
-[![yash-env-test-helper at docs.rs](https://docs.rs/yash-env-test-helper/badge.svg)](https://docs.rs/yash-env-test-helper)
+[![yash-env-test-helper at docs.rs](https://img.shields.io/docsrs/yash-env-test-helper/latest)](https://docs.rs/yash-env-test-helper)
 [![Build status](https://github.com/magicant/yash-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/magicant/yash-rs/actions/workflows/ci.yml)
 
 - [Changelog](CHANGELOG.md)

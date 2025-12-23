@@ -7,7 +7,7 @@ parse POSIX-compatible shell scripts.
 Note that `yash-syntax` does not include functionality for executing parsed scripts.
 
 [![yash-syntax at crates.io](https://img.shields.io/crates/v/yash-syntax.svg)](https://crates.io/crates/yash-syntax)
-[![yash-syntax at docs.rs](https://docs.rs/yash-syntax/badge.svg)](https://docs.rs/yash-syntax)
+[![yash-syntax at docs.rs](https://img.shields.io/docsrs/yash-syntax/latest)](https://docs.rs/yash-syntax)
 [![Build status](https://github.com/magicant/yash-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/magicant/yash-rs/actions/workflows/ci.yml)
 
 - [Changelog](CHANGELOG.md)

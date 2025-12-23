@@ -10,7 +10,7 @@ implements the shell. The library is not intended to be used by other
 programs.
 
 [![yash-cli at crates.io](https://img.shields.io/crates/v/yash-cli.svg)](https://crates.io/crates/yash-cli)
-[![yash-cli at docs.rs](https://docs.rs/yash-cli/badge.svg)](https://docs.rs/yash-cli)
+[![yash-cli at docs.rs](https://img.shields.io/docsrs/yash-cli/latest)](https://docs.rs/yash-cli)
 [![Build status](https://github.com/magicant/yash-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/magicant/yash-rs/actions/workflows/ci.yml)
 
 ## Versioning

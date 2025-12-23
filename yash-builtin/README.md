@@ -4,7 +4,7 @@
 [yash](../README.md).
 
 [![yash-builtin at crates.io](https://img.shields.io/crates/v/yash-builtin.svg)](https://crates.io/crates/yash-builtin)
-[![yash-builtin at docs.rs](https://docs.rs/yash-builtin/badge.svg)](https://docs.rs/yash-builtin)
+[![yash-builtin at docs.rs](https://img.shields.io/docsrs/yash-builtin/latest)](https://docs.rs/yash-builtin)
 [![Build status](https://github.com/magicant/yash-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/magicant/yash-rs/actions/workflows/ci.yml)
 
 - [Changelog](CHANGELOG.md)
