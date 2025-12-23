@@ -27,6 +27,7 @@ pub mod real;
 pub mod resource;
 mod select;
 mod shared;
+mod time;
 pub mod r#virtual;
 
 pub use self::errno::Errno;
@@ -50,6 +51,7 @@ use self::resource::Resource;
 use self::select::SelectSystem;
 use self::select::SignalStatus;
 pub use self::shared::SharedSystem;
+pub use self::time::Time;
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
 use crate::Env;
@@ -72,7 +74,6 @@ use std::ffi::c_int;
 use std::fmt::Debug;
 use std::pin::Pin;
 use std::time::Duration;
-use std::time::Instant;
 use r#virtual::SignalEffect;
 
 /// API to the system-managed parts of the environment.
@@ -83,7 +84,19 @@ use r#virtual::SignalEffect;
 /// [`VirtualSystem`]. Another implementor is [`SharedSystem`], which wraps a
 /// `System` instance to extend the interface with asynchronous methods.
 pub trait System:
-    Close + Debug + Dup + Fcntl + Fstat + IsExecutableFile + Open + Pipe + Read + Seek + Umask + Write
+    Close
+    + Debug
+    + Dup
+    + Fcntl
+    + Fstat
+    + IsExecutableFile
+    + Open
+    + Pipe
+    + Read
+    + Seek
+    + Time
+    + Umask
+    + Write
 {
     /// Tests if a file descriptor is associated with a terminal device.
     ///
@@ -91,10 +104,6 @@ pub trait System:
     /// information is provided because POSIX does not require the `isatty`
     /// function to set `errno`.
     fn isatty(&self, fd: Fd) -> bool;
-
-    /// Returns the current time.
-    #[must_use]
-    fn now(&self) -> Instant;
 
     /// Returns consumed CPU times.
     fn times(&self) -> Result<Times>;

@@ -55,6 +55,7 @@ use super::Seek;
 use super::SigmaskOp;
 use super::Stat;
 use super::System;
+use super::Time;
 use super::Times;
 use super::Uid;
 use super::Umask;
@@ -440,13 +441,15 @@ impl Umask for RealSystem {
     }
 }
 
+impl Time for RealSystem {
+    fn now(&self) -> Instant {
+        Instant::now()
+    }
+}
+
 impl System for RealSystem {
     fn isatty(&self, fd: Fd) -> bool {
         (unsafe { libc::isatty(fd.0) } != 0)
-    }
-
-    fn now(&self) -> Instant {
-        Instant::now()
     }
 
     /// Returns consumed CPU times.

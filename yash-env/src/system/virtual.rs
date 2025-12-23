@@ -74,6 +74,7 @@ use super::Result;
 use super::Seek;
 use super::SigmaskOp;
 use super::Stat;
+use super::Time;
 use super::Times;
 use super::Uid;
 use super::Umask;
@@ -592,14 +593,7 @@ impl Umask for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
-    fn isatty(&self, fd: Fd) -> bool {
-        self.with_open_file_description(fd, |ofd| {
-            Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
-        })
-        .unwrap_or(false)
-    }
-
+impl Time for VirtualSystem {
     /// Returns `now` in [`SystemState`].
     ///
     /// Panics if it is `None`.
@@ -608,6 +602,15 @@ impl System for VirtualSystem {
             .borrow()
             .now
             .expect("SystemState::now not assigned")
+    }
+}
+
+impl System for VirtualSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        self.with_open_file_description(fd, |ofd| {
+            Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
+        })
+        .unwrap_or(false)
     }
 
     /// Returns `times` in [`SystemState`].

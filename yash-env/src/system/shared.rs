@@ -46,6 +46,7 @@ use super::SignalSystem;
 use super::Stat;
 use super::System;
 use super::SystemEx;
+use super::Time;
 use super::Times;
 use super::Uid;
 use super::Umask;
@@ -427,6 +428,13 @@ impl<T: Umask> Umask for &SharedSystem<T> {
     }
 }
 
+/// Delegates `Time` methods to the contained implementor.
+impl<T: Time> Time for &SharedSystem<T> {
+    fn now(&self) -> Instant {
+        self.0.borrow().now()
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
@@ -434,9 +442,6 @@ impl<T: Umask> Umask for &SharedSystem<T> {
 impl<S: System> System for &SharedSystem<S> {
     fn isatty(&self, fd: Fd) -> bool {
         self.0.borrow().isatty(fd)
-    }
-    fn now(&self) -> Instant {
-        self.0.borrow().now()
     }
     fn times(&self) -> Result<Times> {
         self.0.borrow().times()
@@ -684,6 +689,14 @@ impl<T: Umask> Umask for SharedSystem<T> {
     }
 }
 
+/// Delegates `Time` methods to the contained implementor.
+impl<T: Time> Time for SharedSystem<T> {
+    #[inline]
+    fn now(&self) -> Instant {
+        (&self).now()
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
@@ -691,10 +704,6 @@ impl<S: System> System for SharedSystem<S> {
     #[inline]
     fn isatty(&self, fd: Fd) -> bool {
         (&self).isatty(fd)
-    }
-    #[inline]
-    fn now(&self) -> Instant {
-        (&self).now()
     }
     #[inline]
     fn times(&self) -> Result<Times> {
