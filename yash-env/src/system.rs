@@ -17,7 +17,6 @@
 //! [System] and its implementors.
 
 mod errno;
-mod fd_flag;
 mod file_system;
 mod future;
 mod id;
@@ -33,7 +32,6 @@ pub mod r#virtual;
 pub use self::errno::Errno;
 pub use self::errno::RawErrno;
 pub use self::errno::Result;
-pub use self::fd_flag::FdFlag;
 pub use self::file_system::{
     AT_FDCWD, Dir, DirEntry, FileType, Fstat, IsExecutableFile, Mode, OfdAccess, Open, OpenFlag,
     RawMode, Seek, Stat, Umask,
@@ -43,6 +41,7 @@ pub use self::id::Gid;
 pub use self::id::RawGid;
 pub use self::id::RawUid;
 pub use self::id::Uid;
+pub use self::io::FdFlag;
 pub use self::io::{Close, Dup, Fcntl, Pipe, Read, Write};
 #[cfg(all(doc, unix))]
 use self::real::RealSystem;

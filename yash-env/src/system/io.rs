@@ -17,10 +17,18 @@
 //! Items about I/O operations
 
 use super::Result;
-use super::fd_flag::FdFlag;
 use super::file_system::OfdAccess;
 use crate::io::Fd;
-use enumset::EnumSet;
+use enumset::{EnumSet, EnumSetType};
+
+/// Attributes for file descriptors
+#[derive(Debug, EnumSetType, Hash)]
+#[non_exhaustive]
+pub enum FdFlag {
+    /// Close the file descriptor upon execution of an exec family function
+    CloseOnExec,
+    // TODO CloseOnFork,
+}
 
 /// Trait for closing file descriptors
 pub trait Close {
