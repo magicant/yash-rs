@@ -32,6 +32,7 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `Seek`: Declares the `lseek` method for seeking within file
       descriptors.
     - `Time`: Declares the `now` method for getting the current time.
+    - `Times`: Declares the `times` method for getting CPU times.
     - `Umask`: Declares the `umask` method for setting the file mode
       creation mask.
     - `Write`: Declares the `write` method for writing to file
@@ -63,6 +64,7 @@ A _private dependency_ is used internally and not visible to downstream users.
   synchronous `Result<()>`. This change allows virtual systems to simulate the
   blocking behavior of `tcsetpgrp` when called from a background process group,
   though the current virtual system implementation does not yet do so.
+- The `system::Times` struct has been renamed to `CpuTimes`.
 - `system::virtual::VirtualSystem::current_process_mut` now takes `&self`
   instead of `&mut self` because it returns a `std::cell::RefMut` out of a
   `RefCell`.

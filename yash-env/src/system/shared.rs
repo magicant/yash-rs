@@ -17,6 +17,7 @@
 //! [`SharedSystem`] and related items
 
 use super::ChildProcessStarter;
+use super::CpuTimes;
 use super::Dir;
 use super::Disposition;
 use super::Dup;
@@ -435,6 +436,13 @@ impl<T: Time> Time for &SharedSystem<T> {
     }
 }
 
+/// Delegates `Times` methods to the contained implementor.
+impl<T: Times> Times for &SharedSystem<T> {
+    fn times(&self) -> Result<CpuTimes> {
+        self.0.borrow().times()
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
@@ -442,9 +450,6 @@ impl<T: Time> Time for &SharedSystem<T> {
 impl<S: System> System for &SharedSystem<S> {
     fn isatty(&self, fd: Fd) -> bool {
         self.0.borrow().isatty(fd)
-    }
-    fn times(&self) -> Result<Times> {
-        self.0.borrow().times()
     }
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
         self.0.borrow().validate_signal(number)
@@ -697,6 +702,14 @@ impl<T: Time> Time for SharedSystem<T> {
     }
 }
 
+/// Delegates `Times` methods to the contained implementor.
+impl<T: Times> Times for SharedSystem<T> {
+    #[inline]
+    fn times(&self) -> Result<CpuTimes> {
+        (&self).times()
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
@@ -704,10 +717,6 @@ impl<S: System> System for SharedSystem<S> {
     #[inline]
     fn isatty(&self, fd: Fd) -> bool {
         (&self).isatty(fd)
-    }
-    #[inline]
-    fn times(&self) -> Result<Times> {
-        (&self).times()
     }
     #[inline]
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {

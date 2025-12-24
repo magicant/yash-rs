@@ -50,7 +50,7 @@ use self::resource::Resource;
 use self::select::SelectSystem;
 use self::select::SignalStatus;
 pub use self::shared::SharedSystem;
-pub use self::time::Time;
+pub use self::time::{CpuTimes, Time, Times};
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
 use crate::Env;
@@ -94,6 +94,7 @@ pub trait System:
     + Read
     + Seek
     + Time
+    + Times
     + Umask
     + Write
 {
@@ -103,9 +104,6 @@ pub trait System:
     /// information is provided because POSIX does not require the `isatty`
     /// function to set `errno`.
     fn isatty(&self, fd: Fd) -> bool;
-
-    /// Returns consumed CPU times.
-    fn times(&self) -> Result<Times>;
 
     /// Tests if a signal number is valid.
     ///
@@ -399,23 +397,6 @@ pub trait System:
     ///
     /// [`INFINITY`]: self::resource::INFINITY
     fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()>;
-}
-
-/// Set of consumed CPU time
-///
-/// This structure contains four CPU time values, all in seconds.
-///
-/// This structure is returned by [`System::times`].
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Times {
-    /// User CPU time consumed by the current process
-    pub self_user: f64,
-    /// System CPU time consumed by the current process
-    pub self_system: f64,
-    /// User CPU time consumed by the children of the current process
-    pub children_user: f64,
-    /// System CPU time consumed by the children of the current process
-    pub children_system: f64,
 }
 
 /// Operation applied to the signal blocking mask

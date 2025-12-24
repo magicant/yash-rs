@@ -16,6 +16,7 @@
 
 //! Items about time
 
+use super::Result;
 use std::time::Instant;
 
 /// Trait for getting the current time
@@ -23,4 +24,30 @@ pub trait Time {
     /// Returns the current time.
     #[must_use]
     fn now(&self) -> Instant;
+}
+
+/// Set of consumed CPU time statistics
+///
+/// This structure contains four CPU time values, all in seconds.
+///
+/// This structure is returned by [`Times::times`].
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CpuTimes {
+    /// User CPU time consumed by the current process
+    pub self_user: f64,
+    /// System CPU time consumed by the current process
+    pub self_system: f64,
+    /// User CPU time consumed by the children of the current process
+    pub children_user: f64,
+    /// System CPU time consumed by the children of the current process
+    pub children_system: f64,
+}
+
+/// Trait for getting consumed CPU time statistics
+pub trait Times {
+    /// Returns the consumed CPU time statistics.
+    ///
+    /// This function abstracts the behavior of the
+    /// [`times` system call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/times.html).
+    fn times(&self) -> Result<CpuTimes>;
 }

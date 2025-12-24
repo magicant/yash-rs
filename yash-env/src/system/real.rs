@@ -30,6 +30,7 @@ mod signal;
 use super::AT_FDCWD;
 use super::ChildProcessStarter;
 use super::Close;
+use super::CpuTimes;
 use super::Dir;
 use super::DirEntry;
 use super::Disposition;
@@ -447,16 +448,12 @@ impl Time for RealSystem {
     }
 }
 
-impl System for RealSystem {
-    fn isatty(&self, fd: Fd) -> bool {
-        (unsafe { libc::isatty(fd.0) } != 0)
-    }
-
+impl Times for RealSystem {
     /// Returns consumed CPU times.
     ///
     /// This function actually uses `getrusage` rather than `times` because it
     /// provides better resolution on many systems.
-    fn times(&self) -> Result<Times> {
+    fn times(&self) -> Result<CpuTimes> {
         let mut usage = MaybeUninit::<libc::rusage>::uninit();
 
         unsafe { libc::getrusage(libc::RUSAGE_SELF, usage.as_mut_ptr()) }.errno_if_m1()?;
@@ -479,12 +476,18 @@ impl System for RealSystem {
                 + (*usage.as_ptr()).ru_stime.tv_usec as f64 * 1e-6
         };
 
-        Ok(Times {
+        Ok(CpuTimes {
             self_user,
             self_system,
             children_user,
             children_system,
         })
+    }
+}
+
+impl System for RealSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        (unsafe { libc::isatty(fd.0) } != 0)
     }
 
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {

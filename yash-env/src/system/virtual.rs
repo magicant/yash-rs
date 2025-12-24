@@ -55,6 +55,7 @@ pub use self::process::*;
 pub use self::signal::*;
 use super::AT_FDCWD;
 use super::Close;
+use super::CpuTimes;
 use super::Dir;
 use super::Disposition;
 use super::Dup;
@@ -605,17 +606,19 @@ impl Time for VirtualSystem {
     }
 }
 
+impl Times for VirtualSystem {
+    /// Returns `times` in [`SystemState`].
+    fn times(&self) -> Result<CpuTimes> {
+        Ok(self.state.borrow().times)
+    }
+}
+
 impl System for VirtualSystem {
     fn isatty(&self, fd: Fd) -> bool {
         self.with_open_file_description(fd, |ofd| {
             Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
         })
         .unwrap_or(false)
-    }
-
-    /// Returns `times` in [`SystemState`].
-    fn times(&self) -> Result<Times> {
-        Ok(self.state.borrow().times)
     }
 
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
@@ -1143,8 +1146,8 @@ pub struct SystemState {
     /// Current time
     pub now: Option<Instant>,
 
-    /// Consumed CPU time
-    pub times: Times,
+    /// Consumed CPU time statistics
+    pub times: CpuTimes,
 
     /// Task manager that can execute asynchronous tasks
     ///
