@@ -73,6 +73,7 @@ use super::Pipe;
 use super::Read;
 use super::Result;
 use super::Seek;
+use super::Sigaction;
 use super::SigmaskOp;
 use super::Signals;
 use super::Stat;
@@ -627,6 +628,22 @@ impl Signals for VirtualSystem {
     }
 }
 
+impl Sigaction for VirtualSystem {
+    fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
+        let process = self.current_process();
+        Ok(process.disposition(signal))
+    }
+
+    fn sigaction(
+        &mut self,
+        signal: signal::Number,
+        disposition: Disposition,
+    ) -> Result<Disposition> {
+        let mut process = self.current_process_mut();
+        Ok(process.set_disposition(signal, disposition))
+    }
+}
+
 impl System for VirtualSystem {
     fn isatty(&self, fd: Fd) -> bool {
         self.with_open_file_description(fd, |ofd| {
@@ -660,20 +677,6 @@ impl System for VirtualSystem {
         }
 
         Ok(())
-    }
-
-    fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
-        let process = self.current_process();
-        Ok(process.disposition(signal))
-    }
-
-    fn sigaction(
-        &mut self,
-        signal: signal::Number,
-        disposition: Disposition,
-    ) -> Result<Disposition> {
-        let mut process = self.current_process_mut();
-        Ok(process.set_disposition(signal, disposition))
     }
 
     fn caught_signals(&mut self) -> Vec<signal::Number> {

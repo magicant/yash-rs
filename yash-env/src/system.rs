@@ -51,7 +51,7 @@ use self::resource::Resource;
 use self::select::SelectSystem;
 use self::select::SignalStatus;
 pub use self::shared::SharedSystem;
-pub use self::signal::Signals;
+pub use self::signal::{Disposition, Sigaction, Signals};
 pub use self::time::{CpuTimes, Time, Times};
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
@@ -94,6 +94,7 @@ pub trait System:
     + Pipe
     + Read
     + Seek
+    + Sigaction
     + Signals
     + Time
     + Times
@@ -126,39 +127,6 @@ pub trait System:
         old_mask: Option<&mut Vec<signal::Number>>,
     ) -> Result<()>;
 
-    /// Gets the disposition for a signal.
-    ///
-    /// This is a low-level function used internally by
-    /// [`SharedSystem::get_disposition`]. You should not call this function
-    /// directly, or you will leave the `SharedSystem` instance in an
-    /// inconsistent state. The description below applies if you want to do
-    /// everything yourself without depending on `SharedSystem`.
-    ///
-    /// This is an abstract wrapper around the `sigaction` system call. This
-    /// function returns the current disposition if successful.
-    ///
-    /// To change the disposition, use [`sigaction`](Self::sigaction).
-    fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition>;
-
-    /// Gets and sets the disposition for a signal.
-    ///
-    /// This is a low-level function used internally by
-    /// [`SharedSystem::set_disposition`]. You should not call this function
-    /// directly, or you will leave the `SharedSystem` instance in an
-    /// inconsistent state. The description below applies if you want to do
-    /// everything yourself without depending on `SharedSystem`.
-    ///
-    /// This is an abstract wrapper around the `sigaction` system call. This
-    /// function returns the previous disposition if successful.
-    ///
-    /// When you set the disposition to `Disposition::Catch`, signals sent to
-    /// this process are accumulated in the `System` instance and made available
-    /// from [`caught_signals`](Self::caught_signals).
-    ///
-    /// To get the current disposition without changing it, use
-    /// [`get_sigaction`](Self::get_sigaction).
-    fn sigaction(&mut self, signal: signal::Number, action: Disposition) -> Result<Disposition>;
-
     /// Returns signals this process has caught, if any.
     ///
     /// This is a low-level function used internally by
@@ -168,10 +136,9 @@ pub trait System:
     /// `SharedSystem`.
     ///
     /// To catch a signal, you must firstly install a signal handler by calling
-    /// [`sigaction`](Self::sigaction) with [`Disposition::Catch`]. Once the
-    /// handler is ready, signals sent to the process are accumulated in the
-    /// `System`. You call `caught_signals` to obtain a list of caught signals
-    /// thus far.
+    /// [`Sigaction::sigaction`] with [`Disposition::Catch`]. Once the handler
+    /// is ready, signals sent to the process are accumulated in the `System`.
+    /// You call `caught_signals` to obtain a list of caught signals thus far.
     ///
     /// This function clears the internal list of caught signals, so a next call
     /// will return an empty list unless another signal is caught since the
@@ -396,21 +363,6 @@ pub enum SigmaskOp {
     Set,
 }
 
-/// How the shell process responds to a signal
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum Disposition {
-    /// Perform the default action for the signal.
-    ///
-    /// The default action depends on the signal. For example, `SIGINT` causes
-    /// the process to terminate, and `SIGTSTP` causes the process to stop.
-    #[default]
-    Default,
-    /// Ignore the signal.
-    Ignore,
-    /// Catch the signal.
-    Catch,
-}
-
 /// Task executed in a child process
 ///
 /// This is an argument passed to a [`ChildProcessStarter`]. The task is
@@ -521,8 +473,8 @@ pub trait SystemEx: System {
     ///
     /// This is a convenience function to ensure the shell has been in the
     /// foreground and optionally change the foreground process group. This
-    /// function calls [`sigaction`](System::sigaction) to restore the action
-    /// for SIGTTOU to the default disposition (which is to suspend the shell
+    /// function calls [`Sigaction::sigaction`] to restore the action for
+    /// SIGTTOU to the default disposition (which is to suspend the shell
     /// process), [`sigmask`](System::sigmask) to unblock SIGTTOU, and
     /// [`tcsetpgrp`](System::tcsetpgrp) to modify the foreground job. If the
     /// calling process is not in the foreground, `tcsetpgrp` will suspend the

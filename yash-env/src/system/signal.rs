@@ -16,6 +16,9 @@
 
 //! Signal-related functionality for the system module
 
+use super::Result;
+#[cfg(doc)]
+use super::SharedSystem;
 pub use crate::signal::{Name, Number, RawNumber};
 
 /// Trait for managing available signals
@@ -36,4 +39,57 @@ pub trait Signals {
     /// in the system. If the signal name is not supported, it returns `None`.
     #[must_use]
     fn signal_number_from_name(&self, name: Name) -> Option<Number>;
+}
+
+/// How the shell process responds to a signal
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum Disposition {
+    /// Perform the default action for the signal.
+    ///
+    /// The default action depends on the signal. For example, `SIGINT` causes
+    /// the process to terminate, and `SIGTSTP` causes the process to stop.
+    #[default]
+    Default,
+    /// Ignore the signal.
+    Ignore,
+    /// Catch the signal.
+    Catch,
+}
+
+/// Trait for managing signal dispositions
+pub trait Sigaction {
+    /// Gets the disposition for a signal.
+    ///
+    /// This is a low-level function used internally by
+    /// [`SharedSystem`]. You should not call this function directly, or you
+    /// will leave the `SharedSystem` instance in an inconsistent state. The
+    /// description below applies if you want to do everything yourself without
+    /// depending on `SharedSystem`.
+    ///
+    /// This is an abstract wrapper around the [`sigaction` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigaction.html).
+    /// This function returns the current disposition if successful.
+    ///
+    /// To change the disposition, use [`sigaction`](Self::sigaction).
+    fn get_sigaction(&self, signal: Number) -> Result<Disposition>;
+
+    /// Gets and sets the disposition for a signal.
+    ///
+    /// This is a low-level function used internally by [`SharedSystem`]. You
+    /// should not call this function directly, or you will leave the
+    /// `SharedSystem` instance in an inconsistent state. The description below
+    /// applies if you want to do everything yourself without depending on
+    /// `SharedSystem`.
+    ///
+    /// This is an abstract wrapper around the [`sigaction` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigaction.html).
+    /// This function returns the previous disposition if successful.
+    ///
+    /// When you set the disposition to `Disposition::Catch`, signals sent to
+    /// this process are accumulated in `self` and made available from
+    /// [`caught_signals`](super::System::caught_signals).
+    ///
+    /// To get the current disposition without changing it, use
+    /// [`get_sigaction`](Self::get_sigaction).
+    fn sigaction(&mut self, signal: Number, action: Disposition) -> Result<Disposition>;
 }

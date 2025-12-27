@@ -35,6 +35,7 @@ use yash_env::RealSystem;
 use yash_env::System;
 use yash_env::option::{Interactive, On};
 use yash_env::signal;
+use yash_env::system::Sigaction as _;
 use yash_env::system::Signals as _;
 use yash_env::system::SystemEx as _;
 use yash_env::system::{Disposition, Errno};
