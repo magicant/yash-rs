@@ -41,6 +41,43 @@ pub trait Signals {
     fn signal_number_from_name(&self, name: Name) -> Option<Number>;
 }
 
+/// Operation applied to the signal blocking mask
+///
+/// This enum corresponds to the operations of the `sigprocmask` system call and
+/// is used in the [`Sigmask::sigmask`] method.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum SigmaskOp {
+    /// Add signals to the mask (`SIG_BLOCK`)
+    Add,
+    /// Remove signals from the mask (`SIG_UNBLOCK`)
+    Remove,
+    /// Set the mask to the given signals (`SIG_SETMASK`)
+    Set,
+}
+
+/// Trait for managing signal blocking mask
+pub trait Sigmask {
+    /// Gets and/or sets the signal blocking mask.
+    ///
+    /// This is a low-level function used internally by [`SharedSystem`]. You
+    /// should not call this function directly, or you will disrupt the behavior
+    /// of `SharedSystem`. The description below applies if you want to do
+    /// everything yourself without depending on `SharedSystem`.
+    ///
+    /// This is a thin wrapper around the [`sigprocmask` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_sigmask.html).
+    /// If `op` is `Some`, this function updates the signal blocking mask by
+    /// applying the given `SigmaskOp` and signal set to the current mask. If
+    /// `op` is `None`, this function does not change the mask.
+    /// If `old_mask` is `Some`, this function sets the previous mask to it.
+    fn sigmask(
+        &mut self,
+        op: Option<(SigmaskOp, &[Number])>,
+        old_mask: Option<&mut Vec<Number>>,
+    ) -> Result<()>;
+}
+
 /// How the shell process responds to a signal
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Disposition {

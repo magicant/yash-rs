@@ -32,6 +32,7 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `Seek`: Declares the `lseek` method for seeking within file
       descriptors.
     - `Sigaction`: Declares methods for managing signal dispositions.
+    - `Sigmask`: Declares the `sigmask` method for managing signal masks.
     - `Signals`: Declares the `signal_number_from_name` and
       `validate_signal` methods for converting between signal names and numbers.
     - `Time`: Declares the `now` method for getting the current time.

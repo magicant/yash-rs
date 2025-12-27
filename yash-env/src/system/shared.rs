@@ -42,6 +42,7 @@ use super::Result;
 use super::Seek;
 use super::SelectSystem;
 use super::Sigaction;
+use super::Sigmask;
 use super::SigmaskOp;
 use super::SignalStatus;
 use super::SignalSystem;
@@ -455,6 +456,17 @@ impl<T: Signals> Signals for &SharedSystem<T> {
     }
 }
 
+/// Delegates `Sigmask` methods to the contained implementor.
+impl<T: Sigmask> Sigmask for &SharedSystem<T> {
+    fn sigmask(
+        &mut self,
+        op: Option<(SigmaskOp, &[signal::Number])>,
+        old_mask: Option<&mut Vec<signal::Number>>,
+    ) -> Result<()> {
+        (**self.0.borrow_mut()).sigmask(op, old_mask)
+    }
+}
+
 /// Delegates `Sigaction` methods to the contained implementor.
 impl<T: Sigaction> Sigaction for &SharedSystem<T> {
     fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
@@ -472,13 +484,6 @@ impl<T: Sigaction> Sigaction for &SharedSystem<T> {
 impl<S: System> System for &SharedSystem<S> {
     fn isatty(&self, fd: Fd) -> bool {
         self.0.borrow().isatty(fd)
-    }
-    fn sigmask(
-        &mut self,
-        op: Option<(SigmaskOp, &[signal::Number])>,
-        old_mask: Option<&mut Vec<signal::Number>>,
-    ) -> Result<()> {
-        (**self.0.borrow_mut()).sigmask(op, old_mask)
     }
     fn caught_signals(&mut self) -> Vec<signal::Number> {
         self.0.borrow_mut().caught_signals()
@@ -732,6 +737,18 @@ impl<T: Signals> Signals for SharedSystem<T> {
     }
 }
 
+/// Delegates `Sigmask` methods to the contained implementor.
+impl<T: Sigmask> Sigmask for SharedSystem<T> {
+    #[inline]
+    fn sigmask(
+        &mut self,
+        op: Option<(SigmaskOp, &[signal::Number])>,
+        old_mask: Option<&mut Vec<signal::Number>>,
+    ) -> Result<()> {
+        (&mut &*self).sigmask(op, old_mask)
+    }
+}
+
 /// Delegates `Sigaction` methods to the contained implementor.
 impl<T: Sigaction> Sigaction for SharedSystem<T> {
     #[inline]
@@ -751,14 +768,6 @@ impl<S: System> System for SharedSystem<S> {
     #[inline]
     fn isatty(&self, fd: Fd) -> bool {
         (&self).isatty(fd)
-    }
-    #[inline]
-    fn sigmask(
-        &mut self,
-        op: Option<(SigmaskOp, &[signal::Number])>,
-        old_mask: Option<&mut Vec<signal::Number>>,
-    ) -> Result<()> {
-        (&mut &*self).sigmask(op, old_mask)
     }
     #[inline]
     fn caught_signals(&mut self) -> Vec<signal::Number> {

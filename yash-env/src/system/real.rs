@@ -54,6 +54,7 @@ use super::Read;
 use super::Result;
 use super::Seek;
 use super::Sigaction;
+use super::Sigmask;
 use super::SigmaskOp;
 use super::Signals;
 use super::Stat;
@@ -500,21 +501,7 @@ impl Signals for RealSystem {
     }
 }
 
-impl Sigaction for RealSystem {
-    fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
-        sigaction_impl(signal, None)
-    }
-
-    fn sigaction(&mut self, signal: signal::Number, handling: Disposition) -> Result<Disposition> {
-        sigaction_impl(signal, Some(handling))
-    }
-}
-
-impl System for RealSystem {
-    fn isatty(&self, fd: Fd) -> bool {
-        (unsafe { libc::isatty(fd.0) } != 0)
-    }
-
+impl Sigmask for RealSystem {
     fn sigmask(
         &mut self,
         op: Option<(SigmaskOp, &[signal::Number])>,
@@ -567,6 +554,22 @@ impl System for RealSystem {
 
             Ok(())
         }
+    }
+}
+
+impl Sigaction for RealSystem {
+    fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
+        sigaction_impl(signal, None)
+    }
+
+    fn sigaction(&mut self, signal: signal::Number, handling: Disposition) -> Result<Disposition> {
+        sigaction_impl(signal, Some(handling))
+    }
+}
+
+impl System for RealSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        (unsafe { libc::isatty(fd.0) } != 0)
     }
 
     fn caught_signals(&mut self) -> Vec<signal::Number> {

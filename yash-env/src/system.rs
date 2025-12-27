@@ -51,7 +51,7 @@ use self::resource::Resource;
 use self::select::SelectSystem;
 use self::select::SignalStatus;
 pub use self::shared::SharedSystem;
-pub use self::signal::{Disposition, Sigaction, Signals};
+pub use self::signal::{Disposition, Sigaction, Sigmask, SigmaskOp, Signals};
 pub use self::time::{CpuTimes, Time, Times};
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
@@ -95,6 +95,7 @@ pub trait System:
     + Read
     + Seek
     + Sigaction
+    + Sigmask
     + Signals
     + Time
     + Times
@@ -107,25 +108,6 @@ pub trait System:
     /// information is provided because POSIX does not require the `isatty`
     /// function to set `errno`.
     fn isatty(&self, fd: Fd) -> bool;
-
-    /// Gets and/or sets the signal blocking mask.
-    ///
-    /// This is a low-level function used internally by
-    /// [`SharedSystem::set_disposition`]. You should not call this function
-    /// directly, or you will disrupt the behavior of `SharedSystem`. The
-    /// description below applies if you want to do everything yourself without
-    /// depending on `SharedSystem`.
-    ///
-    /// This is a thin wrapper around the `sigprocmask` system call. If `op` is
-    /// `Some`, this function updates the signal blocking mask by applying the
-    /// given `SigmaskOp` and signal set to the current mask. If `op` is `None`,
-    /// this function does not change the mask.
-    /// If `old_mask` is `Some`, this function sets the previous mask to it.
-    fn sigmask(
-        &mut self,
-        op: Option<(SigmaskOp, &[signal::Number])>,
-        old_mask: Option<&mut Vec<signal::Number>>,
-    ) -> Result<()>;
 
     /// Returns signals this process has caught, if any.
     ///
@@ -147,8 +129,8 @@ pub trait System:
     /// caught signals are silently ignored.
     ///
     /// Note that signals become pending if sent while blocked by
-    /// [`sigmask`](Self::sigmask). They must be unblocked so that they are
-    /// caught and made available from this function.
+    /// [`Sigmask::sigmask`]. They must be unblocked so that they are caught and
+    /// made available from this function.
     fn caught_signals(&mut self) -> Vec<signal::Number>;
 
     /// Sends a signal.
@@ -351,18 +333,6 @@ pub trait System:
     fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()>;
 }
 
-/// Operation applied to the signal blocking mask
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[non_exhaustive]
-pub enum SigmaskOp {
-    /// Add signals to the mask (`SIG_BLOCK`)
-    Add,
-    /// Remove signals from the mask (`SIG_UNBLOCK`)
-    Remove,
-    /// Set the mask to the given signals (`SIG_SETMASK`)
-    Set,
-}
-
 /// Task executed in a child process
 ///
 /// This is an argument passed to a [`ChildProcessStarter`]. The task is
@@ -445,7 +415,7 @@ pub trait SystemEx: System {
     /// safely. If you call [`tcsetpgrp`](System::tcsetpgrp) from a background
     /// process, the process is stopped by SIGTTOU by default. To prevent this
     /// effect, SIGTTOU must be blocked or ignored when `tcsetpgrp` is called.
-    /// This function uses [`sigmask`](System::sigmask) to block SIGTTOU before
+    /// This function uses [`Sigmask::sigmask`] to block SIGTTOU before
     /// calling [`tcsetpgrp`](System::tcsetpgrp) and also to restore the
     /// original signal mask after `tcsetpgrp`.
     ///
@@ -475,7 +445,7 @@ pub trait SystemEx: System {
     /// foreground and optionally change the foreground process group. This
     /// function calls [`Sigaction::sigaction`] to restore the action for
     /// SIGTTOU to the default disposition (which is to suspend the shell
-    /// process), [`sigmask`](System::sigmask) to unblock SIGTTOU, and
+    /// process), [`Sigmask::sigmask`] to unblock SIGTTOU, and
     /// [`tcsetpgrp`](System::tcsetpgrp) to modify the foreground job. If the
     /// calling process is not in the foreground, `tcsetpgrp` will suspend the
     /// process with SIGTTOU until another job-controlling process resumes it in
