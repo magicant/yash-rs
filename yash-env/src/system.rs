@@ -51,7 +51,7 @@ use self::resource::Resource;
 use self::select::SelectSystem;
 use self::select::SignalStatus;
 pub use self::shared::SharedSystem;
-pub use self::signal::{Disposition, Sigaction, Sigmask, SigmaskOp, Signals};
+pub use self::signal::{CaughtSignals, Disposition, Sigaction, Sigmask, SigmaskOp, Signals};
 pub use self::time::{CpuTimes, Time, Times};
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
@@ -84,7 +84,8 @@ use r#virtual::SignalEffect;
 /// [`VirtualSystem`]. Another implementor is [`SharedSystem`], which wraps a
 /// `System` instance to extend the interface with asynchronous methods.
 pub trait System:
-    Close
+    CaughtSignals
+    + Close
     + Debug
     + Dup
     + Fcntl
@@ -108,30 +109,6 @@ pub trait System:
     /// information is provided because POSIX does not require the `isatty`
     /// function to set `errno`.
     fn isatty(&self, fd: Fd) -> bool;
-
-    /// Returns signals this process has caught, if any.
-    ///
-    /// This is a low-level function used internally by
-    /// [`SharedSystem::select`]. You should not call this function directly, or
-    /// you will disrupt the behavior of `SharedSystem`. The description below
-    /// applies if you want to do everything yourself without depending on
-    /// `SharedSystem`.
-    ///
-    /// To catch a signal, you must firstly install a signal handler by calling
-    /// [`Sigaction::sigaction`] with [`Disposition::Catch`]. Once the handler
-    /// is ready, signals sent to the process are accumulated in the `System`.
-    /// You call `caught_signals` to obtain a list of caught signals thus far.
-    ///
-    /// This function clears the internal list of caught signals, so a next call
-    /// will return an empty list unless another signal is caught since the
-    /// first call. Because the list size is limited, you should call this
-    /// function periodically before the list gets full, in which case further
-    /// caught signals are silently ignored.
-    ///
-    /// Note that signals become pending if sent while blocked by
-    /// [`Sigmask::sigmask`]. They must be unblocked so that they are caught and
-    /// made available from this function.
-    fn caught_signals(&mut self) -> Vec<signal::Number>;
 
     /// Sends a signal.
     ///

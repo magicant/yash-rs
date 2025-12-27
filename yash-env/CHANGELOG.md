@@ -17,6 +17,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   workaround for the now non-functional
   `<system::SharedSystem as System>::new_child_process`.
 - The following traits have been added to the `system` module:
+    - `CaughtSignals`: Declares the `caught_signals` method for retrieving
+      caught signals.
     - `Close`: Declares the `close` method for closing file descriptors.
     - `Dup`: Declares the `dup` and `dup2` methods for duplicating file
       descriptors.

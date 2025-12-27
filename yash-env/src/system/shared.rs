@@ -16,6 +16,7 @@
 
 //! [`SharedSystem`] and related items
 
+use super::CaughtSignals;
 use super::ChildProcessStarter;
 use super::CpuTimes;
 use super::Dir;
@@ -477,6 +478,13 @@ impl<T: Sigaction> Sigaction for &SharedSystem<T> {
     }
 }
 
+/// Delegates `CaughtSignals` methods to the contained implementor.
+impl<T: CaughtSignals> CaughtSignals for &SharedSystem<T> {
+    fn caught_signals(&mut self) -> Vec<signal::Number> {
+        self.0.borrow_mut().caught_signals()
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
@@ -484,9 +492,6 @@ impl<T: Sigaction> Sigaction for &SharedSystem<T> {
 impl<S: System> System for &SharedSystem<S> {
     fn isatty(&self, fd: Fd) -> bool {
         self.0.borrow().isatty(fd)
-    }
-    fn caught_signals(&mut self) -> Vec<signal::Number> {
-        self.0.borrow_mut().caught_signals()
     }
     fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
         self.0.borrow_mut().kill(target, signal)
@@ -761,6 +766,14 @@ impl<T: Sigaction> Sigaction for SharedSystem<T> {
     }
 }
 
+/// Delegates `CaughtSignals` methods to the contained implementor.
+impl<T: CaughtSignals> CaughtSignals for SharedSystem<T> {
+    #[inline]
+    fn caught_signals(&mut self) -> Vec<signal::Number> {
+        (&mut &*self).caught_signals()
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
@@ -768,10 +781,6 @@ impl<S: System> System for SharedSystem<S> {
     #[inline]
     fn isatty(&self, fd: Fd) -> bool {
         (&self).isatty(fd)
-    }
-    #[inline]
-    fn caught_signals(&mut self) -> Vec<signal::Number> {
-        (&mut &*self).caught_signals()
     }
     #[inline]
     fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {

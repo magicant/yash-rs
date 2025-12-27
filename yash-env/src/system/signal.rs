@@ -124,9 +124,41 @@ pub trait Sigaction {
     ///
     /// When you set the disposition to `Disposition::Catch`, signals sent to
     /// this process are accumulated in `self` and made available from
-    /// [`caught_signals`](super::System::caught_signals).
+    /// [`caught_signals`](CaughtSignals::caught_signals).
     ///
     /// To get the current disposition without changing it, use
     /// [`get_sigaction`](Self::get_sigaction).
     fn sigaction(&mut self, signal: Number, action: Disposition) -> Result<Disposition>;
+}
+
+/// Trait for examining signals caught by the process
+///
+/// Implementors of this trait usually also implement [`Sigaction`] to allow
+/// setting which signals are caught.
+pub trait CaughtSignals {
+    /// Returns signals this process has caught, if any.
+    ///
+    /// This is a low-level function used internally by
+    /// [`SharedSystem::select`]. You should not call this function directly, or
+    /// you will disrupt the behavior of `SharedSystem`. The description below
+    /// applies if you want to do everything yourself without depending on
+    /// `SharedSystem`.
+    ///
+    /// Implementors of this trait usually also implement [`Sigaction`] to allow
+    /// setting which signals are caught.
+    /// To catch a signal, you firstly install a signal handler by calling
+    /// [`Sigaction::sigaction`] with [`Disposition::Catch`]. Once the handler
+    /// is ready, signals sent to the process are accumulated in the
+    /// implementor. Calling this function retrieves the list of caught signals.
+    ///
+    /// This function clears the internal list of caught signals, so a next call
+    /// will return an empty list unless another signal is caught since the
+    /// first call. Because the list size may be limited, you should call this
+    /// function periodically before the list gets full, in which case further
+    /// caught signals are silently ignored.
+    ///
+    /// Note that signals become pending if sent while blocked by
+    /// [`Sigmask::sigmask`]. They must be unblocked so that they are caught and
+    /// made available from this function.
+    fn caught_signals(&mut self) -> Vec<Number>;
 }

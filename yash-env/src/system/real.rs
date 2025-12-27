@@ -28,6 +28,7 @@ mod resource;
 mod signal;
 
 use super::AT_FDCWD;
+use super::CaughtSignals;
 use super::ChildProcessStarter;
 use super::Close;
 use super::CpuTimes;
@@ -567,11 +568,7 @@ impl Sigaction for RealSystem {
     }
 }
 
-impl System for RealSystem {
-    fn isatty(&self, fd: Fd) -> bool {
-        (unsafe { libc::isatty(fd.0) } != 0)
-    }
-
+impl CaughtSignals for RealSystem {
     fn caught_signals(&mut self) -> Vec<signal::Number> {
         let mut signals = Vec::new();
         for slot in &CAUGHT_SIGNALS {
@@ -592,6 +589,12 @@ impl System for RealSystem {
             }
         }
         signals
+    }
+}
+
+impl System for RealSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        (unsafe { libc::isatty(fd.0) } != 0)
     }
 
     fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {

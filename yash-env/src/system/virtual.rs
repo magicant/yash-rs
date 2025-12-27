@@ -54,6 +54,7 @@ pub use self::io::*;
 pub use self::process::*;
 pub use self::signal::*;
 use super::AT_FDCWD;
+use super::CaughtSignals;
 use super::Close;
 use super::CpuTimes;
 use super::Dir;
@@ -674,16 +675,18 @@ impl Sigaction for VirtualSystem {
     }
 }
 
+impl CaughtSignals for VirtualSystem {
+    fn caught_signals(&mut self) -> Vec<signal::Number> {
+        std::mem::take(&mut self.current_process_mut().caught_signals)
+    }
+}
+
 impl System for VirtualSystem {
     fn isatty(&self, fd: Fd) -> bool {
         self.with_open_file_description(fd, |ofd| {
             Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
         })
         .unwrap_or(false)
-    }
-
-    fn caught_signals(&mut self) -> Vec<signal::Number> {
-        std::mem::take(&mut self.current_process_mut().caught_signals)
     }
 
     /// Sends a signal to the target process.
