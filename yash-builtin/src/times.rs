@@ -27,6 +27,7 @@ use crate::common::report::report_simple_failure;
 use yash_env::Env;
 use yash_env::System;
 use yash_env::semantics::Field;
+use yash_env::system::Times as _;
 
 mod format;
 mod syntax;

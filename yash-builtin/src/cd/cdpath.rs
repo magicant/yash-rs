@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn empty_directory_name_in_cdpath() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         create_dummy_file(&system, "/foo/one/file");
         create_dummy_file(&system, "/bar/two/file");
         system.current_process_mut().chdir("/bar".into());
@@ -164,7 +164,7 @@ mod tests {
 
     #[test]
     fn path_starting_with_dot() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         create_dummy_file(&system, "/foo/one/file");
         create_dummy_file(&system, "/bar/two/file");
         system.current_process_mut().chdir("/".into());
@@ -178,7 +178,7 @@ mod tests {
 
     #[test]
     fn path_starting_with_dot_dot() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         create_dummy_file(&system, "/foo/one/file");
         create_dummy_file(&system, "/bar/two/file");
         system.current_process_mut().chdir("/bar/two".into());

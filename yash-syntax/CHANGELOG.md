@@ -14,6 +14,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 ### Changed
 
 - Public dependency versions:
+    - Rust 1.86.0 → 1.87.0
     - yash-env 0.10.0 → 0.11.0
 
 ## [0.17.0] - 2025-11-26

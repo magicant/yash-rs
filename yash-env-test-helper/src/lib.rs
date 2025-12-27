@@ -102,7 +102,7 @@ pub fn stub_tty(state: &RefCell<SystemState>) {
 /// # use std::rc::Rc;
 /// # use yash_env::Env;
 /// # use yash_env::io::Fd;
-/// # use yash_env::system::System;
+/// # use yash_env::system::Write as _;
 /// # use yash_env::system::r#virtual::VirtualSystem;
 /// # use yash_env_test_helper::assert_stdout;
 /// let system = VirtualSystem::new();

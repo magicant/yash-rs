@@ -33,6 +33,7 @@ use yash_env::semantics::{Divert, ExitStatus, Field, RunReadEvalLoop};
 use yash_env::source::Source;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::stack::Frame;
+use yash_env::system::Close as _;
 use yash_env::system::Errno;
 use yash_env::system::Mode;
 use yash_env::system::OfdAccess;

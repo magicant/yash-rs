@@ -16,9 +16,40 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `system::SharedSystem::new_child_process`: This method has been added as a
   workaround for the now non-functional
   `<system::SharedSystem as System>::new_child_process`.
+- The following traits have been added to the `system` module:
+    - `CaughtSignals`: Declares the `caught_signals` method for retrieving
+      caught signals.
+    - `Close`: Declares the `close` method for closing file descriptors.
+    - `Dup`: Declares the `dup` and `dup2` methods for duplicating file
+      descriptors.
+    - `Fcntl`: Declares the `ofd_access`, `get_and_set_nonblocking`,
+      `fcntl_getfd`, and `fcntl_setfd` methods for `fcntl`-related operations.
+    - `Fstat`: Declares `fstat` and `fstatat` methods for getting file
+      metadata and provides a default implementation of `is_directory`.
+    - `IsExecutableFile`: Declares the `is_executable_file` method for checking
+      if a file is executable.
+    - `Open`: Declares the `open` and other methods for opening files.
+    - `Pipe`: Declares the `pipe` method for creating pipes.
+    - `Read`: Declares the `read` method for reading from file descriptors.
+    - `Seek`: Declares the `lseek` method for seeking within file
+      descriptors.
+    - `Sigaction`: Declares methods for managing signal dispositions.
+    - `Sigmask`: Declares the `sigmask` method for managing signal masks.
+    - `Signals`: Declares the `signal_number_from_name` and
+      `validate_signal` methods for converting between signal names and numbers.
+    - `Time`: Declares the `now` method for getting the current time.
+    - `Times`: Declares the `times` method for getting CPU times.
+    - `Umask`: Declares the `umask` method for setting the file mode
+      creation mask.
+    - `Write`: Declares the `write` method for writing to file
+      descriptors.
+- Implementations of these traits are provided for those types that implement
+  `System`.
 
 ### Changed
 
+- Public dependency versions:
+    - Rust 1.86.0 → 1.87.0
 - `system::SharedSystem` now directly holds an instance of `System` rather than
   being trait-objectified as a `Box<dyn System>`. Type parameters `S`
   representing the concrete type of `System` have been added to `Env` and
@@ -33,10 +64,19 @@ A _private dependency_ is used internally and not visible to downstream users.
       they cannot create `ChildProcessStarter<SharedSystem>` by wrapping the
       results of `new_child_process` calls on the inner `System` instance. Use
       the new `system::SharedSystem::new_child_process` inherent method instead.
+- The `System` trait has been split into smaller, more specialized traits. It
+  is now a supertrait of those new traits declared in the `system` module.
 - `System::tcsetpgrp` now returns a `FlexFuture<Result<()>>` instead of a
   synchronous `Result<()>`. This change allows virtual systems to simulate the
   blocking behavior of `tcsetpgrp` when called from a background process group,
   though the current virtual system implementation does not yet do so.
+- The `system::Times` struct has been renamed to `CpuTimes`.
+- `system::virtual::VirtualSystem::current_process_mut` now takes `&self`
+  instead of `&mut self` because it returns a `std::cell::RefMut` out of a
+  `RefCell`.
+- `system::virtual::VirtualSystem::with_open_file_description_mut` now takes
+  `&self` instead of `&mut self` as it internally depends on
+  `current_process_mut`.
 - `impl<S> std::fmt::Debug for builtin::Builtin<S>` now prints the `execute`
   field as well.
 

@@ -367,7 +367,7 @@ mod tests {
 
     #[test]
     fn jobs_not_removed_in_case_of_error() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system.current_process_mut().close_fd(Fd::STDOUT);
         let mut env = Env::with_system(system);
 
@@ -408,7 +408,7 @@ mod tests {
 
     #[test]
     fn state_changed_flag_not_cleared_in_case_of_error() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system.current_process_mut().close_fd(Fd::STDOUT);
         let mut env = Env::with_system(system);
         let i72 = env.jobs.add(Job::new(Pid(72)));

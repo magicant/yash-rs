@@ -7,7 +7,7 @@
 **Key Facts:**
 - Main binary: `yash3` (from `yash-cli` crate)
 - Target platforms: Unix-like systems (Linux, macOS, WSL on Windows)
-- Rust version: 1.90.0 (stable), MSRV: 1.85.0-1.86.0 per crate
+- Rust version: 1.90.0 (stable), MSRV: 1.87.0
 - License: GPLv3 for most crates; MIT/Apache-2.0 for `yash-executor`, `yash-fnmatch`, `yash-quote`
 
 ## Workspace Structure
@@ -113,7 +113,7 @@ This script verifies:
 ```sh
 ./check-msrv.sh -v
 ```
-**Prerequisites:** Requires nightly, 1.85.0, and 1.86.0 toolchains
+**Prerequisites:** Requires nightly and 1.87.0 toolchains
 Tests each crate with minimal dependency versions at their MSRV.
 
 **Documentation checks:**

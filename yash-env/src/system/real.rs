@@ -28,26 +28,43 @@ mod resource;
 mod signal;
 
 use super::AT_FDCWD;
+use super::CaughtSignals;
 use super::ChildProcessStarter;
+use super::Close;
+use super::CpuTimes;
 use super::Dir;
 use super::DirEntry;
 use super::Disposition;
+use super::Dup;
 #[cfg(doc)]
 use super::Env;
 use super::Errno;
+use super::Fcntl;
 use super::FdFlag;
 use super::FileType;
 use super::FlexFuture;
+use super::Fstat;
 use super::Gid;
+use super::IsExecutableFile;
 use super::Mode;
 use super::OfdAccess;
+use super::Open;
 use super::OpenFlag;
+use super::Pipe;
+use super::Read;
 use super::Result;
+use super::Seek;
+use super::Sigaction;
+use super::Sigmask;
 use super::SigmaskOp;
+use super::Signals;
 use super::Stat;
 use super::System;
+use super::Time;
 use super::Times;
 use super::Uid;
+use super::Umask;
+use super::Write;
 use super::resource::LimitPair;
 use super::resource::Resource;
 use crate::io::Fd;
@@ -221,7 +238,7 @@ impl RealSystem {
     }
 }
 
-impl System for RealSystem {
+impl Fstat for RealSystem {
     fn fstat(&self, fd: Fd) -> Result<Stat> {
         let mut stat = MaybeUninit::<libc::stat>::uninit();
         unsafe { libc::fstat(fd.0, stat.as_mut_ptr()) }.errno_if_m1()?;
@@ -242,24 +259,26 @@ impl System for RealSystem {
         let stat = unsafe { Stat::from_raw(&stat) };
         Ok(stat)
     }
+}
 
+impl IsExecutableFile for RealSystem {
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.file_has_type(path, FileType::Regular) && self.has_execute_permission(path)
     }
+}
 
-    fn is_directory(&self, path: &CStr) -> bool {
-        self.file_has_type(path, FileType::Directory)
-    }
-
-    fn pipe(&mut self) -> Result<(Fd, Fd)> {
+impl Pipe for RealSystem {
+    fn pipe(&self) -> Result<(Fd, Fd)> {
         let mut fds = MaybeUninit::<[c_int; 2]>::uninit();
         // TODO Use as_mut_ptr rather than cast when array_ptr_get is stabilized
         unsafe { libc::pipe(fds.as_mut_ptr().cast()) }.errno_if_m1()?;
         let fds = unsafe { fds.assume_init() };
         Ok((Fd(fds[0]), Fd(fds[1])))
     }
+}
 
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
+impl Dup for RealSystem {
+    fn dup(&self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
         let command = if flags.contains(FdFlag::CloseOnExec) {
             libc::F_DUPFD_CLOEXEC
         } else {
@@ -270,7 +289,7 @@ impl System for RealSystem {
             .map(Fd)
     }
 
-    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
+    fn dup2(&self, from: Fd, to: Fd) -> Result<Fd> {
         loop {
             let result = unsafe { libc::dup2(from.0, to.0) }.errno_if_m1().map(Fd);
             if result != Err(Errno::EINTR) {
@@ -278,7 +297,9 @@ impl System for RealSystem {
             }
         }
     }
+}
 
+impl Open for RealSystem {
     fn open(
         &mut self,
         path: &CStr,
@@ -313,7 +334,22 @@ impl System for RealSystem {
         Ok(fd)
     }
 
-    fn close(&mut self, fd: Fd) -> Result<()> {
+    fn fdopendir(&mut self, fd: Fd) -> Result<impl Dir + use<>> {
+        let dir = unsafe { libc::fdopendir(fd.0) };
+        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
+        Ok(RealDir(dir))
+    }
+
+    fn opendir(&mut self, path: &CStr) -> Result<impl Dir + use<>> {
+        let dir = unsafe { libc::opendir(path.as_ptr()) };
+        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
+        Ok(RealDir(dir))
+    }
+}
+
+impl Close for RealSystem {
+    fn close(&self, fd: Fd) -> Result<()> {
+        // TODO: Use posix_close when available
         loop {
             let result = unsafe { libc::close(fd.0) }.errno_if_m1().map(drop);
             match result {
@@ -323,13 +359,15 @@ impl System for RealSystem {
             }
         }
     }
+}
 
+impl Fcntl for RealSystem {
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
         let flags = unsafe { libc::fcntl(fd.0, libc::F_GETFL) }.errno_if_m1()?;
         Ok(OfdAccess::from_real_flag(flags))
     }
 
-    fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
+    fn get_and_set_nonblocking(&self, fd: Fd, nonblocking: bool) -> Result<bool> {
         let old_flags = unsafe { libc::fcntl(fd.0, libc::F_GETFL) }.errno_if_m1()?;
         let new_flags = if nonblocking {
             old_flags | libc::O_NONBLOCK
@@ -352,7 +390,7 @@ impl System for RealSystem {
         Ok(flags)
     }
 
-    fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
+    fn fcntl_setfd(&self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
         let mut bits = 0 as c_int;
         if flags.contains(FdFlag::CloseOnExec) {
             bits |= libc::FD_CLOEXEC;
@@ -361,12 +399,10 @@ impl System for RealSystem {
             .errno_if_m1()
             .map(drop)
     }
+}
 
-    fn isatty(&self, fd: Fd) -> bool {
-        (unsafe { libc::isatty(fd.0) } != 0)
-    }
-
-    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
+impl Read for RealSystem {
+    fn read(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
         loop {
             let result =
                 unsafe { libc::read(fd.0, buffer.as_mut_ptr().cast(), buffer.len()) }.errno_if_m1();
@@ -375,8 +411,10 @@ impl System for RealSystem {
             }
         }
     }
+}
 
-    fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {
+impl Write for RealSystem {
+    fn write(&self, fd: Fd, buffer: &[u8]) -> Result<usize> {
         loop {
             let result =
                 unsafe { libc::write(fd.0, buffer.as_ptr().cast(), buffer.len()) }.errno_if_m1();
@@ -385,8 +423,10 @@ impl System for RealSystem {
             }
         }
     }
+}
 
-    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
+impl Seek for RealSystem {
+    fn lseek(&self, fd: Fd, position: SeekFrom) -> Result<u64> {
         let (offset, whence) = match position {
             SeekFrom::Start(offset) => {
                 let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
@@ -398,32 +438,26 @@ impl System for RealSystem {
         let new_offset = unsafe { libc::lseek(fd.0, offset, whence) }.errno_if_m1()?;
         Ok(new_offset.try_into().unwrap())
     }
+}
 
-    fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
-        let dir = unsafe { libc::fdopendir(fd.0) };
-        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
-        Ok(Box::new(RealDir(dir)))
-    }
-
-    fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
-        let dir = unsafe { libc::opendir(path.as_ptr()) };
-        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
-        Ok(Box::new(RealDir(dir)))
-    }
-
-    fn umask(&mut self, new_mask: Mode) -> Mode {
+impl Umask for RealSystem {
+    fn umask(&self, new_mask: Mode) -> Mode {
         Mode::from_bits_retain(unsafe { libc::umask(new_mask.bits()) })
     }
+}
 
+impl Time for RealSystem {
     fn now(&self) -> Instant {
         Instant::now()
     }
+}
 
+impl Times for RealSystem {
     /// Returns consumed CPU times.
     ///
     /// This function actually uses `getrusage` rather than `times` because it
     /// provides better resolution on many systems.
-    fn times(&self) -> Result<Times> {
+    fn times(&self) -> Result<CpuTimes> {
         let mut usage = MaybeUninit::<libc::rusage>::uninit();
 
         unsafe { libc::getrusage(libc::RUSAGE_SELF, usage.as_mut_ptr()) }.errno_if_m1()?;
@@ -446,14 +480,16 @@ impl System for RealSystem {
                 + (*usage.as_ptr()).ru_stime.tv_usec as f64 * 1e-6
         };
 
-        Ok(Times {
+        Ok(CpuTimes {
             self_user,
             self_system,
             children_user,
             children_system,
         })
     }
+}
 
+impl Signals for RealSystem {
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
         let non_zero = NonZero::new(number)?;
         let name = signal::Name::try_from_raw_real(number)?;
@@ -464,7 +500,9 @@ impl System for RealSystem {
     fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
         name.to_raw_real()
     }
+}
 
+impl Sigmask for RealSystem {
     fn sigmask(
         &mut self,
         op: Option<(SigmaskOp, &[signal::Number])>,
@@ -518,7 +556,9 @@ impl System for RealSystem {
             Ok(())
         }
     }
+}
 
+impl Sigaction for RealSystem {
     fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
         sigaction_impl(signal, None)
     }
@@ -526,7 +566,9 @@ impl System for RealSystem {
     fn sigaction(&mut self, signal: signal::Number, handling: Disposition) -> Result<Disposition> {
         sigaction_impl(signal, Some(handling))
     }
+}
 
+impl CaughtSignals for RealSystem {
     fn caught_signals(&mut self) -> Vec<signal::Number> {
         let mut signals = Vec::new();
         for slot in &CAUGHT_SIGNALS {
@@ -547,6 +589,12 @@ impl System for RealSystem {
             }
         }
         signals
+    }
+}
+
+impl System for RealSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        (unsafe { libc::isatty(fd.0) } != 0)
     }
 
     fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {

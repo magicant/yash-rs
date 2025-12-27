@@ -278,7 +278,7 @@ mod tests {
 
     #[test]
     fn new_pwd_physical() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system
             .current_process_mut()
             .chdir(PathBuf::from("/some/path"));
@@ -290,7 +290,7 @@ mod tests {
 
     #[test]
     fn new_pwd_logical() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system
             .current_process_mut()
             .chdir(PathBuf::from("/some/path"));

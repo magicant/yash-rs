@@ -16,9 +16,8 @@
 
 //! Implementation for Item.
 
-use crate::trap::run_exit_trap;
-
 use super::Command;
+use crate::trap::run_exit_trap;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::Env;
@@ -31,8 +30,10 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
+use yash_env::system::Close as _;
 use yash_env::system::Mode;
 use yash_env::system::OfdAccess;
+use yash_env::system::Open as _;
 use yash_syntax::source::Location;
 use yash_syntax::syntax;
 use yash_syntax::syntax::AndOrList;
@@ -155,6 +156,7 @@ mod tests {
     use yash_env::job::ProcessState;
     use yash_env::option::Option::{Interactive, Monitor};
     use yash_env::option::State::On;
+    use yash_env::system::Signals as _;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::Inode;
     use yash_env::system::r#virtual::SystemState;

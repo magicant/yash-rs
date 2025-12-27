@@ -47,6 +47,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::signal;
 use yash_env::system::Errno;
+use yash_env::system::Signals as _;
 use yash_env::system::System;
 use yash_env::system::SystemEx as _;
 

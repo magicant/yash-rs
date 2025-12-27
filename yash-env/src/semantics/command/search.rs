@@ -42,6 +42,7 @@ use crate::builtin::Builtin;
 use crate::builtin::Type::{Special, Substitutive};
 use crate::function::Function;
 use crate::path::PathBuf;
+use crate::system::IsExecutableFile as _;
 use crate::variable::Expansion;
 use crate::variable::PATH;
 use std::ffi::CStr;

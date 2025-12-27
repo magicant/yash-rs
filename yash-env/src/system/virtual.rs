@@ -54,19 +54,36 @@ pub use self::io::*;
 pub use self::process::*;
 pub use self::signal::*;
 use super::AT_FDCWD;
+use super::CaughtSignals;
+use super::Close;
+use super::CpuTimes;
 use super::Dir;
 use super::Disposition;
+use super::Dup;
 use super::Errno;
+use super::Fcntl;
 use super::FdFlag;
 use super::FlexFuture;
+use super::Fstat;
 use super::Gid;
+use super::IsExecutableFile;
 use super::OfdAccess;
+use super::Open;
 use super::OpenFlag;
+use super::Pipe;
+use super::Read;
 use super::Result;
+use super::Seek;
+use super::Sigaction;
+use super::Sigmask;
 use super::SigmaskOp;
+use super::Signals;
 use super::Stat;
+use super::Time;
 use super::Times;
 use super::Uid;
+use super::Umask;
+use super::Write;
 use super::resource::INFINITY;
 use super::resource::LimitPair;
 use super::resource::Resource;
@@ -205,7 +222,7 @@ impl VirtualSystem {
     ///
     /// This function will panic if it cannot find a process having
     /// `self.process_id`.
-    pub fn current_process_mut(&mut self) -> RefMut<'_, Process> {
+    pub fn current_process_mut(&self) -> RefMut<'_, Process> {
         RefMut::map(self.state.borrow_mut(), |state| {
             state.processes.get_mut(&self.process_id).unwrap()
         })
@@ -227,7 +244,7 @@ impl VirtualSystem {
     /// Calls the given closure passing the open file description for the FD.
     ///
     /// Returns `Err(Errno::EBADF)` if the FD is not open.
-    pub fn with_open_file_description_mut<F, R>(&mut self, fd: Fd, f: F) -> Result<R>
+    pub fn with_open_file_description_mut<F, R>(&self, fd: Fd, f: F) -> Result<R>
     where
         F: FnOnce(&mut OpenFileDescription) -> Result<R>,
     {
@@ -309,25 +326,19 @@ impl Default for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
-    /// Retrieves metadata of a file.
-    ///
-    /// The current implementation fills only some values of the returned
-    /// `FileStat`. See [`Inode::stat`] for details.
+impl Fstat for VirtualSystem {
     fn fstat(&self, fd: Fd) -> Result<Stat> {
         self.with_open_file_description(fd, |ofd| Ok(ofd.file.borrow().stat()))
     }
 
-    /// Retrieves metadata of a file.
-    ///
-    /// The current implementation fills only some values of the returned
-    /// `FileStat`. See [`Inode::stat`] for details.
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
         let path = Path::new(UnixStr::from_bytes(path.to_bytes()));
         let inode = self.resolve_existing_file(dir_fd, path, follow_symlinks)?;
         Ok(inode.borrow().stat())
     }
+}
 
+impl IsExecutableFile for VirtualSystem {
     /// Tests whether the specified file is executable or not.
     ///
     /// The current implementation only checks if the file has any executable
@@ -337,14 +348,10 @@ impl System for VirtualSystem {
         self.resolve_existing_file(AT_FDCWD, path, /* follow symlinks */ true)
             .is_ok_and(|inode| inode.borrow().permissions.intersects(Mode::ALL_EXEC))
     }
+}
 
-    fn is_directory(&self, path: &CStr) -> bool {
-        let path = Path::new(UnixStr::from_bytes(path.to_bytes()));
-        self.resolve_existing_file(AT_FDCWD, path, /* follow symlinks */ true)
-            .is_ok_and(|inode| matches!(inode.borrow().body, FileBody::Directory { .. }))
-    }
-
-    fn pipe(&mut self) -> Result<(Fd, Fd)> {
+impl Pipe for VirtualSystem {
+    fn pipe(&self) -> Result<(Fd, Fd)> {
         let file = Rc::new(RefCell::new(Inode {
             body: FileBody::Fifo {
                 content: VecDeque::new(),
@@ -385,22 +392,26 @@ impl System for VirtualSystem {
         })?;
         Ok((reader, writer))
     }
+}
 
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
+impl Dup for VirtualSystem {
+    fn dup(&self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
         let mut process = self.current_process_mut();
         let mut body = process.fds.get(&from).ok_or(Errno::EBADF)?.clone();
         body.flags = flags;
         process.open_fd_ge(to_min, body).map_err(|_| Errno::EMFILE)
     }
 
-    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
+    fn dup2(&self, from: Fd, to: Fd) -> Result<Fd> {
         let mut process = self.current_process_mut();
         let mut body = process.fds.get(&from).ok_or(Errno::EBADF)?.clone();
         body.flags = EnumSet::empty();
         process.set_fd(to, body).map_err(|_| Errno::EBADF)?;
         Ok(to)
     }
+}
 
+impl Open for VirtualSystem {
     fn open(
         &mut self,
         path: &CStr,
@@ -495,11 +506,33 @@ impl System for VirtualSystem {
         process.open_fd(body).map_err(|_| Errno::EMFILE)
     }
 
-    fn close(&mut self, fd: Fd) -> Result<()> {
+    fn fdopendir(&mut self, fd: Fd) -> Result<impl Dir + use<>> {
+        self.with_open_file_description(fd, |ofd| {
+            let inode = ofd.inode();
+            let dir = VirtualDir::try_from(&inode.borrow().body)?;
+            Ok(dir)
+        })
+    }
+
+    fn opendir(&mut self, path: &CStr) -> Result<impl Dir + use<>> {
+        let fd = self.open(
+            path,
+            OfdAccess::ReadOnly,
+            OpenFlag::Directory.into(),
+            Mode::empty(),
+        )?;
+        self.fdopendir(fd)
+    }
+}
+
+impl Close for VirtualSystem {
+    fn close(&self, fd: Fd) -> Result<()> {
         self.current_process_mut().close_fd(fd);
         Ok(())
     }
+}
 
+impl Fcntl for VirtualSystem {
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
         fn is_directory(file_body: &FileBody) -> bool {
             matches!(file_body, FileBody::Directory { .. })
@@ -519,8 +552,8 @@ impl System for VirtualSystem {
         })
     }
 
-    fn get_and_set_nonblocking(&mut self, fd: Fd, _nonblocking: bool) -> Result<bool> {
-        self.with_open_file_description_mut(fd, |_ofd| {
+    fn get_and_set_nonblocking(&self, fd: Fd, _nonblocking: bool) -> Result<bool> {
+        self.with_open_file_description(fd, |_ofd| {
             // TODO Implement non-blocking I/O
             Ok(false)
         })
@@ -532,55 +565,40 @@ impl System for VirtualSystem {
         Ok(body.flags)
     }
 
-    fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
+    fn fcntl_setfd(&self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
         let mut process = self.current_process_mut();
         let body = process.get_fd_mut(fd).ok_or(Errno::EBADF)?;
         body.flags = flags;
         Ok(())
     }
+}
 
-    fn isatty(&self, fd: Fd) -> bool {
-        self.with_open_file_description(fd, |ofd| {
-            Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
-        })
-        .unwrap_or(false)
-    }
-
-    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
+impl Read for VirtualSystem {
+    fn read(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
         self.with_open_file_description_mut(fd, |ofd| ofd.read(buffer))
     }
+}
 
-    fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {
+impl Write for VirtualSystem {
+    fn write(&self, fd: Fd, buffer: &[u8]) -> Result<usize> {
         self.with_open_file_description_mut(fd, |ofd| ofd.write(buffer))
     }
+}
 
-    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
+impl Seek for VirtualSystem {
+    fn lseek(&self, fd: Fd, position: SeekFrom) -> Result<u64> {
         self.with_open_file_description_mut(fd, |ofd| ofd.seek(position))
             .and_then(|new_offset| new_offset.try_into().map_err(|_| Errno::EOVERFLOW))
     }
+}
 
-    fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
-        self.with_open_file_description(fd, |ofd| {
-            let inode = ofd.inode();
-            let dir = VirtualDir::try_from(&inode.borrow().body)?;
-            Ok(Box::new(dir) as Box<dyn Dir>)
-        })
-    }
-
-    fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
-        let fd = self.open(
-            path,
-            OfdAccess::ReadOnly,
-            OpenFlag::Directory.into(),
-            Mode::empty(),
-        )?;
-        self.fdopendir(fd)
-    }
-
-    fn umask(&mut self, new_mask: Mode) -> Mode {
+impl Umask for VirtualSystem {
+    fn umask(&self, new_mask: Mode) -> Mode {
         std::mem::replace(&mut self.current_process_mut().umask, new_mask)
     }
+}
 
+impl Time for VirtualSystem {
     /// Returns `now` in [`SystemState`].
     ///
     /// Panics if it is `None`.
@@ -590,12 +608,16 @@ impl System for VirtualSystem {
             .now
             .expect("SystemState::now not assigned")
     }
+}
 
+impl Times for VirtualSystem {
     /// Returns `times` in [`SystemState`].
-    fn times(&self) -> Result<Times> {
+    fn times(&self) -> Result<CpuTimes> {
         Ok(self.state.borrow().times)
     }
+}
 
+impl Signals for VirtualSystem {
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
         let non_zero = NonZero::new(number)?;
         let name = signal::Name::try_from_raw_virtual(number)?;
@@ -606,7 +628,9 @@ impl System for VirtualSystem {
     fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
         name.to_raw_virtual()
     }
+}
 
+impl Sigmask for VirtualSystem {
     fn sigmask(
         &mut self,
         op: Option<(SigmaskOp, &[signal::Number])>,
@@ -633,7 +657,9 @@ impl System for VirtualSystem {
 
         Ok(())
     }
+}
 
+impl Sigaction for VirtualSystem {
     fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
         let process = self.current_process();
         Ok(process.disposition(signal))
@@ -647,9 +673,20 @@ impl System for VirtualSystem {
         let mut process = self.current_process_mut();
         Ok(process.set_disposition(signal, disposition))
     }
+}
 
+impl CaughtSignals for VirtualSystem {
     fn caught_signals(&mut self) -> Vec<signal::Number> {
         std::mem::take(&mut self.current_process_mut().caught_signals)
+    }
+}
+
+impl System for VirtualSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        self.with_open_file_description(fd, |ofd| {
+            Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
+        })
+        .unwrap_or(false)
     }
 
     /// Sends a signal to the target process.
@@ -883,7 +920,7 @@ impl System for VirtualSystem {
 
         let state = Rc::clone(&self.state);
         Ok(Box::new(move |parent_env, task| {
-            let mut system = VirtualSystem { state, process_id };
+            let system = VirtualSystem { state, process_id };
             let mut child_env = parent_env.clone_with_system(system.clone());
 
             {
@@ -1121,8 +1158,8 @@ pub struct SystemState {
     /// Current time
     pub now: Option<Instant>,
 
-    /// Consumed CPU time
-    pub times: Times,
+    /// Consumed CPU time statistics
+    pub times: CpuTimes,
 
     /// Task manager that can execute asynchronous tasks
     ///
@@ -1425,7 +1462,7 @@ mod tests {
 
     #[test]
     fn pipe_read_write() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let (reader, writer) = system.pipe().unwrap();
         let result = system.write(writer, &[5, 42, 29]);
         assert_eq!(result, Ok(3));
@@ -1444,7 +1481,7 @@ mod tests {
 
     #[test]
     fn dup_shares_open_file_description() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.dup(Fd::STDOUT, Fd::STDERR, EnumSet::empty());
         assert_eq!(result, Ok(Fd(3)));
 
@@ -1456,7 +1493,7 @@ mod tests {
 
     #[test]
     fn dup_can_set_cloexec() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.dup(Fd::STDOUT, Fd::STDERR, FdFlag::CloseOnExec.into());
         assert_eq!(result, Ok(Fd(3)));
 
@@ -1467,7 +1504,7 @@ mod tests {
 
     #[test]
     fn dup2_shares_open_file_description() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.dup2(Fd::STDOUT, Fd(5));
         assert_eq!(result, Ok(Fd(5)));
 
@@ -1479,7 +1516,7 @@ mod tests {
 
     #[test]
     fn dup2_clears_cloexec() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let mut process = system.current_process_mut();
         process.fds.get_mut(&Fd::STDOUT).unwrap().flags = FdFlag::CloseOnExec.into();
         drop(process);
@@ -1762,7 +1799,7 @@ mod tests {
 
     #[test]
     fn close() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         let result = system.close(Fd::STDERR);
         assert_eq!(result, Ok(()));
@@ -1774,7 +1811,7 @@ mod tests {
 
     #[test]
     fn fcntl_getfd_and_setfd() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         let flags = system.fcntl_getfd(Fd::STDIN).unwrap();
         assert_eq!(flags, EnumSet::empty());

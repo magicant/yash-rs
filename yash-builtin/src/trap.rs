@@ -431,7 +431,7 @@ mod tests {
 
     #[test]
     fn printing_initially_ignored_trap() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system
             .current_process_mut()
             .set_disposition(SIGINT, Disposition::Ignore);
@@ -465,7 +465,7 @@ mod tests {
 
     #[test]
     fn error_printing_traps() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system.current_process_mut().close_fd(Fd::STDOUT);
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
@@ -523,7 +523,7 @@ mod tests {
 
     #[test]
     fn initially_ignored_signal_not_modifiable_if_non_interactive() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system
             .current_process_mut()
             .set_disposition(SIGINT, Disposition::Ignore);
@@ -545,7 +545,7 @@ mod tests {
 
     #[test]
     fn modifying_initially_ignored_signal_in_interactive_mode() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system
             .current_process_mut()
             .set_disposition(SIGINT, Disposition::Ignore);

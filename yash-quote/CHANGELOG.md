@@ -14,7 +14,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 ### Changed
 
 - Public dependency versions
-    - Rust 1.56.0 → 1.85.0
+    - Rust 1.56.0 → 1.87.0
 
 ## [1.1.1] - 2023-11-12
 

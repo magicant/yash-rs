@@ -16,7 +16,7 @@
 
 //! Formatting the result of the times built-in
 
-use yash_env::system::Times;
+use yash_env::system::CpuTimes;
 
 /// Formats a single time.
 fn format_one_time<W>(seconds: f64, result: &mut W) -> std::fmt::Result
@@ -37,7 +37,7 @@ where
 /// This function takes a `Times` structure and returns a string that is to be
 /// printed to the standard output. See the
 /// [parent module documentation](crate::times) for the format.
-pub fn format(times: &Times) -> String {
+pub fn format(times: &CpuTimes) -> String {
     let mut result = String::with_capacity(64);
 
     // The Write impl for String never returns an error, so unwrap is safe here.
@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn format_times() {
-        let times = Times {
+        let times = CpuTimes {
             self_user: 12.5,
             self_system: 65.25,
             children_user: 24.75,

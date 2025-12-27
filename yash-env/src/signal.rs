@@ -27,22 +27,24 @@
 //! some exotic signals may not be available on all systems.
 //!
 //! A [`Name`] can represent a single signal name, such as `SIGINT`
-//! ([`Name::Int`]), regardless of whether the signal is available on the
-//! [`System`]. `Name`s are more useful for user-facing applications, as they
-//! are easier to read and understand.
+//! ([`Name::Int`]), regardless of whether the signal is available on
+//! [`Signals`] implementors representing specific systems. This makes `Name`s
+//! suitable for user-facing applications that need to display or parse signal
+//! names.
 //!
-//! A [`Number`] represents a signal that is available on the [`System`] by its
+//! A [`Number`] represents a signal that is available on a specific system
+//! implementing the [`Signals`] trait. It is a thin wrapper around a raw
 //! signal number. The number is guaranteed to be a positive integer, so it
 //! optimizes the size of `Option<Number>`, etc. `Number`s are used in most
-//! signal-related functions of the [`System`] to efficiently interact with the
-//! underlying system calls.
+//! signal-related functions of the `Signals` and related traits to efficiently
+//! interact with the underlying system calls.
 //!
 //! All proper signal names start with `"SIG"`. However, the names defined,
 //! parsed, and displayed in this module do not include the `"SIG"` prefix.
 
 use crate::system::Errno;
 #[cfg(doc)]
-use crate::system::System;
+use crate::system::Signals;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::ffi::c_int;
@@ -60,10 +62,11 @@ pub type RawNumber = c_int;
 /// Signal name
 ///
 /// This enum identifies a signal by its name. It can be used to represent
-/// signals regardless of whether they are available on the [`System`].
+/// signals regardless of whether they are available on a specific system
+/// implementing the [`Signals`] trait.
 ///
-/// Use the [`System::validate_signal`] function to obtain a `Name` from a
-/// signal number. The [`System::signal_number_from_name`] function can be used
+/// Use the [`Signals::validate_signal`] function to obtain a `Name` from a
+/// signal number. The [`Signals::signal_number_from_name`] function can be used
 /// to convert a `Name` to a `Number`.
 #[derive(Clone, Copy, Debug, EnumIter, Eq, Hash, PartialEq)]
 #[non_exhaustive]
@@ -395,8 +398,8 @@ fn test_name_from_str() {
 /// integer, so it optimizes the size of `Option<Number>`, etc.
 ///
 /// To make sure that all `Number`s are valid, you can only obtain a `Number`
-/// from an instance of [`System`]. Use the [`System::validate_signal`] and
-/// [`System::signal_number_from_name`] methods to create a `Number` from a raw
+/// from an instance of [`Signals`]. Use the [`Signals::validate_signal`] and
+/// [`Signals::signal_number_from_name`] methods to create a `Number` from a raw
 /// signal number or a signal name, respectively.
 ///
 /// Signal numbers are specific to the underlying system. Passing a signal
@@ -435,7 +438,7 @@ impl Number {
     /// `Number` does not lead to undefined behavior. However, it is not
     /// recommended to use this function unless you are sure that the raw signal
     /// number is valid. To make sure that all `Number`s are valid, use the
-    /// [`System::validate_signal`] and [`System::signal_number_from_name`]
+    /// [`Signals::validate_signal`] and [`Signals::signal_number_from_name`]
     /// methods instead.
     #[inline(always)]
     #[must_use]

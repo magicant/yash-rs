@@ -17,36 +17,33 @@
 //! [System] and its implementors.
 
 mod errno;
-mod fd_flag;
 mod file_system;
 mod future;
 mod id;
-mod open_flag;
+mod io;
 #[cfg(unix)]
 pub mod real;
 pub mod resource;
 mod select;
 mod shared;
+mod signal;
+mod time;
 pub mod r#virtual;
 
 pub use self::errno::Errno;
 pub use self::errno::RawErrno;
 pub use self::errno::Result;
-pub use self::fd_flag::FdFlag;
-pub use self::file_system::AT_FDCWD;
-pub use self::file_system::Dir;
-pub use self::file_system::DirEntry;
-pub use self::file_system::FileType;
-pub use self::file_system::Mode;
-pub use self::file_system::RawMode;
-pub use self::file_system::Stat;
+pub use self::file_system::{
+    AT_FDCWD, Dir, DirEntry, FileType, Fstat, IsExecutableFile, Mode, OfdAccess, Open, OpenFlag,
+    RawMode, Seek, Stat, Umask,
+};
 pub use self::future::FlexFuture;
 pub use self::id::Gid;
 pub use self::id::RawGid;
 pub use self::id::RawUid;
 pub use self::id::Uid;
-pub use self::open_flag::OfdAccess;
-pub use self::open_flag::OpenFlag;
+pub use self::io::FdFlag;
+pub use self::io::{Close, Dup, Fcntl, Pipe, Read, Write};
 #[cfg(all(doc, unix))]
 use self::real::RealSystem;
 use self::resource::LimitPair;
@@ -54,6 +51,8 @@ use self::resource::Resource;
 use self::select::SelectSystem;
 use self::select::SignalStatus;
 pub use self::shared::SharedSystem;
+pub use self::signal::{CaughtSignals, Disposition, Sigaction, Sigmask, SigmaskOp, Signals};
+pub use self::time::{CpuTimes, Time, Times};
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
 use crate::Env;
@@ -64,21 +63,17 @@ use crate::job::ProcessState;
 use crate::path::Path;
 use crate::path::PathBuf;
 use crate::semantics::ExitStatus;
-use crate::signal;
 use crate::str::UnixString;
 #[cfg(doc)]
 use crate::subshell::Subshell;
 use crate::trap::SignalSystem;
-use enumset::EnumSet;
 use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::c_int;
 use std::fmt::Debug;
-use std::io::SeekFrom;
 use std::pin::Pin;
 use std::time::Duration;
-use std::time::Instant;
 use r#virtual::SignalEffect;
 
 /// API to the system-managed parts of the environment.
@@ -88,234 +83,32 @@ use r#virtual::SignalEffect;
 /// substantial implementors for this trait: [`RealSystem`] and
 /// [`VirtualSystem`]. Another implementor is [`SharedSystem`], which wraps a
 /// `System` instance to extend the interface with asynchronous methods.
-pub trait System: Debug {
-    /// Retrieves metadata of a file.
-    fn fstat(&self, fd: Fd) -> Result<Stat>;
-
-    /// Retrieves metadata of a file.
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat>;
-
-    /// Whether there is an executable file at the specified path.
-    #[must_use]
-    fn is_executable_file(&self, path: &CStr) -> bool;
-
-    /// Whether there is a directory at the specified path.
-    #[must_use]
-    fn is_directory(&self, path: &CStr) -> bool;
-
-    /// Creates an unnamed pipe.
-    ///
-    /// This is a thin wrapper around the `pipe` system call.
-    /// If successful, returns the reading and writing ends of the pipe.
-    fn pipe(&mut self) -> Result<(Fd, Fd)>;
-
-    /// Duplicates a file descriptor.
-    ///
-    /// This is a thin wrapper around the `fcntl` system call that opens a new
-    /// FD that shares the open file description with `from`. The new FD will be
-    /// the minimum unused FD not less than `to_min`. The `flags` are set to the
-    /// new FD.
-    ///
-    /// If successful, returns `Ok(new_fd)`. On error, returns `Err(_)`.
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd>;
-
-    /// Duplicates a file descriptor.
-    ///
-    /// This is a thin wrapper around the `dup2` system call. If successful,
-    /// returns `Ok(to)`. On error, returns `Err(_)`.
-    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd>;
-
-    /// Opens a file descriptor.
-    ///
-    /// This is a thin wrapper around the `open` system call.
-    fn open(
-        &mut self,
-        path: &CStr,
-        access: OfdAccess,
-        flags: EnumSet<OpenFlag>,
-        mode: Mode,
-    ) -> Result<Fd>;
-
-    /// Opens a file descriptor associated with an anonymous temporary file.
-    ///
-    /// This function works similarly to the `O_TMPFILE` flag specified to the
-    /// `open` function.
-    fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd>;
-
-    /// Closes a file descriptor.
-    ///
-    /// This is a thin wrapper around the `close` system call.
-    ///
-    /// This function returns `Ok(())` when the FD is already closed.
-    fn close(&mut self, fd: Fd) -> Result<()>;
-
-    /// Returns the open file description access mode.
-    fn ofd_access(&self, fd: Fd) -> Result<OfdAccess>;
-
-    /// Gets and sets the non-blocking mode for the open file description.
-    ///
-    /// This is a wrapper around the `fcntl` system call.
-    /// This function sets the non-blocking mode to the given value and returns
-    /// the previous mode.
-    fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool>;
-
-    /// Returns the attributes for the file descriptor.
-    ///
-    /// This is a thin wrapper around the `fcntl` system call.
-    fn fcntl_getfd(&self, fd: Fd) -> Result<EnumSet<FdFlag>>;
-
-    /// Sets attributes for the file descriptor.
-    ///
-    /// This is a thin wrapper around the `fcntl` system call.
-    fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()>;
-
+pub trait System:
+    CaughtSignals
+    + Close
+    + Debug
+    + Dup
+    + Fcntl
+    + Fstat
+    + IsExecutableFile
+    + Open
+    + Pipe
+    + Read
+    + Seek
+    + Sigaction
+    + Sigmask
+    + Signals
+    + Time
+    + Times
+    + Umask
+    + Write
+{
     /// Tests if a file descriptor is associated with a terminal device.
     ///
     /// On error, this function simply returns `false` and no detailed error
     /// information is provided because POSIX does not require the `isatty`
     /// function to set `errno`.
     fn isatty(&self, fd: Fd) -> bool;
-
-    /// Reads from the file descriptor.
-    ///
-    /// This is a thin wrapper around the `read` system call.
-    /// If successful, returns the number of bytes read.
-    ///
-    /// This function may perform blocking I/O, especially if the `O_NONBLOCK`
-    /// flag is not set for the FD. Use [`SharedSystem::read_async`] to support
-    /// concurrent I/O in an `async` function context.
-    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize>;
-
-    /// Writes to the file descriptor.
-    ///
-    /// This is a thin wrapper around the `write` system call.
-    /// If successful, returns the number of bytes written.
-    ///
-    /// This function may write only part of the `buffer` and block if the
-    /// `O_NONBLOCK` flag is not set for the FD. Use [`SharedSystem::write_all`]
-    /// to support concurrent I/O in an `async` function context and ensure the
-    /// whole `buffer` is written.
-    fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize>;
-
-    /// Moves the position of the open file description.
-    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64>;
-
-    /// Opens a directory for enumerating entries.
-    fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>>;
-
-    /// Opens a directory for enumerating entries.
-    fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>>;
-
-    /// Gets and sets the file creation mode mask.
-    ///
-    /// This is a thin wrapper around the `umask` system call. It sets the mask
-    /// to the given value and returns the previous mask.
-    ///
-    /// You cannot tell the current mask without setting a new one. If you only
-    /// want to get the current mask, you need to set it back to the original
-    /// value after getting it.
-    fn umask(&mut self, new_mask: Mode) -> Mode;
-
-    /// Returns the current time.
-    #[must_use]
-    fn now(&self) -> Instant;
-
-    /// Returns consumed CPU times.
-    fn times(&self) -> Result<Times>;
-
-    /// Tests if a signal number is valid.
-    ///
-    /// This function returns `Some((name, number))` if the signal number refers
-    /// to a valid signal supported by the system. Otherwise, it returns `None`.
-    ///
-    /// Note that one signal number can have multiple names, in which case this
-    /// function returns the name that is considered the most common.
-    #[must_use]
-    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)>;
-
-    /// Gets the signal number from the signal name.
-    ///
-    /// This function returns the signal number corresponding to the signal name
-    /// in the system. If the signal name is not supported, it returns `None`.
-    #[must_use]
-    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number>;
-
-    /// Gets and/or sets the signal blocking mask.
-    ///
-    /// This is a low-level function used internally by
-    /// [`SharedSystem::set_disposition`]. You should not call this function
-    /// directly, or you will disrupt the behavior of `SharedSystem`. The
-    /// description below applies if you want to do everything yourself without
-    /// depending on `SharedSystem`.
-    ///
-    /// This is a thin wrapper around the `sigprocmask` system call. If `op` is
-    /// `Some`, this function updates the signal blocking mask by applying the
-    /// given `SigmaskOp` and signal set to the current mask. If `op` is `None`,
-    /// this function does not change the mask.
-    /// If `old_mask` is `Some`, this function sets the previous mask to it.
-    fn sigmask(
-        &mut self,
-        op: Option<(SigmaskOp, &[signal::Number])>,
-        old_mask: Option<&mut Vec<signal::Number>>,
-    ) -> Result<()>;
-
-    /// Gets the disposition for a signal.
-    ///
-    /// This is a low-level function used internally by
-    /// [`SharedSystem::get_disposition`]. You should not call this function
-    /// directly, or you will leave the `SharedSystem` instance in an
-    /// inconsistent state. The description below applies if you want to do
-    /// everything yourself without depending on `SharedSystem`.
-    ///
-    /// This is an abstract wrapper around the `sigaction` system call. This
-    /// function returns the current disposition if successful.
-    ///
-    /// To change the disposition, use [`sigaction`](Self::sigaction).
-    fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition>;
-
-    /// Gets and sets the disposition for a signal.
-    ///
-    /// This is a low-level function used internally by
-    /// [`SharedSystem::set_disposition`]. You should not call this function
-    /// directly, or you will leave the `SharedSystem` instance in an
-    /// inconsistent state. The description below applies if you want to do
-    /// everything yourself without depending on `SharedSystem`.
-    ///
-    /// This is an abstract wrapper around the `sigaction` system call. This
-    /// function returns the previous disposition if successful.
-    ///
-    /// When you set the disposition to `Disposition::Catch`, signals sent to
-    /// this process are accumulated in the `System` instance and made available
-    /// from [`caught_signals`](Self::caught_signals).
-    ///
-    /// To get the current disposition without changing it, use
-    /// [`get_sigaction`](Self::get_sigaction).
-    fn sigaction(&mut self, signal: signal::Number, action: Disposition) -> Result<Disposition>;
-
-    /// Returns signals this process has caught, if any.
-    ///
-    /// This is a low-level function used internally by
-    /// [`SharedSystem::select`]. You should not call this function directly, or
-    /// you will disrupt the behavior of `SharedSystem`. The description below
-    /// applies if you want to do everything yourself without depending on
-    /// `SharedSystem`.
-    ///
-    /// To catch a signal, you must firstly install a signal handler by calling
-    /// [`sigaction`](Self::sigaction) with [`Disposition::Catch`]. Once the
-    /// handler is ready, signals sent to the process are accumulated in the
-    /// `System`. You call `caught_signals` to obtain a list of caught signals
-    /// thus far.
-    ///
-    /// This function clears the internal list of caught signals, so a next call
-    /// will return an empty list unless another signal is caught since the
-    /// first call. Because the list size is limited, you should call this
-    /// function periodically before the list gets full, in which case further
-    /// caught signals are silently ignored.
-    ///
-    /// Note that signals become pending if sent while blocked by
-    /// [`sigmask`](Self::sigmask). They must be unblocked so that they are
-    /// caught and made available from this function.
-    fn caught_signals(&mut self) -> Vec<signal::Number>;
 
     /// Sends a signal.
     ///
@@ -517,50 +310,6 @@ pub trait System: Debug {
     fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()>;
 }
 
-/// Set of consumed CPU time
-///
-/// This structure contains four CPU time values, all in seconds.
-///
-/// This structure is returned by [`System::times`].
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Times {
-    /// User CPU time consumed by the current process
-    pub self_user: f64,
-    /// System CPU time consumed by the current process
-    pub self_system: f64,
-    /// User CPU time consumed by the children of the current process
-    pub children_user: f64,
-    /// System CPU time consumed by the children of the current process
-    pub children_system: f64,
-}
-
-/// Operation applied to the signal blocking mask
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[non_exhaustive]
-pub enum SigmaskOp {
-    /// Add signals to the mask (`SIG_BLOCK`)
-    Add,
-    /// Remove signals from the mask (`SIG_UNBLOCK`)
-    Remove,
-    /// Set the mask to the given signals (`SIG_SETMASK`)
-    Set,
-}
-
-/// How the shell process responds to a signal
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum Disposition {
-    /// Perform the default action for the signal.
-    ///
-    /// The default action depends on the signal. For example, `SIGINT` causes
-    /// the process to terminate, and `SIGTSTP` causes the process to stop.
-    #[default]
-    Default,
-    /// Ignore the signal.
-    Ignore,
-    /// Catch the signal.
-    Catch,
-}
-
 /// Task executed in a child process
 ///
 /// This is an argument passed to a [`ChildProcessStarter`]. The task is
@@ -611,7 +360,7 @@ pub trait SystemEx: System {
     /// larger than or equal to [`MIN_INTERNAL_FD`].
     ///
     /// If the given file descriptor is less than [`MIN_INTERNAL_FD`], this
-    /// function duplicates the file descriptor with [`System::dup`] and closes
+    /// function duplicates the file descriptor with [`Dup::dup`] and closes
     /// the original one. Otherwise, this function does nothing.
     ///
     /// The new file descriptor will have the CLOEXEC flag set when it is
@@ -643,7 +392,7 @@ pub trait SystemEx: System {
     /// safely. If you call [`tcsetpgrp`](System::tcsetpgrp) from a background
     /// process, the process is stopped by SIGTTOU by default. To prevent this
     /// effect, SIGTTOU must be blocked or ignored when `tcsetpgrp` is called.
-    /// This function uses [`sigmask`](System::sigmask) to block SIGTTOU before
+    /// This function uses [`Sigmask::sigmask`] to block SIGTTOU before
     /// calling [`tcsetpgrp`](System::tcsetpgrp) and also to restore the
     /// original signal mask after `tcsetpgrp`.
     ///
@@ -671,9 +420,9 @@ pub trait SystemEx: System {
     ///
     /// This is a convenience function to ensure the shell has been in the
     /// foreground and optionally change the foreground process group. This
-    /// function calls [`sigaction`](System::sigaction) to restore the action
-    /// for SIGTTOU to the default disposition (which is to suspend the shell
-    /// process), [`sigmask`](System::sigmask) to unblock SIGTTOU, and
+    /// function calls [`Sigaction::sigaction`] to restore the action for
+    /// SIGTTOU to the default disposition (which is to suspend the shell
+    /// process), [`Sigmask::sigmask`] to unblock SIGTTOU, and
     /// [`tcsetpgrp`](System::tcsetpgrp) to modify the foreground job. If the
     /// calling process is not in the foreground, `tcsetpgrp` will suspend the
     /// process with SIGTTOU until another job-controlling process resumes it in

@@ -24,7 +24,7 @@
 use crate::common::output;
 use crate::common::report::report_error;
 use yash_env::semantics::Field;
-use yash_env::system::Mode;
+use yash_env::system::{Mode, Umask};
 use yash_env::{Env, System};
 
 pub mod eval;
@@ -68,12 +68,12 @@ impl Command {
     ///
     /// Regardless of the command type, this function performs the following steps:
     ///
-    /// 1. Obtain the current mask from the environment. ([`System::umask`])
+    /// 1. Obtain the current mask from the environment. ([`Umask::umask`])
     /// 1. Compute a new mask to be set. ([`eval::new_mask`])
-    /// 1. Set the new mask. ([`System::umask`])
+    /// 1. Set the new mask. ([`Umask::umask`])
     ///
     /// Returns the string that should be printed to the standard output.
-    pub fn execute<S: System>(&self, env: &mut Env<S>) -> String {
+    pub fn execute<S: Umask>(&self, env: &mut Env<S>) -> String {
         let current = !env.system.umask(Mode::empty()).bits();
         let new_mask = eval::new_mask(current as _, self);
         env.system.umask(Mode::from_bits_retain(!new_mask as _));
