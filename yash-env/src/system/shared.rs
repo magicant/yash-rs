@@ -44,6 +44,7 @@ use super::SelectSystem;
 use super::SigmaskOp;
 use super::SignalStatus;
 use super::SignalSystem;
+use super::Signals;
 use super::Stat;
 use super::System;
 use super::SystemEx;
@@ -443,6 +444,16 @@ impl<T: Times> Times for &SharedSystem<T> {
     }
 }
 
+/// Delegates `Signals` methods to the contained implementor.
+impl<T: Signals> Signals for &SharedSystem<T> {
+    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
+        self.0.borrow().validate_signal(number)
+    }
+    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
+        self.0.borrow().signal_number_from_name(name)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
@@ -450,12 +461,6 @@ impl<T: Times> Times for &SharedSystem<T> {
 impl<S: System> System for &SharedSystem<S> {
     fn isatty(&self, fd: Fd) -> bool {
         self.0.borrow().isatty(fd)
-    }
-    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
-        self.0.borrow().validate_signal(number)
-    }
-    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
-        self.0.borrow().signal_number_from_name(name)
     }
     fn sigmask(
         &mut self,
@@ -710,6 +715,18 @@ impl<T: Times> Times for SharedSystem<T> {
     }
 }
 
+/// Delegates `Signals` methods to the contained implementor.
+impl<T: Signals> Signals for SharedSystem<T> {
+    #[inline]
+    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
+        (&self).validate_signal(number)
+    }
+    #[inline]
+    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
+        (&self).signal_number_from_name(name)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
@@ -717,14 +734,6 @@ impl<S: System> System for SharedSystem<S> {
     #[inline]
     fn isatty(&self, fd: Fd) -> bool {
         (&self).isatty(fd)
-    }
-    #[inline]
-    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
-        (&self).validate_signal(number)
-    }
-    #[inline]
-    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
-        System::signal_number_from_name(&self, name)
     }
     #[inline]
     fn sigmask(
@@ -874,7 +883,7 @@ impl<S: System> SignalSystem for &SharedSystem<S> {
 
     #[inline]
     fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
-        System::signal_number_from_name(*self, name)
+        Signals::signal_number_from_name(*self, name)
     }
 
     fn get_disposition(&self, signal: signal::Number) -> Result<Disposition> {
@@ -898,7 +907,7 @@ impl<S: System> SignalSystem for SharedSystem<S> {
 
     #[inline]
     fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
-        System::signal_number_from_name(self, name)
+        Signals::signal_number_from_name(self, name)
     }
 
     #[inline]

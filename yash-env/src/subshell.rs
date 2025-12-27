@@ -34,6 +34,7 @@ use crate::stack::Frame;
 use crate::system::ChildProcessTask;
 use crate::system::Errno;
 use crate::system::SigmaskOp;
+use crate::system::Signals as _;
 use crate::system::System;
 use crate::system::SystemEx as _;
 use std::marker::PhantomData;

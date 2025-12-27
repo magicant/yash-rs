@@ -156,6 +156,7 @@ mod tests {
     use yash_env::job::ProcessState;
     use yash_env::option::Option::{Interactive, Monitor};
     use yash_env::option::State::On;
+    use yash_env::system::Signals as _;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::Inode;
     use yash_env::system::r#virtual::SystemState;

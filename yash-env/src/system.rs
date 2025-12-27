@@ -26,6 +26,7 @@ pub mod real;
 pub mod resource;
 mod select;
 mod shared;
+mod signal;
 mod time;
 pub mod r#virtual;
 
@@ -50,6 +51,7 @@ use self::resource::Resource;
 use self::select::SelectSystem;
 use self::select::SignalStatus;
 pub use self::shared::SharedSystem;
+pub use self::signal::Signals;
 pub use self::time::{CpuTimes, Time, Times};
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
@@ -61,7 +63,6 @@ use crate::job::ProcessState;
 use crate::path::Path;
 use crate::path::PathBuf;
 use crate::semantics::ExitStatus;
-use crate::signal;
 use crate::str::UnixString;
 #[cfg(doc)]
 use crate::subshell::Subshell;
@@ -93,6 +94,7 @@ pub trait System:
     + Pipe
     + Read
     + Seek
+    + Signals
     + Time
     + Times
     + Umask
@@ -104,23 +106,6 @@ pub trait System:
     /// information is provided because POSIX does not require the `isatty`
     /// function to set `errno`.
     fn isatty(&self, fd: Fd) -> bool;
-
-    /// Tests if a signal number is valid.
-    ///
-    /// This function returns `Some((name, number))` if the signal number refers
-    /// to a valid signal supported by the system. Otherwise, it returns `None`.
-    ///
-    /// Note that one signal number can have multiple names, in which case this
-    /// function returns the name that is considered the most common.
-    #[must_use]
-    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)>;
-
-    /// Gets the signal number from the signal name.
-    ///
-    /// This function returns the signal number corresponding to the signal name
-    /// in the system. If the signal name is not supported, it returns `None`.
-    #[must_use]
-    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number>;
 
     /// Gets and/or sets the signal blocking mask.
     ///

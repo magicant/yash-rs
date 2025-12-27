@@ -74,6 +74,7 @@ use super::Read;
 use super::Result;
 use super::Seek;
 use super::SigmaskOp;
+use super::Signals;
 use super::Stat;
 use super::Time;
 use super::Times;
@@ -613,14 +614,7 @@ impl Times for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
-    fn isatty(&self, fd: Fd) -> bool {
-        self.with_open_file_description(fd, |ofd| {
-            Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
-        })
-        .unwrap_or(false)
-    }
-
+impl Signals for VirtualSystem {
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
         let non_zero = NonZero::new(number)?;
         let name = signal::Name::try_from_raw_virtual(number)?;
@@ -630,6 +624,15 @@ impl System for VirtualSystem {
     #[inline(always)]
     fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
         name.to_raw_virtual()
+    }
+}
+
+impl System for VirtualSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        self.with_open_file_description(fd, |ofd| {
+            Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
+        })
+        .unwrap_or(false)
     }
 
     fn sigmask(

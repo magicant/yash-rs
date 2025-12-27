@@ -54,6 +54,7 @@ use super::Read;
 use super::Result;
 use super::Seek;
 use super::SigmaskOp;
+use super::Signals;
 use super::Stat;
 use super::System;
 use super::Time;
@@ -485,11 +486,7 @@ impl Times for RealSystem {
     }
 }
 
-impl System for RealSystem {
-    fn isatty(&self, fd: Fd) -> bool {
-        (unsafe { libc::isatty(fd.0) } != 0)
-    }
-
+impl Signals for RealSystem {
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
         let non_zero = NonZero::new(number)?;
         let name = signal::Name::try_from_raw_real(number)?;
@@ -499,6 +496,12 @@ impl System for RealSystem {
     #[inline(always)]
     fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
         name.to_raw_real()
+    }
+}
+
+impl System for RealSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        (unsafe { libc::isatty(fd.0) } != 0)
     }
 
     fn sigmask(
