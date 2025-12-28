@@ -160,7 +160,7 @@ pub trait CaughtSignals {
     /// Note that signals become pending if sent while blocked by
     /// [`Sigmask::sigmask`]. They must be unblocked so that they are caught and
     /// made available from this function.
-    fn caught_signals(&mut self) -> Vec<Number>;
+    fn caught_signals(&self) -> Vec<Number>;
 }
 
 /// Trait for sending signals to processes

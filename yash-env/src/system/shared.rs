@@ -481,8 +481,8 @@ impl<T: Sigaction> Sigaction for &SharedSystem<T> {
 
 /// Delegates `CaughtSignals` methods to the contained implementor.
 impl<T: CaughtSignals> CaughtSignals for &SharedSystem<T> {
-    fn caught_signals(&mut self) -> Vec<signal::Number> {
-        self.0.borrow_mut().caught_signals()
+    fn caught_signals(&self) -> Vec<signal::Number> {
+        self.0.borrow().caught_signals()
     }
 }
 
@@ -774,8 +774,8 @@ impl<T: Sigaction> Sigaction for SharedSystem<T> {
 /// Delegates `CaughtSignals` methods to the contained implementor.
 impl<T: CaughtSignals> CaughtSignals for SharedSystem<T> {
     #[inline]
-    fn caught_signals(&mut self) -> Vec<signal::Number> {
-        (&mut &*self).caught_signals()
+    fn caught_signals(&self) -> Vec<signal::Number> {
+        (&self).caught_signals()
     }
 }
 

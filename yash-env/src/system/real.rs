@@ -570,7 +570,7 @@ impl Sigaction for RealSystem {
 }
 
 impl CaughtSignals for RealSystem {
-    fn caught_signals(&mut self) -> Vec<signal::Number> {
+    fn caught_signals(&self) -> Vec<signal::Number> {
         let mut signals = Vec::new();
         for slot in &CAUGHT_SIGNALS {
             // Need a fence to ensure we examine the slots in order.
@@ -1017,7 +1017,7 @@ mod tests {
     #[test]
     fn real_system_caught_signals() {
         unsafe {
-            let mut system = RealSystem::new();
+            let system = RealSystem::new();
             let result = system.caught_signals();
             assert_eq!(result, []);
 

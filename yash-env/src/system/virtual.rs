@@ -677,7 +677,7 @@ impl Sigaction for VirtualSystem {
 }
 
 impl CaughtSignals for VirtualSystem {
-    fn caught_signals(&mut self) -> Vec<signal::Number> {
+    fn caught_signals(&self) -> Vec<signal::Number> {
         std::mem::take(&mut self.current_process_mut().caught_signals)
     }
 }
