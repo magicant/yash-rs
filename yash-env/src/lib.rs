@@ -48,6 +48,7 @@ use self::semantics::ExitStatus;
 use self::stack::Frame;
 use self::stack::Stack;
 use self::system::Errno;
+use self::system::GetPid as _;
 use self::system::Mode;
 use self::system::OfdAccess;
 use self::system::Open as _;

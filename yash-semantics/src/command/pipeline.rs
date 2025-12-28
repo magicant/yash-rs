@@ -341,6 +341,7 @@ mod tests {
     use yash_env::job::ProcessState;
     use yash_env::option::Option::{ErrExit, Monitor};
     use yash_env::semantics::Field;
+    use yash_env::system::GetPid as _;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::SIGSTOP;
     use yash_env_test_helper::assert_stdout;

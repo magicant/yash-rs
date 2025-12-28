@@ -21,6 +21,7 @@ mod file_system;
 mod future;
 mod id;
 mod io;
+mod process;
 #[cfg(unix)]
 pub mod real;
 pub mod resource;
@@ -44,6 +45,7 @@ pub use self::id::RawUid;
 pub use self::id::Uid;
 pub use self::io::FdFlag;
 pub use self::io::{Close, Dup, Fcntl, Pipe, Read, Write};
+pub use self::process::{GetPid, SetPgid};
 #[cfg(all(doc, unix))]
 use self::real::RealSystem;
 use self::resource::LimitPair;
@@ -91,6 +93,7 @@ pub trait System:
     + Dup
     + Fcntl
     + Fstat
+    + GetPid
     + IsExecutableFile
     + Open
     + Pipe
@@ -98,6 +101,7 @@ pub trait System:
     + Seek
     + Select
     + SendSignal
+    + SetPgid
     + Sigaction
     + Sigmask
     + Signals
@@ -112,29 +116,6 @@ pub trait System:
     /// information is provided because POSIX does not require the `isatty`
     /// function to set `errno`.
     fn isatty(&self, fd: Fd) -> bool;
-
-    /// Returns the session ID of the specified process.
-    ///
-    /// If `pid` is `Pid(0)`, this function returns the session ID of the
-    /// current process.
-    fn getsid(&self, pid: Pid) -> Result<Pid>;
-
-    /// Returns the process ID of the current process.
-    #[must_use]
-    fn getpid(&self) -> Pid;
-
-    /// Returns the process ID of the parent process.
-    #[must_use]
-    fn getppid(&self) -> Pid;
-
-    /// Returns the process group ID of the current process.
-    #[must_use]
-    fn getpgrp(&self) -> Pid;
-
-    /// Modifies the process group ID of a process.
-    ///
-    /// This is a thin wrapper around the `setpgid` system call.
-    fn setpgid(&mut self, pid: Pid, pgid: Pid) -> Result<()>;
 
     /// Returns the current foreground process group ID.
     ///

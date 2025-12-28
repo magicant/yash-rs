@@ -44,6 +44,7 @@ use super::FdFlag;
 use super::FileType;
 use super::FlexFuture;
 use super::Fstat;
+use super::GetPid;
 use super::Gid;
 use super::IsExecutableFile;
 use super::Mode;
@@ -56,6 +57,7 @@ use super::Result;
 use super::Seek;
 use super::Select;
 use super::SendSignal;
+use super::SetPgid;
 use super::Sigaction;
 use super::Sigmask;
 use super::SigmaskOp;
@@ -491,6 +493,31 @@ impl Times for RealSystem {
     }
 }
 
+impl GetPid for RealSystem {
+    fn getsid(&self, pid: Pid) -> Result<Pid> {
+        unsafe { libc::getsid(pid.0) }.errno_if_m1().map(Pid)
+    }
+
+    fn getpid(&self) -> Pid {
+        Pid(unsafe { libc::getpid() })
+    }
+
+    fn getppid(&self) -> Pid {
+        Pid(unsafe { libc::getppid() })
+    }
+
+    fn getpgrp(&self) -> Pid {
+        Pid(unsafe { libc::getpgrp() })
+    }
+}
+
+impl SetPgid for RealSystem {
+    fn setpgid(&self, pid: Pid, pgid: Pid) -> Result<()> {
+        let result = unsafe { libc::setpgid(pid.0, pgid.0) };
+        result.errno_if_m1().map(drop)
+    }
+}
+
 impl Signals for RealSystem {
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
         let non_zero = NonZero::new(number)?;
@@ -681,27 +708,6 @@ impl Select for RealSystem {
 impl System for RealSystem {
     fn isatty(&self, fd: Fd) -> bool {
         (unsafe { libc::isatty(fd.0) } != 0)
-    }
-
-    fn getsid(&self, pid: Pid) -> Result<Pid> {
-        unsafe { libc::getsid(pid.0) }.errno_if_m1().map(Pid)
-    }
-
-    fn getpid(&self) -> Pid {
-        Pid(unsafe { libc::getpid() })
-    }
-
-    fn getppid(&self) -> Pid {
-        Pid(unsafe { libc::getppid() })
-    }
-
-    fn getpgrp(&self) -> Pid {
-        Pid(unsafe { libc::getpgrp() })
-    }
-
-    fn setpgid(&mut self, pid: Pid, pgid: Pid) -> Result<()> {
-        let result = unsafe { libc::setpgid(pid.0, pgid.0) };
-        result.errno_if_m1().map(drop)
     }
 
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {

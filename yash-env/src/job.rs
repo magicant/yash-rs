@@ -84,7 +84,7 @@ pub type RawPid = RawPidDef;
 ///
 /// [`kill`]: crate::system::SendSignal::kill
 /// [`wait`]: crate::system::System::wait
-/// [`setpgid`]: crate::system::System::setpgid
+/// [`setpgid`]: crate::system::SetPgid::setpgid
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Pid(pub RawPid);

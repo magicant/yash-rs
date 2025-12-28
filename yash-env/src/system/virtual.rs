@@ -65,6 +65,7 @@ use super::Fcntl;
 use super::FdFlag;
 use super::FlexFuture;
 use super::Fstat;
+use super::GetPid;
 use super::Gid;
 use super::IsExecutableFile;
 use super::OfdAccess;
@@ -76,6 +77,7 @@ use super::Result;
 use super::Seek;
 use super::Select;
 use super::SendSignal;
+use super::SetPgid;
 use super::Sigaction;
 use super::Sigmask;
 use super::SigmaskOp;
@@ -632,6 +634,62 @@ impl Signals for VirtualSystem {
     }
 }
 
+impl GetPid for VirtualSystem {
+    /// Currently, this function always returns `Pid(2)` if the process exists.
+    fn getsid(&self, pid: Pid) -> Result<Pid> {
+        self.state
+            .borrow()
+            .processes
+            .get(&pid)
+            .map_or(Err(Errno::ESRCH), |_| Ok(Pid(2)))
+    }
+
+    fn getpid(&self) -> Pid {
+        self.process_id
+    }
+
+    fn getppid(&self) -> Pid {
+        self.current_process().ppid
+    }
+
+    fn getpgrp(&self) -> Pid {
+        self.current_process().pgid
+    }
+}
+
+impl SetPgid for VirtualSystem {
+    /// Modifies the process group ID of a process.
+    ///
+    /// The current implementation does not yet support the concept of sessions.
+    fn setpgid(&self, mut pid: Pid, mut pgid: Pid) -> Result<()> {
+        if pgid.0 < 0 {
+            return Err(Errno::EINVAL);
+        }
+        if pid.0 == 0 {
+            pid = self.process_id;
+        }
+        if pgid.0 == 0 {
+            pgid = pid;
+        }
+
+        let mut state = self.state.borrow_mut();
+        if pgid != pid && !state.processes.values().any(|p| p.pgid == pgid) {
+            return Err(Errno::EPERM);
+        }
+        let process = state.processes.get_mut(&pid).ok_or(Errno::ESRCH)?;
+        if pid != self.process_id && process.ppid != self.process_id {
+            return Err(Errno::ESRCH);
+        }
+        if process.last_exec.is_some() {
+            return Err(Errno::EACCES);
+        }
+
+        process.pgid = pgid;
+        Ok(())
+        // TODO Support sessions
+    }
+}
+
 impl Sigmask for VirtualSystem {
     fn sigmask(
         &mut self,
@@ -809,58 +867,6 @@ impl System for VirtualSystem {
             Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
         })
         .unwrap_or(false)
-    }
-
-    /// Currently, this function always returns `Pid(2)` if the process exists.
-    fn getsid(&self, pid: Pid) -> Result<Pid> {
-        self.state
-            .borrow()
-            .processes
-            .get(&pid)
-            .map_or(Err(Errno::ESRCH), |_| Ok(Pid(2)))
-    }
-
-    fn getpid(&self) -> Pid {
-        self.process_id
-    }
-
-    fn getppid(&self) -> Pid {
-        self.current_process().ppid
-    }
-
-    fn getpgrp(&self) -> Pid {
-        self.current_process().pgid
-    }
-
-    /// Modifies the process group ID of a process.
-    ///
-    /// The current implementation does not yet support the concept of sessions.
-    fn setpgid(&mut self, mut pid: Pid, mut pgid: Pid) -> Result<()> {
-        if pgid.0 < 0 {
-            return Err(Errno::EINVAL);
-        }
-        if pid.0 == 0 {
-            pid = self.process_id;
-        }
-        if pgid.0 == 0 {
-            pgid = pid;
-        }
-
-        let mut state = self.state.borrow_mut();
-        if pgid != pid && !state.processes.values().any(|p| p.pgid == pgid) {
-            return Err(Errno::EPERM);
-        }
-        let process = state.processes.get_mut(&pid).ok_or(Errno::ESRCH)?;
-        if pid != self.process_id && process.ppid != self.process_id {
-            return Err(Errno::ESRCH);
-        }
-        if process.last_exec.is_some() {
-            return Err(Errno::EACCES);
-        }
-
-        process.pgid = pgid;
-        Ok(())
-        // TODO Support sessions
     }
 
     /// Returns the current foreground process group ID.

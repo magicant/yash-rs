@@ -134,6 +134,7 @@ mod tests {
     use yash_env::job::{Job, ProcessResult};
     use yash_env::option::{Monitor, On};
     use yash_env::subshell::{JobControl, Subshell};
+    use yash_env::system::GetPid as _;
     use yash_env::system::SendSignal as _;
     use yash_env::system::r#virtual::SIGSTOP;
     use yash_env::trap::RunSignalTrapIfCaught;

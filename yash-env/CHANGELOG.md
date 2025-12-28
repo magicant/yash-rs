@@ -26,6 +26,8 @@ A _private dependency_ is used internally and not visible to downstream users.
       `fcntl_getfd`, and `fcntl_setfd` methods for `fcntl`-related operations.
     - `Fstat`: Declares `fstat` and `fstatat` methods for getting file
       metadata and provides a default implementation of `is_directory`.
+    - `GetPid`: Declares the `getpid` and other methods for getting process IDs
+      and other attributes.
     - `IsExecutableFile`: Declares the `is_executable_file` method for checking
       if a file is executable.
     - `Open`: Declares the `open` and other methods for opening files.
@@ -37,6 +39,7 @@ A _private dependency_ is used internally and not visible to downstream users.
       descriptors and signals.
     - `SendSignal`: Declares the `kill` and `raise` methods for sending signals
       to processes.
+    - `SetPgid`: Declares the `setpgid` method for setting process group IDs.
     - `Sigaction`: Declares methods for managing signal dispositions.
     - `Sigmask`: Declares the `sigmask` method for managing signal masks.
     - `Signals`: Declares the `signal_number_from_name` and

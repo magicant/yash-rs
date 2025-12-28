@@ -27,6 +27,7 @@ use super::Fcntl;
 use super::FdFlag;
 use super::FlexFuture;
 use super::Fstat;
+use super::GetPid;
 use super::Gid;
 use super::IsExecutableFile;
 use super::LimitPair;
@@ -44,6 +45,7 @@ use super::Seek;
 use super::Select;
 use super::SelectSystem;
 use super::SendSignal;
+use super::SetPgid;
 use super::Sigaction;
 use super::Sigmask;
 use super::SigmaskOp;
@@ -449,6 +451,32 @@ impl<T: Times> Times for &SharedSystem<T> {
     }
 }
 
+/// Delegates `GetPid` methods to the contained implementor.
+impl<T: GetPid> GetPid for &SharedSystem<T> {
+    fn getsid(&self, pid: Pid) -> Result<Pid> {
+        self.0.borrow().getsid(pid)
+    }
+
+    fn getpid(&self) -> Pid {
+        self.0.borrow().getpid()
+    }
+
+    fn getppid(&self) -> Pid {
+        self.0.borrow().getppid()
+    }
+
+    fn getpgrp(&self) -> Pid {
+        self.0.borrow().getpgrp()
+    }
+}
+
+/// Delegates `SetPgid` methods to the contained implementor.
+impl<T: SetPgid> SetPgid for &SharedSystem<T> {
+    fn setpgid(&self, pid: Pid, pgid: Pid) -> Result<()> {
+        self.0.borrow().setpgid(pid, pgid)
+    }
+}
+
 /// Delegates `Signals` methods to the contained implementor.
 impl<T: Signals> Signals for &SharedSystem<T> {
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
@@ -517,21 +545,6 @@ impl<T: Select> Select for &SharedSystem<T> {
 impl<S: System> System for &SharedSystem<S> {
     fn isatty(&self, fd: Fd) -> bool {
         self.0.borrow().isatty(fd)
-    }
-    fn getsid(&self, pid: Pid) -> Result<Pid> {
-        self.0.borrow().getsid(pid)
-    }
-    fn getpid(&self) -> Pid {
-        self.0.borrow().getpid()
-    }
-    fn getppid(&self) -> Pid {
-        self.0.borrow().getppid()
-    }
-    fn getpgrp(&self) -> Pid {
-        self.0.borrow().getpgrp()
-    }
-    fn setpgid(&mut self, pid: Pid, pgid: Pid) -> Result<()> {
-        self.0.borrow_mut().setpgid(pid, pgid)
     }
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
         self.0.borrow().tcgetpgrp(fd)
@@ -740,6 +753,37 @@ impl<T: Times> Times for SharedSystem<T> {
     }
 }
 
+/// Delegates `GetPid` methods to the contained implementor.
+impl<T: GetPid> GetPid for SharedSystem<T> {
+    #[inline]
+    fn getsid(&self, pid: Pid) -> Result<Pid> {
+        (&self).getsid(pid)
+    }
+
+    #[inline]
+    fn getpid(&self) -> Pid {
+        (&self).getpid()
+    }
+
+    #[inline]
+    fn getppid(&self) -> Pid {
+        (&self).getppid()
+    }
+
+    #[inline]
+    fn getpgrp(&self) -> Pid {
+        (&self).getpgrp()
+    }
+}
+
+/// Delegates `SetPgid` methods to the contained implementor.
+impl<T: SetPgid> SetPgid for SharedSystem<T> {
+    #[inline]
+    fn setpgid(&self, pid: Pid, pgid: Pid) -> Result<()> {
+        (&self).setpgid(pid, pgid)
+    }
+}
+
 /// Delegates `Signals` methods to the contained implementor.
 impl<T: Signals> Signals for SharedSystem<T> {
     #[inline]
@@ -817,26 +861,6 @@ impl<S: System> System for SharedSystem<S> {
     #[inline]
     fn isatty(&self, fd: Fd) -> bool {
         (&self).isatty(fd)
-    }
-    #[inline]
-    fn getsid(&self, pid: Pid) -> Result<Pid> {
-        (&self).getsid(pid)
-    }
-    #[inline]
-    fn getpid(&self) -> Pid {
-        (&self).getpid()
-    }
-    #[inline]
-    fn getppid(&self) -> Pid {
-        (&self).getppid()
-    }
-    #[inline]
-    fn getpgrp(&self) -> Pid {
-        (&self).getpgrp()
-    }
-    #[inline]
-    fn setpgid(&mut self, pid: Pid, pgid: Pid) -> Result<()> {
-        (&mut &*self).setpgid(pid, pgid)
     }
     #[inline]
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {

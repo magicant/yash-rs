@@ -33,6 +33,8 @@ use crate::signal;
 use crate::stack::Frame;
 use crate::system::ChildProcessTask;
 use crate::system::Errno;
+use crate::system::GetPid as _;
+use crate::system::SetPgid as _;
 use crate::system::Sigmask as _;
 use crate::system::SigmaskOp;
 use crate::system::Signals as _;
