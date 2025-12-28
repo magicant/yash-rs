@@ -30,6 +30,8 @@ A _private dependency_ is used internally and not visible to downstream users.
       and other attributes.
     - `IsExecutableFile`: Declares the `is_executable_file` method for checking
       if a file is executable.
+    - `Isatty`: Declares the `isatty` method for testing if a file descriptor is
+      associated with a terminal device.
     - `Open`: Declares the `open` and other methods for opening files.
     - `Pipe`: Declares the `pipe` method for creating pipes.
     - `Read`: Declares the `read` method for reading from file descriptors.

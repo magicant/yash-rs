@@ -68,6 +68,7 @@ use super::Fstat;
 use super::GetPid;
 use super::Gid;
 use super::IsExecutableFile;
+use super::Isatty;
 use super::OfdAccess;
 use super::Open;
 use super::OpenFlag;
@@ -351,6 +352,15 @@ impl IsExecutableFile for VirtualSystem {
         let path = Path::new(UnixStr::from_bytes(path.to_bytes()));
         self.resolve_existing_file(AT_FDCWD, path, /* follow symlinks */ true)
             .is_ok_and(|inode| inode.borrow().permissions.intersects(Mode::ALL_EXEC))
+    }
+}
+
+impl Isatty for VirtualSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        self.with_open_file_description(fd, |ofd| {
+            Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
+        })
+        .unwrap_or(false)
     }
 }
 
@@ -862,13 +872,6 @@ impl Select for VirtualSystem {
 }
 
 impl System for VirtualSystem {
-    fn isatty(&self, fd: Fd) -> bool {
-        self.with_open_file_description(fd, |ofd| {
-            Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
-        })
-        .unwrap_or(false)
-    }
-
     /// Returns the current foreground process group ID.
     ///
     /// The current implementation does not yet support the concept of

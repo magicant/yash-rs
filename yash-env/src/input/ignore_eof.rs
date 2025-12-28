@@ -20,6 +20,7 @@ use super::{Context, Input, Result};
 use crate::Env;
 use crate::io::Fd;
 use crate::option::{IgnoreEof as IgnoreEofOption, Interactive, Off};
+use crate::system::Isatty as _;
 use crate::system::System;
 use std::cell::RefCell;
 

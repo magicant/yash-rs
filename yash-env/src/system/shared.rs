@@ -30,6 +30,7 @@ use super::Fstat;
 use super::GetPid;
 use super::Gid;
 use super::IsExecutableFile;
+use super::Isatty;
 use super::LimitPair;
 use super::Mode;
 use super::OfdAccess;
@@ -347,6 +348,13 @@ impl<T: IsExecutableFile> IsExecutableFile for &SharedSystem<T> {
     }
 }
 
+/// Delegates `Isatty` methods to the contained implementor.
+impl<S: System> Isatty for &SharedSystem<S> {
+    fn isatty(&self, fd: Fd) -> bool {
+        self.0.borrow().isatty(fd)
+    }
+}
+
 /// Delegates `Pipe` methods to the contained implementor.
 impl<T: Pipe> Pipe for &SharedSystem<T> {
     fn pipe(&self) -> Result<(Fd, Fd)> {
@@ -543,9 +551,6 @@ impl<T: Select> Select for &SharedSystem<T> {
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl<S: System> System for &SharedSystem<S> {
-    fn isatty(&self, fd: Fd) -> bool {
-        self.0.borrow().isatty(fd)
-    }
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
         self.0.borrow().tcgetpgrp(fd)
     }
@@ -628,6 +633,14 @@ impl<T: IsExecutableFile> IsExecutableFile for SharedSystem<T> {
     #[inline]
     fn is_executable_file(&self, path: &CStr) -> bool {
         (&self).is_executable_file(path)
+    }
+}
+
+/// Delegates `Isatty` methods to the contained implementor.
+impl<S: System> Isatty for SharedSystem<S> {
+    #[inline]
+    fn isatty(&self, fd: Fd) -> bool {
+        (&self).isatty(fd)
     }
 }
 
@@ -858,10 +871,6 @@ impl<T: Select> Select for SharedSystem<T> {
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
     // which in turn delegates to the contained system instance.
-    #[inline]
-    fn isatty(&self, fd: Fd) -> bool {
-        (&self).isatty(fd)
-    }
     #[inline]
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
         (&self).tcgetpgrp(fd)
