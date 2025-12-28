@@ -103,7 +103,7 @@ impl std::ops::Neg for Pid {
 }
 
 impl Pid {
-    /// Sentinel value for the [`kill`] and [`wait`]system calls specifying all
+    /// Sentinel value for the [`kill`] and [`wait`] system calls specifying all
     /// processes in the process group of the calling process.
     ///
     /// [`kill`]: crate::system::SendSignal::kill
