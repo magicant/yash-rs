@@ -40,6 +40,7 @@ use yash_env::option::State::{Off, On};
 use yash_env::parser::Config;
 use yash_env::system::Errno;
 use yash_env::system::Fcntl as _;
+use yash_env::system::Isatty as _;
 use yash_env::system::Mode;
 use yash_env::system::OfdAccess;
 use yash_env::system::Open as _;

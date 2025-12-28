@@ -252,6 +252,20 @@ pub trait IsExecutableFile {
     fn is_executable_file(&self, path: &CStr) -> bool;
 }
 
+/// Trait for testing if a file descriptor is associated with a terminal device
+///
+/// This trait declares the `isatty` method, which tests whether a file
+/// descriptor is associated with a terminal device.
+pub trait Isatty {
+    /// Tests if a file descriptor is associated with a terminal device.
+    ///
+    /// On error, this function simply returns `false` and no detailed error
+    /// information is provided because POSIX does not require the `isatty`
+    /// function to set `errno`.
+    #[must_use]
+    fn isatty(&self, fd: Fd) -> bool;
+}
+
 /// File access mode of open file descriptions
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]

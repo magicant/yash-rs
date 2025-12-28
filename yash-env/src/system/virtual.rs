@@ -68,6 +68,7 @@ use super::Fstat;
 use super::GetPid;
 use super::Gid;
 use super::IsExecutableFile;
+use super::Isatty;
 use super::OfdAccess;
 use super::Open;
 use super::OpenFlag;
@@ -861,14 +862,16 @@ impl Select for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
+impl Isatty for VirtualSystem {
     fn isatty(&self, fd: Fd) -> bool {
         self.with_open_file_description(fd, |ofd| {
             Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
         })
         .unwrap_or(false)
     }
+}
 
+impl System for VirtualSystem {
     /// Returns the current foreground process group ID.
     ///
     /// The current implementation does not yet support the concept of

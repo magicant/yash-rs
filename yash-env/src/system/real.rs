@@ -47,6 +47,7 @@ use super::Fstat;
 use super::GetPid;
 use super::Gid;
 use super::IsExecutableFile;
+use super::Isatty;
 use super::Mode;
 use super::OfdAccess;
 use super::Open;
@@ -705,11 +706,13 @@ impl Select for RealSystem {
     }
 }
 
-impl System for RealSystem {
+impl Isatty for RealSystem {
     fn isatty(&self, fd: Fd) -> bool {
         (unsafe { libc::isatty(fd.0) } != 0)
     }
+}
 
+impl System for RealSystem {
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
         unsafe { libc::tcgetpgrp(fd.0) }.errno_if_m1().map(Pid)
     }

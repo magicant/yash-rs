@@ -23,7 +23,7 @@ use yash_env::prompt::GetPrompt;
 use yash_env::semantics::expansion::attr::AttrChar;
 use yash_env::semantics::expansion::attr::Origin;
 use yash_env::source::pretty::{Report, ReportType};
-use yash_env::system::{Errno, System};
+use yash_env::system::{Errno, Isatty as _, System};
 
 /// Error reading from the standard input
 ///

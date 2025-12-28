@@ -35,8 +35,8 @@ pub use self::errno::Errno;
 pub use self::errno::RawErrno;
 pub use self::errno::Result;
 pub use self::file_system::{
-    AT_FDCWD, Dir, DirEntry, FileType, Fstat, IsExecutableFile, Mode, OfdAccess, Open, OpenFlag,
-    RawMode, Seek, Stat, Umask,
+    AT_FDCWD, Dir, DirEntry, FileType, Fstat, IsExecutableFile, Isatty, Mode, OfdAccess, Open,
+    OpenFlag, RawMode, Seek, Stat, Umask,
 };
 pub use self::future::FlexFuture;
 pub use self::id::Gid;
@@ -95,6 +95,7 @@ pub trait System:
     + Fstat
     + GetPid
     + IsExecutableFile
+    + Isatty
     + Open
     + Pipe
     + Read
@@ -110,13 +111,6 @@ pub trait System:
     + Umask
     + Write
 {
-    /// Tests if a file descriptor is associated with a terminal device.
-    ///
-    /// On error, this function simply returns `false` and no detailed error
-    /// information is provided because POSIX does not require the `isatty`
-    /// function to set `errno`.
-    fn isatty(&self, fd: Fd) -> bool;
-
     /// Returns the current foreground process group ID.
     ///
     /// This is a thin wrapper around the `tcgetpgrp` system call.

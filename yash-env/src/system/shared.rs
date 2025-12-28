@@ -30,6 +30,7 @@ use super::Fstat;
 use super::GetPid;
 use super::Gid;
 use super::IsExecutableFile;
+use super::Isatty;
 use super::LimitPair;
 use super::Mode;
 use super::OfdAccess;
@@ -538,14 +539,17 @@ impl<T: Select> Select for &SharedSystem<T> {
     }
 }
 
+impl<S: System> Isatty for &SharedSystem<S> {
+    fn isatty(&self, fd: Fd) -> bool {
+        self.0.borrow().isatty(fd)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl<S: System> System for &SharedSystem<S> {
-    fn isatty(&self, fd: Fd) -> bool {
-        self.0.borrow().isatty(fd)
-    }
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
         self.0.borrow().tcgetpgrp(fd)
     }
@@ -854,14 +858,17 @@ impl<T: Select> Select for SharedSystem<T> {
     }
 }
 
-/// Delegates `System` methods to the contained system instance.
-impl<S: System> System for SharedSystem<S> {
-    // All methods are delegated to `impl System for &SharedSystem`,
-    // which in turn delegates to the contained system instance.
+impl<S: System> Isatty for SharedSystem<S> {
     #[inline]
     fn isatty(&self, fd: Fd) -> bool {
         (&self).isatty(fd)
     }
+}
+
+/// Delegates `System` methods to the contained system instance.
+impl<S: System> System for SharedSystem<S> {
+    // All methods are delegated to `impl System for &SharedSystem`,
+    // which in turn delegates to the contained system instance.
     #[inline]
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
         (&self).tcgetpgrp(fd)
