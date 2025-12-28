@@ -19,6 +19,8 @@
 use super::Disposition;
 use super::Errno;
 use super::Result;
+#[cfg(doc)]
+use super::SharedSystem;
 use super::SigmaskOp;
 use super::System;
 use super::signal;
@@ -28,6 +30,7 @@ use std::cmp::Ordering;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::collections::binary_heap::PeekMut;
+use std::ffi::c_int;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::rc::Rc;
@@ -35,6 +38,44 @@ use std::rc::Weak;
 use std::task::Waker;
 use std::time::Duration;
 use std::time::Instant;
+
+/// Trait for performing the `select` operation
+pub trait Select {
+    /// Waits for a next event.
+    ///
+    /// This is a low-level function used internally by
+    /// [`SharedSystem::select`]. You should not call this function directly, or
+    /// you will disrupt the behavior of `SharedSystem`. The description below
+    /// applies if you want to do everything yourself without depending on
+    /// `SharedSystem`.
+    ///
+    /// This function blocks the calling thread until one of the following
+    /// condition is met:
+    ///
+    /// - An FD in `readers` becomes ready for reading.
+    /// - An FD in `writers` becomes ready for writing.
+    /// - The specified `timeout` duration has passed.
+    /// - A signal handler catches a signal.
+    ///
+    /// When this function returns an `Ok`, FDs that are not ready for reading
+    /// and writing are removed from `readers` and `writers`, respectively. The
+    /// return value will be the number of FDs left in `readers` and `writers`.
+    ///
+    /// If `readers` and `writers` contain an FD that is not open for reading
+    /// and writing, respectively, this function will fail with `EBADF`. In this
+    /// case, you should remove the FD from `readers` and `writers` and try
+    /// again.
+    ///
+    /// If `signal_mask` is `Some` list of signals, it is used as the signal
+    /// blocking mask while waiting and restored when the function returns.
+    fn select(
+        &self,
+        readers: &mut Vec<Fd>,
+        writers: &mut Vec<Fd>,
+        timeout: Option<Duration>,
+        signal_mask: Option<&[signal::Number]>,
+    ) -> Result<c_int>;
+}
 
 /// [System] extended with internal state to support asynchronous functions.
 ///

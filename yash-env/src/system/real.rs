@@ -54,6 +54,7 @@ use super::Pipe;
 use super::Read;
 use super::Result;
 use super::Seek;
+use super::Select;
 use super::SendSignal;
 use super::Sigaction;
 use super::Sigmask;
@@ -606,13 +607,9 @@ impl SendSignal for RealSystem {
     }
 }
 
-impl System for RealSystem {
-    fn isatty(&self, fd: Fd) -> bool {
-        (unsafe { libc::isatty(fd.0) } != 0)
-    }
-
+impl Select for RealSystem {
     fn select(
-        &mut self,
+        &self,
         readers: &mut Vec<Fd>,
         writers: &mut Vec<Fd>,
         timeout: Option<Duration>,
@@ -678,6 +675,12 @@ impl System for RealSystem {
         writers.retain(|fd| unsafe { libc::FD_ISSET(fd.0, writers_ptr) });
 
         Ok(count)
+    }
+}
+
+impl System for RealSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        (unsafe { libc::isatty(fd.0) } != 0)
     }
 
     fn getsid(&self, pid: Pid) -> Result<Pid> {

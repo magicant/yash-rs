@@ -48,6 +48,7 @@ pub use self::io::{Close, Dup, Fcntl, Pipe, Read, Write};
 use self::real::RealSystem;
 use self::resource::LimitPair;
 use self::resource::Resource;
+pub use self::select::Select;
 use self::select::SelectSystem;
 use self::select::SignalStatus;
 pub use self::shared::SharedSystem;
@@ -72,10 +73,8 @@ use crate::trap::SignalSystem;
 use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::ffi::c_int;
 use std::fmt::Debug;
 use std::pin::Pin;
-use std::time::Duration;
 use r#virtual::SignalEffect;
 
 /// API to the system-managed parts of the environment.
@@ -97,6 +96,7 @@ pub trait System:
     + Pipe
     + Read
     + Seek
+    + Select
     + SendSignal
     + Sigaction
     + Sigmask
@@ -112,41 +112,6 @@ pub trait System:
     /// information is provided because POSIX does not require the `isatty`
     /// function to set `errno`.
     fn isatty(&self, fd: Fd) -> bool;
-
-    /// Waits for a next event.
-    ///
-    /// This is a low-level function used internally by
-    /// [`SharedSystem::select`]. You should not call this function directly, or
-    /// you will disrupt the behavior of `SharedSystem`. The description below
-    /// applies if you want to do everything yourself without depending on
-    /// `SharedSystem`.
-    ///
-    /// This function blocks the calling thread until one of the following
-    /// condition is met:
-    ///
-    /// - An FD in `readers` becomes ready for reading.
-    /// - An FD in `writers` becomes ready for writing.
-    /// - The specified `timeout` duration has passed.
-    /// - A signal handler catches a signal.
-    ///
-    /// When this function returns an `Ok`, FDs that are not ready for reading
-    /// and writing are removed from `readers` and `writers`, respectively. The
-    /// return value will be the number of FDs left in `readers` and `writers`.
-    ///
-    /// If `readers` and `writers` contain an FD that is not open for reading
-    /// and writing, respectively, this function will fail with `EBADF`. In this
-    /// case, you should remove the FD from `readers` and `writers` and try
-    /// again.
-    ///
-    /// If `signal_mask` is `Some` list of signals, it is used as the signal
-    /// blocking mask while waiting and restored when the function returns.
-    fn select(
-        &mut self,
-        readers: &mut Vec<Fd>,
-        writers: &mut Vec<Fd>,
-        timeout: Option<Duration>,
-        signal_mask: Option<&[signal::Number]>,
-    ) -> Result<c_int>;
 
     /// Returns the session ID of the specified process.
     ///

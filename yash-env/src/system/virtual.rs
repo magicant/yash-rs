@@ -74,6 +74,7 @@ use super::Pipe;
 use super::Read;
 use super::Result;
 use super::Seek;
+use super::Select;
 use super::SendSignal;
 use super::Sigaction;
 use super::Sigmask;
@@ -736,14 +737,7 @@ impl SendSignal for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
-    fn isatty(&self, fd: Fd) -> bool {
-        self.with_open_file_description(fd, |ofd| {
-            Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
-        })
-        .unwrap_or(false)
-    }
-
+impl Select for VirtualSystem {
     /// Waits for a next event.
     ///
     /// The `VirtualSystem` implementation for this method does not actually
@@ -753,7 +747,7 @@ impl System for VirtualSystem {
     /// or a caught signal. Otherwise, the timeout is added to
     /// [`SystemState::now`], which must not be `None` then.
     fn select(
-        &mut self,
+        &self,
         readers: &mut Vec<Fd>,
         writers: &mut Vec<Fd>,
         timeout: Option<Duration>,
@@ -806,6 +800,15 @@ impl System for VirtualSystem {
             }
         }
         Ok(count)
+    }
+}
+
+impl System for VirtualSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        self.with_open_file_description(fd, |ofd| {
+            Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
+        })
+        .unwrap_or(false)
     }
 
     /// Currently, this function always returns `Pid(2)` if the process exists.
@@ -2046,7 +2049,7 @@ mod tests {
 
     #[test]
     fn select_regular_file_is_always_ready() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let mut readers = vec![Fd::STDIN];
         let mut writers = vec![Fd::STDOUT, Fd::STDERR];
 
@@ -2058,7 +2061,7 @@ mod tests {
 
     #[test]
     fn select_pipe_reader_is_ready_if_writer_is_closed() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let (reader, writer) = system.pipe().unwrap();
         system.close(writer).unwrap();
         let mut readers = vec![reader];
@@ -2072,7 +2075,7 @@ mod tests {
 
     #[test]
     fn select_pipe_reader_is_ready_if_something_has_been_written() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let (reader, writer) = system.pipe().unwrap();
         system.write(writer, &[0]).unwrap();
         let mut readers = vec![reader];
@@ -2086,7 +2089,7 @@ mod tests {
 
     #[test]
     fn select_pipe_reader_is_not_ready_if_writer_has_written_nothing() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let (reader, _writer) = system.pipe().unwrap();
         let mut readers = vec![reader];
         let mut writers = vec![];
@@ -2099,7 +2102,7 @@ mod tests {
 
     #[test]
     fn select_pipe_writer_is_ready_if_pipe_is_not_full() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let (_reader, writer) = system.pipe().unwrap();
         let mut readers = vec![];
         let mut writers = vec![writer];
@@ -2112,7 +2115,7 @@ mod tests {
 
     #[test]
     fn select_on_unreadable_fd() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let (_reader, writer) = system.pipe().unwrap();
         let mut fds = vec![writer];
         let result = system.select(&mut fds, &mut vec![], None, None);
@@ -2122,7 +2125,7 @@ mod tests {
 
     #[test]
     fn select_on_unwritable_fd() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let (reader, _writer) = system.pipe().unwrap();
         let mut fds = vec![reader];
         let result = system.select(&mut vec![], &mut fds, None, None);
@@ -2132,7 +2135,7 @@ mod tests {
 
     #[test]
     fn select_on_closed_fd() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.select(&mut vec![Fd(17)], &mut vec![], None, None);
         assert_eq!(result, Err(Errno::EBADF));
 
@@ -2151,7 +2154,7 @@ mod tests {
 
     #[test]
     fn select_on_non_pending_signal() {
-        let mut system = system_for_catching_sigchld();
+        let system = system_for_catching_sigchld();
         let result = system.select(&mut vec![], &mut vec![], None, Some(&[]));
         assert_eq!(result, Ok(0));
         assert_eq!(system.caught_signals(), []);
@@ -2159,7 +2162,7 @@ mod tests {
 
     #[test]
     fn select_on_pending_signal() {
-        let mut system = system_for_catching_sigchld();
+        let system = system_for_catching_sigchld();
         let _ = system.current_process_mut().raise_signal(SIGCHLD);
         let result = system.select(&mut vec![], &mut vec![], None, Some(&[]));
         assert_eq!(result, Err(Errno::EINTR));
@@ -2168,7 +2171,7 @@ mod tests {
 
     #[test]
     fn select_timeout() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let now = Instant::now();
         system.state.borrow_mut().now = Some(now);
 

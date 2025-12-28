@@ -41,6 +41,7 @@ use super::Read;
 use super::Resource;
 use super::Result;
 use super::Seek;
+use super::Select;
 use super::SelectSystem;
 use super::SendSignal;
 use super::Sigaction;
@@ -295,7 +296,7 @@ impl<S: System> SharedSystem<S> {
 
     /// Waits for a next event to occur.
     ///
-    /// This function calls [`System::select`] with arguments computed from the
+    /// This function calls [`Select::select`] with arguments computed from the
     /// current internal state of the `SharedSystem`. It will wake up tasks
     /// waiting for the file descriptor to be ready in
     /// [`read_async`](Self::read_async) and [`write_all`](Self::write_all) or
@@ -496,6 +497,19 @@ impl<T: SendSignal> SendSignal for &SharedSystem<T> {
     }
 }
 
+/// Delegates `Select` methods to the contained implementor.
+impl<T: Select> Select for &SharedSystem<T> {
+    fn select(
+        &self,
+        readers: &mut Vec<Fd>,
+        writers: &mut Vec<Fd>,
+        timeout: Option<Duration>,
+        signal_mask: Option<&[signal::Number]>,
+    ) -> Result<c_int> {
+        (**self.0.borrow()).select(readers, writers, timeout, signal_mask)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
@@ -503,15 +517,6 @@ impl<T: SendSignal> SendSignal for &SharedSystem<T> {
 impl<S: System> System for &SharedSystem<S> {
     fn isatty(&self, fd: Fd) -> bool {
         self.0.borrow().isatty(fd)
-    }
-    fn select(
-        &mut self,
-        readers: &mut Vec<Fd>,
-        writers: &mut Vec<Fd>,
-        timeout: Option<Duration>,
-        signal_mask: Option<&[signal::Number]>,
-    ) -> Result<c_int> {
-        (**self.0.borrow_mut()).select(readers, writers, timeout, signal_mask)
     }
     fn getsid(&self, pid: Pid) -> Result<Pid> {
         self.0.borrow().getsid(pid)
@@ -791,6 +796,20 @@ impl<T: SendSignal> SendSignal for SharedSystem<T> {
     }
 }
 
+/// Delegates `Select` methods to the contained implementor.
+impl<T: Select> Select for SharedSystem<T> {
+    #[inline]
+    fn select(
+        &self,
+        readers: &mut Vec<Fd>,
+        writers: &mut Vec<Fd>,
+        timeout: Option<Duration>,
+        signal_mask: Option<&[signal::Number]>,
+    ) -> Result<c_int> {
+        (&self).select(readers, writers, timeout, signal_mask)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
@@ -798,16 +817,6 @@ impl<S: System> System for SharedSystem<S> {
     #[inline]
     fn isatty(&self, fd: Fd) -> bool {
         (&self).isatty(fd)
-    }
-    #[inline]
-    fn select(
-        &mut self,
-        readers: &mut Vec<Fd>,
-        writers: &mut Vec<Fd>,
-        timeout: Option<Duration>,
-        signal_mask: Option<&[signal::Number]>,
-    ) -> Result<c_int> {
-        (&mut &*self).select(readers, writers, timeout, signal_mask)
     }
     #[inline]
     fn getsid(&self, pid: Pid) -> Result<Pid> {
