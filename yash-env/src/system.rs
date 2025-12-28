@@ -51,7 +51,9 @@ use self::resource::Resource;
 use self::select::SelectSystem;
 use self::select::SignalStatus;
 pub use self::shared::SharedSystem;
-pub use self::signal::{CaughtSignals, Disposition, Sigaction, Sigmask, SigmaskOp, Signals};
+pub use self::signal::{
+    CaughtSignals, Disposition, SendSignal, Sigaction, Sigmask, SigmaskOp, Signals,
+};
 pub use self::time::{CpuTimes, Time, Times};
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
@@ -95,6 +97,7 @@ pub trait System:
     + Pipe
     + Read
     + Seek
+    + SendSignal
     + Sigaction
     + Sigmask
     + Signals
@@ -109,25 +112,6 @@ pub trait System:
     /// information is provided because POSIX does not require the `isatty`
     /// function to set `errno`.
     fn isatty(&self, fd: Fd) -> bool;
-
-    /// Sends a signal.
-    ///
-    /// This is a thin wrapper around the `kill` system call. If `signal` is
-    /// `None`, permission to send a signal is checked, but no signal is sent.
-    ///
-    /// The virtual system version of this function blocks the calling thread if
-    /// the signal stops or terminates the current process, hence returning a
-    /// future. See [`VirtualSystem::kill`] for details.
-    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>>;
-
-    /// Sends a signal to the current process.
-    ///
-    /// This is a thin wrapper around the `raise` system call.
-    ///
-    /// The virtual system version of this function blocks the calling thread if
-    /// the signal stops or terminates the current process, hence returning a
-    /// future. See [`VirtualSystem::kill`] for details.
-    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>>;
 
     /// Waits for a next event.
     ///
@@ -318,8 +302,8 @@ pub trait System:
 /// process ID than the parent.
 ///
 /// Note that the output type of the task is `Infallible`. This is to ensure that
-/// the task [exits](System::exit) cleanly or [kills](System::kill) itself with
-/// a signal.
+/// the task [exits](System::exit) cleanly or [kills](SendSignal::kill) itself
+/// with a signal.
 pub type ChildProcessTask<S> =
     Box<dyn for<'a> FnOnce(&'a mut Env<S>) -> Pin<Box<dyn Future<Output = Infallible> + 'a>>>;
 

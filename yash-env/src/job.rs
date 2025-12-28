@@ -82,7 +82,7 @@ pub type RawPid = RawPidDef;
 ///
 /// This type may also be used to represent process group IDs, session IDs, etc.
 ///
-/// [`kill`]: crate::system::System::kill
+/// [`kill`]: crate::system::SendSignal::kill
 /// [`wait`]: crate::system::System::wait
 /// [`setpgid`]: crate::system::System::setpgid
 #[repr(transparent)]
@@ -106,14 +106,14 @@ impl Pid {
     /// Sentinel value for the [`kill`] and [`wait`]system calls specifying all
     /// processes in the process group of the calling process.
     ///
-    /// [`kill`]: crate::system::System::kill
+    /// [`kill`]: crate::system::SendSignal::kill
     /// [`wait`]: crate::system::System::wait
     pub const MY_PROCESS_GROUP: Self = Pid(0);
 
     /// Sentinel value for the [`kill`] and [`wait`] system calls specifying all
     /// possible processes.
     ///
-    /// [`kill`]: crate::system::System::kill
+    /// [`kill`]: crate::system::SendSignal::kill
     /// [`wait`]: crate::system::System::wait
     pub const ALL: Self = Pid(-1);
 }

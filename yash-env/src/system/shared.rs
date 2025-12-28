@@ -42,6 +42,7 @@ use super::Resource;
 use super::Result;
 use super::Seek;
 use super::SelectSystem;
+use super::SendSignal;
 use super::Sigaction;
 use super::Sigmask;
 use super::SigmaskOp;
@@ -485,6 +486,16 @@ impl<T: CaughtSignals> CaughtSignals for &SharedSystem<T> {
     }
 }
 
+/// Delegates `SendSignal` methods to the contained implementor.
+impl<T: SendSignal> SendSignal for &SharedSystem<T> {
+    fn kill(&self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
+        self.0.borrow().kill(target, signal)
+    }
+    fn raise(&self, signal: signal::Number) -> FlexFuture<Result<()>> {
+        self.0.borrow().raise(signal)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
@@ -492,12 +503,6 @@ impl<T: CaughtSignals> CaughtSignals for &SharedSystem<T> {
 impl<S: System> System for &SharedSystem<S> {
     fn isatty(&self, fd: Fd) -> bool {
         self.0.borrow().isatty(fd)
-    }
-    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
-        self.0.borrow_mut().kill(target, signal)
-    }
-    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>> {
-        self.0.borrow_mut().raise(signal)
     }
     fn select(
         &mut self,
@@ -774,6 +779,18 @@ impl<T: CaughtSignals> CaughtSignals for SharedSystem<T> {
     }
 }
 
+/// Delegates `SendSignal` methods to the contained implementor.
+impl<T: SendSignal> SendSignal for SharedSystem<T> {
+    #[inline]
+    fn kill(&self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
+        (&self).kill(target, signal)
+    }
+    #[inline]
+    fn raise(&self, signal: signal::Number) -> FlexFuture<Result<()>> {
+        (&self).raise(signal)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
@@ -781,14 +798,6 @@ impl<S: System> System for SharedSystem<S> {
     #[inline]
     fn isatty(&self, fd: Fd) -> bool {
         (&self).isatty(fd)
-    }
-    #[inline]
-    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
-        (&mut &*self).kill(target, signal)
-    }
-    #[inline]
-    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>> {
-        (&mut &*self).raise(signal)
     }
     #[inline]
     fn select(

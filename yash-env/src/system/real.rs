@@ -54,6 +54,7 @@ use super::Pipe;
 use super::Read;
 use super::Result;
 use super::Seek;
+use super::SendSignal;
 use super::Sigaction;
 use super::Sigmask;
 use super::SigmaskOp;
@@ -592,20 +593,22 @@ impl CaughtSignals for RealSystem {
     }
 }
 
-impl System for RealSystem {
-    fn isatty(&self, fd: Fd) -> bool {
-        (unsafe { libc::isatty(fd.0) } != 0)
-    }
-
-    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
+impl SendSignal for RealSystem {
+    fn kill(&self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
         let raw = signal.map_or(0, signal::Number::as_raw);
         let result = unsafe { libc::kill(target.0, raw) }.errno_if_m1().map(drop);
         result.into()
     }
 
-    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>> {
+    fn raise(&self, signal: signal::Number) -> FlexFuture<Result<()>> {
         let raw = signal.as_raw();
         unsafe { libc::raise(raw) }.errno_if_m1().map(drop).into()
+    }
+}
+
+impl System for RealSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        (unsafe { libc::isatty(fd.0) } != 0)
     }
 
     fn select(

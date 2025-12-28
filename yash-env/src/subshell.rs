@@ -325,6 +325,7 @@ mod tests {
     use crate::source::Location;
     use crate::system::Disposition;
     use crate::system::Errno;
+    use crate::system::SendSignal as _;
     use crate::system::r#virtual::Inode;
     use crate::system::r#virtual::SystemState;
     use crate::system::r#virtual::{SIGCHLD, SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU};

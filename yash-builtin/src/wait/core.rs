@@ -119,6 +119,7 @@ mod tests {
     use yash_env::semantics::ExitStatus;
     use yash_env::source::Location;
     use yash_env::subshell::Subshell;
+    use yash_env::system::SendSignal as _;
     use yash_env::system::r#virtual::{SIGSTOP, SIGTERM};
     use yash_env::trap::Action;
     use yash_env::variable::Value;

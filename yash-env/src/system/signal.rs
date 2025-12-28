@@ -16,9 +16,9 @@
 
 //! Signal-related functionality for the system module
 
-use super::Result;
 #[cfg(doc)]
 use super::SharedSystem;
+use super::{FlexFuture, Pid, Result};
 pub use crate::signal::{Name, Number, RawNumber};
 
 /// Trait for managing available signals
@@ -161,4 +161,32 @@ pub trait CaughtSignals {
     /// [`Sigmask::sigmask`]. They must be unblocked so that they are caught and
     /// made available from this function.
     fn caught_signals(&mut self) -> Vec<Number>;
+}
+
+/// Trait for sending signals to processes
+pub trait SendSignal {
+    /// Sends a signal.
+    ///
+    /// This is a thin wrapper around the [`kill` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/kill.html).
+    /// If `signal` is `None`, permission to send a signal is checked, but no
+    /// signal is sent.
+    ///
+    /// The virtual system version of this function blocks the calling thread if
+    /// the signal stops or terminates the current process, hence returning a
+    /// future. See [`VirtualSystem::kill`] for details.
+    ///
+    /// [`VirtualSystem::kill`]: crate::system::virtual::VirtualSystem::kill
+    fn kill(&self, target: Pid, signal: Option<Number>) -> FlexFuture<Result<()>>;
+
+    /// Sends a signal to the current process.
+    ///
+    /// This is a thin wrapper around the `raise` system call.
+    ///
+    /// The virtual system version of this function blocks the calling thread if
+    /// the signal stops or terminates the current process, hence returning a
+    /// future. See [`VirtualSystem::kill`] for details.
+    ///
+    /// [`VirtualSystem::kill`]: crate::system::virtual::VirtualSystem::kill
+    fn raise(&self, signal: Number) -> FlexFuture<Result<()>>;
 }

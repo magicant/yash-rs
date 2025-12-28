@@ -33,6 +33,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `Read`: Declares the `read` method for reading from file descriptors.
     - `Seek`: Declares the `lseek` method for seeking within file
       descriptors.
+    - `SendSignal`: Declares the `kill` and `raise` methods for sending signals
+      to processes.
     - `Sigaction`: Declares methods for managing signal dispositions.
     - `Sigmask`: Declares the `sigmask` method for managing signal masks.
     - `Signals`: Declares the `signal_number_from_name` and

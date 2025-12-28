@@ -542,8 +542,8 @@ impl<S> std::fmt::Debug for RunSignalTrapIfCaught<S> {
 mod tests {
     use super::*;
     use crate::job::ProcessState;
+    use crate::system::SendSignal as _;
     use crate::system::Signals as _;
-    use crate::system::System as _;
     use crate::system::SystemEx as _;
     use crate::system::r#virtual::VirtualSystem;
     use crate::system::r#virtual::{

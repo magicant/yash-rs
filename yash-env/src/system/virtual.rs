@@ -74,6 +74,7 @@ use super::Pipe;
 use super::Read;
 use super::Result;
 use super::Seek;
+use super::SendSignal;
 use super::Sigaction;
 use super::Sigmask;
 use super::SigmaskOp;
@@ -681,14 +682,7 @@ impl CaughtSignals for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
-    fn isatty(&self, fd: Fd) -> bool {
-        self.with_open_file_description(fd, |ofd| {
-            Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
-        })
-        .unwrap_or(false)
-    }
-
+impl SendSignal for VirtualSystem {
     /// Sends a signal to the target process.
     ///
     /// This function returns a future that enables the executor to block the
@@ -697,7 +691,7 @@ impl System for VirtualSystem {
     /// the future will be ready only when the process is resumed. Similarly, if
     /// the signal causes the current process to terminate, the future will
     /// never be ready.
-    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
+    fn kill(&self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
         let result = match target {
             Pid::MY_PROCESS_GROUP => {
                 let target_pgid = self.current_process().pgid;
@@ -736,9 +730,18 @@ impl System for VirtualSystem {
         })
     }
 
-    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>> {
+    fn raise(&self, signal: signal::Number) -> FlexFuture<Result<()>> {
         let target = self.process_id;
         self.kill(target, Some(signal))
+    }
+}
+
+impl System for VirtualSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        self.with_open_file_description(fd, |ofd| {
+            Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
+        })
+        .unwrap_or(false)
     }
 
     /// Waits for a next event.
@@ -1864,7 +1867,7 @@ mod tests {
 
     #[test]
     fn kill_process() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system
             .kill(system.process_id, None)
             .now_or_never()
@@ -1883,7 +1886,7 @@ mod tests {
             })
         );
 
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let state = system.state.borrow();
         let max_pid = *state.processes.keys().max().unwrap();
         drop(state);
@@ -1897,7 +1900,7 @@ mod tests {
 
     #[test]
     fn kill_all_processes() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let pgid = system.current_process().pgid;
         let mut state = system.state.borrow_mut();
         state.processes.insert(
@@ -1930,7 +1933,7 @@ mod tests {
 
     #[test]
     fn kill_processes_in_same_group() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let pgid = system.current_process().pgid;
         let mut state = system.state.borrow_mut();
         state.processes.insert(
@@ -1978,7 +1981,7 @@ mod tests {
 
     #[test]
     fn kill_process_group() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let pgid = system.current_process().pgid;
         let mut state = system.state.borrow_mut();
         state.processes.insert(
@@ -2023,7 +2026,7 @@ mod tests {
 
     #[test]
     fn kill_returns_success_even_if_process_state_did_not_change() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let pgid = system.current_process().pgid;
         let mut state = system.state.borrow_mut();
         state.processes.insert(
