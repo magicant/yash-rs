@@ -545,21 +545,21 @@ impl<T: Select> Select for &SharedSystem<T> {
 }
 
 /// Delegates `Isatty` methods to the contained implementor.
-impl<S: System> Isatty for &SharedSystem<S> {
+impl<T: Isatty> Isatty for &SharedSystem<T> {
     fn isatty(&self, fd: Fd) -> bool {
         self.0.borrow().isatty(fd)
     }
 }
 
 /// Delegates `TcGetPgrp` methods to the contained implementor.
-impl<S: System> TcGetPgrp for &SharedSystem<S> {
+impl<T: TcGetPgrp> TcGetPgrp for &SharedSystem<T> {
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
         self.0.borrow().tcgetpgrp(fd)
     }
 }
 
 /// Delegates `TcSetPgrp` methods to the contained implementor.
-impl<S: System> TcSetPgrp for &SharedSystem<S> {
+impl<T: TcSetPgrp> TcSetPgrp for &SharedSystem<T> {
     fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
         self.0.borrow().tcsetpgrp(fd, pgid)
     }
@@ -567,7 +567,7 @@ impl<S: System> TcSetPgrp for &SharedSystem<S> {
 
 // TODO: This implementation should be removed after refactoring Fork API (#662).
 /// Delegates `Fork` methods to the contained implementor.
-impl<S: System> Fork for &SharedSystem<S> {
+impl<T: Fork> Fork for &SharedSystem<T> {
     /// This method is not supported for `SharedSystem` because types do not match.
     ///
     /// You should call the inherent method [`SharedSystem::new_child_process`] instead.
@@ -580,12 +580,14 @@ impl<S: System> Fork for &SharedSystem<S> {
     }
 }
 
-impl<S: System> Wait for &SharedSystem<S> {
+/// Delegates `Wait` methods to the contained implementor.
+impl<T: Wait> Wait for &SharedSystem<T> {
     fn wait(&self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         self.0.borrow().wait(target)
     }
 }
 
+/// Delegates `Exec` methods to the contained implementor.
 impl<T: Exec> Exec for &SharedSystem<T> {
     fn execve(
         &self,
@@ -884,7 +886,7 @@ impl<T: Select> Select for SharedSystem<T> {
 }
 
 /// Delegates `Isatty` methods to the contained implementor.
-impl<S: System> Isatty for SharedSystem<S> {
+impl<T: Isatty> Isatty for SharedSystem<T> {
     #[inline]
     fn isatty(&self, fd: Fd) -> bool {
         (&self).isatty(fd)
@@ -892,7 +894,7 @@ impl<S: System> Isatty for SharedSystem<S> {
 }
 
 /// Delegates `TcGetPgrp` methods to the contained implementor.
-impl<S: System> TcGetPgrp for SharedSystem<S> {
+impl<T: TcGetPgrp> TcGetPgrp for SharedSystem<T> {
     #[inline]
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
         (&self).tcgetpgrp(fd)
@@ -900,7 +902,7 @@ impl<S: System> TcGetPgrp for SharedSystem<S> {
 }
 
 /// Delegates `TcSetPgrp` methods to the contained implementor.
-impl<S: System> TcSetPgrp for SharedSystem<S> {
+impl<T: TcSetPgrp> TcSetPgrp for SharedSystem<T> {
     #[inline]
     fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
         (&self).tcsetpgrp(fd, pgid)
@@ -909,7 +911,7 @@ impl<S: System> TcSetPgrp for SharedSystem<S> {
 
 // TODO: This implementation should be removed after refactoring Fork API (#662).
 /// Delegates `Fork` methods to the contained implementor.
-impl<S: System> Fork for SharedSystem<S> {
+impl<T: Fork> Fork for SharedSystem<T> {
     /// This method is not supported for `SharedSystem` because types do not match.
     ///
     /// You should call the inherent method [`SharedSystem::new_child_process`] instead.
@@ -923,7 +925,7 @@ impl<S: System> Fork for SharedSystem<S> {
     }
 }
 
-impl<S: System> Wait for SharedSystem<S> {
+impl<T: Wait> Wait for SharedSystem<T> {
     #[inline]
     fn wait(&self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         (&self).wait(target)
