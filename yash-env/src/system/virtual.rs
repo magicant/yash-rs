@@ -64,6 +64,7 @@ use super::Errno;
 use super::Fcntl;
 use super::FdFlag;
 use super::FlexFuture;
+use super::Fork;
 use super::Fstat;
 use super::GetPid;
 use super::Gid;
@@ -913,7 +914,7 @@ impl TcSetPgrp for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
+impl Fork for VirtualSystem {
     /// Creates a new child process.
     ///
     /// This implementation does not create any real child process. Instead,
@@ -926,7 +927,7 @@ impl System for VirtualSystem {
     ///
     /// The process ID of the child will be the maximum of existing process IDs
     /// plus 1. If there are no other processes, it will be 2.
-    fn new_child_process(&mut self) -> Result<ChildProcessStarter<Self>> {
+    fn new_child_process(&self) -> Result<ChildProcessStarter<Self>> {
         let mut state = self.state.borrow_mut();
         let executor = state.executor.clone().ok_or(Errno::ENOSYS)?;
         let process_id = state
@@ -965,7 +966,9 @@ impl System for VirtualSystem {
             process_id
         }))
     }
+}
 
+impl System for VirtualSystem {
     /// Waits for a child.
     ///
     /// TODO: Currently, this function only supports `target == -1 || target > 0`.
@@ -2400,7 +2403,7 @@ mod tests {
 
     #[test]
     fn new_child_process_without_executor() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.new_child_process();
         match result {
             Ok(_) => panic!("unexpected Ok value"),
@@ -2410,7 +2413,7 @@ mod tests {
 
     #[test]
     fn new_child_process_with_executor() {
-        let (mut system, _executor) = virtual_system_with_executor();
+        let (system, _executor) = virtual_system_with_executor();
 
         let result = system.new_child_process();
 
@@ -2429,7 +2432,7 @@ mod tests {
 
     #[test]
     fn wait_for_running_child() {
-        let (mut system, _executor) = virtual_system_with_executor();
+        let (system, _executor) = virtual_system_with_executor();
 
         let child_process = system.new_child_process();
 
@@ -2450,7 +2453,7 @@ mod tests {
 
     #[test]
     fn wait_for_exited_child() {
-        let (mut system, mut executor) = virtual_system_with_executor();
+        let (system, mut executor) = virtual_system_with_executor();
 
         let child_process = system.new_child_process();
 
@@ -2468,7 +2471,7 @@ mod tests {
 
     #[test]
     fn wait_for_signaled_child() {
-        let (mut system, mut executor) = virtual_system_with_executor();
+        let (system, mut executor) = virtual_system_with_executor();
 
         let child_process = system.new_child_process();
 
@@ -2501,7 +2504,7 @@ mod tests {
 
     #[test]
     fn wait_for_stopped_child() {
-        let (mut system, mut executor) = virtual_system_with_executor();
+        let (system, mut executor) = virtual_system_with_executor();
 
         let child_process = system.new_child_process();
 
@@ -2525,7 +2528,7 @@ mod tests {
 
     #[test]
     fn wait_for_resumed_child() {
-        let (mut system, mut executor) = virtual_system_with_executor();
+        let (system, mut executor) = virtual_system_with_executor();
 
         let child_process = system.new_child_process();
 

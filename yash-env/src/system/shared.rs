@@ -26,6 +26,7 @@ use super::Errno;
 use super::Fcntl;
 use super::FdFlag;
 use super::FlexFuture;
+use super::Fork;
 use super::Fstat;
 use super::GetPid;
 use super::Gid;
@@ -321,9 +322,9 @@ impl<S: System> SharedSystem<S> {
 
     /// Creates a new child process.
     ///
-    /// See [`System::new_child_process`] for details.
+    /// See [`Fork::new_child_process`] for details.
     pub fn new_child_process(&self) -> Result<ChildProcessStarter<S>> {
-        self.0.borrow_mut().new_child_process()
+        self.0.borrow().new_child_process()
     }
 }
 
@@ -562,21 +563,26 @@ impl<S: System> TcSetPgrp for &SharedSystem<S> {
     }
 }
 
+// TODO: This implementation should be removed after refactoring Fork API (#662).
+/// Delegates `Fork` methods to the contained implementor.
+impl<S: System> Fork for &SharedSystem<S> {
+    /// This method is not supported for `SharedSystem` because types do not match.
+    ///
+    /// You should call the inherent method [`SharedSystem::new_child_process`] instead.
+    /// If you call this trait method, it will panic.
+    fn new_child_process(&self) -> Result<ChildProcessStarter<Self>> {
+        // self.0.borrow().new_child_process()
+        unimplemented!(
+            "new_child_process is not supported for SharedSystem because types do not match"
+        )
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl<S: System> System for &SharedSystem<S> {
-    /// This method is not supported for `SharedSystem` because types do not match.
-    ///
-    /// You should call the inherent method [`SharedSystem::new_child_process`] instead.
-    /// If you call this trait method, it will panic.
-    fn new_child_process(&mut self) -> Result<ChildProcessStarter<Self>> {
-        // self.0.borrow_mut().new_child_process()
-        unimplemented!(
-            "new_child_process is not supported for SharedSystem because types do not match"
-        )
-    }
     fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         self.0.borrow_mut().wait(target)
     }
@@ -893,22 +899,27 @@ impl<S: System> TcSetPgrp for SharedSystem<S> {
     }
 }
 
-/// Delegates `System` methods to the contained system instance.
-impl<S: System> System for SharedSystem<S> {
-    // All methods are delegated to `impl System for &SharedSystem`,
-    // which in turn delegates to the contained system instance.
-
+// TODO: This implementation should be removed after refactoring Fork API (#662).
+/// Delegates `Fork` methods to the contained implementor.
+impl<S: System> Fork for SharedSystem<S> {
     /// This method is not supported for `SharedSystem` because types do not match.
     ///
     /// You should call the inherent method [`SharedSystem::new_child_process`] instead.
     /// If you call this trait method, it will panic.
     #[inline]
-    fn new_child_process(&mut self) -> Result<ChildProcessStarter<Self>> {
-        // (&mut &*self).new_child_process()
+    fn new_child_process(&self) -> Result<ChildProcessStarter<Self>> {
+        // (&self).new_child_process()
         unimplemented!(
             "new_child_process is not supported for SharedSystem because types do not match"
         )
     }
+}
+
+/// Delegates `System` methods to the contained system instance.
+impl<S: System> System for SharedSystem<S> {
+    // All methods are delegated to `impl System for &SharedSystem`,
+    // which in turn delegates to the contained system instance.
+
     #[inline]
     fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         (&mut &*self).wait(target)

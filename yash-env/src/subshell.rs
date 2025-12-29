@@ -22,9 +22,9 @@
 //! [start](Subshell::start) the subshell.
 //!
 //! [`Subshell`] is implemented as a wrapper around
-//! [`System::new_child_process`]. You should prefer `Subshell` for the purpose
-//! of creating a subshell because it helps to arrange the child process
-//! properly.
+//! [`Fork::new_child_process`](crate::system::Fork::new_child_process). You
+//! should prefer `Subshell` for the purpose of creating a subshell because it
+//! helps to arrange the child process properly.
 
 use crate::Env;
 use crate::job::Pid;

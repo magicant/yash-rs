@@ -46,7 +46,7 @@ pub use self::id::RawUid;
 pub use self::id::Uid;
 pub use self::io::FdFlag;
 pub use self::io::{Close, Dup, Fcntl, Pipe, Read, Write};
-pub use self::process::{GetPid, SetPgid};
+pub use self::process::{ChildProcessStarter, ChildProcessTask, Fork, GetPid, SetPgid};
 #[cfg(all(doc, unix))]
 use self::real::RealSystem;
 use self::resource::LimitPair;
@@ -62,7 +62,6 @@ pub use self::terminal::{Isatty, TcGetPgrp, TcSetPgrp};
 pub use self::time::{CpuTimes, Time, Times};
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
-use crate::Env;
 use crate::io::Fd;
 use crate::io::MIN_INTERNAL_FD;
 use crate::job::Pid;
@@ -78,7 +77,6 @@ use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::fmt::Debug;
-use std::pin::Pin;
 use r#virtual::SignalEffect;
 
 /// API to the system-managed parts of the environment.
@@ -94,6 +92,7 @@ pub trait System:
     + Debug
     + Dup
     + Fcntl
+    + Fork
     + Fstat
     + GetPid
     + IsExecutableFile
@@ -115,28 +114,13 @@ pub trait System:
     + Umask
     + Write
 {
-    /// Creates a new child process.
-    ///
-    /// This is a thin wrapper around the `fork` system call. Users of `Env`
-    /// should not call it directly. Instead, use [`Subshell`] so that the
-    /// environment can condition the state of the child process before it
-    /// starts running.
-    ///
-    /// Because we need the parent environment to create the child environment,
-    /// this method cannot initiate the child task directly. Instead, it returns
-    /// a [`ChildProcessStarter`] function that takes the parent environment and
-    /// the child task. The caller must call the starter to make sure the parent
-    /// and child processes perform correctly after forking.
-    fn new_child_process(&mut self) -> Result<ChildProcessStarter<Self>>
-    where
-        Self: Sized;
-
     /// Reports updated status of a child process.
     ///
     /// This is a low-level function used internally by
-    /// [`Env::wait_for_subshell`]. You should not call this function directly,
-    /// or you will disrupt the behavior of `Env`. The description below applies
-    /// if you want to do everything yourself without depending on `Env`.
+    /// [`Env::wait_for_subshell`](crate::Env::wait_for_subshell). You should
+    /// not call this function directly, or you will disrupt the behavior of
+    /// `Env`. The description below applies if you want to do everything
+    /// yourself without depending on `Env`.
     ///
     /// This function performs
     /// `waitpid(target, ..., WUNTRACED | WCONTINUED | WNOHANG)`.
@@ -224,43 +208,6 @@ pub trait System:
     /// [`INFINITY`]: self::resource::INFINITY
     fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()>;
 }
-
-/// Task executed in a child process
-///
-/// This is an argument passed to a [`ChildProcessStarter`]. The task is
-/// executed in a child process initiated by the starter. The environment passed
-/// to the task is a clone of the parent environment, but it has a different
-/// process ID than the parent.
-///
-/// Note that the output type of the task is `Infallible`. This is to ensure that
-/// the task [exits](System::exit) cleanly or [kills](SendSignal::kill) itself
-/// with a signal.
-pub type ChildProcessTask<S> =
-    Box<dyn for<'a> FnOnce(&'a mut Env<S>) -> Pin<Box<dyn Future<Output = Infallible> + 'a>>>;
-
-/// Abstract function that starts a child process
-///
-/// [`System::new_child_process`] returns a child process starter. You need to
-/// pass the parent environment and a task to the starter to complete the child
-/// process creation. The starter provides a unified interface that hides the
-/// differences between [`RealSystem`] and [`VirtualSystem`].
-///
-/// [`RealSystem::new_child_process`] performs a `fork` system call and returns
-/// a starter in the parent and child processes. When the starter is called in
-/// the parent, it just returns the child process ID. The starter in the child
-/// process runs the task and exits the process with the exit status of the
-/// task.
-///
-/// [`VirtualSystem::new_child_process`] does ont create a real child process.
-/// Instead, the starter runs the task concurrently in the current process using
-/// the executor contained in the system. A new [`Process`](virtual::Process) is
-/// added to the system to represent the child process. The starter returns its
-/// process ID.
-///
-/// This function only starts the child, which continues to run asynchronously
-/// after the function returns its PID. To wait for the child to finish and
-/// obtain its exit status, use [`System::wait`].
-pub type ChildProcessStarter<S> = Box<dyn FnOnce(&mut Env<S>, ChildProcessTask<S>) -> Pid>;
 
 /// Extension for [`System`]
 ///

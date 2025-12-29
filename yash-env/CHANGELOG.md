@@ -24,6 +24,7 @@ A _private dependency_ is used internally and not visible to downstream users.
       descriptors.
     - `Fcntl`: Declares the `ofd_access`, `get_and_set_nonblocking`,
       `fcntl_getfd`, and `fcntl_setfd` methods for `fcntl`-related operations.
+    - `Fork`: Declares a method for creating new child processes.
     - `Fstat`: Declares `fstat` and `fstatat` methods for getting file
       metadata and provides a default implementation of `is_directory`.
     - `GetPid`: Declares the `getpid` and other methods for getting process IDs

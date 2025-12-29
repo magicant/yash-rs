@@ -17,7 +17,12 @@
 //! Items related to process management
 
 use super::Result;
+use crate::Env;
 use crate::job::Pid;
+#[cfg(doc)]
+use crate::{RealSystem, VirtualSystem};
+use std::convert::Infallible;
+use std::pin::Pin;
 
 /// Trait for getting the current process ID and other process-related information
 pub trait GetPid {
@@ -61,4 +66,63 @@ pub trait SetPgid {
     /// `pgid` specifies the new process group ID to be set. If `pgid` is
     /// `Pid(0)`, the process ID of the specified process is used.
     fn setpgid(&self, pid: Pid, pgid: Pid) -> Result<()>;
+}
+
+type PinFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
+
+/// Task executed in a child process
+///
+/// This is an argument passed to a [`ChildProcessStarter`]. The task is
+/// executed in a child process initiated by the starter. The environment passed
+/// to the task is a clone of the parent environment, but it has a different
+/// process ID than the parent.
+///
+/// Note that the output type of the task is `Infallible`. This is to ensure
+/// that the task [exits](super::System::exit) cleanly or
+/// [kills](super::SendSignal::kill) itself with a signal.
+pub type ChildProcessTask<S> = Box<dyn for<'a> FnOnce(&'a mut Env<S>) -> PinFuture<'a, Infallible>>;
+
+/// Abstract function that starts a child process
+///
+/// [`Fork::new_child_process`] returns a child process starter. You need to
+/// pass the parent environment and a task to the starter to complete the child
+/// process creation. The starter provides a unified interface that hides the
+/// differences between [`RealSystem`] and [`VirtualSystem`].
+///
+/// [`RealSystem::new_child_process`] performs a `fork` system call and returns
+/// a starter in the parent and child processes. When the starter is called in
+/// the parent, it just returns the child process ID. The starter in the child
+/// process runs the task and exits the process with the exit status of the
+/// task.
+///
+/// [`VirtualSystem::new_child_process`] does ont create a real child process.
+/// Instead, the starter runs the task concurrently in the current process using
+/// the executor contained in the system. A new
+/// [`Process`](super::virtual::Process) is added to the system to represent the
+/// child process. The starter returns its process ID.
+///
+/// This function only starts the child, which continues to run asynchronously
+/// after the function returns its PID. To wait for the child to finish and
+/// obtain its exit status, use [`wait`](super::System::wait).
+pub type ChildProcessStarter<S> = Box<dyn FnOnce(&mut Env<S>, ChildProcessTask<S>) -> Pid>;
+
+/// Trait for spawning new processes
+pub trait Fork {
+    // XXX: This method needs refactoring! (#662)
+    /// Creates a new child process.
+    ///
+    /// This is a wrapper around the [`fork` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/fork.html).
+    /// Users of [`Env`] should not call it directly. Instead, use
+    /// [`Subshell`](crate::subshell::Subshell) so that the environment can
+    /// condition the state of the child process before it starts running.
+    ///
+    /// Because we need the parent environment to create the child environment,
+    /// this method cannot initiate the child task directly. Instead, it returns
+    /// a [`ChildProcessStarter`] function that takes the parent environment and
+    /// the child task. The caller must call the starter to make sure the parent
+    /// and child processes perform correctly after forking.
+    fn new_child_process(&self) -> Result<ChildProcessStarter<Self>>
+    where
+        Self: Sized;
 }

@@ -36,13 +36,12 @@ use super::Dir;
 use super::DirEntry;
 use super::Disposition;
 use super::Dup;
-#[cfg(doc)]
-use super::Env;
 use super::Errno;
 use super::Fcntl;
 use super::FdFlag;
 use super::FileType;
 use super::FlexFuture;
+use super::Fork;
 use super::Fstat;
 use super::GetPid;
 use super::Gid;
@@ -74,6 +73,8 @@ use super::Umask;
 use super::Write;
 use super::resource::LimitPair;
 use super::resource::Resource;
+#[cfg(doc)]
+use crate::Env;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessResult;
@@ -727,7 +728,7 @@ impl TcSetPgrp for RealSystem {
     }
 }
 
-impl System for RealSystem {
+impl Fork for RealSystem {
     /// Creates a new child process.
     ///
     /// This implementation calls the `fork` system call and returns both in the
@@ -735,7 +736,7 @@ impl System for RealSystem {
     /// `ChildProcessStarter` ignores any arguments and returns the child
     /// process ID. In the child, the starter runs the task and exits the
     /// process.
-    fn new_child_process(&mut self) -> Result<ChildProcessStarter<Self>> {
+    fn new_child_process(&self) -> Result<ChildProcessStarter<Self>> {
         let raw_pid = unsafe { libc::fork() }.errno_if_m1()?;
         if raw_pid != 0 {
             // Parent process
@@ -759,7 +760,9 @@ impl System for RealSystem {
             }
         }))
     }
+}
 
+impl System for RealSystem {
     fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         let mut status = 0;
         let options = libc::WUNTRACED | libc::WCONTINUED | libc::WNOHANG;
