@@ -46,6 +46,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `Sigmask`: Declares the `sigmask` method for managing signal masks.
     - `Signals`: Declares the `signal_number_from_name` and
       `validate_signal` methods for converting between signal names and numbers.
+    - `TcGetPgrp`: Declares the `tcgetpgrp` method for getting the
+      foreground process group ID of a terminal.
     - `Time`: Declares the `now` method for getting the current time.
     - `Times`: Declares the `times` method for getting CPU times.
     - `Umask`: Declares the `umask` method for setting the file mode

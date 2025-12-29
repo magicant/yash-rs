@@ -177,6 +177,7 @@ mod tests {
     use yash_env::subshell::JobControl;
     use yash_env::subshell::Subshell;
     use yash_env::system::GetPid as _;
+    use yash_env::system::TcGetPgrp as _;
     use yash_env::system::r#virtual::Process;
     use yash_env::system::r#virtual::SIGSTOP;
     use yash_env_test_helper::assert_stderr;

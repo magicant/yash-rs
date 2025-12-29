@@ -28,6 +28,7 @@ pub mod resource;
 mod select;
 mod shared;
 mod signal;
+mod terminal;
 mod time;
 pub mod r#virtual;
 
@@ -35,8 +36,8 @@ pub use self::errno::Errno;
 pub use self::errno::RawErrno;
 pub use self::errno::Result;
 pub use self::file_system::{
-    AT_FDCWD, Dir, DirEntry, FileType, Fstat, IsExecutableFile, Isatty, Mode, OfdAccess, Open,
-    OpenFlag, RawMode, Seek, Stat, Umask,
+    AT_FDCWD, Dir, DirEntry, FileType, Fstat, IsExecutableFile, Mode, OfdAccess, Open, OpenFlag,
+    RawMode, Seek, Stat, Umask,
 };
 pub use self::future::FlexFuture;
 pub use self::id::Gid;
@@ -57,6 +58,7 @@ pub use self::shared::SharedSystem;
 pub use self::signal::{
     CaughtSignals, Disposition, SendSignal, Sigaction, Sigmask, SigmaskOp, Signals,
 };
+pub use self::terminal::{Isatty, TcGetPgrp};
 pub use self::time::{CpuTimes, Time, Times};
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
@@ -106,16 +108,12 @@ pub trait System:
     + Sigaction
     + Sigmask
     + Signals
+    + TcGetPgrp
     + Time
     + Times
     + Umask
     + Write
 {
-    /// Returns the current foreground process group ID.
-    ///
-    /// This is a thin wrapper around the `tcgetpgrp` system call.
-    fn tcgetpgrp(&self, fd: Fd) -> Result<Pid>;
-
     /// Switches the foreground process group.
     ///
     /// This is a thin wrapper around the `tcsetpgrp` system call.

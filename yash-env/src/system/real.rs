@@ -65,6 +65,7 @@ use super::SigmaskOp;
 use super::Signals;
 use super::Stat;
 use super::System;
+use super::TcGetPgrp;
 use super::Time;
 use super::Times;
 use super::Uid;
@@ -269,12 +270,6 @@ impl Fstat for RealSystem {
 impl IsExecutableFile for RealSystem {
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.file_has_type(path, FileType::Regular) && self.has_execute_permission(path)
-    }
-}
-
-impl Isatty for RealSystem {
-    fn isatty(&self, fd: Fd) -> bool {
-        (unsafe { libc::isatty(fd.0) } != 0)
     }
 }
 
@@ -712,11 +707,19 @@ impl Select for RealSystem {
     }
 }
 
-impl System for RealSystem {
+impl Isatty for RealSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        (unsafe { libc::isatty(fd.0) } != 0)
+    }
+}
+
+impl TcGetPgrp for RealSystem {
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
         unsafe { libc::tcgetpgrp(fd.0) }.errno_if_m1().map(Pid)
     }
+}
 
+impl System for RealSystem {
     fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
         let result = unsafe { libc::tcsetpgrp(fd.0, pgid.0) };
         result.errno_if_m1().map(drop).into()
