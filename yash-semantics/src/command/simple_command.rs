@@ -101,9 +101,9 @@ use yash_syntax::syntax::Word;
 ///
 /// If the target is an external utility, a subshell is created.  Redirections
 /// and assignments, if any, are performed in the subshell. The assigned
-/// variables are exported. The subshell calls the [`execve`](System::execve)
-/// function to invoke the external utility with all the fields passed as
-/// arguments.
+/// variables are exported. The subshell calls the
+/// [`execve`](yash_env::system::Exec::execve) function to invoke the external
+/// utility with all the fields passed as arguments.
 ///
 /// If `execve` fails with an `ENOEXEC` error, it is re-called with the current
 /// executable file so that the restarted shell executes the external utility as

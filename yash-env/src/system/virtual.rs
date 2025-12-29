@@ -61,6 +61,7 @@ use super::Dir;
 use super::Disposition;
 use super::Dup;
 use super::Errno;
+use super::Exec;
 use super::Fcntl;
 use super::FdFlag;
 use super::FlexFuture;
@@ -990,14 +991,14 @@ impl Wait for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
+impl Exec for VirtualSystem {
     /// Stub for the `execve` system call.
     ///
     /// The `execve` system call cannot be simulated in the userland. This
     /// function returns `ENOSYS` if the file at `path` is a native executable,
     /// `ENOEXEC` if a non-executable file, and `ENOENT` otherwise.
     fn execve(
-        &mut self,
+        &self,
         path: &CStr,
         args: &[CString],
         envs: &[CString],
@@ -1033,7 +1034,9 @@ impl System for VirtualSystem {
             Err(Errno::ENOEXEC).into()
         }
     }
+}
 
+impl System for VirtualSystem {
     fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
         let mut myself = self.current_process_mut();
         let parent_pid = myself.ppid;
@@ -2601,7 +2604,7 @@ mod tests {
 
     #[test]
     fn execve_returns_enosys_for_executable_file() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let path = "/some/file";
         let mut content = Inode::default();
         content.body = FileBody::Regular {
@@ -2620,7 +2623,7 @@ mod tests {
 
     #[test]
     fn execve_saves_arguments() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let path = "/some/file";
         let mut content = Inode::default();
         content.body = FileBody::Regular {
@@ -2646,7 +2649,7 @@ mod tests {
 
     #[test]
     fn execve_returns_enoexec_for_non_executable_file() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let path = "/some/file";
         let mut content = Inode::default();
         content.permissions.set(Mode::USER_EXEC, true);
@@ -2661,7 +2664,7 @@ mod tests {
 
     #[test]
     fn execve_returns_enoent_on_file_not_found() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system
             .execve(c"/no/such/file", &[], &[])
             .now_or_never()

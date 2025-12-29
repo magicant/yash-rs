@@ -27,6 +27,7 @@ use crate::semantics::{ExitStatus, Field, Result};
 use crate::source::Location;
 use crate::source::pretty::{Report, ReportType, Snippet};
 use crate::subshell::{JobControl, Subshell};
+use crate::system::Exec as _;
 use crate::system::{Errno, System};
 use itertools::Itertools as _;
 use std::convert::Infallible;
@@ -111,7 +112,7 @@ impl<S> std::fmt::Debug for RunFunction<S> {
 pub struct ReplaceCurrentProcessError {
     /// Path of the external utility attempted to be executed
     pub path: CString,
-    /// Error returned by the [`execve`](System::execve) system call
+    /// Error returned by the [`execve`](crate::system::Exec::execve) system call
     pub errno: Errno,
 }
 
@@ -119,10 +120,10 @@ pub struct ReplaceCurrentProcessError {
 ///
 /// This function performs the very last step of the simple command execution.
 /// It disables the internal signal dispositions and calls the
-/// [`execve`](System::execve) system call. If the call fails, it updates
-/// `env.exit_status` and returns an error, in which case the caller should
-/// print an error message and terminate the current process with the exit
-/// status.
+/// [`execve`](crate::system::Exec::execve) system call. If the call fails, it
+/// updates `env.exit_status` and returns an error, in which case the caller
+/// should print an error message and terminate the current process with the
+/// exit status.
 ///
 /// If the `execve` call fails with [`ENOEXEC`](Errno::ENOEXEC), this function
 /// falls back on invoking the shell with the given arguments, so that the shell

@@ -23,6 +23,7 @@ use super::Dir;
 use super::Disposition;
 use super::Dup;
 use super::Errno;
+use super::Exec;
 use super::Fcntl;
 use super::FdFlag;
 use super::FlexFuture;
@@ -585,19 +586,22 @@ impl<S: System> Wait for &SharedSystem<S> {
     }
 }
 
+impl<T: Exec> Exec for &SharedSystem<T> {
+    fn execve(
+        &self,
+        path: &CStr,
+        args: &[CString],
+        envs: &[CString],
+    ) -> FlexFuture<Result<Infallible>> {
+        self.0.borrow().execve(path, args, envs)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl<S: System> System for &SharedSystem<S> {
-    fn execve(
-        &mut self,
-        path: &CStr,
-        args: &[CString],
-        envs: &[CString],
-    ) -> FlexFuture<Result<Infallible>> {
-        self.0.borrow_mut().execve(path, args, envs)
-    }
     fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
         self.0.borrow_mut().exit(exit_status)
     }
@@ -926,20 +930,24 @@ impl<S: System> Wait for SharedSystem<S> {
     }
 }
 
+/// Delegates `Exec` methods to the contained implementor.
+impl<T: Exec> Exec for SharedSystem<T> {
+    #[inline]
+    fn execve(
+        &self,
+        path: &CStr,
+        args: &[CString],
+        envs: &[CString],
+    ) -> FlexFuture<Result<Infallible>> {
+        (&self).execve(path, args, envs)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
     // which in turn delegates to the contained system instance.
 
-    #[inline]
-    fn execve(
-        &mut self,
-        path: &CStr,
-        args: &[CString],
-        envs: &[CString],
-    ) -> FlexFuture<Result<Infallible>> {
-        (&mut &*self).execve(path, args, envs)
-    }
     #[inline]
     fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
         (&mut &*self).exit(exit_status)

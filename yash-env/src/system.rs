@@ -46,7 +46,7 @@ pub use self::id::RawUid;
 pub use self::id::Uid;
 pub use self::io::FdFlag;
 pub use self::io::{Close, Dup, Fcntl, Pipe, Read, Write};
-pub use self::process::{ChildProcessStarter, ChildProcessTask, Fork, GetPid, SetPgid, Wait};
+pub use self::process::{ChildProcessStarter, ChildProcessTask, Exec, Fork, GetPid, SetPgid, Wait};
 #[cfg(all(doc, unix))]
 use self::real::RealSystem;
 use self::resource::LimitPair;
@@ -90,6 +90,7 @@ pub trait System:
     + Close
     + Debug
     + Dup
+    + Exec
     + Fcntl
     + Fork
     + Fstat
@@ -114,17 +115,6 @@ pub trait System:
     + Wait
     + Write
 {
-    // TODO Consider passing raw pointers for optimization
-    /// Replaces the current process with an external utility.
-    ///
-    /// This is a thin wrapper around the `execve` system call.
-    fn execve(
-        &mut self,
-        path: &CStr,
-        args: &[CString],
-        envs: &[CString],
-    ) -> FlexFuture<Result<Infallible>>;
-
     /// Terminates the current process.
     ///
     /// This function is a thin wrapper around the `_exit` system call.

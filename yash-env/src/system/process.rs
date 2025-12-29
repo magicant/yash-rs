@@ -16,7 +16,7 @@
 
 //! Items related to process management
 
-use super::Result;
+use super::{FlexFuture, Result};
 use crate::Env;
 #[cfg(all(doc, unix))]
 use crate::RealSystem;
@@ -25,6 +25,7 @@ use crate::VirtualSystem;
 use crate::job::Pid;
 use crate::job::ProcessState;
 use std::convert::Infallible;
+use std::ffi::{CStr, CString};
 use std::pin::Pin;
 
 /// Trait for getting the current process ID and other process-related information
@@ -151,4 +152,18 @@ pub trait Wait {
     /// function returns `Ok(None)`. If an error occurs, this function returns
     /// `Err(_)`.
     fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>>;
+}
+
+/// Trait for executing a new program in the current process
+pub trait Exec {
+    // TODO Consider passing raw pointers for optimization
+    /// Replaces the current process with an external utility.
+    ///
+    /// This is a thin wrapper around the `execve` system call.
+    fn execve(
+        &self,
+        path: &CStr,
+        args: &[CString],
+        envs: &[CString],
+    ) -> FlexFuture<Result<Infallible>>;
 }

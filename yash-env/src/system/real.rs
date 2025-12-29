@@ -37,6 +37,7 @@ use super::DirEntry;
 use super::Disposition;
 use super::Dup;
 use super::Errno;
+use super::Exec;
 use super::Fcntl;
 use super::FdFlag;
 use super::FileType;
@@ -799,9 +800,9 @@ impl Wait for RealSystem {
     }
 }
 
-impl System for RealSystem {
+impl Exec for RealSystem {
     fn execve(
-        &mut self,
+        &self,
         path: &CStr,
         args: &[CString],
         envs: &[CString],
@@ -832,7 +833,9 @@ impl System for RealSystem {
             }
         }
     }
+}
 
+impl System for RealSystem {
     fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
         unsafe { libc::_exit(exit_status.0) }
     }
