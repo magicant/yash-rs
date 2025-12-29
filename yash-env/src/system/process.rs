@@ -18,9 +18,11 @@
 
 use super::Result;
 use crate::Env;
-use crate::job::Pid;
+#[cfg(all(doc, unix))]
+use crate::RealSystem;
 #[cfg(doc)]
-use crate::{RealSystem, VirtualSystem};
+use crate::VirtualSystem;
+use crate::job::Pid;
 use std::convert::Infallible;
 use std::pin::Pin;
 
