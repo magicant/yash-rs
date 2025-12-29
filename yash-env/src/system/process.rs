@@ -104,7 +104,7 @@ pub type ChildProcessTask<S> = Box<dyn for<'a> FnOnce(&'a mut Env<S>) -> PinFutu
 ///
 /// This function only starts the child, which continues to run asynchronously
 /// after the function returns its PID. To wait for the child to finish and
-/// obtain its exit status, use [`wait`](super::System::wait).
+/// obtain its exit status, use [`wait`](Wait::wait).
 pub type ChildProcessStarter<S> = Box<dyn FnOnce(&mut Env<S>, ChildProcessTask<S>) -> Pid>;
 
 /// Trait for spawning new processes

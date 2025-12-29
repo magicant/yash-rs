@@ -378,7 +378,7 @@ impl<S: System> Env<S> {
     /// - `pid`: the child whose process ID is `pid`
     /// - `-pgid`: any child in the process group whose process group ID is `pgid`
     ///
-    /// When [`self.system.wait`](System::wait) returned a new state of the
+    /// When [`self.system.wait`](system::Wait::wait) returned a new state of the
     /// target, it is sent to `self.jobs` ([`JobList::update_status`]) before
     /// being returned from this function.
     ///
@@ -446,7 +446,7 @@ impl<S: System> Env<S> {
 
     /// Applies all job status updates to jobs in `self.jobs`.
     ///
-    /// This function calls [`self.system.wait`](System::wait) repeatedly until
+    /// This function calls [`self.system.wait`](system::Wait::wait) repeatedly until
     /// all status updates available are applied to `self.jobs`
     /// ([`JobList::update_status`]).
     ///
