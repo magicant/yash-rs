@@ -390,7 +390,7 @@ impl TrapSet {
     /// Installs the internal disposition for `SIGCHLD`.
     ///
     /// You should install the internal disposition for `SIGCHLD` by using this
-    /// function before waiting for `SIGCHLD` with [`System::wait`] and
+    /// function before waiting for `SIGCHLD` with [`crate::system::Wait::wait`] and
     /// [`SharedSystem::wait_for_signal`]. The disposition allows catching
     /// `SIGCHLD`.
     ///

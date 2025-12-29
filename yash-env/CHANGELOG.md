@@ -55,6 +55,7 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `Times`: Declares the `times` method for getting CPU times.
     - `Umask`: Declares the `umask` method for setting the file mode
       creation mask.
+    - `Wait`: Declares the `wait` method for waiting for child processes.
     - `Write`: Declares the `write` method for writing to file
       descriptors.
 - Implementations of these traits are provided for those types that implement

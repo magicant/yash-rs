@@ -23,6 +23,7 @@ use crate::RealSystem;
 #[cfg(doc)]
 use crate::VirtualSystem;
 use crate::job::Pid;
+use crate::job::ProcessState;
 use std::convert::Infallible;
 use std::pin::Pin;
 
@@ -105,7 +106,7 @@ pub type ChildProcessTask<S> = Box<dyn for<'a> FnOnce(&'a mut Env<S>) -> PinFutu
 ///
 /// This function only starts the child, which continues to run asynchronously
 /// after the function returns its PID. To wait for the child to finish and
-/// obtain its exit status, use [`wait`](super::System::wait).
+/// obtain its exit status, use [`wait`](Wait::wait).
 pub type ChildProcessStarter<S> = Box<dyn FnOnce(&mut Env<S>, ChildProcessTask<S>) -> Pid>;
 
 /// Trait for spawning new processes
@@ -127,4 +128,27 @@ pub trait Fork {
     fn new_child_process(&self) -> Result<ChildProcessStarter<Self>>
     where
         Self: Sized;
+}
+
+/// Trait for waiting for child processes
+pub trait Wait {
+    /// Reports updated status of a child process.
+    ///
+    /// This is a low-level function used internally by
+    /// [`Env::wait_for_subshell`](crate::Env::wait_for_subshell). You should
+    /// not call this function directly, or you will disrupt the behavior of
+    /// `Env`. The description below applies if you want to do everything
+    /// yourself without depending on `Env`.
+    ///
+    /// This function performs
+    /// `waitpid(target, ..., WUNTRACED | WCONTINUED | WNOHANG)`.
+    /// Despite the name, this function does not block: it returns the result
+    /// immediately.
+    ///
+    /// This function returns a pair of the process ID and the process state if
+    /// a process matching `target` is found and its state has changed. If all
+    /// the processes matching `target` have not changed their states, this
+    /// function returns `Ok(None)`. If an error occurs, this function returns
+    /// `Err(_)`.
+    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>>;
 }

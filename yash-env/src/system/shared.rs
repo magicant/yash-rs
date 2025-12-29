@@ -64,6 +64,7 @@ use super::Times;
 use super::Uid;
 use super::Umask;
 use super::UnixString;
+use super::Wait;
 use super::Write;
 use super::signal;
 #[cfg(doc)]
@@ -578,14 +579,17 @@ impl<S: System> Fork for &SharedSystem<S> {
     }
 }
 
+impl<S: System> Wait for &SharedSystem<S> {
+    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
+        self.0.borrow_mut().wait(target)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl<S: System> System for &SharedSystem<S> {
-    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
-        self.0.borrow_mut().wait(target)
-    }
     fn execve(
         &mut self,
         path: &CStr,
@@ -915,15 +919,18 @@ impl<S: System> Fork for SharedSystem<S> {
     }
 }
 
+impl<S: System> Wait for SharedSystem<S> {
+    #[inline]
+    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
+        (&mut &*self).wait(target)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
     // which in turn delegates to the contained system instance.
 
-    #[inline]
-    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
-        (&mut &*self).wait(target)
-    }
     #[inline]
     fn execve(
         &mut self,

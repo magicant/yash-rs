@@ -70,6 +70,7 @@ use super::Time;
 use super::Times;
 use super::Uid;
 use super::Umask;
+use super::Wait;
 use super::Write;
 use super::resource::LimitPair;
 use super::resource::Resource;
@@ -762,7 +763,7 @@ impl Fork for RealSystem {
     }
 }
 
-impl System for RealSystem {
+impl Wait for RealSystem {
     fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         let mut status = 0;
         let options = libc::WUNTRACED | libc::WCONTINUED | libc::WNOHANG;
@@ -796,7 +797,9 @@ impl System for RealSystem {
             }
         }
     }
+}
 
+impl System for RealSystem {
     fn execve(
         &mut self,
         path: &CStr,
