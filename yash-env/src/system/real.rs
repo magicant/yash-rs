@@ -765,7 +765,7 @@ impl Fork for RealSystem {
 }
 
 impl Wait for RealSystem {
-    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
+    fn wait(&self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         let mut status = 0;
         let options = libc::WUNTRACED | libc::WCONTINUED | libc::WNOHANG;
         match unsafe { libc::waitpid(target.0, &mut status, options) } {

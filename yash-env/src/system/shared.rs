@@ -581,8 +581,8 @@ impl<S: System> Fork for &SharedSystem<S> {
 }
 
 impl<S: System> Wait for &SharedSystem<S> {
-    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
-        self.0.borrow_mut().wait(target)
+    fn wait(&self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
+        self.0.borrow().wait(target)
     }
 }
 
@@ -925,8 +925,8 @@ impl<S: System> Fork for SharedSystem<S> {
 
 impl<S: System> Wait for SharedSystem<S> {
     #[inline]
-    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
-        (&mut &*self).wait(target)
+    fn wait(&self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
+        (&self).wait(target)
     }
 }
 

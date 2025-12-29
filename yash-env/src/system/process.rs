@@ -151,7 +151,7 @@ pub trait Wait {
     /// the processes matching `target` have not changed their states, this
     /// function returns `Ok(None)`. If an error occurs, this function returns
     /// `Err(_)`.
-    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>>;
+    fn wait(&self, target: Pid) -> Result<Option<(Pid, ProcessState)>>;
 }
 
 /// Trait for executing a new program in the current process

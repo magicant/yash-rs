@@ -974,7 +974,7 @@ impl Wait for VirtualSystem {
     /// Waits for a child.
     ///
     /// TODO: Currently, this function only supports `target == -1 || target > 0`.
-    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
+    fn wait(&self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         let parent_pid = self.process_id;
         let mut state = self.state.borrow_mut();
         if let Some((pid, process)) = state.child_to_wait_for(parent_pid, target) {
@@ -2570,7 +2570,7 @@ mod tests {
 
     #[test]
     fn wait_without_child() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.wait(Pid::ALL);
         assert_eq!(result, Err(Errno::ECHILD));
         // TODO
