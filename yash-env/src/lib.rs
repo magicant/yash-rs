@@ -58,6 +58,7 @@ pub use self::system::SharedSystem;
 use self::system::Signals as _;
 pub use self::system::System;
 use self::system::SystemEx;
+use self::system::Wait as _;
 #[cfg(unix)]
 pub use self::system::real::RealSystem;
 pub use self::system::r#virtual::VirtualSystem;

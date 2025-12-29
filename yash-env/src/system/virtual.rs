@@ -91,6 +91,7 @@ use super::Time;
 use super::Times;
 use super::Uid;
 use super::Umask;
+use super::Wait;
 use super::Write;
 use super::resource::INFINITY;
 use super::resource::LimitPair;
@@ -968,7 +969,7 @@ impl Fork for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
+impl Wait for VirtualSystem {
     /// Waits for a child.
     ///
     /// TODO: Currently, this function only supports `target == -1 || target > 0`.
@@ -987,7 +988,9 @@ impl System for VirtualSystem {
             Err(Errno::ECHILD)
         }
     }
+}
 
+impl System for VirtualSystem {
     /// Stub for the `execve` system call.
     ///
     /// The `execve` system call cannot be simulated in the userland. This

@@ -46,7 +46,7 @@ pub use self::id::RawUid;
 pub use self::id::Uid;
 pub use self::io::FdFlag;
 pub use self::io::{Close, Dup, Fcntl, Pipe, Read, Write};
-pub use self::process::{ChildProcessStarter, ChildProcessTask, Fork, GetPid, SetPgid};
+pub use self::process::{ChildProcessStarter, ChildProcessTask, Fork, GetPid, SetPgid, Wait};
 #[cfg(all(doc, unix))]
 use self::real::RealSystem;
 use self::resource::LimitPair;
@@ -65,7 +65,6 @@ use self::r#virtual::VirtualSystem;
 use crate::io::Fd;
 use crate::io::MIN_INTERNAL_FD;
 use crate::job::Pid;
-use crate::job::ProcessState;
 use crate::path::Path;
 use crate::path::PathBuf;
 use crate::semantics::ExitStatus;
@@ -112,28 +111,9 @@ pub trait System:
     + Time
     + Times
     + Umask
+    + Wait
     + Write
 {
-    /// Reports updated status of a child process.
-    ///
-    /// This is a low-level function used internally by
-    /// [`Env::wait_for_subshell`](crate::Env::wait_for_subshell). You should
-    /// not call this function directly, or you will disrupt the behavior of
-    /// `Env`. The description below applies if you want to do everything
-    /// yourself without depending on `Env`.
-    ///
-    /// This function performs
-    /// `waitpid(target, ..., WUNTRACED | WCONTINUED | WNOHANG)`.
-    /// Despite the name, this function does not block: it returns the result
-    /// immediately.
-    ///
-    /// This function returns a pair of the process ID and the process state if
-    /// a process matching `target` is found and its state has changed. If all
-    /// the processes matching `target` have not changed their states, this
-    /// function returns `Ok(None)`. If an error occurs, this function returns
-    /// `Err(_)`.
-    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>>;
-
     // TODO Consider passing raw pointers for optimization
     /// Replaces the current process with an external utility.
     ///

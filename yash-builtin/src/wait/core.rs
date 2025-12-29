@@ -26,6 +26,7 @@ use yash_env::System;
 use yash_env::job::Pid;
 use yash_env::signal;
 use yash_env::system::Errno;
+use yash_env::system::Wait as _;
 use yash_env::trap::RunSignalTrapIfCaught;
 
 /// Errors that may occur while waiting for a job
