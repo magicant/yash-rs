@@ -58,7 +58,7 @@ pub use self::shared::SharedSystem;
 pub use self::signal::{
     CaughtSignals, Disposition, SendSignal, Sigaction, Sigmask, SigmaskOp, Signals,
 };
-pub use self::terminal::{Isatty, TcGetPgrp};
+pub use self::terminal::{Isatty, TcGetPgrp, TcSetPgrp};
 pub use self::time::{CpuTimes, Time, Times};
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
@@ -109,19 +109,12 @@ pub trait System:
     + Sigmask
     + Signals
     + TcGetPgrp
+    + TcSetPgrp
     + Time
     + Times
     + Umask
     + Write
 {
-    /// Switches the foreground process group.
-    ///
-    /// This is a thin wrapper around the `tcsetpgrp` system call.
-    ///
-    /// The virtual system version of this function may block the calling thread
-    /// if called in a background process group, hence returning a future.
-    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>>;
-
     /// Creates a new child process.
     ///
     /// This is a thin wrapper around the `fork` system call. Users of `Env`
@@ -311,12 +304,12 @@ pub trait SystemEx: System {
     /// Switches the foreground process group with SIGTTOU blocked.
     ///
     /// This is a convenience function to change the foreground process group
-    /// safely. If you call [`tcsetpgrp`](System::tcsetpgrp) from a background
-    /// process, the process is stopped by SIGTTOU by default. To prevent this
-    /// effect, SIGTTOU must be blocked or ignored when `tcsetpgrp` is called.
-    /// This function uses [`Sigmask::sigmask`] to block SIGTTOU before
-    /// calling [`tcsetpgrp`](System::tcsetpgrp) and also to restore the
-    /// original signal mask after `tcsetpgrp`.
+    /// safely. If you call [`TcSetPgrp::tcsetpgrp`] from a background process,
+    /// the process is stopped by SIGTTOU by default. To prevent this effect,
+    /// SIGTTOU must be blocked or ignored when `tcsetpgrp` is called.  This
+    /// function uses [`Sigmask::sigmask`] to block SIGTTOU before calling
+    /// `tcsetpgrp` and also to restore the original signal mask after
+    /// `tcsetpgrp`.
     ///
     /// Use [`tcsetpgrp_without_block`](Self::tcsetpgrp_without_block) if you
     /// need to make sure the shell is in the foreground before changing the
@@ -345,11 +338,11 @@ pub trait SystemEx: System {
     /// function calls [`Sigaction::sigaction`] to restore the action for
     /// SIGTTOU to the default disposition (which is to suspend the shell
     /// process), [`Sigmask::sigmask`] to unblock SIGTTOU, and
-    /// [`tcsetpgrp`](System::tcsetpgrp) to modify the foreground job. If the
-    /// calling process is not in the foreground, `tcsetpgrp` will suspend the
-    /// process with SIGTTOU until another job-controlling process resumes it in
-    /// the foreground. After `tcsetpgrp` completes, this function calls
-    /// `sigmask` and `sigaction` to restore the original state.
+    /// [`TcSetPgrp::tcsetpgrp`] to modify the foreground job. If the calling
+    /// process is not in the foreground, `tcsetpgrp` will suspend the process
+    /// with SIGTTOU until another job-controlling process resumes it in the
+    /// foreground. After `tcsetpgrp` completes, this function calls `sigmask`
+    /// and `sigaction` to restore the original state.
     ///
     /// Note that if `pgid` is the process group ID of the current process, this
     /// function does not change the foreground job, but the process is still

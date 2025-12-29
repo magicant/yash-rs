@@ -57,6 +57,7 @@ use super::Stat;
 use super::System;
 use super::SystemEx;
 use super::TcGetPgrp;
+use super::TcSetPgrp;
 use super::Time;
 use super::Times;
 use super::Uid;
@@ -554,14 +555,18 @@ impl<S: System> TcGetPgrp for &SharedSystem<S> {
     }
 }
 
+/// Delegates `TcSetPgrp` methods to the contained implementor.
+impl<S: System> TcSetPgrp for &SharedSystem<S> {
+    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
+        self.0.borrow().tcsetpgrp(fd, pgid)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl<S: System> System for &SharedSystem<S> {
-    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
-        self.0.borrow_mut().tcsetpgrp(fd, pgid)
-    }
     /// This method is not supported for `SharedSystem` because types do not match.
     ///
     /// You should call the inherent method [`SharedSystem::new_child_process`] instead.
@@ -880,14 +885,19 @@ impl<S: System> TcGetPgrp for SharedSystem<S> {
     }
 }
 
+/// Delegates `TcSetPgrp` methods to the contained implementor.
+impl<S: System> TcSetPgrp for SharedSystem<S> {
+    #[inline]
+    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
+        (&self).tcsetpgrp(fd, pgid)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
     // which in turn delegates to the contained system instance.
-    #[inline]
-    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
-        (&mut &*self).tcsetpgrp(fd, pgid)
-    }
+
     /// This method is not supported for `SharedSystem` because types do not match.
     ///
     /// You should call the inherent method [`SharedSystem::new_child_process`] instead.

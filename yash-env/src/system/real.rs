@@ -66,6 +66,7 @@ use super::Signals;
 use super::Stat;
 use super::System;
 use super::TcGetPgrp;
+use super::TcSetPgrp;
 use super::Time;
 use super::Times;
 use super::Uid;
@@ -719,12 +720,14 @@ impl TcGetPgrp for RealSystem {
     }
 }
 
-impl System for RealSystem {
-    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
+impl TcSetPgrp for RealSystem {
+    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
         let result = unsafe { libc::tcsetpgrp(fd.0, pgid.0) };
         result.errno_if_m1().map(drop).into()
     }
+}
 
+impl System for RealSystem {
     /// Creates a new child process.
     ///
     /// This implementation calls the `fork` system call and returns both in the

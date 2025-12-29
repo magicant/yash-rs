@@ -51,6 +51,7 @@ use yash_env::system::SendSignal as _;
 use yash_env::system::Signals as _;
 use yash_env::system::System;
 use yash_env::system::SystemEx as _;
+use yash_env::system::TcSetPgrp as _;
 
 /// Resumes the job at the specified index.
 ///

@@ -16,7 +16,7 @@
 
 //! Items for controlling terminal devices
 
-use super::{Fd, Pid, Result};
+use super::{Fd, FlexFuture, Pid, Result};
 
 // TODO: Isatty should be a subtrait of TcGetAttr
 /// Trait for testing if a file descriptor is associated with a terminal device
@@ -44,4 +44,16 @@ pub trait TcGetPgrp {
     /// This is a thin wrapper around the [`tcgetpgrp` system
     /// function](https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcgetpgrp.html).
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid>;
+}
+
+/// Trait for setting the foreground process group ID of a terminal
+pub trait TcSetPgrp {
+    /// Switches the foreground process group.
+    ///
+    /// This is a thin wrapper around the [`tcsetpgrp` system
+    /// function](https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcsetpgrp.html).
+    ///
+    /// The virtual system version of this function may block the calling thread
+    /// if called in a background process group, hence returning a future.
+    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>>;
 }

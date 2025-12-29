@@ -85,6 +85,7 @@ use super::SigmaskOp;
 use super::Signals;
 use super::Stat;
 use super::TcGetPgrp;
+use super::TcSetPgrp;
 use super::Time;
 use super::Times;
 use super::Uid;
@@ -885,13 +886,13 @@ impl TcGetPgrp for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
+impl TcSetPgrp for VirtualSystem {
     /// Switches the foreground process.
     ///
     /// The current implementation does not yet support the concept of
     /// controlling terminals and sessions. It accepts any open file descriptor.
-    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
-        fn inner(system: &mut VirtualSystem, fd: Fd, pgid: Pid) -> Result<()> {
+    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
+        fn inner(system: &VirtualSystem, fd: Fd, pgid: Pid) -> Result<()> {
             // Make sure the FD is open
             system.with_open_file_description(fd, |_| Ok(()))?;
 
@@ -902,7 +903,7 @@ impl System for VirtualSystem {
             }
 
             // TODO: Suspend the calling process group if it is in the background
-            // and not ignoring SIGTTOU.
+            // and not ignoring or blocking SIGTTOU.
 
             state.foreground = Some(pgid);
             Ok(())
@@ -910,7 +911,9 @@ impl System for VirtualSystem {
 
         inner(self, fd, pgid).into()
     }
+}
 
+impl System for VirtualSystem {
     /// Creates a new child process.
     ///
     /// This implementation does not create any real child process. Instead,
@@ -2358,7 +2361,7 @@ mod tests {
 
     #[test]
     fn tcsetpgrp_success() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let pid = Pid(10);
         let ppid = system.process_id;
         let pgid = Pid(9);
@@ -2380,14 +2383,14 @@ mod tests {
 
     #[test]
     fn tcsetpgrp_with_invalid_fd() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.tcsetpgrp(Fd(100), Pid(2)).now_or_never().unwrap();
         assert_eq!(result, Err(Errno::EBADF));
     }
 
     #[test]
     fn tcsetpgrp_with_nonexisting_pgrp() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system
             .tcsetpgrp(Fd::STDIN, Pid(100))
             .now_or_never()
