@@ -120,9 +120,9 @@ use std::time::Instant;
 /// # use yash_env::{SharedSystem, System, VirtualSystem};
 /// # use yash_env::system::Pipe as _;
 /// # use futures_util::task::LocalSpawnExt;
-/// let mut system = SharedSystem::new(VirtualSystem::new());
-/// let mut system2 = system.clone();
-/// let mut system3 = system.clone();
+/// let system = SharedSystem::new(VirtualSystem::new());
+/// let system2 = system.clone();
+/// let system3 = system.clone();
 /// let (reader, writer) = system.pipe().unwrap();
 /// let mut executor = futures_executor::LocalPool::new();
 ///
