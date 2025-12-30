@@ -38,6 +38,7 @@ use super::Disposition;
 use super::Dup;
 use super::Errno;
 use super::Exec;
+use super::Exit;
 use super::Fcntl;
 use super::FdFlag;
 use super::FileType;
@@ -835,11 +836,13 @@ impl Exec for RealSystem {
     }
 }
 
-impl System for RealSystem {
-    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
+impl Exit for RealSystem {
+    fn exit(&self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
         unsafe { libc::_exit(exit_status.0) }
     }
+}
 
+impl System for RealSystem {
     fn getcwd(&self) -> Result<PathBuf> {
         // Some getcwd implementations allocate a buffer for the path if the
         // first argument is null, but we cannot use that feature because Vec's

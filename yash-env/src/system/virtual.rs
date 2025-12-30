@@ -62,6 +62,7 @@ use super::Disposition;
 use super::Dup;
 use super::Errno;
 use super::Exec;
+use super::Exit;
 use super::Fcntl;
 use super::FdFlag;
 use super::FlexFuture;
@@ -1036,8 +1037,8 @@ impl Exec for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
-    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
+impl Exit for VirtualSystem {
+    fn exit(&self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
         let mut myself = self.current_process_mut();
         let parent_pid = myself.ppid;
         let exited = myself.set_state(ProcessState::exited(exit_status));
@@ -1048,7 +1049,9 @@ impl System for VirtualSystem {
 
         pending().into()
     }
+}
 
+impl System for VirtualSystem {
     fn getcwd(&self) -> Result<PathBuf> {
         Ok(self.current_process().cwd.clone())
     }
@@ -2674,7 +2677,7 @@ mod tests {
 
     #[test]
     fn exit_sets_current_process_state_to_exited() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system.exit(ExitStatus(42)).now_or_never();
 
         assert!(system.current_process().state_has_changed());

@@ -46,7 +46,9 @@ pub use self::id::RawUid;
 pub use self::id::Uid;
 pub use self::io::FdFlag;
 pub use self::io::{Close, Dup, Fcntl, Pipe, Read, Write};
-pub use self::process::{ChildProcessStarter, ChildProcessTask, Exec, Fork, GetPid, SetPgid, Wait};
+pub use self::process::{
+    ChildProcessStarter, ChildProcessTask, Exec, Exit, Fork, GetPid, SetPgid, Wait,
+};
 #[cfg(all(doc, unix))]
 use self::real::RealSystem;
 use self::resource::LimitPair;
@@ -91,6 +93,7 @@ pub trait System:
     + Debug
     + Dup
     + Exec
+    + Exit
     + Fcntl
     + Fork
     + Fstat
@@ -115,11 +118,6 @@ pub trait System:
     + Wait
     + Write
 {
-    /// Terminates the current process.
-    ///
-    /// This function is a thin wrapper around the `_exit` system call.
-    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible>;
-
     /// Returns the current working directory path.
     fn getcwd(&self) -> Result<PathBuf>;
 

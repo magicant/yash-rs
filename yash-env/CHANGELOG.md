@@ -23,6 +23,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `Dup`: Declares the `dup` and `dup2` methods for duplicating file
       descriptors.
     - `Exec`: Declares the `execve` method for executing new programs.
+    - `Exit`: Declares the `exit` method for terminating the current
+      process.
     - `Fcntl`: Declares the `ofd_access`, `get_and_set_nonblocking`,
       `fcntl_getfd`, and `fcntl_setfd` methods for `fcntl`-related operations.
     - `Fork`: Declares a method for creating new child processes.

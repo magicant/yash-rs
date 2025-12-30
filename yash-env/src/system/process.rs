@@ -16,7 +16,7 @@
 
 //! Items related to process management
 
-use super::{FlexFuture, Result};
+use super::{ExitStatus, FlexFuture, Result};
 use crate::Env;
 #[cfg(all(doc, unix))]
 use crate::RealSystem;
@@ -82,7 +82,7 @@ type PinFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 /// process ID than the parent.
 ///
 /// Note that the output type of the task is `Infallible`. This is to ensure
-/// that the task [exits](super::System::exit) cleanly or
+/// that the task [exits](super::Exit::exit) cleanly or
 /// [kills](super::SendSignal::kill) itself with a signal.
 pub type ChildProcessTask<S> = Box<dyn for<'a> FnOnce(&'a mut Env<S>) -> PinFuture<'a, Infallible>>;
 
@@ -166,4 +166,13 @@ pub trait Exec {
         args: &[CString],
         envs: &[CString],
     ) -> FlexFuture<Result<Infallible>>;
+}
+
+/// Trait for terminating the current process
+pub trait Exit {
+    /// Terminates the current process.
+    ///
+    /// This function is a thin wrapper around the [`_exit` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/_exit.html).
+    fn exit(&self, exit_status: ExitStatus) -> FlexFuture<Infallible>;
 }

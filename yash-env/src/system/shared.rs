@@ -24,6 +24,7 @@ use super::Disposition;
 use super::Dup;
 use super::Errno;
 use super::Exec;
+use super::Exit;
 use super::Fcntl;
 use super::FdFlag;
 use super::FlexFuture;
@@ -599,14 +600,18 @@ impl<T: Exec> Exec for &SharedSystem<T> {
     }
 }
 
+/// Delegates `Exit` methods to the contained implementor.
+impl<T: Exit> Exit for &SharedSystem<T> {
+    fn exit(&self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
+        self.0.borrow().exit(exit_status)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl<S: System> System for &SharedSystem<S> {
-    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
-        self.0.borrow_mut().exit(exit_status)
-    }
     fn getcwd(&self) -> Result<PathBuf> {
         self.0.borrow().getcwd()
     }
@@ -945,15 +950,19 @@ impl<T: Exec> Exec for SharedSystem<T> {
     }
 }
 
+/// Delegates `Exit` methods to the contained implementor.
+impl<T: Exit> Exit for SharedSystem<T> {
+    #[inline]
+    fn exit(&self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
+        (&self).exit(exit_status)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
     // which in turn delegates to the contained system instance.
 
-    #[inline]
-    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
-        (&mut &*self).exit(exit_status)
-    }
     #[inline]
     fn getcwd(&self) -> Result<PathBuf> {
         (&self).getcwd()
