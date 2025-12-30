@@ -432,7 +432,7 @@ impl Dup for VirtualSystem {
 
 impl Open for VirtualSystem {
     fn open(
-        &mut self,
+        &self,
         path: &CStr,
         access: OfdAccess,
         flags: EnumSet<OpenFlag>,
@@ -507,7 +507,7 @@ impl Open for VirtualSystem {
         process.open_fd(body).map_err(|_| Errno::EMFILE)
     }
 
-    fn open_tmpfile(&mut self, _parent_dir: &Path) -> Result<Fd> {
+    fn open_tmpfile(&self, _parent_dir: &Path) -> Result<Fd> {
         let file = Rc::new(RefCell::new(Inode::new([])));
         let open_file_description = Rc::new(RefCell::new(OpenFileDescription {
             file,
@@ -525,7 +525,7 @@ impl Open for VirtualSystem {
         process.open_fd(body).map_err(|_| Errno::EMFILE)
     }
 
-    fn fdopendir(&mut self, fd: Fd) -> Result<impl Dir + use<>> {
+    fn fdopendir(&self, fd: Fd) -> Result<impl Dir + use<>> {
         self.with_open_file_description(fd, |ofd| {
             let inode = ofd.inode();
             let dir = VirtualDir::try_from(&inode.borrow().body)?;
@@ -533,7 +533,7 @@ impl Open for VirtualSystem {
         })
     }
 
-    fn opendir(&mut self, path: &CStr) -> Result<impl Dir + use<>> {
+    fn opendir(&self, path: &CStr) -> Result<impl Dir + use<>> {
         let fd = self.open(
             path,
             OfdAccess::ReadOnly,
@@ -1587,7 +1587,7 @@ mod tests {
 
     #[test]
     fn open_non_existing_file_no_creation() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.open(
             c"/no/such/file",
             OfdAccess::ReadOnly,
@@ -1599,7 +1599,7 @@ mod tests {
 
     #[test]
     fn open_creating_non_existing_file() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.open(
             c"new_file",
             OfdAccess::WriteOnly,
@@ -1619,7 +1619,7 @@ mod tests {
 
     #[test]
     fn open_creating_non_existing_file_umask() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system.umask(Mode::from_bits_retain(0o125));
         system
             .open(
@@ -1637,7 +1637,7 @@ mod tests {
 
     #[test]
     fn open_existing_file() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let fd = system
             .open(
                 c"file",
@@ -1666,7 +1666,7 @@ mod tests {
 
     #[test]
     fn open_existing_file_excl() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let first = system.open(
             c"my_file",
             OfdAccess::WriteOnly,
@@ -1686,7 +1686,7 @@ mod tests {
 
     #[test]
     fn open_truncating() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let fd = system
             .open(
                 c"file",
@@ -1719,7 +1719,7 @@ mod tests {
 
     #[test]
     fn open_appending() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let fd = system
             .open(
                 c"file",
@@ -1755,7 +1755,7 @@ mod tests {
 
     #[test]
     fn open_directory() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         // Create a regular file and its parent directory
         let _ = system.open(
@@ -1776,7 +1776,7 @@ mod tests {
 
     #[test]
     fn open_non_directory_path_prefix() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         // Create a regular file
         let _ = system.open(
@@ -1797,7 +1797,7 @@ mod tests {
 
     #[test]
     fn open_non_directory_file() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         // Create a regular file
         let _ = system.open(
@@ -1819,7 +1819,7 @@ mod tests {
     #[test]
     fn open_default_working_directory() {
         // The default working directory is the root directory.
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         let writer = system.open(
             c"/dir/file",
@@ -1843,7 +1843,7 @@ mod tests {
 
     #[test]
     fn open_tmpfile() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let fd = system.open_tmpfile(Path::new("")).unwrap();
         system.write(fd, &[42, 17, 75]).unwrap();
         system.lseek(fd, SeekFrom::Start(0)).unwrap();
@@ -1891,7 +1891,7 @@ mod tests {
     #[test]
     fn opendir_default_working_directory() {
         // The default working directory is the root directory.
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         let _ = system.open(
             c"/dir/file",
@@ -2729,7 +2729,7 @@ mod tests {
 
     #[test]
     fn chdir_changes_directory() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         // Create a regular file and its parent directory
         let _ = system.open(
@@ -2754,7 +2754,7 @@ mod tests {
 
     #[test]
     fn chdir_fails_with_non_directory_file() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         // Create a regular file and its parent directory
         let _ = system.open(

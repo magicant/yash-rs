@@ -225,7 +225,7 @@ mod tests {
             let file = Rc::new(Inode::new("echo file\n").into());
             state.file_system.save("/foo", file).unwrap();
         }
-        let mut system = SharedSystem::new(system);
+        let system = SharedSystem::new(system);
         let path = c"/foo";
         let fd = system
             .open(

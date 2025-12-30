@@ -381,24 +381,24 @@ impl<T: Dup> Dup for &SharedSystem<T> {
 
 impl<T: Open> Open for &SharedSystem<T> {
     fn open(
-        &mut self,
+        &self,
         path: &CStr,
         access: OfdAccess,
         flags: EnumSet<OpenFlag>,
         mode: Mode,
     ) -> Result<Fd> {
-        self.0.borrow_mut().open(path, access, flags, mode)
+        self.0.borrow().open(path, access, flags, mode)
     }
-    fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
-        self.0.borrow_mut().open_tmpfile(parent_dir)
-    }
-    #[allow(refining_impl_trait)]
-    fn fdopendir(&mut self, fd: Fd) -> Result<impl Dir + use<T>> {
-        self.0.borrow_mut().fdopendir(fd)
+    fn open_tmpfile(&self, parent_dir: &Path) -> Result<Fd> {
+        self.0.borrow().open_tmpfile(parent_dir)
     }
     #[allow(refining_impl_trait)]
-    fn opendir(&mut self, path: &CStr) -> Result<impl Dir + use<T>> {
-        self.0.borrow_mut().opendir(path)
+    fn fdopendir(&self, fd: Fd) -> Result<impl Dir + use<T>> {
+        self.0.borrow().fdopendir(fd)
+    }
+    #[allow(refining_impl_trait)]
+    fn opendir(&self, path: &CStr) -> Result<impl Dir + use<T>> {
+        self.0.borrow().opendir(path)
     }
 }
 
@@ -730,25 +730,25 @@ impl<T: Dup> Dup for SharedSystem<T> {
 impl<T: Open> Open for SharedSystem<T> {
     #[inline]
     fn open(
-        &mut self,
+        &self,
         path: &CStr,
         access: OfdAccess,
         flags: EnumSet<OpenFlag>,
         mode: Mode,
     ) -> Result<Fd> {
-        (&mut &*self).open(path, access, flags, mode)
+        (&self).open(path, access, flags, mode)
     }
     #[inline]
-    fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
-        (&mut &*self).open_tmpfile(parent_dir)
+    fn open_tmpfile(&self, parent_dir: &Path) -> Result<Fd> {
+        (&self).open_tmpfile(parent_dir)
     }
     #[inline]
-    fn fdopendir(&mut self, fd: Fd) -> Result<impl Dir + use<T>> {
-        (&mut &*self).fdopendir(fd)
+    fn fdopendir(&self, fd: Fd) -> Result<impl Dir + use<T>> {
+        (&self).fdopendir(fd)
     }
     #[inline]
-    fn opendir(&mut self, path: &CStr) -> Result<impl Dir + use<T>> {
-        (&mut &*self).opendir(path)
+    fn opendir(&self, path: &CStr) -> Result<impl Dir + use<T>> {
+        (&self).opendir(path)
     }
 }
 

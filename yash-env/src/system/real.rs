@@ -320,7 +320,7 @@ impl Dup for RealSystem {
 
 impl Open for RealSystem {
     fn open(
-        &mut self,
+        &self,
         path: &CStr,
         access: OfdAccess,
         flags: EnumSet<OpenFlag>,
@@ -341,7 +341,7 @@ impl Open for RealSystem {
             .map(Fd)
     }
 
-    fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
+    fn open_tmpfile(&self, parent_dir: &Path) -> Result<Fd> {
         let parent_dir = OsStr::from_bytes(parent_dir.as_unix_str().as_bytes());
         let file = tempfile::tempfile_in(parent_dir)
             .map_err(|errno| Errno(errno.raw_os_error().unwrap_or(0)))?;
@@ -353,13 +353,13 @@ impl Open for RealSystem {
         Ok(fd)
     }
 
-    fn fdopendir(&mut self, fd: Fd) -> Result<impl Dir + use<>> {
+    fn fdopendir(&self, fd: Fd) -> Result<impl Dir + use<>> {
         let dir = unsafe { libc::fdopendir(fd.0) };
         let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
         Ok(RealDir(dir))
     }
 
-    fn opendir(&mut self, path: &CStr) -> Result<impl Dir + use<>> {
+    fn opendir(&self, path: &CStr) -> Result<impl Dir + use<>> {
         let dir = unsafe { libc::opendir(path.as_ptr()) };
         let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
         Ok(RealDir(dir))
@@ -1058,7 +1058,7 @@ mod tests {
 
     #[test]
     fn real_system_directory_entries() {
-        let mut system = unsafe { RealSystem::new() };
+        let system = unsafe { RealSystem::new() };
         let mut dir = system.opendir(c".").unwrap();
         let mut count = 0;
         while dir.next().unwrap().is_some() {
