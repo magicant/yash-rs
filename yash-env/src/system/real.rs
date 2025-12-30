@@ -48,6 +48,7 @@ use super::Fork;
 use super::Fstat;
 use super::GetCwd;
 use super::GetPid;
+use super::GetUid;
 use super::Gid;
 use super::IsExecutableFile;
 use super::Isatty;
@@ -880,7 +881,7 @@ impl Exit for RealSystem {
     }
 }
 
-impl System for RealSystem {
+impl GetUid for RealSystem {
     fn getuid(&self) -> Uid {
         Uid(unsafe { libc::getuid() })
     }
@@ -896,7 +897,9 @@ impl System for RealSystem {
     fn getegid(&self) -> Gid {
         Gid(unsafe { libc::getegid() })
     }
+}
 
+impl System for RealSystem {
     fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
         Errno::clear();
         let passwd = unsafe { libc::getpwnam(name.as_ptr()) };

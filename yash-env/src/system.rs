@@ -19,7 +19,6 @@
 mod errno;
 mod file_system;
 mod future;
-mod id;
 mod io;
 mod process;
 #[cfg(unix)]
@@ -30,6 +29,7 @@ mod shared;
 mod signal;
 mod terminal;
 mod time;
+mod user;
 pub mod r#virtual;
 
 pub use self::errno::Errno;
@@ -40,12 +40,7 @@ pub use self::file_system::{
     Open, OpenFlag, RawMode, Seek, Stat, Umask,
 };
 pub use self::future::FlexFuture;
-pub use self::id::Gid;
-pub use self::id::RawGid;
-pub use self::id::RawUid;
-pub use self::id::Uid;
-pub use self::io::FdFlag;
-pub use self::io::{Close, Dup, Fcntl, Pipe, Read, Write};
+pub use self::io::{Close, Dup, Fcntl, FdFlag, Pipe, Read, Write};
 pub use self::process::{
     ChildProcessStarter, ChildProcessTask, Exec, Exit, Fork, GetPid, SetPgid, Wait,
 };
@@ -62,6 +57,7 @@ pub use self::signal::{
 };
 pub use self::terminal::{Isatty, TcGetPgrp, TcSetPgrp};
 pub use self::time::{CpuTimes, Time, Times};
+pub use self::user::{GetUid, Gid, RawGid, RawUid, Uid};
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
 use crate::io::Fd;
@@ -100,6 +96,7 @@ pub trait System:
     + Fstat
     + GetCwd
     + GetPid
+    + GetUid
     + IsExecutableFile
     + Isatty
     + Open
@@ -120,18 +117,6 @@ pub trait System:
     + Wait
     + Write
 {
-    /// Returns the real user ID of the current process.
-    fn getuid(&self) -> Uid;
-
-    /// Returns the effective user ID of the current process.
-    fn geteuid(&self) -> Uid;
-
-    /// Returns the real group ID of the current process.
-    fn getgid(&self) -> Gid;
-
-    /// Returns the effective group ID of the current process.
-    fn getegid(&self) -> Gid;
-
     /// Returns the home directory path of the given user.
     ///
     /// Returns `Ok(None)` if the user is not found.

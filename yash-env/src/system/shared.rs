@@ -33,6 +33,7 @@ use super::Fork;
 use super::Fstat;
 use super::GetCwd;
 use super::GetPid;
+use super::GetUid;
 use super::Gid;
 use super::IsExecutableFile;
 use super::Isatty;
@@ -623,11 +624,8 @@ impl<T: Exit> Exit for &SharedSystem<T> {
     }
 }
 
-/// Delegates `System` methods to the contained system instance.
-///
-/// This implementation only requires a non-mutable reference to the shared
-/// system because it uses `RefCell` to access the contained system instance.
-impl<S: System> System for &SharedSystem<S> {
+/// Delegates `GetUid` methods to the contained implementor.
+impl<T: GetUid> GetUid for &SharedSystem<T> {
     fn getuid(&self) -> Uid {
         self.0.borrow().getuid()
     }
@@ -640,6 +638,13 @@ impl<S: System> System for &SharedSystem<S> {
     fn getegid(&self) -> Gid {
         self.0.borrow().getegid()
     }
+}
+
+/// Delegates `System` methods to the contained system instance.
+///
+/// This implementation only requires a non-mutable reference to the shared
+/// system because it uses `RefCell` to access the contained system instance.
+impl<S: System> System for &SharedSystem<S> {
     fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
         self.0.borrow().getpwnam_dir(name)
     }
@@ -984,11 +989,8 @@ impl<T: Exit> Exit for SharedSystem<T> {
     }
 }
 
-/// Delegates `System` methods to the contained system instance.
-impl<S: System> System for SharedSystem<S> {
-    // All methods are delegated to `impl System for &SharedSystem`,
-    // which in turn delegates to the contained system instance.
-
+/// Delegates `GetUid` methods to the contained implementor.
+impl<T: GetUid> GetUid for SharedSystem<T> {
     #[inline]
     fn getuid(&self) -> Uid {
         (&self).getuid()
@@ -1005,6 +1007,13 @@ impl<S: System> System for SharedSystem<S> {
     fn getegid(&self) -> Gid {
         (&self).getegid()
     }
+}
+
+/// Delegates `System` methods to the contained system instance.
+impl<S: System> System for SharedSystem<S> {
+    // All methods are delegated to `impl System for &SharedSystem`,
+    // which in turn delegates to the contained system instance.
+
     #[inline]
     fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
         (&self).getpwnam_dir(name)

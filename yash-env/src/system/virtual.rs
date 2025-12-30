@@ -71,6 +71,7 @@ use super::Fork;
 use super::Fstat;
 use super::GetCwd;
 use super::GetPid;
+use super::GetUid;
 use super::Gid;
 use super::IsExecutableFile;
 use super::Isatty;
@@ -1074,7 +1075,7 @@ impl Exit for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
+impl GetUid for VirtualSystem {
     fn getuid(&self) -> Uid {
         self.current_process().uid()
     }
@@ -1090,7 +1091,9 @@ impl System for VirtualSystem {
     fn getegid(&self) -> Gid {
         self.current_process().egid()
     }
+}
 
+impl System for VirtualSystem {
     fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
         let state = self.state.borrow();
         let name = match name.to_str() {
