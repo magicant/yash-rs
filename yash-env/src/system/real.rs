@@ -584,7 +584,7 @@ impl Signals for RealSystem {
 
 impl Sigmask for RealSystem {
     fn sigmask(
-        &mut self,
+        &self,
         op: Option<(SigmaskOp, &[signal::Number])>,
         old_mask: Option<&mut Vec<signal::Number>>,
     ) -> Result<()> {

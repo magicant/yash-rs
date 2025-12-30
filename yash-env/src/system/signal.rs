@@ -72,7 +72,7 @@ pub trait Sigmask {
     /// `op` is `None`, this function does not change the mask.
     /// If `old_mask` is `Some`, this function sets the previous mask to it.
     fn sigmask(
-        &mut self,
+        &self,
         op: Option<(SigmaskOp, &[Number])>,
         old_mask: Option<&mut Vec<Number>>,
     ) -> Result<()>;

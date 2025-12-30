@@ -519,11 +519,11 @@ impl<T: Signals> Signals for &SharedSystem<T> {
 /// Delegates `Sigmask` methods to the contained implementor.
 impl<T: Sigmask> Sigmask for &SharedSystem<T> {
     fn sigmask(
-        &mut self,
+        &self,
         op: Option<(SigmaskOp, &[signal::Number])>,
         old_mask: Option<&mut Vec<signal::Number>>,
     ) -> Result<()> {
-        (**self.0.borrow_mut()).sigmask(op, old_mask)
+        (**self.0.borrow()).sigmask(op, old_mask)
     }
 }
 
@@ -891,11 +891,11 @@ impl<T: Signals> Signals for SharedSystem<T> {
 impl<T: Sigmask> Sigmask for SharedSystem<T> {
     #[inline]
     fn sigmask(
-        &mut self,
+        &self,
         op: Option<(SigmaskOp, &[signal::Number])>,
         old_mask: Option<&mut Vec<signal::Number>>,
     ) -> Result<()> {
-        (&mut &*self).sigmask(op, old_mask)
+        (&self).sigmask(op, old_mask)
     }
 }
 
