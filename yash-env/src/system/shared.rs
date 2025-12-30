@@ -54,6 +54,7 @@ use super::Select;
 use super::SelectSystem;
 use super::SendSignal;
 use super::SetPgid;
+use super::ShellPath;
 use super::Sigaction;
 use super::Sigmask;
 use super::SigmaskOp;
@@ -656,14 +657,18 @@ impl<T: Sysconf> Sysconf for &SharedSystem<T> {
     }
 }
 
+/// Delegates `ShellPath` methods to the contained implementor.
+impl<T: ShellPath> ShellPath for &SharedSystem<T> {
+    fn shell_path(&self) -> CString {
+        self.0.borrow().shell_path()
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl<S: System> System for &SharedSystem<S> {
-    fn shell_path(&self) -> CString {
-        self.0.borrow().shell_path()
-    }
     fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
         self.0.borrow().getrlimit(resource)
     }
@@ -1035,15 +1040,19 @@ impl<T: Sysconf> Sysconf for SharedSystem<T> {
     }
 }
 
+/// Delegates `ShellPath` methods to the contained implementor.
+impl<T: ShellPath> ShellPath for SharedSystem<T> {
+    #[inline]
+    fn shell_path(&self) -> CString {
+        (&self).shell_path()
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
     // which in turn delegates to the contained system instance.
 
-    #[inline]
-    fn shell_path(&self) -> CString {
-        (&self).shell_path()
-    }
     #[inline]
     fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
         (&self).getrlimit(resource)

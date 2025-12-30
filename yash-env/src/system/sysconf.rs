@@ -18,6 +18,7 @@
 
 use super::Result;
 use crate::str::UnixString;
+use std::ffi::CString;
 
 /// Trait for getting system configuration information
 pub trait Sysconf {
@@ -26,4 +27,14 @@ pub trait Sysconf {
     ///
     /// This is a thin wrapper around `confstr(_CS_PATH, …)`.
     fn confstr_path(&self) -> Result<UnixString>;
+}
+
+pub trait ShellPath {
+    // TODO: Should return `Cow<CStr>` instead
+    /// Returns the path to the shell executable.
+    ///
+    /// If possible, this function should return the path to the current shell
+    /// executable. Otherwise, it should return the path to the default POSIX
+    /// shell.
+    fn shell_path(&self) -> CString;
 }

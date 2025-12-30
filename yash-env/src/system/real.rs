@@ -64,6 +64,7 @@ use super::Seek;
 use super::Select;
 use super::SendSignal;
 use super::SetPgid;
+use super::ShellPath;
 use super::Sigaction;
 use super::Sigmask;
 use super::SigmaskOp;
@@ -951,7 +952,7 @@ impl Sysconf for RealSystem {
     }
 }
 
-impl System for RealSystem {
+impl ShellPath for RealSystem {
     /// Returns the path to the shell.
     ///
     /// On Linux, this function returns `/proc/self/exe`. On other platforms, it
@@ -981,7 +982,9 @@ impl System for RealSystem {
         // The last resort
         c"/bin/sh".to_owned()
     }
+}
 
+impl System for RealSystem {
     fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
         let raw_resource = resource.as_raw_type().ok_or(Errno::EINVAL)?;
 

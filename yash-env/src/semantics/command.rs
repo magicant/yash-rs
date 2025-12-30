@@ -27,8 +27,7 @@ use crate::semantics::{ExitStatus, Field, Result};
 use crate::source::Location;
 use crate::source::pretty::{Report, ReportType, Snippet};
 use crate::subshell::{JobControl, Subshell};
-use crate::system::Exec as _;
-use crate::system::{Errno, System};
+use crate::system::{Errno, Exec, ShellPath, System};
 use itertools::Itertools as _;
 use std::convert::Infallible;
 use std::ffi::CString;
@@ -128,7 +127,7 @@ pub struct ReplaceCurrentProcessError {
 /// If the `execve` call fails with [`ENOEXEC`](Errno::ENOEXEC), this function
 /// falls back on invoking the shell with the given arguments, so that the shell
 /// can interpret the script. The path to the shell executable is taken from
-/// [`System::shell_path`].
+/// [`ShellPath::shell_path`].
 ///
 /// If the `execve` call succeeds, the future returned by this function never
 /// resolves.
@@ -170,7 +169,7 @@ fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
 }
 
 /// Invokes the shell with the given arguments.
-async fn fall_back_on_sh<S: System>(
+async fn fall_back_on_sh<S: ShellPath + Exec>(
     system: &mut S,
     mut script_path: CString,
     mut args: Vec<CString>,

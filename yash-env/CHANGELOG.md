@@ -53,6 +53,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `SendSignal`: Declares the `kill` and `raise` methods for sending signals
       to processes.
     - `SetPgid`: Declares the `setpgid` method for setting process group IDs.
+    - `ShellPath`: Declares the `shell_path` method for getting the path to
+      the shell executable.
     - `Sigaction`: Declares methods for managing signal dispositions.
     - `Sigmask`: Declares the `sigmask` method for managing signal masks.
     - `Signals`: Declares the `signal_number_from_name` and

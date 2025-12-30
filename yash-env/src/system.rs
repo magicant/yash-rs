@@ -56,7 +56,7 @@ pub use self::shared::SharedSystem;
 pub use self::signal::{
     CaughtSignals, Disposition, SendSignal, Sigaction, Sigmask, SigmaskOp, Signals,
 };
-pub use self::sysconf::Sysconf;
+pub use self::sysconf::{ShellPath, Sysconf};
 pub use self::terminal::{Isatty, TcGetPgrp, TcSetPgrp};
 pub use self::time::{CpuTimes, Time, Times};
 pub use self::user::{GetPw, GetUid, Gid, RawGid, RawUid, Uid};
@@ -73,7 +73,6 @@ use crate::str::UnixString;
 use crate::subshell::Subshell;
 use crate::trap::SignalSystem;
 use std::convert::Infallible;
-use std::ffi::CString;
 use std::fmt::Debug;
 use r#virtual::SignalEffect;
 
@@ -108,6 +107,7 @@ pub trait System:
     + Select
     + SendSignal
     + SetPgid
+    + ShellPath
     + Sigaction
     + Sigmask
     + Signals
@@ -120,13 +120,6 @@ pub trait System:
     + Wait
     + Write
 {
-    /// Returns the path to the shell executable.
-    ///
-    /// If possible, this function should return the path to the current shell
-    /// executable. Otherwise, it should return the path to the default POSIX
-    /// shell.
-    fn shell_path(&self) -> CString;
-
     /// Returns the limits for the specified resource.
     ///
     /// This function returns a pair of the soft and hard limits for the given

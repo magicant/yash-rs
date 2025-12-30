@@ -86,6 +86,7 @@ use super::Seek;
 use super::Select;
 use super::SendSignal;
 use super::SetPgid;
+use super::ShellPath;
 use super::Sigaction;
 use super::Sigmask;
 use super::SigmaskOp;
@@ -1121,14 +1122,16 @@ impl Sysconf for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
+impl ShellPath for VirtualSystem {
     /// Returns the path to the shell.
     ///
     /// The current implementation returns "/bin/sh".
     fn shell_path(&self) -> CString {
         c"/bin/sh".to_owned()
     }
+}
 
+impl System for VirtualSystem {
     fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
         Ok(self
             .current_process()
