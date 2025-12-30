@@ -106,6 +106,7 @@ use super::Write;
 use super::resource::INFINITY;
 use super::resource::LimitPair;
 use super::resource::Resource;
+#[cfg(doc)]
 use crate::System;
 use crate::io::Fd;
 use crate::job::Pid;
@@ -1166,8 +1167,6 @@ impl SetRlimit for VirtualSystem {
         Ok(())
     }
 }
-
-impl System for VirtualSystem {}
 
 fn send_signal_to_processes(
     state: &mut SystemState,

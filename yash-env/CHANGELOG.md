@@ -76,6 +76,8 @@ A _private dependency_ is used internally and not visible to downstream users.
       setting resource limits.
 - Implementations of these traits are provided for those types that implement
   `System`.
+- `System` is now implemented for any type that implements all of the above
+  traits.
 
 ### Changed
 

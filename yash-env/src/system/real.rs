@@ -74,7 +74,6 @@ use super::SigmaskOp;
 use super::Signals;
 use super::Stat;
 use super::Sysconf;
-use super::System;
 use super::TcGetPgrp;
 use super::TcSetPgrp;
 use super::Times;
@@ -1017,8 +1016,6 @@ impl SetRlimit for RealSystem {
         Ok(())
     }
 }
-
-impl System for RealSystem {}
 
 /// Implementor of [`Dir`] that iterates on a real directory
 #[derive(Debug)]

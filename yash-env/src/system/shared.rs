@@ -680,8 +680,6 @@ impl<T: SetRlimit> SetRlimit for SharedSystem<T> {
     }
 }
 
-impl<S: System> System for SharedSystem<S> {}
-
 impl<S: System> SignalSystem for &SharedSystem<S> {
     #[inline]
     fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {

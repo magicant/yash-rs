@@ -123,6 +123,47 @@ pub trait System:
 {
 }
 
+impl<T> System for T where
+    T: CaughtSignals
+        + Chdir
+        + Clock
+        + Close
+        + Debug
+        + Dup
+        + Exec
+        + Exit
+        + Fcntl
+        + Fork
+        + Fstat
+        + GetCwd
+        + GetPid
+        + GetPw
+        + GetRlimit
+        + GetUid
+        + IsExecutableFile
+        + Isatty
+        + Open
+        + Pipe
+        + Read
+        + Seek
+        + Select
+        + SendSignal
+        + SetPgid
+        + SetRlimit
+        + ShellPath
+        + Sigaction
+        + Sigmask
+        + Signals
+        + Sysconf
+        + TcGetPgrp
+        + TcSetPgrp
+        + Times
+        + Umask
+        + Wait
+        + Write
+{
+}
+
 /// Extension for [`System`]
 ///
 /// This trait provides some extension methods for `System`.
