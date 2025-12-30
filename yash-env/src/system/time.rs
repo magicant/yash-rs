@@ -20,7 +20,7 @@ use super::Result;
 use std::time::Instant;
 
 /// Trait for getting the current time
-pub trait Time {
+pub trait Clock {
     /// Returns the current time.
     #[must_use]
     fn now(&self) -> Instant;

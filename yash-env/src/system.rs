@@ -57,7 +57,7 @@ pub use self::signal::{
 };
 pub use self::sysconf::{ShellPath, Sysconf};
 pub use self::terminal::{Isatty, TcGetPgrp, TcSetPgrp};
-pub use self::time::{CpuTimes, Time, Times};
+pub use self::time::{Clock, CpuTimes, Times};
 pub use self::user::{GetPw, GetUid, Gid, RawGid, RawUid, Uid};
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
@@ -85,6 +85,7 @@ use r#virtual::SignalEffect;
 pub trait System:
     CaughtSignals
     + Chdir
+    + Clock
     + Close
     + Debug
     + Dup
@@ -115,7 +116,6 @@ pub trait System:
     + Sysconf
     + TcGetPgrp
     + TcSetPgrp
-    + Time
     + Times
     + Umask
     + Wait

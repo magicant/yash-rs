@@ -31,6 +31,7 @@ use super::AT_FDCWD;
 use super::CaughtSignals;
 use super::Chdir;
 use super::ChildProcessStarter;
+use super::Clock;
 use super::Close;
 use super::CpuTimes;
 use super::Dir;
@@ -76,7 +77,6 @@ use super::Sysconf;
 use super::System;
 use super::TcGetPgrp;
 use super::TcSetPgrp;
-use super::Time;
 use super::Times;
 use super::Uid;
 use super::Umask;
@@ -501,7 +501,7 @@ impl Chdir for RealSystem {
     }
 }
 
-impl Time for RealSystem {
+impl Clock for RealSystem {
     fn now(&self) -> Instant {
         Instant::now()
     }

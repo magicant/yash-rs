@@ -19,6 +19,7 @@
 use super::CaughtSignals;
 use super::Chdir;
 use super::ChildProcessStarter;
+use super::Clock;
 use super::CpuTimes;
 use super::Dir;
 use super::Disposition;
@@ -69,7 +70,6 @@ use super::System;
 use super::SystemEx;
 use super::TcGetPgrp;
 use super::TcSetPgrp;
-use super::Time;
 use super::Times;
 use super::Uid;
 use super::Umask;
@@ -467,7 +467,7 @@ impl<T: Chdir> Chdir for &SharedSystem<T> {
 }
 
 /// Delegates `Time` methods to the contained implementor.
-impl<T: Time> Time for &SharedSystem<T> {
+impl<T: Clock> Clock for &SharedSystem<T> {
     fn now(&self) -> Instant {
         self.0.borrow().now()
     }
@@ -829,7 +829,7 @@ impl<T: Chdir> Chdir for SharedSystem<T> {
 }
 
 /// Delegates `Time` methods to the contained implementor.
-impl<T: Time> Time for SharedSystem<T> {
+impl<T: Clock> Clock for SharedSystem<T> {
     #[inline]
     fn now(&self) -> Instant {
         (&self).now()

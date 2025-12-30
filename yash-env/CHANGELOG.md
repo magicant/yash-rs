@@ -21,6 +21,7 @@ A _private dependency_ is used internally and not visible to downstream users.
       caught signals.
     - `Chdir`: Declares the `chdir` method for changing the current
       working directory.
+    - `Clock`: Declares the `now` method for getting the current time.
     - `Close`: Declares the `close` method for closing file descriptors.
     - `Dup`: Declares the `dup` and `dup2` methods for duplicating file
       descriptors.
@@ -63,7 +64,6 @@ A _private dependency_ is used internally and not visible to downstream users.
       foreground process group ID of a terminal.
     - `TcSetPgrp`: Declares the `tcsetpgrp` method for setting the
       foreground process group ID of a terminal.
-    - `Time`: Declares the `now` method for getting the current time.
     - `Times`: Declares the `times` method for getting CPU times.
     - `Umask`: Declares the `umask` method for setting the file mode
       creation mask.

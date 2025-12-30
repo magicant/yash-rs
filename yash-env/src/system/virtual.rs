@@ -56,6 +56,7 @@ pub use self::signal::*;
 use super::AT_FDCWD;
 use super::CaughtSignals;
 use super::Chdir;
+use super::Clock;
 use super::Close;
 use super::CpuTimes;
 use super::Dir;
@@ -97,7 +98,6 @@ use super::Stat;
 use super::Sysconf;
 use super::TcGetPgrp;
 use super::TcSetPgrp;
-use super::Time;
 use super::Times;
 use super::Uid;
 use super::Umask;
@@ -638,7 +638,7 @@ impl Chdir for VirtualSystem {
     }
 }
 
-impl Time for VirtualSystem {
+impl Clock for VirtualSystem {
     /// Returns `now` in [`SystemState`].
     ///
     /// Panics if it is `None`.
