@@ -111,6 +111,11 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `impl<S> std::fmt::Debug for builtin::Builtin<S>` now prints the `execute`
   field as well.
 
+### Removed
+
+- `&system::SharedSystem` no longer implements `System` because all `System`
+  methods now can be called on `&SharedSystem` directly.
+
 ## [0.10.1] - 2025-11-29
 
 ### Fixed
