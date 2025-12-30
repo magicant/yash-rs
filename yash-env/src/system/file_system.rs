@@ -18,7 +18,7 @@
 
 use super::{Gid, Result, Uid};
 use crate::io::Fd;
-use crate::path::Path;
+use crate::path::{Path, PathBuf};
 use crate::str::UnixStr;
 use bitflags::bitflags;
 use enumset::{EnumSet, EnumSetType};
@@ -356,4 +356,10 @@ pub trait Umask {
     /// want to get the current mask, you need to set it back to the original
     /// value after getting it.
     fn umask(&self, new_mask: Mode) -> Mode;
+}
+
+/// Trait for getting the current working directory
+pub trait GetCwd {
+    /// Returns the current working directory path.
+    fn getcwd(&self) -> Result<PathBuf>;
 }

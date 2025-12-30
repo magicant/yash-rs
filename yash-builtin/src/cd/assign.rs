@@ -24,6 +24,7 @@ use yash_env::path::Path;
 use yash_env::path::PathBuf;
 use yash_env::source::pretty::{Report, ReportType, Snippet, Span, SpanRole};
 use yash_env::system::Errno;
+use yash_env::system::GetCwd;
 use yash_env::variable::AssignError;
 use yash_env::variable::OLDPWD;
 use yash_env::variable::PWD;
@@ -90,10 +91,10 @@ async fn handle_assign_error<S: System>(
 /// Computes the new value of `$PWD`.
 ///
 /// If `mode` is `Logical`, this function returns `path` without any
-/// modification. If `mode` is `Physical`, this function uses [`System::getcwd`]
+/// modification. If `mode` is `Physical`, this function uses [`GetCwd::getcwd`]
 /// to obtain the working directory path. If `System::getcwd` fails, the error
 /// code is returned.
-pub fn new_pwd<S: System>(env: &Env<S>, mode: Mode, path: &Path) -> Result<PathBuf, Errno> {
+pub fn new_pwd<T: GetCwd>(env: &Env<T>, mode: Mode, path: &Path) -> Result<PathBuf, Errno> {
     match mode {
         Mode::Logical => Ok(path.to_owned()),
         Mode::Physical => env.system.getcwd(),

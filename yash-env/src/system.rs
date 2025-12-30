@@ -36,8 +36,8 @@ pub use self::errno::Errno;
 pub use self::errno::RawErrno;
 pub use self::errno::Result;
 pub use self::file_system::{
-    AT_FDCWD, Dir, DirEntry, FileType, Fstat, IsExecutableFile, Mode, OfdAccess, Open, OpenFlag,
-    RawMode, Seek, Stat, Umask,
+    AT_FDCWD, Dir, DirEntry, FileType, Fstat, GetCwd, IsExecutableFile, Mode, OfdAccess, Open,
+    OpenFlag, RawMode, Seek, Stat, Umask,
 };
 pub use self::future::FlexFuture;
 pub use self::id::Gid;
@@ -97,6 +97,7 @@ pub trait System:
     + Fcntl
     + Fork
     + Fstat
+    + GetCwd
     + GetPid
     + IsExecutableFile
     + Isatty
@@ -118,9 +119,6 @@ pub trait System:
     + Wait
     + Write
 {
-    /// Returns the current working directory path.
-    fn getcwd(&self) -> Result<PathBuf>;
-
     /// Changes the working directory.
     fn chdir(&mut self, path: &CStr) -> Result<()>;
 

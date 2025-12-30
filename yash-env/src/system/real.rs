@@ -45,6 +45,7 @@ use super::FileType;
 use super::FlexFuture;
 use super::Fork;
 use super::Fstat;
+use super::GetCwd;
 use super::GetPid;
 use super::Gid;
 use super::IsExecutableFile;
@@ -457,6 +458,35 @@ impl Umask for RealSystem {
     }
 }
 
+impl GetCwd for RealSystem {
+    fn getcwd(&self) -> Result<PathBuf> {
+        // Some getcwd implementations allocate a buffer for the path if the
+        // first argument is null, but we cannot use that feature because Vec's
+        // allocator may not be compatible with the system's allocator.
+
+        // Since there is no way to know the required buffer size, we try
+        // several buffer sizes.
+        let mut buffer = Vec::<u8>::new();
+        for capacity in [1 << 10, 1 << 12, 1 << 14, 1 << 16] {
+            buffer.reserve_exact(capacity);
+
+            let result = unsafe { libc::getcwd(buffer.as_mut_ptr().cast(), capacity) };
+            if !result.is_null() {
+                // len does not include the null terminator
+                let len = unsafe { CStr::from_ptr(buffer.as_ptr().cast()) }.count_bytes();
+                unsafe { buffer.set_len(len) }
+                buffer.shrink_to_fit();
+                return Ok(PathBuf::from(UnixString::from_vec(buffer)));
+            }
+            let errno = Errno::last();
+            if errno != Errno::ERANGE {
+                return Err(errno);
+            }
+        }
+        Err(Errno::ERANGE)
+    }
+}
+
 impl Time for RealSystem {
     fn now(&self) -> Instant {
         Instant::now()
@@ -843,33 +873,6 @@ impl Exit for RealSystem {
 }
 
 impl System for RealSystem {
-    fn getcwd(&self) -> Result<PathBuf> {
-        // Some getcwd implementations allocate a buffer for the path if the
-        // first argument is null, but we cannot use that feature because Vec's
-        // allocator may not be compatible with the system's allocator.
-
-        // Since there is no way to know the required buffer size, we try
-        // several buffer sizes.
-        let mut buffer = Vec::<u8>::new();
-        for capacity in [1 << 10, 1 << 12, 1 << 14, 1 << 16] {
-            buffer.reserve_exact(capacity);
-
-            let result = unsafe { libc::getcwd(buffer.as_mut_ptr().cast(), capacity) };
-            if !result.is_null() {
-                // len does not include the null terminator
-                let len = unsafe { CStr::from_ptr(buffer.as_ptr().cast()) }.count_bytes();
-                unsafe { buffer.set_len(len) }
-                buffer.shrink_to_fit();
-                return Ok(PathBuf::from(UnixString::from_vec(buffer)));
-            }
-            let errno = Errno::last();
-            if errno != Errno::ERANGE {
-                return Err(errno);
-            }
-        }
-        Err(Errno::ERANGE)
-    }
-
     fn chdir(&mut self, path: &CStr) -> Result<()> {
         let result = unsafe { libc::chdir(path.as_ptr()) };
         result.errno_if_m1().map(drop)

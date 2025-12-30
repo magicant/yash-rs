@@ -68,6 +68,7 @@ use super::FdFlag;
 use super::FlexFuture;
 use super::Fork;
 use super::Fstat;
+use super::GetCwd;
 use super::GetPid;
 use super::Gid;
 use super::IsExecutableFile;
@@ -609,6 +610,12 @@ impl Umask for VirtualSystem {
     }
 }
 
+impl GetCwd for VirtualSystem {
+    fn getcwd(&self) -> Result<PathBuf> {
+        Ok(self.current_process().cwd.clone())
+    }
+}
+
 impl Time for VirtualSystem {
     /// Returns `now` in [`SystemState`].
     ///
@@ -1052,10 +1059,6 @@ impl Exit for VirtualSystem {
 }
 
 impl System for VirtualSystem {
-    fn getcwd(&self) -> Result<PathBuf> {
-        Ok(self.current_process().cwd.clone())
-    }
-
     /// Changes the current working directory.
     fn chdir(&mut self, path: &CStr) -> Result<()> {
         let path = Path::new(UnixStr::from_bytes(path.to_bytes()));

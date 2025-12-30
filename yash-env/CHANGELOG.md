@@ -30,6 +30,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `Fork`: Declares a method for creating new child processes.
     - `Fstat`: Declares `fstat` and `fstatat` methods for getting file
       metadata and provides a default implementation of `is_directory`.
+    - `GetCwd`: Declares the `getcwd` method for getting the current
+      working directory.
     - `GetPid`: Declares the `getpid` and other methods for getting process IDs
       and other attributes.
     - `IsExecutableFile`: Declares the `is_executable_file` method for checking

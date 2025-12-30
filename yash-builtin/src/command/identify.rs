@@ -35,6 +35,7 @@ use yash_env::semantics::Field;
 use yash_env::semantics::command::search::{Target, search};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::str::UnixStr;
+use yash_env::system::GetCwd as _;
 use yash_env::system::IsExecutableFile as _;
 use yash_quote::quoted;
 

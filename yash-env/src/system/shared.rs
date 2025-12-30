@@ -30,6 +30,7 @@ use super::FdFlag;
 use super::FlexFuture;
 use super::Fork;
 use super::Fstat;
+use super::GetCwd;
 use super::GetPid;
 use super::Gid;
 use super::IsExecutableFile;
@@ -444,6 +445,13 @@ impl<T: Umask> Umask for &SharedSystem<T> {
     }
 }
 
+/// Delegates `GetCwd` methods to the contained implementor.
+impl<T: GetCwd> GetCwd for &SharedSystem<T> {
+    fn getcwd(&self) -> Result<PathBuf> {
+        self.0.borrow().getcwd()
+    }
+}
+
 /// Delegates `Time` methods to the contained implementor.
 impl<T: Time> Time for &SharedSystem<T> {
     fn now(&self) -> Instant {
@@ -612,9 +620,6 @@ impl<T: Exit> Exit for &SharedSystem<T> {
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl<S: System> System for &SharedSystem<S> {
-    fn getcwd(&self) -> Result<PathBuf> {
-        self.0.borrow().getcwd()
-    }
     fn chdir(&mut self, path: &CStr) -> Result<()> {
         self.0.borrow_mut().chdir(path)
     }
@@ -770,6 +775,14 @@ impl<T: Umask> Umask for SharedSystem<T> {
     #[inline]
     fn umask(&self, new_mask: Mode) -> Mode {
         (&self).umask(new_mask)
+    }
+}
+
+/// Delegates `GetCwd` methods to the contained implementor.
+impl<T: GetCwd> GetCwd for SharedSystem<T> {
+    #[inline]
+    fn getcwd(&self) -> Result<PathBuf> {
+        (&self).getcwd()
     }
 }
 
@@ -963,10 +976,6 @@ impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
     // which in turn delegates to the contained system instance.
 
-    #[inline]
-    fn getcwd(&self) -> Result<PathBuf> {
-        (&self).getcwd()
-    }
     #[inline]
     fn chdir(&mut self, path: &CStr) -> Result<()> {
         (&mut &*self).chdir(path)

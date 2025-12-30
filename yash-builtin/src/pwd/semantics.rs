@@ -20,6 +20,7 @@ use super::Mode;
 use thiserror::Error;
 use yash_env::source::pretty::{Report, ReportType};
 use yash_env::system::Errno;
+use yash_env::system::GetCwd as _;
 use yash_env::{Env, System};
 
 /// Error in running the pwd built-in

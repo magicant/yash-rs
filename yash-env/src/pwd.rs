@@ -22,6 +22,7 @@ use crate::path::Path;
 use crate::system::AT_FDCWD;
 use crate::system::Errno;
 use crate::system::Fstat;
+use crate::system::GetCwd as _;
 use crate::variable::AssignError;
 use crate::variable::PWD;
 use crate::variable::Scope::Global;
