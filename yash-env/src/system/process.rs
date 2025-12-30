@@ -99,7 +99,7 @@ pub type ChildProcessTask<S> = Box<dyn for<'a> FnOnce(&'a mut Env<S>) -> PinFutu
 /// process runs the task and exits the process with the exit status of the
 /// task.
 ///
-/// [`VirtualSystem::new_child_process`] does ont create a real child process.
+/// [`VirtualSystem::new_child_process`] does not create a real child process.
 /// Instead, the starter runs the task concurrently in the current process using
 /// the executor contained in the system. A new
 /// [`Process`](super::virtual::Process) is added to the system to represent the
