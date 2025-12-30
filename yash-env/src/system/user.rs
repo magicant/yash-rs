@@ -16,6 +16,10 @@
 
 //! Items for user management
 
+use super::Result;
+use crate::path::PathBuf;
+use std::ffi::CStr;
+
 #[cfg(unix)]
 type RawUidDef = libc::uid_t;
 #[cfg(not(unix))]
@@ -79,4 +83,16 @@ pub trait GetUid {
 
     /// Returns the effective group ID of the current process.
     fn getegid(&self) -> Gid;
+}
+
+/// Trait for getting user information
+///
+/// This trait declares methods for getting user information. `Pw` in the trait
+/// name stands for "password", referring to the traditional Unix password
+/// file that stores user account information.
+pub trait GetPw {
+    /// Returns the home directory path of the given user.
+    ///
+    /// Returns `Ok(None)` if the user is not found.
+    fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>>;
 }

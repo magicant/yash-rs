@@ -48,6 +48,7 @@ use super::Fork;
 use super::Fstat;
 use super::GetCwd;
 use super::GetPid;
+use super::GetPw;
 use super::GetUid;
 use super::Gid;
 use super::IsExecutableFile;
@@ -899,7 +900,7 @@ impl GetUid for RealSystem {
     }
 }
 
-impl System for RealSystem {
+impl GetPw for RealSystem {
     fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
         Errno::clear();
         let passwd = unsafe { libc::getpwnam(name.as_ptr()) };
@@ -915,7 +916,9 @@ impl System for RealSystem {
         let dir = unsafe { CStr::from_ptr((*passwd).pw_dir) };
         Ok(Some(UnixString::from_vec(dir.to_bytes().to_vec()).into()))
     }
+}
 
+impl System for RealSystem {
     fn confstr_path(&self) -> Result<UnixString> {
         // TODO Support other platforms
         #[cfg(any(

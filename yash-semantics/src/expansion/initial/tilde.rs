@@ -21,11 +21,11 @@ use crate::expansion::attr::Origin;
 use std::borrow::Cow;
 use std::ffi::CString;
 use yash_env::Env;
-use yash_env::System;
+use yash_env::system::GetPw;
 use yash_env::variable::HOME;
 
 /// Computes the main result of tilde expansion.
-fn expand_body<'n: 'r, 'e: 'r, 'r, S: System>(name: &'n str, env: &'e Env<S>) -> Cow<'r, str> {
+fn expand_body<'n: 'r, 'e: 'r, 'r, T: GetPw>(name: &'n str, env: &'e Env<T>) -> Cow<'r, str> {
     if name.is_empty() {
         return Cow::Borrowed(env.variables.get_scalar(HOME).unwrap_or("~"));
     }
@@ -71,7 +71,7 @@ fn finish(mut chars: &str, followed_by_slash: bool) -> Vec<AttrChar> {
 }
 
 /// Performs tilde expansion.
-pub fn expand<S: System>(name: &str, followed_by_slash: bool, env: &Env<S>) -> Vec<AttrChar> {
+pub fn expand<T: GetPw>(name: &str, followed_by_slash: bool, env: &Env<T>) -> Vec<AttrChar> {
     let chars = expand_body(name, env);
     finish(&chars, followed_by_slash)
 }

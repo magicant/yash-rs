@@ -36,6 +36,7 @@ A _private dependency_ is used internally and not visible to downstream users.
       working directory.
     - `GetPid`: Declares the `getpid` and other methods for getting process IDs
       and other attributes.
+    - `GetPw`: Declares methods for getting user information.
     - `GetUid`: Declares the `getuid`, `geteuid`, `getgid`, and
       `getegid` methods for getting user and group IDs.
     - `IsExecutableFile`: Declares the `is_executable_file` method for checking

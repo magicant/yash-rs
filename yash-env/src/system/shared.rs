@@ -33,6 +33,7 @@ use super::Fork;
 use super::Fstat;
 use super::GetCwd;
 use super::GetPid;
+use super::GetPw;
 use super::GetUid;
 use super::Gid;
 use super::IsExecutableFile;
@@ -640,14 +641,18 @@ impl<T: GetUid> GetUid for &SharedSystem<T> {
     }
 }
 
+/// Delegates `GetPw` methods to the contained implementor.
+impl<T: GetPw> GetPw for &SharedSystem<T> {
+    fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
+        self.0.borrow().getpwnam_dir(name)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl<S: System> System for &SharedSystem<S> {
-    fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
-        self.0.borrow().getpwnam_dir(name)
-    }
     fn confstr_path(&self) -> Result<UnixString> {
         self.0.borrow().confstr_path()
     }
@@ -1009,15 +1014,19 @@ impl<T: GetUid> GetUid for SharedSystem<T> {
     }
 }
 
+/// Delegates `GetPw` methods to the contained implementor.
+impl<T: GetPw> GetPw for SharedSystem<T> {
+    #[inline]
+    fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
+        (&self).getpwnam_dir(name)
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
     // which in turn delegates to the contained system instance.
 
-    #[inline]
-    fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
-        (&self).getpwnam_dir(name)
-    }
     #[inline]
     fn confstr_path(&self) -> Result<UnixString> {
         (&self).confstr_path()

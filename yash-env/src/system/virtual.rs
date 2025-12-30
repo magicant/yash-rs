@@ -71,6 +71,7 @@ use super::Fork;
 use super::Fstat;
 use super::GetCwd;
 use super::GetPid;
+use super::GetPw;
 use super::GetUid;
 use super::Gid;
 use super::IsExecutableFile;
@@ -1093,7 +1094,7 @@ impl GetUid for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
+impl GetPw for VirtualSystem {
     fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
         let state = self.state.borrow();
         let name = match name.to_str() {
@@ -1102,7 +1103,9 @@ impl System for VirtualSystem {
         };
         Ok(state.home_dirs.get(name).cloned())
     }
+}
 
+impl System for VirtualSystem {
     /// Returns the standard path for the system.
     ///
     /// This function returns the value of [`SystemState::path`]. If it is empty,

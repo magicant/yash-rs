@@ -57,7 +57,7 @@ pub use self::signal::{
 };
 pub use self::terminal::{Isatty, TcGetPgrp, TcSetPgrp};
 pub use self::time::{CpuTimes, Time, Times};
-pub use self::user::{GetUid, Gid, RawGid, RawUid, Uid};
+pub use self::user::{GetPw, GetUid, Gid, RawGid, RawUid, Uid};
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
 use crate::io::Fd;
@@ -71,7 +71,6 @@ use crate::str::UnixString;
 use crate::subshell::Subshell;
 use crate::trap::SignalSystem;
 use std::convert::Infallible;
-use std::ffi::CStr;
 use std::ffi::CString;
 use std::fmt::Debug;
 use r#virtual::SignalEffect;
@@ -96,6 +95,7 @@ pub trait System:
     + Fstat
     + GetCwd
     + GetPid
+    + GetPw
     + GetUid
     + IsExecutableFile
     + Isatty
@@ -117,11 +117,6 @@ pub trait System:
     + Wait
     + Write
 {
-    /// Returns the home directory path of the given user.
-    ///
-    /// Returns `Ok(None)` if the user is not found.
-    fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>>;
-
     /// Returns the standard `$PATH` value where all standard utilities are
     /// expected to be found.
     ///
