@@ -55,6 +55,7 @@ pub use self::process::*;
 pub use self::signal::*;
 use super::AT_FDCWD;
 use super::CaughtSignals;
+use super::Chdir;
 use super::Close;
 use super::CpuTimes;
 use super::Dir;
@@ -616,6 +617,21 @@ impl GetCwd for VirtualSystem {
     }
 }
 
+impl Chdir for VirtualSystem {
+    fn chdir(&self, path: &CStr) -> Result<()> {
+        let path = Path::new(UnixStr::from_bytes(path.to_bytes()));
+        let inode = self.resolve_existing_file(AT_FDCWD, path, /* follow links */ true)?;
+        if matches!(&inode.borrow().body, FileBody::Directory { .. }) {
+            let mut process = self.current_process_mut();
+            let new_path = process.cwd.join(path);
+            process.chdir(new_path);
+            Ok(())
+        } else {
+            Err(Errno::ENOTDIR)
+        }
+    }
+}
+
 impl Time for VirtualSystem {
     /// Returns `now` in [`SystemState`].
     ///
@@ -1059,20 +1075,6 @@ impl Exit for VirtualSystem {
 }
 
 impl System for VirtualSystem {
-    /// Changes the current working directory.
-    fn chdir(&mut self, path: &CStr) -> Result<()> {
-        let path = Path::new(UnixStr::from_bytes(path.to_bytes()));
-        let inode = self.resolve_existing_file(AT_FDCWD, path, /* follow links */ true)?;
-        if matches!(&inode.borrow().body, FileBody::Directory { .. }) {
-            let mut process = self.current_process_mut();
-            let new_path = process.cwd.join(path);
-            process.chdir(new_path);
-            Ok(())
-        } else {
-            Err(Errno::ENOTDIR)
-        }
-    }
-
     fn getuid(&self) -> Uid {
         self.current_process().uid()
     }
@@ -2726,7 +2728,7 @@ mod tests {
 
     #[test]
     fn chdir_fails_with_non_existing_directory() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         let result = system.chdir(c"/no/such/dir");
         assert_eq!(result, Err(Errno::ENOENT));

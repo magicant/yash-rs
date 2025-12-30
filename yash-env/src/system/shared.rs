@@ -17,6 +17,7 @@
 //! [`SharedSystem`] and related items
 
 use super::CaughtSignals;
+use super::Chdir;
 use super::ChildProcessStarter;
 use super::CpuTimes;
 use super::Dir;
@@ -452,6 +453,13 @@ impl<T: GetCwd> GetCwd for &SharedSystem<T> {
     }
 }
 
+/// Delegates `Chdir` methods to the contained implementor.
+impl<T: Chdir> Chdir for &SharedSystem<T> {
+    fn chdir(&self, path: &CStr) -> Result<()> {
+        self.0.borrow().chdir(path)
+    }
+}
+
 /// Delegates `Time` methods to the contained implementor.
 impl<T: Time> Time for &SharedSystem<T> {
     fn now(&self) -> Instant {
@@ -620,9 +628,6 @@ impl<T: Exit> Exit for &SharedSystem<T> {
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl<S: System> System for &SharedSystem<S> {
-    fn chdir(&mut self, path: &CStr) -> Result<()> {
-        self.0.borrow_mut().chdir(path)
-    }
     fn getuid(&self) -> Uid {
         self.0.borrow().getuid()
     }
@@ -783,6 +788,14 @@ impl<T: GetCwd> GetCwd for SharedSystem<T> {
     #[inline]
     fn getcwd(&self) -> Result<PathBuf> {
         (&self).getcwd()
+    }
+}
+
+/// Delegates `Chdir` methods to the contained implementor.
+impl<T: Chdir> Chdir for SharedSystem<T> {
+    #[inline]
+    fn chdir(&self, path: &CStr) -> Result<()> {
+        (&self).chdir(path)
     }
 }
 
@@ -976,10 +989,6 @@ impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
     // which in turn delegates to the contained system instance.
 
-    #[inline]
-    fn chdir(&mut self, path: &CStr) -> Result<()> {
-        (&mut &*self).chdir(path)
-    }
     #[inline]
     fn getuid(&self) -> Uid {
         (&self).getuid()

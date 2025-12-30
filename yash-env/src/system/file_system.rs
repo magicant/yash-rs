@@ -359,7 +359,17 @@ pub trait Umask {
 }
 
 /// Trait for getting the current working directory
+///
+/// See also [`Chdir`].
 pub trait GetCwd {
     /// Returns the current working directory path.
     fn getcwd(&self) -> Result<PathBuf>;
+}
+
+/// Trait for changing the current working directory
+///
+/// See also [`GetCwd`].
+pub trait Chdir {
+    /// Changes the working directory.
+    fn chdir(&self, path: &CStr) -> Result<()>;
 }

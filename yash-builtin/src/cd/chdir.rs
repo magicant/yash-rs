@@ -29,6 +29,7 @@ use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 #[cfg(doc)]
 use yash_env::stack::Stack;
+use yash_env::system::Chdir;
 use yash_env::system::Errno;
 #[cfg(doc)]
 use yash_env::system::SharedSystem;
@@ -51,7 +52,7 @@ impl From<NulError> for Error {
     }
 }
 
-pub fn chdir<S: System>(env: &mut Env<S>, path: &Path) -> Result<(), Error> {
+pub fn chdir<T: Chdir>(env: &mut Env<T>, path: &Path) -> Result<(), Error> {
     let c_path = CString::new(path.as_unix_str().as_bytes())?;
     Ok(env.system.chdir(&c_path)?)
 }

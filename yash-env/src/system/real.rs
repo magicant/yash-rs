@@ -29,6 +29,7 @@ mod signal;
 
 use super::AT_FDCWD;
 use super::CaughtSignals;
+use super::Chdir;
 use super::ChildProcessStarter;
 use super::Close;
 use super::CpuTimes;
@@ -487,6 +488,13 @@ impl GetCwd for RealSystem {
     }
 }
 
+impl Chdir for RealSystem {
+    fn chdir(&self, path: &CStr) -> Result<()> {
+        let result = unsafe { libc::chdir(path.as_ptr()) };
+        result.errno_if_m1().map(drop)
+    }
+}
+
 impl Time for RealSystem {
     fn now(&self) -> Instant {
         Instant::now()
@@ -873,11 +881,6 @@ impl Exit for RealSystem {
 }
 
 impl System for RealSystem {
-    fn chdir(&mut self, path: &CStr) -> Result<()> {
-        let result = unsafe { libc::chdir(path.as_ptr()) };
-        result.errno_if_m1().map(drop)
-    }
-
     fn getuid(&self) -> Uid {
         Uid(unsafe { libc::getuid() })
     }

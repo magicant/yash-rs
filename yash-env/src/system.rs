@@ -36,8 +36,8 @@ pub use self::errno::Errno;
 pub use self::errno::RawErrno;
 pub use self::errno::Result;
 pub use self::file_system::{
-    AT_FDCWD, Dir, DirEntry, FileType, Fstat, GetCwd, IsExecutableFile, Mode, OfdAccess, Open,
-    OpenFlag, RawMode, Seek, Stat, Umask,
+    AT_FDCWD, Chdir, Dir, DirEntry, FileType, Fstat, GetCwd, IsExecutableFile, Mode, OfdAccess,
+    Open, OpenFlag, RawMode, Seek, Stat, Umask,
 };
 pub use self::future::FlexFuture;
 pub use self::id::Gid;
@@ -89,6 +89,7 @@ use r#virtual::SignalEffect;
 /// `System` instance to extend the interface with asynchronous methods.
 pub trait System:
     CaughtSignals
+    + Chdir
     + Close
     + Debug
     + Dup
@@ -119,9 +120,6 @@ pub trait System:
     + Wait
     + Write
 {
-    /// Changes the working directory.
-    fn chdir(&mut self, path: &CStr) -> Result<()>;
-
     /// Returns the real user ID of the current process.
     fn getuid(&self) -> Uid;
 
