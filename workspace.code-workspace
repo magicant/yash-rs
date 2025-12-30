@@ -105,6 +105,8 @@
 			"SIGTTOU",
 			"subshell",
 			"subshells",
+			"subtrait",
+			"subtraits",
 			"sysconf",
 			"tcgetpgrp",
 			"tcsetpgrp",

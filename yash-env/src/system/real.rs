@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Implementation of `System` that actually interacts with the system.
+//! Implementation of [`System`] that actually interacts with the system
 //!
 //! This module is implemented on Unix-like targets only. It provides an
 //! implementation of the `System` trait that interacts with the underlying
@@ -74,6 +74,8 @@ use super::SigmaskOp;
 use super::Signals;
 use super::Stat;
 use super::Sysconf;
+#[cfg(doc)]
+use super::System;
 use super::TcGetPgrp;
 use super::TcSetPgrp;
 use super::Times;

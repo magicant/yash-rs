@@ -14,7 +14,86 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! [System] and its implementors.
+//! API declarations and implementations for system-managed parts of the environment
+//!
+//! This module defines the [`System`] trait, which provides an interface to
+//! interact with the underlying system. It is a subtrait of various other traits
+//! that define specific functionalities, such as file system operations, process
+//! management, signal handling, and resource limit management. The following
+//! traits are included as subtraits of `System`:
+//!
+//! - [`CaughtSignals`]: Declares the `caught_signals` method for retrieving
+//!   caught signals.
+//! - [`Chdir`]: Declares the `chdir` method for changing the current
+//!   working directory.
+//! - [`Clock`]: Declares the `now` method for getting the current time.
+//! - [`Close`]: Declares the `close` method for closing file descriptors.
+//! - [`Dup`]: Declares the `dup` and `dup2` methods for duplicating file
+//!   descriptors.
+//! - [`Exec`]: Declares the `execve` method for executing new programs.
+//! - [`Exit`]: Declares the `exit` method for terminating the current
+//!   process.
+//! - [`Fcntl`]: Declares the `ofd_access`, `get_and_set_nonblocking`,
+//!   `fcntl_getfd`, and `fcntl_setfd` methods for `fcntl`-related operations.
+//! - [`Fork`]: Declares a method for creating new child processes.
+//! - [`Fstat`]: Declares `fstat` and `fstatat` methods for getting file
+//!   metadata and provides a default implementation of `is_directory`.
+//! - [`GetCwd`]: Declares the `getcwd` method for getting the current
+//!   working directory.
+//! - [`GetPid`]: Declares the `getpid` and other methods for getting process IDs
+//!   and other attributes.
+//! - [`GetPw`]: Declares methods for getting user information.
+//! - [`GetUid`]: Declares the `getuid`, `geteuid`, `getgid`, and
+//!   `getegid` methods for getting user and group IDs.
+//! - [`IsExecutableFile`]: Declares the `is_executable_file` method for checking
+//!   if a file is executable.
+//! - [`Isatty`]: Declares the `isatty` method for testing if a file descriptor is
+//!   associated with a terminal device.
+//! - [`Open`]: Declares the `open` and other methods for opening files.
+//! - [`Pipe`]: Declares the `pipe` method for creating pipes.
+//! - [`Read`]: Declares the `read` method for reading from file descriptors.
+//! - [`Seek`]: Declares the `lseek` method for seeking within file
+//!   descriptors.
+//! - [`Select`]: Declares the `select` method for waiting on multiple file
+//!   descriptors and signals.
+//! - [`SendSignal`]: Declares the `kill` and `raise` methods for sending signals
+//!   to processes.
+//! - [`SetPgid`]: Declares the `setpgid` method for setting process group IDs.
+//! - [`ShellPath`]: Declares the `shell_path` method for getting the path to
+//!   the shell executable.
+//! - [`Sigaction`]: Declares methods for managing signal dispositions.
+//! - [`Sigmask`]: Declares the `sigmask` method for managing signal masks.
+//! - [`Signals`]: Declares the `signal_number_from_name` and
+//!   `validate_signal` methods for converting between signal names and numbers.
+//! - [`TcGetPgrp`]: Declares the `tcgetpgrp` method for getting the
+//!   foreground process group ID of a terminal.
+//! - [`TcSetPgrp`]: Declares the `tcsetpgrp` method for setting the
+//!   foreground process group ID of a terminal.
+//! - [`Times`]: Declares the `times` method for getting CPU times.
+//! - [`Umask`]: Declares the `umask` method for setting the file mode
+//!   creation mask.
+//! - [`Wait`]: Declares the `wait` method for waiting for child processes.
+//! - [`Write`]: Declares the `write` method for writing to file
+//!   descriptors.
+//! - [`resource::GetRlimit`]: Declares the `getrlimit` method for
+//!   retrieving resource limits.
+//! - [`resource::SetRlimit`]: Declares the `setrlimit` method for
+//!   setting resource limits.
+//!
+//! There are two main implementors of the `System` trait:
+//!
+//! - `RealSystem`: An implementation that interacts with the actual
+//!   underlying system (see the [`real`] module).
+//! - `VirtualSystem`: An implementation that simulates system behavior
+//!   for testing purposes (see the [`virtual`] module).
+//!
+//! Additionally, there is the [`SharedSystem`] implementor that wraps
+//! another `System` instance to provide asynchronous methods.
+//!
+//! User code should generally depend only on specific subtraits of `System`
+//! rather than `System` itself. This allows for more modular and testable code.
+//! For example, code that only needs to write to file descriptors can depend
+//! on the `Write` trait alone.
 
 mod errno;
 mod file_system;
