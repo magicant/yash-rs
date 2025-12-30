@@ -22,12 +22,18 @@ A _private dependency_ is used internally and not visible to downstream users.
     - yash-env 0.10.0 → 0.11.0
 - Many types and functions now take type parameters representing the concrete
   `System` type due to changes in the `yash-env` crate.
+- `ulimit::set::set` now requires
+  `E: yash_env::system::resource::GetRlimit + yash_env::system::resource::SetRlimit`
+  instead of `E: ulimit::set::Env`.
 
 ### Removed
 
 - `BUILTINS` has been removed because the `Builtin` struct now has a type
   parameter that prevents declaration of the constant. Use the new `iter`
   function to list all built-in utilities instead.
+- The `ulimit::set::Env` trait has been removed in favor of using the
+  `yash_env::system::resource::GetRlimit` and
+  `yash_env::system::resource::SetRlimit` traits directly.
 
 ## [0.13.0] - 2025-11-26
 

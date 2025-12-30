@@ -34,6 +34,7 @@ use super::Fstat;
 use super::GetCwd;
 use super::GetPid;
 use super::GetPw;
+use super::GetRlimit;
 use super::GetUid;
 use super::Gid;
 use super::IsExecutableFile;
@@ -54,6 +55,7 @@ use super::Select;
 use super::SelectSystem;
 use super::SendSignal;
 use super::SetPgid;
+use super::SetRlimit;
 use super::ShellPath;
 use super::Sigaction;
 use super::Sigmask;
@@ -664,18 +666,25 @@ impl<T: ShellPath> ShellPath for &SharedSystem<T> {
     }
 }
 
-/// Delegates `System` methods to the contained system instance.
-///
-/// This implementation only requires a non-mutable reference to the shared
-/// system because it uses `RefCell` to access the contained system instance.
-impl<S: System> System for &SharedSystem<S> {
+/// Delegates `GetRlimit` methods to the contained implementor.
+impl<T: GetRlimit> GetRlimit for &SharedSystem<T> {
     fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
         self.0.borrow().getrlimit(resource)
     }
+}
+
+/// Delegates `SetRlimit` methods to the contained implementor.
+impl<T: SetRlimit> SetRlimit for &SharedSystem<T> {
     fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()> {
         self.0.borrow_mut().setrlimit(resource, limits)
     }
 }
+
+/// Delegates `System` methods to the contained system instance.
+///
+/// This implementation only requires a non-mutable reference to the shared
+/// system because it uses `RefCell` to access the contained system instance.
+impl<S: System> System for &SharedSystem<S> {}
 
 /// Delegates `Fstat` methods to the contained implementor.
 impl<T: Fstat> Fstat for SharedSystem<T> {
@@ -1048,20 +1057,24 @@ impl<T: ShellPath> ShellPath for SharedSystem<T> {
     }
 }
 
-/// Delegates `System` methods to the contained system instance.
-impl<S: System> System for SharedSystem<S> {
-    // All methods are delegated to `impl System for &SharedSystem`,
-    // which in turn delegates to the contained system instance.
-
+/// Delegates `GetRlimit` methods to the contained implementor.
+impl<T: GetRlimit> GetRlimit for SharedSystem<T> {
     #[inline]
     fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
         (&self).getrlimit(resource)
     }
+}
+
+/// Delegates `SetRlimit` methods to the contained implementor.
+impl<T: SetRlimit> SetRlimit for SharedSystem<T> {
     #[inline]
     fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()> {
         (&mut &*self).setrlimit(resource, limits)
     }
 }
+
+/// Delegates `System` methods to the contained system instance.
+impl<S: System> System for SharedSystem<S> {}
 
 impl<S: System> SignalSystem for &SharedSystem<S> {
     #[inline]

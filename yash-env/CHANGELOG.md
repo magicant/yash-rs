@@ -70,6 +70,10 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `Wait`: Declares the `wait` method for waiting for child processes.
     - `Write`: Declares the `write` method for writing to file
       descriptors.
+    - `resource::GetRlimit`: Declares the `getrlimit` method for
+      retrieving resource limits.
+    - `resource::SetRlimit`: Declares the `setrlimit` method for
+      setting resource limits.
 - Implementations of these traits are provided for those types that implement
   `System`.
 

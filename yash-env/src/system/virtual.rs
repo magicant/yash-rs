@@ -72,6 +72,7 @@ use super::Fstat;
 use super::GetCwd;
 use super::GetPid;
 use super::GetPw;
+use super::GetRlimit;
 use super::GetUid;
 use super::Gid;
 use super::IsExecutableFile;
@@ -86,6 +87,7 @@ use super::Seek;
 use super::Select;
 use super::SendSignal;
 use super::SetPgid;
+use super::SetRlimit;
 use super::ShellPath;
 use super::Sigaction;
 use super::Sigmask;
@@ -1131,7 +1133,7 @@ impl ShellPath for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
+impl GetRlimit for VirtualSystem {
     fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
         Ok(self
             .current_process()
@@ -1143,7 +1145,9 @@ impl System for VirtualSystem {
                 hard: INFINITY,
             }))
     }
+}
 
+impl SetRlimit for VirtualSystem {
     fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()> {
         if limits.soft_exceeds_hard() {
             return Err(Errno::EINVAL);
@@ -1166,6 +1170,8 @@ impl System for VirtualSystem {
         Ok(())
     }
 }
+
+impl System for VirtualSystem {}
 
 fn send_signal_to_processes(
     state: &mut SystemState,

@@ -710,6 +710,7 @@ mod tests {
     use yash_env::system::Write as _;
     use yash_env::system::resource::LimitPair;
     use yash_env::system::resource::Resource;
+    use yash_env::system::resource::SetRlimit as _;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::Inode;
     use yash_env_test_helper::in_virtual_system;

@@ -47,8 +47,7 @@ pub use self::process::{
 };
 #[cfg(all(doc, unix))]
 use self::real::RealSystem;
-use self::resource::LimitPair;
-use self::resource::Resource;
+use self::resource::{GetRlimit, LimitPair, Resource, SetRlimit};
 pub use self::select::Select;
 use self::select::SelectSystem;
 use self::select::SignalStatus;
@@ -97,6 +96,7 @@ pub trait System:
     + GetCwd
     + GetPid
     + GetPw
+    + GetRlimit
     + GetUid
     + IsExecutableFile
     + Isatty
@@ -107,6 +107,7 @@ pub trait System:
     + Select
     + SendSignal
     + SetPgid
+    + SetRlimit
     + ShellPath
     + Sigaction
     + Sigmask
@@ -120,27 +121,6 @@ pub trait System:
     + Wait
     + Write
 {
-    /// Returns the limits for the specified resource.
-    ///
-    /// This function returns a pair of the soft and hard limits for the given
-    /// resource. The soft limit is the current limit, and the hard limit is the
-    /// maximum value that the soft limit can be set to.
-    ///
-    /// When no limit is set, the limit value is [`INFINITY`].
-    ///
-    /// This is a thin wrapper around the `getrlimit` system call.
-    ///
-    /// [`INFINITY`]: self::resource::INFINITY
-    fn getrlimit(&self, resource: Resource) -> Result<LimitPair>;
-
-    /// Sets the limits for the specified resource.
-    ///
-    /// Specify [`INFINITY`] as the limit value to remove the limit.
-    ///
-    /// This is a thin wrapper around the `setrlimit` system call.
-    ///
-    /// [`INFINITY`]: self::resource::INFINITY
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()>;
 }
 
 /// Extension for [`System`]

@@ -49,6 +49,7 @@ use super::Fstat;
 use super::GetCwd;
 use super::GetPid;
 use super::GetPw;
+use super::GetRlimit;
 use super::GetUid;
 use super::Gid;
 use super::IsExecutableFile;
@@ -64,6 +65,7 @@ use super::Seek;
 use super::Select;
 use super::SendSignal;
 use super::SetPgid;
+use super::SetRlimit;
 use super::ShellPath;
 use super::Sigaction;
 use super::Sigmask;
@@ -984,7 +986,7 @@ impl ShellPath for RealSystem {
     }
 }
 
-impl System for RealSystem {
+impl GetRlimit for RealSystem {
     fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
         let raw_resource = resource.as_raw_type().ok_or(Errno::EINVAL)?;
 
@@ -999,7 +1001,9 @@ impl System for RealSystem {
             hard: unsafe { (*limits.as_ptr()).rlim_max },
         })
     }
+}
 
+impl SetRlimit for RealSystem {
     fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()> {
         let raw_resource = resource.as_raw_type().ok_or(Errno::EINVAL)?;
 
@@ -1013,6 +1017,8 @@ impl System for RealSystem {
         Ok(())
     }
 }
+
+impl System for RealSystem {}
 
 /// Implementor of [`Dir`] that iterates on a real directory
 #[derive(Debug)]

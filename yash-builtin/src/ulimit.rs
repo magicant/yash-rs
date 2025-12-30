@@ -30,6 +30,7 @@ use crate::common::output;
 use crate::common::report::{report_error, report_simple_failure};
 use yash_env::Env;
 use yash_env::semantics::Field;
+use yash_env::system::resource::GetRlimit as _;
 use yash_env::system::resource::{Limit, Resource};
 use yash_env::system::{Errno, System};
 
