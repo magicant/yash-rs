@@ -15,5 +15,8 @@ reviews:
     github-checks:
       enabled: true
       timeout_ms: 600000
+  path_instructions:
+    - path: "**/*.rs"
+      instructions: Review the Rust code from every possible angle, but avoid pointing out any errors or warnings that the compiler, formatter, or linter (clippy) would likely detect.
 chat:
   auto_reply: true
