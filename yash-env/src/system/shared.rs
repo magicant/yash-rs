@@ -675,8 +675,8 @@ impl<T: GetRlimit> GetRlimit for &SharedSystem<T> {
 
 /// Delegates `SetRlimit` methods to the contained implementor.
 impl<T: SetRlimit> SetRlimit for &SharedSystem<T> {
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()> {
-        self.0.borrow_mut().setrlimit(resource, limits)
+    fn setrlimit(&self, resource: Resource, limits: LimitPair) -> Result<()> {
+        self.0.borrow().setrlimit(resource, limits)
     }
 }
 
@@ -1068,8 +1068,8 @@ impl<T: GetRlimit> GetRlimit for SharedSystem<T> {
 /// Delegates `SetRlimit` methods to the contained implementor.
 impl<T: SetRlimit> SetRlimit for SharedSystem<T> {
     #[inline]
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()> {
-        (&mut &*self).setrlimit(resource, limits)
+    fn setrlimit(&self, resource: Resource, limits: LimitPair) -> Result<()> {
+        (&self).setrlimit(resource, limits)
     }
 }
 

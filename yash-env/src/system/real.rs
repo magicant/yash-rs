@@ -1004,7 +1004,7 @@ impl GetRlimit for RealSystem {
 }
 
 impl SetRlimit for RealSystem {
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()> {
+    fn setrlimit(&self, resource: Resource, limits: LimitPair) -> Result<()> {
         let raw_resource = resource.as_raw_type().ok_or(Errno::EINVAL)?;
 
         let mut rlimit = MaybeUninit::<libc::rlimit>::uninit();

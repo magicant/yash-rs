@@ -1144,7 +1144,7 @@ impl GetRlimit for VirtualSystem {
 }
 
 impl SetRlimit for VirtualSystem {
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()> {
+    fn setrlimit(&self, resource: Resource, limits: LimitPair) -> Result<()> {
         if limits.soft_exceeds_hard() {
             return Err(Errno::EINVAL);
         }
@@ -2779,7 +2779,7 @@ mod tests {
 
     #[test]
     fn setrlimit_and_getrlimit_with_finite_limits() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system
             .setrlimit(
                 Resource::CORE,
@@ -2807,7 +2807,7 @@ mod tests {
 
     #[test]
     fn setrlimit_rejects_soft_limit_higher_than_hard_limit() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.setrlimit(Resource::CPU, LimitPair { soft: 2, hard: 1 });
         assert_eq!(result, Err(Errno::EINVAL));
 
@@ -2824,7 +2824,7 @@ mod tests {
 
     #[test]
     fn setrlimit_refuses_raising_hard_limit() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system
             .setrlimit(Resource::CPU, LimitPair { soft: 1, hard: 1 })
             .unwrap();

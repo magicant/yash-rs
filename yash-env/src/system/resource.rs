@@ -160,5 +160,5 @@ pub trait SetRlimit {
     /// Specify [`INFINITY`] as the limit value to remove the limit.
     ///
     /// This is a thin wrapper around the `setrlimit` system call.
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()>;
+    fn setrlimit(&self, resource: Resource, limits: LimitPair) -> Result<()>;
 }

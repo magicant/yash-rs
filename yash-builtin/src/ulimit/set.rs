@@ -380,7 +380,7 @@ mod tests {
             }
         }
         impl SetRlimit for ResourcelessSystem {
-            fn setrlimit(&mut self, _resource: Resource, _limits: LimitPair) -> Result<(), Errno> {
+            fn setrlimit(&self, _resource: Resource, _limits: LimitPair) -> Result<(), Errno> {
                 Err(Errno::EINVAL)
             }
         }

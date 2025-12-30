@@ -718,7 +718,7 @@ mod tests {
 
     /// Returns a virtual system with a file descriptor limit.
     fn system_with_nofile_limit() -> VirtualSystem {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system
             .setrlimit(
                 Resource::NOFILE,
