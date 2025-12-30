@@ -105,6 +105,7 @@
 			"SIGTTOU",
 			"subshell",
 			"subshells",
+			"sysconf",
 			"tcgetpgrp",
 			"tcsetpgrp",
 			"terminfo",

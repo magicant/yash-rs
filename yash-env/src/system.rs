@@ -27,6 +27,7 @@ pub mod resource;
 mod select;
 mod shared;
 mod signal;
+mod sysconf;
 mod terminal;
 mod time;
 mod user;
@@ -55,6 +56,7 @@ pub use self::shared::SharedSystem;
 pub use self::signal::{
     CaughtSignals, Disposition, SendSignal, Sigaction, Sigmask, SigmaskOp, Signals,
 };
+pub use self::sysconf::Sysconf;
 pub use self::terminal::{Isatty, TcGetPgrp, TcSetPgrp};
 pub use self::time::{CpuTimes, Time, Times};
 pub use self::user::{GetPw, GetUid, Gid, RawGid, RawUid, Uid};
@@ -109,6 +111,7 @@ pub trait System:
     + Sigaction
     + Sigmask
     + Signals
+    + Sysconf
     + TcGetPgrp
     + TcSetPgrp
     + Time
@@ -117,12 +120,6 @@ pub trait System:
     + Wait
     + Write
 {
-    /// Returns the standard `$PATH` value where all standard utilities are
-    /// expected to be found.
-    ///
-    /// This is a thin wrapper around the `confstr(_CS_PATH, …)`.
-    fn confstr_path(&self) -> Result<UnixString>;
-
     /// Returns the path to the shell executable.
     ///
     /// If possible, this function should return the path to the current shell

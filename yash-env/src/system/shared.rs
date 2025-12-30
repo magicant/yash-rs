@@ -61,6 +61,7 @@ use super::SignalStatus;
 use super::SignalSystem;
 use super::Signals;
 use super::Stat;
+use super::Sysconf;
 use super::System;
 use super::SystemEx;
 use super::TcGetPgrp;
@@ -648,14 +649,18 @@ impl<T: GetPw> GetPw for &SharedSystem<T> {
     }
 }
 
+/// Delegates `Sysconf` methods to the contained implementor.
+impl<T: Sysconf> Sysconf for &SharedSystem<T> {
+    fn confstr_path(&self) -> Result<UnixString> {
+        self.0.borrow().confstr_path()
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 ///
 /// This implementation only requires a non-mutable reference to the shared
 /// system because it uses `RefCell` to access the contained system instance.
 impl<S: System> System for &SharedSystem<S> {
-    fn confstr_path(&self) -> Result<UnixString> {
-        self.0.borrow().confstr_path()
-    }
     fn shell_path(&self) -> CString {
         self.0.borrow().shell_path()
     }
@@ -1022,15 +1027,19 @@ impl<T: GetPw> GetPw for SharedSystem<T> {
     }
 }
 
+/// Delegates `Sysconf` methods to the contained implementor.
+impl<T: Sysconf> Sysconf for SharedSystem<T> {
+    #[inline]
+    fn confstr_path(&self) -> Result<UnixString> {
+        (&self).confstr_path()
+    }
+}
+
 /// Delegates `System` methods to the contained system instance.
 impl<S: System> System for SharedSystem<S> {
     // All methods are delegated to `impl System for &SharedSystem`,
     // which in turn delegates to the contained system instance.
 
-    #[inline]
-    fn confstr_path(&self) -> Result<UnixString> {
-        (&self).confstr_path()
-    }
     #[inline]
     fn shell_path(&self) -> CString {
         (&self).shell_path()

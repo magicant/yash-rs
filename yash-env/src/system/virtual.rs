@@ -91,6 +91,7 @@ use super::Sigmask;
 use super::SigmaskOp;
 use super::Signals;
 use super::Stat;
+use super::Sysconf;
 use super::TcGetPgrp;
 use super::TcSetPgrp;
 use super::Time;
@@ -1105,7 +1106,7 @@ impl GetPw for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
+impl Sysconf for VirtualSystem {
     /// Returns the standard path for the system.
     ///
     /// This function returns the value of [`SystemState::path`]. If it is empty,
@@ -1118,7 +1119,9 @@ impl System for VirtualSystem {
             Ok(path)
         }
     }
+}
 
+impl System for VirtualSystem {
     /// Returns the path to the shell.
     ///
     /// The current implementation returns "/bin/sh".

@@ -69,6 +69,7 @@ use super::Sigmask;
 use super::SigmaskOp;
 use super::Signals;
 use super::Stat;
+use super::Sysconf;
 use super::System;
 use super::TcGetPgrp;
 use super::TcSetPgrp;
@@ -918,7 +919,7 @@ impl GetPw for RealSystem {
     }
 }
 
-impl System for RealSystem {
+impl Sysconf for RealSystem {
     fn confstr_path(&self) -> Result<UnixString> {
         // TODO Support other platforms
         #[cfg(any(
@@ -948,7 +949,9 @@ impl System for RealSystem {
         #[allow(unreachable_code)]
         Err(Errno::ENOSYS)
     }
+}
 
+impl System for RealSystem {
     /// Returns the path to the shell.
     ///
     /// On Linux, this function returns `/proc/self/exe`. On other platforms, it

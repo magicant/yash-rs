@@ -23,7 +23,7 @@
 //!
 //! # Implementation notes
 //!
-//! The `-p` option depends on [`System::confstr_path`] to obtain the standard
+//! The `-p` option depends on [`Sysconf::confstr_path`] to obtain the standard
 //! search path. See the source code of [`RealSystem::confstr_path`] for the
 //! platforms supported on the real system.
 //!
@@ -48,6 +48,8 @@ use enumset::EnumSet;
 use enumset::EnumSetType;
 use yash_env::Env;
 use yash_env::semantics::Field;
+#[cfg(doc)]
+use yash_env::system::Sysconf;
 use yash_env::system::System;
 #[cfg(all(doc, unix))]
 use yash_env::system::real::RealSystem;

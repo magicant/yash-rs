@@ -27,6 +27,7 @@ use std::rc::Rc;
 use yash_env::Env;
 use yash_env::builtin::Builtin;
 use yash_env::function::Function;
+use yash_env::system::Sysconf;
 use yash_env::system::System;
 use yash_env::variable::Expansion;
 
@@ -47,7 +48,7 @@ impl<S: System> yash_env::semantics::command::search::PathEnv for SearchEnv<'_, 
     /// Returns the path.
     ///
     /// If [`Search::standard_path`] is `true`, this function retrieves the
-    /// standard path from the environment using [`System::confstr_path`].
+    /// standard path from the environment using [`Sysconf::confstr_path`].
     /// Otherwise, the value of the `$PATH` variable is returned.
     fn path(&self) -> Expansion<'_> {
         if self.params.standard_path {
