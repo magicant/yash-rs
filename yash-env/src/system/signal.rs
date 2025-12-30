@@ -128,7 +128,7 @@ pub trait Sigaction {
     ///
     /// To get the current disposition without changing it, use
     /// [`get_sigaction`](Self::get_sigaction).
-    fn sigaction(&mut self, signal: Number, action: Disposition) -> Result<Disposition>;
+    fn sigaction(&self, signal: Number, action: Disposition) -> Result<Disposition>;
 }
 
 /// Trait for examining signals caught by the process

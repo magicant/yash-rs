@@ -761,11 +761,7 @@ impl Sigaction for VirtualSystem {
         Ok(process.disposition(signal))
     }
 
-    fn sigaction(
-        &mut self,
-        signal: signal::Number,
-        disposition: Disposition,
-    ) -> Result<Disposition> {
+    fn sigaction(&self, signal: signal::Number, disposition: Disposition) -> Result<Disposition> {
         let mut process = self.current_process_mut();
         Ok(process.set_disposition(signal, disposition))
     }
@@ -2194,7 +2190,7 @@ mod tests {
     }
 
     fn system_for_catching_sigchld() -> VirtualSystem {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system
             .sigmask(Some((SigmaskOp::Add, &[SIGCHLD])), None)
             .unwrap();
@@ -2613,7 +2609,7 @@ mod tests {
 
     #[test]
     fn exiting_child_sends_sigchld_to_parent() {
-        let (mut system, mut executor) = virtual_system_with_executor();
+        let (system, mut executor) = virtual_system_with_executor();
         system.sigaction(SIGCHLD, Disposition::Catch).unwrap();
 
         let child_process = system.new_child_process().unwrap();
@@ -2712,7 +2708,7 @@ mod tests {
 
     #[test]
     fn exit_sends_sigchld_to_parent() {
-        let (mut system, mut executor) = virtual_system_with_executor();
+        let (system, mut executor) = virtual_system_with_executor();
         system.sigaction(SIGCHLD, Disposition::Catch).unwrap();
 
         let child_process = system.new_child_process().unwrap();

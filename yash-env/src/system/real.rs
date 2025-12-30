@@ -643,7 +643,7 @@ impl Sigaction for RealSystem {
         sigaction_impl(signal, None)
     }
 
-    fn sigaction(&mut self, signal: signal::Number, handling: Disposition) -> Result<Disposition> {
+    fn sigaction(&self, signal: signal::Number, handling: Disposition) -> Result<Disposition> {
         sigaction_impl(signal, Some(handling))
     }
 }

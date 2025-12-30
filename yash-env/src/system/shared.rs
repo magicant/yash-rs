@@ -532,8 +532,8 @@ impl<T: Sigaction> Sigaction for &SharedSystem<T> {
     fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
         self.0.borrow().get_sigaction(signal)
     }
-    fn sigaction(&mut self, signal: signal::Number, action: Disposition) -> Result<Disposition> {
-        self.0.borrow_mut().sigaction(signal, action)
+    fn sigaction(&self, signal: signal::Number, action: Disposition) -> Result<Disposition> {
+        self.0.borrow().sigaction(signal, action)
     }
 }
 
@@ -906,8 +906,8 @@ impl<T: Sigaction> Sigaction for SharedSystem<T> {
         (&self).get_sigaction(signal)
     }
     #[inline]
-    fn sigaction(&mut self, signal: signal::Number, action: Disposition) -> Result<Disposition> {
-        (&mut &*self).sigaction(signal, action)
+    fn sigaction(&self, signal: signal::Number, action: Disposition) -> Result<Disposition> {
+        (&self).sigaction(signal, action)
     }
 }
 
