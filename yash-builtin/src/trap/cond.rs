@@ -18,7 +18,6 @@
 
 use yash_env::signal;
 use yash_env::system::System;
-use yash_env::system::SystemEx as _;
 use yash_env::trap::Condition;
 
 /// Interpretation of a command line operand that specifies a trap condition

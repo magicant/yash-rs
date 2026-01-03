@@ -246,18 +246,6 @@ impl<T> System for T where
 ///
 /// This trait provides some extension methods for `System`.
 pub trait SystemEx: System {
-    /// Returns the signal name for the signal number.
-    ///
-    /// This function returns the signal name for the given signal number.
-    ///
-    /// If the signal number is invalid, this function panics. It may occur if
-    /// the number is from a different system or was created without checking
-    /// the validity.
-    #[must_use]
-    fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
-        self.validate_signal(number.as_raw()).unwrap().0
-    }
-
     /// Terminates the current process with the given exit status, possibly
     /// sending a signal to kill the process.
     ///

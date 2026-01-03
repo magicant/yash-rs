@@ -56,7 +56,6 @@ use super::ProcessState;
 use crate::semantics::ExitStatus;
 use crate::signal;
 use crate::system::System;
-use crate::system::SystemEx;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
