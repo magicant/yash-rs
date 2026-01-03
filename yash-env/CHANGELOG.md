@@ -86,9 +86,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   background. It is a replacement for the deprecated
   `SystemEx::tcsetpgrp_with_block` method.
 - `job::tcsetpgrp_without_block`: This function changes the foreground process
-  group of a terminal without, ensuring that the shell is already in the
-  foreground. It is a replacement for the deprecated
-  `SystemEx::tcsetpgrp_without_block` method.
+  group of a terminal, ensuring that the shell is already in the foreground. It
+  is a replacement for the deprecated `SystemEx::tcsetpgrp_without_block`
+  method.
 - `semantics::exit_or_raise`: This function terminates the current process
   with the given exit status, possibly sending a signal to kill the process. It
   is a replacement for the deprecated `SystemEx::exit_or_raise` method.
