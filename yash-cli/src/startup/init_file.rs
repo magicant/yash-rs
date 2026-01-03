@@ -36,13 +36,14 @@ use yash_env::Env;
 use yash_env::System;
 use yash_env::input::{Echo, FdReader};
 use yash_env::io::Fd;
+use yash_env::io::move_fd_internal;
 use yash_env::option::Option::Interactive;
 use yash_env::option::State::Off;
 use yash_env::parser::Config;
 use yash_env::stack::Frame;
 use yash_env::system::Close as _;
 use yash_env::system::GetUid as _;
-use yash_env::system::{Errno, Mode, OfdAccess, OpenFlag, SystemEx};
+use yash_env::system::{Errno, Mode, OfdAccess, OpenFlag};
 use yash_env::variable::ENV;
 use yash_semantics::Handle;
 use yash_semantics::expansion::expand_text;
@@ -156,7 +157,7 @@ pub async fn run_init_file<S: System + 'static>(env: &mut Env<S>, path: &str) {
             OpenFlag::CloseOnExec.into(),
             Mode::empty(),
         )?;
-        system.move_fd_internal(fd)
+        move_fd_internal(system, fd)
     }
 
     let fd = match open_fd(&mut env.system, path.to_owned()) {

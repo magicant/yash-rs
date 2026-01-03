@@ -331,7 +331,7 @@ impl<S: System> Env<S> {
             result?
         };
 
-        let final_fd = self.system.move_fd_internal(first_fd);
+        let final_fd = io::move_fd_internal(&self.system, first_fd);
         self.tty = final_fd.ok();
         final_fd
     }

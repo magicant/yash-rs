@@ -141,7 +141,6 @@ pub use self::user::{GetPw, GetUid, Gid, RawGid, RawUid, Uid};
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
 use crate::io::Fd;
-use crate::io::MIN_INTERNAL_FD;
 use crate::job::Pid;
 use crate::path::Path;
 use crate::path::PathBuf;
@@ -247,35 +246,6 @@ impl<T> System for T where
 ///
 /// This trait provides some extension methods for `System`.
 pub trait SystemEx: System {
-    /// Moves a file descriptor to [`MIN_INTERNAL_FD`] or larger.
-    ///
-    /// This function can be used to make sure a file descriptor used by the
-    /// shell does not conflict with file descriptors used by the user.
-    /// [`MIN_INTERNAL_FD`] is the minimum file descriptor number the shell
-    /// uses internally. This function moves the file descriptor to a number
-    /// larger than or equal to [`MIN_INTERNAL_FD`].
-    ///
-    /// If the given file descriptor is less than [`MIN_INTERNAL_FD`], this
-    /// function duplicates the file descriptor with [`Dup::dup`] and closes
-    /// the original one. Otherwise, this function does nothing.
-    ///
-    /// The new file descriptor will have the CLOEXEC flag set when it is
-    /// dupped. Note that, if the original file descriptor has the CLOEXEC flag
-    /// unset and is already larger than or equal to [`MIN_INTERNAL_FD`], this
-    /// function will not set the CLOEXEC flag for the returned file descriptor.
-    ///
-    /// This function returns the new file descriptor on success. On error, it
-    /// closes the original file descriptor and returns the error.
-    fn move_fd_internal(&mut self, from: Fd) -> Result<Fd> {
-        if from >= MIN_INTERNAL_FD {
-            return Ok(from);
-        }
-
-        let new = self.dup(from, MIN_INTERNAL_FD, FdFlag::CloseOnExec.into());
-        self.close(from).ok();
-        new
-    }
-
     /// Switches the foreground process group with SIGTTOU blocked.
     ///
     /// This is a convenience function to change the foreground process group

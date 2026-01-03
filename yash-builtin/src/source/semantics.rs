@@ -27,6 +27,7 @@ use yash_env::Env;
 use yash_env::input::Echo;
 use yash_env::input::FdReader;
 use yash_env::io::Fd;
+use yash_env::io::move_fd_internal;
 use yash_env::parser::Config;
 use yash_env::path::PathBuf;
 use yash_env::semantics::{Divert, ExitStatus, Field, RunReadEvalLoop};
@@ -39,7 +40,6 @@ use yash_env::system::Mode;
 use yash_env::system::OfdAccess;
 use yash_env::system::OpenFlag;
 use yash_env::system::System;
-use yash_env::system::SystemEx as _;
 use yash_env::variable::PATH;
 
 impl Command {
@@ -121,7 +121,7 @@ fn open_file<S: System>(system: &mut S, path: &CStr) -> Result<Fd, Errno> {
             OpenFlag::CloseOnExec.into(),
             Mode::empty(),
         )
-        .and_then(|fd| system.move_fd_internal(fd))
+        .and_then(|fd| move_fd_internal(system, fd))
 }
 
 /// Handles the result of the `return` built-in possibly executed in the
