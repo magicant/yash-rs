@@ -33,6 +33,21 @@ pub trait Signals {
     #[must_use]
     fn validate_signal(&self, number: RawNumber) -> Option<(Name, Number)>;
 
+    /// Returns the signal name for the signal number.
+    ///
+    /// This function returns the signal name for the given signal number.
+    ///
+    /// If the signal number is invalid, this function panics. It may occur if
+    /// the number is from a different system or was created without checking
+    /// the validity.
+    ///
+    /// Note that one signal number can have multiple names, in which case this
+    /// function returns the name that is considered the most common.
+    #[must_use]
+    fn signal_name_from_number(&self, number: Number) -> Name {
+        self.validate_signal(number.as_raw()).unwrap().0
+    }
+
     /// Gets the signal number from the signal name.
     ///
     /// This function returns the signal number corresponding to the signal name

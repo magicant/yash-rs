@@ -35,17 +35,18 @@ use yash_env::input::FdReader;
 use yash_env::input::IgnoreEof;
 use yash_env::input::Reporter;
 use yash_env::io::Fd;
+use yash_env::io::move_fd_internal;
 use yash_env::option::Option::Interactive;
 use yash_env::option::State::{Off, On};
 use yash_env::parser::Config;
 use yash_env::system::Errno;
 use yash_env::system::Fcntl as _;
+use yash_env::system::Fstat as _;
 use yash_env::system::Isatty as _;
 use yash_env::system::Mode;
 use yash_env::system::OfdAccess;
 use yash_env::system::Open as _;
 use yash_env::system::OpenFlag;
-use yash_env::system::SystemEx as _;
 use yash_prompt::Prompter;
 use yash_syntax::input::InputObject;
 use yash_syntax::input::Memory;
@@ -118,7 +119,7 @@ where
         }
 
         Source::File { path } => {
-            let mut system = env.borrow().system.clone();
+            let system = env.borrow().system.clone();
 
             let c_path = CString::new(path.as_str()).map_err(|_| PrepareInputError {
                 errno: Errno::EILSEQ,
@@ -131,7 +132,7 @@ where
                     OpenFlag::CloseOnExec.into(),
                     Mode::empty(),
                 )
-                .and_then(|fd| system.move_fd_internal(fd))
+                .and_then(|fd| move_fd_internal(&system, fd))
                 .map_err(|errno| PrepareInputError { errno, path })?;
 
             let input = prepare_fd_input(fd, env);

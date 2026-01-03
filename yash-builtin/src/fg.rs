@@ -40,6 +40,7 @@ use yash_env::job::JobList;
 use yash_env::job::ProcessResult;
 use yash_env::job::ProcessState;
 use yash_env::job::id::parse;
+use yash_env::job::tcsetpgrp_with_block;
 use yash_env::option::Option::Monitor;
 use yash_env::option::State::Off;
 use yash_env::semantics::Divert::Interrupt;
@@ -50,7 +51,6 @@ use yash_env::system::Errno;
 use yash_env::system::SendSignal as _;
 use yash_env::system::Signals as _;
 use yash_env::system::System;
-use yash_env::system::SystemEx as _;
 use yash_env::system::TcSetPgrp as _;
 
 /// Resumes the job at the specified index.
@@ -103,7 +103,7 @@ async fn resume_job_by_index<S: System>(
 
             // Move the shell back to the foreground.
             if let Some(tty) = tty {
-                env.system.tcsetpgrp_with_block(tty, env.main_pgid).await?;
+                tcsetpgrp_with_block(&env.system, tty, env.main_pgid).await?;
             }
 
             result

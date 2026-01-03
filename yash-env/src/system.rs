@@ -141,6 +141,7 @@ pub use self::user::{GetPw, GetUid, Gid, RawGid, RawUid, Uid};
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
 use crate::io::Fd;
+#[cfg(doc)]
 use crate::io::MIN_INTERNAL_FD;
 use crate::job::Pid;
 use crate::path::Path;
@@ -152,7 +153,6 @@ use crate::subshell::Subshell;
 use crate::trap::SignalSystem;
 use std::convert::Infallible;
 use std::fmt::Debug;
-use r#virtual::SignalEffect;
 
 /// API to the system-managed parts of the environment.
 ///
@@ -246,6 +246,10 @@ impl<T> System for T where
 /// Extension for [`System`]
 ///
 /// This trait provides some extension methods for `System`.
+#[deprecated(
+    note = "Use functions in the `yash-env::io` and `yash-env::job` modules instead",
+    since = "0.11.0"
+)]
 pub trait SystemEx: System {
     /// Moves a file descriptor to [`MIN_INTERNAL_FD`] or larger.
     ///
@@ -266,17 +270,19 @@ pub trait SystemEx: System {
     ///
     /// This function returns the new file descriptor on success. On error, it
     /// closes the original file descriptor and returns the error.
+    #[deprecated(
+        note = "use `yash_env::io::move_fd_internal` instead",
+        since = "0.11.0"
+    )]
     fn move_fd_internal(&mut self, from: Fd) -> Result<Fd> {
-        if from >= MIN_INTERNAL_FD {
-            return Ok(from);
-        }
-
-        let new = self.dup(from, MIN_INTERNAL_FD, FdFlag::CloseOnExec.into());
-        self.close(from).ok();
-        new
+        crate::io::move_fd_internal(self, from)
     }
 
     /// Tests if a file descriptor is a pipe.
+    #[deprecated(
+        note = "use `yash_env::system::Fstat::fd_is_pipe` instead",
+        since = "0.11.0"
+    )]
     fn fd_is_pipe(&self, fd: Fd) -> bool {
         self.fstat(fd)
             .is_ok_and(|stat| stat.r#type == FileType::Fifo)
@@ -295,21 +301,12 @@ pub trait SystemEx: System {
     /// Use [`tcsetpgrp_without_block`](Self::tcsetpgrp_without_block) if you
     /// need to make sure the shell is in the foreground before changing the
     /// foreground job.
+    #[deprecated(
+        note = "use `yash_env::job::tcsetpgrp_with_block` instead",
+        since = "0.11.0"
+    )]
     fn tcsetpgrp_with_block(&mut self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> {
-        async move {
-            let sigttou = self
-                .signal_number_from_name(signal::Name::Ttou)
-                .ok_or(Errno::EINVAL)?;
-            let mut old_mask = Vec::new();
-
-            self.sigmask(Some((SigmaskOp::Add, &[sigttou])), Some(&mut old_mask))?;
-
-            let result = self.tcsetpgrp(fd, pgid).await;
-
-            let result_2 = self.sigmask(Some((SigmaskOp::Set, &old_mask)), None);
-
-            result.and(result_2)
-        }
+        crate::job::tcsetpgrp_with_block(self, fd, pgid)
     }
 
     /// Switches the foreground process group with the default SIGTTOU settings.
@@ -331,34 +328,12 @@ pub trait SystemEx: System {
     ///
     /// Use [`tcsetpgrp_with_block`](Self::tcsetpgrp_with_block) to change the
     /// job even if the current shell is not in the foreground.
+    #[deprecated(
+        note = "use `yash_env::job::tcsetpgrp_without_block` instead",
+        since = "0.11.0"
+    )]
     fn tcsetpgrp_without_block(&mut self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> {
-        async move {
-            let sigttou = self
-                .signal_number_from_name(signal::Name::Ttou)
-                .ok_or(Errno::EINVAL)?;
-            match self.sigaction(sigttou, Disposition::Default) {
-                Err(e) => Err(e),
-                Ok(old_handling) => {
-                    let mut old_mask = Vec::new();
-                    let result = match self
-                        .sigmask(Some((SigmaskOp::Remove, &[sigttou])), Some(&mut old_mask))
-                    {
-                        Err(e) => Err(e),
-                        Ok(()) => {
-                            let result = self.tcsetpgrp(fd, pgid).await;
-
-                            let result_2 = self.sigmask(Some((SigmaskOp::Set, &old_mask)), None);
-
-                            result.and(result_2)
-                        }
-                    };
-
-                    let result_2 = self.sigaction(sigttou, old_handling).map(drop);
-
-                    result.and(result_2)
-                }
-            }
-        }
+        crate::job::tcsetpgrp_without_block(self, fd, pgid)
     }
 
     /// Returns the signal name for the signal number.
@@ -368,6 +343,10 @@ pub trait SystemEx: System {
     /// If the signal number is invalid, this function panics. It may occur if
     /// the number is from a different system or was created without checking
     /// the validity.
+    #[deprecated(
+        note = "use `yash_env::system::Signals::signal_name_from_number` instead",
+        since = "0.11.0"
+    )]
     #[must_use]
     fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
         self.validate_signal(number.as_raw()).unwrap().0
@@ -380,43 +359,14 @@ pub trait SystemEx: System {
     /// command, this function sends the signal to the current process to
     /// propagate the signal to the parent process. Otherwise, this function
     /// terminates the process with the given exit status.
+    #[deprecated(
+        note = "use `yash_env::semantics::exit_or_raise` instead",
+        since = "0.11.0"
+    )]
     fn exit_or_raise(&mut self, exit_status: ExitStatus) -> impl Future<Output = Infallible> {
-        async fn maybe_raise<S: System + ?Sized>(
-            exit_status: ExitStatus,
-            system: &mut S,
-        ) -> Option<Infallible> {
-            let signal = exit_status.to_signal(system, /* exact */ true)?;
-
-            if !matches!(SignalEffect::of(signal.0), SignalEffect::Terminate { .. }) {
-                return None;
-            }
-
-            // Disable core dump
-            system
-                .setrlimit(Resource::CORE, LimitPair { soft: 0, hard: 0 })
-                .ok()?;
-
-            if signal.0 != signal::Name::Kill {
-                // Reset signal disposition
-                system.sigaction(signal.1, Disposition::Default).ok()?;
-            }
-
-            // Unblock the signal
-            system
-                .sigmask(Some((SigmaskOp::Remove, &[signal.1])), None)
-                .ok()?;
-
-            // Send the signal to the current process
-            system.raise(signal.1).await.ok()?;
-
-            None
-        }
-
-        async move {
-            maybe_raise(exit_status, self).await;
-            self.exit(exit_status).await
-        }
+        async move { crate::semantics::exit_or_raise(self, exit_status).await }
     }
 }
 
+#[allow(deprecated)]
 impl<T: System + ?Sized> SystemEx for T {}

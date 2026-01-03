@@ -21,7 +21,7 @@ use crate::source::Location;
 use crate::source::pretty::{Report, ReportType, Snippet};
 #[cfg(doc)]
 use crate::system::SharedSystem;
-use crate::system::System;
+use crate::system::{Close, Dup, FdFlag, System};
 use annotate_snippets::Renderer;
 use std::borrow::Cow;
 #[cfg(unix)]
@@ -65,12 +65,37 @@ impl std::fmt::Display for Fd {
 /// them freely. When the shell needs to open a file descriptor that is
 /// invisible to the user, it should be kept at `MIN_INTERNAL_FD` or above.
 /// (Hint: A typical way to move a file descriptor is to
-/// [`dup`](crate::system::Dup::dup) and
-/// [`close`](crate::system::Close::close). You can also use
-/// [`move_fd_internal`].)
-///
-/// [`move_fd_internal`]: crate::system::SystemEx::move_fd_internal
+/// [`dup`](crate::system::Dup::dup) and [`close`](crate::system::Close::close).
+/// You can also use [`move_fd_internal`].)
 pub const MIN_INTERNAL_FD: Fd = Fd(10);
+
+/// Moves a file descriptor to be at least [`MIN_INTERNAL_FD`].
+///
+/// This is a convenience function that duplicates the given `from` FD to be at
+/// least `MIN_INTERNAL_FD`, and closes the original `from` FD. The new FD will
+/// have the `CLOEXEC` flag set. If `from` is already at least
+/// `MIN_INTERNAL_FD`, this function does nothing and returns `from`.
+///
+/// This function can be used to make sure a file descriptor used by the shell
+/// does not conflict with file descriptors used by the user.
+/// [`MIN_INTERNAL_FD`] is the minimum file descriptor number the shell may use
+/// internally.
+///
+/// Returns the new file descriptor. On error during duplication, the original
+/// `from` FD is still closed, and the error is returned. Errors during closing
+/// the original `from` FD are ignored.
+pub fn move_fd_internal<S>(system: &S, from: Fd) -> crate::system::Result<Fd>
+where
+    S: Dup + Close + ?Sized,
+{
+    if from >= MIN_INTERNAL_FD {
+        return Ok(from);
+    }
+
+    let new = system.dup(from, MIN_INTERNAL_FD, FdFlag::CloseOnExec.into());
+    system.close(from).ok();
+    new
+}
 
 /// Convenience function for converting a report into a string.
 ///

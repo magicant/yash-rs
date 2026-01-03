@@ -544,7 +544,6 @@ mod tests {
     use crate::job::ProcessState;
     use crate::system::SendSignal as _;
     use crate::system::Signals as _;
-    use crate::system::SystemEx as _;
     use crate::system::r#virtual::VirtualSystem;
     use crate::system::r#virtual::{
         SIGCHLD, SIGINT, SIGKILL, SIGQUIT, SIGSTOP, SIGTERM, SIGTSTP, SIGTTIN, SIGTTOU, SIGUSR1,

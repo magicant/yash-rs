@@ -67,7 +67,6 @@ use super::Signals;
 use super::Stat;
 use super::Sysconf;
 use super::System;
-use super::SystemEx;
 use super::TcGetPgrp;
 use super::TcSetPgrp;
 use super::Times;
@@ -683,7 +682,7 @@ impl<T: SetRlimit> SetRlimit for SharedSystem<T> {
 impl<S: System> SignalSystem for &SharedSystem<S> {
     #[inline]
     fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
-        SystemEx::signal_name_from_number(*self, number)
+        Signals::signal_name_from_number(*self, number)
     }
 
     #[inline]
@@ -707,7 +706,7 @@ impl<S: System> SignalSystem for &SharedSystem<S> {
 impl<S: System> SignalSystem for SharedSystem<S> {
     #[inline]
     fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
-        SystemEx::signal_name_from_number(self, number)
+        Signals::signal_name_from_number(self, number)
     }
 
     #[inline]

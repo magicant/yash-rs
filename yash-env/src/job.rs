@@ -42,8 +42,10 @@
 //! special parameter.
 
 use crate::Env;
+use crate::io::Fd;
 use crate::semantics::{Divert, ExitStatus};
 use crate::signal;
+use crate::system::{Disposition, Errno, Sigaction, Sigmask, SigmaskOp, Signals, TcSetPgrp};
 use slab::Slab;
 use std::collections::HashMap;
 use std::iter::FusedIterator;
@@ -923,6 +925,84 @@ impl JobList {
     }
 }
 
+/// Switches the foreground process group with SIGTTOU blocked.
+///
+/// This is a convenience function to change the foreground process group
+/// safely. If you call [`TcSetPgrp::tcsetpgrp`] from a background process, the
+/// process is stopped by SIGTTOU by default. To prevent this effect, SIGTTOU
+/// must be blocked or ignored when `tcsetpgrp` is called. This function uses
+/// [`Sigmask::sigmask`] to block SIGTTOU before calling `tcsetpgrp` and also to
+/// restore the original signal mask after `tcsetpgrp`.
+///
+/// Use [`tcsetpgrp_without_block`] if you need to make sure the shell is in the
+/// foreground before changing the foreground job.
+pub async fn tcsetpgrp_with_block<S>(system: &S, fd: Fd, pgid: Pid) -> crate::system::Result<()>
+where
+    S: Signals + Sigmask + TcSetPgrp + ?Sized,
+{
+    let sigttou = system
+        .signal_number_from_name(signal::Name::Ttou)
+        .ok_or(Errno::EINVAL)?;
+    let mut old_mask = Vec::new();
+
+    system.sigmask(Some((SigmaskOp::Add, &[sigttou])), Some(&mut old_mask))?;
+
+    let result = system.tcsetpgrp(fd, pgid).await;
+
+    let result_2 = system.sigmask(Some((SigmaskOp::Set, &old_mask)), None);
+
+    result.and(result_2)
+}
+
+/// Switches the foreground process group with the default SIGTTOU settings.
+///
+/// This is a convenience function to ensure the shell has been in the
+/// foreground and optionally change the foreground process group. This
+/// function calls [`Sigaction::sigaction`] to restore the action for
+/// SIGTTOU to the default disposition (which is to suspend the shell
+/// process), [`Sigmask::sigmask`] to unblock SIGTTOU, and
+/// [`TcSetPgrp::tcsetpgrp`] to modify the foreground job. If the calling
+/// process is not in the foreground, `tcsetpgrp` will suspend the process
+/// with SIGTTOU until another job-controlling process resumes it in the
+/// foreground. After `tcsetpgrp` completes, this function calls `sigmask`
+/// and `sigaction` to restore the original state.
+///
+/// Note that if `pgid` is the process group ID of the current process, this
+/// function does not change the foreground job, but the process is still
+/// subject to suspension if it has not been in the foreground.
+///
+/// Use [`tcsetpgrp_with_block`] to change the job even if the current shell is
+/// not in the foreground.
+pub async fn tcsetpgrp_without_block<S>(system: &S, fd: Fd, pgid: Pid) -> crate::system::Result<()>
+where
+    S: Signals + Sigaction + Sigmask + TcSetPgrp + ?Sized,
+{
+    let sigttou = system
+        .signal_number_from_name(signal::Name::Ttou)
+        .ok_or(Errno::EINVAL)?;
+    match system.sigaction(sigttou, Disposition::Default) {
+        Err(e) => Err(e),
+        Ok(old_handling) => {
+            let mut old_mask = Vec::new();
+            let result =
+                match system.sigmask(Some((SigmaskOp::Remove, &[sigttou])), Some(&mut old_mask)) {
+                    Err(e) => Err(e),
+                    Ok(()) => {
+                        let result = system.tcsetpgrp(fd, pgid).await;
+
+                        let result_2 = system.sigmask(Some((SigmaskOp::Set, &old_mask)), None);
+
+                        result.and(result_2)
+                    }
+                };
+
+            let result_2 = system.sigaction(sigttou, old_handling).map(drop);
+
+            result.and(result_2)
+        }
+    }
+}
+
 /// Adds a job if the process is suspended.
 ///
 /// This is a convenience function for handling the result of
@@ -1565,6 +1645,9 @@ mod tests {
         assert_eq!(list.current_job(), Some(i12));
         assert_eq!(list.previous_job(), Some(i10));
     }
+
+    // TODO tcsetpgrp_with_block tests
+    // TODO tcsetpgrp_without_block tests
 
     #[test]
     fn do_not_add_job_if_exited() {
