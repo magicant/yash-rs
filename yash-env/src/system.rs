@@ -246,55 +246,6 @@ impl<T> System for T where
 ///
 /// This trait provides some extension methods for `System`.
 pub trait SystemEx: System {
-    /// Switches the foreground process group with the default SIGTTOU settings.
-    ///
-    /// This is a convenience function to ensure the shell has been in the
-    /// foreground and optionally change the foreground process group. This
-    /// function calls [`Sigaction::sigaction`] to restore the action for
-    /// SIGTTOU to the default disposition (which is to suspend the shell
-    /// process), [`Sigmask::sigmask`] to unblock SIGTTOU, and
-    /// [`TcSetPgrp::tcsetpgrp`] to modify the foreground job. If the calling
-    /// process is not in the foreground, `tcsetpgrp` will suspend the process
-    /// with SIGTTOU until another job-controlling process resumes it in the
-    /// foreground. After `tcsetpgrp` completes, this function calls `sigmask`
-    /// and `sigaction` to restore the original state.
-    ///
-    /// Note that if `pgid` is the process group ID of the current process, this
-    /// function does not change the foreground job, but the process is still
-    /// subject to suspension if it has not been in the foreground.
-    ///
-    /// Use [`tcsetpgrp_with_block`](Self::tcsetpgrp_with_block) to change the
-    /// job even if the current shell is not in the foreground.
-    fn tcsetpgrp_without_block(&mut self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> {
-        async move {
-            let sigttou = self
-                .signal_number_from_name(signal::Name::Ttou)
-                .ok_or(Errno::EINVAL)?;
-            match self.sigaction(sigttou, Disposition::Default) {
-                Err(e) => Err(e),
-                Ok(old_handling) => {
-                    let mut old_mask = Vec::new();
-                    let result = match self
-                        .sigmask(Some((SigmaskOp::Remove, &[sigttou])), Some(&mut old_mask))
-                    {
-                        Err(e) => Err(e),
-                        Ok(()) => {
-                            let result = self.tcsetpgrp(fd, pgid).await;
-
-                            let result_2 = self.sigmask(Some((SigmaskOp::Set, &old_mask)), None);
-
-                            result.and(result_2)
-                        }
-                    };
-
-                    let result_2 = self.sigaction(sigttou, old_handling).map(drop);
-
-                    result.and(result_2)
-                }
-            }
-        }
-    }
-
     /// Returns the signal name for the signal number.
     ///
     /// This function returns the signal name for the given signal number.
