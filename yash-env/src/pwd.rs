@@ -21,6 +21,8 @@ use crate::System;
 use crate::path::Path;
 use crate::system::AT_FDCWD;
 use crate::system::Errno;
+use crate::system::Fstat;
+use crate::system::GetCwd as _;
 use crate::variable::AssignError;
 use crate::variable::PWD;
 use crate::variable::Scope::Global;
@@ -142,7 +144,7 @@ mod tests {
     }
 
     fn env_with_symlink_to_dir() -> Env<VirtualSystem> {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let mut state = system.state.borrow_mut();
         state
             .file_system
@@ -245,7 +247,7 @@ mod tests {
 
     #[test]
     fn prepare_pwd_with_non_absolute_path() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let mut state = system.state.borrow_mut();
         state
             .file_system

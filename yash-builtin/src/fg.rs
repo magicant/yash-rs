@@ -47,8 +47,11 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::signal;
 use yash_env::system::Errno;
+use yash_env::system::SendSignal as _;
+use yash_env::system::Signals as _;
 use yash_env::system::System;
 use yash_env::system::SystemEx as _;
+use yash_env::system::TcSetPgrp as _;
 
 /// Resumes the job at the specified index.
 ///
@@ -174,6 +177,8 @@ mod tests {
     use yash_env::option::State::On;
     use yash_env::subshell::JobControl;
     use yash_env::subshell::Subshell;
+    use yash_env::system::GetPid as _;
+    use yash_env::system::TcGetPgrp as _;
     use yash_env::system::r#virtual::Process;
     use yash_env::system::r#virtual::SIGSTOP;
     use yash_env_test_helper::assert_stderr;

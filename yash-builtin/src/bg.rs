@@ -54,6 +54,8 @@ use yash_env::semantics::Field;
 use yash_env::signal;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::Errno;
+use yash_env::system::SendSignal as _;
+use yash_env::system::Signals as _;
 
 // Some definitions in this module are shared with the `fg` built-in.
 

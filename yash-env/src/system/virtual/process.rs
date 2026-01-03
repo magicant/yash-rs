@@ -549,7 +549,7 @@ impl Process {
     }
 
     /// Returns the arguments to the last call to
-    /// [`execve`](crate::System::execve) on this process.
+    /// [`execve`](crate::system::Exec::execve) on this process.
     #[inline(always)]
     #[must_use]
     pub fn last_exec(&self) -> &Option<(CString, Vec<CString>, Vec<CString>)> {

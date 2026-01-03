@@ -130,10 +130,10 @@ impl<S: System> Input for FdReader<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::System;
     use crate::system::Errno;
     use crate::system::Mode;
     use crate::system::OfdAccess;
+    use crate::system::Open as _;
     use crate::system::OpenFlag;
     use crate::system::r#virtual::FileBody;
     use crate::system::r#virtual::Inode;
@@ -225,7 +225,7 @@ mod tests {
             let file = Rc::new(Inode::new("echo file\n").into());
             state.file_system.save("/foo", file).unwrap();
         }
-        let mut system = SharedSystem::new(system);
+        let system = SharedSystem::new(system);
         let path = c"/foo";
         let fd = system
             .open(
@@ -253,7 +253,7 @@ mod tests {
 
     #[test]
     fn reader_error() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system.current_process_mut().close_fd(Fd::STDIN);
         let system = SharedSystem::new(system);
         let mut reader = FdReader::new(Fd::STDIN, system);

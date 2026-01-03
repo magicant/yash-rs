@@ -21,7 +21,10 @@ use yash_env::Env;
 use yash_env::System;
 use yash_env::io::Fd;
 use yash_env::path::Path;
+use yash_env::system::Close as _;
 use yash_env::system::Errno;
+use yash_env::system::Open as _;
+use yash_env::system::Seek as _;
 
 async fn fill_content<S: System>(env: &mut Env<S>, fd: Fd, content: &str) -> Result<(), Errno> {
     env.system.write_all(fd, content.as_bytes()).await?;
@@ -55,8 +58,8 @@ pub(super) async fn open_fd<S: System>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::FutureExt;
-    use yash_env::System;
+    use futures_util::FutureExt as _;
+    use yash_env::system::Read as _;
 
     #[test]
     fn open_fd_and_read_from_it() {

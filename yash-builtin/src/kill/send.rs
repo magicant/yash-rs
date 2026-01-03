@@ -18,7 +18,7 @@
 //!
 //! [`execute`] calls [`send`] for each target and reports all errors.
 //! [`send`] uses [`resolve_target`] to determine the argument to the
-//! [`kill`](System::kill) system call.
+//! [`kill`](SendSignal::kill) system call.
 
 use super::Signal;
 use crate::common::report::{merge_reports, report_failure};
@@ -32,6 +32,7 @@ use yash_env::semantics::Field;
 use yash_env::signal;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::Errno;
+use yash_env::system::SendSignal;
 use yash_env::system::System;
 
 /// Error that may occur while [sending](send) a signal.
@@ -81,7 +82,7 @@ pub fn resolve_target(jobs: &JobList, target: &str) -> Result<Pid, Error> {
 }
 
 /// Sends the specified signal to the specified target.
-pub async fn send<S: System>(
+pub async fn send<S: SendSignal>(
     env: &mut Env<S>,
     signal: Option<signal::Number>,
     target: &Field,

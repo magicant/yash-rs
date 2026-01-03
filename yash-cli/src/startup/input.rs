@@ -39,8 +39,11 @@ use yash_env::option::Option::Interactive;
 use yash_env::option::State::{Off, On};
 use yash_env::parser::Config;
 use yash_env::system::Errno;
+use yash_env::system::Fcntl as _;
+use yash_env::system::Isatty as _;
 use yash_env::system::Mode;
 use yash_env::system::OfdAccess;
+use yash_env::system::Open as _;
 use yash_env::system::OpenFlag;
 use yash_env::system::SystemEx as _;
 use yash_prompt::Prompter;
@@ -100,7 +103,7 @@ where
 
     match source {
         Source::Stdin => {
-            let mut system = env.borrow().system.clone();
+            let system = env.borrow().system.clone();
             if system.isatty(Fd::STDIN) || system.fd_is_pipe(Fd::STDIN) {
                 // It makes virtually no sense to make it blocking here
                 // since we will be doing non-blocking reads anyway,

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Implementation of `System` that actually interacts with the system.
+//! Implementation of [`System`] that actually interacts with the system
 //!
 //! This module is implemented on Unix-like targets only. It provides an
 //! implementation of the `System` trait that interacts with the underlying
@@ -28,28 +28,65 @@ mod resource;
 mod signal;
 
 use super::AT_FDCWD;
+use super::CaughtSignals;
+use super::Chdir;
 use super::ChildProcessStarter;
+use super::Clock;
+use super::Close;
+use super::CpuTimes;
 use super::Dir;
 use super::DirEntry;
 use super::Disposition;
-#[cfg(doc)]
-use super::Env;
+use super::Dup;
 use super::Errno;
+use super::Exec;
+use super::Exit;
+use super::Fcntl;
 use super::FdFlag;
 use super::FileType;
 use super::FlexFuture;
+use super::Fork;
+use super::Fstat;
+use super::GetCwd;
+use super::GetPid;
+use super::GetPw;
+use super::GetRlimit;
+use super::GetUid;
 use super::Gid;
+use super::IsExecutableFile;
+use super::Isatty;
 use super::Mode;
 use super::OfdAccess;
+use super::Open;
 use super::OpenFlag;
+use super::Pipe;
+use super::Read;
 use super::Result;
+use super::Seek;
+use super::Select;
+use super::SendSignal;
+use super::SetPgid;
+use super::SetRlimit;
+use super::ShellPath;
+use super::Sigaction;
+use super::Sigmask;
 use super::SigmaskOp;
+use super::Signals;
 use super::Stat;
+use super::Sysconf;
+#[cfg(doc)]
 use super::System;
+use super::TcGetPgrp;
+use super::TcSetPgrp;
 use super::Times;
 use super::Uid;
+use super::Umask;
+use super::Wait;
+use super::Write;
 use super::resource::LimitPair;
 use super::resource::Resource;
+#[cfg(doc)]
+use crate::Env;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessResult;
@@ -221,7 +258,7 @@ impl RealSystem {
     }
 }
 
-impl System for RealSystem {
+impl Fstat for RealSystem {
     fn fstat(&self, fd: Fd) -> Result<Stat> {
         let mut stat = MaybeUninit::<libc::stat>::uninit();
         unsafe { libc::fstat(fd.0, stat.as_mut_ptr()) }.errno_if_m1()?;
@@ -242,24 +279,26 @@ impl System for RealSystem {
         let stat = unsafe { Stat::from_raw(&stat) };
         Ok(stat)
     }
+}
 
+impl IsExecutableFile for RealSystem {
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.file_has_type(path, FileType::Regular) && self.has_execute_permission(path)
     }
+}
 
-    fn is_directory(&self, path: &CStr) -> bool {
-        self.file_has_type(path, FileType::Directory)
-    }
-
-    fn pipe(&mut self) -> Result<(Fd, Fd)> {
+impl Pipe for RealSystem {
+    fn pipe(&self) -> Result<(Fd, Fd)> {
         let mut fds = MaybeUninit::<[c_int; 2]>::uninit();
         // TODO Use as_mut_ptr rather than cast when array_ptr_get is stabilized
         unsafe { libc::pipe(fds.as_mut_ptr().cast()) }.errno_if_m1()?;
         let fds = unsafe { fds.assume_init() };
         Ok((Fd(fds[0]), Fd(fds[1])))
     }
+}
 
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
+impl Dup for RealSystem {
+    fn dup(&self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
         let command = if flags.contains(FdFlag::CloseOnExec) {
             libc::F_DUPFD_CLOEXEC
         } else {
@@ -270,7 +309,7 @@ impl System for RealSystem {
             .map(Fd)
     }
 
-    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
+    fn dup2(&self, from: Fd, to: Fd) -> Result<Fd> {
         loop {
             let result = unsafe { libc::dup2(from.0, to.0) }.errno_if_m1().map(Fd);
             if result != Err(Errno::EINTR) {
@@ -278,9 +317,11 @@ impl System for RealSystem {
             }
         }
     }
+}
 
+impl Open for RealSystem {
     fn open(
-        &mut self,
+        &self,
         path: &CStr,
         access: OfdAccess,
         flags: EnumSet<OpenFlag>,
@@ -301,7 +342,7 @@ impl System for RealSystem {
             .map(Fd)
     }
 
-    fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
+    fn open_tmpfile(&self, parent_dir: &Path) -> Result<Fd> {
         let parent_dir = OsStr::from_bytes(parent_dir.as_unix_str().as_bytes());
         let file = tempfile::tempfile_in(parent_dir)
             .map_err(|errno| Errno(errno.raw_os_error().unwrap_or(0)))?;
@@ -313,7 +354,22 @@ impl System for RealSystem {
         Ok(fd)
     }
 
-    fn close(&mut self, fd: Fd) -> Result<()> {
+    fn fdopendir(&self, fd: Fd) -> Result<impl Dir + use<>> {
+        let dir = unsafe { libc::fdopendir(fd.0) };
+        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
+        Ok(RealDir(dir))
+    }
+
+    fn opendir(&self, path: &CStr) -> Result<impl Dir + use<>> {
+        let dir = unsafe { libc::opendir(path.as_ptr()) };
+        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
+        Ok(RealDir(dir))
+    }
+}
+
+impl Close for RealSystem {
+    fn close(&self, fd: Fd) -> Result<()> {
+        // TODO: Use posix_close when available
         loop {
             let result = unsafe { libc::close(fd.0) }.errno_if_m1().map(drop);
             match result {
@@ -323,13 +379,15 @@ impl System for RealSystem {
             }
         }
     }
+}
 
+impl Fcntl for RealSystem {
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
         let flags = unsafe { libc::fcntl(fd.0, libc::F_GETFL) }.errno_if_m1()?;
         Ok(OfdAccess::from_real_flag(flags))
     }
 
-    fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
+    fn get_and_set_nonblocking(&self, fd: Fd, nonblocking: bool) -> Result<bool> {
         let old_flags = unsafe { libc::fcntl(fd.0, libc::F_GETFL) }.errno_if_m1()?;
         let new_flags = if nonblocking {
             old_flags | libc::O_NONBLOCK
@@ -352,7 +410,7 @@ impl System for RealSystem {
         Ok(flags)
     }
 
-    fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
+    fn fcntl_setfd(&self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
         let mut bits = 0 as c_int;
         if flags.contains(FdFlag::CloseOnExec) {
             bits |= libc::FD_CLOEXEC;
@@ -361,12 +419,10 @@ impl System for RealSystem {
             .errno_if_m1()
             .map(drop)
     }
+}
 
-    fn isatty(&self, fd: Fd) -> bool {
-        (unsafe { libc::isatty(fd.0) } != 0)
-    }
-
-    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
+impl Read for RealSystem {
+    fn read(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
         loop {
             let result =
                 unsafe { libc::read(fd.0, buffer.as_mut_ptr().cast(), buffer.len()) }.errno_if_m1();
@@ -375,8 +431,10 @@ impl System for RealSystem {
             }
         }
     }
+}
 
-    fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {
+impl Write for RealSystem {
+    fn write(&self, fd: Fd, buffer: &[u8]) -> Result<usize> {
         loop {
             let result =
                 unsafe { libc::write(fd.0, buffer.as_ptr().cast(), buffer.len()) }.errno_if_m1();
@@ -385,8 +443,10 @@ impl System for RealSystem {
             }
         }
     }
+}
 
-    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
+impl Seek for RealSystem {
+    fn lseek(&self, fd: Fd, position: SeekFrom) -> Result<u64> {
         let (offset, whence) = match position {
             SeekFrom::Start(offset) => {
                 let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
@@ -398,32 +458,62 @@ impl System for RealSystem {
         let new_offset = unsafe { libc::lseek(fd.0, offset, whence) }.errno_if_m1()?;
         Ok(new_offset.try_into().unwrap())
     }
+}
 
-    fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
-        let dir = unsafe { libc::fdopendir(fd.0) };
-        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
-        Ok(Box::new(RealDir(dir)))
-    }
-
-    fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
-        let dir = unsafe { libc::opendir(path.as_ptr()) };
-        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
-        Ok(Box::new(RealDir(dir)))
-    }
-
-    fn umask(&mut self, new_mask: Mode) -> Mode {
+impl Umask for RealSystem {
+    fn umask(&self, new_mask: Mode) -> Mode {
         Mode::from_bits_retain(unsafe { libc::umask(new_mask.bits()) })
     }
+}
 
+impl GetCwd for RealSystem {
+    fn getcwd(&self) -> Result<PathBuf> {
+        // Some getcwd implementations allocate a buffer for the path if the
+        // first argument is null, but we cannot use that feature because Vec's
+        // allocator may not be compatible with the system's allocator.
+
+        // Since there is no way to know the required buffer size, we try
+        // several buffer sizes.
+        let mut buffer = Vec::<u8>::new();
+        for capacity in [1 << 10, 1 << 12, 1 << 14, 1 << 16] {
+            buffer.reserve_exact(capacity);
+
+            let result = unsafe { libc::getcwd(buffer.as_mut_ptr().cast(), capacity) };
+            if !result.is_null() {
+                // len does not include the null terminator
+                let len = unsafe { CStr::from_ptr(buffer.as_ptr().cast()) }.count_bytes();
+                unsafe { buffer.set_len(len) }
+                buffer.shrink_to_fit();
+                return Ok(PathBuf::from(UnixString::from_vec(buffer)));
+            }
+            let errno = Errno::last();
+            if errno != Errno::ERANGE {
+                return Err(errno);
+            }
+        }
+        Err(Errno::ERANGE)
+    }
+}
+
+impl Chdir for RealSystem {
+    fn chdir(&self, path: &CStr) -> Result<()> {
+        let result = unsafe { libc::chdir(path.as_ptr()) };
+        result.errno_if_m1().map(drop)
+    }
+}
+
+impl Clock for RealSystem {
     fn now(&self) -> Instant {
         Instant::now()
     }
+}
 
+impl Times for RealSystem {
     /// Returns consumed CPU times.
     ///
     /// This function actually uses `getrusage` rather than `times` because it
     /// provides better resolution on many systems.
-    fn times(&self) -> Result<Times> {
+    fn times(&self) -> Result<CpuTimes> {
         let mut usage = MaybeUninit::<libc::rusage>::uninit();
 
         unsafe { libc::getrusage(libc::RUSAGE_SELF, usage.as_mut_ptr()) }.errno_if_m1()?;
@@ -446,14 +536,41 @@ impl System for RealSystem {
                 + (*usage.as_ptr()).ru_stime.tv_usec as f64 * 1e-6
         };
 
-        Ok(Times {
+        Ok(CpuTimes {
             self_user,
             self_system,
             children_user,
             children_system,
         })
     }
+}
 
+impl GetPid for RealSystem {
+    fn getsid(&self, pid: Pid) -> Result<Pid> {
+        unsafe { libc::getsid(pid.0) }.errno_if_m1().map(Pid)
+    }
+
+    fn getpid(&self) -> Pid {
+        Pid(unsafe { libc::getpid() })
+    }
+
+    fn getppid(&self) -> Pid {
+        Pid(unsafe { libc::getppid() })
+    }
+
+    fn getpgrp(&self) -> Pid {
+        Pid(unsafe { libc::getpgrp() })
+    }
+}
+
+impl SetPgid for RealSystem {
+    fn setpgid(&self, pid: Pid, pgid: Pid) -> Result<()> {
+        let result = unsafe { libc::setpgid(pid.0, pgid.0) };
+        result.errno_if_m1().map(drop)
+    }
+}
+
+impl Signals for RealSystem {
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
         let non_zero = NonZero::new(number)?;
         let name = signal::Name::try_from_raw_real(number)?;
@@ -464,9 +581,11 @@ impl System for RealSystem {
     fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
         name.to_raw_real()
     }
+}
 
+impl Sigmask for RealSystem {
     fn sigmask(
-        &mut self,
+        &self,
         op: Option<(SigmaskOp, &[signal::Number])>,
         old_mask: Option<&mut Vec<signal::Number>>,
     ) -> Result<()> {
@@ -518,16 +637,20 @@ impl System for RealSystem {
             Ok(())
         }
     }
+}
 
+impl Sigaction for RealSystem {
     fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
         sigaction_impl(signal, None)
     }
 
-    fn sigaction(&mut self, signal: signal::Number, handling: Disposition) -> Result<Disposition> {
+    fn sigaction(&self, signal: signal::Number, handling: Disposition) -> Result<Disposition> {
         sigaction_impl(signal, Some(handling))
     }
+}
 
-    fn caught_signals(&mut self) -> Vec<signal::Number> {
+impl CaughtSignals for RealSystem {
+    fn caught_signals(&self) -> Vec<signal::Number> {
         let mut signals = Vec::new();
         for slot in &CAUGHT_SIGNALS {
             // Need a fence to ensure we examine the slots in order.
@@ -548,20 +671,24 @@ impl System for RealSystem {
         }
         signals
     }
+}
 
-    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
+impl SendSignal for RealSystem {
+    fn kill(&self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
         let raw = signal.map_or(0, signal::Number::as_raw);
         let result = unsafe { libc::kill(target.0, raw) }.errno_if_m1().map(drop);
         result.into()
     }
 
-    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>> {
+    fn raise(&self, signal: signal::Number) -> FlexFuture<Result<()>> {
         let raw = signal.as_raw();
         unsafe { libc::raise(raw) }.errno_if_m1().map(drop).into()
     }
+}
 
+impl Select for RealSystem {
     fn select(
-        &mut self,
+        &self,
         readers: &mut Vec<Fd>,
         writers: &mut Vec<Fd>,
         timeout: Option<Duration>,
@@ -628,37 +755,28 @@ impl System for RealSystem {
 
         Ok(count)
     }
+}
 
-    fn getsid(&self, pid: Pid) -> Result<Pid> {
-        unsafe { libc::getsid(pid.0) }.errno_if_m1().map(Pid)
+impl Isatty for RealSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        (unsafe { libc::isatty(fd.0) } != 0)
     }
+}
 
-    fn getpid(&self) -> Pid {
-        Pid(unsafe { libc::getpid() })
-    }
-
-    fn getppid(&self) -> Pid {
-        Pid(unsafe { libc::getppid() })
-    }
-
-    fn getpgrp(&self) -> Pid {
-        Pid(unsafe { libc::getpgrp() })
-    }
-
-    fn setpgid(&mut self, pid: Pid, pgid: Pid) -> Result<()> {
-        let result = unsafe { libc::setpgid(pid.0, pgid.0) };
-        result.errno_if_m1().map(drop)
-    }
-
+impl TcGetPgrp for RealSystem {
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
         unsafe { libc::tcgetpgrp(fd.0) }.errno_if_m1().map(Pid)
     }
+}
 
-    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
+impl TcSetPgrp for RealSystem {
+    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
         let result = unsafe { libc::tcsetpgrp(fd.0, pgid.0) };
         result.errno_if_m1().map(drop).into()
     }
+}
 
+impl Fork for RealSystem {
     /// Creates a new child process.
     ///
     /// This implementation calls the `fork` system call and returns both in the
@@ -666,7 +784,7 @@ impl System for RealSystem {
     /// `ChildProcessStarter` ignores any arguments and returns the child
     /// process ID. In the child, the starter runs the task and exits the
     /// process.
-    fn new_child_process(&mut self) -> Result<ChildProcessStarter<Self>> {
+    fn new_child_process(&self) -> Result<ChildProcessStarter<Self>> {
         let raw_pid = unsafe { libc::fork() }.errno_if_m1()?;
         if raw_pid != 0 {
             // Parent process
@@ -690,8 +808,10 @@ impl System for RealSystem {
             }
         }))
     }
+}
 
-    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
+impl Wait for RealSystem {
+    fn wait(&self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         let mut status = 0;
         let options = libc::WUNTRACED | libc::WCONTINUED | libc::WNOHANG;
         match unsafe { libc::waitpid(target.0, &mut status, options) } {
@@ -724,9 +844,11 @@ impl System for RealSystem {
             }
         }
     }
+}
 
+impl Exec for RealSystem {
     fn execve(
-        &mut self,
+        &self,
         path: &CStr,
         args: &[CString],
         envs: &[CString],
@@ -757,43 +879,15 @@ impl System for RealSystem {
             }
         }
     }
+}
 
-    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
+impl Exit for RealSystem {
+    fn exit(&self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
         unsafe { libc::_exit(exit_status.0) }
     }
+}
 
-    fn getcwd(&self) -> Result<PathBuf> {
-        // Some getcwd implementations allocate a buffer for the path if the
-        // first argument is null, but we cannot use that feature because Vec's
-        // allocator may not be compatible with the system's allocator.
-
-        // Since there is no way to know the required buffer size, we try
-        // several buffer sizes.
-        let mut buffer = Vec::<u8>::new();
-        for capacity in [1 << 10, 1 << 12, 1 << 14, 1 << 16] {
-            buffer.reserve_exact(capacity);
-
-            let result = unsafe { libc::getcwd(buffer.as_mut_ptr().cast(), capacity) };
-            if !result.is_null() {
-                // len does not include the null terminator
-                let len = unsafe { CStr::from_ptr(buffer.as_ptr().cast()) }.count_bytes();
-                unsafe { buffer.set_len(len) }
-                buffer.shrink_to_fit();
-                return Ok(PathBuf::from(UnixString::from_vec(buffer)));
-            }
-            let errno = Errno::last();
-            if errno != Errno::ERANGE {
-                return Err(errno);
-            }
-        }
-        Err(Errno::ERANGE)
-    }
-
-    fn chdir(&mut self, path: &CStr) -> Result<()> {
-        let result = unsafe { libc::chdir(path.as_ptr()) };
-        result.errno_if_m1().map(drop)
-    }
-
+impl GetUid for RealSystem {
     fn getuid(&self) -> Uid {
         Uid(unsafe { libc::getuid() })
     }
@@ -809,7 +903,9 @@ impl System for RealSystem {
     fn getegid(&self) -> Gid {
         Gid(unsafe { libc::getegid() })
     }
+}
 
+impl GetPw for RealSystem {
     fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
         Errno::clear();
         let passwd = unsafe { libc::getpwnam(name.as_ptr()) };
@@ -825,7 +921,9 @@ impl System for RealSystem {
         let dir = unsafe { CStr::from_ptr((*passwd).pw_dir) };
         Ok(Some(UnixString::from_vec(dir.to_bytes().to_vec()).into()))
     }
+}
 
+impl Sysconf for RealSystem {
     fn confstr_path(&self) -> Result<UnixString> {
         // TODO Support other platforms
         #[cfg(any(
@@ -855,7 +953,9 @@ impl System for RealSystem {
         #[allow(unreachable_code)]
         Err(Errno::ENOSYS)
     }
+}
 
+impl ShellPath for RealSystem {
     /// Returns the path to the shell.
     ///
     /// On Linux, this function returns `/proc/self/exe`. On other platforms, it
@@ -885,7 +985,9 @@ impl System for RealSystem {
         // The last resort
         c"/bin/sh".to_owned()
     }
+}
 
+impl GetRlimit for RealSystem {
     fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
         let raw_resource = resource.as_raw_type().ok_or(Errno::EINVAL)?;
 
@@ -900,8 +1002,10 @@ impl System for RealSystem {
             hard: unsafe { (*limits.as_ptr()).rlim_max },
         })
     }
+}
 
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()> {
+impl SetRlimit for RealSystem {
+    fn setrlimit(&self, resource: Resource, limits: LimitPair) -> Result<()> {
         let raw_resource = resource.as_raw_type().ok_or(Errno::EINVAL)?;
 
         let mut rlimit = MaybeUninit::<libc::rlimit>::uninit();
@@ -953,7 +1057,7 @@ mod tests {
 
     #[test]
     fn real_system_directory_entries() {
-        let mut system = unsafe { RealSystem::new() };
+        let system = unsafe { RealSystem::new() };
         let mut dir = system.opendir(c".").unwrap();
         let mut count = 0;
         while dir.next().unwrap().is_some() {
@@ -966,7 +1070,7 @@ mod tests {
     #[test]
     fn real_system_caught_signals() {
         unsafe {
-            let mut system = RealSystem::new();
+            let system = RealSystem::new();
             let result = system.caught_signals();
             assert_eq!(result, []);
 

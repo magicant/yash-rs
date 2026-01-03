@@ -35,7 +35,10 @@ use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
+use yash_env::system::Close as _;
+use yash_env::system::Dup as _;
 use yash_env::system::Errno;
+use yash_env::system::Pipe as _;
 use yash_syntax::syntax;
 
 /// Executes the pipeline.
@@ -338,6 +341,7 @@ mod tests {
     use yash_env::job::ProcessState;
     use yash_env::option::Option::{ErrExit, Monitor};
     use yash_env::semantics::Field;
+    use yash_env::system::GetPid as _;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::SIGSTOP;
     use yash_env_test_helper::assert_stdout;

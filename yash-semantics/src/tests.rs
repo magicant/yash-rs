@@ -30,6 +30,7 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::Errno;
+use yash_env::system::SendSignal as _;
 use yash_env::system::r#virtual::SIGSTOP;
 use yash_env::variable::Scope;
 

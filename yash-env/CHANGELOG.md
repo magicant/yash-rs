@@ -16,9 +16,73 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `system::SharedSystem::new_child_process`: This method has been added as a
   workaround for the now non-functional
   `<system::SharedSystem as System>::new_child_process`.
+- The following traits have been added to the `system` module:
+    - `CaughtSignals`: Declares the `caught_signals` method for retrieving
+      caught signals.
+    - `Chdir`: Declares the `chdir` method for changing the current
+      working directory.
+    - `Clock`: Declares the `now` method for getting the current time.
+    - `Close`: Declares the `close` method for closing file descriptors.
+    - `Dup`: Declares the `dup` and `dup2` methods for duplicating file
+      descriptors.
+    - `Exec`: Declares the `execve` method for executing new programs.
+    - `Exit`: Declares the `exit` method for terminating the current
+      process.
+    - `Fcntl`: Declares the `ofd_access`, `get_and_set_nonblocking`,
+      `fcntl_getfd`, and `fcntl_setfd` methods for `fcntl`-related operations.
+    - `Fork`: Declares a method for creating new child processes.
+    - `Fstat`: Declares `fstat` and `fstatat` methods for getting file
+      metadata and provides a default implementation of `is_directory`.
+    - `GetCwd`: Declares the `getcwd` method for getting the current
+      working directory.
+    - `GetPid`: Declares the `getpid` and other methods for getting process IDs
+      and other attributes.
+    - `GetPw`: Declares methods for getting user information.
+    - `GetUid`: Declares the `getuid`, `geteuid`, `getgid`, and
+      `getegid` methods for getting user and group IDs.
+    - `IsExecutableFile`: Declares the `is_executable_file` method for checking
+      if a file is executable.
+    - `Isatty`: Declares the `isatty` method for testing if a file descriptor is
+      associated with a terminal device.
+    - `Open`: Declares the `open` and other methods for opening files.
+    - `Pipe`: Declares the `pipe` method for creating pipes.
+    - `Read`: Declares the `read` method for reading from file descriptors.
+    - `Seek`: Declares the `lseek` method for seeking within file
+      descriptors.
+    - `Select`: Declares the `select` method for waiting on multiple file
+      descriptors and signals.
+    - `SendSignal`: Declares the `kill` and `raise` methods for sending signals
+      to processes.
+    - `SetPgid`: Declares the `setpgid` method for setting process group IDs.
+    - `ShellPath`: Declares the `shell_path` method for getting the path to
+      the shell executable.
+    - `Sigaction`: Declares methods for managing signal dispositions.
+    - `Sigmask`: Declares the `sigmask` method for managing signal masks.
+    - `Signals`: Declares the `signal_number_from_name` and
+      `validate_signal` methods for converting between signal names and numbers.
+    - `TcGetPgrp`: Declares the `tcgetpgrp` method for getting the
+      foreground process group ID of a terminal.
+    - `TcSetPgrp`: Declares the `tcsetpgrp` method for setting the
+      foreground process group ID of a terminal.
+    - `Times`: Declares the `times` method for getting CPU times.
+    - `Umask`: Declares the `umask` method for setting the file mode
+      creation mask.
+    - `Wait`: Declares the `wait` method for waiting for child processes.
+    - `Write`: Declares the `write` method for writing to file
+      descriptors.
+    - `resource::GetRlimit`: Declares the `getrlimit` method for
+      retrieving resource limits.
+    - `resource::SetRlimit`: Declares the `setrlimit` method for
+      setting resource limits.
+- Implementations of these traits are provided for those types that implement
+  `System`.
+- `System` is now implemented for any type that implements all of the above
+  traits.
 
 ### Changed
 
+- Public dependency versions:
+    - Rust 1.86.0 → 1.87.0
 - `system::SharedSystem` now directly holds an instance of `System` rather than
   being trait-objectified as a `Box<dyn System>`. Type parameters `S`
   representing the concrete type of `System` have been added to `Env` and
@@ -33,12 +97,26 @@ A _private dependency_ is used internally and not visible to downstream users.
       they cannot create `ChildProcessStarter<SharedSystem>` by wrapping the
       results of `new_child_process` calls on the inner `System` instance. Use
       the new `system::SharedSystem::new_child_process` inherent method instead.
+- The `System` trait has been split into smaller, more specialized traits. It
+  is now a supertrait of those new traits declared in the `system` module.
 - `System::tcsetpgrp` now returns a `FlexFuture<Result<()>>` instead of a
   synchronous `Result<()>`. This change allows virtual systems to simulate the
   blocking behavior of `tcsetpgrp` when called from a background process group,
   though the current virtual system implementation does not yet do so.
+- The `system::Times` struct has been renamed to `CpuTimes`.
+- `system::virtual::VirtualSystem::current_process_mut` now takes `&self`
+  instead of `&mut self` because it returns a `std::cell::RefMut` out of a
+  `RefCell`.
+- `system::virtual::VirtualSystem::with_open_file_description_mut` now takes
+  `&self` instead of `&mut self` as it internally depends on
+  `current_process_mut`.
 - `impl<S> std::fmt::Debug for builtin::Builtin<S>` now prints the `execute`
   field as well.
+
+### Removed
+
+- `&system::SharedSystem` no longer implements `System` because all `System`
+  methods now can be called on `&SharedSystem` directly.
 
 ## [0.10.1] - 2025-11-29
 

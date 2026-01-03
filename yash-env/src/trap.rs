@@ -390,7 +390,7 @@ impl TrapSet {
     /// Installs the internal disposition for `SIGCHLD`.
     ///
     /// You should install the internal disposition for `SIGCHLD` by using this
-    /// function before waiting for `SIGCHLD` with [`System::wait`] and
+    /// function before waiting for `SIGCHLD` with [`crate::system::Wait::wait`] and
     /// [`SharedSystem::wait_for_signal`]. The disposition allows catching
     /// `SIGCHLD`.
     ///
@@ -542,7 +542,8 @@ impl<S> std::fmt::Debug for RunSignalTrapIfCaught<S> {
 mod tests {
     use super::*;
     use crate::job::ProcessState;
-    use crate::system::System as _;
+    use crate::system::SendSignal as _;
+    use crate::system::Signals as _;
     use crate::system::SystemEx as _;
     use crate::system::r#virtual::VirtualSystem;
     use crate::system::r#virtual::{

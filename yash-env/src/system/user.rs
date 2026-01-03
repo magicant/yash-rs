@@ -1,5 +1,5 @@
 // This file is part of yash, an extended POSIX shell.
-// Copyright (C) 2024 WATANABE Yuki
+// Copyright (C) 2025 WATANABE Yuki
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,7 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Definitions of ID types
+//! Items for user management
+
+use super::Result;
+use crate::path::PathBuf;
+use std::ffi::CStr;
 
 #[cfg(unix)]
 type RawUidDef = libc::uid_t;
@@ -65,3 +69,30 @@ pub type RawGid = RawGidDef;
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(transparent)]
 pub struct Gid(pub RawGid);
+
+/// Trait for getting user and group IDs
+pub trait GetUid {
+    /// Returns the real user ID of the current process.
+    fn getuid(&self) -> Uid;
+
+    /// Returns the effective user ID of the current process.
+    fn geteuid(&self) -> Uid;
+
+    /// Returns the real group ID of the current process.
+    fn getgid(&self) -> Gid;
+
+    /// Returns the effective group ID of the current process.
+    fn getegid(&self) -> Gid;
+}
+
+/// Trait for getting user information
+///
+/// This trait declares methods for getting user information. `Pw` in the trait
+/// name stands for "password", referring to the traditional Unix password
+/// file that stores user account information.
+pub trait GetPw {
+    /// Returns the home directory path of the given user.
+    ///
+    /// Returns `Ok(None)` if the user is not found.
+    fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>>;
+}

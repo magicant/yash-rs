@@ -26,6 +26,7 @@ use yash_env::System;
 use yash_env::job::Pid;
 use yash_env::signal;
 use yash_env::system::Errno;
+use yash_env::system::Wait as _;
 use yash_env::trap::RunSignalTrapIfCaught;
 
 /// Errors that may occur while waiting for a job
@@ -119,6 +120,7 @@ mod tests {
     use yash_env::semantics::ExitStatus;
     use yash_env::source::Location;
     use yash_env::subshell::Subshell;
+    use yash_env::system::SendSignal as _;
     use yash_env::system::r#virtual::{SIGSTOP, SIGTERM};
     use yash_env::trap::Action;
     use yash_env::variable::Value;
@@ -192,7 +194,7 @@ mod tests {
                     },
                 )));
 
-            let mut system = VirtualSystem {
+            let system = VirtualSystem {
                 state,
                 process_id: env.main_pid,
             };

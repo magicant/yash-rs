@@ -16,31 +16,66 @@
 
 //! [`SharedSystem`] and related items
 
+use super::CaughtSignals;
+use super::Chdir;
 use super::ChildProcessStarter;
+use super::Clock;
+use super::CpuTimes;
 use super::Dir;
 use super::Disposition;
+use super::Dup;
 use super::Errno;
+use super::Exec;
+use super::Exit;
+use super::Fcntl;
 use super::FdFlag;
 use super::FlexFuture;
+use super::Fork;
+use super::Fstat;
+use super::GetCwd;
+use super::GetPid;
+use super::GetPw;
+use super::GetRlimit;
+use super::GetUid;
 use super::Gid;
+use super::IsExecutableFile;
+use super::Isatty;
 use super::LimitPair;
 use super::Mode;
 use super::OfdAccess;
+use super::Open;
 use super::OpenFlag;
 use super::Path;
 use super::PathBuf;
+use super::Pipe;
+use super::Read;
 use super::Resource;
 use super::Result;
+use super::Seek;
+use super::Select;
 use super::SelectSystem;
+use super::SendSignal;
+use super::SetPgid;
+use super::SetRlimit;
+use super::ShellPath;
+use super::Sigaction;
+use super::Sigmask;
 use super::SigmaskOp;
 use super::SignalStatus;
 use super::SignalSystem;
+use super::Signals;
 use super::Stat;
+use super::Sysconf;
 use super::System;
 use super::SystemEx;
+use super::TcGetPgrp;
+use super::TcSetPgrp;
 use super::Times;
 use super::Uid;
+use super::Umask;
 use super::UnixString;
+use super::Wait;
+use super::Write;
 use super::signal;
 #[cfg(doc)]
 use crate::Env;
@@ -48,6 +83,7 @@ use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessState;
 use crate::semantics::ExitStatus;
+use crate::system::Close;
 use enumset::EnumSet;
 use std::cell::RefCell;
 use std::convert::Infallible;
@@ -75,17 +111,18 @@ use std::time::Instant;
 /// instance of type `S`. You should avoid calling some of the `System` methods,
 /// however. Prefer `async` functions provided by `SharedSystem` (e.g.,
 /// [`read_async`](Self::read_async)) over raw system functions (e.g.,
-/// [`read`](System::read)).
+/// [`read`](Read::read)).
 ///
 /// The following example illustrates how multiple concurrent tasks are run in a
 /// single-threaded pool:
 ///
 /// ```
 /// # use yash_env::{SharedSystem, System, VirtualSystem};
+/// # use yash_env::system::Pipe as _;
 /// # use futures_util::task::LocalSpawnExt;
-/// let mut system = SharedSystem::new(VirtualSystem::new());
-/// let mut system2 = system.clone();
-/// let mut system3 = system.clone();
+/// let system = SharedSystem::new(VirtualSystem::new());
+/// let system2 = system.clone();
+/// let system3 = system.clone();
 /// let (reader, writer) = system.pipe().unwrap();
 /// let mut executor = futures_executor::LocalPool::new();
 ///
@@ -134,7 +171,7 @@ impl<S: System> SharedSystem<S> {
     /// This function waits for one or more bytes to be available for reading.
     /// If successful, returns the number of bytes read.
     pub async fn read_async(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
-        let was_nonblocking = (&mut &*self).get_and_set_nonblocking(fd, true)?;
+        let was_nonblocking = self.get_and_set_nonblocking(fd, true)?;
 
         // We need to retain a strong reference to the waker outside the poll_fn
         // function because SelectSystem only retains a weak reference to it.
@@ -155,14 +192,14 @@ impl<S: System> SharedSystem<S> {
         })
         .await;
 
-        _ = (&mut &*self).get_and_set_nonblocking(fd, was_nonblocking);
+        self.get_and_set_nonblocking(fd, was_nonblocking).ok();
 
         result
     }
 
     /// Writes to the file descriptor.
     ///
-    /// This function calls [`System::write`] repeatedly until the whole
+    /// This function calls [`write`](Write::write) repeatedly until the whole
     /// `buffer` is written to the FD. If the `buffer` is empty, `write` is not
     /// called at all, so any error that would be returned from `write` is not
     /// returned.
@@ -173,7 +210,7 @@ impl<S: System> SharedSystem<S> {
             return Ok(0);
         }
 
-        let was_nonblocking = (&mut &*self).get_and_set_nonblocking(fd, true)?;
+        let was_nonblocking = self.get_and_set_nonblocking(fd, true)?;
         let mut written = 0;
 
         // We need to retain a strong reference to the waker outside the poll_fn
@@ -202,7 +239,7 @@ impl<S: System> SharedSystem<S> {
         })
         .await;
 
-        _ = (&mut &*self).get_and_set_nonblocking(fd, was_nonblocking);
+        self.get_and_set_nonblocking(fd, was_nonblocking).ok();
 
         result
     }
@@ -276,7 +313,7 @@ impl<S: System> SharedSystem<S> {
 
     /// Waits for a next event to occur.
     ///
-    /// This function calls [`System::select`] with arguments computed from the
+    /// This function calls [`Select::select`] with arguments computed from the
     /// current internal state of the `SharedSystem`. It will wake up tasks
     /// waiting for the file descriptor to be ready in
     /// [`read_async`](Self::read_async) and [`write_all`](Self::write_all) or
@@ -296,9 +333,9 @@ impl<S: System> SharedSystem<S> {
 
     /// Creates a new child process.
     ///
-    /// See [`System::new_child_process`] for details.
+    /// See [`Fork::new_child_process`] for details.
     pub fn new_child_process(&self) -> Result<ChildProcessStarter<S>> {
-        self.0.borrow_mut().new_child_process()
+        self.0.borrow().new_child_process()
     }
 }
 
@@ -308,174 +345,292 @@ impl<S> Clone for SharedSystem<S> {
     }
 }
 
-/// Delegates `System` methods to the contained system instance.
-///
-/// This implementation only requires a non-mutable reference to the shared
-/// system because it uses `RefCell` to access the contained system instance.
-impl<S: System> System for &SharedSystem<S> {
+/// Delegates `Fstat` methods to the contained implementor.
+impl<T: Fstat> Fstat for SharedSystem<T> {
     fn fstat(&self, fd: Fd) -> Result<Stat> {
         self.0.borrow().fstat(fd)
     }
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
         self.0.borrow().fstatat(dir_fd, path, follow_symlinks)
     }
+}
+
+/// Delegates `IsExecutableFile` methods to the contained implementor.
+impl<T: IsExecutableFile> IsExecutableFile for SharedSystem<T> {
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.0.borrow().is_executable_file(path)
     }
-    fn is_directory(&self, path: &CStr) -> bool {
-        self.0.borrow().is_directory(path)
+}
+
+/// Delegates `Pipe` methods to the contained implementor.
+impl<T: Pipe> Pipe for SharedSystem<T> {
+    fn pipe(&self) -> Result<(Fd, Fd)> {
+        self.0.borrow().pipe()
     }
-    fn pipe(&mut self) -> Result<(Fd, Fd)> {
-        self.0.borrow_mut().pipe()
+}
+
+/// Delegates `Dup` methods to the contained implementor.
+impl<T: Dup> Dup for SharedSystem<T> {
+    fn dup(&self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
+        self.0.borrow().dup(from, to_min, flags)
     }
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
-        self.0.borrow_mut().dup(from, to_min, flags)
+    fn dup2(&self, from: Fd, to: Fd) -> Result<Fd> {
+        self.0.borrow().dup2(from, to)
     }
-    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
-        self.0.borrow_mut().dup2(from, to)
-    }
+}
+
+impl<T: Open> Open for SharedSystem<T> {
     fn open(
-        &mut self,
+        &self,
         path: &CStr,
         access: OfdAccess,
         flags: EnumSet<OpenFlag>,
         mode: Mode,
     ) -> Result<Fd> {
-        self.0.borrow_mut().open(path, access, flags, mode)
+        self.0.borrow().open(path, access, flags, mode)
     }
-    fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
-        self.0.borrow_mut().open_tmpfile(parent_dir)
+    fn open_tmpfile(&self, parent_dir: &Path) -> Result<Fd> {
+        self.0.borrow().open_tmpfile(parent_dir)
     }
-    fn close(&mut self, fd: Fd) -> Result<()> {
-        self.0.borrow_mut().close(fd)
+    #[allow(refining_impl_trait)]
+    fn fdopendir(&self, fd: Fd) -> Result<impl Dir + use<T>> {
+        self.0.borrow().fdopendir(fd)
     }
+    #[allow(refining_impl_trait)]
+    fn opendir(&self, path: &CStr) -> Result<impl Dir + use<T>> {
+        self.0.borrow().opendir(path)
+    }
+}
+
+impl<T: Close> Close for SharedSystem<T> {
+    fn close(&self, fd: Fd) -> Result<()> {
+        self.0.borrow().close(fd)
+    }
+}
+
+/// Delegates `Fcntl` methods to the contained implementor.
+impl<T: Fcntl> Fcntl for SharedSystem<T> {
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
         self.0.borrow().ofd_access(fd)
     }
-    fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
-        self.0.borrow_mut().get_and_set_nonblocking(fd, nonblocking)
+    fn get_and_set_nonblocking(&self, fd: Fd, nonblocking: bool) -> Result<bool> {
+        self.0.borrow().get_and_set_nonblocking(fd, nonblocking)
     }
     fn fcntl_getfd(&self, fd: Fd) -> Result<EnumSet<FdFlag>> {
         self.0.borrow().fcntl_getfd(fd)
     }
-    fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
-        self.0.borrow_mut().fcntl_setfd(fd, flags)
+    fn fcntl_setfd(&self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
+        self.0.borrow().fcntl_setfd(fd, flags)
     }
-    fn isatty(&self, fd: Fd) -> bool {
-        self.0.borrow().isatty(fd)
+}
+
+/// Delegates `Read` methods to the contained implementor.
+impl<T: Read> Read for SharedSystem<T> {
+    fn read(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
+        self.0.borrow().read(fd, buffer)
     }
-    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
-        self.0.borrow_mut().read(fd, buffer)
+}
+
+/// Delegates `Write` methods to the contained implementor.
+impl<T: Write> Write for SharedSystem<T> {
+    fn write(&self, fd: Fd, buffer: &[u8]) -> Result<usize> {
+        self.0.borrow().write(fd, buffer)
     }
-    fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {
-        self.0.borrow_mut().write(fd, buffer)
+}
+
+/// Delegates `Seek` methods to the contained implementor.
+impl<T: Seek> Seek for SharedSystem<T> {
+    fn lseek(&self, fd: Fd, position: SeekFrom) -> Result<u64> {
+        self.0.borrow().lseek(fd, position)
     }
-    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
-        self.0.borrow_mut().lseek(fd, position)
+}
+
+/// Delegates `Umask` methods to the contained implementor.
+impl<T: Umask> Umask for SharedSystem<T> {
+    fn umask(&self, new_mask: Mode) -> Mode {
+        self.0.borrow().umask(new_mask)
     }
-    fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
-        self.0.borrow_mut().fdopendir(fd)
+}
+
+/// Delegates `GetCwd` methods to the contained implementor.
+impl<T: GetCwd> GetCwd for SharedSystem<T> {
+    fn getcwd(&self) -> Result<PathBuf> {
+        self.0.borrow().getcwd()
     }
-    fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
-        self.0.borrow_mut().opendir(path)
+}
+
+/// Delegates `Chdir` methods to the contained implementor.
+impl<T: Chdir> Chdir for SharedSystem<T> {
+    fn chdir(&self, path: &CStr) -> Result<()> {
+        self.0.borrow().chdir(path)
     }
-    fn umask(&mut self, mask: Mode) -> Mode {
-        self.0.borrow_mut().umask(mask)
-    }
+}
+
+/// Delegates `Time` methods to the contained implementor.
+impl<T: Clock> Clock for SharedSystem<T> {
     fn now(&self) -> Instant {
         self.0.borrow().now()
     }
-    fn times(&self) -> Result<Times> {
+}
+
+/// Delegates `Times` methods to the contained implementor.
+impl<T: Times> Times for SharedSystem<T> {
+    fn times(&self) -> Result<CpuTimes> {
         self.0.borrow().times()
     }
+}
+
+/// Delegates `GetPid` methods to the contained implementor.
+impl<T: GetPid> GetPid for SharedSystem<T> {
+    fn getsid(&self, pid: Pid) -> Result<Pid> {
+        self.0.borrow().getsid(pid)
+    }
+
+    fn getpid(&self) -> Pid {
+        self.0.borrow().getpid()
+    }
+
+    fn getppid(&self) -> Pid {
+        self.0.borrow().getppid()
+    }
+
+    fn getpgrp(&self) -> Pid {
+        self.0.borrow().getpgrp()
+    }
+}
+
+/// Delegates `SetPgid` methods to the contained implementor.
+impl<T: SetPgid> SetPgid for SharedSystem<T> {
+    fn setpgid(&self, pid: Pid, pgid: Pid) -> Result<()> {
+        self.0.borrow().setpgid(pid, pgid)
+    }
+}
+
+/// Delegates `Signals` methods to the contained implementor.
+impl<T: Signals> Signals for SharedSystem<T> {
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
         self.0.borrow().validate_signal(number)
     }
     fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
         self.0.borrow().signal_number_from_name(name)
     }
+}
+
+/// Delegates `Sigmask` methods to the contained implementor.
+impl<T: Sigmask> Sigmask for SharedSystem<T> {
     fn sigmask(
-        &mut self,
+        &self,
         op: Option<(SigmaskOp, &[signal::Number])>,
         old_mask: Option<&mut Vec<signal::Number>>,
     ) -> Result<()> {
-        (**self.0.borrow_mut()).sigmask(op, old_mask)
+        (**self.0.borrow()).sigmask(op, old_mask)
     }
+}
+
+/// Delegates `Sigaction` methods to the contained implementor.
+impl<T: Sigaction> Sigaction for SharedSystem<T> {
     fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
         self.0.borrow().get_sigaction(signal)
     }
-    fn sigaction(&mut self, signal: signal::Number, action: Disposition) -> Result<Disposition> {
-        self.0.borrow_mut().sigaction(signal, action)
+    fn sigaction(&self, signal: signal::Number, action: Disposition) -> Result<Disposition> {
+        self.0.borrow().sigaction(signal, action)
     }
-    fn caught_signals(&mut self) -> Vec<signal::Number> {
-        self.0.borrow_mut().caught_signals()
+}
+
+/// Delegates `CaughtSignals` methods to the contained implementor.
+impl<T: CaughtSignals> CaughtSignals for SharedSystem<T> {
+    fn caught_signals(&self) -> Vec<signal::Number> {
+        self.0.borrow().caught_signals()
     }
-    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
-        self.0.borrow_mut().kill(target, signal)
+}
+
+/// Delegates `SendSignal` methods to the contained implementor.
+impl<T: SendSignal> SendSignal for SharedSystem<T> {
+    fn kill(&self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
+        self.0.borrow().kill(target, signal)
     }
-    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>> {
-        self.0.borrow_mut().raise(signal)
+    fn raise(&self, signal: signal::Number) -> FlexFuture<Result<()>> {
+        self.0.borrow().raise(signal)
     }
+}
+
+/// Delegates `Select` methods to the contained implementor.
+impl<T: Select> Select for SharedSystem<T> {
     fn select(
-        &mut self,
+        &self,
         readers: &mut Vec<Fd>,
         writers: &mut Vec<Fd>,
         timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
     ) -> Result<c_int> {
-        (**self.0.borrow_mut()).select(readers, writers, timeout, signal_mask)
+        (**self.0.borrow()).select(readers, writers, timeout, signal_mask)
     }
-    fn getsid(&self, pid: Pid) -> Result<Pid> {
-        self.0.borrow().getsid(pid)
+}
+
+/// Delegates `Isatty` methods to the contained implementor.
+impl<T: Isatty> Isatty for SharedSystem<T> {
+    fn isatty(&self, fd: Fd) -> bool {
+        self.0.borrow().isatty(fd)
     }
-    fn getpid(&self) -> Pid {
-        self.0.borrow().getpid()
-    }
-    fn getppid(&self) -> Pid {
-        self.0.borrow().getppid()
-    }
-    fn getpgrp(&self) -> Pid {
-        self.0.borrow().getpgrp()
-    }
-    fn setpgid(&mut self, pid: Pid, pgid: Pid) -> Result<()> {
-        self.0.borrow_mut().setpgid(pid, pgid)
-    }
+}
+
+/// Delegates `TcGetPgrp` methods to the contained implementor.
+impl<T: TcGetPgrp> TcGetPgrp for SharedSystem<T> {
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
         self.0.borrow().tcgetpgrp(fd)
     }
-    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
-        self.0.borrow_mut().tcsetpgrp(fd, pgid)
+}
+
+/// Delegates `TcSetPgrp` methods to the contained implementor.
+impl<T: TcSetPgrp> TcSetPgrp for SharedSystem<T> {
+    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
+        self.0.borrow().tcsetpgrp(fd, pgid)
     }
+}
+
+// TODO: This implementation should be removed after refactoring Fork API (#662).
+/// Delegates `Fork` methods to the contained implementor.
+impl<T: Fork> Fork for SharedSystem<T> {
     /// This method is not supported for `SharedSystem` because types do not match.
     ///
     /// You should call the inherent method [`SharedSystem::new_child_process`] instead.
     /// If you call this trait method, it will panic.
-    fn new_child_process(&mut self) -> Result<ChildProcessStarter<Self>> {
-        // self.0.borrow_mut().new_child_process()
+    fn new_child_process(&self) -> Result<ChildProcessStarter<Self>> {
+        // self.0.borrow().new_child_process()
         unimplemented!(
             "new_child_process is not supported for SharedSystem because types do not match"
         )
     }
-    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
-        self.0.borrow_mut().wait(target)
+}
+
+/// Delegates `Wait` methods to the contained implementor.
+impl<T: Wait> Wait for SharedSystem<T> {
+    fn wait(&self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
+        self.0.borrow().wait(target)
     }
+}
+
+/// Delegates `Exec` methods to the contained implementor.
+impl<T: Exec> Exec for SharedSystem<T> {
     fn execve(
-        &mut self,
+        &self,
         path: &CStr,
         args: &[CString],
         envs: &[CString],
     ) -> FlexFuture<Result<Infallible>> {
-        self.0.borrow_mut().execve(path, args, envs)
+        self.0.borrow().execve(path, args, envs)
     }
-    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
-        self.0.borrow_mut().exit(exit_status)
+}
+
+/// Delegates `Exit` methods to the contained implementor.
+impl<T: Exit> Exit for SharedSystem<T> {
+    fn exit(&self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
+        self.0.borrow().exit(exit_status)
     }
-    fn getcwd(&self) -> Result<PathBuf> {
-        self.0.borrow().getcwd()
-    }
-    fn chdir(&mut self, path: &CStr) -> Result<()> {
-        self.0.borrow_mut().chdir(path)
-    }
+}
+
+/// Delegates `GetUid` methods to the contained implementor.
+impl<T: GetUid> GetUid for SharedSystem<T> {
     fn getuid(&self) -> Uid {
         self.0.borrow().getuid()
     }
@@ -488,270 +643,40 @@ impl<S: System> System for &SharedSystem<S> {
     fn getegid(&self) -> Gid {
         self.0.borrow().getegid()
     }
+}
+
+/// Delegates `GetPw` methods to the contained implementor.
+impl<T: GetPw> GetPw for SharedSystem<T> {
     fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
         self.0.borrow().getpwnam_dir(name)
     }
+}
+
+/// Delegates `Sysconf` methods to the contained implementor.
+impl<T: Sysconf> Sysconf for SharedSystem<T> {
     fn confstr_path(&self) -> Result<UnixString> {
         self.0.borrow().confstr_path()
     }
+}
+
+/// Delegates `ShellPath` methods to the contained implementor.
+impl<T: ShellPath> ShellPath for SharedSystem<T> {
     fn shell_path(&self) -> CString {
         self.0.borrow().shell_path()
     }
+}
+
+/// Delegates `GetRlimit` methods to the contained implementor.
+impl<T: GetRlimit> GetRlimit for SharedSystem<T> {
     fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
         self.0.borrow().getrlimit(resource)
     }
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()> {
-        self.0.borrow_mut().setrlimit(resource, limits)
-    }
 }
 
-/// Delegates `System` methods to the contained system instance.
-impl<S: System> System for SharedSystem<S> {
-    // All methods are delegated to `impl System for &SharedSystem`,
-    // which in turn delegates to the contained system instance.
-    #[inline]
-    fn fstat(&self, fd: Fd) -> Result<Stat> {
-        (&self).fstat(fd)
-    }
-    #[inline]
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
-        (&self).fstatat(dir_fd, path, follow_symlinks)
-    }
-    #[inline]
-    fn is_executable_file(&self, path: &CStr) -> bool {
-        (&self).is_executable_file(path)
-    }
-    #[inline]
-    fn is_directory(&self, path: &CStr) -> bool {
-        (&self).is_directory(path)
-    }
-    #[inline]
-    fn pipe(&mut self) -> Result<(Fd, Fd)> {
-        (&mut &*self).pipe()
-    }
-    #[inline]
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
-        (&mut &*self).dup(from, to_min, flags)
-    }
-    #[inline]
-    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
-        (&mut &*self).dup2(from, to)
-    }
-    #[inline]
-    fn open(
-        &mut self,
-        path: &CStr,
-        access: OfdAccess,
-        flags: EnumSet<OpenFlag>,
-        mode: Mode,
-    ) -> Result<Fd> {
-        (&mut &*self).open(path, access, flags, mode)
-    }
-    #[inline]
-    fn open_tmpfile(&mut self, parent_dir: &Path) -> Result<Fd> {
-        (&mut &*self).open_tmpfile(parent_dir)
-    }
-    #[inline]
-    fn close(&mut self, fd: Fd) -> Result<()> {
-        (&mut &*self).close(fd)
-    }
-    #[inline]
-    fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
-        (&self).ofd_access(fd)
-    }
-    #[inline]
-    fn get_and_set_nonblocking(&mut self, fd: Fd, nonblocking: bool) -> Result<bool> {
-        (&mut &*self).get_and_set_nonblocking(fd, nonblocking)
-    }
-    #[inline]
-    fn fcntl_getfd(&self, fd: Fd) -> Result<EnumSet<FdFlag>> {
-        (&self).fcntl_getfd(fd)
-    }
-    #[inline]
-    fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
-        (&mut &*self).fcntl_setfd(fd, flags)
-    }
-    #[inline]
-    fn isatty(&self, fd: Fd) -> bool {
-        (&self).isatty(fd)
-    }
-    #[inline]
-    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
-        (&mut &*self).read(fd, buffer)
-    }
-    #[inline]
-    fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {
-        (&mut &*self).write(fd, buffer)
-    }
-    #[inline]
-    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
-        (&mut &*self).lseek(fd, position)
-    }
-    #[inline]
-    fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
-        (&mut &*self).fdopendir(fd)
-    }
-    #[inline]
-    fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
-        (&mut &*self).opendir(path)
-    }
-    #[inline]
-    fn umask(&mut self, mask: Mode) -> Mode {
-        (&mut &*self).umask(mask)
-    }
-    #[inline]
-    fn now(&self) -> Instant {
-        (&self).now()
-    }
-    #[inline]
-    fn times(&self) -> Result<Times> {
-        (&self).times()
-    }
-    #[inline]
-    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
-        (&self).validate_signal(number)
-    }
-    #[inline]
-    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
-        System::signal_number_from_name(&self, name)
-    }
-    #[inline]
-    fn sigmask(
-        &mut self,
-        op: Option<(SigmaskOp, &[signal::Number])>,
-        old_mask: Option<&mut Vec<signal::Number>>,
-    ) -> Result<()> {
-        (&mut &*self).sigmask(op, old_mask)
-    }
-    #[inline]
-    fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
-        (&self).get_sigaction(signal)
-    }
-    #[inline]
-    fn sigaction(&mut self, signal: signal::Number, action: Disposition) -> Result<Disposition> {
-        (&mut &*self).sigaction(signal, action)
-    }
-    #[inline]
-    fn caught_signals(&mut self) -> Vec<signal::Number> {
-        (&mut &*self).caught_signals()
-    }
-    #[inline]
-    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
-        (&mut &*self).kill(target, signal)
-    }
-    #[inline]
-    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>> {
-        (&mut &*self).raise(signal)
-    }
-    #[inline]
-    fn select(
-        &mut self,
-        readers: &mut Vec<Fd>,
-        writers: &mut Vec<Fd>,
-        timeout: Option<Duration>,
-        signal_mask: Option<&[signal::Number]>,
-    ) -> Result<c_int> {
-        (&mut &*self).select(readers, writers, timeout, signal_mask)
-    }
-    #[inline]
-    fn getsid(&self, pid: Pid) -> Result<Pid> {
-        (&self).getsid(pid)
-    }
-    #[inline]
-    fn getpid(&self) -> Pid {
-        (&self).getpid()
-    }
-    #[inline]
-    fn getppid(&self) -> Pid {
-        (&self).getppid()
-    }
-    #[inline]
-    fn getpgrp(&self) -> Pid {
-        (&self).getpgrp()
-    }
-    #[inline]
-    fn setpgid(&mut self, pid: Pid, pgid: Pid) -> Result<()> {
-        (&mut &*self).setpgid(pid, pgid)
-    }
-    #[inline]
-    fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
-        (&self).tcgetpgrp(fd)
-    }
-    #[inline]
-    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
-        (&mut &*self).tcsetpgrp(fd, pgid)
-    }
-    /// This method is not supported for `SharedSystem` because types do not match.
-    ///
-    /// You should call the inherent method [`SharedSystem::new_child_process`] instead.
-    /// If you call this trait method, it will panic.
-    #[inline]
-    fn new_child_process(&mut self) -> Result<ChildProcessStarter<Self>> {
-        // (&mut &*self).new_child_process()
-        unimplemented!(
-            "new_child_process is not supported for SharedSystem because types do not match"
-        )
-    }
-    #[inline]
-    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
-        (&mut &*self).wait(target)
-    }
-    #[inline]
-    fn execve(
-        &mut self,
-        path: &CStr,
-        args: &[CString],
-        envs: &[CString],
-    ) -> FlexFuture<Result<Infallible>> {
-        (&mut &*self).execve(path, args, envs)
-    }
-    #[inline]
-    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
-        (&mut &*self).exit(exit_status)
-    }
-    #[inline]
-    fn getcwd(&self) -> Result<PathBuf> {
-        (&self).getcwd()
-    }
-    #[inline]
-    fn chdir(&mut self, path: &CStr) -> Result<()> {
-        (&mut &*self).chdir(path)
-    }
-    #[inline]
-    fn getuid(&self) -> Uid {
-        (&self).getuid()
-    }
-    #[inline]
-    fn geteuid(&self) -> Uid {
-        (&self).geteuid()
-    }
-    #[inline]
-    fn getgid(&self) -> Gid {
-        (&self).getgid()
-    }
-    #[inline]
-    fn getegid(&self) -> Gid {
-        (&self).getegid()
-    }
-    #[inline]
-    fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
-        (&self).getpwnam_dir(name)
-    }
-    #[inline]
-    fn confstr_path(&self) -> Result<UnixString> {
-        (&self).confstr_path()
-    }
-    #[inline]
-    fn shell_path(&self) -> CString {
-        (&self).shell_path()
-    }
-    #[inline]
-    fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
-        (&self).getrlimit(resource)
-    }
-    #[inline]
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()> {
-        (&mut &*self).setrlimit(resource, limits)
+/// Delegates `SetRlimit` methods to the contained implementor.
+impl<T: SetRlimit> SetRlimit for SharedSystem<T> {
+    fn setrlimit(&self, resource: Resource, limits: LimitPair) -> Result<()> {
+        self.0.borrow().setrlimit(resource, limits)
     }
 }
 
@@ -763,7 +688,7 @@ impl<S: System> SignalSystem for &SharedSystem<S> {
 
     #[inline]
     fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
-        System::signal_number_from_name(*self, name)
+        Signals::signal_number_from_name(*self, name)
     }
 
     fn get_disposition(&self, signal: signal::Number) -> Result<Disposition> {
@@ -787,7 +712,7 @@ impl<S: System> SignalSystem for SharedSystem<S> {
 
     #[inline]
     fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
-        System::signal_number_from_name(self, name)
+        Signals::signal_number_from_name(self, name)
     }
 
     #[inline]
@@ -820,7 +745,7 @@ mod tests {
 
     #[test]
     fn shared_system_read_async_ready() {
-        let mut system = SharedSystem::new(VirtualSystem::new());
+        let system = SharedSystem::new(VirtualSystem::new());
         let (reader, writer) = system.pipe().unwrap();
         system.write(writer, &[42]).unwrap();
 
@@ -835,7 +760,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(system);
+        let system = SharedSystem::new(system);
         let system2 = system.clone();
         let (reader, writer) = system.pipe().unwrap();
 
@@ -864,7 +789,7 @@ mod tests {
 
     #[test]
     fn shared_system_write_all_ready() {
-        let mut system = SharedSystem::new(VirtualSystem::new());
+        let system = SharedSystem::new(VirtualSystem::new());
         let (reader, writer) = system.pipe().unwrap();
         let result = system.write_all(writer, &[17]).now_or_never().unwrap();
         assert_eq!(result, Ok(1));
@@ -879,7 +804,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(system);
+        let system = SharedSystem::new(system);
         let (reader, writer) = system.pipe().unwrap();
 
         state.borrow_mut().processes[&process_id].fds[&writer]
@@ -939,7 +864,7 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(system);
+        let system = SharedSystem::new(system);
         let (_reader, writer) = system.pipe().unwrap();
 
         state.borrow_mut().processes[&process_id].fds[&writer]
@@ -1097,9 +1022,9 @@ mod tests {
     #[test]
     fn shared_system_select_does_not_wake_signal_waiters_on_io() {
         let system = VirtualSystem::new();
-        let mut system_1 = SharedSystem::new(system);
+        let system_1 = SharedSystem::new(system);
         let mut system_2 = system_1.clone();
-        let mut system_3 = system_1.clone();
+        let system_3 = system_1.clone();
         let (reader, writer) = system_1.pipe().unwrap();
         system_2
             .set_disposition(SIGCHLD, Disposition::Catch)

@@ -65,8 +65,8 @@ impl std::fmt::Display for Fd {
 /// them freely. When the shell needs to open a file descriptor that is
 /// invisible to the user, it should be kept at `MIN_INTERNAL_FD` or above.
 /// (Hint: A typical way to move a file descriptor is to
-/// [`dup`](crate::system::System::dup) and
-/// [`close`](crate::system::System::close). You can also use
+/// [`dup`](crate::system::Dup::dup) and
+/// [`close`](crate::system::Close::close). You can also use
 /// [`move_fd_internal`].)
 ///
 /// [`move_fd_internal`]: crate::system::SystemEx::move_fd_internal

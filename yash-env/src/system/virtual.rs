@@ -54,22 +54,59 @@ pub use self::io::*;
 pub use self::process::*;
 pub use self::signal::*;
 use super::AT_FDCWD;
+use super::CaughtSignals;
+use super::Chdir;
+use super::Clock;
+use super::Close;
+use super::CpuTimes;
 use super::Dir;
 use super::Disposition;
+use super::Dup;
 use super::Errno;
+use super::Exec;
+use super::Exit;
+use super::Fcntl;
 use super::FdFlag;
 use super::FlexFuture;
+use super::Fork;
+use super::Fstat;
+use super::GetCwd;
+use super::GetPid;
+use super::GetPw;
+use super::GetRlimit;
+use super::GetUid;
 use super::Gid;
+use super::IsExecutableFile;
+use super::Isatty;
 use super::OfdAccess;
+use super::Open;
 use super::OpenFlag;
+use super::Pipe;
+use super::Read;
 use super::Result;
+use super::Seek;
+use super::Select;
+use super::SendSignal;
+use super::SetPgid;
+use super::SetRlimit;
+use super::ShellPath;
+use super::Sigaction;
+use super::Sigmask;
 use super::SigmaskOp;
+use super::Signals;
 use super::Stat;
+use super::Sysconf;
+use super::TcGetPgrp;
+use super::TcSetPgrp;
 use super::Times;
 use super::Uid;
+use super::Umask;
+use super::Wait;
+use super::Write;
 use super::resource::INFINITY;
 use super::resource::LimitPair;
 use super::resource::Resource;
+#[cfg(doc)]
 use crate::System;
 use crate::io::Fd;
 use crate::job::Pid;
@@ -205,7 +242,7 @@ impl VirtualSystem {
     ///
     /// This function will panic if it cannot find a process having
     /// `self.process_id`.
-    pub fn current_process_mut(&mut self) -> RefMut<'_, Process> {
+    pub fn current_process_mut(&self) -> RefMut<'_, Process> {
         RefMut::map(self.state.borrow_mut(), |state| {
             state.processes.get_mut(&self.process_id).unwrap()
         })
@@ -227,7 +264,7 @@ impl VirtualSystem {
     /// Calls the given closure passing the open file description for the FD.
     ///
     /// Returns `Err(Errno::EBADF)` if the FD is not open.
-    pub fn with_open_file_description_mut<F, R>(&mut self, fd: Fd, f: F) -> Result<R>
+    pub fn with_open_file_description_mut<F, R>(&self, fd: Fd, f: F) -> Result<R>
     where
         F: FnOnce(&mut OpenFileDescription) -> Result<R>,
     {
@@ -309,25 +346,19 @@ impl Default for VirtualSystem {
     }
 }
 
-impl System for VirtualSystem {
-    /// Retrieves metadata of a file.
-    ///
-    /// The current implementation fills only some values of the returned
-    /// `FileStat`. See [`Inode::stat`] for details.
+impl Fstat for VirtualSystem {
     fn fstat(&self, fd: Fd) -> Result<Stat> {
         self.with_open_file_description(fd, |ofd| Ok(ofd.file.borrow().stat()))
     }
 
-    /// Retrieves metadata of a file.
-    ///
-    /// The current implementation fills only some values of the returned
-    /// `FileStat`. See [`Inode::stat`] for details.
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
         let path = Path::new(UnixStr::from_bytes(path.to_bytes()));
         let inode = self.resolve_existing_file(dir_fd, path, follow_symlinks)?;
         Ok(inode.borrow().stat())
     }
+}
 
+impl IsExecutableFile for VirtualSystem {
     /// Tests whether the specified file is executable or not.
     ///
     /// The current implementation only checks if the file has any executable
@@ -337,14 +368,10 @@ impl System for VirtualSystem {
         self.resolve_existing_file(AT_FDCWD, path, /* follow symlinks */ true)
             .is_ok_and(|inode| inode.borrow().permissions.intersects(Mode::ALL_EXEC))
     }
+}
 
-    fn is_directory(&self, path: &CStr) -> bool {
-        let path = Path::new(UnixStr::from_bytes(path.to_bytes()));
-        self.resolve_existing_file(AT_FDCWD, path, /* follow symlinks */ true)
-            .is_ok_and(|inode| matches!(inode.borrow().body, FileBody::Directory { .. }))
-    }
-
-    fn pipe(&mut self) -> Result<(Fd, Fd)> {
+impl Pipe for VirtualSystem {
+    fn pipe(&self) -> Result<(Fd, Fd)> {
         let file = Rc::new(RefCell::new(Inode {
             body: FileBody::Fifo {
                 content: VecDeque::new(),
@@ -385,24 +412,28 @@ impl System for VirtualSystem {
         })?;
         Ok((reader, writer))
     }
+}
 
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
+impl Dup for VirtualSystem {
+    fn dup(&self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
         let mut process = self.current_process_mut();
         let mut body = process.fds.get(&from).ok_or(Errno::EBADF)?.clone();
         body.flags = flags;
         process.open_fd_ge(to_min, body).map_err(|_| Errno::EMFILE)
     }
 
-    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd> {
+    fn dup2(&self, from: Fd, to: Fd) -> Result<Fd> {
         let mut process = self.current_process_mut();
         let mut body = process.fds.get(&from).ok_or(Errno::EBADF)?.clone();
         body.flags = EnumSet::empty();
         process.set_fd(to, body).map_err(|_| Errno::EBADF)?;
         Ok(to)
     }
+}
 
+impl Open for VirtualSystem {
     fn open(
-        &mut self,
+        &self,
         path: &CStr,
         access: OfdAccess,
         flags: EnumSet<OpenFlag>,
@@ -477,7 +508,7 @@ impl System for VirtualSystem {
         process.open_fd(body).map_err(|_| Errno::EMFILE)
     }
 
-    fn open_tmpfile(&mut self, _parent_dir: &Path) -> Result<Fd> {
+    fn open_tmpfile(&self, _parent_dir: &Path) -> Result<Fd> {
         let file = Rc::new(RefCell::new(Inode::new([])));
         let open_file_description = Rc::new(RefCell::new(OpenFileDescription {
             file,
@@ -495,11 +526,33 @@ impl System for VirtualSystem {
         process.open_fd(body).map_err(|_| Errno::EMFILE)
     }
 
-    fn close(&mut self, fd: Fd) -> Result<()> {
+    fn fdopendir(&self, fd: Fd) -> Result<impl Dir + use<>> {
+        self.with_open_file_description(fd, |ofd| {
+            let inode = ofd.inode();
+            let dir = VirtualDir::try_from(&inode.borrow().body)?;
+            Ok(dir)
+        })
+    }
+
+    fn opendir(&self, path: &CStr) -> Result<impl Dir + use<>> {
+        let fd = self.open(
+            path,
+            OfdAccess::ReadOnly,
+            OpenFlag::Directory.into(),
+            Mode::empty(),
+        )?;
+        self.fdopendir(fd)
+    }
+}
+
+impl Close for VirtualSystem {
+    fn close(&self, fd: Fd) -> Result<()> {
         self.current_process_mut().close_fd(fd);
         Ok(())
     }
+}
 
+impl Fcntl for VirtualSystem {
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
         fn is_directory(file_body: &FileBody) -> bool {
             matches!(file_body, FileBody::Directory { .. })
@@ -519,8 +572,8 @@ impl System for VirtualSystem {
         })
     }
 
-    fn get_and_set_nonblocking(&mut self, fd: Fd, _nonblocking: bool) -> Result<bool> {
-        self.with_open_file_description_mut(fd, |_ofd| {
+    fn get_and_set_nonblocking(&self, fd: Fd, _nonblocking: bool) -> Result<bool> {
+        self.with_open_file_description(fd, |_ofd| {
             // TODO Implement non-blocking I/O
             Ok(false)
         })
@@ -532,55 +585,61 @@ impl System for VirtualSystem {
         Ok(body.flags)
     }
 
-    fn fcntl_setfd(&mut self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
+    fn fcntl_setfd(&self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
         let mut process = self.current_process_mut();
         let body = process.get_fd_mut(fd).ok_or(Errno::EBADF)?;
         body.flags = flags;
         Ok(())
     }
+}
 
-    fn isatty(&self, fd: Fd) -> bool {
-        self.with_open_file_description(fd, |ofd| {
-            Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
-        })
-        .unwrap_or(false)
-    }
-
-    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
+impl Read for VirtualSystem {
+    fn read(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
         self.with_open_file_description_mut(fd, |ofd| ofd.read(buffer))
     }
+}
 
-    fn write(&mut self, fd: Fd, buffer: &[u8]) -> Result<usize> {
+impl Write for VirtualSystem {
+    fn write(&self, fd: Fd, buffer: &[u8]) -> Result<usize> {
         self.with_open_file_description_mut(fd, |ofd| ofd.write(buffer))
     }
+}
 
-    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> Result<u64> {
+impl Seek for VirtualSystem {
+    fn lseek(&self, fd: Fd, position: SeekFrom) -> Result<u64> {
         self.with_open_file_description_mut(fd, |ofd| ofd.seek(position))
             .and_then(|new_offset| new_offset.try_into().map_err(|_| Errno::EOVERFLOW))
     }
+}
 
-    fn fdopendir(&mut self, fd: Fd) -> Result<Box<dyn Dir>> {
-        self.with_open_file_description(fd, |ofd| {
-            let inode = ofd.inode();
-            let dir = VirtualDir::try_from(&inode.borrow().body)?;
-            Ok(Box::new(dir) as Box<dyn Dir>)
-        })
-    }
-
-    fn opendir(&mut self, path: &CStr) -> Result<Box<dyn Dir>> {
-        let fd = self.open(
-            path,
-            OfdAccess::ReadOnly,
-            OpenFlag::Directory.into(),
-            Mode::empty(),
-        )?;
-        self.fdopendir(fd)
-    }
-
-    fn umask(&mut self, new_mask: Mode) -> Mode {
+impl Umask for VirtualSystem {
+    fn umask(&self, new_mask: Mode) -> Mode {
         std::mem::replace(&mut self.current_process_mut().umask, new_mask)
     }
+}
 
+impl GetCwd for VirtualSystem {
+    fn getcwd(&self) -> Result<PathBuf> {
+        Ok(self.current_process().cwd.clone())
+    }
+}
+
+impl Chdir for VirtualSystem {
+    fn chdir(&self, path: &CStr) -> Result<()> {
+        let path = Path::new(UnixStr::from_bytes(path.to_bytes()));
+        let inode = self.resolve_existing_file(AT_FDCWD, path, /* follow links */ true)?;
+        if matches!(&inode.borrow().body, FileBody::Directory { .. }) {
+            let mut process = self.current_process_mut();
+            let new_path = process.cwd.join(path);
+            process.chdir(new_path);
+            Ok(())
+        } else {
+            Err(Errno::ENOTDIR)
+        }
+    }
+}
+
+impl Clock for VirtualSystem {
     /// Returns `now` in [`SystemState`].
     ///
     /// Panics if it is `None`.
@@ -590,12 +649,16 @@ impl System for VirtualSystem {
             .now
             .expect("SystemState::now not assigned")
     }
+}
 
+impl Times for VirtualSystem {
     /// Returns `times` in [`SystemState`].
-    fn times(&self) -> Result<Times> {
+    fn times(&self) -> Result<CpuTimes> {
         Ok(self.state.borrow().times)
     }
+}
 
+impl Signals for VirtualSystem {
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
         let non_zero = NonZero::new(number)?;
         let name = signal::Name::try_from_raw_virtual(number)?;
@@ -606,9 +669,67 @@ impl System for VirtualSystem {
     fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
         name.to_raw_virtual()
     }
+}
 
+impl GetPid for VirtualSystem {
+    /// Currently, this function always returns `Pid(2)` if the process exists.
+    fn getsid(&self, pid: Pid) -> Result<Pid> {
+        self.state
+            .borrow()
+            .processes
+            .get(&pid)
+            .map_or(Err(Errno::ESRCH), |_| Ok(Pid(2)))
+    }
+
+    fn getpid(&self) -> Pid {
+        self.process_id
+    }
+
+    fn getppid(&self) -> Pid {
+        self.current_process().ppid
+    }
+
+    fn getpgrp(&self) -> Pid {
+        self.current_process().pgid
+    }
+}
+
+impl SetPgid for VirtualSystem {
+    /// Modifies the process group ID of a process.
+    ///
+    /// The current implementation does not yet support the concept of sessions.
+    fn setpgid(&self, mut pid: Pid, mut pgid: Pid) -> Result<()> {
+        if pgid.0 < 0 {
+            return Err(Errno::EINVAL);
+        }
+        if pid.0 == 0 {
+            pid = self.process_id;
+        }
+        if pgid.0 == 0 {
+            pgid = pid;
+        }
+
+        let mut state = self.state.borrow_mut();
+        if pgid != pid && !state.processes.values().any(|p| p.pgid == pgid) {
+            return Err(Errno::EPERM);
+        }
+        let process = state.processes.get_mut(&pid).ok_or(Errno::ESRCH)?;
+        if pid != self.process_id && process.ppid != self.process_id {
+            return Err(Errno::ESRCH);
+        }
+        if process.last_exec.is_some() {
+            return Err(Errno::EACCES);
+        }
+
+        process.pgid = pgid;
+        Ok(())
+        // TODO Support sessions
+    }
+}
+
+impl Sigmask for VirtualSystem {
     fn sigmask(
-        &mut self,
+        &self,
         op: Option<(SigmaskOp, &[signal::Number])>,
         old_mask: Option<&mut Vec<signal::Number>>,
     ) -> Result<()> {
@@ -633,25 +754,27 @@ impl System for VirtualSystem {
 
         Ok(())
     }
+}
 
+impl Sigaction for VirtualSystem {
     fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
         let process = self.current_process();
         Ok(process.disposition(signal))
     }
 
-    fn sigaction(
-        &mut self,
-        signal: signal::Number,
-        disposition: Disposition,
-    ) -> Result<Disposition> {
+    fn sigaction(&self, signal: signal::Number, disposition: Disposition) -> Result<Disposition> {
         let mut process = self.current_process_mut();
         Ok(process.set_disposition(signal, disposition))
     }
+}
 
-    fn caught_signals(&mut self) -> Vec<signal::Number> {
+impl CaughtSignals for VirtualSystem {
+    fn caught_signals(&self) -> Vec<signal::Number> {
         std::mem::take(&mut self.current_process_mut().caught_signals)
     }
+}
 
+impl SendSignal for VirtualSystem {
     /// Sends a signal to the target process.
     ///
     /// This function returns a future that enables the executor to block the
@@ -660,7 +783,7 @@ impl System for VirtualSystem {
     /// the future will be ready only when the process is resumed. Similarly, if
     /// the signal causes the current process to terminate, the future will
     /// never be ready.
-    fn kill(&mut self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
+    fn kill(&self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
         let result = match target {
             Pid::MY_PROCESS_GROUP => {
                 let target_pgid = self.current_process().pgid;
@@ -699,11 +822,13 @@ impl System for VirtualSystem {
         })
     }
 
-    fn raise(&mut self, signal: signal::Number) -> FlexFuture<Result<()>> {
+    fn raise(&self, signal: signal::Number) -> FlexFuture<Result<()>> {
         let target = self.process_id;
         self.kill(target, Some(signal))
     }
+}
 
+impl Select for VirtualSystem {
     /// Waits for a next event.
     ///
     /// The `VirtualSystem` implementation for this method does not actually
@@ -713,7 +838,7 @@ impl System for VirtualSystem {
     /// or a caught signal. Otherwise, the timeout is added to
     /// [`SystemState::now`], which must not be `None` then.
     fn select(
-        &mut self,
+        &self,
         readers: &mut Vec<Fd>,
         writers: &mut Vec<Fd>,
         timeout: Option<Duration>,
@@ -767,59 +892,18 @@ impl System for VirtualSystem {
         }
         Ok(count)
     }
+}
 
-    /// Currently, this function always returns `Pid(2)` if the process exists.
-    fn getsid(&self, pid: Pid) -> Result<Pid> {
-        self.state
-            .borrow()
-            .processes
-            .get(&pid)
-            .map_or(Err(Errno::ESRCH), |_| Ok(Pid(2)))
+impl Isatty for VirtualSystem {
+    fn isatty(&self, fd: Fd) -> bool {
+        self.with_open_file_description(fd, |ofd| {
+            Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
+        })
+        .unwrap_or(false)
     }
+}
 
-    fn getpid(&self) -> Pid {
-        self.process_id
-    }
-
-    fn getppid(&self) -> Pid {
-        self.current_process().ppid
-    }
-
-    fn getpgrp(&self) -> Pid {
-        self.current_process().pgid
-    }
-
-    /// Modifies the process group ID of a process.
-    ///
-    /// The current implementation does not yet support the concept of sessions.
-    fn setpgid(&mut self, mut pid: Pid, mut pgid: Pid) -> Result<()> {
-        if pgid.0 < 0 {
-            return Err(Errno::EINVAL);
-        }
-        if pid.0 == 0 {
-            pid = self.process_id;
-        }
-        if pgid.0 == 0 {
-            pgid = pid;
-        }
-
-        let mut state = self.state.borrow_mut();
-        if pgid != pid && !state.processes.values().any(|p| p.pgid == pgid) {
-            return Err(Errno::EPERM);
-        }
-        let process = state.processes.get_mut(&pid).ok_or(Errno::ESRCH)?;
-        if pid != self.process_id && process.ppid != self.process_id {
-            return Err(Errno::ESRCH);
-        }
-        if process.last_exec.is_some() {
-            return Err(Errno::EACCES);
-        }
-
-        process.pgid = pgid;
-        Ok(())
-        // TODO Support sessions
-    }
-
+impl TcGetPgrp for VirtualSystem {
     /// Returns the current foreground process group ID.
     ///
     /// The current implementation does not yet support the concept of
@@ -830,13 +914,15 @@ impl System for VirtualSystem {
 
         self.state.borrow().foreground.ok_or(Errno::ENOTTY)
     }
+}
 
+impl TcSetPgrp for VirtualSystem {
     /// Switches the foreground process.
     ///
     /// The current implementation does not yet support the concept of
     /// controlling terminals and sessions. It accepts any open file descriptor.
-    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
-        fn inner(system: &mut VirtualSystem, fd: Fd, pgid: Pid) -> Result<()> {
+    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
+        fn inner(system: &VirtualSystem, fd: Fd, pgid: Pid) -> Result<()> {
             // Make sure the FD is open
             system.with_open_file_description(fd, |_| Ok(()))?;
 
@@ -847,7 +933,7 @@ impl System for VirtualSystem {
             }
 
             // TODO: Suspend the calling process group if it is in the background
-            // and not ignoring SIGTTOU.
+            // and not ignoring or blocking SIGTTOU.
 
             state.foreground = Some(pgid);
             Ok(())
@@ -855,7 +941,9 @@ impl System for VirtualSystem {
 
         inner(self, fd, pgid).into()
     }
+}
 
+impl Fork for VirtualSystem {
     /// Creates a new child process.
     ///
     /// This implementation does not create any real child process. Instead,
@@ -868,7 +956,7 @@ impl System for VirtualSystem {
     ///
     /// The process ID of the child will be the maximum of existing process IDs
     /// plus 1. If there are no other processes, it will be 2.
-    fn new_child_process(&mut self) -> Result<ChildProcessStarter<Self>> {
+    fn new_child_process(&self) -> Result<ChildProcessStarter<Self>> {
         let mut state = self.state.borrow_mut();
         let executor = state.executor.clone().ok_or(Errno::ENOSYS)?;
         let process_id = state
@@ -883,7 +971,7 @@ impl System for VirtualSystem {
 
         let state = Rc::clone(&self.state);
         Ok(Box::new(move |parent_env, task| {
-            let mut system = VirtualSystem { state, process_id };
+            let system = VirtualSystem { state, process_id };
             let mut child_env = parent_env.clone_with_system(system.clone());
 
             {
@@ -907,11 +995,13 @@ impl System for VirtualSystem {
             process_id
         }))
     }
+}
 
+impl Wait for VirtualSystem {
     /// Waits for a child.
     ///
     /// TODO: Currently, this function only supports `target == -1 || target > 0`.
-    fn wait(&mut self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
+    fn wait(&self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         let parent_pid = self.process_id;
         let mut state = self.state.borrow_mut();
         if let Some((pid, process)) = state.child_to_wait_for(parent_pid, target) {
@@ -926,14 +1016,16 @@ impl System for VirtualSystem {
             Err(Errno::ECHILD)
         }
     }
+}
 
+impl Exec for VirtualSystem {
     /// Stub for the `execve` system call.
     ///
     /// The `execve` system call cannot be simulated in the userland. This
     /// function returns `ENOSYS` if the file at `path` is a native executable,
     /// `ENOEXEC` if a non-executable file, and `ENOENT` otherwise.
     fn execve(
-        &mut self,
+        &self,
         path: &CStr,
         args: &[CString],
         envs: &[CString],
@@ -969,8 +1061,10 @@ impl System for VirtualSystem {
             Err(Errno::ENOEXEC).into()
         }
     }
+}
 
-    fn exit(&mut self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
+impl Exit for VirtualSystem {
+    fn exit(&self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
         let mut myself = self.current_process_mut();
         let parent_pid = myself.ppid;
         let exited = myself.set_state(ProcessState::exited(exit_status));
@@ -981,25 +1075,9 @@ impl System for VirtualSystem {
 
         pending().into()
     }
+}
 
-    fn getcwd(&self) -> Result<PathBuf> {
-        Ok(self.current_process().cwd.clone())
-    }
-
-    /// Changes the current working directory.
-    fn chdir(&mut self, path: &CStr) -> Result<()> {
-        let path = Path::new(UnixStr::from_bytes(path.to_bytes()));
-        let inode = self.resolve_existing_file(AT_FDCWD, path, /* follow links */ true)?;
-        if matches!(&inode.borrow().body, FileBody::Directory { .. }) {
-            let mut process = self.current_process_mut();
-            let new_path = process.cwd.join(path);
-            process.chdir(new_path);
-            Ok(())
-        } else {
-            Err(Errno::ENOTDIR)
-        }
-    }
-
+impl GetUid for VirtualSystem {
     fn getuid(&self) -> Uid {
         self.current_process().uid()
     }
@@ -1015,7 +1093,9 @@ impl System for VirtualSystem {
     fn getegid(&self) -> Gid {
         self.current_process().egid()
     }
+}
 
+impl GetPw for VirtualSystem {
     fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
         let state = self.state.borrow();
         let name = match name.to_str() {
@@ -1024,7 +1104,9 @@ impl System for VirtualSystem {
         };
         Ok(state.home_dirs.get(name).cloned())
     }
+}
 
+impl Sysconf for VirtualSystem {
     /// Returns the standard path for the system.
     ///
     /// This function returns the value of [`SystemState::path`]. If it is empty,
@@ -1037,14 +1119,18 @@ impl System for VirtualSystem {
             Ok(path)
         }
     }
+}
 
+impl ShellPath for VirtualSystem {
     /// Returns the path to the shell.
     ///
     /// The current implementation returns "/bin/sh".
     fn shell_path(&self) -> CString {
         c"/bin/sh".to_owned()
     }
+}
 
+impl GetRlimit for VirtualSystem {
     fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
         Ok(self
             .current_process()
@@ -1056,8 +1142,10 @@ impl System for VirtualSystem {
                 hard: INFINITY,
             }))
     }
+}
 
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<()> {
+impl SetRlimit for VirtualSystem {
+    fn setrlimit(&self, resource: Resource, limits: LimitPair) -> Result<()> {
         if limits.soft_exceeds_hard() {
             return Err(Errno::EINVAL);
         }
@@ -1121,8 +1209,8 @@ pub struct SystemState {
     /// Current time
     pub now: Option<Instant>,
 
-    /// Consumed CPU time
-    pub times: Times,
+    /// Consumed CPU time statistics
+    pub times: CpuTimes,
 
     /// Task manager that can execute asynchronous tasks
     ///
@@ -1425,7 +1513,7 @@ mod tests {
 
     #[test]
     fn pipe_read_write() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let (reader, writer) = system.pipe().unwrap();
         let result = system.write(writer, &[5, 42, 29]);
         assert_eq!(result, Ok(3));
@@ -1444,7 +1532,7 @@ mod tests {
 
     #[test]
     fn dup_shares_open_file_description() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.dup(Fd::STDOUT, Fd::STDERR, EnumSet::empty());
         assert_eq!(result, Ok(Fd(3)));
 
@@ -1456,7 +1544,7 @@ mod tests {
 
     #[test]
     fn dup_can_set_cloexec() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.dup(Fd::STDOUT, Fd::STDERR, FdFlag::CloseOnExec.into());
         assert_eq!(result, Ok(Fd(3)));
 
@@ -1467,7 +1555,7 @@ mod tests {
 
     #[test]
     fn dup2_shares_open_file_description() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.dup2(Fd::STDOUT, Fd(5));
         assert_eq!(result, Ok(Fd(5)));
 
@@ -1479,7 +1567,7 @@ mod tests {
 
     #[test]
     fn dup2_clears_cloexec() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let mut process = system.current_process_mut();
         process.fds.get_mut(&Fd::STDOUT).unwrap().flags = FdFlag::CloseOnExec.into();
         drop(process);
@@ -1494,7 +1582,7 @@ mod tests {
 
     #[test]
     fn open_non_existing_file_no_creation() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.open(
             c"/no/such/file",
             OfdAccess::ReadOnly,
@@ -1506,7 +1594,7 @@ mod tests {
 
     #[test]
     fn open_creating_non_existing_file() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.open(
             c"new_file",
             OfdAccess::WriteOnly,
@@ -1526,7 +1614,7 @@ mod tests {
 
     #[test]
     fn open_creating_non_existing_file_umask() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system.umask(Mode::from_bits_retain(0o125));
         system
             .open(
@@ -1544,7 +1632,7 @@ mod tests {
 
     #[test]
     fn open_existing_file() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let fd = system
             .open(
                 c"file",
@@ -1573,7 +1661,7 @@ mod tests {
 
     #[test]
     fn open_existing_file_excl() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let first = system.open(
             c"my_file",
             OfdAccess::WriteOnly,
@@ -1593,7 +1681,7 @@ mod tests {
 
     #[test]
     fn open_truncating() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let fd = system
             .open(
                 c"file",
@@ -1626,7 +1714,7 @@ mod tests {
 
     #[test]
     fn open_appending() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let fd = system
             .open(
                 c"file",
@@ -1662,7 +1750,7 @@ mod tests {
 
     #[test]
     fn open_directory() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         // Create a regular file and its parent directory
         let _ = system.open(
@@ -1683,7 +1771,7 @@ mod tests {
 
     #[test]
     fn open_non_directory_path_prefix() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         // Create a regular file
         let _ = system.open(
@@ -1704,7 +1792,7 @@ mod tests {
 
     #[test]
     fn open_non_directory_file() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         // Create a regular file
         let _ = system.open(
@@ -1726,7 +1814,7 @@ mod tests {
     #[test]
     fn open_default_working_directory() {
         // The default working directory is the root directory.
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         let writer = system.open(
             c"/dir/file",
@@ -1750,7 +1838,7 @@ mod tests {
 
     #[test]
     fn open_tmpfile() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let fd = system.open_tmpfile(Path::new("")).unwrap();
         system.write(fd, &[42, 17, 75]).unwrap();
         system.lseek(fd, SeekFrom::Start(0)).unwrap();
@@ -1762,7 +1850,7 @@ mod tests {
 
     #[test]
     fn close() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         let result = system.close(Fd::STDERR);
         assert_eq!(result, Ok(()));
@@ -1774,7 +1862,7 @@ mod tests {
 
     #[test]
     fn fcntl_getfd_and_setfd() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         let flags = system.fcntl_getfd(Fd::STDIN).unwrap();
         assert_eq!(flags, EnumSet::empty());
@@ -1798,7 +1886,7 @@ mod tests {
     #[test]
     fn opendir_default_working_directory() {
         // The default working directory is the root directory.
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         let _ = system.open(
             c"/dir/file",
@@ -1827,7 +1915,7 @@ mod tests {
 
     #[test]
     fn kill_process() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system
             .kill(system.process_id, None)
             .now_or_never()
@@ -1846,7 +1934,7 @@ mod tests {
             })
         );
 
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let state = system.state.borrow();
         let max_pid = *state.processes.keys().max().unwrap();
         drop(state);
@@ -1860,7 +1948,7 @@ mod tests {
 
     #[test]
     fn kill_all_processes() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let pgid = system.current_process().pgid;
         let mut state = system.state.borrow_mut();
         state.processes.insert(
@@ -1893,7 +1981,7 @@ mod tests {
 
     #[test]
     fn kill_processes_in_same_group() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let pgid = system.current_process().pgid;
         let mut state = system.state.borrow_mut();
         state.processes.insert(
@@ -1941,7 +2029,7 @@ mod tests {
 
     #[test]
     fn kill_process_group() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let pgid = system.current_process().pgid;
         let mut state = system.state.borrow_mut();
         state.processes.insert(
@@ -1986,7 +2074,7 @@ mod tests {
 
     #[test]
     fn kill_returns_success_even_if_process_state_did_not_change() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let pgid = system.current_process().pgid;
         let mut state = system.state.borrow_mut();
         state.processes.insert(
@@ -2006,7 +2094,7 @@ mod tests {
 
     #[test]
     fn select_regular_file_is_always_ready() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let mut readers = vec![Fd::STDIN];
         let mut writers = vec![Fd::STDOUT, Fd::STDERR];
 
@@ -2018,7 +2106,7 @@ mod tests {
 
     #[test]
     fn select_pipe_reader_is_ready_if_writer_is_closed() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let (reader, writer) = system.pipe().unwrap();
         system.close(writer).unwrap();
         let mut readers = vec![reader];
@@ -2032,7 +2120,7 @@ mod tests {
 
     #[test]
     fn select_pipe_reader_is_ready_if_something_has_been_written() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let (reader, writer) = system.pipe().unwrap();
         system.write(writer, &[0]).unwrap();
         let mut readers = vec![reader];
@@ -2046,7 +2134,7 @@ mod tests {
 
     #[test]
     fn select_pipe_reader_is_not_ready_if_writer_has_written_nothing() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let (reader, _writer) = system.pipe().unwrap();
         let mut readers = vec![reader];
         let mut writers = vec![];
@@ -2059,7 +2147,7 @@ mod tests {
 
     #[test]
     fn select_pipe_writer_is_ready_if_pipe_is_not_full() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let (_reader, writer) = system.pipe().unwrap();
         let mut readers = vec![];
         let mut writers = vec![writer];
@@ -2072,7 +2160,7 @@ mod tests {
 
     #[test]
     fn select_on_unreadable_fd() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let (_reader, writer) = system.pipe().unwrap();
         let mut fds = vec![writer];
         let result = system.select(&mut fds, &mut vec![], None, None);
@@ -2082,7 +2170,7 @@ mod tests {
 
     #[test]
     fn select_on_unwritable_fd() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let (reader, _writer) = system.pipe().unwrap();
         let mut fds = vec![reader];
         let result = system.select(&mut vec![], &mut fds, None, None);
@@ -2092,7 +2180,7 @@ mod tests {
 
     #[test]
     fn select_on_closed_fd() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.select(&mut vec![Fd(17)], &mut vec![], None, None);
         assert_eq!(result, Err(Errno::EBADF));
 
@@ -2101,7 +2189,7 @@ mod tests {
     }
 
     fn system_for_catching_sigchld() -> VirtualSystem {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system
             .sigmask(Some((SigmaskOp::Add, &[SIGCHLD])), None)
             .unwrap();
@@ -2111,7 +2199,7 @@ mod tests {
 
     #[test]
     fn select_on_non_pending_signal() {
-        let mut system = system_for_catching_sigchld();
+        let system = system_for_catching_sigchld();
         let result = system.select(&mut vec![], &mut vec![], None, Some(&[]));
         assert_eq!(result, Ok(0));
         assert_eq!(system.caught_signals(), []);
@@ -2119,7 +2207,7 @@ mod tests {
 
     #[test]
     fn select_on_pending_signal() {
-        let mut system = system_for_catching_sigchld();
+        let system = system_for_catching_sigchld();
         let _ = system.current_process_mut().raise_signal(SIGCHLD);
         let result = system.select(&mut vec![], &mut vec![], None, Some(&[]));
         assert_eq!(result, Err(Errno::EINTR));
@@ -2128,7 +2216,7 @@ mod tests {
 
     #[test]
     fn select_timeout() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let now = Instant::now();
         system.state.borrow_mut().now = Some(now);
 
@@ -2303,7 +2391,7 @@ mod tests {
 
     #[test]
     fn tcsetpgrp_success() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let pid = Pid(10);
         let ppid = system.process_id;
         let pgid = Pid(9);
@@ -2325,14 +2413,14 @@ mod tests {
 
     #[test]
     fn tcsetpgrp_with_invalid_fd() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.tcsetpgrp(Fd(100), Pid(2)).now_or_never().unwrap();
         assert_eq!(result, Err(Errno::EBADF));
     }
 
     #[test]
     fn tcsetpgrp_with_nonexisting_pgrp() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system
             .tcsetpgrp(Fd::STDIN, Pid(100))
             .now_or_never()
@@ -2342,7 +2430,7 @@ mod tests {
 
     #[test]
     fn new_child_process_without_executor() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.new_child_process();
         match result {
             Ok(_) => panic!("unexpected Ok value"),
@@ -2352,7 +2440,7 @@ mod tests {
 
     #[test]
     fn new_child_process_with_executor() {
-        let (mut system, _executor) = virtual_system_with_executor();
+        let (system, _executor) = virtual_system_with_executor();
 
         let result = system.new_child_process();
 
@@ -2371,7 +2459,7 @@ mod tests {
 
     #[test]
     fn wait_for_running_child() {
-        let (mut system, _executor) = virtual_system_with_executor();
+        let (system, _executor) = virtual_system_with_executor();
 
         let child_process = system.new_child_process();
 
@@ -2392,7 +2480,7 @@ mod tests {
 
     #[test]
     fn wait_for_exited_child() {
-        let (mut system, mut executor) = virtual_system_with_executor();
+        let (system, mut executor) = virtual_system_with_executor();
 
         let child_process = system.new_child_process();
 
@@ -2410,7 +2498,7 @@ mod tests {
 
     #[test]
     fn wait_for_signaled_child() {
-        let (mut system, mut executor) = virtual_system_with_executor();
+        let (system, mut executor) = virtual_system_with_executor();
 
         let child_process = system.new_child_process();
 
@@ -2443,7 +2531,7 @@ mod tests {
 
     #[test]
     fn wait_for_stopped_child() {
-        let (mut system, mut executor) = virtual_system_with_executor();
+        let (system, mut executor) = virtual_system_with_executor();
 
         let child_process = system.new_child_process();
 
@@ -2467,7 +2555,7 @@ mod tests {
 
     #[test]
     fn wait_for_resumed_child() {
-        let (mut system, mut executor) = virtual_system_with_executor();
+        let (system, mut executor) = virtual_system_with_executor();
 
         let child_process = system.new_child_process();
 
@@ -2503,7 +2591,7 @@ mod tests {
 
     #[test]
     fn wait_without_child() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.wait(Pid::ALL);
         assert_eq!(result, Err(Errno::ECHILD));
         // TODO
@@ -2520,7 +2608,7 @@ mod tests {
 
     #[test]
     fn exiting_child_sends_sigchld_to_parent() {
-        let (mut system, mut executor) = virtual_system_with_executor();
+        let (system, mut executor) = virtual_system_with_executor();
         system.sigaction(SIGCHLD, Disposition::Catch).unwrap();
 
         let child_process = system.new_child_process().unwrap();
@@ -2537,7 +2625,7 @@ mod tests {
 
     #[test]
     fn execve_returns_enosys_for_executable_file() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let path = "/some/file";
         let mut content = Inode::default();
         content.body = FileBody::Regular {
@@ -2556,7 +2644,7 @@ mod tests {
 
     #[test]
     fn execve_saves_arguments() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let path = "/some/file";
         let mut content = Inode::default();
         content.body = FileBody::Regular {
@@ -2582,7 +2670,7 @@ mod tests {
 
     #[test]
     fn execve_returns_enoexec_for_non_executable_file() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let path = "/some/file";
         let mut content = Inode::default();
         content.permissions.set(Mode::USER_EXEC, true);
@@ -2597,7 +2685,7 @@ mod tests {
 
     #[test]
     fn execve_returns_enoent_on_file_not_found() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system
             .execve(c"/no/such/file", &[], &[])
             .now_or_never()
@@ -2607,7 +2695,7 @@ mod tests {
 
     #[test]
     fn exit_sets_current_process_state_to_exited() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system.exit(ExitStatus(42)).now_or_never();
 
         assert!(system.current_process().state_has_changed());
@@ -2619,7 +2707,7 @@ mod tests {
 
     #[test]
     fn exit_sends_sigchld_to_parent() {
-        let (mut system, mut executor) = virtual_system_with_executor();
+        let (system, mut executor) = virtual_system_with_executor();
         system.sigaction(SIGCHLD, Disposition::Catch).unwrap();
 
         let child_process = system.new_child_process().unwrap();
@@ -2636,7 +2724,7 @@ mod tests {
 
     #[test]
     fn chdir_changes_directory() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         // Create a regular file and its parent directory
         let _ = system.open(
@@ -2653,7 +2741,7 @@ mod tests {
 
     #[test]
     fn chdir_fails_with_non_existing_directory() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         let result = system.chdir(c"/no/such/dir");
         assert_eq!(result, Err(Errno::ENOENT));
@@ -2661,7 +2749,7 @@ mod tests {
 
     #[test]
     fn chdir_fails_with_non_directory_file() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
 
         // Create a regular file and its parent directory
         let _ = system.open(
@@ -2690,7 +2778,7 @@ mod tests {
 
     #[test]
     fn setrlimit_and_getrlimit_with_finite_limits() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system
             .setrlimit(
                 Resource::CORE,
@@ -2718,7 +2806,7 @@ mod tests {
 
     #[test]
     fn setrlimit_rejects_soft_limit_higher_than_hard_limit() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let result = system.setrlimit(Resource::CPU, LimitPair { soft: 2, hard: 1 });
         assert_eq!(result, Err(Errno::EINVAL));
 
@@ -2735,7 +2823,7 @@ mod tests {
 
     #[test]
     fn setrlimit_refuses_raising_hard_limit() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system
             .setrlimit(Resource::CPU, LimitPair { soft: 1, hard: 1 })
             .unwrap();

@@ -97,12 +97,11 @@ use yash_env::option::Option::Clobber;
 use yash_env::option::State::Off;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::system::Errno;
-use yash_env::system::FdFlag;
-use yash_env::system::FileType;
-use yash_env::system::Mode;
-use yash_env::system::OfdAccess;
-use yash_env::system::OpenFlag;
+use yash_env::system::Close as _;
+use yash_env::system::Dup as _;
+use yash_env::system::Fcntl as _;
+use yash_env::system::Open as _;
+use yash_env::system::{Errno, FdFlag, FileType, Fstat, Mode, OfdAccess, OpenFlag};
 use yash_quote::quoted;
 use yash_syntax::source::Location;
 use yash_syntax::source::pretty::{Report, ReportType, Snippet};
@@ -707,8 +706,11 @@ mod tests {
     use std::rc::Rc;
     use yash_env::Env;
     use yash_env::VirtualSystem;
+    use yash_env::system::Read as _;
+    use yash_env::system::Write as _;
     use yash_env::system::resource::LimitPair;
     use yash_env::system::resource::Resource;
+    use yash_env::system::resource::SetRlimit as _;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::Inode;
     use yash_env_test_helper::in_virtual_system;
@@ -716,7 +718,7 @@ mod tests {
 
     /// Returns a virtual system with a file descriptor limit.
     fn system_with_nofile_limit() -> VirtualSystem {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         system
             .setrlimit(
                 Resource::NOFILE,

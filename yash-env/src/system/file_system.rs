@@ -18,9 +18,13 @@
 
 use super::{Gid, Result, Uid};
 use crate::io::Fd;
+use crate::path::{Path, PathBuf};
 use crate::str::UnixStr;
 use bitflags::bitflags;
+use enumset::{EnumSet, EnumSetType};
+use std::ffi::CStr;
 use std::fmt::Debug;
+use std::io::SeekFrom;
 
 #[cfg(unix)]
 const RAW_AT_FDCWD: i32 = libc::AT_FDCWD;
@@ -30,7 +34,7 @@ const RAW_AT_FDCWD: i32 = -100;
 /// Sentinel for the current working directory
 ///
 /// This value can be passed to system calls named "*at" such as
-/// [`fstatat`](super::System::fstatat).
+/// [`fstatat`](super::Fstat::fstatat).
 pub const AT_FDCWD: Fd = Fd(RAW_AT_FDCWD);
 
 /// Metadata of a file contained in a directory
@@ -204,4 +208,168 @@ impl Stat {
     pub const fn identity(&self) -> (u64, u64) {
         (self.dev, self.ino)
     }
+}
+
+/// Trait for retrieving file metadata
+///
+/// See also [`IsExecutableFile`].
+pub trait Fstat {
+    /// Retrieves metadata of a file.
+    ///
+    /// This method wraps the [`fstat` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/fstat.html).
+    /// It takes a file descriptor and returns a `Stat` object containing the
+    /// file metadata.
+    fn fstat(&self, fd: Fd) -> Result<Stat>;
+
+    /// Retrieves metadata of a file.
+    ///
+    /// This method wraps the [`fstatat` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/fstatat.html).
+    /// It takes a directory file descriptor, a file path, and a flag indicating
+    /// whether to follow symbolic links. It returns a `Stat` object containing
+    /// the file metadata. The file path is interpreted relative to the
+    /// directory represented by the directory file descriptor.
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat>;
+
+    /// Whether there is a directory at the specified path.
+    #[must_use]
+    fn is_directory(&self, path: &CStr) -> bool {
+        self.fstatat(AT_FDCWD, path, /* follow_symlinks */ true)
+            .is_ok_and(|stat| stat.r#type == FileType::Directory)
+    }
+}
+
+/// Trait for checking if a file is executable
+///
+/// This trait declares the `is_executable_file` method, which checks whether a
+/// filepath points to an executable regular file. This trait is separate from
+/// the [`Fstat`] trait because the implementation depends on the `faccessat`
+/// system call.
+pub trait IsExecutableFile {
+    /// Whether there is an executable regular file at the specified path.
+    #[must_use]
+    fn is_executable_file(&self, path: &CStr) -> bool;
+}
+
+/// File access mode of open file descriptions
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum OfdAccess {
+    /// Open for reading only
+    ReadOnly,
+    /// Open for writing only
+    WriteOnly,
+    /// Open for reading and writing
+    ReadWrite,
+    /// Open for executing only (non-directory files)
+    Exec,
+    /// Open for searching only (directories)
+    Search,
+}
+
+/// Options for opening file descriptors
+///
+/// A set of `OpenFlag` values can be passed to [`open`] to configure how the
+/// file descriptor is opened. Some of the flags become the attributes of the
+/// open file description created by the `open` function.
+///
+/// [`open`]: Open::open
+#[derive(Debug, EnumSetType, Hash)]
+#[non_exhaustive]
+pub enum OpenFlag {
+    /// Always write to the end of the file
+    Append,
+    /// Close the file descriptor upon execution of an exec family function
+    CloseOnExec,
+    /// Create the file if it does not exist
+    Create,
+    /// Fail if the file is not a directory
+    Directory,
+    /// Atomically create the file if it does not exist
+    Exclusive,
+    /// Do not make the opened terminal the controlling terminal for the process
+    NoCtty,
+    /// Do not follow symbolic links
+    NoFollow,
+    /// Open the file in non-blocking mode
+    NonBlock,
+    /// Wait until the written data is physically stored on the underlying
+    /// storage device on each write
+    Sync,
+    /// Truncate the file to zero length
+    Truncate,
+}
+
+/// Trait for opening files
+pub trait Open {
+    /// Opens a file descriptor.
+    ///
+    /// This is a thin wrapper around the [`open` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/open.html).
+    fn open(
+        &self,
+        path: &CStr,
+        access: OfdAccess,
+        flags: EnumSet<OpenFlag>,
+        mode: Mode,
+    ) -> Result<Fd>;
+
+    /// Opens a file descriptor associated with an anonymous temporary file.
+    ///
+    /// This function works similarly to the `O_TMPFILE` flag specified to the
+    /// `open` function.
+    fn open_tmpfile(&self, parent_dir: &Path) -> Result<Fd>;
+
+    /// Opens a directory for enumerating entries.
+    ///
+    /// This is a thin wrapper around the [`fdopendir` system
+    /// function](https://pubs.opengroup.org/onlinepubs/9799919799/functions/fdopendir.html).
+    fn fdopendir(&self, fd: Fd) -> Result<impl Dir + use<Self>>;
+
+    /// Opens a directory for enumerating entries.
+    ///
+    /// This is a thin wrapper around the [`opendir` system
+    /// function](https://pubs.opengroup.org/onlinepubs/9799919799/functions/fdopendir.html).
+    fn opendir(&self, path: &CStr) -> Result<impl Dir + use<Self>>;
+}
+
+/// Trait for seeking within file descriptors
+pub trait Seek {
+    /// Moves the position of the open file description.
+    ///
+    /// This is a thin wrapper around the [`lseek` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/lseek.html).
+    /// If successful, returns the new position from the beginning of the file.
+    fn lseek(&self, fd: Fd, position: SeekFrom) -> Result<u64>;
+}
+
+/// Trait for getting and setting the file creation mask
+pub trait Umask {
+    /// Gets and sets the file creation mode mask.
+    ///
+    /// This is a thin wrapper around the [`umask` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/umask.html).
+    /// It sets the mask to the given value and returns the previous mask.
+    ///
+    /// You cannot tell the current mask without setting a new one. If you only
+    /// want to get the current mask, you need to set it back to the original
+    /// value after getting it.
+    fn umask(&self, new_mask: Mode) -> Mode;
+}
+
+/// Trait for getting the current working directory
+///
+/// See also [`Chdir`].
+pub trait GetCwd {
+    /// Returns the current working directory path.
+    fn getcwd(&self) -> Result<PathBuf>;
+}
+
+/// Trait for changing the current working directory
+///
+/// See also [`GetCwd`].
+pub trait Chdir {
+    /// Changes the working directory.
+    fn chdir(&self, path: &CStr) -> Result<()>;
 }

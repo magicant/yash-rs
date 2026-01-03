@@ -26,7 +26,7 @@
 //! job](JobList::remove). Note that the job list may reuse the index of a
 //! removed job for another job added later.
 //!
-//! When the [wait system call](crate::System::wait) returns a new state of a
+//! When the [wait system call](crate::system::Wait::wait) returns a new state of a
 //! child process, the caller should pass it to [`JobList::update_status`],
 //! which modifies the state of the corresponding job. The `state_changed` flag
 //! of the job is set when the job is updated and should be
@@ -82,9 +82,9 @@ pub type RawPid = RawPidDef;
 ///
 /// This type may also be used to represent process group IDs, session IDs, etc.
 ///
-/// [`kill`]: crate::system::System::kill
-/// [`wait`]: crate::system::System::wait
-/// [`setpgid`]: crate::system::System::setpgid
+/// [`kill`]: crate::system::SendSignal::kill
+/// [`wait`]: crate::system::Wait::wait
+/// [`setpgid`]: crate::system::SetPgid::setpgid
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Pid(pub RawPid);
@@ -103,18 +103,18 @@ impl std::ops::Neg for Pid {
 }
 
 impl Pid {
-    /// Sentinel value for the [`kill`] and [`wait`]system calls specifying all
+    /// Sentinel value for the [`kill`] and [`wait`] system calls specifying all
     /// processes in the process group of the calling process.
     ///
-    /// [`kill`]: crate::system::System::kill
-    /// [`wait`]: crate::system::System::wait
+    /// [`kill`]: crate::system::SendSignal::kill
+    /// [`wait`]: crate::system::Wait::wait
     pub const MY_PROCESS_GROUP: Self = Pid(0);
 
     /// Sentinel value for the [`kill`] and [`wait`] system calls specifying all
     /// possible processes.
     ///
-    /// [`kill`]: crate::system::System::kill
-    /// [`wait`]: crate::system::System::wait
+    /// [`kill`]: crate::system::SendSignal::kill
+    /// [`wait`]: crate::system::Wait::wait
     pub const ALL: Self = Pid(-1);
 }
 
@@ -741,7 +741,7 @@ impl JobList {
 impl JobList {
     /// Updates the state of a job.
     ///
-    /// The result of a [`wait`](crate::System::wait) call should be passed to
+    /// The result of a [`wait`](crate::system::Wait::wait) call should be passed to
     /// this function. It looks up the job for the given process ID, updates the
     /// state of the job to the given `state`, and sets the `state_changed` flag
     /// in the job. As an exception, if `state` is equal to the `expected_state`

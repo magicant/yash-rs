@@ -22,13 +22,15 @@
 //!
 //! # Implementation notes
 //!
-//! The result for the `-P` option is obtained with [`System::getcwd`].
+//! The result for the `-P` option is obtained with [`GetCwd::getcwd`].
 
 use crate::common::output;
 use crate::common::report::{report_error, report_failure};
 use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
+#[cfg(doc)]
+use yash_env::system::GetCwd;
 use yash_env::system::System;
 
 /// Choice of the behavior of the built-in

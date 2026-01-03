@@ -16,11 +16,10 @@
 
 //! Resource types and limits
 //!
-//! This module defines resource types and their limit values that are used in
-//! [`getrlimit`] and [`setrlimit`].
-//!
-//! [`getrlimit`]: super::System::getrlimit
-//! [`setrlimit`]: super::System::setrlimit
+//! This module defines resource types, their limit values, and traits for
+//! getting and setting resource limits.
+
+use super::Result;
 
 #[cfg(unix)]
 type RawLimit = libc::rlim_t;
@@ -50,13 +49,10 @@ pub const INFINITY: Limit = RLIM_INFINITY;
 /// Resource type definition
 ///
 /// A `Resource` value represents a resource whose limit can be retrieved or
-/// set using [`getrlimit`] and [`setrlimit`].
+/// set using [`GetRlimit`] and [`SetRlimit`].
 ///
 /// This enum contains all possible resource types that may or may not be
 /// available depending on the platform.
-///
-/// [`getrlimit`]: super::System::getrlimit
-/// [`setrlimit`]: super::System::setrlimit
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Resource {
@@ -143,4 +139,26 @@ impl LimitPair {
     pub fn soft_exceeds_hard(&self) -> bool {
         self.hard != INFINITY && (self.soft == INFINITY || self.soft > self.hard)
     }
+}
+
+pub trait GetRlimit {
+    /// Returns the limits for the specified resource.
+    ///
+    /// This function returns a pair of the soft and hard limits for the given
+    /// resource. The soft limit is the current limit, and the hard limit is the
+    /// maximum value that the soft limit can be set to.
+    ///
+    /// When no limit is set, the limit value is [`INFINITY`].
+    ///
+    /// This is a thin wrapper around the `getrlimit` system call.
+    fn getrlimit(&self, resource: Resource) -> Result<LimitPair>;
+}
+
+pub trait SetRlimit {
+    /// Sets the limits for the specified resource.
+    ///
+    /// Specify [`INFINITY`] as the limit value to remove the limit.
+    ///
+    /// This is a thin wrapper around the `setrlimit` system call.
+    fn setrlimit(&self, resource: Resource, limits: LimitPair) -> Result<()>;
 }

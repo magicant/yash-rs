@@ -17,35 +17,11 @@
 //! Setting resource limits
 
 use super::{Error, ResourceExt as _, SetLimitType, SetLimitValue};
-use yash_env::System;
 use yash_env::system::Errno;
-use yash_env::system::resource::{INFINITY, LimitPair, Resource};
-
-/// Environment for setting resource limits
-///
-/// This trait is a subset of [`System`] that is used for
-/// setting resource limits.
-pub trait Env {
-    /// See [`System::getrlimit`]
-    fn getrlimit(&self, resource: Resource) -> Result<LimitPair, Errno>;
-    /// See [`System::setrlimit`]
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<(), Errno>;
-}
-
-impl<T: System> Env for T {
-    #[inline(always)]
-    fn getrlimit(&self, resource: Resource) -> Result<LimitPair, Errno> {
-        System::getrlimit(self, resource)
-    }
-
-    #[inline(always)]
-    fn setrlimit(&mut self, resource: Resource, limits: LimitPair) -> Result<(), Errno> {
-        System::setrlimit(self, resource, limits)
-    }
-}
+use yash_env::system::resource::{GetRlimit, INFINITY, LimitPair, Resource, SetRlimit};
 
 /// Sets the limit for a specific resource.
-pub fn set<E: Env>(
+pub fn set<E: GetRlimit + SetRlimit>(
     env: &mut E,
     resource: Resource,
     limit_type: SetLimitType,
@@ -113,7 +89,7 @@ mod tests {
         )
         .unwrap();
 
-        let limits = System::getrlimit(&system, Resource::CPU).unwrap();
+        let limits = system.getrlimit(Resource::CPU).unwrap();
         assert_eq!(
             limits,
             LimitPair {
@@ -141,7 +117,7 @@ mod tests {
         )
         .unwrap();
 
-        let limits = System::getrlimit(&system, Resource::CPU).unwrap();
+        let limits = system.getrlimit(Resource::CPU).unwrap();
         assert_eq!(limits, LimitPair { soft: 0, hard: 0 });
     }
 
@@ -156,7 +132,7 @@ mod tests {
         )
         .unwrap();
 
-        let limits = System::getrlimit(&system, Resource::CPU).unwrap();
+        let limits = system.getrlimit(Resource::CPU).unwrap();
         assert_eq!(limits, LimitPair { soft: 0, hard: 0 });
     }
 
@@ -178,7 +154,7 @@ mod tests {
         )
         .unwrap();
 
-        let limits = System::getrlimit(&system, Resource::CPU).unwrap();
+        let limits = system.getrlimit(Resource::CPU).unwrap();
         assert_eq!(
             limits,
             LimitPair {
@@ -220,7 +196,7 @@ mod tests {
         )
         .unwrap();
 
-        let limits = System::getrlimit(&system, Resource::CPU).unwrap();
+        let limits = system.getrlimit(Resource::CPU).unwrap();
         assert_eq!(limits, LimitPair { soft: 10, hard: 10 });
     }
 
@@ -242,7 +218,7 @@ mod tests {
         )
         .unwrap();
 
-        let limits = System::getrlimit(&system, Resource::CPU).unwrap();
+        let limits = system.getrlimit(Resource::CPU).unwrap();
         assert_eq!(limits, LimitPair { soft: 10, hard: 10 });
     }
 
@@ -264,7 +240,7 @@ mod tests {
         )
         .unwrap();
 
-        let limits = System::getrlimit(&system, Resource::CPU).unwrap();
+        let limits = system.getrlimit(Resource::CPU).unwrap();
         assert_eq!(limits, LimitPair { soft: 1, hard: 4 });
     }
 
@@ -286,7 +262,7 @@ mod tests {
         )
         .unwrap();
 
-        let limits = System::getrlimit(&system, Resource::CPU).unwrap();
+        let limits = system.getrlimit(Resource::CPU).unwrap();
         assert_eq!(limits, LimitPair { soft: 0, hard: 4 });
     }
 
@@ -341,7 +317,7 @@ mod tests {
         )
         .unwrap();
 
-        let limits = System::getrlimit(&system, Resource::FSIZE).unwrap();
+        let limits = system.getrlimit(Resource::FSIZE).unwrap();
         assert_eq!(
             limits,
             LimitPair {
@@ -398,11 +374,13 @@ mod tests {
     #[test]
     fn set_unsupported_resource() {
         struct ResourcelessSystem;
-        impl Env for ResourcelessSystem {
+        impl GetRlimit for ResourcelessSystem {
             fn getrlimit(&self, _resource: Resource) -> Result<LimitPair, Errno> {
                 Err(Errno::EINVAL)
             }
-            fn setrlimit(&mut self, _resource: Resource, _limits: LimitPair) -> Result<(), Errno> {
+        }
+        impl SetRlimit for ResourcelessSystem {
+            fn setrlimit(&self, _resource: Resource, _limits: LimitPair) -> Result<(), Errno> {
                 Err(Errno::EINVAL)
             }
         }
