@@ -31,7 +31,6 @@ use yash_env::semantics::Field;
 use yash_env::signal::{Name, Number};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::System;
-use yash_env::system::SystemEx;
 
 /// Returns an iterator over all supported signals.
 ///
@@ -116,7 +115,7 @@ impl<'a> From<&'a InvalidSignal<'a>> for Report<'a> {
 ///
 /// If `signals` is empty, all signals are listed.
 /// If `signals` contains invalid signals, the function returns an error.
-pub fn print<'a, S: SystemEx>(
+pub fn print<'a, S: System>(
     system: &S,
     signals: &'a [(Signal, Field)],
     verbose: bool,

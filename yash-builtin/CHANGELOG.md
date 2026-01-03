@@ -25,6 +25,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `ulimit::set::set` now requires
   `E: yash_env::system::resource::GetRlimit + yash_env::system::resource::SetRlimit`
   instead of `E: ulimit::set::Env`.
+- `kill::print::print` and `kill::Signal::to_name_and_number` now only require
+  `S: yash_env::system::System` instead of `S: yash_env::system::SystemEx`.
 
 ### Removed
 
