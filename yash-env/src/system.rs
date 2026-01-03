@@ -276,12 +276,6 @@ pub trait SystemEx: System {
         new
     }
 
-    /// Tests if a file descriptor is a pipe.
-    fn fd_is_pipe(&self, fd: Fd) -> bool {
-        self.fstat(fd)
-            .is_ok_and(|stat| stat.r#type == FileType::Fifo)
-    }
-
     /// Switches the foreground process group with SIGTTOU blocked.
     ///
     /// This is a convenience function to change the foreground process group

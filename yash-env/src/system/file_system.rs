@@ -238,6 +238,13 @@ pub trait Fstat {
         self.fstatat(AT_FDCWD, path, /* follow_symlinks */ true)
             .is_ok_and(|stat| stat.r#type == FileType::Directory)
     }
+
+    /// Tests if a file descriptor is a pipe.
+    #[must_use]
+    fn fd_is_pipe(&self, fd: Fd) -> bool {
+        self.fstat(fd)
+            .is_ok_and(|stat| stat.r#type == FileType::Fifo)
+    }
 }
 
 /// Trait for checking if a file is executable
