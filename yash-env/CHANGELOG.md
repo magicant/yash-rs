@@ -78,6 +78,20 @@ A _private dependency_ is used internally and not visible to downstream users.
   `System`.
 - `System` is now implemented for any type that implements all of the above
   traits.
+- `io::move_fd_internal`: This function moves a file descriptor to
+  `MIN_INTERNAL_FD` or larger. It is a replacement for the deprecated
+  `SystemEx::move_fd_internal` method.
+- `job::tcsetpgrp_with_block`: This function changes the foreground process group
+  of a terminal, ensuring that the shell is not suspended if the shell is in the
+  background. It is a replacement for the deprecated
+  `SystemEx::tcsetpgrp_with_block` method.
+- `job::tcsetpgrp_without_block`: This function changes the foreground process
+  group of a terminal without, ensuring that the shell is already in the
+  foreground. It is a replacement for the deprecated
+  `SystemEx::tcsetpgrp_without_block` method.
+- `semantics::exit_or_raise`: This function terminates the current process
+  with the given exit status, possibly sending a signal to kill the process. It
+  is a replacement for the deprecated `SystemEx::exit_or_raise` method.
 
 ### Changed
 
@@ -112,6 +126,18 @@ A _private dependency_ is used internally and not visible to downstream users.
   `current_process_mut`.
 - `impl<S> std::fmt::Debug for builtin::Builtin<S>` now prints the `execute`
   field as well.
+
+### Deprecated
+
+- `system::SystemEx`: This trait is now deprecated.
+    - `move_fd_internal`: Use `io::move_fd_internal` instead.
+    - `fd_is_pipe`: Use `system::Fstat::fd_is_pipe` instead.
+    - `tcsetpgrp_with_block`: Use `job::tcsetpgrp_with_block` instead.
+    - `tcsetpgrp_without_block`: Use `job::tcsetpgrp_without_block`
+      instead.
+    - `signal_name_from_number`: Use `system::Signals::signal_name_from_number`
+      instead.
+    - `exit_or_raise`: Use `semantics::exit_or_raise` instead.
 
 ### Removed
 

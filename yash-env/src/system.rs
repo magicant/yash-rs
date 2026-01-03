@@ -141,6 +141,8 @@ pub use self::user::{GetPw, GetUid, Gid, RawGid, RawUid, Uid};
 #[cfg(doc)]
 use self::r#virtual::VirtualSystem;
 use crate::io::Fd;
+#[cfg(doc)]
+use crate::io::MIN_INTERNAL_FD;
 use crate::job::Pid;
 use crate::path::Path;
 use crate::path::PathBuf;
@@ -149,6 +151,7 @@ use crate::str::UnixString;
 #[cfg(doc)]
 use crate::subshell::Subshell;
 use crate::trap::SignalSystem;
+use std::convert::Infallible;
 use std::fmt::Debug;
 
 /// API to the system-managed parts of the environment.
@@ -243,6 +246,127 @@ impl<T> System for T where
 /// Extension for [`System`]
 ///
 /// This trait provides some extension methods for `System`.
-pub trait SystemEx: System {}
+#[deprecated(
+    note = "Use functions in the `yash-env::io` and `yash-env::job` modules instead",
+    since = "0.11.0"
+)]
+pub trait SystemEx: System {
+    /// Moves a file descriptor to [`MIN_INTERNAL_FD`] or larger.
+    ///
+    /// This function can be used to make sure a file descriptor used by the
+    /// shell does not conflict with file descriptors used by the user.
+    /// [`MIN_INTERNAL_FD`] is the minimum file descriptor number the shell
+    /// uses internally. This function moves the file descriptor to a number
+    /// larger than or equal to [`MIN_INTERNAL_FD`].
+    ///
+    /// If the given file descriptor is less than [`MIN_INTERNAL_FD`], this
+    /// function duplicates the file descriptor with [`Dup::dup`] and closes
+    /// the original one. Otherwise, this function does nothing.
+    ///
+    /// The new file descriptor will have the CLOEXEC flag set when it is
+    /// dupped. Note that, if the original file descriptor has the CLOEXEC flag
+    /// unset and is already larger than or equal to [`MIN_INTERNAL_FD`], this
+    /// function will not set the CLOEXEC flag for the returned file descriptor.
+    ///
+    /// This function returns the new file descriptor on success. On error, it
+    /// closes the original file descriptor and returns the error.
+    #[deprecated(
+        note = "use `yash_env::io::move_fd_internal` instead",
+        since = "0.11.0"
+    )]
+    fn move_fd_internal(&mut self, from: Fd) -> Result<Fd> {
+        crate::io::move_fd_internal(self, from)
+    }
 
+    /// Tests if a file descriptor is a pipe.
+    #[deprecated(
+        note = "use `yash_env::system::Fstat::fd_is_pipe` instead",
+        since = "0.11.0"
+    )]
+    fn fd_is_pipe(&self, fd: Fd) -> bool {
+        self.fstat(fd)
+            .is_ok_and(|stat| stat.r#type == FileType::Fifo)
+    }
+
+    /// Switches the foreground process group with SIGTTOU blocked.
+    ///
+    /// This is a convenience function to change the foreground process group
+    /// safely. If you call [`TcSetPgrp::tcsetpgrp`] from a background process,
+    /// the process is stopped by SIGTTOU by default. To prevent this effect,
+    /// SIGTTOU must be blocked or ignored when `tcsetpgrp` is called.  This
+    /// function uses [`Sigmask::sigmask`] to block SIGTTOU before calling
+    /// `tcsetpgrp` and also to restore the original signal mask after
+    /// `tcsetpgrp`.
+    ///
+    /// Use [`tcsetpgrp_without_block`](Self::tcsetpgrp_without_block) if you
+    /// need to make sure the shell is in the foreground before changing the
+    /// foreground job.
+    #[deprecated(
+        note = "use `yash_env::job::tcsetpgrp_with_block` instead",
+        since = "0.11.0"
+    )]
+    fn tcsetpgrp_with_block(&mut self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> {
+        crate::job::tcsetpgrp_with_block(self, fd, pgid)
+    }
+
+    /// Switches the foreground process group with the default SIGTTOU settings.
+    ///
+    /// This is a convenience function to ensure the shell has been in the
+    /// foreground and optionally change the foreground process group. This
+    /// function calls [`Sigaction::sigaction`] to restore the action for
+    /// SIGTTOU to the default disposition (which is to suspend the shell
+    /// process), [`Sigmask::sigmask`] to unblock SIGTTOU, and
+    /// [`TcSetPgrp::tcsetpgrp`] to modify the foreground job. If the calling
+    /// process is not in the foreground, `tcsetpgrp` will suspend the process
+    /// with SIGTTOU until another job-controlling process resumes it in the
+    /// foreground. After `tcsetpgrp` completes, this function calls `sigmask`
+    /// and `sigaction` to restore the original state.
+    ///
+    /// Note that if `pgid` is the process group ID of the current process, this
+    /// function does not change the foreground job, but the process is still
+    /// subject to suspension if it has not been in the foreground.
+    ///
+    /// Use [`tcsetpgrp_with_block`](Self::tcsetpgrp_with_block) to change the
+    /// job even if the current shell is not in the foreground.
+    #[deprecated(
+        note = "use `yash_env::job::tcsetpgrp_without_block` instead",
+        since = "0.11.0"
+    )]
+    fn tcsetpgrp_without_block(&mut self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> {
+        crate::job::tcsetpgrp_without_block(self, fd, pgid)
+    }
+
+    /// Returns the signal name for the signal number.
+    ///
+    /// This function returns the signal name for the given signal number.
+    ///
+    /// If the signal number is invalid, this function panics. It may occur if
+    /// the number is from a different system or was created without checking
+    /// the validity.
+    #[deprecated(
+        note = "use `yash_env::system::Signals::signal_name_from_number` instead",
+        since = "0.11.0"
+    )]
+    #[must_use]
+    fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
+        self.validate_signal(number.as_raw()).unwrap().0
+    }
+
+    /// Terminates the current process with the given exit status, possibly
+    /// sending a signal to kill the process.
+    ///
+    /// If the exit status represents a signal that killed the last executed
+    /// command, this function sends the signal to the current process to
+    /// propagate the signal to the parent process. Otherwise, this function
+    /// terminates the process with the given exit status.
+    #[deprecated(
+        note = "use `yash_env::semantics::exit_or_raise` instead",
+        since = "0.11.0"
+    )]
+    fn exit_or_raise(&mut self, exit_status: ExitStatus) -> impl Future<Output = Infallible> {
+        async move { crate::semantics::exit_or_raise(self, exit_status).await }
+    }
+}
+
+#[allow(deprecated)]
 impl<T: System + ?Sized> SystemEx for T {}
