@@ -29,6 +29,7 @@
 use crate::Env;
 use crate::job::Pid;
 use crate::job::ProcessResult;
+use crate::job::tcsetpgrp_with_block;
 use crate::signal;
 use crate::stack::Frame;
 use crate::system::ChildProcessTask;
@@ -185,7 +186,7 @@ where
                             JobControl::Foreground => {
                                 if let Some(tty) = tty {
                                     let pgid = env.system.getpgrp();
-                                    env.system.tcsetpgrp_with_block(tty, pgid).await.ok();
+                                    tcsetpgrp_with_block(&env.system, tty, pgid).await.ok();
                                 }
                             }
                         }
@@ -252,8 +253,7 @@ where
 
         if job_control == Some(JobControl::Foreground) {
             if let Some(tty) = env.tty {
-                env.system
-                    .tcsetpgrp_with_block(tty, env.main_pgid)
+                tcsetpgrp_with_block(&env.system, tty, env.main_pgid)
                     .await
                     .ok();
             }

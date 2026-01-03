@@ -246,36 +246,6 @@ impl<T> System for T where
 ///
 /// This trait provides some extension methods for `System`.
 pub trait SystemEx: System {
-    /// Switches the foreground process group with SIGTTOU blocked.
-    ///
-    /// This is a convenience function to change the foreground process group
-    /// safely. If you call [`TcSetPgrp::tcsetpgrp`] from a background process,
-    /// the process is stopped by SIGTTOU by default. To prevent this effect,
-    /// SIGTTOU must be blocked or ignored when `tcsetpgrp` is called.  This
-    /// function uses [`Sigmask::sigmask`] to block SIGTTOU before calling
-    /// `tcsetpgrp` and also to restore the original signal mask after
-    /// `tcsetpgrp`.
-    ///
-    /// Use [`tcsetpgrp_without_block`](Self::tcsetpgrp_without_block) if you
-    /// need to make sure the shell is in the foreground before changing the
-    /// foreground job.
-    fn tcsetpgrp_with_block(&mut self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> {
-        async move {
-            let sigttou = self
-                .signal_number_from_name(signal::Name::Ttou)
-                .ok_or(Errno::EINVAL)?;
-            let mut old_mask = Vec::new();
-
-            self.sigmask(Some((SigmaskOp::Add, &[sigttou])), Some(&mut old_mask))?;
-
-            let result = self.tcsetpgrp(fd, pgid).await;
-
-            let result_2 = self.sigmask(Some((SigmaskOp::Set, &old_mask)), None);
-
-            result.and(result_2)
-        }
-    }
-
     /// Switches the foreground process group with the default SIGTTOU settings.
     ///
     /// This is a convenience function to ensure the shell has been in the

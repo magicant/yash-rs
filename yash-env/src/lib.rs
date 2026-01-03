@@ -340,7 +340,7 @@ impl<S: System> Env<S> {
     ///
     /// If the current process belongs to the same process group as the session
     /// leader, this function forces the current process to be in the foreground
-    /// by calling [`SystemEx::tcsetpgrp_with_block`]. Otherwise, this function
+    /// by calling [`job::tcsetpgrp_with_block`]. Otherwise, this function
     /// suspends the process until it is resumed in the foreground by another
     /// job-controlling process (see [`SystemEx::tcsetpgrp_without_block`]).
     ///
@@ -360,7 +360,7 @@ impl<S: System> Env<S> {
         let fd = self.get_tty()?;
 
         if self.system.getsid(Pid(0)) == Ok(self.main_pgid) {
-            self.system.tcsetpgrp_with_block(fd, self.main_pgid).await
+            job::tcsetpgrp_with_block(&self.system, fd, self.main_pgid).await
         } else {
             self.system
                 .tcsetpgrp_without_block(fd, self.main_pgid)
