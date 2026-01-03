@@ -19,7 +19,9 @@
 use crate::Env;
 use crate::signal;
 use crate::source::Location;
-use crate::system::System;
+use crate::system::resource::{LimitPair, Resource};
+use crate::system::r#virtual::SignalEffect;
+use crate::system::{Disposition, SigmaskOp, System};
 use std::cell::RefCell;
 use std::ffi::c_int;
 use std::ops::ControlFlow;
@@ -331,6 +333,49 @@ impl<S> std::fmt::Debug for RunReadEvalLoop<S> {
 
 pub mod command;
 pub mod expansion;
+
+/// Terminates the current process with the given exit status, possibly sending
+/// a signal to kill the process.
+///
+/// If the exit status represents a signal that killed the last executed
+/// command, this function sends the signal to the current process to propagate
+/// the termination status to the parent process. Otherwise, this function
+/// terminates the process with the given exit status.
+pub async fn exit_or_raise<S>(system: &S, exit_status: ExitStatus) -> !
+where
+    S: System + ?Sized,
+{
+    async fn maybe_raise<S>(system: &S, exit_status: ExitStatus) -> crate::system::Result<()>
+    where
+        S: System + ?Sized,
+    {
+        let Some(signal) = exit_status.to_signal(system, /* exact */ true) else {
+            return Ok(());
+        };
+        if !matches!(SignalEffect::of(signal.0), SignalEffect::Terminate { .. }) {
+            return Ok(());
+        }
+
+        // Disable core dump
+        system.setrlimit(Resource::CORE, LimitPair { soft: 0, hard: 0 })?;
+
+        if signal.0 != signal::Name::Kill {
+            // Reset signal disposition
+            system.sigaction(signal.1, Disposition::Default)?;
+        }
+
+        // Unblock the signal
+        system.sigmask(Some((SigmaskOp::Remove, &[signal.1])), None)?;
+
+        // Send the signal to the current process
+        system.raise(signal.1).await?;
+
+        Ok(())
+    }
+
+    maybe_raise(system, exit_status).await.ok();
+    match system.exit(exit_status).await {}
+}
 
 #[cfg(test)]
 mod tests {

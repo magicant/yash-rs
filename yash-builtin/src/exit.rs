@@ -37,8 +37,8 @@
 //!   trap.
 //!
 //! The exit status is meant to be passed to
-//! [`SystemEx::exit_or_raise`](yash_env::system::SystemEx::exit_or_raise) to
-//! exit (or terminate) the shell process properly.
+//! [`exit_or_raise`](yash_env::semantics::exit_or_raise) to exit (or terminate)
+//! the shell process properly.
 //!
 //! In case of an error, the result will have a [`Divert::Interrupt`] value
 //! instead, in which case the shell will not exit if it is interactive.

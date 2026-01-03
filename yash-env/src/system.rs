@@ -149,9 +149,7 @@ use crate::str::UnixString;
 #[cfg(doc)]
 use crate::subshell::Subshell;
 use crate::trap::SignalSystem;
-use std::convert::Infallible;
 use std::fmt::Debug;
-use r#virtual::SignalEffect;
 
 /// API to the system-managed parts of the environment.
 ///
@@ -245,51 +243,6 @@ impl<T> System for T where
 /// Extension for [`System`]
 ///
 /// This trait provides some extension methods for `System`.
-pub trait SystemEx: System {
-    /// Terminates the current process with the given exit status, possibly
-    /// sending a signal to kill the process.
-    ///
-    /// If the exit status represents a signal that killed the last executed
-    /// command, this function sends the signal to the current process to
-    /// propagate the signal to the parent process. Otherwise, this function
-    /// terminates the process with the given exit status.
-    fn exit_or_raise(&mut self, exit_status: ExitStatus) -> impl Future<Output = Infallible> {
-        async fn maybe_raise<S: System + ?Sized>(
-            exit_status: ExitStatus,
-            system: &mut S,
-        ) -> Option<Infallible> {
-            let signal = exit_status.to_signal(system, /* exact */ true)?;
-
-            if !matches!(SignalEffect::of(signal.0), SignalEffect::Terminate { .. }) {
-                return None;
-            }
-
-            // Disable core dump
-            system
-                .setrlimit(Resource::CORE, LimitPair { soft: 0, hard: 0 })
-                .ok()?;
-
-            if signal.0 != signal::Name::Kill {
-                // Reset signal disposition
-                system.sigaction(signal.1, Disposition::Default).ok()?;
-            }
-
-            // Unblock the signal
-            system
-                .sigmask(Some((SigmaskOp::Remove, &[signal.1])), None)
-                .ok()?;
-
-            // Send the signal to the current process
-            system.raise(signal.1).await.ok()?;
-
-            None
-        }
-
-        async move {
-            maybe_raise(exit_status, self).await;
-            self.exit(exit_status).await
-        }
-    }
-}
+pub trait SystemEx: System {}
 
 impl<T: System + ?Sized> SystemEx for T {}
