@@ -17,12 +17,11 @@
 //! Working directory path handling
 
 use super::Env;
-use crate::System;
 use crate::path::Path;
 use crate::system::AT_FDCWD;
 use crate::system::Errno;
 use crate::system::Fstat;
-use crate::system::GetCwd as _;
+use crate::system::GetCwd;
 use crate::variable::AssignError;
 use crate::variable::PWD;
 use crate::variable::Scope::Global;
@@ -46,7 +45,7 @@ pub enum PreparePwdError {
     GetCwdError(#[from] Errno),
 }
 
-impl<S: System> Env<S> {
+impl<S> Env<S> {
     /// Returns the value of the `$PWD` variable if it is correct.
     ///
     /// The variable is correct if:
@@ -56,7 +55,10 @@ impl<S: System> Env<S> {
     ///   including symbolic link components), and
     /// - there is no dot (`.`) or dot-dot (`..`) component in the pathname.
     #[must_use]
-    pub fn get_pwd_if_correct(&self) -> Option<&str> {
+    pub fn get_pwd_if_correct(&self) -> Option<&str>
+    where
+        S: Fstat,
+    {
         self.variables.get_scalar(PWD).filter(|pwd| {
             if !Path::new(pwd).is_absolute() {
                 return false;
@@ -80,7 +82,10 @@ impl<S: System> Env<S> {
     /// Tests if the `$PWD` variable is correct.
     #[inline]
     #[must_use]
-    fn has_correct_pwd(&self) -> bool {
+    fn has_correct_pwd(&self) -> bool
+    where
+        S: Fstat,
+    {
         self.get_pwd_if_correct().is_some()
     }
 
@@ -92,7 +97,10 @@ impl<S: System> Env<S> {
     ///
     /// This function is meant for initializing the `$PWD` variable when the
     /// shell starts.
-    pub fn prepare_pwd(&mut self) -> Result<(), PreparePwdError> {
+    pub fn prepare_pwd(&mut self) -> Result<(), PreparePwdError>
+    where
+        S: Fstat + GetCwd,
+    {
         if !self.has_correct_pwd() {
             let dir = self
                 .system
