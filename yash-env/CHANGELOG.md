@@ -141,8 +141,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Removed
 
-- `&system::SharedSystem` no longer implements `System` because all `System`
-  methods now can be called on `&SharedSystem` directly.
+- `&system::SharedSystem` no longer implements `System` or `trap::SignalSystem`
+  because all the required methods can now be called on `&SharedSystem` directly.
 
 ## [0.10.1] - 2025-11-29
 
