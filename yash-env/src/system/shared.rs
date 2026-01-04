@@ -66,7 +66,6 @@ use super::SignalSystem;
 use super::Signals;
 use super::Stat;
 use super::Sysconf;
-use super::System;
 use super::TcGetPgrp;
 use super::TcSetPgrp;
 use super::Times;
@@ -159,7 +158,7 @@ use std::time::Instant;
 #[derive(Debug)]
 pub struct SharedSystem<S>(pub(super) Rc<RefCell<SelectSystem<S>>>);
 
-impl<S: System> SharedSystem<S> {
+impl<S> SharedSystem<S> {
     /// Creates a new shared system.
     pub fn new(system: S) -> Self {
         SharedSystem(Rc::new(RefCell::new(SelectSystem::new(system))))
@@ -169,7 +168,10 @@ impl<S: System> SharedSystem<S> {
     ///
     /// This function waits for one or more bytes to be available for reading.
     /// If successful, returns the number of bytes read.
-    pub async fn read_async(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
+    pub async fn read_async(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize>
+    where
+        S: Fcntl + Read,
+    {
         let was_nonblocking = self.get_and_set_nonblocking(fd, true)?;
 
         // We need to retain a strong reference to the waker outside the poll_fn
@@ -204,7 +206,10 @@ impl<S: System> SharedSystem<S> {
     /// returned.
     ///
     /// This function silently ignores signals that may interrupt writes.
-    pub async fn write_all(&self, fd: Fd, mut buffer: &[u8]) -> Result<usize> {
+    pub async fn write_all(&self, fd: Fd, mut buffer: &[u8]) -> Result<usize>
+    where
+        S: Fcntl + Write,
+    {
         if buffer.is_empty() {
             return Ok(0);
         }
@@ -244,12 +249,18 @@ impl<S: System> SharedSystem<S> {
     }
 
     /// Convenience function for printing a message to the standard error
-    pub async fn print_error(&self, message: &str) {
+    pub async fn print_error(&self, message: &str)
+    where
+        S: Fcntl + Write,
+    {
         _ = self.write_all(Fd::STDERR, message.as_bytes()).await;
     }
 
     /// Waits until the specified time point.
-    pub async fn wait_until(&self, target: Instant) {
+    pub async fn wait_until(&self, target: Instant)
+    where
+        S: Clock,
+    {
         // We need to retain a strong reference to the waker outside the poll_fn
         // function because SelectSystem only retains a weak reference to it.
         // This allows SelectSystem to discard defunct wakers if this async task
@@ -326,14 +337,20 @@ impl<S: System> SharedSystem<S> {
     ///
     /// This function may wake up a task even if the condition it is expecting
     /// has not yet been met.
-    pub fn select(&self, poll: bool) -> Result<()> {
+    pub fn select(&self, poll: bool) -> Result<()>
+    where
+        S: Select + CaughtSignals + Clock,
+    {
         self.0.borrow_mut().select(poll)
     }
 
     /// Creates a new child process.
     ///
     /// See [`Fork::new_child_process`] for details.
-    pub fn new_child_process(&self) -> Result<ChildProcessStarter<S>> {
+    pub fn new_child_process(&self) -> Result<ChildProcessStarter<S>>
+    where
+        S: Fork,
+    {
         self.0.borrow().new_child_process()
     }
 }
@@ -679,7 +696,7 @@ impl<T: SetRlimit> SetRlimit for SharedSystem<T> {
     }
 }
 
-impl<S: System> SignalSystem for SharedSystem<S> {
+impl<S: Signals + Sigmask + Sigaction> SignalSystem for SharedSystem<S> {
     #[inline]
     fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
         Signals::signal_name_from_number(self, number)
