@@ -154,6 +154,7 @@ use std::time::Instant;
 /// up when needed.
 /// (TBD code example)
 ///
+/// [`System`]: crate::system::System
 /// [`VirtualSystem`]: crate::system::virtual::VirtualSystem
 #[derive(Debug)]
 pub struct SharedSystem<S>(pub(super) Rc<RefCell<SelectSystem<S>>>);
