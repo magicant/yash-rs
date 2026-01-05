@@ -27,7 +27,11 @@ use crate::semantics::{ExitStatus, Field, Result};
 use crate::source::Location;
 use crate::source::pretty::{Report, ReportType, Snippet};
 use crate::subshell::{JobControl, Subshell};
-use crate::system::{Errno, Exec, ShellPath, System};
+use crate::system::resource::SetRlimit;
+use crate::system::{
+    Close, Dup, Errno, Exec, Exit, Fork, GetPid, Open, SendSignal, SetPgid, ShellPath, Sigaction,
+    Sigmask, Signals, TcSetPgrp, Wait,
+};
 use itertools::Itertools as _;
 use std::convert::Infallible;
 use std::ffi::CString;
@@ -111,7 +115,7 @@ impl<S> std::fmt::Debug for RunFunction<S> {
 pub struct ReplaceCurrentProcessError {
     /// Path of the external utility attempted to be executed
     pub path: CString,
-    /// Error returned by the [`execve`](crate::system::Exec::execve) system call
+    /// Error returned by the [`execve`](Exec::execve) system call
     pub errno: Errno,
 }
 
@@ -119,10 +123,10 @@ pub struct ReplaceCurrentProcessError {
 ///
 /// This function performs the very last step of the simple command execution.
 /// It disables the internal signal dispositions and calls the
-/// [`execve`](crate::system::Exec::execve) system call. If the call fails, it
-/// updates `env.exit_status` and returns an error, in which case the caller
-/// should print an error message and terminate the current process with the
-/// exit status.
+/// [`execve`](Exec::execve) system call. If the call fails, it updates
+/// `env.exit_status` and returns an error, in which case the caller should
+/// print an error message and terminate the current process with the exit
+/// status.
 ///
 /// If the `execve` call fails with [`ENOEXEC`](Errno::ENOEXEC), this function
 /// falls back on invoking the shell with the given arguments, so that the shell
@@ -134,7 +138,7 @@ pub struct ReplaceCurrentProcessError {
 ///
 /// This function is for implementing the simple command execution semantics and
 /// the `exec` built-in utility.
-pub async fn replace_current_process<S: System>(
+pub async fn replace_current_process<S: Exec + ShellPath + Signals + Sigmask + Sigaction>(
     env: &mut Env<S>,
     path: CString,
     args: Vec<Field>,
@@ -237,7 +241,7 @@ impl<'a> From<&'a StartSubshellError> for Report<'a> {
 /// This function is for implementing the simple command execution semantics and
 /// the `command` built-in utility. This function internally uses
 /// [`replace_current_process`] to execute the utility in the subshell.
-pub async fn run_external_utility_in_subshell<S: System + 'static>(
+pub async fn run_external_utility_in_subshell<S>(
     env: &mut Env<S>,
     path: CString,
     args: Vec<Field>,
@@ -247,7 +251,26 @@ pub async fn run_external_utility_in_subshell<S: System + 'static>(
         ReplaceCurrentProcessError,
         Location,
     ) -> PinFuture<'_>,
-) -> Result<ExitStatus> {
+) -> Result<ExitStatus>
+where
+    S: Close
+        + Dup
+        + Exec
+        + Exit
+        + Fork
+        + GetPid
+        + Open
+        + SendSignal
+        + SetPgid
+        + SetRlimit
+        + ShellPath
+        + Sigaction
+        + Sigmask
+        + Signals
+        + TcSetPgrp
+        + Wait
+        + 'static,
+{
     let utility = args[0].clone();
 
     let job_name = if env.controls_jobs() {
