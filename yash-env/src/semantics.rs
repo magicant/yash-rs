@@ -19,9 +19,9 @@
 use crate::Env;
 use crate::signal;
 use crate::source::Location;
-use crate::system::resource::{LimitPair, Resource};
+use crate::system::resource::{LimitPair, Resource, SetRlimit};
 use crate::system::r#virtual::SignalEffect;
-use crate::system::{Disposition, SigmaskOp, System};
+use crate::system::{Disposition, Exit, SendSignal, Sigaction, Sigmask, SigmaskOp, Signals};
 use std::cell::RefCell;
 use std::ffi::c_int;
 use std::ops::ControlFlow;
@@ -127,12 +127,12 @@ impl ExitStatus {
     ///
     /// If `self` is not a valid signal exit status, this function returns `None`.
     #[must_use]
-    pub fn to_signal<S: System + ?Sized>(
+    pub fn to_signal<S: Signals + ?Sized>(
         self,
         system: &S,
         exact: bool,
     ) -> Option<(signal::Name, signal::Number)> {
-        fn convert<S: System + ?Sized>(
+        fn convert<S: Signals + ?Sized>(
             exit_status: ExitStatus,
             offset: c_int,
             system: &S,
@@ -343,11 +343,11 @@ pub mod expansion;
 /// terminates the process with the given exit status.
 pub async fn exit_or_raise<S>(system: &S, exit_status: ExitStatus) -> !
 where
-    S: System + ?Sized,
+    S: Signals + Sigmask + Sigaction + SendSignal + SetRlimit + Exit + ?Sized,
 {
     async fn maybe_raise<S>(system: &S, exit_status: ExitStatus) -> crate::system::Result<()>
     where
-        S: System + ?Sized,
+        S: Signals + Sigmask + Sigaction + SendSignal + SetRlimit + ?Sized,
     {
         let Some(signal) = exit_status.to_signal(system, /* exact */ true) else {
             return Ok(());
