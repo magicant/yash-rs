@@ -21,10 +21,9 @@
 //! After configuring the builder with some options, you can
 //! [start](Subshell::start) the subshell.
 //!
-//! [`Subshell`] is implemented as a wrapper around
-//! [`Fork::new_child_process`](crate::system::Fork::new_child_process). You
-//! should prefer `Subshell` for the purpose of creating a subshell because it
-//! helps to arrange the child process properly.
+//! [`Subshell`] is implemented as a wrapper around [`Fork::new_child_process`].
+//! You should prefer `Subshell` for the purpose of creating a subshell because
+//! it helps to arrange the child process properly.
 
 use crate::Env;
 use crate::job::Pid;
@@ -34,13 +33,22 @@ use crate::semantics::exit_or_raise;
 use crate::signal;
 use crate::stack::Frame;
 use crate::system::ChildProcessTask;
+use crate::system::Close;
+use crate::system::Dup;
 use crate::system::Errno;
-use crate::system::GetPid as _;
-use crate::system::SetPgid as _;
-use crate::system::Sigmask as _;
+use crate::system::Exit;
+use crate::system::Fork;
+use crate::system::GetPid;
+use crate::system::Open;
+use crate::system::SendSignal;
+use crate::system::SetPgid;
+use crate::system::Sigaction;
+use crate::system::Sigmask;
 use crate::system::SigmaskOp;
-use crate::system::Signals as _;
-use crate::system::System;
+use crate::system::Signals;
+use crate::system::TcSetPgrp;
+use crate::system::Wait;
+use crate::system::resource::SetRlimit;
 use std::marker::PhantomData;
 use std::pin::Pin;
 
@@ -72,7 +80,19 @@ impl<S, F> std::fmt::Debug for Subshell<S, F> {
 
 impl<S, F> Subshell<S, F>
 where
-    S: System,
+    S: Close
+        + Dup
+        + Exit
+        + Fork
+        + GetPid
+        + Open
+        + SendSignal
+        + SetPgid
+        + SetRlimit
+        + Sigaction
+        + Sigmask
+        + Signals
+        + TcSetPgrp,
     F: for<'a> FnOnce(&'a mut Env<S>, Option<JobControl>) -> Pin<Box<dyn Future<Output = ()> + 'a>>
         + 'static,
     // TODO Revisit to simplify this function type when impl Future is allowed in return type
@@ -242,7 +262,10 @@ where
     ///
     /// When a job-controlled subshell suspends, this function does not add it
     /// to `env.jobs`. You have to do it for yourself if necessary.
-    pub async fn start_and_wait(self, env: &mut Env<S>) -> Result<(Pid, ProcessResult), Errno> {
+    pub async fn start_and_wait(self, env: &mut Env<S>) -> Result<(Pid, ProcessResult), Errno>
+    where
+        S: Wait,
+    {
         let (pid, job_control) = self.start(env).await?;
         let result = loop {
             let result = env.wait_for_subshell_to_halt(pid).await?.1;
@@ -268,12 +291,12 @@ where
 /// This object blocks SIGINT and SIGQUIT and remembers the previous signal
 /// blocking mask, which is restored when the object is dropped.
 #[derive(Debug)]
-struct MaskGuard<'a, S: System> {
+struct MaskGuard<'a, S: Signals + Sigmask> {
     env: &'a mut Env<S>,
     old_mask: Option<Vec<signal::Number>>,
 }
 
-impl<'a, S: System> MaskGuard<'a, S> {
+impl<'a, S: Signals + Sigmask> MaskGuard<'a, S> {
     fn new(env: &'a mut Env<S>) -> Self {
         let old_mask = None;
         Self { env, old_mask }
@@ -306,7 +329,7 @@ impl<'a, S: System> MaskGuard<'a, S> {
     }
 }
 
-impl<S: System> Drop for MaskGuard<'_, S> {
+impl<S: Signals + Sigmask> Drop for MaskGuard<'_, S> {
     fn drop(&mut self) {
         if let Some(old_mask) = &self.old_mask {
             self.env
@@ -326,8 +349,6 @@ mod tests {
     use crate::semantics::ExitStatus;
     use crate::source::Location;
     use crate::system::Disposition;
-    use crate::system::Errno;
-    use crate::system::SendSignal as _;
     use crate::system::r#virtual::Inode;
     use crate::system::r#virtual::SystemState;
     use crate::system::r#virtual::{SIGCHLD, SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU};
