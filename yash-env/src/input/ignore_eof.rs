@@ -20,8 +20,7 @@ use super::{Context, Input, Result};
 use crate::Env;
 use crate::io::Fd;
 use crate::option::{IgnoreEof as IgnoreEofOption, Interactive, Off};
-use crate::system::Isatty as _;
-use crate::system::System;
+use crate::system::{Fcntl, Isatty, Write};
 use std::cell::RefCell;
 
 /// `Input` decorator that ignores EOF on a terminal
@@ -91,7 +90,7 @@ impl<S, T: Clone> Clone for IgnoreEof<'_, '_, S, T> {
     }
 }
 
-impl<S: System, T: Input> Input for IgnoreEof<'_, '_, S, T> {
+impl<S: Fcntl + Isatty + Write, T: Input> Input for IgnoreEof<'_, '_, S, T> {
     #[allow(clippy::await_holding_refcell_ref)]
     async fn next_line(&mut self, context: &Context) -> Result {
         let mut remaining_tries = 50;

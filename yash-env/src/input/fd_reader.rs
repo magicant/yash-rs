@@ -19,7 +19,7 @@
 use super::{Context, Input, Result};
 use crate::io::Fd;
 use crate::option::State;
-use crate::system::{SharedSystem, System};
+use crate::system::{Fcntl, Read, SharedSystem, Write};
 use std::cell::Cell;
 use std::rc::Rc;
 use std::slice::from_mut;
@@ -90,7 +90,7 @@ impl<S> Clone for FdReader<S> {
     }
 }
 
-impl<S: System> Input for FdReader<S> {
+impl<S: Fcntl + Read + Write> Input for FdReader<S> {
     async fn next_line(&mut self, _context: &Context) -> Result {
         // TODO Read many bytes at once if seekable
 
