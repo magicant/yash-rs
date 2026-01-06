@@ -143,7 +143,6 @@ impl State {
     /// If the signal number is not recognized, the signal name `Rtmin(-1)` is
     /// used as a fallback replacement.
     #[must_use]
-    // TODO This function only needs SignalSystem, not System
     pub fn from_process_state<S: Signals>(state: ProcessState, system: &S) -> Self {
         match state {
             ProcessState::Running => Self::Running,
