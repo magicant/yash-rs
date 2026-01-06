@@ -20,7 +20,7 @@ use super::expand_posix;
 use std::cell::RefCell;
 use yash_env::Env;
 use yash_env::input::{Context, Input, Result};
-use yash_env::system::System;
+use yash_env::system::{Fcntl, Write};
 use yash_env::variable::{PS1, PS2, VariableSet};
 
 /// [`Input`] decorator that shows a command prompt
@@ -64,7 +64,7 @@ impl<S, T: Clone> Clone for Prompter<'_, '_, S, T> {
 
 impl<S, T> Input for Prompter<'_, '_, S, T>
 where
-    S: System + 'static,
+    S: Fcntl + Write + 'static,
     T: Input,
 {
     #[allow(clippy::await_holding_refcell_ref)]
@@ -76,7 +76,7 @@ where
 
 async fn print_prompt<S>(env: &mut Env<S>, context: &Context)
 where
-    S: System + 'static,
+    S: Fcntl + Write + 'static,
 {
     // Obtain the prompt string
     let prompt = fetch_posix(&env.variables, context);
