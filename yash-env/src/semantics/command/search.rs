@@ -37,12 +37,11 @@
 //! [simple command]: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_09_01
 
 use crate::Env;
-use crate::System;
 use crate::builtin::Builtin;
 use crate::builtin::Type::{Special, Substitutive};
 use crate::function::Function;
 use crate::path::PathBuf;
-use crate::system::IsExecutableFile as _;
+use crate::system::IsExecutableFile;
 use crate::variable::Expansion;
 use crate::variable::PATH;
 use std::ffi::CStr;
@@ -193,7 +192,7 @@ pub trait PathEnv {
     // TODO Cache the results of external utility search
 }
 
-impl<S: System> PathEnv for Env<S> {
+impl<S: IsExecutableFile> PathEnv for Env<S> {
     /// Returns the value of the `$PATH` variable.
     ///
     /// This function assumes that the `$PATH` variable has no quirks. If the

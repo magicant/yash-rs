@@ -19,7 +19,7 @@ use crate::Env;
 use crate::io::Fd;
 use crate::job::fmt::Accumulator;
 use crate::option::{Interactive, Monitor, Off};
-use crate::system::System;
+use crate::system::{Fcntl, Signals, Write};
 use std::cell::RefCell;
 
 /// `Input` decorator that reports job status changes before reading a line
@@ -56,7 +56,7 @@ impl<S, T: Clone> Clone for Reporter<'_, '_, S, T> {
     }
 }
 
-impl<S: System, T: Input> Input for Reporter<'_, '_, S, T> {
+impl<S: Fcntl + Signals + Write, T: Input> Input for Reporter<'_, '_, S, T> {
     #[allow(clippy::await_holding_refcell_ref)]
     async fn next_line(&mut self, context: &Context) -> Result {
         report(&mut self.env.borrow_mut()).await;
@@ -64,7 +64,7 @@ impl<S: System, T: Input> Input for Reporter<'_, '_, S, T> {
     }
 }
 
-async fn report<S: System>(env: &mut Env<S>) {
+async fn report<S: Fcntl + Signals + Write>(env: &mut Env<S>) {
     if env.options.get(Interactive) == Off || env.options.get(Monitor) == Off {
         return;
     }

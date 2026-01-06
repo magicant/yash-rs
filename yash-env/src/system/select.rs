@@ -22,9 +22,9 @@ use super::Result;
 #[cfg(doc)]
 use super::SharedSystem;
 use super::SigmaskOp;
-use super::System;
 use super::signal;
 use crate::io::Fd;
+use crate::system::{CaughtSignals, Clock, Sigaction, Sigmask};
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::cmp::Reverse;
@@ -114,7 +114,7 @@ impl<S> DerefMut for SelectSystem<S> {
     }
 }
 
-impl<S: System> SelectSystem<S> {
+impl<S> SelectSystem<S> {
     /// Creates a new `SelectSystem` that wraps the given `System`.
     pub fn new(system: S) -> Self {
         SelectSystem {
@@ -127,7 +127,10 @@ impl<S: System> SelectSystem<S> {
     }
 
     /// Calls `sigmask` and updates `self.wait_mask`.
-    fn sigmask(&mut self, op: SigmaskOp, signal: signal::Number) -> Result<()> {
+    fn sigmask(&mut self, op: SigmaskOp, signal: signal::Number) -> Result<()>
+    where
+        S: Sigmask,
+    {
         match &mut self.wait_mask {
             None => {
                 // This is the first call to sigmask. We need to get the current
@@ -152,7 +155,10 @@ impl<S: System> SelectSystem<S> {
     ///
     /// See [`SharedSystem::get_disposition`].
     #[inline]
-    pub fn get_disposition(&self, signal: signal::Number) -> Result<Disposition> {
+    pub fn get_disposition(&self, signal: signal::Number) -> Result<Disposition>
+    where
+        S: Sigaction,
+    {
         self.system.get_sigaction(signal)
     }
 
@@ -163,7 +169,10 @@ impl<S: System> SelectSystem<S> {
         &mut self,
         signal: signal::Number,
         handling: Disposition,
-    ) -> Result<Disposition> {
+    ) -> Result<Disposition>
+    where
+        S: Sigaction + Sigmask,
+    {
         // The order of sigmask and sigaction is important to prevent the signal
         // from being caught. The signal must be caught only when the select
         // function temporarily unblocks the signal. This is to avoid race
@@ -208,7 +217,10 @@ impl<S: System> SelectSystem<S> {
         self.signal.wait_for_signals()
     }
 
-    fn wake_timeouts(&mut self) {
+    fn wake_timeouts(&mut self)
+    where
+        S: Clock,
+    {
         if !self.time.is_empty() {
             let now = self.now();
             self.time.wake_if_passed(now);
@@ -216,7 +228,10 @@ impl<S: System> SelectSystem<S> {
         self.time.gc();
     }
 
-    fn wake_on_signals(&mut self) {
+    fn wake_on_signals(&mut self)
+    where
+        S: CaughtSignals,
+    {
         let signals = self.system.caught_signals();
         if signals.is_empty() {
             self.signal.gc()
@@ -228,7 +243,10 @@ impl<S: System> SelectSystem<S> {
     /// Implements the select function for `SharedSystem`.
     ///
     /// See [`SharedSystem::select`].
-    pub fn select(&mut self, poll: bool) -> Result<()> {
+    pub fn select(&mut self, poll: bool) -> Result<()>
+    where
+        S: Select + CaughtSignals + Clock,
+    {
         let mut readers = self.io.readers();
         let mut writers = self.io.writers();
         let timeout = if poll {

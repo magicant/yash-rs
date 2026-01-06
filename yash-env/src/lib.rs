@@ -47,17 +47,28 @@ use self::semantics::Divert;
 use self::semantics::ExitStatus;
 use self::stack::Frame;
 use self::stack::Stack;
+use self::system::CaughtSignals;
+use self::system::Clock;
+use self::system::Close;
+use self::system::Dup;
 use self::system::Errno;
-use self::system::GetPid as _;
-use self::system::Isatty as _;
+use self::system::Fstat;
+use self::system::GetCwd;
+use self::system::GetPid;
+use self::system::Isatty;
 use self::system::Mode;
 use self::system::OfdAccess;
-use self::system::Open as _;
+use self::system::Open;
 use self::system::OpenFlag;
+use self::system::Select;
 pub use self::system::SharedSystem;
-use self::system::Signals as _;
+use self::system::Sigaction;
+use self::system::Sigmask;
+use self::system::Signals;
+#[allow(deprecated)]
 pub use self::system::System;
-use self::system::Wait as _;
+use self::system::TcSetPgrp;
+use self::system::Wait;
 #[cfg(unix)]
 pub use self::system::real::RealSystem;
 pub use self::system::r#virtual::VirtualSystem;
@@ -145,14 +156,17 @@ pub struct Env<S> {
     pub system: SharedSystem<S>,
 }
 
-impl<S: System> Env<S> {
+impl<S> Env<S> {
     /// Creates a new environment with the given system.
     ///
     /// Members of the new environments are default-constructed except that:
     /// - `main_pid` is initialized as `system.getpid()`
     /// - `system` is initialized as `SharedSystem::new(system)`
     #[must_use]
-    pub fn with_system(system: S) -> Self {
+    pub fn with_system(system: S) -> Self
+    where
+        S: GetPid,
+    {
         Env {
             aliases: Default::default(),
             arg0: Default::default(),
@@ -207,7 +221,7 @@ impl Env<VirtualSystem> {
     }
 }
 
-impl<S: System> Env<S> {
+impl<S> Env<S> {
     /// Initializes default variables.
     ///
     /// This function assigns the following variables to `self`:
@@ -223,7 +237,10 @@ impl<S: System> Env<S> {
     /// This function ignores any errors that may occur.
     ///
     /// TODO: PS1 should be set to `"# "` for root users.
-    pub fn init_variables(&mut self) {
+    pub fn init_variables(&mut self)
+    where
+        S: Fstat + GetCwd + GetPid,
+    {
         self.variables.init();
 
         self.variables
@@ -264,7 +281,10 @@ impl<S: System> Env<S> {
     /// [`wait_for_signals`](Self::wait_for_signals) but does not wait for
     /// signals to be caught. Instead, it only checks if any signals have been
     /// caught but not yet consumed in the [`SharedSystem`].
-    pub fn poll_signals(&mut self) -> Option<Rc<[signal::Number]>> {
+    pub fn poll_signals(&mut self) -> Option<Rc<[signal::Number]>>
+    where
+        S: Select + CaughtSignals + Clock,
+    {
         let system = self.system.clone();
 
         let mut future = std::pin::pin!(self.wait_for_signals());
@@ -291,7 +311,10 @@ impl<S: System> Env<S> {
     /// terminal. This will be changed in the future to support user
     /// configuration.
     #[must_use]
-    fn should_print_error_in_color(&self) -> bool {
+    fn should_print_error_in_color(&self) -> bool
+    where
+        S: Isatty,
+    {
         // TODO Enable color depending on user config (force/auto/never)
         // TODO Check if the terminal really supports color (needs terminfo)
         self.system.isatty(Fd::STDERR)
@@ -301,7 +324,10 @@ impl<S: System> Env<S> {
     ///
     /// This function returns `self.tty` if it is `Some` FD. Otherwise, it
     /// opens `/dev/tty` and saves the new FD to `self.tty` before returning it.
-    pub fn get_tty(&mut self) -> Result<Fd, Errno> {
+    pub fn get_tty(&mut self) -> Result<Fd, Errno>
+    where
+        S: Open + Dup + Close,
+    {
         if let Some(fd) = self.tty {
             return Ok(fd);
         }
@@ -355,7 +381,10 @@ impl<S: System> Env<S> {
     /// shell into the foreground if the shell is in the same process group as
     /// the session leader because it is unlikely that there is another
     /// job-controlling process that can bring the shell into the foreground.
-    pub async fn ensure_foreground(&mut self) -> Result<(), Errno> {
+    pub async fn ensure_foreground(&mut self) -> Result<(), Errno>
+    where
+        S: Open + Dup + Close + GetPid + Signals + Sigmask + Sigaction + TcSetPgrp,
+    {
         let fd = self.get_tty()?;
 
         if self.system.getsid(Pid(0)) == Ok(self.main_pgid) {
@@ -385,7 +414,10 @@ impl<S: System> Env<S> {
     /// If the target subshell is not job-controlled, you may want to use
     /// [`wait_for_subshell_to_finish`](Self::wait_for_subshell_to_finish)
     /// instead.
-    pub async fn wait_for_subshell(&mut self, target: Pid) -> Result<(Pid, ProcessState), Errno> {
+    pub async fn wait_for_subshell(&mut self, target: Pid) -> Result<(Pid, ProcessState), Errno>
+    where
+        S: Signals + Sigmask + Sigaction + Wait,
+    {
         // We need to set the internal disposition before calling `wait` so we don't
         // miss any `SIGCHLD` that may arrive between `wait` and `wait_for_signal`.
         self.traps
@@ -413,7 +445,10 @@ impl<S: System> Env<S> {
     pub async fn wait_for_subshell_to_halt(
         &mut self,
         target: Pid,
-    ) -> Result<(Pid, ProcessResult), Errno> {
+    ) -> Result<(Pid, ProcessResult), Errno>
+    where
+        S: Signals + Sigmask + Sigaction + Wait,
+    {
         loop {
             let (pid, state) = self.wait_for_subshell(target).await?;
             if let ProcessState::Halted(result) = state {
@@ -432,7 +467,10 @@ impl<S: System> Env<S> {
     pub async fn wait_for_subshell_to_finish(
         &mut self,
         target: Pid,
-    ) -> Result<(Pid, ExitStatus), Errno> {
+    ) -> Result<(Pid, ExitStatus), Errno>
+    where
+        S: Signals + Sigmask + Sigaction + Wait,
+    {
         loop {
             let (pid, result) = self.wait_for_subshell_to_halt(target).await?;
             if !result.is_stopped() {
@@ -449,7 +487,10 @@ impl<S: System> Env<S> {
     ///
     /// Note that updates of subshells that are not managed in `self.jobs` are
     /// lost when you call this function.
-    pub fn update_all_subshell_statuses(&mut self) {
+    pub fn update_all_subshell_statuses(&mut self)
+    where
+        S: Wait,
+    {
         while let Ok(Some((pid, state))) = self.system.wait(Pid::ALL) {
             self.jobs.update_status(pid, state);
         }

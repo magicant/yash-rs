@@ -55,7 +55,7 @@ use super::ProcessResult;
 use super::ProcessState;
 use crate::semantics::ExitStatus;
 use crate::signal;
-use crate::system::System;
+use crate::system::Signals;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
@@ -143,8 +143,7 @@ impl State {
     /// If the signal number is not recognized, the signal name `Rtmin(-1)` is
     /// used as a fallback replacement.
     #[must_use]
-    // TODO This function only needs SignalSystem, not System
-    pub fn from_process_state<S: System>(state: ProcessState, system: &S) -> Self {
+    pub fn from_process_state<S: Signals>(state: ProcessState, system: &S) -> Self {
         match state {
             ProcessState::Running => Self::Running,
             ProcessState::Halted(result) => match result {
@@ -273,8 +272,7 @@ impl Accumulator {
     ///
     /// The `indices_reported` field is updated to include the `index`
     /// parameter.
-    // TODO This function only needs SignalSystem, not System
-    pub fn add<S: System>(&mut self, index: usize, job: &Job, system: &S) {
+    pub fn add<S: Signals>(&mut self, index: usize, job: &Job, system: &S) {
         use std::fmt::Write as _;
 
         if self.pgid_only {

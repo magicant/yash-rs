@@ -21,7 +21,7 @@ use crate::source::Location;
 use crate::source::pretty::{Report, ReportType, Snippet};
 #[cfg(doc)]
 use crate::system::SharedSystem;
-use crate::system::{Close, Dup, FdFlag, System};
+use crate::system::{Close, Dup, Fcntl, FdFlag, Isatty, Write};
 use annotate_snippets::Renderer;
 use std::borrow::Cow;
 #[cfg(unix)]
@@ -105,7 +105,7 @@ where
 /// To print the returned string to the standard error, you can use
 /// [`SharedSystem::print_error`].
 #[must_use]
-pub fn report_to_string<S: System>(env: &Env<S>, report: &Report<'_>) -> String {
+pub fn report_to_string<S: Isatty>(env: &Env<S>, report: &Report<'_>) -> String {
     let renderer = if env.should_print_error_in_color() {
         Renderer::styled()
     } else {
@@ -118,7 +118,7 @@ pub fn report_to_string<S: System>(env: &Env<S>, report: &Report<'_>) -> String 
 ///
 /// This function converts the `report` into a string by using
 /// [`report_to_string`], and prints the result to the standard error.
-pub async fn print_report<S: System>(env: &mut Env<S>, report: &Report<'_>) {
+pub async fn print_report<S: Isatty + Fcntl + Write>(env: &mut Env<S>, report: &Report<'_>) {
     let report_str = report_to_string(env, report);
     env.system.print_error(&report_str).await;
 }
@@ -127,7 +127,7 @@ pub async fn print_report<S: System>(env: &mut Env<S>, report: &Report<'_>) {
 ///
 /// This function constructs a temporary [`Report`] based on the given `title`,
 /// `label`, and `location`. The message is printed using [`print_report`].
-pub async fn print_error<S: System>(
+pub async fn print_error<S: Isatty + Fcntl + Write>(
     env: &mut Env<S>,
     title: Cow<'_, str>,
     label: Cow<'_, str>,

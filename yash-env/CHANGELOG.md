@@ -113,6 +113,10 @@ A _private dependency_ is used internally and not visible to downstream users.
       the new `system::SharedSystem::new_child_process` inherent method instead.
 - The `System` trait has been split into smaller, more specialized traits. It
   is now a supertrait of those new traits declared in the `system` module.
+- Functions that previously required `System` as a trait bound now require only
+  the specific traits they need. For example, `system::SharedSystem::new` no
+  longer requires `S: System`, and `system::SharedSystem::read_async` now
+  requires only `S: system::Fcntl + system::Read` instead of `S: System`.
 - `System::tcsetpgrp` now returns a `FlexFuture<Result<()>>` instead of a
   synchronous `Result<()>`. This change allows virtual systems to simulate the
   blocking behavior of `tcsetpgrp` when called from a background process group,
@@ -141,8 +145,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Removed
 
-- `&system::SharedSystem` no longer implements `System` because all `System`
-  methods now can be called on `&SharedSystem` directly.
+- `&system::SharedSystem` no longer implements `System` or `trap::SignalSystem`
+  because all the required methods can now be called on `&SharedSystem` directly.
 
 ## [0.10.1] - 2025-11-29
 
