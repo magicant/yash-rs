@@ -25,7 +25,6 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::rc::Rc;
 use yash_env::Env;
-use yash_env::System;
 use yash_env::alias::Alias;
 use yash_env::builtin::{Builtin, Type};
 use yash_env::parser::IsKeyword;
@@ -35,8 +34,7 @@ use yash_env::semantics::Field;
 use yash_env::semantics::command::search::{Target, search};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::str::UnixStr;
-use yash_env::system::GetCwd as _;
-use yash_env::system::IsExecutableFile as _;
+use yash_env::system::{Fcntl, Fstat, GetCwd, IsExecutableFile, Isatty, Sysconf, Write};
 use yash_quote::quoted;
 
 /// Result of [categorizing](categorize) a command
@@ -145,7 +143,10 @@ trait NormalizeEnv {
     fn pwd(&self) -> Result<PathBuf, ()>;
 }
 
-impl<S: System> NormalizeEnv for Env<S> {
+impl<S> NormalizeEnv for Env<S>
+where
+    S: Fstat + GetCwd + IsExecutableFile,
+{
     #[inline]
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.system.is_executable_file(path)
@@ -204,7 +205,7 @@ pub fn categorize<'f, S>(
     env: &mut SearchEnv<S>,
 ) -> Result<Categorization<S>, NotFound<'f>>
 where
-    S: System + 'static,
+    S: Fstat + GetCwd + IsExecutableFile + Sysconf + 'static,
 {
     if env.params.categories.contains(Category::Keyword) {
         let IsKeyword(is_keyword) = env.env.any.get().expect("IsKeyword not found in env.any");
@@ -344,7 +345,10 @@ impl Identify {
     /// This function requires an instance of [`IsKeyword`] to be present in the
     /// environment's [`any`](Env::any) storage to check for keywords. If no
     /// such instance is found, this function will **panic**.
-    pub fn result<S: System + 'static>(&self, env: &mut Env<S>) -> (String, Vec<NotFound<'_>>) {
+    pub fn result<S>(&self, env: &mut Env<S>) -> (String, Vec<NotFound<'_>>)
+    where
+        S: Fstat + GetCwd + IsExecutableFile + Sysconf + 'static,
+    {
         let params = &self.search;
         let env = &mut SearchEnv { env, params };
         let mut result = String::new();
@@ -361,7 +365,10 @@ impl Identify {
     }
 
     /// Performs the identifying semantics.
-    pub async fn execute<S: System + 'static>(&self, env: &mut Env<S>) -> crate::Result {
+    pub async fn execute<S>(&self, env: &mut Env<S>) -> crate::Result
+    where
+        S: Fcntl + Fstat + GetCwd + IsExecutableFile + Isatty + Sysconf + Write + 'static,
+    {
         let (result, errors) = self.result(env);
 
         let output_result = output(env, &result).await;

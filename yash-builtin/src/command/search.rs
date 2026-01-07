@@ -27,8 +27,8 @@ use std::rc::Rc;
 use yash_env::Env;
 use yash_env::builtin::Builtin;
 use yash_env::function::Function;
+use yash_env::system::IsExecutableFile;
 use yash_env::system::Sysconf;
-use yash_env::system::System;
 use yash_env::variable::Expansion;
 
 /// Environment adapter for applying the search parameters
@@ -44,7 +44,10 @@ pub struct SearchEnv<'a, S> {
     pub params: &'a Search,
 }
 
-impl<S: System> yash_env::semantics::command::search::PathEnv for SearchEnv<'_, S> {
+impl<S> yash_env::semantics::command::search::PathEnv for SearchEnv<'_, S>
+where
+    S: IsExecutableFile + Sysconf,
+{
     /// Returns the path.
     ///
     /// If [`Search::standard_path`] is `true`, this function retrieves the
@@ -70,7 +73,7 @@ impl<S: System> yash_env::semantics::command::search::PathEnv for SearchEnv<'_, 
     }
 }
 
-impl<S: System> yash_env::semantics::command::search::ClassifyEnv<S> for SearchEnv<'_, S> {
+impl<S> yash_env::semantics::command::search::ClassifyEnv<S> for SearchEnv<'_, S> {
     fn builtin(&self, name: &str) -> Option<Builtin<S>> {
         if self.params.categories.contains(Category::Builtin) {
             self.env.builtin(name)
