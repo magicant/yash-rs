@@ -28,8 +28,7 @@ use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::{Footnote, FootnoteType, Report, ReportType};
-use yash_env::system::Errno;
-use yash_env::system::System;
+use yash_env::system::{Chdir, Errno, Fcntl, Fstat, GetCwd, Isatty, Write};
 use yash_env::variable::PWD;
 
 /// Exit status when the built-in succeeds
@@ -100,7 +99,10 @@ fn get_pwd<S>(env: &Env<S>) -> String {
 
 /// Reports that the new `$PWD` value cannot be determined, and returns the
 /// corresponding exit status.
-async fn report_pwd_error<S: System>(env: &mut Env<S>, errno: Errno, ensure_pwd: bool) -> Result {
+async fn report_pwd_error<S>(env: &mut Env<S>, errno: Errno, ensure_pwd: bool) -> Result
+where
+    S: Fcntl + Isatty + Write,
+{
     let (r#type, exit_status) = if ensure_pwd {
         (ReportType::Error, EXIT_STATUS_STALE_PWD)
     } else {
@@ -120,7 +122,10 @@ async fn report_pwd_error<S: System>(env: &mut Env<S>, errno: Errno, ensure_pwd:
 /// Entry point for executing the `cd` built-in
 ///
 /// This function uses functions in the submodules to execute the built-in.
-pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
+where
+    S: Chdir + Fcntl + Fstat + GetCwd + Isatty + Write,
+{
     let command = match syntax::parse(env, args) {
         Ok(command) => command,
         Err(e) => return report(env, &e, EXIT_STATUS_SYNTAX_ERROR).await,

@@ -18,11 +18,11 @@
 
 use std::ffi::CString;
 use thiserror::Error;
-use yash_env::System;
 use yash_env::path::Path;
 use yash_env::path::PathBuf;
 use yash_env::str::UnixStr;
 use yash_env::str::UnixString;
+use yash_env::system::Fstat;
 
 #[derive(Debug, Clone, Eq, Error, PartialEq)]
 #[error("non-existing directory component '{}'", missing.display())]
@@ -40,7 +40,7 @@ pub struct NonExistingDirectoryError {
 /// It is an error if a component preceding a dot-dot component refers to a
 /// non-existent directory. In other words, in order to canonicalize "a/b/../c"
 /// into "a/c", the directory "a/b" must exist.
-pub fn canonicalize<S: System>(
+pub fn canonicalize<S: Fstat>(
     system: &S,
     path: &Path,
 ) -> Result<PathBuf, NonExistingDirectoryError> {
@@ -57,7 +57,7 @@ pub fn canonicalize<S: System>(
 }
 
 /// Removes dot-dot components along with the preceding component.
-fn remove_dot_dot<S: System>(
+fn remove_dot_dot<S: Fstat>(
     system: &S,
     leading_slashes: usize,
     components: &mut Vec<&[u8]>,
@@ -110,7 +110,7 @@ fn create_path(leading_slashes: usize, components: &[&[u8]]) -> PathBuf {
 }
 
 /// Returns an error if the given path is not a directory.
-fn ensure_directory<S: System>(system: &S, path: PathBuf) -> Result<(), NonExistingDirectoryError> {
+fn ensure_directory<S: Fstat>(system: &S, path: PathBuf) -> Result<(), NonExistingDirectoryError> {
     match CString::new(path.into_unix_string().into_vec()) {
         Ok(path) if system.is_directory(&path) => Ok(()),
         Ok(path) => Err(NonExistingDirectoryError {

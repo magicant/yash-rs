@@ -18,10 +18,10 @@
 
 use std::ffi::CString;
 use yash_env::Env;
-use yash_env::System;
 use yash_env::path::Path;
 use yash_env::path::PathBuf;
 use yash_env::str::UnixString;
+use yash_env::system::Fstat;
 use yash_env::variable::CDPATH;
 
 /// Searches `$CDPATH` for the given path.
@@ -40,7 +40,7 @@ use yash_env::variable::CDPATH;
 ///
 /// If the given path is absolute or starts with a "." or ".." component, this
 /// function just returns `None` without any search.
-pub fn search<S: System>(env: &Env<S>, path: &Path) -> Option<PathBuf> {
+pub fn search<S: Fstat>(env: &Env<S>, path: &Path) -> Option<PathBuf> {
     if path.is_absolute() || path.starts_with(".") || path.starts_with("..") {
         return None;
     }
@@ -64,7 +64,7 @@ pub fn search<S: System>(env: &Env<S>, path: &Path) -> Option<PathBuf> {
 ///
 /// This function requires the ownership of the given path to create a temporary
 /// `CString` used in the underlying system call.
-fn ensure_directory<S: System>(system: &S, path: PathBuf) -> Option<PathBuf> {
+fn ensure_directory<S: Fstat>(system: &S, path: PathBuf) -> Option<PathBuf> {
     match CString::new(path.into_unix_string().into_vec()) {
         Ok(path) if system.is_directory(&path) => {
             Some(UnixString::from_vec(path.into_bytes()).into())

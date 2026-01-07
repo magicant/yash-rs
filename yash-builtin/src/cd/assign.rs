@@ -19,12 +19,10 @@
 use super::Mode;
 use crate::common::report::report;
 use yash_env::Env;
-use yash_env::System;
 use yash_env::path::Path;
 use yash_env::path::PathBuf;
 use yash_env::source::pretty::{Report, ReportType, Snippet, Span, SpanRole};
-use yash_env::system::Errno;
-use yash_env::system::GetCwd;
+use yash_env::system::{Errno, Fcntl, GetCwd, Isatty, Write};
 use yash_env::variable::AssignError;
 use yash_env::variable::OLDPWD;
 use yash_env::variable::PWD;
@@ -38,7 +36,10 @@ use yash_env::variable::Value::Scalar;
 ///
 /// This function examines the stack to find the command location that invoked
 /// the cd built-in.
-pub async fn set_oldpwd<S: System>(env: &mut Env<S>, value: String) -> crate::Result {
+pub async fn set_oldpwd<S>(env: &mut Env<S>, value: String) -> crate::Result
+where
+    S: Fcntl + Isatty + Write,
+{
     set_variable(env, OLDPWD, value).await
 }
 
@@ -50,12 +51,18 @@ pub async fn set_oldpwd<S: System>(env: &mut Env<S>, value: String) -> crate::Re
 ///
 /// This function examines the stack to find the command location that invoked
 /// the cd built-in.
-pub async fn set_pwd<S: System>(env: &mut Env<S>, path: PathBuf) -> crate::Result {
+pub async fn set_pwd<S>(env: &mut Env<S>, path: PathBuf) -> crate::Result
+where
+    S: Fcntl + Isatty + Write,
+{
     let value = path.into_unix_string().into_string().unwrap_or_default();
     set_variable(env, PWD, value).await
 }
 
-async fn set_variable<S: System>(env: &mut Env<S>, name: &str, value: String) -> crate::Result {
+async fn set_variable<S>(env: &mut Env<S>, name: &str, value: String) -> crate::Result
+where
+    S: Fcntl + Isatty + Write,
+{
     let current_builtin = env.stack.current_builtin();
     let current_location = current_builtin.map(|builtin| builtin.name.origin.clone());
     let var = &mut env.get_or_create_variable(name, Global);
@@ -68,11 +75,10 @@ async fn set_variable<S: System>(env: &mut Env<S>, name: &str, value: String) ->
 }
 
 /// Prints an error message for a read-only variable.
-async fn handle_assign_error<S: System>(
-    env: &mut Env<S>,
-    name: &str,
-    error: AssignError,
-) -> crate::Result {
+async fn handle_assign_error<S>(env: &mut Env<S>, name: &str, error: AssignError) -> crate::Result
+where
+    S: Fcntl + Isatty + Write,
+{
     let mut report = Report::new();
     report.r#type = ReportType::Error;
     report.title = format!("cannot update read-only variable `{name}`").into();
@@ -92,7 +98,7 @@ async fn handle_assign_error<S: System>(
 ///
 /// If `mode` is `Logical`, this function returns `path` without any
 /// modification. If `mode` is `Physical`, this function uses [`GetCwd::getcwd`]
-/// to obtain the working directory path. If `System::getcwd` fails, the error
+/// to obtain the working directory path. If `GetCwd::getcwd` fails, the error
 /// code is returned.
 pub fn new_pwd<T: GetCwd>(env: &Env<T>, mode: Mode, path: &Path) -> Result<PathBuf, Errno> {
     match mode {
