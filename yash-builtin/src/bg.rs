@@ -40,7 +40,6 @@ use crate::common::syntax::parse_arguments;
 use std::fmt::Display;
 use thiserror::Error;
 use yash_env::Env;
-use yash_env::System;
 use yash_env::io::Fd;
 #[cfg(doc)]
 use yash_env::job::JobList;
@@ -53,9 +52,7 @@ use yash_env::option::State::Off;
 use yash_env::semantics::Field;
 use yash_env::signal;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
-use yash_env::system::Errno;
-use yash_env::system::SendSignal as _;
-use yash_env::system::Signals as _;
+use yash_env::system::{Errno, Fcntl, Isatty, SendSignal, Signals, Write};
 
 // Some definitions in this module are shared with the `fg` built-in.
 
@@ -119,7 +116,7 @@ impl<'a> From<&'a OperandError> for Report<'a> {
 /// This function panics if there is no job at the specified index.
 async fn resume_job_by_index<S>(env: &mut Env<S>, index: usize) -> Result<(), ResumeError>
 where
-    S: System,
+    S: Signals + SendSignal + Fcntl + Write,
 {
     let mut job = env.jobs.get_mut(index).unwrap();
     if !job.is_owned {
@@ -158,7 +155,7 @@ where
 /// Resumes the job specified by the operand.
 async fn resume_job_by_id<S>(env: &mut Env<S>, job_id: &str) -> Result<(), OperandErrorKind>
 where
-    S: System,
+    S: Signals + SendSignal + Fcntl + Write,
 {
     let job_id = parse(job_id)?;
     let index = job_id.find(&env.jobs)?;
@@ -169,7 +166,7 @@ where
 /// Entry point of the `bg` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
-    S: System,
+    S: Signals + SendSignal + Fcntl + Isatty + Write,
 {
     let (options, operands) = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok(result) => result,
