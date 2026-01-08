@@ -38,7 +38,7 @@ use yash_env::parser::Config;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::{Field, RunReadEvalLoop};
 use yash_env::source::Source;
-use yash_env::system::System;
+use yash_env::system::{Fcntl, Isatty, Write};
 
 /// Entry point of the `eval` built-in execution
 ///
@@ -51,7 +51,10 @@ use yash_env::system::System;
 /// environment's [`any`](Env::any) storage. This instance is used to run the
 /// read-eval loop for evaluating the command string. If the instance is not
 /// found, the function **panics**.
-pub async fn main<S: System + 'static>(env: &mut Env<S>, args: Vec<Field>) -> Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
+where
+    S: Fcntl + Isatty + Write + 'static,
+{
     // TODO Support non-POSIX options
     let args = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok((_options, operands)) => operands,
