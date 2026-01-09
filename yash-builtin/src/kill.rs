@@ -23,7 +23,7 @@
 use crate::common::report::report_error;
 use yash_env::Env;
 use yash_env::semantics::Field;
-use yash_env::system::System;
+use yash_env::system::{Fcntl, Isatty, SendSignal, Signals, Write};
 
 mod signal;
 
@@ -59,7 +59,10 @@ pub mod syntax;
 
 impl Command {
     /// Executes the built-in.
-    pub async fn execute<S: System>(&self, env: &mut Env<S>) -> crate::Result {
+    pub async fn execute<S>(&self, env: &mut Env<S>) -> crate::Result
+    where
+        S: Fcntl + Isatty + SendSignal + Signals + Write,
+    {
         match self {
             Self::Send {
                 signal,
@@ -73,7 +76,10 @@ impl Command {
 }
 
 /// Entry point of the kill built-in
-pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
+where
+    S: Fcntl + Isatty + SendSignal + Signals + Write,
+{
     match syntax::parse(env, args) {
         Ok(command) => command.execute(env).await,
         Err(error) => report_error(env, &error).await,

@@ -24,7 +24,7 @@ use std::fmt::Display;
 use std::str::FromStr;
 use yash_env::semantics::ExitStatus;
 use yash_env::signal::{Name, Number, RawNumber};
-use yash_env::system::System;
+use yash_env::system::Signals;
 
 /// Specification of a signal to be sent by the kill built-in
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -83,7 +83,7 @@ impl Signal {
     ///
     /// If the signal is not supported by the system, the function returns an
     /// error.
-    pub fn to_number<S: System>(self, system: &S) -> Result<Option<Number>, UnsupportedSignal> {
+    pub fn to_number<S: Signals>(self, system: &S) -> Result<Option<Number>, UnsupportedSignal> {
         match self {
             Signal::Name(name) => match system.signal_number_from_name(name) {
                 Some(number) => Ok(Some(number)),
@@ -104,7 +104,7 @@ impl Signal {
     /// as an exit status and converted to a signal number. The function returns
     /// `None` if `self` does not represent a valid signal.
     #[must_use]
-    pub fn to_name_and_number<S: System>(self, system: &S) -> Option<(Name, Number)> {
+    pub fn to_name_and_number<S: Signals>(self, system: &S) -> Option<(Name, Number)> {
         match self {
             Signal::Name(name) => Some((name, system.signal_number_from_name(name)?)),
             Signal::Number(number) => {

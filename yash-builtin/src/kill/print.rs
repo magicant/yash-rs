@@ -23,14 +23,13 @@
 
 use super::Signal;
 use crate::common::report::{merge_reports, report_failure};
-use std::fmt::Write;
 use std::num::NonZero;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::signal::{Name, Number};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
-use yash_env::system::System;
+use yash_env::system::{Fcntl, Isatty, Signals, Write};
 
 /// Returns an iterator over all supported signals.
 ///
@@ -39,7 +38,7 @@ use yash_env::system::System;
 // TODO Most part of this function is duplicated in yash_env::trap::Condition::iter.
 // Consider refactoring to avoid duplication. Note that the two functions require
 // different trait bounds. Also note Condition::iter deduplicates signals.
-fn all_signals<S: System>(system: &S) -> impl Iterator<Item = (Name, Number)> + '_ {
+fn all_signals<S: Signals>(system: &S) -> impl Iterator<Item = (Name, Number)> + '_ {
     let names = Name::iter();
     let non_real_time_count = names.len() - 2;
     let non_real_time = names
@@ -72,6 +71,7 @@ fn all_signals<S: System>(system: &S) -> impl Iterator<Item = (Name, Number)> + 
 
 /// Writes the specified signal into the output string.
 fn write_one_signal(name: Name, number: Number, verbose: bool, output: &mut String) {
+    use std::fmt::Write as _;
     if verbose {
         // TODO Include the description of the signal
         writeln!(output, "{number}\t{name}").unwrap();
@@ -115,7 +115,7 @@ impl<'a> From<&'a InvalidSignal<'a>> for Report<'a> {
 ///
 /// If `signals` is empty, all signals are listed.
 /// If `signals` contains invalid signals, the function returns an error.
-pub fn print<'a, S: System>(
+pub fn print<'a, S: Signals>(
     system: &S,
     signals: &'a [(Signal, Field)],
     verbose: bool,
@@ -147,11 +147,14 @@ pub fn print<'a, S: System>(
 }
 
 /// Executes the `Print` command.
-pub async fn execute<S: System>(
+pub async fn execute<S>(
     env: &mut Env<S>,
     signals: &[(Signal, Field)],
     verbose: bool,
-) -> crate::Result {
+) -> crate::Result
+where
+    S: Fcntl + Isatty + Signals + Write,
+{
     match print(&env.system, signals, verbose) {
         Ok(output) => crate::common::output(env, &output).await,
         Err(errors) => report_failure(env, merge_reports(&errors).unwrap()).await,
