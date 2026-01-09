@@ -36,7 +36,7 @@ use yash_env::semantics::Field;
 use yash_env::source::pretty::Report;
 use yash_env::source::pretty::ReportType;
 use yash_env::source::pretty::Snippet;
-use yash_env::system::System;
+use yash_env::system::{Fcntl, Isatty, Signals, Write};
 
 // TODO Split into syntax and semantics submodules
 
@@ -58,7 +58,10 @@ fn find_error_report(error: FindError, operand: &Field) -> Report<'_> {
 }
 
 /// Entry point for executing the `jobs` built-in
-pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
+where
+    S: Fcntl + Isatty + Signals + Write,
+{
     let (options, operands) = match parse_arguments(OPTIONS, Mode::with_env(env), args) {
         Ok(result) => result,
         Err(error) => return report_error(env, &error).await,
