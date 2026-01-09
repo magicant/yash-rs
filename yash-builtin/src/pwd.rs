@@ -29,9 +29,7 @@ use crate::common::report::{report_error, report_failure};
 use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
-#[cfg(doc)]
-use yash_env::system::GetCwd;
-use yash_env::system::System;
+use yash_env::system::{Fcntl, Fstat, GetCwd, Isatty, Write};
 
 /// Choice of the behavior of the built-in
 #[derive(Debug, Clone, Copy, Default, Eq, Hash, PartialEq)]
@@ -55,7 +53,10 @@ pub mod syntax;
 /// Entry point for executing the `pwd` built-in
 ///
 /// This function uses the [`syntax`] and [`semantics`] modules to execute the built-in.
-pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
+where
+    S: Fcntl + Fstat + GetCwd + Isatty + Write,
+{
     match syntax::parse(env, args) {
         Ok(mode) => match semantics::compute(env, mode) {
             Ok(result) => output(env, &result).await,
