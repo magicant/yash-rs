@@ -45,7 +45,7 @@ use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::option::State::On;
 use yash_env::semantics::Field;
-use yash_env::system::System;
+use yash_env::system::{Fcntl, Isatty, Write};
 
 /// List of portable options applicable to the readonly built-in
 pub const PORTABLE_OPTIONS: &[OptionSpec<'static>] = &[PRINT_OPTION];
@@ -60,7 +60,10 @@ pub const PRINT_CONTEXT: PrintContext<'static> = PrintContext {
 // TODO Split into syntax and semantics submodules
 
 /// Entry point for executing the `readonly` built-in
-pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
+where
+    S: Fcntl + Isatty + Write,
+{
     match parse(PORTABLE_OPTIONS, args) {
         Ok((options, operands)) => match interpret(options, operands) {
             Ok(mut command) => {
