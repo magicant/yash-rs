@@ -31,10 +31,7 @@ use yash_env::io::Fd;
 use yash_env::job::Pid;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
-use yash_env::system::Close as _;
-use yash_env::system::Dup as _;
-use yash_env::system::Errno;
-use yash_env::system::Pipe as _;
+use yash_env::system::{Close, Dup, Errno, Fcntl, Pipe, Read, Sigaction, Sigmask, Signals, Wait};
 use yash_syntax::parser::lex::Lexer;
 use yash_syntax::source::Location;
 use yash_syntax::source::Source;
@@ -113,7 +110,7 @@ async fn expand_common<S>(
     env: &mut Env<'_, S>,
 ) -> Result<Phrase, Error>
 where
-    S: System,
+    S: Close + Fcntl + Read + Signals + Sigmask + Sigaction + Wait,
 {
     // See if the subshell has successfully started
     let pid = match subshell_result {
