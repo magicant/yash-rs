@@ -30,9 +30,8 @@ use crate::common::output;
 use crate::common::report::{report_error, report_simple_failure};
 use yash_env::Env;
 use yash_env::semantics::Field;
-use yash_env::system::resource::GetRlimit as _;
-use yash_env::system::resource::{Limit, Resource};
-use yash_env::system::{Errno, System};
+use yash_env::system::resource::{GetRlimit, Limit, Resource, SetRlimit};
+use yash_env::system::{Errno, Fcntl, Isatty, Write};
 
 /// Type of limit to show
 ///
@@ -112,7 +111,10 @@ impl Command {
     /// Execute the `ulimit` built-in command.
     ///
     /// If successful, returns the string to be printed to the standard output.
-    pub async fn execute<S: System>(&self, env: &mut Env<S>) -> Result<String, Error> {
+    pub async fn execute<S>(&self, env: &mut Env<S>) -> Result<String, Error>
+    where
+        S: GetRlimit + SetRlimit,
+    {
         let getrlimit = |resource| env.system.getrlimit(resource);
         match self {
             Command::ShowAll(limit_type) => Ok(show::show_all(getrlimit, *limit_type)),
@@ -130,7 +132,10 @@ impl Command {
 /// Executes the `ulimit` built-in.
 ///
 /// This is the main entry point for the `ulimit` built-in.
-pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
+where
+    S: GetRlimit + SetRlimit + Fcntl + Isatty + Write,
+{
     match syntax::parse(env, args) {
         Ok(command) => match command.execute(env).await {
             Ok(result) => output(env, &result).await,
