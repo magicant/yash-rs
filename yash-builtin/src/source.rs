@@ -38,7 +38,7 @@ use yash_env::Env;
 #[cfg(doc)]
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::system::System;
+use yash_env::system::{Close, Dup, Fcntl, Isatty, Open, Read, Write};
 
 mod semantics;
 pub mod syntax;
@@ -59,7 +59,10 @@ pub struct Command {
 }
 
 /// Entry point of the `.` built-in execution
-pub async fn main<S: System + 'static>(env: &mut Env<S>, args: Vec<Field>) -> Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
+where
+    S: Close + Dup + Fcntl + Isatty + Open + Read + Write + 'static,
+{
     match syntax::parse(env, args) {
         Ok(command) => command.execute(env).await,
         Err(error) => error.report(env).await,

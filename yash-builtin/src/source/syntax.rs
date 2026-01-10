@@ -25,7 +25,7 @@ use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::{Report, ReportType};
-use yash_env::system::System;
+use yash_env::system::{Fcntl, Isatty, Write};
 
 /// Error in parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -57,7 +57,10 @@ impl Error {
 
     /// Reports the error to the standard error.
     #[inline(always)]
-    pub async fn report<S: System>(&self, env: &mut Env<S>) -> crate::Result {
+    pub async fn report<S>(&self, env: &mut Env<S>) -> crate::Result
+    where
+        S: Fcntl + Isatty + Write,
+    {
         report_error(env, self).await
     }
 }
