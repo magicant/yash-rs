@@ -25,15 +25,17 @@ use crate::common::output;
 use crate::common::report::report_error;
 use crate::common::report::report_simple_failure;
 use yash_env::Env;
-use yash_env::System;
 use yash_env::semantics::Field;
-use yash_env::system::Times as _;
+use yash_env::system::{Fcntl, Isatty, Times, Write};
 
 mod format;
 mod syntax;
 
 /// Entry point of the `times` built-in
-pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
+where
+    S: Times + Fcntl + Isatty + Write,
+{
     match syntax::parse(env, args) {
         Ok(()) => match env.system.times() {
             Ok(times) => {
