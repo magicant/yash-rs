@@ -22,11 +22,9 @@
 
 use thiserror::Error;
 use yash_env::Env;
-use yash_env::System;
 use yash_env::job::Pid;
 use yash_env::signal;
-use yash_env::system::Errno;
-use yash_env::system::Wait as _;
+use yash_env::system::{Errno, Sigaction, Sigmask, Signals, Wait};
 use yash_env::trap::RunSignalTrapIfCaught;
 
 /// Errors that may occur while waiting for a job
@@ -62,7 +60,10 @@ pub enum Error {
 ///
 /// If there is no job to wait for, this function returns
 /// `Err(Error::NothingToWait)` immediately.
-pub async fn wait_for_any_job_or_trap<S: System + 'static>(env: &mut Env<S>) -> Result<(), Error> {
+pub async fn wait_for_any_job_or_trap<S>(env: &mut Env<S>) -> Result<(), Error>
+where
+    S: Signals + Sigmask + Sigaction + Wait + 'static,
+{
     let RunSignalTrapIfCaught(run_trap_if_caught) = *env
         .any
         .get()
