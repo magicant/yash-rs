@@ -25,7 +25,7 @@ use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
-use yash_env::system::System;
+use yash_env::system::Fstat;
 use yash_env::variable::HOME;
 use yash_env::variable::OLDPWD;
 
@@ -147,7 +147,7 @@ pub fn target<S>(
     pwd: &str,
 ) -> Result<(PathBuf, Origin), TargetError>
 where
-    S: System,
+    S: Fstat,
 {
     // Step 1 & 2: substitute $HOME and $OLDPWD
     let (mut curpath, mut origin) = match &command.operand {

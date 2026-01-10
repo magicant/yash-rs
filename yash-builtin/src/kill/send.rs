@@ -31,9 +31,7 @@ use yash_env::job::{JobList, id::FindError};
 use yash_env::semantics::Field;
 use yash_env::signal;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
-use yash_env::system::Errno;
-use yash_env::system::SendSignal;
-use yash_env::system::System;
+use yash_env::system::{Errno, Fcntl, Isatty, SendSignal, Signals, Write};
 
 /// Error that may occur while [sending](send) a signal.
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -157,12 +155,15 @@ impl<'a> From<&'a TargetError<'a>> for Report<'a> {
 /// `signal_origin` is the field that specified the signal. It is used to report
 /// the error location if the signal is not supported on the current system. If
 /// it is `None` and the `signal` is not supported, the function panics.
-pub async fn execute<S: System>(
+pub async fn execute<S>(
     env: &mut Env<S>,
     signal: Signal,
     signal_origin: Option<&Field>,
     targets: &[Field],
-) -> crate::Result {
+) -> crate::Result
+where
+    S: Fcntl + Isatty + SendSignal + Signals + Write,
+{
     let Ok(signal) = signal.to_number(&env.system) else {
         let origin = signal_origin.unwrap();
         let report = UnsupportedSignal { signal, origin };

@@ -53,11 +53,11 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
-use yash_env::system::System;
+use yash_env::system::{Fcntl, Isatty, Write};
 
 // TODO Split into syntax and semantics submodules
 
-async fn operand_parse_error<S: System>(
+async fn operand_parse_error<S: Fcntl + Isatty + Write>(
     env: &mut Env<S>,
     location: &Location,
     error: ParseIntError,
@@ -68,7 +68,10 @@ async fn operand_parse_error<S: System>(
 /// Entry point for executing the `exit` built-in
 ///
 /// See the [module-level documentation](self) for details.
-pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
+where
+    S: Fcntl + Isatty + Write,
+{
     // TODO Support non-POSIX options
     let args = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok((_options, operands)) => operands,

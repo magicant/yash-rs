@@ -44,12 +44,17 @@ use yash_env::semantics::command::{ReplaceCurrentProcessError, replace_current_p
 use yash_env::semantics::{Divert::Abort, ExitStatus, Field};
 use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
-use yash_env::system::System;
+use yash_env::system::{
+    Exec, Fcntl, IsExecutableFile, Isatty, ShellPath, Sigaction, Sigmask, Signals, Write,
+};
 
 // TODO Split into syntax and semantics submodules
 
 /// Entry point for executing the `exec` built-in
-pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
+where
+    S: Exec + Fcntl + IsExecutableFile + Isatty + ShellPath + Sigmask + Sigaction + Signals + Write,
+{
     // TODO Support non-POSIX options
     let args = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok((_options, operands)) => operands,

@@ -28,11 +28,39 @@ use yash_env::semantics::Field;
 use yash_env::semantics::command::RunFunction;
 use yash_env::semantics::command::run_external_utility_in_subshell;
 use yash_env::semantics::command::search::{Target, search};
-use yash_env::system::System;
+use yash_env::system::resource::SetRlimit;
+use yash_env::system::{
+    Close, Dup, Exec, Exit, Fcntl, Fork, GetPid, IsExecutableFile, Isatty, Open, SendSignal,
+    SetPgid, ShellPath, Sigaction, Sigmask, Signals, Sysconf, TcSetPgrp, Wait, Write,
+};
 
 impl Invoke {
     /// Execute the command
-    pub async fn execute<S: System + 'static>(self, env: &mut Env<S>) -> crate::Result {
+    pub async fn execute<S>(self, env: &mut Env<S>) -> crate::Result
+    where
+        S: Close
+            + Dup
+            + Exec
+            + Exit
+            + Fcntl
+            + Fork
+            + GetPid
+            + IsExecutableFile
+            + Isatty
+            + Open
+            + SendSignal
+            + SetPgid
+            + SetRlimit
+            + ShellPath
+            + Sigaction
+            + Sigmask
+            + Signals
+            + Sysconf
+            + TcSetPgrp
+            + Wait
+            + Write
+            + 'static,
+    {
         let Some(name) = self.fields.first() else {
             return crate::Result::default();
         };
@@ -58,11 +86,33 @@ impl Invoke {
 /// This function requires an instance of [`RunFunction`] to be present in
 /// [`env.any`](Env::any), which is used to invoke shell functions. If no such
 /// instance is found, this function will **panic**.
-async fn invoke_target<S: System + 'static>(
+async fn invoke_target<S>(
     env: &mut Env<S>,
     target: Target<S>,
     mut fields: Vec<Field>,
-) -> crate::Result {
+) -> crate::Result
+where
+    S: Close
+        + Dup
+        + Exec
+        + Exit
+        + Fcntl
+        + Fork
+        + GetPid
+        + Isatty
+        + Open
+        + SendSignal
+        + SetPgid
+        + SetRlimit
+        + ShellPath
+        + Sigaction
+        + Sigmask
+        + Signals
+        + TcSetPgrp
+        + Wait
+        + Write
+        + 'static,
+{
     match target {
         Target::Builtin { builtin, .. } => {
             let frame = yash_env::stack::Builtin {
@@ -120,6 +170,7 @@ mod tests {
     use yash_env::function::{Function, FunctionBody, FunctionBodyObject};
     use yash_env::semantics::Field;
     use yash_env::source::Location;
+    use yash_env::system::System;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
     use yash_semantics::Divert::Return;

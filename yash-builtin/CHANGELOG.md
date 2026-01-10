@@ -20,8 +20,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 - Public dependency versions:
     - Rust 1.86.0 → 1.87.0
     - yash-env 0.10.0 → 0.11.0
-- Many types and functions now take type parameters representing the concrete
-  `System` type due to changes in the `yash-env` crate.
+- Many types and functions now take type parameters representing the required
+  system interface due to the introduction of the type parameter to `Env` in
+  the `yash-env` crate.
 - `ulimit::set::set` now requires
   `E: yash_env::system::resource::GetRlimit + yash_env::system::resource::SetRlimit`
   instead of `E: ulimit::set::Env`.

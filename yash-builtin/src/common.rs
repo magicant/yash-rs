@@ -21,7 +21,7 @@
 
 use yash_env::Env;
 use yash_env::io::Fd;
-use yash_env::system::System;
+use yash_env::system::{Fcntl, Isatty, Write};
 
 pub mod report;
 pub mod syntax;
@@ -35,7 +35,7 @@ pub mod syntax;
 /// errors that occur while printing the error message are ignored.
 pub async fn output<S>(env: &mut Env<S>, content: &str) -> yash_env::builtin::Result
 where
-    S: System,
+    S: Isatty + Fcntl + Write,
 {
     match env.system.write_all(Fd::STDOUT, content.as_bytes()).await {
         Ok(_) => Default::default(),

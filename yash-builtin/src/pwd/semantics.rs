@@ -18,10 +18,9 @@
 
 use super::Mode;
 use thiserror::Error;
+use yash_env::Env;
 use yash_env::source::pretty::{Report, ReportType};
-use yash_env::system::Errno;
-use yash_env::system::GetCwd as _;
-use yash_env::{Env, System};
+use yash_env::system::{Errno, Fstat, GetCwd};
 
 /// Error in running the pwd built-in
 #[derive(Debug, Clone, Eq, Error, PartialEq)]
@@ -59,7 +58,10 @@ pub type Result = std::result::Result<String, Error>;
 ///
 /// If successful, the result is the working directory path to be printed,
 /// including the trailing newline.
-pub fn compute<S: System>(env: &Env<S>, mode: Mode) -> Result {
+pub fn compute<S>(env: &Env<S>, mode: Mode) -> Result
+where
+    S: Fstat + GetCwd,
+{
     match mode {
         Mode::Logical => {
             if let Some(pwd) = env.get_pwd_if_correct() {

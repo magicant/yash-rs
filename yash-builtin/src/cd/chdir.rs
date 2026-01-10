@@ -22,17 +22,15 @@ use std::ffi::CString;
 use std::ffi::NulError;
 use thiserror::Error;
 use yash_env::Env;
-use yash_env::System;
 use yash_env::path::Path;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 #[cfg(doc)]
 use yash_env::stack::Stack;
-use yash_env::system::Chdir;
-use yash_env::system::Errno;
 #[cfg(doc)]
 use yash_env::system::SharedSystem;
+use yash_env::system::{Chdir, Errno, Fcntl, Isatty, Write};
 
 /// Error invoking the underlying system call
 #[derive(Debug, Clone, Eq, Error, PartialEq)]
@@ -66,7 +64,7 @@ pub fn chdir<T: Chdir>(env: &mut Env<T>, path: &Path) -> Result<(), Error> {
 ///
 /// See [`prepare_report_message_and_divert`] for the second return value.
 #[must_use = "returned message should be printed"]
-pub fn failure_message<S: System>(
+pub fn failure_message<S: Isatty>(
     env: &Env<S>,
     operand: Option<&Field>,
     path: &Path,
@@ -88,12 +86,15 @@ pub fn failure_message<S: System>(
 ///
 /// This function constructs a message with [`failure_message`] and prints it
 /// with [`SharedSystem::print_error`].
-pub async fn report_failure<S: System>(
+pub async fn report_failure<S>(
     env: &mut Env<S>,
     operand: Option<&Field>,
     path: &Path,
     error: &Error,
-) -> crate::Result {
+) -> crate::Result
+where
+    S: Fcntl + Isatty + Write,
+{
     let (message, divert) = failure_message(env, operand, path, error);
     env.system.print_error(&message).await;
     crate::Result::with_exit_status_and_divert(super::EXIT_STATUS_CHDIR_ERROR, divert)

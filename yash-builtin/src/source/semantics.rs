@@ -34,12 +34,9 @@ use yash_env::semantics::{Divert, ExitStatus, Field, RunReadEvalLoop};
 use yash_env::source::Source;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::stack::Frame;
-use yash_env::system::Close as _;
-use yash_env::system::Errno;
-use yash_env::system::Mode;
-use yash_env::system::OfdAccess;
-use yash_env::system::OpenFlag;
-use yash_env::system::System;
+use yash_env::system::{
+    Close, Dup, Errno, Fcntl, Isatty, Mode, OfdAccess, Open, OpenFlag, Read, Write,
+};
 use yash_env::variable::PATH;
 
 impl Command {
@@ -47,7 +44,10 @@ impl Command {
     ///
     /// If the file is not found or cannot be read, this method reports an error
     /// to the standard error and returns `ExitStatus::FAILURE.into()`.
-    pub async fn execute<S: System + 'static>(self, env: &mut Env<S>) -> crate::Result {
+    pub async fn execute<S>(self, env: &mut Env<S>) -> crate::Result
+    where
+        S: Close + Dup + Fcntl + Isatty + Open + Read + Write + 'static,
+    {
         let env = &mut *env.push_frame(Frame::DotScript);
 
         let fd = match find_and_open_file(env, &self.file.value) {
@@ -85,7 +85,10 @@ impl Command {
 ///
 /// If the name does not contain a slash, this function searches the file in the
 /// `$PATH` variable.
-fn find_and_open_file<S: System>(env: &mut Env<S>, filename: &str) -> Result<Fd, Errno> {
+fn find_and_open_file<S>(env: &mut Env<S>, filename: &str) -> Result<Fd, Errno>
+where
+    S: Open + Close + Dup,
+{
     let dirs: Box<dyn Iterator<Item = &str>> = if filename.contains('/') {
         Box::new(std::iter::once("."))
     } else {
@@ -113,7 +116,10 @@ fn find_and_open_file<S: System>(env: &mut Env<S>, filename: &str) -> Result<Fd,
 ///
 /// The returned file descriptor is opened with the `O_CLOEXEC` flag and is at
 /// least [`MIN_INTERNAL_FD`](yash_env::io::MIN_INTERNAL_FD).
-fn open_file<S: System>(system: &mut S, path: &CStr) -> Result<Fd, Errno> {
+fn open_file<S>(system: &mut S, path: &CStr) -> Result<Fd, Errno>
+where
+    S: Open + Close + Dup + ?Sized,
+{
     system
         .open(
             path,
@@ -139,11 +145,14 @@ fn consume_return(divert: ControlFlow<Divert>) -> (Option<ExitStatus>, ControlFl
 
 /// Reports an error that occurred while preparing the file descriptor to read
 /// from.
-async fn report_find_and_open_file_failure<S: System>(
+async fn report_find_and_open_file_failure<S>(
     env: &mut Env<S>,
     name: &Field,
     errno: Errno,
-) -> crate::Result {
+) -> crate::Result
+where
+    S: Fcntl + Isatty + Write,
+{
     let mut report = Report::new();
     report.r#type = ReportType::Error;
     report.title = "cannot open script file".into();

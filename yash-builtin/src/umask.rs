@@ -23,9 +23,9 @@
 
 use crate::common::output;
 use crate::common::report::report_error;
+use yash_env::Env;
 use yash_env::semantics::Field;
-use yash_env::system::{Mode, Umask};
-use yash_env::{Env, System};
+use yash_env::system::{Fcntl, Isatty, Mode, Umask, Write};
 
 pub mod eval;
 pub mod format;
@@ -91,7 +91,10 @@ impl Command {
 }
 
 /// Entry point of the `umask` built-in
-pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
+where
+    S: Umask + Fcntl + Isatty + Write,
+{
     match syntax::parse(env, args) {
         Ok(command) => {
             let result = command.execute(env);

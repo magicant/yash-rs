@@ -47,11 +47,10 @@ use yash_env::semantics::Divert::Interrupt;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::signal;
-use yash_env::system::Errno;
-use yash_env::system::SendSignal as _;
-use yash_env::system::Signals as _;
-use yash_env::system::System;
-use yash_env::system::TcSetPgrp as _;
+use yash_env::system::{
+    Close, Dup, Errno, Fcntl, Isatty, Open, SendSignal, Sigaction, Sigmask, Signals, TcSetPgrp,
+    Wait, Write,
+};
 
 /// Resumes the job at the specified index.
 ///
@@ -59,10 +58,24 @@ use yash_env::system::TcSetPgrp as _;
 /// signal to it. It then waits for the job to finish (or suspend again).
 ///
 /// This function panics if there is no job at the specified index.
-async fn resume_job_by_index<S: System>(
+async fn resume_job_by_index<S>(
     env: &mut Env<S>,
     index: usize,
-) -> Result<ProcessResult, ResumeError> {
+) -> Result<ProcessResult, ResumeError>
+where
+    S: Close
+        + Dup
+        + Fcntl
+        + Isatty
+        + Open
+        + SendSignal
+        + Signals
+        + Sigmask
+        + Sigaction
+        + TcSetPgrp
+        + Wait
+        + Write,
+{
     let tty = env.get_tty().ok();
 
     let job = &env.jobs[index];
@@ -119,17 +132,45 @@ async fn resume_job_by_index<S: System>(
 }
 
 /// Resumes the job specified by the operand.
-async fn resume_job_by_id<S: System>(
+async fn resume_job_by_id<S>(
     env: &mut Env<S>,
     job_id: &str,
-) -> Result<ProcessResult, OperandErrorKind> {
+) -> Result<ProcessResult, OperandErrorKind>
+where
+    S: Close
+        + Dup
+        + Fcntl
+        + Isatty
+        + Open
+        + SendSignal
+        + Signals
+        + Sigmask
+        + Sigaction
+        + TcSetPgrp
+        + Wait
+        + Write,
+{
     let job_id = parse(job_id)?;
     let index = job_id.find(&env.jobs)?;
     Ok(resume_job_by_index(env, index).await?)
 }
 
 /// Entry point of the `fg` built-in
-pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
+where
+    S: Close
+        + Dup
+        + Fcntl
+        + Isatty
+        + Open
+        + SendSignal
+        + Signals
+        + Sigmask
+        + Sigaction
+        + TcSetPgrp
+        + Wait
+        + Write,
+{
     let (options, operands) = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok(result) => result,
         Err(error) => return report_error(env, &error).await,
@@ -186,7 +227,7 @@ mod tests {
     use yash_env_test_helper::in_virtual_system;
     use yash_env_test_helper::stub_tty;
 
-    async fn suspend<S: System>(env: &mut Env<S>) {
+    async fn suspend(env: &mut Env<VirtualSystem>) {
         let target = env.system.getpid();
         env.system.kill(target, Some(SIGSTOP)).await.unwrap();
     }
