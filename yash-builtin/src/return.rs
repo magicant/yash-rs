@@ -47,24 +47,30 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
-use yash_env::system::System;
+use yash_env::system::{Fcntl, Isatty, Write};
 
 // TODO Split into syntax and semantics submodules
 
 const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('n').long("no-return")];
 
-async fn operand_parse_error<S: System>(
+async fn operand_parse_error<S>(
     env: &mut Env<S>,
     location: &Location,
     error: ParseIntError,
-) -> Result {
+) -> Result
+where
+    S: Fcntl + Isatty + Write,
+{
     syntax_error(env, &error.to_string(), location).await
 }
 
 /// Entry point for executing the `return` built-in
 ///
 /// See the [module-level documentation](self) for details.
-pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
+where
+    S: Fcntl + Isatty + Write,
+{
     let (options, operands) = match parse_arguments(OPTION_SPECS, Mode::with_env(env), args) {
         Ok(result) => result,
         Err(error) => return report_error(env, &error).await,
