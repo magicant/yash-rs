@@ -30,10 +30,9 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
-use yash_env::system::Close as _;
 use yash_env::system::Mode;
 use yash_env::system::OfdAccess;
-use yash_env::system::Open as _;
+use yash_env::system::{Close, Open};
 use yash_syntax::source::Location;
 use yash_syntax::syntax;
 use yash_syntax::syntax::AndOrList;
@@ -131,7 +130,10 @@ async fn async_body<S: System + 'static>(
     run_exit_trap(env).await;
 }
 
-fn nullify_stdin<S: System>(env: &mut Env<S>) -> std::result::Result<(), yash_env::system::Errno> {
+fn nullify_stdin<S>(env: &mut Env<S>) -> std::result::Result<(), yash_env::system::Errno>
+where
+    S: Open + Close,
+{
     env.system.close(Fd::STDIN)?;
 
     let path = c"/dev/null";
