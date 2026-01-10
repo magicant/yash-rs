@@ -41,7 +41,7 @@ use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
-use yash_env::system::System;
+use yash_env::system::{Fcntl, Isatty, Write};
 use yash_env::variable::{Value, Variable};
 
 mod print_functions;
@@ -449,7 +449,10 @@ impl<'a> From<&'a ExecuteError> for Report<'a> {
 }
 
 /// Entry point of the typeset built-in
-pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> yash_env::builtin::Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> yash_env::builtin::Result
+where
+    S: Fcntl + Isatty + Write,
+{
     match syntax::parse(syntax::ALL_OPTIONS, args) {
         Ok((options, operands)) => match syntax::interpret(options, operands) {
             Ok(command) => match command.execute(env, &PRINT_CONTEXT) {
