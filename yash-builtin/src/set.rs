@@ -29,7 +29,6 @@
 
 use crate::common::output;
 use crate::common::report::report_error;
-use std::fmt::Write;
 use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::option::State;
@@ -44,7 +43,9 @@ use yash_env::parser::IsName;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::stack::Frame::Subshell;
-use yash_env::system::System;
+use yash_env::system::{
+    Close, Dup, Fcntl, GetPid, Isatty, Open, Sigaction, Sigmask, Signals, TcSetPgrp, Write,
+};
 use yash_env::variable::Scope::Global;
 
 /// Interpretation of command-line arguments that determine the behavior of the
@@ -74,7 +75,10 @@ pub mod syntax;
 
 /// Enables or disables the internal dispositions for the "stopper" signals
 /// depending on the `Interactive` and `Monitor` option states.
-fn update_internal_dispositions_for_stoppers<S: System>(env: &mut Env<S>) {
+fn update_internal_dispositions_for_stoppers<S>(env: &mut Env<S>)
+where
+    S: Signals + Sigmask + Sigaction,
+{
     if env.options.get(Interactive) == State::On && env.options.get(Monitor) == State::On {
         env.traps
             .enable_internal_dispositions_for_stoppers(&mut env.system)
@@ -87,18 +91,23 @@ fn update_internal_dispositions_for_stoppers<S: System>(env: &mut Env<S>) {
 
 /// Ensures that the shell is in the foreground process group if the `Monitor`
 /// option is enabled.
-async fn ensure_foreground<S: System>(env: &mut Env<S>) {
+async fn ensure_foreground<S>(env: &mut Env<S>)
+where
+    S: Open + Dup + Close + GetPid + Signals + Sigmask + Sigaction + TcSetPgrp,
+{
     if env.options.get(Monitor) == State::On {
         env.ensure_foreground().await.ok();
     }
 }
 
 /// Modifies shell options and positional parameters.
-async fn modify<S: System>(
+async fn modify<S>(
     env: &mut Env<S>,
     options: Vec<(yash_env::option::Option, State)>,
     positional_params: Option<Vec<Field>>,
-) {
+) where
+    S: Open + Dup + Close + GetPid + Signals + Sigmask + Sigaction + TcSetPgrp,
+{
     // Modify options
     let mut monitor_changed = false;
     for (option, state) in options {
@@ -127,7 +136,23 @@ async fn modify<S: System>(
 /// This function requires an instance of [`IsName`] to be present in the
 /// environment's [`any`](Env::any) storage to check for valid variable names.
 /// If no such instance is found, this function will **panic**.
-pub async fn main<S: System + 'static>(env: &mut Env<S>, args: Vec<Field>) -> Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
+where
+    S: Open
+        + Dup
+        + Close
+        + Fcntl
+        + GetPid
+        + Isatty
+        + Signals
+        + Sigmask
+        + Sigaction
+        + TcSetPgrp
+        + Write
+        + 'static,
+{
+    use std::fmt::Write as _;
+
     match syntax::parse(args) {
         Ok(Command::PrintVariables) => {
             let IsName(is_name) = env.any.get().expect("IsName not found in env.any");
