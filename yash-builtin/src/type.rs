@@ -21,6 +21,7 @@
 //! [`type` built-in]: https://magicant.github.io/yash-rs/builtins/type.html
 
 use crate::command::Command;
+use crate::command::Identify;
 use crate::command::syntax::interpret;
 use crate::common::report::report_error;
 use crate::common::syntax::Mode;
@@ -30,13 +31,13 @@ use crate::common::syntax::parse_arguments;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
-use yash_env::system::System;
+use yash_env::system::{Fcntl, Fstat, GetCwd, IsExecutableFile, Isatty, Sysconf, Write};
 
 const OPTION_SPECS: &[OptionSpec] = &[
     // TODO: Non-standard options
 ];
 
-fn parse<S>(env: &mut Env<S>, args: Vec<Field>) -> Result<Command, crate::command::syntax::Error> {
+fn parse<S>(env: &mut Env<S>, args: Vec<Field>) -> Result<Identify, crate::command::syntax::Error> {
     let (mut options, operands) = parse_arguments(OPTION_SPECS, Mode::with_env(env), args)?;
 
     // `type` is equivalent to `command -V`, so add the `-V` option and delegate
@@ -52,13 +53,20 @@ fn parse<S>(env: &mut Env<S>, args: Vec<Field>) -> Result<Command, crate::comman
         argument: None,
     });
 
-    interpret(options, operands)
+    interpret(options, operands).map(|command| match command {
+        Command::Identify(identify) => identify,
+        // With the added `-V` option, other variants are unreachable.
+        Command::Invoke(_) => unreachable!(),
+    })
 }
 
 /// Entry point of the `type` built-in
-pub async fn main<S: System + 'static>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
+where
+    S: Fcntl + Fstat + GetCwd + IsExecutableFile + Isatty + Sysconf + Write + 'static,
+{
     match parse(env, args) {
-        Ok(command) => command.execute(env).await,
+        Ok(identify) => identify.execute(env).await,
         Err(error) => report_error(env, &error).await,
     }
 }
