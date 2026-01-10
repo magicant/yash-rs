@@ -88,16 +88,20 @@ pub mod unalias;
 pub mod unset;
 pub mod wait;
 
+use std::future::ready;
 #[cfg(doc)]
 use yash_env::Env;
+use yash_env::builtin::Type::{Elective, Mandatory, Special, Substitutive};
 #[doc(no_inline)]
 pub use yash_env::builtin::*;
 #[cfg(doc)]
 use yash_env::stack::{Frame, Stack};
-use yash_env::system::System;
-
-use Type::{Elective, Mandatory, Special, Substitutive};
-use std::future::ready;
+use yash_env::system::resource::{GetRlimit, SetRlimit};
+use yash_env::system::{
+    Chdir, Clock, Close, Dup, Exec, Exit, Fcntl, Fork, Fstat, GetCwd, GetPid, GetPw, GetUid,
+    IsExecutableFile, Isatty, Open, Pipe, Read, Seek, SendSignal, SetPgid, ShellPath, Sigaction,
+    Sigmask, Signals, Sysconf, TcGetPgrp, TcSetPgrp, Times, Umask, Wait, Write,
+};
 
 /// Returns an iterator over all the implemented built-in utilities.
 ///
@@ -106,7 +110,43 @@ use std::future::ready;
 /// names in ascending order.
 pub fn iter<S>() -> impl Iterator<Item = (&'static str, Builtin<S>)>
 where
-    S: System + 'static,
+    // Some of these traits are not used in any built-in, but we include them
+    // here for future extensibility.
+    S: Chdir
+        + Clock
+        + Close
+        + Dup
+        + Exec
+        + Exit
+        + Fcntl
+        + Fork
+        + Fstat
+        + GetCwd
+        + GetPid
+        + GetPw
+        + GetRlimit
+        + GetUid
+        + IsExecutableFile
+        + Isatty
+        + Open
+        + Pipe
+        + Read
+        + Seek
+        + SendSignal
+        + SetPgid
+        + SetRlimit
+        + ShellPath
+        + Sigaction
+        + Sigmask
+        + Signals
+        + Sysconf
+        + TcGetPgrp
+        + TcSetPgrp
+        + Times
+        + Umask
+        + Wait
+        + Write
+        + 'static,
 {
     [
         (
