@@ -23,9 +23,11 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Span, SpanRole, add_span};
+use yash_env::system::Fcntl;
+use yash_env::system::Isatty;
 #[cfg(doc)]
 use yash_env::system::SharedSystem;
-use yash_env::system::System;
+use yash_env::system::Write;
 use yash_env::variable::Scope::Global;
 
 /// Error returned by [`unset_variables`].
@@ -117,10 +119,13 @@ pub fn unset_variables<'a, S>(
     since = "0.11.0"
 )]
 #[must_use = "returned message should be printed"]
-pub fn unset_variables_error_message<S: System>(
+pub fn unset_variables_error_message<S>(
     env: &Env<S>,
     errors: &[UnsetVariablesError],
-) -> (String, yash_env::semantics::Result) {
+) -> (String, yash_env::semantics::Result)
+where
+    S: Fcntl + Isatty + Write,
+{
     let mut report = Report::new();
     report.r#type = ReportType::Error;
     report.title = "cannot unset variable".into();
@@ -157,10 +162,13 @@ pub fn unset_variables_error_message<S: System>(
     note = "use `merge_reports` and `report_failure` directly",
     since = "0.11.0"
 )]
-pub async fn report_variables_error<S: System>(
+pub async fn report_variables_error<S>(
     env: &mut Env<S>,
     errors: &[UnsetVariablesError<'_>],
-) -> crate::Result {
+) -> crate::Result
+where
+    S: Fcntl + Isatty + Write,
+{
     #[allow(deprecated)]
     let (message, divert) = unset_variables_error_message(env, errors);
     env.system.print_error(&message).await;
@@ -246,10 +254,13 @@ pub fn unset_functions<'a, S>(
     since = "0.11.0"
 )]
 #[must_use = "returned message should be printed"]
-pub fn unset_functions_error_message<S: System>(
+pub fn unset_functions_error_message<S>(
     env: &mut Env<S>,
     errors: &[UnsetFunctionsError<'_>],
-) -> (String, yash_env::semantics::Result) {
+) -> (String, yash_env::semantics::Result)
+where
+    S: Fcntl + Isatty + Write,
+{
     let mut report = Report::new();
     report.r#type = ReportType::Error;
     report.title = "cannot unset function".into();
@@ -286,10 +297,13 @@ pub fn unset_functions_error_message<S: System>(
     note = "use `merge_reports` and `report_failure` directly",
     since = "0.11.0"
 )]
-pub async fn report_functions_error<S: System>(
+pub async fn report_functions_error<S>(
     env: &mut Env<S>,
     errors: &[UnsetFunctionsError<'_>],
-) -> crate::Result {
+) -> crate::Result
+where
+    S: Fcntl + Isatty + Write,
+{
     #[allow(deprecated)]
     let (message, divert) = unset_functions_error_message(env, errors);
     env.system.print_error(&message).await;

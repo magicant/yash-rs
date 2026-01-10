@@ -25,7 +25,7 @@ use crate::Result;
 use crate::common::report::{merge_reports, report_error, report_failure};
 use yash_env::Env;
 use yash_env::semantics::Field;
-use yash_env::system::System;
+use yash_env::system::{Fcntl, Isatty, Write};
 
 /// Selection of what to unset
 #[derive(Debug, Clone, Copy, Default, Eq, Hash, PartialEq)]
@@ -54,7 +54,10 @@ pub mod semantics;
 pub mod syntax;
 
 /// Entry point of the `unset` built-in
-pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
+where
+    S: Fcntl + Isatty + Write,
+{
     let command = match syntax::parse(env, args) {
         Ok(command) => command,
         Err(e) => return report_error(env, &e).await,
