@@ -36,17 +36,15 @@ use crate::common::report::report_failure;
 use crate::common::syntax::Mode;
 use crate::common::syntax::parse_arguments;
 use itertools::Itertools as _;
-use std::fmt::Write;
 use thiserror::Error;
 use yash_env::Env;
-use yash_env::System;
 use yash_env::option::Option::Interactive;
 use yash_env::option::State::On;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::signal::Name::{Kill, Stop};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
-use yash_env::system::SharedSystem;
+use yash_env::system::{Fcntl, Isatty, SharedSystem, Sigaction, Sigmask, Signals, Write};
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
 use yash_env::trap::SetActionError;
@@ -87,7 +85,7 @@ pub mod syntax;
 /// If the trap is not set and `include_default` is `false`, this function
 /// does nothing. Otherwise, it prints the trap in the format `trap -- command
 /// condition`. The result is written to `output`.
-fn display_trap<S: SignalSystem, W: Write>(
+fn display_trap<S: SignalSystem, W: std::fmt::Write>(
     traps: &mut TrapSet,
     system: &S,
     cond: Condition,
@@ -198,7 +196,7 @@ impl<'a> From<&'a Error> for Report<'a> {
 }
 
 /// Resolves a condition specification to a condition.
-fn resolve<S: System>(cond: CondSpec, field: Field, system: &S) -> Result<Condition, Error> {
+fn resolve<S: Signals>(cond: CondSpec, field: Field, system: &S) -> Result<Condition, Error> {
     cond.to_condition(system).ok_or_else(|| {
         let cause = ErrorCause::UnsupportedSignal;
         Error { cause, cond, field }
@@ -208,14 +206,17 @@ fn resolve<S: System>(cond: CondSpec, field: Field, system: &S) -> Result<Condit
 /// Updates an action for a condition in the trap set.
 ///
 /// This is a utility function for implementing [`Command::execute`].
-fn set_action<S: System>(
+fn set_action<S>(
     traps: &mut TrapSet,
     system: &mut SharedSystem<S>,
     cond: CondSpec,
     field: Field,
     action: Action,
     override_ignore: bool,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    S: Signals + Sigmask + Sigaction,
+{
     let Some(cond2) = cond.to_condition(system) else {
         let cause = ErrorCause::UnsupportedSignal;
         return Err(Error { cause, cond, field });
@@ -239,7 +240,10 @@ impl Command {
     ///
     /// If successful, returns a string that should be printed to the standard
     /// output. On failure, returns a non-empty list of errors.
-    pub fn execute<S: System>(self, env: &mut Env<S>) -> Result<String, Vec<Error>> {
+    pub fn execute<S>(self, env: &mut Env<S>) -> Result<String, Vec<Error>>
+    where
+        S: Signals + Sigmask + Sigaction,
+    {
         match self {
             Self::PrintAll { include_default } => Ok(display_all_traps(
                 &mut env.traps,
@@ -294,7 +298,10 @@ impl Command {
 }
 
 /// Entry point for executing the `trap` built-in
-pub async fn main<S: System>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result {
+pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
+where
+    S: Fcntl + Isatty + Signals + Sigmask + Sigaction + Write,
+{
     let (options, operands) = match parse_arguments(syntax::OPTION_SPECS, Mode::with_env(env), args)
     {
         Ok(result) => result,

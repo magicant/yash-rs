@@ -17,7 +17,7 @@
 //! Definition of `CondSpec`
 
 use yash_env::signal;
-use yash_env::system::System;
+use yash_env::system::Signals;
 use yash_env::trap::Condition;
 
 /// Interpretation of a command line operand that specifies a trap condition
@@ -49,7 +49,7 @@ impl CondSpec {
     /// If this `CondSpec` contains a signal name or number that is not
     /// supported by the system, this function returns `None`.
     #[must_use]
-    pub fn to_condition<S: System>(&self, system: &S) -> Option<Condition> {
+    pub fn to_condition<S: Signals>(&self, system: &S) -> Option<Condition> {
         match self {
             Self::Exit => Some(Condition::Exit),
             Self::SignalName(name) => {
@@ -64,7 +64,7 @@ impl CondSpec {
     ///
     /// If the `Condition` is of an unknown variant, this function returns `None`.
     #[must_use]
-    pub fn from_condition<S: System>(cond: &Condition, system: &S) -> Option<Self> {
+    pub fn from_condition<S: Signals>(cond: &Condition, system: &S) -> Option<Self> {
         match cond {
             Condition::Exit => Some(Self::Exit),
             Condition::Signal(number) => {
