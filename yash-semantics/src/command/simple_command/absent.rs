@@ -18,6 +18,7 @@
 
 use super::perform_assignments;
 use crate::Handle;
+use crate::Runtime;
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;
@@ -32,11 +33,10 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
-use yash_env::system::System;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
 
-pub async fn execute_absent_target<S: System + 'static>(
+pub async fn execute_absent_target<S: Runtime + 'static>(
     env: &mut Env<S>,
     assigns: &[Assign],
     redirs: &Rc<Vec<Redir>>,

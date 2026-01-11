@@ -16,13 +16,13 @@
 
 //! Execution of the while and until loop
 
+use crate::Runtime;
 use crate::command::Command;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
 use yash_env::semantics::Divert;
 use yash_env::semantics::{ExitStatus, Result};
 use yash_env::stack::Frame;
-use yash_env::system::System;
 use yash_syntax::syntax::List;
 
 /// Execution context for loops
@@ -34,7 +34,7 @@ struct Loop<'a, S> {
     exit_status: ExitStatus,
 }
 
-impl<S: System + 'static> Loop<'_, S> {
+impl<S: Runtime + 'static> Loop<'_, S> {
     async fn iterate(&mut self) -> Result {
         while super::evaluate_condition(self.env, self.condition_command).await?
             == self.expected_condition
@@ -63,7 +63,7 @@ impl<S: System + 'static> Loop<'_, S> {
     }
 }
 
-async fn execute_common<S: System + 'static>(
+async fn execute_common<S: Runtime + 'static>(
     env: &mut Env<S>,
     condition_command: &List,
     expected_condition: bool,
@@ -83,7 +83,7 @@ async fn execute_common<S: System + 'static>(
 }
 
 /// Executes the while loop.
-pub async fn execute_while<S: System + 'static>(
+pub async fn execute_while<S: Runtime + 'static>(
     env: &mut Env<S>,
     condition: &List,
     body: &List,
@@ -92,7 +92,7 @@ pub async fn execute_while<S: System + 'static>(
 }
 
 /// Executes the until loop.
-pub async fn execute_until<S: System + 'static>(
+pub async fn execute_until<S: Runtime + 'static>(
     env: &mut Env<S>,
     condition: &List,
     body: &List,

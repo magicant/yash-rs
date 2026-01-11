@@ -18,6 +18,7 @@
 
 use super::perform_assignments;
 use crate::Handle;
+use crate::Runtime;
 use crate::command::search::search_path;
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
@@ -33,12 +34,11 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::stack::Builtin as FrameBuiltin;
-use yash_env::system::System;
 use yash_env::variable::Context;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
 
-pub async fn execute_builtin<S: System + 'static>(
+pub async fn execute_builtin<S: Runtime + 'static>(
     env: &mut Env<S>,
     builtin: Builtin<S>,
     assigns: &[Assign],
