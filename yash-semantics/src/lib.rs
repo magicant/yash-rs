@@ -39,15 +39,6 @@ pub mod redir;
 pub mod trap;
 pub mod xtrace;
 
-/// Runtime environment for executing shell commands
-///
-/// This trait extends [`yash_env::System`] to provide a runtime environment
-/// for executing shell commands and expanding words.
-pub trait Runtime: yash_env::System {}
-
-/// Blanket implementation of `Runtime` for any type implementing `System`
-impl<S: yash_env::System> Runtime for S {}
-
 #[doc(no_inline)]
 pub use yash_env::semantics::*;
 
@@ -57,6 +48,9 @@ pub use handle::Handle;
 mod runner;
 pub use runner::interactive_read_eval_loop;
 pub use runner::read_eval_loop;
+
+mod runtime;
+pub use runtime::Runtime;
 
 #[cfg(test)]
 pub(crate) mod tests;
