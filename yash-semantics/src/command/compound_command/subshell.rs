@@ -16,6 +16,7 @@
 
 //! Semantics of subshell compound commands
 
+use crate::Runtime;
 use crate::command::Command;
 use crate::trap::run_exit_trap;
 use std::ops::ControlFlow::Break;
@@ -28,7 +29,6 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
-use crate::Runtime;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::List;
 

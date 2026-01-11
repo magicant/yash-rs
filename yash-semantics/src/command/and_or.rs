@@ -17,11 +17,11 @@
 //! Implementation of the and-or list semantics.
 
 use super::Command;
+use crate::Runtime;
 use std::ops::ControlFlow::Continue;
 use yash_env::Env;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
-use crate::Runtime;
 use yash_syntax::syntax::AndOr::{self, AndThen, OrElse};
 use yash_syntax::syntax::AndOrList;
 use yash_syntax::syntax::Pipeline;

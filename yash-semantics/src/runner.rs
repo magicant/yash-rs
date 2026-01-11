@@ -17,6 +17,7 @@
 //! Implementation of the read-eval loop
 
 use crate::Handle;
+use crate::Runtime;
 use crate::command::Command;
 use crate::trap::run_traps_for_caught_signals;
 use std::cell::RefCell;
@@ -25,7 +26,6 @@ use yash_env::Env;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
-use crate::Runtime;
 use yash_syntax::parser::lex::Lexer;
 use yash_syntax::parser::{ErrorCause, Parser};
 use yash_syntax::syntax::List;

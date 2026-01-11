@@ -22,6 +22,7 @@
 //! [`syntax::SimpleCommand`].
 
 use crate::Handle;
+use crate::Runtime;
 use crate::command::Command;
 use crate::command::search::classify;
 use crate::expansion::expand_word_with_mode;
@@ -33,7 +34,6 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
-use crate::Runtime;
 #[cfg(doc)]
 use yash_env::variable::Context;
 use yash_env::variable::Scope;

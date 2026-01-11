@@ -23,13 +23,13 @@ mod item;
 mod pipeline;
 pub mod simple_command;
 
+use crate::Runtime;
 use crate::trap::run_traps_for_caught_signals;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
 use yash_env::semantics::Result;
 #[doc(no_inline)]
 pub use yash_env::semantics::command::search;
-use crate::Runtime;
 use yash_syntax::syntax;
 
 /// Syntactic construct that can be executed.

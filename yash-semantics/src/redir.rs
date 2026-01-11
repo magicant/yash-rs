@@ -76,6 +76,7 @@
 //! CLOEXEC flag. Also note that the above described behavior about the CLOEXEC
 //! flag is specific to this implementation.
 
+use crate::Runtime;
 use crate::expansion::expand_text;
 use crate::expansion::expand_word;
 use crate::xtrace::XTrace;
@@ -90,7 +91,6 @@ use std::ops::Deref;
 use std::ops::DerefMut;
 use thiserror::Error;
 use yash_env::Env;
-use crate::Runtime;
 use yash_env::io::Fd;
 use yash_env::io::MIN_INTERNAL_FD;
 use yash_env::option::Option::Clobber;

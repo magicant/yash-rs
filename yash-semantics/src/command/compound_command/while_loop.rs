@@ -16,13 +16,13 @@
 
 //! Execution of the while and until loop
 
+use crate::Runtime;
 use crate::command::Command;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
 use yash_env::semantics::Divert;
 use yash_env::semantics::{ExitStatus, Result};
 use yash_env::stack::Frame;
-use crate::Runtime;
 use yash_syntax::syntax::List;
 
 /// Execution context for loops

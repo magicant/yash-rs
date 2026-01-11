@@ -16,12 +16,12 @@
 
 //! Utility for unit tests
 
+use crate::Runtime;
 use itertools::Itertools;
 use std::future::ready;
 use std::ops::ControlFlow::Break;
 use std::pin::Pin;
 use yash_env::Env;
-use crate::Runtime;
 use yash_env::builtin::Builtin;
 use yash_env::builtin::Type::{Mandatory, Special};
 use yash_env::io::Fd;

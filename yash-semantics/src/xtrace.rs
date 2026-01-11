@@ -34,6 +34,7 @@
 //! [`XTrace::from_options`] is a convenient method to do so.
 
 use crate::Handle;
+use crate::Runtime;
 use crate::expansion::expand_text;
 use std::fmt::Write;
 use std::ops::{Deref, DerefMut};
@@ -41,7 +42,6 @@ use yash_env::Env;
 use yash_env::option::OptionSet;
 use yash_env::option::State;
 use yash_env::semantics::Field;
-use crate::Runtime;
 use yash_env::variable::PS4;
 use yash_quote::quoted;
 use yash_syntax::syntax::Text;

@@ -17,9 +17,9 @@
 //! Running the EXIT trap
 
 use super::run_trap;
+use crate::Runtime;
 use std::rc::Rc;
 use yash_env::Env;
-use crate::Runtime;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
 use yash_env::trap::Origin;

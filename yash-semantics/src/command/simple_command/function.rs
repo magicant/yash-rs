@@ -18,6 +18,7 @@
 
 use super::perform_assignments;
 use crate::Handle;
+use crate::Runtime;
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;
@@ -30,7 +31,6 @@ use yash_env::function::Function;
 use yash_env::semantics::Divert;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
-use crate::Runtime;
 use yash_env::variable::Context;
 use yash_env::variable::PositionalParams;
 use yash_syntax::syntax::Assign;

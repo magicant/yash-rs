@@ -17,6 +17,7 @@
 //! Implementations of function definition semantics.
 
 use crate::Handle;
+use crate::Runtime;
 use crate::command::Command;
 use crate::expansion::Field;
 use crate::expansion::expand_word;
@@ -29,7 +30,6 @@ use yash_env::function::FunctionBody;
 use yash_env::function::FunctionBodyObject;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
-use crate::Runtime;
 use yash_syntax::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
 use yash_syntax::syntax;
 

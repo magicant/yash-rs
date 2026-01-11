@@ -16,13 +16,13 @@
 
 //! Assignment.
 
+use crate::Runtime;
 use crate::expansion::AssignReadOnlyError;
 use crate::expansion::expand_value;
 use crate::xtrace::XTrace;
 use std::fmt::Write;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
-use crate::Runtime;
 
 #[doc(no_inline)]
 pub use crate::expansion::{Error, ErrorCause, Result};

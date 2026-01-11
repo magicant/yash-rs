@@ -17,12 +17,12 @@
 //! Execution of the if command
 
 use super::evaluate_condition;
+use crate::Runtime;
 use crate::command::Command;
 use std::ops::ControlFlow::Continue;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
-use crate::Runtime;
 use yash_syntax::syntax::ElifThen;
 use yash_syntax::syntax::List;
 

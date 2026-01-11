@@ -17,13 +17,13 @@
 //! Implementation of pipeline semantics.
 
 use super::Command;
+use crate::Runtime;
 use crate::trap::run_exit_trap;
 use enumset::EnumSet;
 use itertools::Itertools;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::Env;
-use crate::Runtime;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
 use yash_env::job::add_job_if_suspended;
@@ -201,7 +201,11 @@ async fn execute_multi_command_pipeline<S: Runtime + 'static>(
     Continue(())
 }
 
-async fn shift_or_fail<S: Runtime>(env: &mut Env<S>, pipes: &mut PipeSet, has_next: bool) -> Result {
+async fn shift_or_fail<S: Runtime>(
+    env: &mut Env<S>,
+    pipes: &mut PipeSet,
+    has_next: bool,
+) -> Result {
     match pipes.shift(env, has_next) {
         Ok(()) => Continue(()),
         Err(errno) => {

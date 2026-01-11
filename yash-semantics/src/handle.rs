@@ -17,11 +17,11 @@
 //! Error handlers.
 
 use crate::ExitStatus;
+use crate::Runtime;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
 use yash_env::io::print_report;
 use yash_env::semantics::Divert;
-use crate::Runtime;
 use yash_syntax::source::Source;
 
 /// Error handler.

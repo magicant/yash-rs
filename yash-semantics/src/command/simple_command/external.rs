@@ -18,6 +18,7 @@
 
 use super::perform_assignments;
 use crate::Handle;
+use crate::Runtime;
 use crate::command::search::search_path;
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
@@ -33,7 +34,6 @@ use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::semantics::command::ReplaceCurrentProcessError;
 use yash_env::semantics::command::run_external_utility_in_subshell;
-use crate::Runtime;
 use yash_env::variable::Context;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;

@@ -17,6 +17,7 @@
 //! Execution of the case command
 
 use crate::Handle;
+use crate::Runtime;
 use crate::command::Command;
 use crate::expansion::attr_fnmatch::apply_escapes;
 use crate::expansion::attr_fnmatch::to_pattern_chars;
@@ -29,7 +30,6 @@ use std::ops::ControlFlow::Continue;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
-use crate::Runtime;
 use yash_fnmatch::Config;
 use yash_fnmatch::Pattern;
 use yash_quote::quoted;

@@ -17,6 +17,7 @@
 //! Execution of the for loop
 
 use crate::Handle;
+use crate::Runtime;
 use crate::assign::Error;
 use crate::assign::ErrorCause;
 use crate::command::Command;
@@ -34,7 +35,6 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
-use crate::Runtime;
 use yash_env::variable::Scope;
 use yash_quote::quoted;
 use yash_syntax::syntax::List;

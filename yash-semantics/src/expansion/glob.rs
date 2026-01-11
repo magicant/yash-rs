@@ -53,11 +53,11 @@
 use super::attr::AttrChar;
 use super::attr::AttrField;
 use super::attr::Origin;
+use crate::Runtime;
 use std::ffi::CString;
 use std::iter::Once;
 use std::marker::PhantomData;
 use yash_env::Env;
-use crate::Runtime;
 use yash_env::option::State::Off;
 use yash_env::semantics::Field;
 use yash_env::system::Dir as _;

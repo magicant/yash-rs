@@ -17,11 +17,11 @@
 //! Implementation for Item.
 
 use super::Command;
+use crate::Runtime;
 use crate::trap::run_exit_trap;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::Env;
-use crate::Runtime;
 use yash_env::io::Fd;
 use yash_env::io::print_error;
 use yash_env::job::Job;

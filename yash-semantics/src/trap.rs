@@ -44,6 +44,7 @@
 //! built-in or reaching the end of the script. The [`run_exit_trap`] function,
 //! which should be called before exiting, runs the trap.
 
+use crate::Runtime;
 use crate::read_eval_loop;
 use std::cell::RefCell;
 use std::ops::ControlFlow::Break;
@@ -52,7 +53,6 @@ use yash_env::Env;
 use yash_env::semantics::Divert;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
-use crate::Runtime;
 use yash_env::trap::Condition;
 #[cfg(doc)]
 use yash_env::trap::TrapSet;

@@ -17,8 +17,8 @@
 //! Here-documents
 
 use super::ErrorCause;
-use yash_env::Env;
 use crate::Runtime;
+use yash_env::Env;
 use yash_env::io::Fd;
 use yash_env::path::Path;
 use yash_env::system::Close as _;
