@@ -97,11 +97,9 @@ use yash_env::option::Option::Clobber;
 use yash_env::option::State::Off;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::system::Close as _;
-use yash_env::system::Dup as _;
-use yash_env::system::Fcntl as _;
-use yash_env::system::Open as _;
-use yash_env::system::{Errno, FdFlag, FileType, Fstat, Mode, OfdAccess, OpenFlag};
+use yash_env::system::{
+    Close, Dup as _, Errno, Fcntl, FdFlag, FileType, Fstat, Mode, OfdAccess, Open, OpenFlag,
+};
 use yash_quote::quoted;
 use yash_syntax::source::Location;
 use yash_syntax::source::pretty::{Report, ReportType, Snippet};
@@ -283,7 +281,7 @@ impl FdSpec {
 
 const MODE: Mode = Mode::ALL_READ.union(Mode::ALL_WRITE);
 
-fn is_cloexec<S: Runtime>(env: &Env<S>, fd: Fd) -> bool {
+fn is_cloexec<S: Fcntl>(env: &Env<S>, fd: Fd) -> bool {
     matches!(env.system.fcntl_getfd(fd), Ok(flags) if flags.contains(FdFlag::CloseOnExec))
 }
 
@@ -298,7 +296,7 @@ fn into_c_string_value_and_origin(field: Field) -> Result<(CString, Location), E
 }
 
 /// Opens a file for redirection.
-fn open_file<S: Runtime>(
+fn open_file<S: Open>(
     env: &mut Env<S>,
     access: OfdAccess,
     flags: EnumSet<OpenFlag>,
@@ -316,10 +314,10 @@ fn open_file<S: Runtime>(
 }
 
 /// Opens a file for writing with the `noclobber` option.
-fn open_file_noclobber<S: Runtime>(
-    env: &mut Env<S>,
-    path: Field,
-) -> Result<(FdSpec, Location), Error> {
+fn open_file_noclobber<S>(env: &mut Env<S>, path: Field) -> Result<(FdSpec, Location), Error>
+where
+    S: Open + Fstat + Close,
+{
     let system = &mut env.system;
     let (path, origin) = into_c_string_value_and_origin(path)?;
 
@@ -375,7 +373,7 @@ fn open_file_noclobber<S: Runtime>(
 }
 
 /// Parses the target of `<&` and `>&`.
-fn copy_fd<S: Runtime>(
+fn copy_fd<S: Fcntl>(
     env: &mut Env<S>,
     target: Field,
     expected_access: OfdAccess,
@@ -396,7 +394,7 @@ fn copy_fd<S: Runtime>(
     };
 
     // Check if the FD is really readable or writable
-    fn is_fd_valid<S: Runtime>(system: &S, fd: Fd, expected_access: OfdAccess) -> bool {
+    fn is_fd_valid<S: Fcntl>(system: &S, fd: Fd, expected_access: OfdAccess) -> bool {
         system
             .ofd_access(fd)
             .is_ok_and(|access| access == expected_access || access == OfdAccess::ReadWrite)
@@ -430,11 +428,14 @@ fn copy_fd<S: Runtime>(
 }
 
 /// Opens the file for a normal redirection.
-async fn open_normal<S: Runtime>(
+async fn open_normal<S>(
     env: &mut Env<S>,
     operator: RedirOp,
     operand: Field,
-) -> Result<(FdSpec, Location), Error> {
+) -> Result<(FdSpec, Location), Error>
+where
+    S: Open + Fcntl + Fstat + Close,
+{
     use RedirOp::*;
     match operator {
         FileIn => open_file(env, OfdAccess::ReadOnly, EnumSet::empty(), operand),

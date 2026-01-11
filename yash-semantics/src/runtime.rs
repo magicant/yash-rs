@@ -17,11 +17,12 @@
 //! Definition of `Runtime`
 
 use yash_env::System;
+use yash_env::system::{Close, Dup, Fcntl, Fstat, Isatty, Open, Wait, Write};
 
 /// Runtime environment for executing shell commands
 ///
 /// TBD
-pub trait Runtime: System {}
+pub trait Runtime: Close + Dup + Fcntl + Fstat + Isatty + Open + System + Wait + Write {}
 
 /// Blanket implementation of `Runtime` for any type implementing `System`
-impl<S: System> Runtime for S {}
+impl<S: Close + Dup + Fcntl + Fstat + Isatty + Open + System + Wait + Write> Runtime for S {}
