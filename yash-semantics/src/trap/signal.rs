@@ -23,7 +23,7 @@ use yash_env::Env;
 use yash_env::semantics::Result;
 use yash_env::signal;
 use yash_env::stack::Frame;
-use yash_env::system::System;
+use crate::Runtime;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
 use yash_env::trap::Origin;
@@ -40,7 +40,7 @@ use yash_env::trap::TrapSet;
 /// Returns `None` if the signal has not been caught. Otherwise, returns the
 /// result of running the trap action.
 #[must_use]
-pub async fn run_trap_if_caught<S: System + 'static>(
+pub async fn run_trap_if_caught<S: Runtime + 'static>(
     env: &mut Env<S>,
     signal: signal::Number,
 ) -> Option<Result> {
@@ -81,7 +81,7 @@ fn in_trap<S>(env: &Env<S>) -> bool {
 /// not care for the reentrance of trap actions, so we should not assume they
 /// are reentrant. As an exception, this function does run traps in a subshell
 /// executed in a trap.
-pub async fn run_traps_for_caught_signals<S: System + 'static>(env: &mut Env<S>) -> Result {
+pub async fn run_traps_for_caught_signals<S: Runtime + 'static>(env: &mut Env<S>) -> Result {
     env.poll_signals();
 
     if in_trap(env) {

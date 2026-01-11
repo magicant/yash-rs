@@ -28,12 +28,12 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
-use yash_env::system::System;
+use crate::Runtime;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::List;
 
 /// Executes a subshell command
-pub async fn execute<S: System + 'static>(
+pub async fn execute<S: Runtime + 'static>(
     env: &mut Env<S>,
     body: Rc<List>,
     location: &Location,
@@ -60,7 +60,7 @@ pub async fn execute<S: System + 'static>(
 }
 
 /// Executes the content of the shell.
-async fn subshell_main<S: System + 'static>(env: &mut Env<S>, body: Rc<List>) {
+async fn subshell_main<S: Runtime + 'static>(env: &mut Env<S>, body: Rc<List>) {
     let result = body.execute(env).await;
     env.apply_result(result);
 

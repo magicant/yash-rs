@@ -26,7 +26,7 @@ use crate::expansion::ErrorCause;
 use crate::read_eval_loop;
 use crate::trap::run_exit_trap;
 use std::cell::RefCell;
-use yash_env::System;
+use crate::Runtime;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
 use yash_env::subshell::JobControl;
@@ -47,7 +47,7 @@ pub async fn expand<C, S>(
 ) -> Result<Phrase, Error>
 where
     C: AsRef<str> + 'static,
-    S: System + 'static,
+    S: Runtime + 'static,
 {
     let original = location.clone();
 
@@ -84,7 +84,7 @@ async fn subshell_body<C, S>(
 ) -> yash_env::semantics::Result
 where
     C: AsRef<str>,
-    S: System + 'static,
+    S: Runtime + 'static,
 {
     // Arrange the file descriptors
     env.system.close(reader).ok();
@@ -113,7 +113,7 @@ async fn expand_common<S>(
     env: &mut Env<'_, S>,
 ) -> Result<Phrase, Error>
 where
-    S: System,
+    S: Runtime,
 {
     // See if the subshell has successfully started
     let pid = match subshell_result {

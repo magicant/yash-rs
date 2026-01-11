@@ -32,11 +32,11 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
-use yash_env::system::System;
+use crate::Runtime;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
 
-pub async fn execute_absent_target<S: System + 'static>(
+pub async fn execute_absent_target<S: Runtime + 'static>(
     env: &mut Env<S>,
     assigns: &[Assign],
     redirs: &Rc<Vec<Redir>>,

@@ -90,7 +90,7 @@ use std::ops::Deref;
 use std::ops::DerefMut;
 use thiserror::Error;
 use yash_env::Env;
-use yash_env::System;
+use crate::Runtime;
 use yash_env::io::Fd;
 use yash_env::io::MIN_INTERNAL_FD;
 use yash_env::option::Option::Clobber;
@@ -271,7 +271,7 @@ impl FdSpec {
         }
     }
 
-    fn close<S: System>(self, system: &mut S) {
+    fn close<S: Runtime>(self, system: &mut S) {
         match self {
             FdSpec::Owned(fd) => {
                 let _ = system.close(fd);
@@ -283,7 +283,7 @@ impl FdSpec {
 
 const MODE: Mode = Mode::ALL_READ.union(Mode::ALL_WRITE);
 
-fn is_cloexec<S: System>(env: &Env<S>, fd: Fd) -> bool {
+fn is_cloexec<S: Runtime>(env: &Env<S>, fd: Fd) -> bool {
     matches!(env.system.fcntl_getfd(fd), Ok(flags) if flags.contains(FdFlag::CloseOnExec))
 }
 
@@ -298,7 +298,7 @@ fn into_c_string_value_and_origin(field: Field) -> Result<(CString, Location), E
 }
 
 /// Opens a file for redirection.
-fn open_file<S: System>(
+fn open_file<S: Runtime>(
     env: &mut Env<S>,
     access: OfdAccess,
     flags: EnumSet<OpenFlag>,
@@ -316,7 +316,7 @@ fn open_file<S: System>(
 }
 
 /// Opens a file for writing with the `noclobber` option.
-fn open_file_noclobber<S: System>(
+fn open_file_noclobber<S: Runtime>(
     env: &mut Env<S>,
     path: Field,
 ) -> Result<(FdSpec, Location), Error> {
@@ -375,7 +375,7 @@ fn open_file_noclobber<S: System>(
 }
 
 /// Parses the target of `<&` and `>&`.
-fn copy_fd<S: System>(
+fn copy_fd<S: Runtime>(
     env: &mut Env<S>,
     target: Field,
     expected_access: OfdAccess,
@@ -396,7 +396,7 @@ fn copy_fd<S: System>(
     };
 
     // Check if the FD is really readable or writable
-    fn is_fd_valid<S: System>(system: &S, fd: Fd, expected_access: OfdAccess) -> bool {
+    fn is_fd_valid<S: Runtime>(system: &S, fd: Fd, expected_access: OfdAccess) -> bool {
         system
             .ofd_access(fd)
             .is_ok_and(|access| access == expected_access || access == OfdAccess::ReadWrite)
@@ -430,7 +430,7 @@ fn copy_fd<S: System>(
 }
 
 /// Opens the file for a normal redirection.
-async fn open_normal<S: System>(
+async fn open_normal<S: Runtime>(
     env: &mut Env<S>,
     operator: RedirOp,
     operand: Field,
@@ -492,7 +492,7 @@ mod here_doc;
 
 /// Performs a redirection.
 #[allow(clippy::await_holding_refcell_ref)]
-async fn perform<S: System + 'static>(
+async fn perform<S: Runtime + 'static>(
     env: &mut Env<S>,
     redir: &Redir,
     xtrace: Option<&mut XTrace>,
@@ -584,33 +584,33 @@ async fn perform<S: System + 'static>(
 /// called. That means you need to call `preserve_redirs` explicitly to preserve
 /// the redirections' effect.
 #[derive(Debug)]
-pub struct RedirGuard<'e, S: System> {
+pub struct RedirGuard<'e, S: Runtime> {
     /// Environment in which redirections are performed.
     env: &'e mut yash_env::Env<S>,
     /// Records of file descriptors that have been modified by redirections.
     saved_fds: Vec<SavedFd>,
 }
 
-impl<S: System> Deref for RedirGuard<'_, S> {
+impl<S: Runtime> Deref for RedirGuard<'_, S> {
     type Target = yash_env::Env<S>;
     fn deref(&self) -> &yash_env::Env<S> {
         self.env
     }
 }
 
-impl<S: System> DerefMut for RedirGuard<'_, S> {
+impl<S: Runtime> DerefMut for RedirGuard<'_, S> {
     fn deref_mut(&mut self) -> &mut yash_env::Env<S> {
         self.env
     }
 }
 
-impl<S: System> std::ops::Drop for RedirGuard<'_, S> {
+impl<S: Runtime> std::ops::Drop for RedirGuard<'_, S> {
     fn drop(&mut self) {
         self.undo_redirs()
     }
 }
 
-impl<'e, S: System> RedirGuard<'e, S> {
+impl<'e, S: Runtime> RedirGuard<'e, S> {
     /// Creates a new `RedirGuard`.
     pub fn new(env: &'e mut yash_env::Env<S>) -> Self {
         let saved_fds = Vec::new();

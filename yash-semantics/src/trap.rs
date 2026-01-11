@@ -52,7 +52,7 @@ use yash_env::Env;
 use yash_env::semantics::Divert;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
-use yash_env::system::System;
+use crate::Runtime;
 use yash_env::trap::Condition;
 #[cfg(doc)]
 use yash_env::trap::TrapSet;
@@ -75,7 +75,7 @@ use yash_syntax::source::Source;
 /// simplicity. The exit status section of the POSIX return built-in
 /// specification mentions the intended behavior for the `Divert::Return` case,
 /// implying that the diversion should be passed on to the caller.)
-async fn run_trap<S: System + 'static>(
+async fn run_trap<S: Runtime + 'static>(
     env: &mut Env<S>,
     cond: Condition,
     code: Rc<str>,

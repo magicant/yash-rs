@@ -23,7 +23,7 @@ use itertools::Itertools;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::Env;
-use yash_env::System;
+use crate::Runtime;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
 use yash_env::job::add_job_if_suspended;
@@ -78,7 +78,7 @@ use yash_syntax::syntax;
 ///
 /// if `self.negation` is true, [`Frame::Condition`] is pushed to the
 /// environment's stack while the pipeline is executed.
-impl<S: System + 'static> Command<S> for syntax::Pipeline {
+impl<S: Runtime + 'static> Command<S> for syntax::Pipeline {
     async fn execute(&self, env: &mut Env<S>) -> Result {
         if env.options.get(Exec) == Off && env.options.get(Interactive) == Off {
             return Continue(());
@@ -99,7 +99,7 @@ impl<S: System + 'static> Command<S> for syntax::Pipeline {
     }
 }
 
-async fn execute_commands_in_pipeline<S: System + 'static>(
+async fn execute_commands_in_pipeline<S: Runtime + 'static>(
     env: &mut Env<S>,
     commands: &[Rc<syntax::Command>],
 ) -> Result {
@@ -122,7 +122,7 @@ async fn execute_commands_in_pipeline<S: System + 'static>(
     }
 }
 
-async fn execute_job_controlled_pipeline<S: System + 'static>(
+async fn execute_job_controlled_pipeline<S: Runtime + 'static>(
     env: &mut Env<S>,
     commands: &[Rc<syntax::Command>],
 ) -> Result {
@@ -157,7 +157,7 @@ fn to_job_name(commands: &[Rc<syntax::Command>]) -> String {
         .to_string()
 }
 
-async fn execute_multi_command_pipeline<S: System + 'static>(
+async fn execute_multi_command_pipeline<S: Runtime + 'static>(
     env: &mut Env<S>,
     commands: &[Rc<syntax::Command>],
 ) -> Result {
@@ -201,7 +201,7 @@ async fn execute_multi_command_pipeline<S: System + 'static>(
     Continue(())
 }
 
-async fn shift_or_fail<S: System>(env: &mut Env<S>, pipes: &mut PipeSet, has_next: bool) -> Result {
+async fn shift_or_fail<S: Runtime>(env: &mut Env<S>, pipes: &mut PipeSet, has_next: bool) -> Result {
     match pipes.shift(env, has_next) {
         Ok(()) => Continue(()),
         Err(errno) => {
@@ -213,7 +213,7 @@ async fn shift_or_fail<S: System>(env: &mut Env<S>, pipes: &mut PipeSet, has_nex
     }
 }
 
-async fn connect_pipe_and_execute_command<S: System + 'static>(
+async fn connect_pipe_and_execute_command<S: Runtime + 'static>(
     env: &mut Env<S>,
     pipes: PipeSet,
     command: Rc<syntax::Command>,
@@ -231,7 +231,7 @@ async fn connect_pipe_and_execute_command<S: System + 'static>(
     command.execute(env).await
 }
 
-async fn pid_or_fail<S: System>(
+async fn pid_or_fail<S: Runtime>(
     env: &mut Env<S>,
     start_result: std::result::Result<(Pid, Option<JobControl>), Errno>,
 ) -> Result<Pid> {
@@ -269,7 +269,7 @@ impl PipeSet {
     ///
     /// Closes FDs that are no longer necessary and opens a new pipe if there is
     /// a next command.
-    fn shift<S: System>(
+    fn shift<S: Runtime>(
         &mut self,
         env: &mut Env<S>,
         has_next: bool,
@@ -295,7 +295,7 @@ impl PipeSet {
 
     /// Moves the pipe FDs to stdin/stdout and closes the FDs that are no longer
     /// necessary.
-    fn move_to_stdin_stdout<S: System>(
+    fn move_to_stdin_stdout<S: Runtime>(
         mut self,
         env: &mut Env<S>,
     ) -> std::result::Result<(), Errno> {

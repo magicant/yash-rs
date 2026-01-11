@@ -21,7 +21,7 @@ use std::future::ready;
 use std::ops::ControlFlow::Break;
 use std::pin::Pin;
 use yash_env::Env;
-use yash_env::System;
+use crate::Runtime;
 use yash_env::builtin::Builtin;
 use yash_env::builtin::Type::{Mandatory, Special};
 use yash_env::io::Fd;
@@ -110,7 +110,7 @@ pub fn continue_builtin<S>() -> Builtin<S> {
     Builtin::new(Special, continue_builtin_main)
 }
 
-fn suspend_builtin_main<S: System>(
+fn suspend_builtin_main<S: Runtime>(
     env: &mut Env<S>,
     _args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
@@ -121,11 +121,11 @@ fn suspend_builtin_main<S: System>(
 }
 
 /// Returns a minimal implementation of the `suspend` built-in.
-pub fn suspend_builtin<S: System>() -> Builtin<S> {
+pub fn suspend_builtin<S: Runtime>() -> Builtin<S> {
     Builtin::new(Special, suspend_builtin_main)
 }
 
-fn local_builtin_main<S: System>(
+fn local_builtin_main<S: Runtime>(
     env: &mut Env<S>,
     args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
@@ -156,13 +156,13 @@ fn local_builtin_main<S: System>(
     })
 }
 
-pub fn local_builtin<S: System>() -> Builtin<S> {
+pub fn local_builtin<S: Runtime>() -> Builtin<S> {
     let mut builtin = Builtin::new(Mandatory, local_builtin_main);
     builtin.is_declaration_utility = Some(true);
     builtin
 }
 
-fn echo_builtin_main<S: System>(
+fn echo_builtin_main<S: Runtime>(
     env: &mut Env<S>,
     args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
@@ -178,15 +178,15 @@ fn echo_builtin_main<S: System>(
 }
 
 /// Returns a minimal implementation of the `echo` built-in.
-pub fn echo_builtin<S: System>() -> Builtin<S> {
+pub fn echo_builtin<S: Runtime>() -> Builtin<S> {
     Builtin::new(Mandatory, echo_builtin_main)
 }
 
-fn cat_builtin_main<S: System>(
+fn cat_builtin_main<S: Runtime>(
     env: &mut Env<S>,
     _args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
-    async fn inner<S: System>(env: &mut Env<S>) -> std::result::Result<(), Errno> {
+    async fn inner<S: Runtime>(env: &mut Env<S>) -> std::result::Result<(), Errno> {
         let mut buffer = [0; 1024];
         loop {
             let count = env.system.read_async(Fd::STDIN, &mut buffer).await?;
@@ -207,6 +207,6 @@ fn cat_builtin_main<S: System>(
 }
 
 /// Returns a minimal implementation of the `cat` built-in.
-pub fn cat_builtin<S: System>() -> Builtin<S> {
+pub fn cat_builtin<S: Runtime>() -> Builtin<S> {
     Builtin::new(Mandatory, cat_builtin_main)
 }

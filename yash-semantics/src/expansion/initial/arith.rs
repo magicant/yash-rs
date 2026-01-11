@@ -29,7 +29,7 @@ use std::rc::Rc;
 use yash_arith::eval;
 use yash_env::option::Option::Unset;
 use yash_env::option::State::{Off, On};
-use yash_env::system::System;
+use crate::Runtime;
 use yash_env::variable::Scope::Global;
 use yash_syntax::source::Code;
 use yash_syntax::source::Location;
@@ -253,7 +253,7 @@ impl<S> yash_arith::Env for VarEnv<'_, S> {
     }
 }
 
-pub async fn expand<S: System + 'static>(
+pub async fn expand<S: Runtime + 'static>(
     text: &Text,
     location: &Location,
     env: &mut Env<'_, S>,
