@@ -49,5 +49,8 @@ mod runner;
 pub use runner::interactive_read_eval_loop;
 pub use runner::read_eval_loop;
 
+mod runtime;
+pub use runtime::Runtime;
+
 #[cfg(test)]
 pub(crate) mod tests;
