@@ -17,6 +17,7 @@
 //! Implementations of function definition semantics.
 
 use crate::Handle;
+use crate::Runtime;
 use crate::command::Command;
 use crate::expansion::Field;
 use crate::expansion::expand_word;
@@ -29,7 +30,7 @@ use yash_env::function::FunctionBody;
 use yash_env::function::FunctionBodyObject;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
-use yash_env::system::System;
+use yash_env::system::{Fcntl, Isatty, Write};
 use yash_syntax::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
 use yash_syntax::syntax;
 
@@ -45,7 +46,7 @@ impl std::fmt::Display for BodyImpl {
     }
 }
 
-impl<S: System + 'static> FunctionBody<S> for BodyImpl {
+impl<S: Runtime + 'static> FunctionBody<S> for BodyImpl {
     async fn execute(&self, env: &mut Env<S>) -> Result {
         self.0.execute(env).await
     }
@@ -61,14 +62,14 @@ impl<S: System + 'static> FunctionBody<S> for BodyImpl {
 /// execution ends with an exit status of zero.
 ///
 /// The `ErrExit` shell option is [applied](Env::apply_errexit) on error.
-impl<S: System + 'static> Command<S> for syntax::FunctionDefinition {
+impl<S: Runtime + 'static> Command<S> for syntax::FunctionDefinition {
     async fn execute(&self, env: &mut Env<S>) -> Result {
         define_function(env, self).await?;
         env.apply_errexit()
     }
 }
 
-async fn define_function<S: System + 'static>(
+async fn define_function<S: Runtime + 'static>(
     env: &mut Env<S>,
     def: &syntax::FunctionDefinition,
 ) -> Result {
@@ -105,7 +106,10 @@ async fn define_function<S: System + 'static>(
 /// Reports a function definition error.
 ///
 /// This function assumes `error.existing.read_only_location.is_some()`.
-async fn report_define_error<S: System>(env: &mut Env<S>, error: &DefineError<S>) {
+async fn report_define_error<S>(env: &mut Env<S>, error: &DefineError<S>)
+where
+    S: Fcntl + Isatty + Write,
+{
     let mut report = Report::new();
     report.r#type = ReportType::Error;
     report.title = error.to_string().into();
