@@ -16,7 +16,13 @@
 
 //! Definition of `Runtime`
 
-use yash_env::System;
+use std::fmt::Debug;
+use yash_env::system::resource::SetRlimit;
+use yash_env::system::{
+    CaughtSignals, Clock, Close, Dup, Exec, Exit, Fcntl, Fork, Fstat, GetPid, GetPw,
+    IsExecutableFile, Isatty, Open, Pipe, Read, Seek, Select, SendSignal, SetPgid, ShellPath,
+    Sigaction, Sigmask, Signals, TcSetPgrp, Wait, Write,
+};
 
 /// Runtime environment for executing shell commands
 ///
@@ -26,10 +32,70 @@ use yash_env::System;
 /// part of the implementation is transitively required by most of the
 /// implementation. Therefore, this trait serves as a convenient shorthand to
 /// express the required capabilities.
-pub trait Runtime: System {}
-// TODO: Runtime temporarily requires System. It should require only the
-// necessary traits and System should be removed later.
+pub trait Runtime:
+    CaughtSignals
+    + Clock
+    + Close
+    + Debug
+    + Dup
+    + Exec
+    + Exit
+    + Fcntl
+    + Fork
+    + Fstat
+    + GetPid
+    + GetPw
+    + IsExecutableFile
+    + Isatty
+    + Open
+    + Pipe
+    + Read
+    + Seek
+    + Select
+    + SendSignal
+    + SetPgid
+    + SetRlimit
+    + ShellPath
+    + Sigaction
+    + Sigmask
+    + Signals
+    + TcSetPgrp
+    + Wait
+    + Write
+{
+}
 
 /// Any type automatically implements `Runtime` if it implements all the
 /// supertraits of `Runtime`.
-impl<S: System> Runtime for S {}
+impl<S> Runtime for S where
+    S: CaughtSignals
+        + Clock
+        + Close
+        + Debug
+        + Dup
+        + Exec
+        + Exit
+        + Fcntl
+        + Fork
+        + Fstat
+        + GetPid
+        + GetPw
+        + IsExecutableFile
+        + Isatty
+        + Open
+        + Pipe
+        + Read
+        + Seek
+        + Select
+        + SendSignal
+        + SetPgid
+        + SetRlimit
+        + ShellPath
+        + Sigaction
+        + Sigmask
+        + Signals
+        + TcSetPgrp
+        + Wait
+        + Write
+{
+}
