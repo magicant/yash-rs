@@ -17,17 +17,17 @@
 //! Execution of the if command
 
 use super::evaluate_condition;
+use crate::Runtime;
 use crate::command::Command;
 use std::ops::ControlFlow::Continue;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
-use yash_env::system::System;
 use yash_syntax::syntax::ElifThen;
 use yash_syntax::syntax::List;
 
 /// Executes the if command.
-pub async fn execute<S: System + 'static>(
+pub async fn execute<S: Runtime + 'static>(
     env: &mut Env<S>,
     condition: &List,
     body: &List,
