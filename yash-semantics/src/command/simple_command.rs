@@ -22,6 +22,7 @@
 //! [`syntax::SimpleCommand`].
 
 use crate::Handle;
+use crate::Runtime;
 use crate::command::Command;
 use crate::command::search::classify;
 use crate::expansion::expand_word_with_mode;
@@ -33,7 +34,6 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
-use yash_env::system::System;
 #[cfg(doc)]
 use yash_env::variable::Context;
 use yash_env::variable::Scope;
@@ -161,7 +161,7 @@ use yash_syntax::syntax::Word;
 ///
 /// POSIX leaves many aspects of the simple command execution unspecified. The
 /// detail semantics may differ in other shell implementations.
-impl<S: System + 'static> Command<S> for syntax::SimpleCommand {
+impl<S: Runtime + 'static> Command<S> for syntax::SimpleCommand {
     async fn execute(&self, env: &mut Env<S>) -> Result {
         let (fields, exit_status) = match expand_words(env, &self.words).await {
             Ok(result) => result,
@@ -190,7 +190,7 @@ impl<S: System + 'static> Command<S> for syntax::SimpleCommand {
     }
 }
 
-async fn expand_words<S: System + 'static>(
+async fn expand_words<S: Runtime + 'static>(
     env: &mut Env<S>,
     words: &[(Word, ExpansionMode)],
 ) -> crate::expansion::Result<(Vec<Field>, Option<ExitStatus>)> {
@@ -205,7 +205,7 @@ async fn expand_words<S: System + 'static>(
     Ok((fields, last_exit_status))
 }
 
-async fn perform_assignments<S: System + 'static>(
+async fn perform_assignments<S: Runtime + 'static>(
     env: &mut Env<S>,
     assigns: &[Assign],
     export: bool,
