@@ -33,7 +33,6 @@ use std::ffi::CString;
 use std::rc::Rc;
 use thiserror::Error;
 use yash_env::Env;
-use yash_env::System;
 use yash_env::input::{Echo, FdReader};
 use yash_env::io::Fd;
 use yash_env::io::move_fd_internal;
@@ -41,13 +40,13 @@ use yash_env::option::Option::Interactive;
 use yash_env::option::State::Off;
 use yash_env::parser::Config;
 use yash_env::stack::Frame;
-use yash_env::system::Close as _;
-use yash_env::system::GetUid as _;
-use yash_env::system::{Errno, Mode, OfdAccess, OpenFlag};
+use yash_env::system::{
+    Close, Dup, Errno, Fcntl, GetUid, Isatty, Mode, OfdAccess, Open, OpenFlag, Write,
+};
 use yash_env::variable::ENV;
-use yash_semantics::Handle;
 use yash_semantics::expansion::expand_text;
 use yash_semantics::read_eval_loop;
+use yash_semantics::{Handle, Runtime};
 use yash_syntax::parser::lex::Lexer;
 use yash_syntax::source::Source;
 
@@ -63,7 +62,10 @@ pub enum DefaultFilePathError {
     ExpansionError(#[from] yash_semantics::expansion::Error),
 }
 
-impl<S: System> Handle<S> for DefaultFilePathError {
+impl<S> Handle<S> for DefaultFilePathError
+where
+    S: Fcntl + Isatty + Write,
+{
     async fn handle(&self, env: &mut Env<S>) -> yash_semantics::Result {
         match self {
             DefaultFilePathError::ParseError(e) => e.handle(env).await,
@@ -90,9 +92,10 @@ impl<S: System> Handle<S> for DefaultFilePathError {
 /// [`ENV`]: yash_env::variable::ENV
 /// [`Text`]: yash_syntax::syntax::Text
 /// [initial expansion]: yash_semantics::expansion::initial
-pub async fn default_rcfile_path<S: System + 'static>(
-    env: &mut Env<S>,
-) -> Result<String, DefaultFilePathError> {
+pub async fn default_rcfile_path<S>(env: &mut Env<S>) -> Result<String, DefaultFilePathError>
+where
+    S: Runtime + 'static,
+{
     let raw_value = env.variables.get_scalar(ENV).unwrap_or_default();
 
     let text = {
@@ -118,10 +121,13 @@ pub async fn default_rcfile_path<S: System + 'static>(
 /// - the `Interactive` shell option is off,
 /// - the real user ID of the process is not the same as the effective user ID, or
 /// - the real group ID of the process is not the same as the effective group ID.
-pub async fn resolve_rcfile_path<S: System + 'static>(
+pub async fn resolve_rcfile_path<S>(
     env: &mut Env<S>,
     file: InitFile,
-) -> Result<String, DefaultFilePathError> {
+) -> Result<String, DefaultFilePathError>
+where
+    S: GetUid + Runtime + 'static,
+{
     if file == InitFile::None
         || env.options.get(Interactive) == Off
         || env.system.getuid() != env.system.geteuid()
@@ -144,12 +150,18 @@ pub async fn resolve_rcfile_path<S: System + 'static>(
 /// argument.
 ///
 /// If `path` is an empty string, the function returns immediately.
-pub async fn run_init_file<S: System + 'static>(env: &mut Env<S>, path: &str) {
+pub async fn run_init_file<S>(env: &mut Env<S>, path: &str)
+where
+    S: Runtime + 'static,
+{
     if path.is_empty() {
         return;
     }
 
-    fn open_fd<S: System>(system: &mut S, path: String) -> Result<Fd, Errno> {
+    fn open_fd<S>(system: &mut S, path: String) -> Result<Fd, Errno>
+    where
+        S: Close + Dup + Open,
+    {
         let c_path = CString::new(path).map_err(|_| Errno::EILSEQ)?;
         let fd = system.open(
             &c_path,
@@ -199,7 +211,10 @@ pub async fn run_init_file<S: System + 'static>(env: &mut Env<S>, path: &str) {
 /// This function resolves the path to the rcfile using [`resolve_rcfile_path`]
 /// and then runs the rcfile using [`run_init_file`]. Any errors resolving the
 /// path are reported to the standard error.
-pub async fn run_rcfile<S: System + 'static>(env: &mut Env<S>, file: InitFile) {
+pub async fn run_rcfile<S>(env: &mut Env<S>, file: InitFile)
+where
+    S: GetUid + Runtime + 'static,
+{
     match resolve_rcfile_path(env, file).await {
         Ok(path) => run_init_file(env, &path).await,
         Err(e) => drop(e.handle(env).await),

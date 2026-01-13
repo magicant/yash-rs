@@ -29,7 +29,6 @@ use std::cell::RefCell;
 use std::ffi::CString;
 use thiserror::Error;
 use yash_env::Env;
-use yash_env::System;
 use yash_env::input::Echo;
 use yash_env::input::FdReader;
 use yash_env::input::IgnoreEof;
@@ -39,14 +38,9 @@ use yash_env::io::move_fd_internal;
 use yash_env::option::Option::Interactive;
 use yash_env::option::State::{Off, On};
 use yash_env::parser::Config;
-use yash_env::system::Errno;
-use yash_env::system::Fcntl as _;
-use yash_env::system::Fstat as _;
-use yash_env::system::Isatty as _;
-use yash_env::system::Mode;
-use yash_env::system::OfdAccess;
-use yash_env::system::Open as _;
-use yash_env::system::OpenFlag;
+use yash_env::system::{
+    Close, Dup, Errno, Fcntl, Fstat, Isatty, Mode, OfdAccess, Open, OpenFlag, Read, Signals, Write,
+};
 use yash_prompt::Prompter;
 use yash_syntax::input::InputObject;
 use yash_syntax::input::Memory;
@@ -91,7 +85,7 @@ pub fn prepare_input<'s, 'i, 'e, S>(
 ) -> Result<Lexer<'i>, PrepareInputError<'e>>
 where
     's: 'i + 'e,
-    S: System + 'static,
+    S: Close + Dup + Fcntl + Fstat + Isatty + Open + Read + Signals + Write + 'static,
 {
     fn lexer_with_input_and_source<'a>(
         input: Box<dyn InputObject + 'a>,
@@ -164,7 +158,7 @@ where
 /// applied to the input object.
 fn prepare_fd_input<'i, S>(fd: Fd, ref_env: &'i RefCell<&mut Env<S>>) -> Box<dyn InputObject + 'i>
 where
-    S: System + 'static,
+    S: Fcntl + Isatty + Read + Signals + Write + 'static,
 {
     let env = ref_env.borrow();
     let system = env.system.clone();
