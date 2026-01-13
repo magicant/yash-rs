@@ -170,10 +170,10 @@ mod tests {
     use yash_env::function::{Function, FunctionBody, FunctionBodyObject};
     use yash_env::semantics::Field;
     use yash_env::source::Location;
-    use yash_env::system::System;
     use yash_env_test_helper::assert_stderr;
     use yash_env_test_helper::assert_stdout;
     use yash_semantics::Divert::Return;
+    use yash_semantics::Runtime;
     use yash_syntax::syntax::FullCompoundCommand;
 
     /// Test body wrapper that actually executes the command
@@ -185,14 +185,14 @@ mod tests {
             self.0.fmt(f)
         }
     }
-    impl<S: System + 'static> FunctionBody<S> for FunctionBodyImpl {
+    impl<S: Runtime + 'static> FunctionBody<S> for FunctionBodyImpl {
         async fn execute(&self, env: &mut Env<S>) -> yash_env::semantics::Result {
             use yash_semantics::command::Command as _;
             self.0.execute(env).await
         }
     }
 
-    fn function_body_impl<S: System + 'static>(src: &str) -> Rc<dyn FunctionBodyObject<S>> {
+    fn function_body_impl<S: Runtime + 'static>(src: &str) -> Rc<dyn FunctionBodyObject<S>> {
         Rc::new(FunctionBodyImpl(src.parse().unwrap()))
     }
 
