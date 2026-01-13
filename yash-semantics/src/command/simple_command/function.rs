@@ -18,6 +18,7 @@
 
 use super::perform_assignments;
 use crate::Handle;
+use crate::Runtime;
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;
@@ -30,13 +31,12 @@ use yash_env::function::Function;
 use yash_env::semantics::Divert;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
-use yash_env::system::System;
 use yash_env::variable::Context;
 use yash_env::variable::PositionalParams;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
 
-pub async fn execute_function<S: System + 'static>(
+pub async fn execute_function<S: Runtime + 'static>(
     env: &mut Env<S>,
     function: Rc<Function<S>>,
     assigns: &[Assign],
@@ -69,7 +69,7 @@ type EnvPrepHook<S> = fn(&mut Env<S>) -> Pin<Box<dyn Future<Output = ()> + '_>>;
 /// `env_prep_hook` is called after the new variable context is pushed to the
 /// environment. This is useful for assigning custom local variables before the
 /// function body is executed.
-pub async fn execute_function_body<S: System>(
+pub async fn execute_function_body<S>(
     env: &mut Env<S>,
     function: Rc<Function<S>>,
     fields: Vec<Field>,

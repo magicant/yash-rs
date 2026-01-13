@@ -11,13 +11,19 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.13.0] - Unreleased
 
+### Added
+
+- The `Runtime` trait has been added to represent the system capabilities
+  required for executing shell commands.
+
 ### Changed
 
 - Public dependency versions:
     - Rust 1.86.0 → 1.87.0
     - yash-env 0.10.0 → 0.11.0
-- Many types and functions now take type parameters representing the concrete
-  `System` type due to changes in the `yash-env` crate.
+- Many types and functions now take type parameters representing the required
+  system interface due to the introduction of the type parameter to `Env` in
+  the `yash-env` crate.
 - The `env_prep_hook` parameter in the
   `command::simple_command::execute_function_body` function no longer requires
   the static lifetime for the returned future.

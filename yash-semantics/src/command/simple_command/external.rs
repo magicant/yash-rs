@@ -18,6 +18,7 @@
 
 use super::perform_assignments;
 use crate::Handle;
+use crate::Runtime;
 use crate::command::search::search_path;
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
@@ -33,12 +34,16 @@ use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::semantics::command::ReplaceCurrentProcessError;
 use yash_env::semantics::command::run_external_utility_in_subshell;
-use yash_env::system::System;
+use yash_env::system::resource::SetRlimit;
+use yash_env::system::{
+    Close, Dup, Exec, Exit, Fcntl, Fork, GetPid, Isatty, Open, SendSignal, SetPgid, ShellPath,
+    Sigaction, Sigmask, Signals, TcSetPgrp, Wait, Write,
+};
 use yash_env::variable::Context;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
 
-pub async fn execute_external_utility<S: System + 'static>(
+pub async fn execute_external_utility<S: Runtime + 'static>(
     env: &mut Env<S>,
     assigns: &[Assign],
     fields: Vec<Field>,
@@ -93,11 +98,33 @@ pub async fn execute_external_utility<S: System + 'static>(
 /// This function returns the exit status of the utility. In case of an error,
 /// it prints an error message to the standard error before returning an
 /// appropriate exit status.
-pub async fn start_external_utility_in_subshell_and_wait<S: System + 'static>(
+pub async fn start_external_utility_in_subshell_and_wait<S>(
     env: &mut Env<S>,
     path: CString,
     fields: Vec<Field>,
-) -> Result<ExitStatus> {
+) -> Result<ExitStatus>
+where
+    S: Close
+        + Dup
+        + Exec
+        + Exit
+        + Fcntl
+        + Fork
+        + GetPid
+        + Isatty
+        + Open
+        + SendSignal
+        + SetPgid
+        + SetRlimit
+        + ShellPath
+        + Sigaction
+        + Sigmask
+        + Signals
+        + TcSetPgrp
+        + Wait
+        + Write
+        + 'static,
+{
     run_external_utility_in_subshell(
         env,
         path,

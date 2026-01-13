@@ -57,12 +57,9 @@ use std::ffi::CString;
 use std::iter::Once;
 use std::marker::PhantomData;
 use yash_env::Env;
-use yash_env::System;
 use yash_env::option::State::Off;
 use yash_env::semantics::Field;
-use yash_env::system::Dir as _;
-use yash_env::system::Open as _;
-use yash_env::system::{AT_FDCWD, Fstat};
+use yash_env::system::{AT_FDCWD, Dir as _, Fstat, Open};
 use yash_fnmatch::Config;
 use yash_fnmatch::Pattern;
 use yash_fnmatch::PatternChar;
@@ -106,7 +103,7 @@ impl<S> From<Inner> for Glob<'_, S> {
     }
 }
 
-impl<S: System> Iterator for Glob<'_, S> {
+impl<S: Fstat + Open> Iterator for Glob<'_, S> {
     type Item = Field;
     fn next(&mut self) -> Option<Field> {
         match &mut self.inner {
@@ -166,7 +163,7 @@ struct SearchEnv<'e, S> {
     results: Vec<Field>,
 }
 
-impl<S: System> SearchEnv<'_, S> {
+impl<S: Fstat + Open> SearchEnv<'_, S> {
     /// Recursively searches directories for matching pathnames.
     fn search_dir(&mut self, suffix: &[AttrChar]) {
         let (this, new_suffix) = match suffix.iter().position(|c| c.value == '/') {
@@ -257,7 +254,7 @@ impl<S: System> SearchEnv<'_, S> {
 /// expansion.
 ///
 /// If the `Glob` option is `Off` in `env.options`, the expansion is skipped.
-pub fn glob<S: System>(env: &mut Env<S>, field: AttrField) -> Glob<'_, S> {
+pub fn glob<S: Fstat + Open>(env: &mut Env<S>, field: AttrField) -> Glob<'_, S> {
     if env.options.get(yash_env::option::Option::Glob) == Off {
         return Glob::from(Inner::from(field.remove_quotes_and_strip()));
     }

@@ -21,7 +21,6 @@ use std::future::ready;
 use std::ops::ControlFlow::Break;
 use std::pin::Pin;
 use yash_env::Env;
-use yash_env::System;
 use yash_env::builtin::Builtin;
 use yash_env::builtin::Type::{Mandatory, Special};
 use yash_env::io::Fd;
@@ -30,7 +29,11 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::Errno;
-use yash_env::system::SendSignal as _;
+use yash_env::system::Fcntl;
+use yash_env::system::Isatty;
+use yash_env::system::Read;
+use yash_env::system::SendSignal;
+use yash_env::system::Write;
 use yash_env::system::r#virtual::SIGSTOP;
 use yash_env::variable::Scope;
 
@@ -110,7 +113,7 @@ pub fn continue_builtin<S>() -> Builtin<S> {
     Builtin::new(Special, continue_builtin_main)
 }
 
-fn suspend_builtin_main<S: System>(
+fn suspend_builtin_main<S: SendSignal>(
     env: &mut Env<S>,
     _args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
@@ -121,14 +124,17 @@ fn suspend_builtin_main<S: System>(
 }
 
 /// Returns a minimal implementation of the `suspend` built-in.
-pub fn suspend_builtin<S: System>() -> Builtin<S> {
+pub fn suspend_builtin<S: SendSignal>() -> Builtin<S> {
     Builtin::new(Special, suspend_builtin_main)
 }
 
-fn local_builtin_main<S: System>(
+fn local_builtin_main<S>(
     env: &mut Env<S>,
     args: Vec<Field>,
-) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
+) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>>
+where
+    S: Fcntl + Isatty + Write,
+{
     Box::pin(async move {
         for Field { value, origin } in args {
             if let Some(eq_index) = value.find('=') {
@@ -156,16 +162,22 @@ fn local_builtin_main<S: System>(
     })
 }
 
-pub fn local_builtin<S: System>() -> Builtin<S> {
+pub fn local_builtin<S>() -> Builtin<S>
+where
+    S: Fcntl + Isatty + Write,
+{
     let mut builtin = Builtin::new(Mandatory, local_builtin_main);
     builtin.is_declaration_utility = Some(true);
     builtin
 }
 
-fn echo_builtin_main<S: System>(
+fn echo_builtin_main<S>(
     env: &mut Env<S>,
     args: Vec<Field>,
-) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
+) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>>
+where
+    S: Fcntl + Isatty + Write,
+{
     Box::pin(async move {
         let fields = args.iter().map(|f| &f.value).format(" ");
         let message = format!("{fields}\n");
@@ -178,15 +190,24 @@ fn echo_builtin_main<S: System>(
 }
 
 /// Returns a minimal implementation of the `echo` built-in.
-pub fn echo_builtin<S: System>() -> Builtin<S> {
+pub fn echo_builtin<S>() -> Builtin<S>
+where
+    S: Fcntl + Isatty + Write,
+{
     Builtin::new(Mandatory, echo_builtin_main)
 }
 
-fn cat_builtin_main<S: System>(
+fn cat_builtin_main<S>(
     env: &mut Env<S>,
     _args: Vec<Field>,
-) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
-    async fn inner<S: System>(env: &mut Env<S>) -> std::result::Result<(), Errno> {
+) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>>
+where
+    S: Fcntl + Isatty + Read + Write,
+{
+    async fn inner<S>(env: &mut Env<S>) -> std::result::Result<(), Errno>
+    where
+        S: Fcntl + Isatty + Read + Write,
+    {
         let mut buffer = [0; 1024];
         loop {
             let count = env.system.read_async(Fd::STDIN, &mut buffer).await?;
@@ -207,6 +228,9 @@ fn cat_builtin_main<S: System>(
 }
 
 /// Returns a minimal implementation of the `cat` built-in.
-pub fn cat_builtin<S: System>() -> Builtin<S> {
+pub fn cat_builtin<S>() -> Builtin<S>
+where
+    S: Fcntl + Isatty + Read + Write,
+{
     Builtin::new(Mandatory, cat_builtin_main)
 }

@@ -17,11 +17,11 @@
 //! Implementation for Item.
 
 use super::Command;
+use crate::Runtime;
 use crate::trap::run_exit_trap;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::Env;
-use yash_env::System;
 use yash_env::io::Fd;
 use yash_env::io::print_error;
 use yash_env::job::Job;
@@ -30,10 +30,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
-use yash_env::system::Close as _;
-use yash_env::system::Mode;
-use yash_env::system::OfdAccess;
-use yash_env::system::Open as _;
+use yash_env::system::{Close, Mode, OfdAccess, Open};
 use yash_syntax::source::Location;
 use yash_syntax::syntax;
 use yash_syntax::syntax::AndOrList;
@@ -59,7 +56,7 @@ use yash_syntax::syntax::AndOrList;
 /// and-or list is implicitly redirected to `/dev/null`.
 ///
 /// [`Monitor`]: yash_env::option::Option::Monitor
-impl<S: System + 'static> Command<S> for syntax::Item {
+impl<S: Runtime + 'static> Command<S> for syntax::Item {
     async fn execute(&self, env: &mut Env<S>) -> Result {
         match &self.async_flag {
             None => self.and_or.execute(env).await,
@@ -68,7 +65,7 @@ impl<S: System + 'static> Command<S> for syntax::Item {
     }
 }
 
-async fn execute_async<S: System + 'static>(
+async fn execute_async<S: Runtime + 'static>(
     env: &mut Env<S>,
     and_or: &Rc<AndOrList>,
     async_flag: &Location,
@@ -117,7 +114,7 @@ async fn execute_async<S: System + 'static>(
     }
 }
 
-async fn async_body<S: System + 'static>(
+async fn async_body<S: Runtime + 'static>(
     env: &mut Env<S>,
     job_control: Option<JobControl>,
     and_or: &AndOrList,
@@ -131,7 +128,9 @@ async fn async_body<S: System + 'static>(
     run_exit_trap(env).await;
 }
 
-fn nullify_stdin<S: System>(env: &mut Env<S>) -> std::result::Result<(), yash_env::system::Errno> {
+fn nullify_stdin<S: Open + Close>(
+    env: &mut Env<S>,
+) -> std::result::Result<(), yash_env::system::Errno> {
     env.system.close(Fd::STDIN)?;
 
     let path = c"/dev/null";

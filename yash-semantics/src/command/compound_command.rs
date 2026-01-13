@@ -18,6 +18,7 @@
 
 use super::Command;
 use crate::Handle;
+use crate::Runtime;
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
 use crate::xtrace::finish;
@@ -28,12 +29,11 @@ use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 #[cfg(doc)]
 use yash_env::subshell::Subshell;
-use yash_env::system::System;
 use yash_syntax::syntax;
 use yash_syntax::syntax::Redir;
 
 /// Performs redirections, printing their trace if required.
-async fn perform_redirs<S: System + 'static>(
+async fn perform_redirs<S: Runtime + 'static>(
     env: &mut RedirGuard<'_, S>,
     redirs: &[Redir],
 ) -> std::result::Result<Option<ExitStatus>, crate::redir::Error> {
@@ -45,7 +45,7 @@ async fn perform_redirs<S: System + 'static>(
 }
 
 /// Executes the condition of an if/while/until command.
-async fn evaluate_condition<S: System + 'static>(
+async fn evaluate_condition<S: Runtime + 'static>(
     env: &mut Env<S>,
     condition: &syntax::List,
 ) -> Result<bool> {
@@ -65,7 +65,7 @@ mod while_loop;
 /// The redirections are performed, if any, before executing the command body.
 /// Redirection errors are subject to the `ErrExit` option
 /// (`Env::apply_errexit`).
-impl<S: System + 'static> Command<S> for syntax::FullCompoundCommand {
+impl<S: Runtime + 'static> Command<S> for syntax::FullCompoundCommand {
     async fn execute(&self, env: &mut Env<S>) -> Result {
         let mut env = RedirGuard::new(env);
         match perform_redirs(&mut env, &self.redirs).await {
@@ -131,7 +131,7 @@ impl<S: System + 'static> Command<S> for syntax::FullCompoundCommand {
 ///
 /// After executing the body of the matching item, the case command may process
 /// the next item depending on the continuation.
-impl<S: System + 'static> Command<S> for syntax::CompoundCommand {
+impl<S: Runtime + 'static> Command<S> for syntax::CompoundCommand {
     async fn execute(&self, env: &mut Env<S>) -> Result {
         use syntax::CompoundCommand::*;
         match self {

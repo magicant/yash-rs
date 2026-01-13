@@ -76,6 +76,7 @@
 //! CLOEXEC flag. Also note that the above described behavior about the CLOEXEC
 //! flag is specific to this implementation.
 
+use crate::Runtime;
 use crate::expansion::expand_text;
 use crate::expansion::expand_word;
 use crate::xtrace::XTrace;
@@ -90,18 +91,15 @@ use std::ops::Deref;
 use std::ops::DerefMut;
 use thiserror::Error;
 use yash_env::Env;
-use yash_env::System;
 use yash_env::io::Fd;
 use yash_env::io::MIN_INTERNAL_FD;
 use yash_env::option::Option::Clobber;
 use yash_env::option::State::Off;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::system::Close as _;
-use yash_env::system::Dup as _;
-use yash_env::system::Fcntl as _;
-use yash_env::system::Open as _;
-use yash_env::system::{Errno, FdFlag, FileType, Fstat, Mode, OfdAccess, OpenFlag};
+use yash_env::system::{
+    Close, Dup, Errno, Fcntl, FdFlag, FileType, Fstat, Mode, OfdAccess, Open, OpenFlag,
+};
 use yash_quote::quoted;
 use yash_syntax::source::Location;
 use yash_syntax::source::pretty::{Report, ReportType, Snippet};
@@ -271,7 +269,7 @@ impl FdSpec {
         }
     }
 
-    fn close<S: System>(self, system: &mut S) {
+    fn close<S: Close>(self, system: &mut S) {
         match self {
             FdSpec::Owned(fd) => {
                 let _ = system.close(fd);
@@ -283,7 +281,7 @@ impl FdSpec {
 
 const MODE: Mode = Mode::ALL_READ.union(Mode::ALL_WRITE);
 
-fn is_cloexec<S: System>(env: &Env<S>, fd: Fd) -> bool {
+fn is_cloexec<S: Fcntl>(env: &Env<S>, fd: Fd) -> bool {
     matches!(env.system.fcntl_getfd(fd), Ok(flags) if flags.contains(FdFlag::CloseOnExec))
 }
 
@@ -298,7 +296,7 @@ fn into_c_string_value_and_origin(field: Field) -> Result<(CString, Location), E
 }
 
 /// Opens a file for redirection.
-fn open_file<S: System>(
+fn open_file<S: Open>(
     env: &mut Env<S>,
     access: OfdAccess,
     flags: EnumSet<OpenFlag>,
@@ -316,10 +314,10 @@ fn open_file<S: System>(
 }
 
 /// Opens a file for writing with the `noclobber` option.
-fn open_file_noclobber<S: System>(
-    env: &mut Env<S>,
-    path: Field,
-) -> Result<(FdSpec, Location), Error> {
+fn open_file_noclobber<S>(env: &mut Env<S>, path: Field) -> Result<(FdSpec, Location), Error>
+where
+    S: Open + Fstat + Close,
+{
     let system = &mut env.system;
     let (path, origin) = into_c_string_value_and_origin(path)?;
 
@@ -375,7 +373,7 @@ fn open_file_noclobber<S: System>(
 }
 
 /// Parses the target of `<&` and `>&`.
-fn copy_fd<S: System>(
+fn copy_fd<S: Fcntl>(
     env: &mut Env<S>,
     target: Field,
     expected_access: OfdAccess,
@@ -396,7 +394,7 @@ fn copy_fd<S: System>(
     };
 
     // Check if the FD is really readable or writable
-    fn is_fd_valid<S: System>(system: &S, fd: Fd, expected_access: OfdAccess) -> bool {
+    fn is_fd_valid<S: Fcntl>(system: &S, fd: Fd, expected_access: OfdAccess) -> bool {
         system
             .ofd_access(fd)
             .is_ok_and(|access| access == expected_access || access == OfdAccess::ReadWrite)
@@ -430,11 +428,14 @@ fn copy_fd<S: System>(
 }
 
 /// Opens the file for a normal redirection.
-async fn open_normal<S: System>(
+async fn open_normal<S>(
     env: &mut Env<S>,
     operator: RedirOp,
     operand: Field,
-) -> Result<(FdSpec, Location), Error> {
+) -> Result<(FdSpec, Location), Error>
+where
+    S: Close + Fstat + Fcntl + Open,
+{
     use RedirOp::*;
     match operator {
         FileIn => open_file(env, OfdAccess::ReadOnly, EnumSet::empty(), operand),
@@ -492,11 +493,14 @@ mod here_doc;
 
 /// Performs a redirection.
 #[allow(clippy::await_holding_refcell_ref)]
-async fn perform<S: System + 'static>(
+async fn perform<S>(
     env: &mut Env<S>,
     redir: &Redir,
     xtrace: Option<&mut XTrace>,
-) -> Result<(SavedFd, Option<ExitStatus>), Error> {
+) -> Result<(SavedFd, Option<ExitStatus>), Error>
+where
+    S: Runtime + 'static,
+{
     let target_fd = redir.fd_or_default();
 
     // Make sure target_fd doesn't have the CLOEXEC flag
@@ -584,33 +588,33 @@ async fn perform<S: System + 'static>(
 /// called. That means you need to call `preserve_redirs` explicitly to preserve
 /// the redirections' effect.
 #[derive(Debug)]
-pub struct RedirGuard<'e, S: System> {
+pub struct RedirGuard<'e, S: Close + Dup> {
     /// Environment in which redirections are performed.
     env: &'e mut yash_env::Env<S>,
     /// Records of file descriptors that have been modified by redirections.
     saved_fds: Vec<SavedFd>,
 }
 
-impl<S: System> Deref for RedirGuard<'_, S> {
+impl<S: Close + Dup> Deref for RedirGuard<'_, S> {
     type Target = yash_env::Env<S>;
     fn deref(&self) -> &yash_env::Env<S> {
         self.env
     }
 }
 
-impl<S: System> DerefMut for RedirGuard<'_, S> {
+impl<S: Close + Dup> DerefMut for RedirGuard<'_, S> {
     fn deref_mut(&mut self) -> &mut yash_env::Env<S> {
         self.env
     }
 }
 
-impl<S: System> std::ops::Drop for RedirGuard<'_, S> {
+impl<S: Close + Dup> std::ops::Drop for RedirGuard<'_, S> {
     fn drop(&mut self) {
         self.undo_redirs()
     }
 }
 
-impl<'e, S: System> RedirGuard<'e, S> {
+impl<'e, S: Close + Dup> RedirGuard<'e, S> {
     /// Creates a new `RedirGuard`.
     pub fn new(env: &'e mut yash_env::Env<S>) -> Self {
         let saved_fds = Vec::new();
@@ -631,7 +635,7 @@ impl<'e, S: System> RedirGuard<'e, S> {
         xtrace: Option<&mut XTrace>,
     ) -> Result<Option<ExitStatus>, Error>
     where
-        S: 'static,
+        S: Runtime + 'static,
     {
         let (saved_fd, exit_status) = perform(self, redir, xtrace).await?;
         self.saved_fds.push(saved_fd);
@@ -654,7 +658,7 @@ impl<'e, S: System> RedirGuard<'e, S> {
         mut xtrace: Option<&mut XTrace>,
     ) -> Result<Option<ExitStatus>, Error>
     where
-        S: 'static,
+        S: Runtime + 'static,
         I: IntoIterator<Item = &'a Redir>,
     {
         let mut exit_status = None;

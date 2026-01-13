@@ -21,7 +21,7 @@ use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
 use yash_env::io::print_report;
 use yash_env::semantics::Divert;
-use yash_env::system::System;
+use yash_env::system::{Fcntl, Isatty, Write};
 use yash_syntax::source::Source;
 
 /// Error handler.
@@ -44,7 +44,10 @@ pub trait Handle<S> {
 /// [`ExitStatus::READ_ERROR`] otherwise.
 /// Note that other POSIX-compliant implementations may use different non-zero
 /// exit statuses instead of `ExitStatus::ERROR`.
-impl<S: System> Handle<S> for yash_syntax::parser::Error {
+impl<S> Handle<S> for yash_syntax::parser::Error
+where
+    S: Fcntl + Isatty + Write,
+{
     async fn handle(&self, env: &mut Env<S>) -> super::Result {
         print_report(env, &self.to_report()).await;
 
@@ -69,7 +72,10 @@ impl<S: System> Handle<S> for yash_syntax::parser::Error {
 /// exit statuses.
 ///
 /// [`ErrExit`]: yash_env::option::Option::ErrExit
-impl<S: System> Handle<S> for crate::expansion::Error {
+impl<S> Handle<S> for crate::expansion::Error
+where
+    S: Fcntl + Isatty + Write,
+{
     async fn handle(&self, env: &mut Env<S>) -> super::Result {
         print_report(env, &self.to_report()).await;
 
@@ -93,7 +99,10 @@ impl<S: System> Handle<S> for crate::expansion::Error {
 /// interrupt only on a redirection error during the execution of a special
 /// built-in. The caller is responsible for checking the condition and
 /// interrupting accordingly.
-impl<S: System> Handle<S> for crate::redir::Error {
+impl<S> Handle<S> for crate::redir::Error
+where
+    S: Fcntl + Isatty + Write,
+{
     async fn handle(&self, env: &mut Env<S>) -> super::Result {
         print_report(env, &self.to_report()).await;
         env.exit_status = ExitStatus::ERROR;

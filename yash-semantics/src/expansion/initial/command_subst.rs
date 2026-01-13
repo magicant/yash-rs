@@ -22,19 +22,18 @@ use super::super::phrase::Phrase;
 use super::Env;
 use super::Error;
 use crate::Handle;
+use crate::Runtime;
 use crate::expansion::ErrorCause;
 use crate::read_eval_loop;
 use crate::trap::run_exit_trap;
 use std::cell::RefCell;
-use yash_env::System;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
-use yash_env::system::Close as _;
-use yash_env::system::Dup as _;
-use yash_env::system::Errno;
-use yash_env::system::Pipe as _;
+use yash_env::system::{
+    Close, Dup as _, Errno, Fcntl, Pipe as _, Read, Sigaction, Sigmask, Signals, Wait,
+};
 use yash_syntax::parser::lex::Lexer;
 use yash_syntax::source::Location;
 use yash_syntax::source::Source;
@@ -47,7 +46,7 @@ pub async fn expand<C, S>(
 ) -> Result<Phrase, Error>
 where
     C: AsRef<str> + 'static,
-    S: System + 'static,
+    S: Runtime + 'static,
 {
     let original = location.clone();
 
@@ -84,7 +83,7 @@ async fn subshell_body<C, S>(
 ) -> yash_env::semantics::Result
 where
     C: AsRef<str>,
-    S: System + 'static,
+    S: Runtime + 'static,
 {
     // Arrange the file descriptors
     env.system.close(reader).ok();
@@ -113,7 +112,7 @@ async fn expand_common<S>(
     env: &mut Env<'_, S>,
 ) -> Result<Phrase, Error>
 where
-    S: System,
+    S: Close + Fcntl + Read + Sigaction + Signals + Sigmask + Wait,
 {
     // See if the subshell has successfully started
     let pid = match subshell_result {
@@ -182,7 +181,6 @@ mod tests {
     use crate::tests::return_builtin;
     use futures_util::FutureExt;
     use yash_env::semantics::ExitStatus;
-    use yash_env::system::Errno;
     use yash_env_test_helper::in_virtual_system;
 
     #[test]
