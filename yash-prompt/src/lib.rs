@@ -88,11 +88,12 @@ pub use prompter::fetch_posix;
 #[cfg(test)]
 mod tests {
     use super::ExpandText;
-    use yash_env::{Env, System, VirtualSystem};
+    use yash_env::{Env, VirtualSystem};
+    use yash_semantics::Runtime;
 
     pub(crate) fn env_with_expand_text_and_system<S>(system: S) -> Env<S>
     where
-        S: System + 'static,
+        S: Runtime + 'static,
     {
         let mut env = Env::with_system(system);
         env.any.insert(Box::new(ExpandText::<S>(|env, text| {

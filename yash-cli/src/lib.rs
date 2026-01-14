@@ -32,18 +32,22 @@ use std::cell::RefCell;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
 use yash_env::RealSystem;
-use yash_env::System;
 use yash_env::option::{Interactive, On};
 use yash_env::semantics::{Divert, ExitStatus, exit_or_raise};
 use yash_env::signal;
-use yash_env::system::Sigaction as _;
-use yash_env::system::Signals as _;
-use yash_env::system::{Disposition, Errno};
+use yash_env::system::resource::GetRlimit;
+use yash_env::system::{
+    Chdir, Disposition, Errno, Fcntl, GetCwd, GetUid, Isatty, Sigaction, Signals, Sysconf,
+    TcGetPgrp, Times, Umask, Write,
+};
 use yash_executor::Executor;
 use yash_semantics::trap::run_exit_trap;
-use yash_semantics::{interactive_read_eval_loop, read_eval_loop};
+use yash_semantics::{Runtime, interactive_read_eval_loop, read_eval_loop};
 
-async fn print_version<S: System>(env: &mut Env<S>) {
+async fn print_version<S>(env: &mut Env<S>)
+where
+    S: Fcntl + Isatty + Write,
+{
     let version = env!("CARGO_PKG_VERSION");
     let result = yash_builtin::common::output(env, &format!("yash {version}\n")).await;
     env.exit_status = result.exit_status();
@@ -51,7 +55,19 @@ async fn print_version<S: System>(env: &mut Env<S>) {
 
 // The RefCell is local to this function, so it is safe to keep borrows across await points.
 #[allow(clippy::await_holding_refcell_ref)]
-async fn run_as_shell_process<S: System + 'static>(env: &mut Env<S>) {
+async fn run_as_shell_process<S>(env: &mut Env<S>)
+where
+    S: Chdir
+        + GetCwd
+        + GetRlimit
+        + GetUid
+        + Runtime
+        + Sysconf
+        + TcGetPgrp
+        + Times
+        + Umask
+        + 'static,
+{
     // Parse the command-line arguments
     let run = match self::startup::args::parse(std::env::args()) {
         Ok(Parse::Help) => todo!("print help"),

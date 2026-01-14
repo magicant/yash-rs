@@ -19,7 +19,6 @@
 use self::args::{Run, Source, Work};
 use std::str::FromStr as _;
 use yash_env::Env;
-use yash_env::System;
 use yash_env::io::Fd;
 use yash_env::option::Option::{Interactive, Monitor, Stdin};
 use yash_env::option::State::On;
@@ -27,10 +26,12 @@ use yash_env::parser::IsKeyword;
 use yash_env::parser::IsName;
 use yash_env::prompt::GetPrompt;
 use yash_env::semantics::command::RunFunction;
+use yash_env::system::resource::GetRlimit;
+use yash_env::system::{Chdir, GetCwd, GetUid, Isatty, Sysconf, TcGetPgrp, Times, Umask};
 use yash_env::trap::RunSignalTrapIfCaught;
 use yash_prompt::ExpandText;
-use yash_semantics::RunReadEvalLoop;
 use yash_semantics::expansion::expand_text;
+use yash_semantics::{RunReadEvalLoop, Runtime};
 use yash_syntax::parser::lex::Lexer;
 
 pub mod args;
@@ -45,7 +46,7 @@ pub mod input;
 ///
 /// This function returns `false` if the interactive option is explicitly
 /// specified in the command line arguments to honor the user's intent.
-pub fn auto_interactive<S: System>(system: &S, run: &Run) -> bool {
+pub fn auto_interactive<S: Isatty>(system: &S, run: &Run) -> bool {
     if run.work.source != Source::Stdin {
         return false;
     }
@@ -64,7 +65,19 @@ pub fn auto_interactive<S: System>(system: &S, run: &Run) -> bool {
 ///
 /// This function is _pure_ in that all system calls are performed by the
 /// `System` trait object (`env.system`).
-pub async fn configure_environment<S: System + 'static>(env: &mut Env<S>, run: Run) -> Work {
+pub async fn configure_environment<S>(env: &mut Env<S>, run: Run) -> Work
+where
+    S: Chdir
+        + GetCwd
+        + GetRlimit
+        + GetUid
+        + Runtime
+        + Sysconf
+        + TcGetPgrp
+        + Times
+        + Umask
+        + 'static,
+{
     // Apply the parsed options to the environment
     if auto_interactive(&env.system, &run) {
         env.options.set(Interactive, On);
@@ -114,7 +127,7 @@ pub async fn configure_environment<S: System + 'static>(env: &mut Env<S>, run: R
 }
 
 /// Inject dependencies into the environment.
-fn inject_dependencies<S: System + 'static>(env: &mut Env<S>) {
+fn inject_dependencies<S: Runtime + 'static>(env: &mut Env<S>) {
     env.any.insert(Box::new(IsKeyword::<S>(|_env, word| {
         yash_syntax::parser::lex::Keyword::from_str(word).is_ok()
     })));

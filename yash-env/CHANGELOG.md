@@ -133,6 +133,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Deprecated
 
+- `system::System`: This trait is now deprecated in favor of the smaller,
+  more specialized traits declared in the `system` module.
 - `system::SystemEx`: This trait is now deprecated.
     - `move_fd_internal`: Use `io::move_fd_internal` instead.
     - `fd_is_pipe`: Use `system::Fstat::fd_is_pipe` instead.
