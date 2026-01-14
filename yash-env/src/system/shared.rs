@@ -115,7 +115,7 @@ use std::time::Instant;
 /// single-threaded pool:
 ///
 /// ```
-/// # use yash_env::{SharedSystem, System, VirtualSystem};
+/// # use yash_env::{SharedSystem, VirtualSystem};
 /// # use yash_env::system::Pipe as _;
 /// # use futures_util::task::LocalSpawnExt;
 /// let system = SharedSystem::new(VirtualSystem::new());

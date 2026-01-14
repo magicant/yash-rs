@@ -301,9 +301,9 @@ type PinFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 /// [`yash-semantics` crate](https://crates.io/crates/yash-semantics):
 ///
 /// ```
-/// # use yash_env::{Env, System};
+/// # use yash_env::Env;
 /// # use yash_env::semantics::RunReadEvalLoop;
-/// fn register_read_eval_loop<S: System + 'static>(env: &mut Env<S>) {
+/// fn register_read_eval_loop<S: yash_semantics::Runtime + 'static>(env: &mut Env<S>) {
 ///     env.any.insert(Box::new(RunReadEvalLoop::<S>(|env, config| {
 ///         Box::pin(async move {
 ///             yash_semantics::read_eval_loop(env, &mut config.into()).await
