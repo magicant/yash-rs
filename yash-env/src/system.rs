@@ -161,6 +161,10 @@ use std::fmt::Debug;
 /// substantial implementors for this trait: [`RealSystem`] and
 /// [`VirtualSystem`]. Another implementor is [`SharedSystem`], which wraps a
 /// `System` instance to extend the interface with asynchronous methods.
+#[deprecated(
+    note = "use smaller, more specialized traits declared in the `system` module instead",
+    since = "0.11.0"
+)]
 pub trait System:
     CaughtSignals
     + Chdir
@@ -202,6 +206,7 @@ pub trait System:
 {
 }
 
+#[allow(deprecated)]
 impl<T> System for T where
     T: CaughtSignals
         + Chdir
@@ -246,8 +251,9 @@ impl<T> System for T where
 /// Extension for [`System`]
 ///
 /// This trait provides some extension methods for `System`.
+#[allow(deprecated)]
 #[deprecated(
-    note = "Use functions in the `yash-env::io` and `yash-env::job` modules instead",
+    note = "use functions in the `yash-env::io` and `yash-env::job` modules instead",
     since = "0.11.0"
 )]
 pub trait SystemEx: System {
