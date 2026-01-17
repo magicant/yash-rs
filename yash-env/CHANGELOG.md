@@ -9,13 +9,19 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.12.0] - Unreleased
+
+### Removed
+
+- `impl<T: Fork> Fork for SharedSystem<T>`: This implementation had not been working since 0.11.0.
+
 ## [0.11.0] - 2026-01-16
 
 ### Added
 
 - `system::SharedSystem::new_child_process`: This method has been added as a
   workaround for the now non-functional
-  `<system::SharedSystem as System>::new_child_process`.
+  `<system::SharedSystem as system::Fork>::new_child_process`.
 - The following traits have been added to the `system` module:
     - `CaughtSignals`: Declares the `caught_signals` method for retrieving
       caught signals.
@@ -769,6 +775,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Initial implementation of the `yash-env` crate
 
+[0.12.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.12.0
 [0.11.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.11.0
 [0.10.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.10.1
 [0.10.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.10.0

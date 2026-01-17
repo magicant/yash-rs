@@ -605,21 +605,6 @@ impl<T: TcSetPgrp> TcSetPgrp for SharedSystem<T> {
     }
 }
 
-// TODO: This implementation should be removed after refactoring Fork API (#662).
-/// Delegates `Fork` methods to the contained implementor.
-impl<T: Fork> Fork for SharedSystem<T> {
-    /// This method is not supported for `SharedSystem` because types do not match.
-    ///
-    /// You should call the inherent method [`SharedSystem::new_child_process`] instead.
-    /// If you call this trait method, it will panic.
-    fn new_child_process(&self) -> Result<ChildProcessStarter<Self>> {
-        // self.0.borrow().new_child_process()
-        unimplemented!(
-            "new_child_process is not supported for SharedSystem because types do not match"
-        )
-    }
-}
-
 /// Delegates `Wait` methods to the contained implementor.
 impl<T: Wait> Wait for SharedSystem<T> {
     fn wait(&self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
