@@ -777,6 +777,38 @@ impl TcSetPgrp for RealSystem {
 }
 
 impl Fork for RealSystem {
+    /// Runs a task in a new child process.
+    ///
+    /// This implementation calls the `fork` system call to create a new
+    /// process. As described in [`Fork::run_in_child_process`], the child task
+    /// must not return `Poll::Pending`. If it does, this function panics.
+    fn run_in_child_process<D, F>(&self, shared_data: D, child_task: F) -> Result<(Pid, D)>
+    where
+        Self: Sized,
+        D: Clone + 'static,
+        F: AsyncFnOnce(Self, D) -> ExitStatus + 'static,
+    {
+        let raw_pid = unsafe { libc::fork() }.errno_if_m1()?;
+        if raw_pid != 0 {
+            // Parent process
+            return Ok((Pid(raw_pid), shared_data));
+        }
+
+        // Child process
+        let system = RealSystem(());
+        let task_future = Box::pin(async move {
+            let exit_status = child_task(system, shared_data).await;
+            unsafe { libc::_exit(exit_status.0) }
+        });
+        let executor = Executor::new();
+        // SAFETY: We never create new threads in the whole process, so wakers are
+        // never shared between threads.
+        unsafe { executor.spawn_pinned(task_future) }
+        executor.run_until_stalled();
+        // If we reach here, the child task has returned Poll::Pending.
+        panic!("child task returned Poll::Pending");
+    }
+
     /// Creates a new child process.
     ///
     /// This implementation calls the `fork` system call and returns both in the
