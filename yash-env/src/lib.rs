@@ -26,10 +26,11 @@
 //! and umask are managed by the system to be accessed only by interaction with
 //! the system interface.
 //!
-//! The [`System`] trait is the interface to the system-managed parts.
-//! [`RealSystem`] provides an implementation for `System` that interacts with
-//! the underlying system. [`VirtualSystem`] is a dummy for simulating the
-//! system's behavior without affecting the actual system.
+//! Traits declared in the [`system`] module define the interface to the
+//! system-managed parts of the environment.
+//! [`RealSystem`] provides an implementation for them that interacts with
+//! the underlying system. [`VirtualSystem`] simulates a system for testing
+//! purposes.
 
 use self::alias::AliasSet;
 use self::any::DataSet;
