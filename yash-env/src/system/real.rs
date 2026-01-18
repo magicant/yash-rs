@@ -887,12 +887,10 @@ impl Exec for RealSystem {
 }
 
 impl Exit for RealSystem {
+    #[allow(unreachable_code)]
     fn exit(&self, exit_status: ExitStatus) -> impl Future<Output = Infallible> + use<> {
-        #[allow(unreachable_code)]
-        {
-            unsafe { libc::_exit(exit_status.0) };
-            std::future::ready(unreachable!())
-        }
+        unsafe { libc::_exit(exit_status.0) };
+        std::future::pending()
     }
 }
 
