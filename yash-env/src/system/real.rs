@@ -44,7 +44,6 @@ use super::Exit;
 use super::Fcntl;
 use super::FdFlag;
 use super::FileType;
-use super::FlexFuture;
 use super::Fork;
 use super::Fstat;
 use super::GetCwd;
@@ -776,9 +775,9 @@ impl TcGetPgrp for RealSystem {
 }
 
 impl TcSetPgrp for RealSystem {
-    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
+    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> + use<> {
         let result = unsafe { libc::tcsetpgrp(fd.0, pgid.0) };
-        result.errno_if_m1().map(drop).into()
+        std::future::ready(result.errno_if_m1().map(drop))
     }
 }
 
@@ -858,7 +857,7 @@ impl Exec for RealSystem {
         path: &CStr,
         args: &[CString],
         envs: &[CString],
-    ) -> FlexFuture<Result<Infallible>> {
+    ) -> impl Future<Output = Result<Infallible>> + use<> {
         fn to_pointer_array<S: AsRef<CStr>>(strs: &[S]) -> Vec<*const libc::c_char> {
             strs.iter()
                 .map(|s| s.as_ref().as_ptr())
@@ -881,15 +880,17 @@ impl Exec for RealSystem {
             let _ = unsafe { libc::execve(path.as_ptr(), args.as_ptr(), envs.as_ptr()) };
             let errno = Errno::last();
             if errno != Errno::EINTR {
-                return Err(errno).into();
+                return std::future::ready(Err(errno));
             }
         }
     }
 }
 
 impl Exit for RealSystem {
-    fn exit(&self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
-        unsafe { libc::_exit(exit_status.0) }
+    #[allow(unreachable_code)]
+    fn exit(&self, exit_status: ExitStatus) -> impl Future<Output = Infallible> + use<> {
+        unsafe { libc::_exit(exit_status.0) };
+        std::future::pending::<Infallible>()
     }
 }
 

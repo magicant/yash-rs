@@ -17,6 +17,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   `FlexFuture` type:
     - `system::SendSignal::kill`
     - `system::SendSignal::raise`
+    - `system::TcSetPgrp::tcsetpgrp`
+    - `system::Exec::execve`
+    - `system::Exit::exit`
 
 ### Removed
 
