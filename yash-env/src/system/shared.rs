@@ -29,7 +29,6 @@ use super::Exec;
 use super::Exit;
 use super::Fcntl;
 use super::FdFlag;
-use super::FlexFuture;
 use super::Fork;
 use super::Fstat;
 use super::GetCwd;
@@ -602,7 +601,7 @@ impl<T: TcGetPgrp> TcGetPgrp for SharedSystem<T> {
 
 /// Delegates `TcSetPgrp` methods to the contained implementor.
 impl<T: TcSetPgrp> TcSetPgrp for SharedSystem<T> {
-    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
+    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> + use<T> {
         self.0.borrow().tcsetpgrp(fd, pgid)
     }
 }
@@ -621,14 +620,14 @@ impl<T: Exec> Exec for SharedSystem<T> {
         path: &CStr,
         args: &[CString],
         envs: &[CString],
-    ) -> FlexFuture<Result<Infallible>> {
+    ) -> impl Future<Output = Result<Infallible>> + use<T> {
         self.0.borrow().execve(path, args, envs)
     }
 }
 
 /// Delegates `Exit` methods to the contained implementor.
 impl<T: Exit> Exit for SharedSystem<T> {
-    fn exit(&self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
+    fn exit(&self, exit_status: ExitStatus) -> impl Future<Output = Infallible> + use<T> {
         self.0.borrow().exit(exit_status)
     }
 }

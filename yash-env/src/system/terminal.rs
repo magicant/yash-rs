@@ -16,7 +16,7 @@
 
 //! Items for controlling terminal devices
 
-use super::{Fd, FlexFuture, Pid, Result};
+use super::{Fd, Pid, Result};
 
 // TODO: Isatty should be a subtrait of TcGetAttr
 /// Trait for testing if a file descriptor is associated with a terminal device
@@ -55,5 +55,5 @@ pub trait TcSetPgrp {
     ///
     /// The virtual system version of this function may block the calling thread
     /// if called in a background process group, hence returning a future.
-    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>>;
+    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> + use<Self>;
 }

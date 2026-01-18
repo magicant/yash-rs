@@ -67,7 +67,6 @@ use super::Exec;
 use super::Exit;
 use super::Fcntl;
 use super::FdFlag;
-use super::FlexFuture;
 use super::Fork;
 use super::Fstat;
 use super::GetCwd;
@@ -134,6 +133,7 @@ use std::ffi::c_int;
 use std::fmt::Debug;
 use std::future::pending;
 use std::future::poll_fn;
+use std::future::ready;
 use std::io::SeekFrom;
 use std::num::NonZero;
 use std::ops::DerefMut as _;
@@ -925,7 +925,7 @@ impl TcSetPgrp for VirtualSystem {
     ///
     /// The current implementation does not yet support the concept of
     /// controlling terminals and sessions. It accepts any open file descriptor.
-    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
+    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> + use<> {
         fn inner(system: &VirtualSystem, fd: Fd, pgid: Pid) -> Result<()> {
             // Make sure the FD is open
             system.with_open_file_description(fd, |_| Ok(()))?;
@@ -943,7 +943,7 @@ impl TcSetPgrp for VirtualSystem {
             Ok(())
         }
 
-        inner(self, fd, pgid).into()
+        ready(inner(self, fd, pgid))
     }
 }
 
@@ -1033,13 +1033,13 @@ impl Exec for VirtualSystem {
         path: &CStr,
         args: &[CString],
         envs: &[CString],
-    ) -> FlexFuture<Result<Infallible>> {
+    ) -> impl Future<Output = Result<Infallible>> + use<> {
         let os_path = UnixStr::from_bytes(path.to_bytes());
         let mut state = self.state.borrow_mut();
         let fs = &state.file_system;
         let file = match fs.get(os_path) {
             Ok(file) => file,
-            Err(e) => return Err(e).into(),
+            Err(e) => return ready(Err(e)),
         };
         // TODO Check file permissions
         let is_executable = matches!(
@@ -1060,15 +1060,15 @@ impl Exec for VirtualSystem {
             // TODO: We should abort the currently running task and start the new one.
             // Just returning `pending()` would break existing tests that rely on
             // the current behavior.
-            Err(Errno::ENOSYS).into()
+            ready(Err(Errno::ENOSYS))
         } else {
-            Err(Errno::ENOEXEC).into()
+            ready(Err(Errno::ENOEXEC))
         }
     }
 }
 
 impl Exit for VirtualSystem {
-    fn exit(&self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
+    fn exit(&self, exit_status: ExitStatus) -> impl Future<Output = Infallible> + use<> {
         let mut myself = self.current_process_mut();
         let parent_pid = myself.ppid;
         let exited = myself.set_state(ProcessState::exited(exit_status));
@@ -1077,7 +1077,7 @@ impl Exit for VirtualSystem {
             raise_sigchld(&mut self.state.borrow_mut(), parent_pid);
         }
 
-        pending().into()
+        pending()
     }
 }
 
