@@ -133,6 +133,7 @@ use std::ffi::c_int;
 use std::fmt::Debug;
 use std::future::pending;
 use std::future::poll_fn;
+use std::future::ready;
 use std::io::SeekFrom;
 use std::num::NonZero;
 use std::ops::DerefMut as _;
@@ -942,7 +943,7 @@ impl TcSetPgrp for VirtualSystem {
             Ok(())
         }
 
-        std::future::ready(inner(self, fd, pgid))
+        ready(inner(self, fd, pgid))
     }
 }
 
@@ -1038,7 +1039,7 @@ impl Exec for VirtualSystem {
         let fs = &state.file_system;
         let file = match fs.get(os_path) {
             Ok(file) => file,
-            Err(e) => return std::future::ready(Err(e)),
+            Err(e) => return ready(Err(e)),
         };
         // TODO Check file permissions
         let is_executable = matches!(
@@ -1059,9 +1060,9 @@ impl Exec for VirtualSystem {
             // TODO: We should abort the currently running task and start the new one.
             // Just returning `pending()` would break existing tests that rely on
             // the current behavior.
-            std::future::ready(Err(Errno::ENOSYS))
+            ready(Err(Errno::ENOSYS))
         } else {
-            std::future::ready(Err(Errno::ENOEXEC))
+            ready(Err(Errno::ENOEXEC))
         }
     }
 }

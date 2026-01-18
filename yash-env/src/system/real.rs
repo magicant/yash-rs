@@ -777,7 +777,7 @@ impl TcGetPgrp for RealSystem {
 impl TcSetPgrp for RealSystem {
     fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> + use<> {
         let result = unsafe { libc::tcsetpgrp(fd.0, pgid.0) };
-        std::future::ready(result.errno_if_m1().map(drop))
+        ready(result.errno_if_m1().map(drop))
     }
 }
 
@@ -880,7 +880,7 @@ impl Exec for RealSystem {
             let _ = unsafe { libc::execve(path.as_ptr(), args.as_ptr(), envs.as_ptr()) };
             let errno = Errno::last();
             if errno != Errno::EINTR {
-                return std::future::ready(Err(errno));
+                return ready(Err(errno));
             }
         }
     }
@@ -889,7 +889,7 @@ impl Exec for RealSystem {
 impl Exit for RealSystem {
     #[allow(unreachable_code)]
     fn exit(&self, exit_status: ExitStatus) -> impl Future<Output = Infallible> + use<> {
-        std::future::ready(unsafe { libc::_exit(exit_status.0) })
+        ready(unsafe { libc::_exit(exit_status.0) })
     }
 }
 
