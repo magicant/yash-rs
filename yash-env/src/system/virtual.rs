@@ -14,35 +14,48 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! System simulated in Rust.
+//! System simulated in Rust
 //!
-//! [`VirtualSystem`] is a pure Rust implementation of [`System`] that simulates
-//! the behavior of the underlying system without any interaction with the
-//! actual system. `VirtualSystem` is used for testing the behavior of the shell
-//! in unit tests.
+//! [`VirtualSystem`] is a pure Rust implementation of system traits that
+//! simulates the behavior of the underlying system without any interaction with
+//! the actual system. `VirtualSystem` is used for testing the behavior of the
+//! shell in unit tests.
+//!
+//! # Features and components
 //!
 //! This module also defines elements that compose a virtual system.
 //!
-//! # File system
+//! ## File system
 //!
 //! Basic file operations are supported in the virtual system. Regular files,
 //! directories, named pipes, and symbolic links can be created in the file
 //! system. The file system is shared among all processes in the system.
 //!
-//! # Processes
+//! ## Processes
 //!
 //! A virtual system initially has one process, but can have more processes as a
 //! result of simulating fork. Each process has its own state.
 //!
-//! # I/O
+//! ## I/O
 //!
 //! Currently, read and write operations on files and unnamed pipes are
 //! supported.
 //!
-//! # Signals
+//! ## Signals
 //!
 //! The virtual system can simulate sending signals to processes. Processes can
 //! block, ignore, and catch signals.
+//!
+//! # Concurrency
+//!
+//! `VirtualSystem` is designed to allow multiple virtual processes to run
+//! concurrently. To achieve this, some trait methods return futures that enable
+//! the executor to suspend the calling thread until the process is ready to
+//! proceed. This allows the executor to switch between multiple virtual
+//! processes on a single thread.
+//! See also the [`system` module](super) documentation.
+//!
+//! TBD: Explain how to use `VirtualSystem` with an executor.
 
 mod file_system;
 mod io;
@@ -145,20 +158,20 @@ use std::task::Waker;
 use std::time::Duration;
 use std::time::Instant;
 
-/// Simulated system.
+/// Simulated system
 ///
 /// See the [module-level documentation](self) to grasp a basic understanding of
 /// `VirtualSystem`.
 ///
 /// A `VirtualSystem` instance has two members: `state` and `process_id`. The
-/// former is a [`SystemState`] that effectively contains the state of the
-/// system. The state is contained in `Rc` so that processes can share the same
-/// state. The latter is a process ID that identifies a process calling the
-/// [`System`] interface.
+/// former is a [`SystemState`] that effectively contains the whole state of the
+/// system. The state is contained in `Rc` so that virtual processes can share
+/// the same state. The latter is a process ID that identifies a process calling
+/// the system interfaces.
 ///
 /// When you clone a virtual system, the clone will have the same `process_id`
-/// as the original. To simulate the `fork` system call, you would probably want
-/// to assign a new process ID and add a new [`Process`] to the system state.
+/// and `state` as the original. To simulate the `fork` system call, you should
+/// call a method of the [`Fork`] trait implemented by `VirtualSystem`.
 #[derive(Clone, Debug)]
 pub struct VirtualSystem {
     /// State of the system.

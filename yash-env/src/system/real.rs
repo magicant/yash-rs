@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Implementation of [`System`] that actually interacts with the system
+//! Implementation of system traits that actually interacts with the underlying system
 //!
-//! This module is implemented on Unix-like targets only. It provides an
-//! implementation of the `System` trait that interacts with the underlying
-//! operating system. This implementation is intended to be used in a real
-//! environment, such as a shell running on a Unix-like operating system.
+//! This module is implemented on Unix-like targets only. It provides [`RealSystem`],
+//! an implementation of system traits that interact with the underlying
+//! operating system. This implementation is intended to be used for the actual
+//! shell environment.
 
 mod errno;
 mod file_system;
@@ -73,8 +73,6 @@ use super::SigmaskOp;
 use super::Signals;
 use super::Stat;
 use super::Sysconf;
-#[cfg(doc)]
-use super::System;
 use super::TcGetPgrp;
 use super::TcSetPgrp;
 use super::Times;
@@ -219,10 +217,16 @@ fn sigaction_impl(signal: signal::Number, disposition: Option<Disposition>) -> R
     Ok(old_disposition)
 }
 
-/// Implementation of `System` that actually interacts with the system.
+/// Implementation of system traits that actually interact with the underlying system
 ///
 /// `RealSystem` is an empty `struct` because the underlying operating system
 /// manages the system's internal state.
+///
+/// Some trait methods implemented by `RealSystem` (such as [`SendSignal::kill`])
+/// return futures, but the returned futures do not perform asynchronous operations.
+/// Those methods block the current thread until the underlying system calls
+/// complete and then return ready futures.
+/// See also the [`system` module](super) documentation.
 #[derive(Debug)]
 pub struct RealSystem(());
 
