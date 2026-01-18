@@ -409,11 +409,9 @@ impl<T: Open> Open for SharedSystem<T> {
     fn open_tmpfile(&self, parent_dir: &Path) -> Result<Fd> {
         self.0.borrow().open_tmpfile(parent_dir)
     }
-    #[allow(refining_impl_trait)]
     fn fdopendir(&self, fd: Fd) -> Result<impl Dir + use<T>> {
         self.0.borrow().fdopendir(fd)
     }
-    #[allow(refining_impl_trait)]
     fn opendir(&self, path: &CStr) -> Result<impl Dir + use<T>> {
         self.0.borrow().opendir(path)
     }
