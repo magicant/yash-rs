@@ -18,7 +18,7 @@
 
 #[cfg(doc)]
 use super::SharedSystem;
-use super::{FlexFuture, Pid, Result};
+use super::{Pid, Result};
 pub use crate::signal::{Name, Number, RawNumber};
 
 /// Trait for managing available signals
@@ -192,7 +192,11 @@ pub trait SendSignal {
     /// future. See [`VirtualSystem::kill`] for details.
     ///
     /// [`VirtualSystem::kill`]: crate::system::virtual::VirtualSystem::kill
-    fn kill(&self, target: Pid, signal: Option<Number>) -> FlexFuture<Result<()>>;
+    fn kill(
+        &self,
+        target: Pid,
+        signal: Option<Number>,
+    ) -> impl Future<Output = Result<()>> + use<Self>;
 
     /// Sends a signal to the current process.
     ///
@@ -203,5 +207,5 @@ pub trait SendSignal {
     /// future. See [`VirtualSystem::kill`] for details.
     ///
     /// [`VirtualSystem::kill`]: crate::system::virtual::VirtualSystem::kill
-    fn raise(&self, signal: Number) -> FlexFuture<Result<()>>;
+    fn raise(&self, signal: Number) -> impl Future<Output = Result<()>> + use<Self>;
 }

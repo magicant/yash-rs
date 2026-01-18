@@ -104,6 +104,7 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
 use std::ffi::c_int;
+use std::future::ready;
 use std::io::SeekFrom;
 use std::mem::MaybeUninit;
 use std::num::NonZero;
@@ -674,15 +675,20 @@ impl CaughtSignals for RealSystem {
 }
 
 impl SendSignal for RealSystem {
-    fn kill(&self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
+    fn kill(
+        &self,
+        target: Pid,
+        signal: Option<signal::Number>,
+    ) -> impl Future<Output = Result<()>> + use<> {
         let raw = signal.map_or(0, signal::Number::as_raw);
         let result = unsafe { libc::kill(target.0, raw) }.errno_if_m1().map(drop);
-        result.into()
+        ready(result)
     }
 
-    fn raise(&self, signal: signal::Number) -> FlexFuture<Result<()>> {
+    fn raise(&self, signal: signal::Number) -> impl Future<Output = Result<()>> + use<> {
         let raw = signal.as_raw();
-        unsafe { libc::raise(raw) }.errno_if_m1().map(drop).into()
+        let result = unsafe { libc::raise(raw) }.errno_if_m1().map(drop);
+        ready(result)
     }
 }
 

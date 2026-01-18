@@ -563,10 +563,14 @@ impl<T: CaughtSignals> CaughtSignals for SharedSystem<T> {
 
 /// Delegates `SendSignal` methods to the contained implementor.
 impl<T: SendSignal> SendSignal for SharedSystem<T> {
-    fn kill(&self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
+    fn kill(
+        &self,
+        target: Pid,
+        signal: Option<signal::Number>,
+    ) -> impl Future<Output = Result<()>> + use<T> {
         self.0.borrow().kill(target, signal)
     }
-    fn raise(&self, signal: signal::Number) -> FlexFuture<Result<()>> {
+    fn raise(&self, signal: signal::Number) -> impl Future<Output = Result<()>> + use<T> {
         self.0.borrow().raise(signal)
     }
 }

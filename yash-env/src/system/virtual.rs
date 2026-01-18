@@ -783,7 +783,11 @@ impl SendSignal for VirtualSystem {
     /// the future will be ready only when the process is resumed. Similarly, if
     /// the signal causes the current process to terminate, the future will
     /// never be ready.
-    fn kill(&self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
+    fn kill(
+        &self,
+        target: Pid,
+        signal: Option<signal::Number>,
+    ) -> impl Future<Output = Result<()>> + use<> {
         let result = match target {
             Pid::MY_PROCESS_GROUP => {
                 let target_pgid = self.current_process().pgid;
@@ -816,13 +820,13 @@ impl SendSignal for VirtualSystem {
         };
 
         let system = self.clone();
-        FlexFuture::boxed(async move {
+        async move {
             system.block_until_running().await;
             result
-        })
+        }
     }
 
-    fn raise(&self, signal: signal::Number) -> FlexFuture<Result<()>> {
+    fn raise(&self, signal: signal::Number) -> impl Future<Output = Result<()>> + use<> {
         let target = self.process_id;
         self.kill(target, Some(signal))
     }
