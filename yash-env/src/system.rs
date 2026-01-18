@@ -119,6 +119,7 @@ pub use self::file_system::{
     AT_FDCWD, Chdir, Dir, DirEntry, FileType, Fstat, GetCwd, IsExecutableFile, Mode, OfdAccess,
     Open, OpenFlag, RawMode, Seek, Stat, Umask,
 };
+#[allow(deprecated)]
 pub use self::future::FlexFuture;
 pub use self::io::{Close, Dup, Fcntl, FdFlag, Pipe, Read, Write};
 pub use self::process::{

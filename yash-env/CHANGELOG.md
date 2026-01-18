@@ -21,6 +21,11 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `system::SendSignal::raise`
     - `system::TcSetPgrp::tcsetpgrp`
 
+### Deprecated
+
+- `system::FlexFuture`: This type is now deprecated in favor of using `impl Future`
+  directly in trait method return types.
+
 ### Removed
 
 - `impl<T: Fork> Fork for SharedSystem<T>`: This implementation had not been working since 0.11.0.
