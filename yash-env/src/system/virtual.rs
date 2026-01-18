@@ -14,35 +14,48 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! System simulated in Rust.
+//! System simulated in Rust
 //!
-//! [`VirtualSystem`] is a pure Rust implementation of [`System`] that simulates
-//! the behavior of the underlying system without any interaction with the
-//! actual system. `VirtualSystem` is used for testing the behavior of the shell
-//! in unit tests.
+//! [`VirtualSystem`] is a pure Rust implementation of system traits that
+//! simulates the behavior of the underlying system without any interaction with
+//! the actual system. `VirtualSystem` is used for testing the behavior of the
+//! shell in unit tests.
+//!
+//! # Features and components
 //!
 //! This module also defines elements that compose a virtual system.
 //!
-//! # File system
+//! ## File system
 //!
 //! Basic file operations are supported in the virtual system. Regular files,
 //! directories, named pipes, and symbolic links can be created in the file
 //! system. The file system is shared among all processes in the system.
 //!
-//! # Processes
+//! ## Processes
 //!
 //! A virtual system initially has one process, but can have more processes as a
 //! result of simulating fork. Each process has its own state.
 //!
-//! # I/O
+//! ## I/O
 //!
 //! Currently, read and write operations on files and unnamed pipes are
 //! supported.
 //!
-//! # Signals
+//! ## Signals
 //!
 //! The virtual system can simulate sending signals to processes. Processes can
 //! block, ignore, and catch signals.
+//!
+//! # Concurrency
+//!
+//! `VirtualSystem` is designed to allow multiple virtual processes to run
+//! concurrently. To achieve this, some trait methods return futures that enable
+//! the executor to suspend the calling thread until the process is ready to
+//! proceed. This allows the executor to switch between multiple virtual
+//! processes on a single thread.
+//! See also the [`system` module](super) documentation.
+//!
+//! TBD: Explain how to use `VirtualSystem` with an executor.
 
 mod file_system;
 mod io;
@@ -67,7 +80,6 @@ use super::Exec;
 use super::Exit;
 use super::Fcntl;
 use super::FdFlag;
-use super::FlexFuture;
 use super::Fork;
 use super::Fstat;
 use super::GetCwd;
@@ -134,6 +146,7 @@ use std::ffi::c_int;
 use std::fmt::Debug;
 use std::future::pending;
 use std::future::poll_fn;
+use std::future::ready;
 use std::io::SeekFrom;
 use std::num::NonZero;
 use std::ops::DerefMut as _;
@@ -145,20 +158,20 @@ use std::task::Waker;
 use std::time::Duration;
 use std::time::Instant;
 
-/// Simulated system.
+/// Simulated system
 ///
 /// See the [module-level documentation](self) to grasp a basic understanding of
 /// `VirtualSystem`.
 ///
 /// A `VirtualSystem` instance has two members: `state` and `process_id`. The
-/// former is a [`SystemState`] that effectively contains the state of the
-/// system. The state is contained in `Rc` so that processes can share the same
-/// state. The latter is a process ID that identifies a process calling the
-/// [`System`] interface.
+/// former is a [`SystemState`] that effectively contains the whole state of the
+/// system. The state is contained in `Rc` so that virtual processes can share
+/// the same state. The latter is a process ID that identifies a process calling
+/// the system interfaces.
 ///
 /// When you clone a virtual system, the clone will have the same `process_id`
-/// as the original. To simulate the `fork` system call, you would probably want
-/// to assign a new process ID and add a new [`Process`] to the system state.
+/// and `state` as the original. To simulate the `fork` system call, you should
+/// call a method of the [`Fork`] trait implemented by `VirtualSystem`.
 #[derive(Clone, Debug)]
 pub struct VirtualSystem {
     /// State of the system.
@@ -783,7 +796,11 @@ impl SendSignal for VirtualSystem {
     /// the future will be ready only when the process is resumed. Similarly, if
     /// the signal causes the current process to terminate, the future will
     /// never be ready.
-    fn kill(&self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
+    fn kill(
+        &self,
+        target: Pid,
+        signal: Option<signal::Number>,
+    ) -> impl Future<Output = Result<()>> + use<> {
         let result = match target {
             Pid::MY_PROCESS_GROUP => {
                 let target_pgid = self.current_process().pgid;
@@ -816,13 +833,13 @@ impl SendSignal for VirtualSystem {
         };
 
         let system = self.clone();
-        FlexFuture::boxed(async move {
+        async move {
             system.block_until_running().await;
             result
-        })
+        }
     }
 
-    fn raise(&self, signal: signal::Number) -> FlexFuture<Result<()>> {
+    fn raise(&self, signal: signal::Number) -> impl Future<Output = Result<()>> + use<> {
         let target = self.process_id;
         self.kill(target, Some(signal))
     }
@@ -921,7 +938,7 @@ impl TcSetPgrp for VirtualSystem {
     ///
     /// The current implementation does not yet support the concept of
     /// controlling terminals and sessions. It accepts any open file descriptor.
-    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
+    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> + use<> {
         fn inner(system: &VirtualSystem, fd: Fd, pgid: Pid) -> Result<()> {
             // Make sure the FD is open
             system.with_open_file_description(fd, |_| Ok(()))?;
@@ -939,7 +956,7 @@ impl TcSetPgrp for VirtualSystem {
             Ok(())
         }
 
-        inner(self, fd, pgid).into()
+        ready(inner(self, fd, pgid))
     }
 }
 
@@ -1029,13 +1046,13 @@ impl Exec for VirtualSystem {
         path: &CStr,
         args: &[CString],
         envs: &[CString],
-    ) -> FlexFuture<Result<Infallible>> {
+    ) -> impl Future<Output = Result<Infallible>> + use<> {
         let os_path = UnixStr::from_bytes(path.to_bytes());
         let mut state = self.state.borrow_mut();
         let fs = &state.file_system;
         let file = match fs.get(os_path) {
             Ok(file) => file,
-            Err(e) => return Err(e).into(),
+            Err(e) => return ready(Err(e)),
         };
         // TODO Check file permissions
         let is_executable = matches!(
@@ -1056,15 +1073,15 @@ impl Exec for VirtualSystem {
             // TODO: We should abort the currently running task and start the new one.
             // Just returning `pending()` would break existing tests that rely on
             // the current behavior.
-            Err(Errno::ENOSYS).into()
+            ready(Err(Errno::ENOSYS))
         } else {
-            Err(Errno::ENOEXEC).into()
+            ready(Err(Errno::ENOEXEC))
         }
     }
 }
 
 impl Exit for VirtualSystem {
-    fn exit(&self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
+    fn exit(&self, exit_status: ExitStatus) -> impl Future<Output = Infallible> + use<> {
         let mut myself = self.current_process_mut();
         let parent_pid = myself.ppid;
         let exited = myself.set_state(ProcessState::exited(exit_status));
@@ -1073,7 +1090,7 @@ impl Exit for VirtualSystem {
             raise_sigchld(&mut self.state.borrow_mut(), parent_pid);
         }
 
-        pending().into()
+        pending()
     }
 }
 

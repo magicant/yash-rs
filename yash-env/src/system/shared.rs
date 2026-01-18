@@ -29,7 +29,6 @@ use super::Exec;
 use super::Exit;
 use super::Fcntl;
 use super::FdFlag;
-use super::FlexFuture;
 use super::Fork;
 use super::Fstat;
 use super::GetCwd;
@@ -409,11 +408,9 @@ impl<T: Open> Open for SharedSystem<T> {
     fn open_tmpfile(&self, parent_dir: &Path) -> Result<Fd> {
         self.0.borrow().open_tmpfile(parent_dir)
     }
-    #[allow(refining_impl_trait)]
     fn fdopendir(&self, fd: Fd) -> Result<impl Dir + use<T>> {
         self.0.borrow().fdopendir(fd)
     }
-    #[allow(refining_impl_trait)]
     fn opendir(&self, path: &CStr) -> Result<impl Dir + use<T>> {
         self.0.borrow().opendir(path)
     }
@@ -563,10 +560,14 @@ impl<T: CaughtSignals> CaughtSignals for SharedSystem<T> {
 
 /// Delegates `SendSignal` methods to the contained implementor.
 impl<T: SendSignal> SendSignal for SharedSystem<T> {
-    fn kill(&self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
+    fn kill(
+        &self,
+        target: Pid,
+        signal: Option<signal::Number>,
+    ) -> impl Future<Output = Result<()>> + use<T> {
         self.0.borrow().kill(target, signal)
     }
-    fn raise(&self, signal: signal::Number) -> FlexFuture<Result<()>> {
+    fn raise(&self, signal: signal::Number) -> impl Future<Output = Result<()>> + use<T> {
         self.0.borrow().raise(signal)
     }
 }
@@ -600,7 +601,7 @@ impl<T: TcGetPgrp> TcGetPgrp for SharedSystem<T> {
 
 /// Delegates `TcSetPgrp` methods to the contained implementor.
 impl<T: TcSetPgrp> TcSetPgrp for SharedSystem<T> {
-    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
+    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> + use<T> {
         self.0.borrow().tcsetpgrp(fd, pgid)
     }
 }
@@ -619,14 +620,14 @@ impl<T: Exec> Exec for SharedSystem<T> {
         path: &CStr,
         args: &[CString],
         envs: &[CString],
-    ) -> FlexFuture<Result<Infallible>> {
+    ) -> impl Future<Output = Result<Infallible>> + use<T> {
         self.0.borrow().execve(path, args, envs)
     }
 }
 
 /// Delegates `Exit` methods to the contained implementor.
 impl<T: Exit> Exit for SharedSystem<T> {
-    fn exit(&self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
+    fn exit(&self, exit_status: ExitStatus) -> impl Future<Output = Infallible> + use<T> {
         self.0.borrow().exit(exit_status)
     }
 }

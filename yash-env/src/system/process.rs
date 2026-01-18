@@ -16,7 +16,7 @@
 
 //! Items related to process management
 
-use super::{ExitStatus, FlexFuture, Result};
+use super::{ExitStatus, Result};
 use crate::Env;
 #[cfg(all(doc, unix))]
 use crate::RealSystem;
@@ -165,7 +165,7 @@ pub trait Exec {
         path: &CStr,
         args: &[CString],
         envs: &[CString],
-    ) -> FlexFuture<Result<Infallible>>;
+    ) -> impl Future<Output = Result<Infallible>> + use<Self>;
 }
 
 /// Trait for terminating the current process
@@ -174,5 +174,5 @@ pub trait Exit {
     ///
     /// This function is a thin wrapper around the [`_exit` system
     /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/_exit.html).
-    fn exit(&self, exit_status: ExitStatus) -> FlexFuture<Infallible>;
+    fn exit(&self, exit_status: ExitStatus) -> impl Future<Output = Infallible> + use<Self>;
 }
