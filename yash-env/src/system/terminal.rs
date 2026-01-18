@@ -17,7 +17,6 @@
 //! Items for controlling terminal devices
 
 use super::{Fd, Pid, Result};
-use std::future::Future;
 
 // TODO: Isatty should be a subtrait of TcGetAttr
 /// Trait for testing if a file descriptor is associated with a terminal device

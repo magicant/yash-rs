@@ -26,7 +26,6 @@ use crate::job::Pid;
 use crate::job::ProcessState;
 use std::convert::Infallible;
 use std::ffi::{CStr, CString};
-use std::future::Future;
 use std::pin::Pin;
 
 /// Trait for getting the current process ID and other process-related information

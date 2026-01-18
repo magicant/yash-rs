@@ -15,11 +15,11 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - The following trait methods now return `impl Future` instead of the concrete
   `FlexFuture` type:
+    - `system::Exec::execve`
+    - `system::Exit::exit`
     - `system::SendSignal::kill`
     - `system::SendSignal::raise`
     - `system::TcSetPgrp::tcsetpgrp`
-    - `system::Exec::execve`
-    - `system::Exit::exit`
 
 ### Removed
 

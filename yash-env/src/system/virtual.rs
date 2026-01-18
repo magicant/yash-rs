@@ -1036,35 +1036,33 @@ impl Exec for VirtualSystem {
         let os_path = UnixStr::from_bytes(path.to_bytes());
         let mut state = self.state.borrow_mut();
         let fs = &state.file_system;
-        let result = match fs.get(os_path) {
-            Ok(file) => {
-                // TODO Check file permissions
-                let is_executable = matches!(
-                    &file.borrow().body,
-                    FileBody::Regular {
-                        is_native_executable: true,
-                        ..
-                    }
-                );
-                if is_executable {
-                    // Save arguments in the Process
-                    let process = state.processes.get_mut(&self.process_id).unwrap();
-                    let path = path.to_owned();
-                    let args = args.to_owned();
-                    let envs = envs.to_owned();
-                    process.last_exec = Some((path, args, envs));
-
-                    // TODO: We should abort the currently running task and start the new one.
-                    // Just returning `pending()` would break existing tests that rely on
-                    // the current behavior.
-                    Err(Errno::ENOSYS)
-                } else {
-                    Err(Errno::ENOEXEC)
-                }
-            }
-            Err(e) => Err(e),
+        let file = match fs.get(os_path) {
+            Ok(file) => file,
+            Err(e) => return std::future::ready(Err(e)),
         };
-        std::future::ready(result)
+        // TODO Check file permissions
+        let is_executable = matches!(
+            &file.borrow().body,
+            FileBody::Regular {
+                is_native_executable: true,
+                ..
+            }
+        );
+        if is_executable {
+            // Save arguments in the Process
+            let process = state.processes.get_mut(&self.process_id).unwrap();
+            let path = path.to_owned();
+            let args = args.to_owned();
+            let envs = envs.to_owned();
+            process.last_exec = Some((path, args, envs));
+
+            // TODO: We should abort the currently running task and start the new one.
+            // Just returning `pending()` would break existing tests that rely on
+            // the current behavior.
+            std::future::ready(Err(Errno::ENOSYS))
+        } else {
+            std::future::ready(Err(Errno::ENOEXEC))
+        }
     }
 }
 
