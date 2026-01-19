@@ -11,6 +11,21 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.12.0] - Unreleased
 
+### Changed
+
+- The following trait methods now return `impl Future` instead of the concrete
+  `FlexFuture` type:
+    - `system::Exec::execve`
+    - `system::Exit::exit`
+    - `system::SendSignal::kill`
+    - `system::SendSignal::raise`
+    - `system::TcSetPgrp::tcsetpgrp`
+
+### Deprecated
+
+- `system::FlexFuture`: This type is now deprecated in favor of using `impl Future`
+  directly in trait method return types.
+
 ### Removed
 
 - `impl<T: Fork> Fork for SharedSystem<T>`: This implementation had not been working since 0.11.0.

@@ -94,6 +94,12 @@
 //! rather than `System` itself. This allows for more modular and testable code.
 //! For example, code that only needs to write to file descriptors can depend
 //! on the `Write` trait alone.
+//!
+//! Some methods of these traits return [futures](std::future::Future), not
+//! because the underlying system calls are asynchronous, but to allow
+//! `VirtualSystem` to simulate blocking behavior and run virtual processes
+//! concurrently. `RealSystem` implementations return ready futures after the
+//! underlying system calls complete (which may block the current thread).
 
 mod errno;
 mod file_system;
@@ -119,6 +125,7 @@ pub use self::file_system::{
     AT_FDCWD, Chdir, Dir, DirEntry, FileType, Fstat, GetCwd, IsExecutableFile, Mode, OfdAccess,
     Open, OpenFlag, RawMode, Seek, Stat, Umask,
 };
+#[allow(deprecated)]
 pub use self::future::FlexFuture;
 pub use self::io::{Close, Dup, Fcntl, FdFlag, Pipe, Read, Write};
 pub use self::process::{

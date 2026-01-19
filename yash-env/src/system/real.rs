@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Implementation of [`System`] that actually interacts with the system
+//! Implementation of system traits that actually interacts with the underlying system
 //!
-//! This module is implemented on Unix-like targets only. It provides an
-//! implementation of the `System` trait that interacts with the underlying
-//! operating system. This implementation is intended to be used in a real
-//! environment, such as a shell running on a Unix-like operating system.
+//! This module is implemented on Unix-like targets only. It provides [`RealSystem`],
+//! an implementation of system traits that interact with the underlying
+//! operating system. This implementation is intended to be used for the actual
+//! shell environment.
 
 mod errno;
 mod file_system;
@@ -44,7 +44,6 @@ use super::Exit;
 use super::Fcntl;
 use super::FdFlag;
 use super::FileType;
-use super::FlexFuture;
 use super::Fork;
 use super::Fstat;
 use super::GetCwd;
@@ -74,8 +73,6 @@ use super::SigmaskOp;
 use super::Signals;
 use super::Stat;
 use super::Sysconf;
-#[cfg(doc)]
-use super::System;
 use super::TcGetPgrp;
 use super::TcSetPgrp;
 use super::Times;
@@ -104,6 +101,7 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
 use std::ffi::c_int;
+use std::future::ready;
 use std::io::SeekFrom;
 use std::mem::MaybeUninit;
 use std::num::NonZero;
@@ -219,10 +217,16 @@ fn sigaction_impl(signal: signal::Number, disposition: Option<Disposition>) -> R
     Ok(old_disposition)
 }
 
-/// Implementation of `System` that actually interacts with the system.
+/// Implementation of system traits that actually interact with the underlying system
 ///
 /// `RealSystem` is an empty `struct` because the underlying operating system
 /// manages the system's internal state.
+///
+/// Some trait methods implemented by `RealSystem` (such as [`SendSignal::kill`])
+/// return futures, but the returned futures do not perform asynchronous operations.
+/// Those methods block the current thread until the underlying system calls
+/// complete and then return ready futures.
+/// See also the [`system` module](super) documentation.
 #[derive(Debug)]
 pub struct RealSystem(());
 
@@ -674,15 +678,20 @@ impl CaughtSignals for RealSystem {
 }
 
 impl SendSignal for RealSystem {
-    fn kill(&self, target: Pid, signal: Option<signal::Number>) -> FlexFuture<Result<()>> {
+    fn kill(
+        &self,
+        target: Pid,
+        signal: Option<signal::Number>,
+    ) -> impl Future<Output = Result<()>> + use<> {
         let raw = signal.map_or(0, signal::Number::as_raw);
         let result = unsafe { libc::kill(target.0, raw) }.errno_if_m1().map(drop);
-        result.into()
+        ready(result)
     }
 
-    fn raise(&self, signal: signal::Number) -> FlexFuture<Result<()>> {
+    fn raise(&self, signal: signal::Number) -> impl Future<Output = Result<()>> + use<> {
         let raw = signal.as_raw();
-        unsafe { libc::raise(raw) }.errno_if_m1().map(drop).into()
+        let result = unsafe { libc::raise(raw) }.errno_if_m1().map(drop);
+        ready(result)
     }
 }
 
@@ -770,9 +779,9 @@ impl TcGetPgrp for RealSystem {
 }
 
 impl TcSetPgrp for RealSystem {
-    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> FlexFuture<Result<()>> {
+    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> + use<> {
         let result = unsafe { libc::tcsetpgrp(fd.0, pgid.0) };
-        result.errno_if_m1().map(drop).into()
+        ready(result.errno_if_m1().map(drop))
     }
 }
 
@@ -852,7 +861,7 @@ impl Exec for RealSystem {
         path: &CStr,
         args: &[CString],
         envs: &[CString],
-    ) -> FlexFuture<Result<Infallible>> {
+    ) -> impl Future<Output = Result<Infallible>> + use<> {
         fn to_pointer_array<S: AsRef<CStr>>(strs: &[S]) -> Vec<*const libc::c_char> {
             strs.iter()
                 .map(|s| s.as_ref().as_ptr())
@@ -875,15 +884,16 @@ impl Exec for RealSystem {
             let _ = unsafe { libc::execve(path.as_ptr(), args.as_ptr(), envs.as_ptr()) };
             let errno = Errno::last();
             if errno != Errno::EINTR {
-                return Err(errno).into();
+                return ready(Err(errno));
             }
         }
     }
 }
 
 impl Exit for RealSystem {
-    fn exit(&self, exit_status: ExitStatus) -> FlexFuture<Infallible> {
-        unsafe { libc::_exit(exit_status.0) }
+    #[allow(unreachable_code)]
+    fn exit(&self, exit_status: ExitStatus) -> impl Future<Output = Infallible> + use<> {
+        ready(unsafe { libc::_exit(exit_status.0) })
     }
 }
 
