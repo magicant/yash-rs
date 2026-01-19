@@ -20,6 +20,9 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `system::SendSignal::kill`
     - `system::SendSignal::raise`
     - `system::TcSetPgrp::tcsetpgrp`
+- `<subshell::Subshell as std::fmt::Debug>::fmt` now includes the `job_control`
+  and `ignores_sigint_sigquit` fields in its output.
+  
 
 ### Deprecated
 

@@ -74,7 +74,10 @@ pub struct Subshell<S, F> {
 
 impl<S, F> std::fmt::Debug for Subshell<S, F> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Subshell").finish_non_exhaustive()
+        f.debug_struct("Subshell")
+            .field("job_control", &self.job_control)
+            .field("ignores_sigint_sigquit", &self.ignores_sigint_sigquit)
+            .finish_non_exhaustive()
     }
 }
 
