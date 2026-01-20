@@ -20,6 +20,8 @@
 //! that a specific event has occurred. This module provides a list of signals
 //! defined by POSIX with additional support for some non-standard signals.
 //!
+//! TODO: Explain [`Signal`]
+//!
 //! This module defines two abstractions for signals: [`Name`] and [`Number`].
 //! The `Name` type identifies a signal by its name, while the `Number` type
 //! represents a signal by its number. This reflects the fact that different
@@ -48,6 +50,7 @@ use crate::system::Signals;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::ffi::c_int;
+use std::hash::Hash;
 use std::num::NonZero;
 use std::str::FromStr;
 use strum::{EnumIter, IntoEnumIterator};
@@ -58,6 +61,30 @@ use thiserror::Error;
 /// This is a type alias for the raw signal number used by the underlying
 /// system. POSIX requires valid signal numbers to be positive `c_int` values.
 pub type RawNumber = c_int;
+
+/// Error indicating that no such signal exists
+///
+/// This error is returned when trying to convert from an invalid signal
+/// number or name.
+#[derive(Debug)]
+pub struct NoSuchSignalError;
+
+/// Trait representing a signal
+///
+/// This trait is implemented by types representing signals in the system. It is
+/// an abstraction over [raw signal numbers](RawNumber).
+pub trait Signal:
+    Copy
+    + std::fmt::Debug
+    + std::fmt::Display
+    + FromStr<Err = NoSuchSignalError>
+    + Hash
+    + Ord
+    + TryFrom<NonZero<RawNumber>, Error = NoSuchSignalError>
+where
+    NonZero<RawNumber>: From<Self>,
+{
+}
 
 /// Signal name
 ///
