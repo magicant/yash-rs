@@ -64,10 +64,16 @@ pub type RawNumber = c_int;
 
 /// Error indicating that no such signal exists
 ///
-/// This error is returned when trying to convert from an invalid signal
-/// number or name.
-#[derive(Debug)]
+/// This error is returned when trying to convert from an invalid
+/// [signal](Signal) number or name.
+#[derive(Debug, Error)]
 pub struct NoSuchSignalError;
+
+impl std::fmt::Display for NoSuchSignalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("no such signal")
+    }
+}
 
 /// Trait representing a signal
 ///
