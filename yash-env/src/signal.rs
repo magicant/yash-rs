@@ -73,6 +73,15 @@ pub struct NoSuchSignalError;
 ///
 /// This trait is implemented by types representing signals in the system. It is
 /// an abstraction over [raw signal numbers](RawNumber).
+///
+/// Implementors of this trait must also implement several standard traits to
+/// ensure that signals can be compared, hashed, and converted to and from
+/// strings and raw numbers.
+///
+/// `Signal` is declared as a trait to allow different implementors to use
+/// different concrete types for signals. This helps to prevent accidental
+/// mixing of signals from different systems, which may lead to undefined
+/// behavior.
 pub trait Signal:
     Copy
     + std::fmt::Debug
