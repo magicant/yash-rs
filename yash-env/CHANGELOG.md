@@ -15,6 +15,17 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - The `system::Signals` trait now has the `sig2str` and `str2sig` optional
   methods for converting between signal numbers and names.
+- The `system::Signals` trait now has constants for all possible signals
+  (except `SIGRTMIN` and `SIGRTMAX`):
+    - `SIGABRT`, `SIGALRM`, `SIGBUS`, `SIGCHLD`, `SIGCLD` (optional),
+      `SIGCONT`, `SIGEMT` (optional), `SIGFPE`, `SIGHUP`, `SIGILL`,
+      `SIGINFO` (optional), `SIGINT`, `SIGIO` (optional), `SIGIOT`,
+      `SIGKILL`, `SIGLOST` (optional), `SIGPIPE`, `SIGPOLL` (optional),
+      `SIGPROF`, `SIGPWR` (optional), `SIGQUIT`, `SIGSEGV`,
+      `SIGSTKFLT` (optional), `SIGSTOP`, `SIGSYS`, `SIGTERM`,
+      `SIGTHR` (optional), `SIGTRAP`, `SIGTSTP`, `SIGTTIN`, `SIGTTOU`,
+      `SIGURG`, `SIGUSR1`, `SIGUSR2`, `SIGVTALRM`, `SIGWINCH`, `SIGXCPU`,
+      `SIGXFSZ`
 - `impl From<signal::Number> for std::num::NonZero<signal::RawNumber>`
 - `impl From<signal::Number> for signal::RawNumber`
 

@@ -672,8 +672,44 @@ impl Times for VirtualSystem {
 }
 
 impl Signals for VirtualSystem {
+    const SIGABRT: signal::Number = signal::SIGABRT;
+    const SIGALRM: signal::Number = signal::SIGALRM;
+    const SIGBUS: signal::Number = signal::SIGBUS;
+    const SIGCHLD: signal::Number = signal::SIGCHLD;
+    const SIGCLD: Option<signal::Number> = Some(signal::SIGCLD);
+    const SIGCONT: signal::Number = signal::SIGCONT;
+    const SIGEMT: Option<signal::Number> = Some(signal::SIGEMT);
+    const SIGFPE: signal::Number = signal::SIGFPE;
+    const SIGHUP: signal::Number = signal::SIGHUP;
+    const SIGILL: signal::Number = signal::SIGILL;
+    const SIGINFO: Option<signal::Number> = Some(signal::SIGINFO);
+    const SIGINT: signal::Number = signal::SIGINT;
+    const SIGIO: Option<signal::Number> = Some(signal::SIGIO);
+    const SIGIOT: signal::Number = signal::SIGIOT;
     const SIGKILL: signal::Number = signal::SIGKILL;
+    const SIGLOST: Option<signal::Number> = Some(signal::SIGLOST);
+    const SIGPIPE: signal::Number = signal::SIGPIPE;
     const SIGPOLL: Option<signal::Number> = Some(signal::SIGPOLL);
+    const SIGPROF: signal::Number = signal::SIGPROF;
+    const SIGPWR: Option<signal::Number> = Some(signal::SIGPWR);
+    const SIGQUIT: signal::Number = signal::SIGQUIT;
+    const SIGSEGV: signal::Number = signal::SIGSEGV;
+    const SIGSTKFLT: Option<signal::Number> = Some(signal::SIGSTKFLT);
+    const SIGSTOP: signal::Number = signal::SIGSTOP;
+    const SIGSYS: signal::Number = signal::SIGSYS;
+    const SIGTERM: signal::Number = signal::SIGTERM;
+    const SIGTHR: Option<signal::Number> = Some(signal::SIGTHR);
+    const SIGTRAP: signal::Number = signal::SIGTRAP;
+    const SIGTSTP: signal::Number = signal::SIGTSTP;
+    const SIGTTIN: signal::Number = signal::SIGTTIN;
+    const SIGTTOU: signal::Number = signal::SIGTTOU;
+    const SIGURG: signal::Number = signal::SIGURG;
+    const SIGUSR1: signal::Number = signal::SIGUSR1;
+    const SIGUSR2: signal::Number = signal::SIGUSR2;
+    const SIGVTALRM: signal::Number = signal::SIGVTALRM;
+    const SIGWINCH: signal::Number = signal::SIGWINCH;
+    const SIGXCPU: signal::Number = signal::SIGXCPU;
+    const SIGXFSZ: signal::Number = signal::SIGXFSZ;
 
     // TODO: Implement sig2str and str2sig methods
 
