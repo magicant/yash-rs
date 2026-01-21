@@ -447,6 +447,20 @@ impl Number {
     }
 }
 
+impl From<Number> for NonZero<RawNumber> {
+    #[inline(always)]
+    fn from(number: Number) -> Self {
+        number.0
+    }
+}
+
+impl From<Number> for RawNumber {
+    #[inline(always)]
+    fn from(number: Number) -> Self {
+        number.0.get()
+    }
+}
+
 impl std::fmt::Display for Number {
     #[inline(always)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

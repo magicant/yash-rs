@@ -11,6 +11,11 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.12.0] - Unreleased
 
+### Added
+
+- `impl From<signal::Number> for std::num::NonZero<signal::RawNumber>`
+- `impl From<signal::Number> for signal::RawNumber`
+
 ### Changed
 
 - The following trait methods now return `impl Future` instead of the concrete
