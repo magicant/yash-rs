@@ -523,6 +523,7 @@ impl<T: SetPgid> SetPgid for SharedSystem<T> {
 /// Delegates `Signals` methods to the contained implementor.
 impl<T: Signals> Signals for SharedSystem<T> {
     const SIGKILL: signal::Number = T::SIGKILL;
+    const SIGPOLL: Option<signal::Number> = T::SIGPOLL;
 
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
         self.0.borrow().validate_signal(number)

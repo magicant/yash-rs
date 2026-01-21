@@ -673,6 +673,7 @@ impl Times for VirtualSystem {
 
 impl Signals for VirtualSystem {
     const SIGKILL: signal::Number = signal::SIGKILL;
+    const SIGPOLL: Option<signal::Number> = Some(signal::SIGPOLL);
 
     // TODO: Implement sig2str and str2sig methods
 

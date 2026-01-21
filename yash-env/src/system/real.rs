@@ -574,10 +574,39 @@ impl SetPgid for RealSystem {
     }
 }
 
+const fn to_signal_number(sig: c_int) -> signal::Number {
+    signal::Number::from_raw_unchecked(NonZero::new(sig).unwrap())
+}
+
 impl Signals for RealSystem {
-    const SIGKILL: signal::Number =
-        signal::Number::from_raw_unchecked(NonZero::new(libc::SIGKILL).unwrap());
-    
+    const SIGKILL: signal::Number = to_signal_number(libc::SIGKILL);
+    #[cfg(any(
+        target_os = "aix",
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "haiku",
+        target_os = "horizon",
+        target_os = "illumos",
+        target_os = "linux",
+        target_os = "nto",
+        target_os = "solaris",
+    ))]
+    const SIGPOLL: Option<signal::Number> = Some(to_signal_number(libc::SIGPOLL));
+    #[cfg(not(any(
+        target_os = "aix",
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "haiku",
+        target_os = "horizon",
+        target_os = "illumos",
+        target_os = "linux",
+        target_os = "nto",
+        target_os = "solaris",
+    )))]
+    const SIGPOLL: Option<signal::Number> = None;
+
     // TODO: Implement sig2str and str2sig methods
 
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
