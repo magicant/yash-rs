@@ -575,6 +575,9 @@ impl SetPgid for RealSystem {
 }
 
 impl Signals for RealSystem {
+    const SIGKILL: signal::Number =
+        signal::Number::from_raw_unchecked(NonZero::new(libc::SIGKILL).unwrap());
+
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
         let non_zero = NonZero::new(number)?;
         let name = signal::Name::try_from_raw_real(number)?;

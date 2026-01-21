@@ -672,6 +672,8 @@ impl Times for VirtualSystem {
 }
 
 impl Signals for VirtualSystem {
+    const SIGKILL: signal::Number = signal::SIGKILL;
+
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
         let non_zero = NonZero::new(number)?;
         let name = signal::Name::try_from_raw_virtual(number)?;

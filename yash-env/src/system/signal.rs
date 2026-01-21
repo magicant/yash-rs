@@ -24,6 +24,10 @@ use std::borrow::Cow;
 
 /// Trait for managing available signals
 pub trait Signals {
+    /// The signal number for `SIGKILL`
+    const SIGKILL: Number;
+    // TODO: Add other signal constants like SIGSTOP
+
     /// Converts a signal number to its string representation.
     ///
     /// This function returns `Some(name)` if the signal number refers to a valid
