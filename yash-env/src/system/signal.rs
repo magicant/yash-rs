@@ -20,9 +20,34 @@
 use super::SharedSystem;
 use super::{Pid, Result};
 pub use crate::signal::{Name, Number, RawNumber};
+use std::borrow::Cow;
 
 /// Trait for managing available signals
 pub trait Signals {
+    /// Converts a signal number to its string representation.
+    ///
+    /// This function returns `Some(name)` if the signal number refers to a valid
+    /// signal supported by the system. Otherwise, it returns `None`.
+    ///
+    /// Note that one signal number can have multiple names, in which case it is
+    /// unspecified which name is returned.
+    #[must_use]
+    fn sig2str<S: Into<RawNumber>>(&self, signal: S) -> Option<Cow<'static, str>> {
+        let raw_number = signal.into();
+        self.validate_signal(raw_number)
+            .map(|(name, _)| name.as_string())
+    }
+
+    /// Converts a string representation of a signal to its signal number.
+    ///
+    /// This function returns `Some(number)` if the signal name is supported by
+    /// the system. Otherwise, it returns `None`.
+    #[must_use]
+    fn str2sig(&self, name: &str) -> Option<Number> {
+        let name = name.parse().ok()?;
+        self.signal_number_from_name(name)
+    }
+
     /// Tests if a signal number is valid.
     ///
     /// This function returns `Some((name, number))` if the signal number refers

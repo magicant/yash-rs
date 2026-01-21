@@ -13,6 +13,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Added
 
+- The `system::Signals` trait now has the `sig2str` and `str2sig` optional
+  methods for converting between signal numbers and names.
 - `impl From<signal::Number> for std::num::NonZero<signal::RawNumber>`
 - `impl From<signal::Number> for signal::RawNumber`
 
