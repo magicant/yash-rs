@@ -118,6 +118,7 @@ impl std::fmt::Display for State {
 
             Self::Exited(ExitStatus::SUCCESS) => "Done".fmt(f),
 
+            // Not using write!(f, ...) to honor padding
             Self::Exited(exit_status) => format!("Done({exit_status})").fmt(f),
 
             Self::Stopped(signal) => format!("Stopped(SIG{signal})").fmt(f),
