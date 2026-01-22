@@ -45,7 +45,7 @@ use crate::Env;
 use crate::io::Fd;
 use crate::semantics::{Divert, ExitStatus};
 use crate::signal;
-use crate::system::{Disposition, Errno, Sigaction, Sigmask, SigmaskOp, Signals, TcSetPgrp};
+use crate::system::{Disposition, Sigaction, Sigmask, SigmaskOp, Signals, TcSetPgrp};
 use slab::Slab;
 use std::collections::HashMap;
 use std::iter::FusedIterator;
@@ -940,12 +940,9 @@ pub async fn tcsetpgrp_with_block<S>(system: &S, fd: Fd, pgid: Pid) -> crate::sy
 where
     S: Signals + Sigmask + TcSetPgrp + ?Sized,
 {
-    let sigttou = system
-        .signal_number_from_name(signal::Name::Ttou)
-        .ok_or(Errno::EINVAL)?;
     let mut old_mask = Vec::new();
 
-    system.sigmask(Some((SigmaskOp::Add, &[sigttou])), Some(&mut old_mask))?;
+    system.sigmask(Some((SigmaskOp::Add, &[S::SIGTTOU])), Some(&mut old_mask))?;
 
     let result = system.tcsetpgrp(fd, pgid).await;
 
@@ -977,26 +974,25 @@ pub async fn tcsetpgrp_without_block<S>(system: &S, fd: Fd, pgid: Pid) -> crate:
 where
     S: Signals + Sigaction + Sigmask + TcSetPgrp + ?Sized,
 {
-    let sigttou = system
-        .signal_number_from_name(signal::Name::Ttou)
-        .ok_or(Errno::EINVAL)?;
-    match system.sigaction(sigttou, Disposition::Default) {
+    match system.sigaction(S::SIGTTOU, Disposition::Default) {
         Err(e) => Err(e),
         Ok(old_handling) => {
             let mut old_mask = Vec::new();
-            let result =
-                match system.sigmask(Some((SigmaskOp::Remove, &[sigttou])), Some(&mut old_mask)) {
-                    Err(e) => Err(e),
-                    Ok(()) => {
-                        let result = system.tcsetpgrp(fd, pgid).await;
+            let result = match system.sigmask(
+                Some((SigmaskOp::Remove, &[S::SIGTTOU])),
+                Some(&mut old_mask),
+            ) {
+                Err(e) => Err(e),
+                Ok(()) => {
+                    let result = system.tcsetpgrp(fd, pgid).await;
 
-                        let result_2 = system.sigmask(Some((SigmaskOp::Set, &old_mask)), None);
+                    let result_2 = system.sigmask(Some((SigmaskOp::Set, &old_mask)), None);
 
-                        result.and(result_2)
-                    }
-                };
+                    result.and(result_2)
+                }
+            };
 
-            let result_2 = system.sigaction(sigttou, old_handling).map(drop);
+            let result_2 = system.sigaction(S::SIGTTOU, old_handling).map(drop);
 
             result.and(result_2)
         }
