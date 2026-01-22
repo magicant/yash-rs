@@ -579,7 +579,98 @@ const fn to_signal_number(sig: c_int) -> signal::Number {
 }
 
 impl Signals for RealSystem {
+    const SIGABRT: signal::Number = to_signal_number(libc::SIGABRT);
+    const SIGALRM: signal::Number = to_signal_number(libc::SIGALRM);
+    const SIGBUS: signal::Number = to_signal_number(libc::SIGBUS);
+    const SIGCHLD: signal::Number = to_signal_number(libc::SIGCHLD);
+    #[cfg(any(
+        target_os = "aix",
+        target_os = "horizon",
+        target_os = "illumos",
+        target_os = "solaris",
+    ))]
+    const SIGCLD: Option<signal::Number> = Some(to_signal_number(libc::SIGCLD));
+    #[cfg(not(any(
+        target_os = "aix",
+        target_os = "horizon",
+        target_os = "illumos",
+        target_os = "solaris",
+    )))]
+    const SIGCLD: Option<signal::Number> = None;
+    const SIGCONT: signal::Number = to_signal_number(libc::SIGCONT);
+    #[cfg(not(any(
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "haiku",
+        target_os = "linux",
+        target_os = "redox",
+    )))]
+    const SIGEMT: Option<signal::Number> = Some(to_signal_number(libc::SIGEMT));
+    #[cfg(any(
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "haiku",
+        target_os = "linux",
+        target_os = "redox",
+    ))]
+    const SIGEMT: Option<signal::Number> = None;
+    const SIGFPE: signal::Number = to_signal_number(libc::SIGFPE);
+    const SIGHUP: signal::Number = to_signal_number(libc::SIGHUP);
+    const SIGILL: signal::Number = to_signal_number(libc::SIGILL);
+    #[cfg(not(any(
+        target_os = "aix",
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "haiku",
+        target_os = "linux",
+        target_os = "redox",
+    )))]
+    const SIGINFO: Option<signal::Number> = Some(to_signal_number(libc::SIGINFO));
+    #[cfg(any(
+        target_os = "aix",
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "haiku",
+        target_os = "linux",
+        target_os = "redox",
+    ))]
+    const SIGINFO: Option<signal::Number> = None;
+    const SIGINT: signal::Number = to_signal_number(libc::SIGINT);
+    #[cfg(any(
+        target_os = "aix",
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "horizon",
+        target_os = "illumos",
+        target_os = "linux",
+        target_os = "nto",
+        target_os = "solaris",
+    ))]
+    const SIGIO: Option<signal::Number> = Some(to_signal_number(libc::SIGIO));
+    #[cfg(not(any(
+        target_os = "aix",
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "horizon",
+        target_os = "illumos",
+        target_os = "linux",
+        target_os = "nto",
+        target_os = "solaris",
+    )))]
+    const SIGIO: Option<signal::Number> = None;
+    const SIGIOT: signal::Number = to_signal_number(libc::SIGIOT);
     const SIGKILL: signal::Number = to_signal_number(libc::SIGKILL);
+    #[cfg(target_os = "horizon")]
+    const SIGLOST: Option<signal::Number> = Some(to_signal_number(libc::SIGLOST));
+    #[cfg(not(target_os = "horizon"))]
+    const SIGLOST: Option<signal::Number> = None;
+    const SIGPIPE: signal::Number = to_signal_number(libc::SIGPIPE);
     #[cfg(any(
         target_os = "aix",
         target_os = "android",
@@ -606,6 +697,71 @@ impl Signals for RealSystem {
         target_os = "solaris",
     )))]
     const SIGPOLL: Option<signal::Number> = None;
+    const SIGPROF: signal::Number = to_signal_number(libc::SIGPROF);
+    #[cfg(any(
+        target_os = "aix",
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "illumos",
+        target_os = "linux",
+        target_os = "nto",
+        target_os = "redox",
+        target_os = "solaris",
+    ))]
+    const SIGPWR: Option<signal::Number> = Some(to_signal_number(libc::SIGPWR));
+    #[cfg(not(any(
+        target_os = "aix",
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "illumos",
+        target_os = "linux",
+        target_os = "nto",
+        target_os = "redox",
+        target_os = "solaris",
+    )))]
+    const SIGPWR: Option<signal::Number> = None;
+    const SIGQUIT: signal::Number = to_signal_number(libc::SIGQUIT);
+    const SIGSEGV: signal::Number = to_signal_number(libc::SIGSEGV);
+    #[cfg(all(
+        any(
+            target_os = "android",
+            target_os = "emscripten",
+            target_os = "fuchsia",
+            target_os = "linux"
+        ),
+        not(any(target_arch = "mips", target_arch = "mips64", target_arch = "sparc64"))
+    ))]
+    const SIGSTKFLT: Option<signal::Number> = Some(to_signal_number(libc::SIGSTKFLT));
+    #[cfg(not(all(
+        any(
+            target_os = "android",
+            target_os = "emscripten",
+            target_os = "fuchsia",
+            target_os = "linux"
+        ),
+        not(any(target_arch = "mips", target_arch = "mips64", target_arch = "sparc64"))
+    )))]
+    const SIGSTKFLT: Option<signal::Number> = None;
+    const SIGSTOP: signal::Number = to_signal_number(libc::SIGSTOP);
+    const SIGSYS: signal::Number = to_signal_number(libc::SIGSYS);
+    const SIGTERM: signal::Number = to_signal_number(libc::SIGTERM);
+    #[cfg(target_os = "freebsd")]
+    const SIGTHR: Option<signal::Number> = Some(to_signal_number(libc::SIGTHR));
+    #[cfg(not(target_os = "freebsd"))]
+    const SIGTHR: Option<signal::Number> = None;
+    const SIGTRAP: signal::Number = to_signal_number(libc::SIGTRAP);
+    const SIGTSTP: signal::Number = to_signal_number(libc::SIGTSTP);
+    const SIGTTIN: signal::Number = to_signal_number(libc::SIGTTIN);
+    const SIGTTOU: signal::Number = to_signal_number(libc::SIGTTOU);
+    const SIGURG: signal::Number = to_signal_number(libc::SIGURG);
+    const SIGUSR1: signal::Number = to_signal_number(libc::SIGUSR1);
+    const SIGUSR2: signal::Number = to_signal_number(libc::SIGUSR2);
+    const SIGVTALRM: signal::Number = to_signal_number(libc::SIGVTALRM);
+    const SIGWINCH: signal::Number = to_signal_number(libc::SIGWINCH);
+    const SIGXCPU: signal::Number = to_signal_number(libc::SIGXCPU);
+    const SIGXFSZ: signal::Number = to_signal_number(libc::SIGXFSZ);
 
     // TODO: Implement sig2str and str2sig methods
 

@@ -24,11 +24,82 @@ use std::borrow::Cow;
 
 /// Trait for managing available signals
 pub trait Signals {
+    /// The signal number for `SIGABRT`
+    const SIGABRT: Number;
+    /// The signal number for `SIGALRM`
+    const SIGALRM: Number;
+    /// The signal number for `SIGBUS`
+    const SIGBUS: Number;
+    /// The signal number for `SIGCHLD`
+    const SIGCHLD: Number;
+    /// The signal number for `SIGCLD`, if available on the system
+    const SIGCLD: Option<Number>;
+    /// The signal number for `SIGCONT`
+    const SIGCONT: Number;
+    /// The signal number for `SIGEMT`, if available on the system
+    const SIGEMT: Option<Number>;
+    /// The signal number for `SIGFPE`
+    const SIGFPE: Number;
+    /// The signal number for `SIGHUP`
+    const SIGHUP: Number;
+    /// The signal number for `SIGILL`
+    const SIGILL: Number;
+    /// The signal number for `SIGINFO`, if available on the system
+    const SIGINFO: Option<Number>;
+    /// The signal number for `SIGINT`
+    const SIGINT: Number;
+    /// The signal number for `SIGIO`, if available on the system
+    const SIGIO: Option<Number>;
+    /// The signal number for `SIGIOT`
+    const SIGIOT: Number;
     /// The signal number for `SIGKILL`
     const SIGKILL: Number;
+    /// The signal number for `SIGLOST`, if available on the system
+    const SIGLOST: Option<Number>;
+    /// The signal number for `SIGPIPE`
+    const SIGPIPE: Number;
     /// The signal number for `SIGPOLL`, if available on the system
     const SIGPOLL: Option<Number>;
-    // TODO: Add other signal constants like SIGSTOP
+    /// The signal number for `SIGPROF`
+    const SIGPROF: Number;
+    /// The signal number for `SIGPWR`, if available on the system
+    const SIGPWR: Option<Number>;
+    /// The signal number for `SIGQUIT`
+    const SIGQUIT: Number;
+    /// The signal number for `SIGSEGV`
+    const SIGSEGV: Number;
+    /// The signal number for `SIGSTKFLT`, if available on the system
+    const SIGSTKFLT: Option<Number>;
+    /// The signal number for `SIGSTOP`
+    const SIGSTOP: Number;
+    /// The signal number for `SIGSYS`
+    const SIGSYS: Number;
+    /// The signal number for `SIGTERM`
+    const SIGTERM: Number;
+    /// The signal number for `SIGTHR`, if available on the system
+    const SIGTHR: Option<Number>;
+    /// The signal number for `SIGTRAP`
+    const SIGTRAP: Number;
+    /// The signal number for `SIGTSTP`
+    const SIGTSTP: Number;
+    /// The signal number for `SIGTTIN`
+    const SIGTTIN: Number;
+    /// The signal number for `SIGTTOU`
+    const SIGTTOU: Number;
+    /// The signal number for `SIGURG`
+    const SIGURG: Number;
+    /// The signal number for `SIGUSR1`
+    const SIGUSR1: Number;
+    /// The signal number for `SIGUSR2`
+    const SIGUSR2: Number;
+    /// The signal number for `SIGVTALRM`
+    const SIGVTALRM: Number;
+    /// The signal number for `SIGWINCH`
+    const SIGWINCH: Number;
+    /// The signal number for `SIGXCPU`
+    const SIGXCPU: Number;
+    /// The signal number for `SIGXFSZ`
+    const SIGXFSZ: Number;
 
     /// Converts a signal number to its string representation.
     ///
