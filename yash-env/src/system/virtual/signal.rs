@@ -220,7 +220,7 @@ pub const SIGRTMIN: Number = Number::from_raw_unchecked(NonZero::new(201).unwrap
 pub const SIGRTMAX: Number = Number::from_raw_unchecked(NonZero::new(209).unwrap());
 
 /// Range of the real-time signals supported by the virtual system.
-const RT_RANGE: std::ops::RangeInclusive<RawNumber> = SIGRTMIN.as_raw()..=SIGRTMAX.as_raw();
+pub const RT_RANGE: std::ops::RangeInclusive<RawNumber> = SIGRTMIN.as_raw()..=SIGRTMAX.as_raw();
 
 impl Name {
     pub(super) fn to_raw_virtual(self) -> Option<Number> {

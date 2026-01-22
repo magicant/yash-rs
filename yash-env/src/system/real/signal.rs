@@ -28,7 +28,7 @@ use std::ops::RangeInclusive;
 /// If the real system does not support real-time signals, this function returns
 /// an empty range.
 #[must_use]
-fn rt_range() -> RangeInclusive<RawNumber> {
+pub fn rt_range() -> RangeInclusive<RawNumber> {
     #[cfg(target_os = "aix")]
     return libc::SIGRTMIN..=libc::SIGRTMAX;
 

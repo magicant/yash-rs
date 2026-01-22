@@ -711,6 +711,10 @@ impl Signals for VirtualSystem {
     const SIGXCPU: signal::Number = signal::SIGXCPU;
     const SIGXFSZ: signal::Number = signal::SIGXFSZ;
 
+    fn sigrt(&self) -> impl DoubleEndedIterator<Item = Number> + use<> {
+        signal::RT_RANGE.map(|raw| signal::Number::from_raw_unchecked(NonZero::new(raw).unwrap()))
+    }
+
     // TODO: Implement sig2str and str2sig methods
 
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {

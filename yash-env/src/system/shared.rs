@@ -561,6 +561,10 @@ impl<T: Signals> Signals for SharedSystem<T> {
     const SIGXCPU: signal::Number = T::SIGXCPU;
     const SIGXFSZ: signal::Number = T::SIGXFSZ;
 
+    fn sigrt(&self) -> impl DoubleEndedIterator<Item = signal::Number> + use<T> {
+        self.0.borrow().sigrt()
+    }
+
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
         self.0.borrow().validate_signal(number)
     }

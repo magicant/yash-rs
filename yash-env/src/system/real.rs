@@ -763,6 +763,11 @@ impl Signals for RealSystem {
     const SIGXCPU: signal::Number = to_signal_number(libc::SIGXCPU);
     const SIGXFSZ: signal::Number = to_signal_number(libc::SIGXFSZ);
 
+    fn sigrt(&self) -> impl DoubleEndedIterator<Item = signal::Number> + use<> {
+        signal::rt_range()
+            .filter_map(|raw| NonZero::new(raw).map(signal::Number::from_raw_unchecked))
+    }
+
     // TODO: Implement sig2str and str2sig methods
 
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {

@@ -101,6 +101,12 @@ pub trait Signals {
     /// The signal number for `SIGXFSZ`
     const SIGXFSZ: Number;
 
+    /// Returns an iterator over all real-time signals supported by the system.
+    ///
+    /// The iterator yields signal numbers in ascending order. If the system
+    /// does not support real-time signals, the iterator yields no items.
+    fn sigrt(&self) -> impl DoubleEndedIterator<Item = Number> + use<Self>;
+
     /// Converts a signal number to its string representation.
     ///
     /// This function returns `Some(name)` if the signal number refers to a valid
