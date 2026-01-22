@@ -118,19 +118,19 @@ impl std::fmt::Display for State {
 
             Self::Exited(ExitStatus::SUCCESS) => "Done".fmt(f),
 
-            Self::Exited(exit_status) => format!("Done({exit_status})").fmt(f),
+            Self::Exited(exit_status) => write!(f, "Done({exit_status})"),
 
-            Self::Stopped(signal) => format!("Stopped(SIG{signal})").fmt(f),
+            Self::Stopped(signal) => write!(f, "Stopped(SIG{signal})"),
 
             Self::Signaled {
                 signal,
                 core_dump: false,
-            } => format!("Killed(SIG{signal})").fmt(f),
+            } => write!(f, "Killed(SIG{signal})"),
 
             Self::Signaled {
                 signal,
                 core_dump: true,
-            } => format!("Killed(SIG{signal}: core dumped)").fmt(f),
+            } => write!(f, "Killed(SIG{signal}: core dumped)"),
         }
     }
 }
