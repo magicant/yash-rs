@@ -114,9 +114,9 @@ pub enum State {
 impl std::fmt::Display for State {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Self::Running => "Running".fmt(f),
+            Self::Running => f.pad("Running"),
 
-            Self::Exited(ExitStatus::SUCCESS) => "Done".fmt(f),
+            Self::Exited(ExitStatus::SUCCESS) => f.pad("Done"),
 
             Self::Exited(exit_status) => f.pad(&format!("Done({exit_status})")),
 
