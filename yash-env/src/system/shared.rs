@@ -89,6 +89,7 @@ use std::ffi::CString;
 use std::ffi::c_int;
 use std::future::poll_fn;
 use std::io::SeekFrom;
+use std::ops::RangeInclusive;
 use std::rc::Rc;
 use std::task::Poll;
 use std::time::Duration;
@@ -561,8 +562,12 @@ impl<T: Signals> Signals for SharedSystem<T> {
     const SIGXCPU: signal::Number = T::SIGXCPU;
     const SIGXFSZ: signal::Number = T::SIGXFSZ;
 
-    fn sigrt(&self) -> impl DoubleEndedIterator<Item = signal::Number> + use<T> {
-        self.0.borrow().sigrt()
+    fn sigrt_range(&self) -> Option<RangeInclusive<signal::Number>> {
+        self.0.borrow().sigrt_range()
+    }
+
+    fn iter_sigrt(&self) -> impl DoubleEndedIterator<Item = signal::Number> + use<T> {
+        self.0.borrow().iter_sigrt()
     }
 
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {

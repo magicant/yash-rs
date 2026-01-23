@@ -21,6 +21,8 @@ use super::SharedSystem;
 use super::{Pid, Result};
 pub use crate::signal::{Name, Number, RawNumber};
 use std::borrow::Cow;
+use std::num::NonZero;
+use std::ops::RangeInclusive;
 
 /// Trait for managing available signals
 pub trait Signals {
@@ -101,11 +103,28 @@ pub trait Signals {
     /// The signal number for `SIGXFSZ`
     const SIGXFSZ: Number;
 
+    /// Returns the range of real-time signals supported by the system.
+    ///
+    /// If the system does not support real-time signals, returns `None`.
+    ///
+    /// The range is provided as a method rather than associated constants
+    /// because some systems determine the range at runtime.
+    #[must_use]
+    fn sigrt_range(&self) -> Option<RangeInclusive<Number>>;
+
     /// Returns an iterator over all real-time signals supported by the system.
     ///
     /// The iterator yields signal numbers in ascending order. If the system
     /// does not support real-time signals, the iterator yields no items.
-    fn sigrt(&self) -> impl DoubleEndedIterator<Item = Number> + use<Self>;
+    fn iter_sigrt(&self) -> impl DoubleEndedIterator<Item = Number> + use<Self> {
+        let range = match self.sigrt_range() {
+            Some(range) => range.start().as_raw()..=range.end().as_raw(),
+            #[allow(clippy::reversed_empty_ranges)]
+            None => 0..=-1,
+        };
+        // If NonZero implemented Step, we could use range.map(...)
+        range.filter_map(|raw| NonZero::new(raw).map(Number::from_raw_unchecked))
+    }
 
     /// Converts a signal number to its string representation.
     ///

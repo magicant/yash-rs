@@ -150,6 +150,7 @@ use std::future::ready;
 use std::io::SeekFrom;
 use std::num::NonZero;
 use std::ops::DerefMut as _;
+use std::ops::RangeInclusive;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::Context;
@@ -711,8 +712,8 @@ impl Signals for VirtualSystem {
     const SIGXCPU: signal::Number = signal::SIGXCPU;
     const SIGXFSZ: signal::Number = signal::SIGXFSZ;
 
-    fn sigrt(&self) -> impl DoubleEndedIterator<Item = Number> + use<> {
-        signal::RT_RANGE.map(|raw| signal::Number::from_raw_unchecked(NonZero::new(raw).unwrap()))
+    fn sigrt_range(&self) -> Option<RangeInclusive<Number>> {
+        Some(signal::SIGRTMIN..=signal::SIGRTMAX)
     }
 
     // TODO: Implement sig2str and str2sig methods

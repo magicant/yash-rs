@@ -105,6 +105,7 @@ use std::future::ready;
 use std::io::SeekFrom;
 use std::mem::MaybeUninit;
 use std::num::NonZero;
+use std::ops::RangeInclusive;
 use std::os::unix::ffi::OsStrExt as _;
 use std::os::unix::io::IntoRawFd;
 use std::ptr::NonNull;
@@ -763,9 +764,11 @@ impl Signals for RealSystem {
     const SIGXCPU: signal::Number = to_signal_number(libc::SIGXCPU);
     const SIGXFSZ: signal::Number = to_signal_number(libc::SIGXFSZ);
 
-    fn sigrt(&self) -> impl DoubleEndedIterator<Item = signal::Number> + use<> {
-        signal::rt_range()
-            .filter_map(|raw| NonZero::new(raw).map(signal::Number::from_raw_unchecked))
+    fn sigrt_range(&self) -> Option<RangeInclusive<signal::Number>> {
+        let raw_range = signal::rt_range();
+        let start = signal::Number::from_raw_unchecked(NonZero::new(*raw_range.start())?);
+        let end = signal::Number::from_raw_unchecked(NonZero::new(*raw_range.end())?);
+        Some(start..=end).filter(|range| !range.is_empty())
     }
 
     // TODO: Implement sig2str and str2sig methods
