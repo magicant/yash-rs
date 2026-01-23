@@ -251,9 +251,9 @@ impl Pattern {
         match &self.body {
             Body::Literal(s) => match (self.config.anchor_begin, self.config.anchor_end) {
                 (false, false) => text.find(s).map(|pos| pos..pos + s.len()),
-                (true, false) => text.starts_with(s).then(|| 0..s.len()),
+                (true, false) => text.starts_with(s).then_some(0..s.len()),
                 (false, true) => text.ends_with(s).then(|| text.len() - s.len()..text.len()),
-                (true, true) => (text == s).then(|| 0..s.len()),
+                (true, true) => (text == s).then_some(0..s.len()),
             },
             Body::Regex {
                 regex,
@@ -277,9 +277,9 @@ impl Pattern {
         match &self.body {
             Body::Literal(s) => match (self.config.anchor_begin, self.config.anchor_end) {
                 (false, false) => text.rfind(s).map(|pos| pos..pos + s.len()),
-                (true, false) => text.starts_with(s).then(|| 0..s.len()),
+                (true, false) => text.starts_with(s).then_some(0..s.len()),
                 (false, true) => text.ends_with(s).then(|| text.len() - s.len()..text.len()),
-                (true, true) => (text == s).then(|| 0..s.len()),
+                (true, true) => (text == s).then_some(0..s.len()),
             },
 
             Body::Regex {
