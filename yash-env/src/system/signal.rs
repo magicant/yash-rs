@@ -243,10 +243,79 @@ pub trait Signals {
     ///
     /// This function returns `Some(number)` if the signal name is supported by
     /// the system. Otherwise, it returns `None`.
+    ///
+    /// The input name should not include the `SIG` prefix, and is case-sensitive.
     #[must_use]
     fn str2sig(&self, name: &str) -> Option<Number> {
-        let name = name.parse().ok()?;
-        self.signal_number_from_name(name)
+        match name {
+            "ABRT" => Some(Self::SIGABRT),
+            "ALRM" => Some(Self::SIGALRM),
+            "BUS" => Some(Self::SIGBUS),
+            "CHLD" => Some(Self::SIGCHLD),
+            "CLD" => Self::SIGCLD,
+            "CONT" => Some(Self::SIGCONT),
+            "EMT" => Self::SIGEMT,
+            "FPE" => Some(Self::SIGFPE),
+            "HUP" => Some(Self::SIGHUP),
+            "ILL" => Some(Self::SIGILL),
+            "INFO" => Self::SIGINFO,
+            "INT" => Some(Self::SIGINT),
+            "IO" => Self::SIGIO,
+            "IOT" => Some(Self::SIGIOT),
+            "KILL" => Some(Self::SIGKILL),
+            "LOST" => Self::SIGLOST,
+            "PIPE" => Some(Self::SIGPIPE),
+            "POLL" => Self::SIGPOLL,
+            "PROF" => Some(Self::SIGPROF),
+            "PWR" => Self::SIGPWR,
+            "QUIT" => Some(Self::SIGQUIT),
+            "SEGV" => Some(Self::SIGSEGV),
+            "STKFLT" => Self::SIGSTKFLT,
+            "STOP" => Some(Self::SIGSTOP),
+            "SYS" => Some(Self::SIGSYS),
+            "TERM" => Some(Self::SIGTERM),
+            "THR" => Self::SIGTHR,
+            "TRAP" => Some(Self::SIGTRAP),
+            "TSTP" => Some(Self::SIGTSTP),
+            "TTIN" => Some(Self::SIGTTIN),
+            "TTOU" => Some(Self::SIGTTOU),
+            "URG" => Some(Self::SIGURG),
+            "USR1" => Some(Self::SIGUSR1),
+            "USR2" => Some(Self::SIGUSR2),
+            "VTALRM" => Some(Self::SIGVTALRM),
+            "WINCH" => Some(Self::SIGWINCH),
+            "XCPU" => Some(Self::SIGXCPU),
+            "XFSZ" => Some(Self::SIGXFSZ),
+            _ => {
+                enum BaseName {
+                    Rtmin,
+                    Rtmax,
+                }
+                let (basename, suffix) = if let Some(suffix) = name.strip_prefix("RTMIN") {
+                    (BaseName::Rtmin, suffix)
+                } else if let Some(suffix) = name.strip_prefix("RTMAX") {
+                    (BaseName::Rtmax, suffix)
+                } else {
+                    return None;
+                };
+                if !suffix.is_empty() && !suffix.starts_with(['+', '-']) {
+                    return None;
+                }
+                let range = self.sigrt_range()?;
+                let base_raw = match basename {
+                    BaseName::Rtmin => range.start().as_raw(),
+                    BaseName::Rtmax => range.end().as_raw(),
+                };
+                let raw_number = if suffix.is_empty() {
+                    base_raw
+                } else {
+                    let offset: RawNumber = suffix.parse().ok()?;
+                    base_raw.checked_add(offset)?
+                };
+                let number = Number::from_raw_unchecked(NonZero::new(raw_number)?);
+                range.contains(&number).then_some(number)
+            }
+        }
     }
 
     /// Tests if a signal number is valid.

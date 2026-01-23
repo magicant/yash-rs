@@ -716,8 +716,6 @@ impl Signals for VirtualSystem {
         Some(signal::SIGRTMIN..=signal::SIGRTMAX)
     }
 
-    // TODO: Implement str2sig method
-
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
         let non_zero = NonZero::new(number)?;
         let name = signal::Name::try_from_raw_virtual(number)?;
