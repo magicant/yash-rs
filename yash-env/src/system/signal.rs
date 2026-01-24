@@ -143,96 +143,62 @@ pub trait Signals {
             let number = Number::from_raw_unchecked(NonZero::new(raw_number)?);
             // The signals below are ordered roughly by frequency of use
             // so that common names are preferred for signals with multiple names.
-            if number == S::SIGABRT {
-                Some(Cow::Borrowed("ABRT"))
-            } else if number == S::SIGALRM {
-                Some(Cow::Borrowed("ALRM"))
-            } else if number == S::SIGBUS {
-                Some(Cow::Borrowed("BUS"))
-            } else if number == S::SIGCHLD {
-                Some(Cow::Borrowed("CHLD"))
-            } else if number == S::SIGCONT {
-                Some(Cow::Borrowed("CONT"))
-            } else if number == S::SIGFPE {
-                Some(Cow::Borrowed("FPE"))
-            } else if number == S::SIGHUP {
-                Some(Cow::Borrowed("HUP"))
-            } else if number == S::SIGILL {
-                Some(Cow::Borrowed("ILL"))
-            } else if number == S::SIGINT {
-                Some(Cow::Borrowed("INT"))
-            } else if number == S::SIGKILL {
-                Some(Cow::Borrowed("KILL"))
-            } else if number == S::SIGPIPE {
-                Some(Cow::Borrowed("PIPE"))
-            } else if number == S::SIGQUIT {
-                Some(Cow::Borrowed("QUIT"))
-            } else if number == S::SIGSEGV {
-                Some(Cow::Borrowed("SEGV"))
-            } else if number == S::SIGSTOP {
-                Some(Cow::Borrowed("STOP"))
-            } else if number == S::SIGTERM {
-                Some(Cow::Borrowed("TERM"))
-            } else if number == S::SIGTSTP {
-                Some(Cow::Borrowed("TSTP"))
-            } else if number == S::SIGTTIN {
-                Some(Cow::Borrowed("TTIN"))
-            } else if number == S::SIGTTOU {
-                Some(Cow::Borrowed("TTOU"))
-            } else if number == S::SIGUSR1 {
-                Some(Cow::Borrowed("USR1"))
-            } else if number == S::SIGUSR2 {
-                Some(Cow::Borrowed("USR2"))
-            } else if Some(number) == S::SIGPOLL {
-                Some(Cow::Borrowed("POLL"))
-            } else if number == S::SIGPROF {
-                Some(Cow::Borrowed("PROF"))
-            } else if number == S::SIGSYS {
-                Some(Cow::Borrowed("SYS"))
-            } else if number == S::SIGTRAP {
-                Some(Cow::Borrowed("TRAP"))
-            } else if number == S::SIGURG {
-                Some(Cow::Borrowed("URG"))
-            } else if number == S::SIGVTALRM {
-                Some(Cow::Borrowed("VTALRM"))
-            } else if number == S::SIGWINCH {
-                Some(Cow::Borrowed("WINCH"))
-            } else if number == S::SIGXCPU {
-                Some(Cow::Borrowed("XCPU"))
-            } else if number == S::SIGXFSZ {
-                Some(Cow::Borrowed("XFSZ"))
-            } else if Some(number) == S::SIGEMT {
-                Some(Cow::Borrowed("EMT"))
-            } else if Some(number) == S::SIGINFO {
-                Some(Cow::Borrowed("INFO"))
-            } else if Some(number) == S::SIGIO {
-                Some(Cow::Borrowed("IO"))
-            } else if Some(number) == S::SIGLOST {
-                Some(Cow::Borrowed("LOST"))
-            } else if Some(number) == S::SIGPWR {
-                Some(Cow::Borrowed("PWR"))
-            } else if Some(number) == S::SIGSTKFLT {
-                Some(Cow::Borrowed("STKFLT"))
-            } else if Some(number) == S::SIGTHR {
-                Some(Cow::Borrowed("THR"))
-            } else {
-                let range = system.sigrt_range()?;
-                if number == *range.start() {
-                    Some(Cow::Borrowed("RTMIN"))
-                } else if number == *range.end() {
-                    Some(Cow::Borrowed("RTMAX"))
-                } else if range.contains(&number) {
-                    let rtmin = range.start().as_raw();
-                    let rtmax = range.end().as_raw();
-                    if raw_number <= rtmin.midpoint(rtmax) {
-                        let offset = raw_number - rtmin;
-                        Some(Cow::Owned(format!("RTMIN+{}", offset)))
+            match () {
+                () if number == S::SIGABRT => Some(Cow::Borrowed("ABRT")),
+                () if number == S::SIGALRM => Some(Cow::Borrowed("ALRM")),
+                () if number == S::SIGBUS => Some(Cow::Borrowed("BUS")),
+                () if number == S::SIGCHLD => Some(Cow::Borrowed("CHLD")),
+                () if number == S::SIGCONT => Some(Cow::Borrowed("CONT")),
+                () if number == S::SIGFPE => Some(Cow::Borrowed("FPE")),
+                () if number == S::SIGHUP => Some(Cow::Borrowed("HUP")),
+                () if number == S::SIGILL => Some(Cow::Borrowed("ILL")),
+                () if number == S::SIGINT => Some(Cow::Borrowed("INT")),
+                () if number == S::SIGKILL => Some(Cow::Borrowed("KILL")),
+                () if number == S::SIGPIPE => Some(Cow::Borrowed("PIPE")),
+                () if number == S::SIGQUIT => Some(Cow::Borrowed("QUIT")),
+                () if number == S::SIGSEGV => Some(Cow::Borrowed("SEGV")),
+                () if number == S::SIGSTOP => Some(Cow::Borrowed("STOP")),
+                () if number == S::SIGTERM => Some(Cow::Borrowed("TERM")),
+                () if number == S::SIGTSTP => Some(Cow::Borrowed("TSTP")),
+                () if number == S::SIGTTIN => Some(Cow::Borrowed("TTIN")),
+                () if number == S::SIGTTOU => Some(Cow::Borrowed("TTOU")),
+                () if number == S::SIGUSR1 => Some(Cow::Borrowed("USR1")),
+                () if number == S::SIGUSR2 => Some(Cow::Borrowed("USR2")),
+                () if Some(number) == S::SIGPOLL => Some(Cow::Borrowed("POLL")),
+                () if number == S::SIGPROF => Some(Cow::Borrowed("PROF")),
+                () if number == S::SIGSYS => Some(Cow::Borrowed("SYS")),
+                () if number == S::SIGTRAP => Some(Cow::Borrowed("TRAP")),
+                () if number == S::SIGURG => Some(Cow::Borrowed("URG")),
+                () if number == S::SIGVTALRM => Some(Cow::Borrowed("VTALRM")),
+                () if number == S::SIGWINCH => Some(Cow::Borrowed("WINCH")),
+                () if number == S::SIGXCPU => Some(Cow::Borrowed("XCPU")),
+                () if number == S::SIGXFSZ => Some(Cow::Borrowed("XFSZ")),
+                () if Some(number) == S::SIGEMT => Some(Cow::Borrowed("EMT")),
+                () if Some(number) == S::SIGINFO => Some(Cow::Borrowed("INFO")),
+                () if Some(number) == S::SIGIO => Some(Cow::Borrowed("IO")),
+                () if Some(number) == S::SIGLOST => Some(Cow::Borrowed("LOST")),
+                () if Some(number) == S::SIGPWR => Some(Cow::Borrowed("PWR")),
+                () if Some(number) == S::SIGSTKFLT => Some(Cow::Borrowed("STKFLT")),
+                () if Some(number) == S::SIGTHR => Some(Cow::Borrowed("THR")),
+                _ => {
+                    let range = system.sigrt_range()?;
+                    if number == *range.start() {
+                        Some(Cow::Borrowed("RTMIN"))
+                    } else if number == *range.end() {
+                        Some(Cow::Borrowed("RTMAX"))
+                    } else if range.contains(&number) {
+                        let rtmin = range.start().as_raw();
+                        let rtmax = range.end().as_raw();
+                        if raw_number <= rtmin.midpoint(rtmax) {
+                            let offset = raw_number - rtmin;
+                            Some(Cow::Owned(format!("RTMIN+{}", offset)))
+                        } else {
+                            let offset = rtmax - raw_number;
+                            Some(Cow::Owned(format!("RTMAX-{}", offset)))
+                        }
                     } else {
-                        let offset = rtmax - raw_number;
-                        Some(Cow::Owned(format!("RTMAX-{}", offset)))
+                        None
                     }
-                } else {
-                    None
                 }
             }
         }
