@@ -367,7 +367,7 @@ pub enum SigmaskOp {
 }
 
 /// Trait for managing signal blocking mask
-pub trait Sigmask {
+pub trait Sigmask: Signals {
     /// Gets and/or sets the signal blocking mask.
     ///
     /// This is a low-level function used internally by [`SharedSystem`]. You
@@ -448,7 +448,7 @@ pub trait Sigaction: GetSigaction {
 ///
 /// Implementors of this trait usually also implement [`Sigaction`] to allow
 /// setting which signals are caught.
-pub trait CaughtSignals {
+pub trait CaughtSignals: Signals {
     /// Returns signals this process has caught, if any.
     ///
     /// This is a low-level function used internally by
@@ -477,7 +477,7 @@ pub trait CaughtSignals {
 }
 
 /// Trait for sending signals to processes
-pub trait SendSignal {
+pub trait SendSignal: Signals {
     /// Sends a signal.
     ///
     /// This is a thin wrapper around the [`kill` system

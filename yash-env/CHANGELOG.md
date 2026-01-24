@@ -43,6 +43,12 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `system::SendSignal::raise`
     - `system::TcSetPgrp::tcsetpgrp`
 - The `system::Sigaction` trait now has the `system::GetSigaction` supertrait.
+- The following traits now have the `system::Signals` supertrait:
+    - `system::CaughtSignals`
+    - `system::Select`
+    - `system::SendSignal`
+    - `system::Sigmask`
+    - `system::Wait`
 - `<subshell::Subshell as std::fmt::Debug>::fmt` now includes the `job_control`
   and `ignores_sigint_sigquit` fields in its output.
 

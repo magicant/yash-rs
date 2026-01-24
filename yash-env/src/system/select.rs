@@ -24,7 +24,7 @@ use super::SharedSystem;
 use super::SigmaskOp;
 use super::signal;
 use crate::io::Fd;
-use crate::system::{CaughtSignals, Clock, Sigaction, Sigmask};
+use crate::system::{CaughtSignals, Clock, Sigaction, Sigmask, Signals};
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::cmp::Reverse;
@@ -40,7 +40,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 /// Trait for performing the `select` operation
-pub trait Select {
+pub trait Select: Signals {
     /// Waits for a next event.
     ///
     /// This is a low-level function used internally by
