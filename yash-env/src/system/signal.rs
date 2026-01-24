@@ -326,7 +326,68 @@ pub trait Signals {
     /// Note that one signal number can have multiple names, in which case this
     /// function returns the name that is considered the most common.
     #[must_use]
-    fn validate_signal(&self, number: RawNumber) -> Option<(Name, Number)>;
+    fn validate_signal(&self, number: RawNumber) -> Option<(Name, Number)> {
+        let raw_number = number;
+        let number = Number::from_raw_unchecked(NonZero::new(raw_number)?);
+
+        // The signals below are ordered roughly by frequency of use
+        // so that common names are preferred for signals with multiple names.
+        let name = match () {
+            () if number == Self::SIGABRT => Name::Abrt,
+            () if number == Self::SIGALRM => Name::Alrm,
+            () if number == Self::SIGBUS => Name::Bus,
+            () if number == Self::SIGCHLD => Name::Chld,
+            () if number == Self::SIGCONT => Name::Cont,
+            () if number == Self::SIGFPE => Name::Fpe,
+            () if number == Self::SIGHUP => Name::Hup,
+            () if number == Self::SIGILL => Name::Ill,
+            () if number == Self::SIGINT => Name::Int,
+            () if number == Self::SIGKILL => Name::Kill,
+            () if number == Self::SIGPIPE => Name::Pipe,
+            () if number == Self::SIGQUIT => Name::Quit,
+            () if number == Self::SIGSEGV => Name::Segv,
+            () if number == Self::SIGSTOP => Name::Stop,
+            () if number == Self::SIGTERM => Name::Term,
+            () if number == Self::SIGTSTP => Name::Tstp,
+            () if number == Self::SIGTTIN => Name::Ttin,
+            () if number == Self::SIGTTOU => Name::Ttou,
+            () if number == Self::SIGUSR1 => Name::Usr1,
+            () if number == Self::SIGUSR2 => Name::Usr2,
+            () if Some(number) == Self::SIGPOLL => Name::Poll,
+            () if number == Self::SIGPROF => Name::Prof,
+            () if number == Self::SIGSYS => Name::Sys,
+            () if number == Self::SIGTRAP => Name::Trap,
+            () if number == Self::SIGURG => Name::Urg,
+            () if number == Self::SIGVTALRM => Name::Vtalrm,
+            () if number == Self::SIGWINCH => Name::Winch,
+            () if number == Self::SIGXCPU => Name::Xcpu,
+            () if number == Self::SIGXFSZ => Name::Xfsz,
+            () if Some(number) == Self::SIGEMT => Name::Emt,
+            () if Some(number) == Self::SIGINFO => Name::Info,
+            () if Some(number) == Self::SIGIO => Name::Io,
+            () if Some(number) == Self::SIGLOST => Name::Lost,
+            () if Some(number) == Self::SIGPWR => Name::Pwr,
+            () if Some(number) == Self::SIGSTKFLT => Name::Stkflt,
+            () if Some(number) == Self::SIGTHR => Name::Thr,
+            _ => {
+                let range = self.sigrt_range()?;
+                if !range.contains(&number) {
+                    return None;
+                }
+                let rtmin = range.start().as_raw();
+                let rtmax = range.end().as_raw();
+                if raw_number <= rtmin.midpoint(rtmax) {
+                    let offset = raw_number - rtmin;
+                    Name::Rtmin(offset)
+                } else {
+                    let offset = raw_number - rtmax;
+                    Name::Rtmax(offset)
+                }
+            }
+        };
+
+        Some((name, number))
+    }
 
     /// Returns the signal name for the signal number.
     ///

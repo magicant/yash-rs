@@ -26,8 +26,11 @@ A _private dependency_ is used internally and not visible to downstream users.
       `SIGTHR` (optional), `SIGTRAP`, `SIGTSTP`, `SIGTTIN`, `SIGTTOU`,
       `SIGURG`, `SIGUSR1`, `SIGUSR2`, `SIGVTALRM`, `SIGWINCH`, `SIGXCPU`,
       `SIGXFSZ`
-- The `system::Signals` trait now has the `sigrt` method that returns an
-  iterator over all real-time signals supported by the system.
+- The `system::Signals` trait now has the `sigrt_range` method that returns
+  the range of real-time signals supported by the system and the `iter_sigrt`
+  method that returns an iterator over those signals.
+- The `system::Signals::validate_signal` method now has a default
+  implementation.
 - The `system::GetSigaction` trait has been added to declare the `get_sigaction`
   method, which has been moved from the `system::Sigaction` trait.
 - `impl From<signal::Number> for std::num::NonZero<signal::RawNumber>`

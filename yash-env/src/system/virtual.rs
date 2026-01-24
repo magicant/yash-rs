@@ -149,7 +149,6 @@ use std::future::pending;
 use std::future::poll_fn;
 use std::future::ready;
 use std::io::SeekFrom;
-use std::num::NonZero;
 use std::ops::DerefMut as _;
 use std::ops::RangeInclusive;
 use std::pin::Pin;
@@ -715,12 +714,6 @@ impl Signals for VirtualSystem {
 
     fn sigrt_range(&self) -> Option<RangeInclusive<Number>> {
         Some(signal::SIGRTMIN..=signal::SIGRTMAX)
-    }
-
-    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
-        let non_zero = NonZero::new(number)?;
-        let name = signal::Name::try_from_raw_virtual(number)?;
-        Some((name, signal::Number::from_raw_unchecked(non_zero)))
     }
 
     #[inline(always)]
