@@ -50,6 +50,7 @@ use super::GetCwd;
 use super::GetPid;
 use super::GetPw;
 use super::GetRlimit;
+use super::GetSigaction;
 use super::GetUid;
 use super::Gid;
 use super::IsExecutableFile;
@@ -841,11 +842,13 @@ impl Sigmask for RealSystem {
     }
 }
 
-impl Sigaction for RealSystem {
+impl GetSigaction for RealSystem {
     fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
         sigaction_impl(signal, None)
     }
+}
 
+impl Sigaction for RealSystem {
     fn sigaction(&self, signal: signal::Number, handling: Disposition) -> Result<Disposition> {
         sigaction_impl(signal, Some(handling))
     }

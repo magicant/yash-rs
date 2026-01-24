@@ -403,8 +403,8 @@ pub enum Disposition {
     Catch,
 }
 
-/// Trait for managing signal dispositions
-pub trait Sigaction {
+/// Trait for getting signal dispositions
+pub trait GetSigaction: Signals {
     /// Gets the disposition for a signal.
     ///
     /// This is a low-level function used internally by
@@ -417,9 +417,12 @@ pub trait Sigaction {
     /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigaction.html).
     /// This function returns the current disposition if successful.
     ///
-    /// To change the disposition, use [`sigaction`](Self::sigaction).
+    /// To change the disposition, use [`Sigaction::sigaction`].
     fn get_sigaction(&self, signal: Number) -> Result<Disposition>;
+}
 
+/// Trait for managing signal dispositions
+pub trait Sigaction: GetSigaction {
     /// Gets and sets the disposition for a signal.
     ///
     /// This is a low-level function used internally by [`SharedSystem`]. You
@@ -437,7 +440,7 @@ pub trait Sigaction {
     /// [`caught_signals`](CaughtSignals::caught_signals).
     ///
     /// To get the current disposition without changing it, use
-    /// [`get_sigaction`](Self::get_sigaction).
+    /// [`GetSigaction::get_sigaction`].
     fn sigaction(&self, signal: Number, action: Disposition) -> Result<Disposition>;
 }
 

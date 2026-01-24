@@ -86,6 +86,7 @@ use super::GetCwd;
 use super::GetPid;
 use super::GetPw;
 use super::GetRlimit;
+use super::GetSigaction;
 use super::GetUid;
 use super::Gid;
 use super::IsExecutableFile;
@@ -813,12 +814,14 @@ impl Sigmask for VirtualSystem {
     }
 }
 
-impl Sigaction for VirtualSystem {
+impl GetSigaction for VirtualSystem {
     fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
         let process = self.current_process();
         Ok(process.disposition(signal))
     }
+}
 
+impl Sigaction for VirtualSystem {
     fn sigaction(&self, signal: signal::Number, disposition: Disposition) -> Result<Disposition> {
         let mut process = self.current_process_mut();
         Ok(process.set_disposition(signal, disposition))

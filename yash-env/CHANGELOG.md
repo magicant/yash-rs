@@ -28,6 +28,8 @@ A _private dependency_ is used internally and not visible to downstream users.
       `SIGXFSZ`
 - The `system::Signals` trait now has the `sigrt` method that returns an
   iterator over all real-time signals supported by the system.
+- The `system::GetSigaction` trait has been added to declare the `get_sigaction`
+  method, which has been moved from the `system::Sigaction` trait.
 - `impl From<signal::Number> for std::num::NonZero<signal::RawNumber>`
 - `impl From<signal::Number> for signal::RawNumber`
 
@@ -40,9 +42,9 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `system::SendSignal::kill`
     - `system::SendSignal::raise`
     - `system::TcSetPgrp::tcsetpgrp`
+- The `system::Sigaction` trait now has the `system::GetSigaction` supertrait.
 - `<subshell::Subshell as std::fmt::Debug>::fmt` now includes the `job_control`
   and `ignores_sigint_sigquit` fields in its output.
-  
 
 ### Deprecated
 
@@ -51,7 +53,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Removed
 
-- `impl<T: Fork> Fork for SharedSystem<T>`: This implementation had not been working since 0.11.0.
+- `system::Sigaction::get_sigaction`: This method has been moved to the new
+  `system::GetSigaction` trait.
+- `impl<T: Fork> Fork for SharedSystem<T>`: This implementation had not been
+  working since 0.11.0.
 
 ## [0.11.0] - 2026-01-16
 

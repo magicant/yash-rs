@@ -35,6 +35,7 @@ use super::GetCwd;
 use super::GetPid;
 use super::GetPw;
 use super::GetRlimit;
+use super::GetSigaction;
 use super::GetUid;
 use super::Gid;
 use super::IsExecutableFile;
@@ -589,11 +590,15 @@ impl<T: Sigmask> Sigmask for SharedSystem<T> {
     }
 }
 
-/// Delegates `Sigaction` methods to the contained implementor.
-impl<T: Sigaction> Sigaction for SharedSystem<T> {
+/// Delegates `GetSigaction` methods to the contained implementor.
+impl<T: Sigaction> GetSigaction for SharedSystem<T> {
     fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
         self.0.borrow().get_sigaction(signal)
     }
+}
+
+/// Delegates `Sigaction` methods to the contained implementor.
+impl<T: Sigaction> Sigaction for SharedSystem<T> {
     fn sigaction(&self, signal: signal::Number, action: Disposition) -> Result<Disposition> {
         self.0.borrow().sigaction(signal, action)
     }
