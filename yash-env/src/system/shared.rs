@@ -574,9 +574,6 @@ impl<T: Signals> Signals for SharedSystem<T> {
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
         self.0.borrow().validate_signal(number)
     }
-    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
-        self.0.borrow().signal_number_from_name(name)
-    }
 }
 
 /// Delegates `Sigmask` methods to the contained implementor.

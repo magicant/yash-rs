@@ -223,59 +223,6 @@ pub const SIGRTMAX: Number = Number::from_raw_unchecked(NonZero::new(209).unwrap
 pub const RT_RANGE: std::ops::RangeInclusive<RawNumber> = SIGRTMIN.as_raw()..=SIGRTMAX.as_raw();
 
 impl Name {
-    pub(super) fn to_raw_virtual(self) -> Option<Number> {
-        fn rt(base: Number, n: RawNumber) -> Option<Number> {
-            let number = base.as_raw().checked_add(n)?;
-            let non_zero = NonZero::new(number)?;
-            RT_RANGE
-                .contains(&number)
-                .then(|| Number::from_raw_unchecked(non_zero))
-        }
-
-        match self {
-            Self::Abrt => Some(SIGABRT),
-            Self::Alrm => Some(SIGALRM),
-            Self::Bus => Some(SIGBUS),
-            Self::Chld => Some(SIGCHLD),
-            Self::Cld => Some(SIGCLD),
-            Self::Cont => Some(SIGCONT),
-            Self::Emt => Some(SIGEMT),
-            Self::Fpe => Some(SIGFPE),
-            Self::Hup => Some(SIGHUP),
-            Self::Ill => Some(SIGILL),
-            Self::Info => Some(SIGINFO),
-            Self::Int => Some(SIGINT),
-            Self::Io => Some(SIGIO),
-            Self::Iot => Some(SIGIOT),
-            Self::Kill => Some(SIGKILL),
-            Self::Lost => Some(SIGLOST),
-            Self::Pipe => Some(SIGPIPE),
-            Self::Poll => Some(SIGPOLL),
-            Self::Prof => Some(SIGPROF),
-            Self::Pwr => Some(SIGPWR),
-            Self::Quit => Some(SIGQUIT),
-            Self::Segv => Some(SIGSEGV),
-            Self::Stkflt => Some(SIGSTKFLT),
-            Self::Stop => Some(SIGSTOP),
-            Self::Sys => Some(SIGSYS),
-            Self::Term => Some(SIGTERM),
-            Self::Thr => Some(SIGTHR),
-            Self::Trap => Some(SIGTRAP),
-            Self::Tstp => Some(SIGTSTP),
-            Self::Ttin => Some(SIGTTIN),
-            Self::Ttou => Some(SIGTTOU),
-            Self::Urg => Some(SIGURG),
-            Self::Usr1 => Some(SIGUSR1),
-            Self::Usr2 => Some(SIGUSR2),
-            Self::Vtalrm => Some(SIGVTALRM),
-            Self::Winch => Some(SIGWINCH),
-            Self::Xcpu => Some(SIGXCPU),
-            Self::Xfsz => Some(SIGXFSZ),
-            Self::Rtmin(n) => rt(SIGRTMIN, n),
-            Self::Rtmax(n) => rt(SIGRTMAX, n),
-        }
-    }
-
     /// Returns the name for the raw signal number for the virtual system.
     ///
     /// This function returns `None` if the given number is not a valid signal.

@@ -715,11 +715,6 @@ impl Signals for VirtualSystem {
     fn sigrt_range(&self) -> Option<RangeInclusive<Number>> {
         Some(signal::SIGRTMIN..=signal::SIGRTMAX)
     }
-
-    #[inline(always)]
-    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
-        name.to_raw_virtual()
-    }
 }
 
 impl GetPid for VirtualSystem {

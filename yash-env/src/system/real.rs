@@ -773,11 +773,6 @@ impl Signals for RealSystem {
     }
 
     // TODO: Implement sig2str and str2sig methods
-
-    #[inline(always)]
-    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
-        name.to_raw_real()
-    }
 }
 
 impl Sigmask for RealSystem {

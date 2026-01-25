@@ -318,7 +318,9 @@ pub trait Signals {
     /// This function returns the signal number corresponding to the signal name
     /// in the system. If the signal name is not supported, it returns `None`.
     #[must_use]
-    fn signal_number_from_name(&self, name: Name) -> Option<Number>;
+    fn signal_number_from_name(&self, name: Name) -> Option<Number> {
+        self.str2sig(&name.as_string())
+    }
 }
 
 /// Operation applied to the signal blocking mask
