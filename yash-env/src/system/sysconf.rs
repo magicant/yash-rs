@@ -29,6 +29,7 @@ pub trait Sysconf {
     fn confstr_path(&self) -> Result<UnixString>;
 }
 
+/// Trait for getting the path to the shell executable
 pub trait ShellPath {
     // TODO: Should return `Cow<CStr>` instead
     /// Returns the path to the shell executable.
