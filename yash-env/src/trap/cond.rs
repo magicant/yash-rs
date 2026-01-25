@@ -20,6 +20,7 @@ use super::SignalSystem;
 #[cfg(doc)]
 use super::state::Action;
 use crate::signal;
+use crate::system::Signals;
 use itertools::Itertools as _;
 use std::borrow::Cow;
 use std::num::NonZero;
@@ -68,13 +69,12 @@ impl Condition {
     ///
     /// The result is an uppercase string representing the condition such as
     /// `"EXIT"` and `"TERM"`. Signal names are obtained from
-    /// [`signal::Name::as_string`]. This function depends on the signal system
-    /// to convert signal numbers to names.
+    /// [`Signals::sig2str`].
     #[must_use]
-    pub fn to_string<S: SignalSystem>(&self, system: &S) -> Cow<'static, str> {
+    pub fn to_string<S: Signals>(&self, system: &S) -> Cow<'static, str> {
         match self {
             Self::Exit => Cow::Borrowed("EXIT"),
-            Self::Signal(number) => system.signal_name_from_number(*number).as_string(),
+            Self::Signal(number) => system.sig2str(*number).unwrap_or(Cow::Borrowed("?")),
         }
     }
 
