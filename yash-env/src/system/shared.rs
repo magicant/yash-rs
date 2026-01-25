@@ -735,16 +735,6 @@ impl<T: SetRlimit> SetRlimit for SharedSystem<T> {
 
 impl<S: Signals + Sigmask + Sigaction> SignalSystem for SharedSystem<S> {
     #[inline]
-    fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
-        Signals::signal_name_from_number(self, number)
-    }
-
-    #[inline]
-    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
-        Signals::signal_number_from_name(self, name)
-    }
-
-    #[inline]
     fn get_disposition(&self, signal: signal::Number) -> Result<Disposition> {
         self.0.borrow().get_disposition(signal)
     }

@@ -53,6 +53,7 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `system::SendSignal`
     - `system::Sigmask`
     - `system::Wait`
+    - `trap::SignalSystem`
 - `<subshell::Subshell as std::fmt::Debug>::fmt` now includes the `job_control`
   and `ignores_sigint_sigquit` fields in its output.
 
@@ -63,6 +64,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Removed
 
+- The following trait methods of `trap::SignalSystem` have been removed as they
+  are now provided by the `system::Signals` supertrait:
+    - `signal_name_from_number`
+    - `signal_number_from_name`
 - `system::Sigaction::get_sigaction`: This method has been moved to the new
   `system::GetSigaction` trait.
 - `impl<T: Fork> Fork for SharedSystem<T>`: This implementation had not been
