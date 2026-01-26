@@ -112,6 +112,58 @@ pub trait Signals {
     #[must_use]
     fn sigrt_range(&self) -> Option<RangeInclusive<Number>>;
 
+    /// List of all signal names and their numbers, excluding real-time signals
+    ///
+    /// This list contains all named signals declared in this trait, except for
+    /// real-time signals. Each entry is a tuple of the signal name (without the
+    /// `SIG` prefix) and its corresponding signal number. If a signal is not
+    /// available on the system, its number is `None`.
+    ///
+    /// The signals are listed in alphabetical order by name (without the `SIG`
+    /// prefix). Implementations that override this constant must preserve this
+    /// ordering because the default implementation of
+    /// [`str2sig`](Self::str2sig) relies on it to perform a binary search.
+    const NAMED_SIGNALS: &'static [(&'static str, Option<Number>)] = &[
+        ("ABRT", Some(Self::SIGABRT)),
+        ("ALRM", Some(Self::SIGALRM)),
+        ("BUS", Some(Self::SIGBUS)),
+        ("CHLD", Some(Self::SIGCHLD)),
+        ("CLD", Self::SIGCLD),
+        ("CONT", Some(Self::SIGCONT)),
+        ("EMT", Self::SIGEMT),
+        ("FPE", Some(Self::SIGFPE)),
+        ("HUP", Some(Self::SIGHUP)),
+        ("ILL", Some(Self::SIGILL)),
+        ("INFO", Self::SIGINFO),
+        ("INT", Some(Self::SIGINT)),
+        ("IO", Self::SIGIO),
+        ("IOT", Some(Self::SIGIOT)),
+        ("KILL", Some(Self::SIGKILL)),
+        ("LOST", Self::SIGLOST),
+        ("PIPE", Some(Self::SIGPIPE)),
+        ("POLL", Self::SIGPOLL),
+        ("PROF", Some(Self::SIGPROF)),
+        ("PWR", Self::SIGPWR),
+        ("QUIT", Some(Self::SIGQUIT)),
+        ("SEGV", Some(Self::SIGSEGV)),
+        ("STKFLT", Self::SIGSTKFLT),
+        ("STOP", Some(Self::SIGSTOP)),
+        ("SYS", Some(Self::SIGSYS)),
+        ("TERM", Some(Self::SIGTERM)),
+        ("THR", Self::SIGTHR),
+        ("TRAP", Some(Self::SIGTRAP)),
+        ("TSTP", Some(Self::SIGTSTP)),
+        ("TTIN", Some(Self::SIGTTIN)),
+        ("TTOU", Some(Self::SIGTTOU)),
+        ("URG", Some(Self::SIGURG)),
+        ("USR1", Some(Self::SIGUSR1)),
+        ("USR2", Some(Self::SIGUSR2)),
+        ("VTALRM", Some(Self::SIGVTALRM)),
+        ("WINCH", Some(Self::SIGWINCH)),
+        ("XCPU", Some(Self::SIGXCPU)),
+        ("XFSZ", Some(Self::SIGXFSZ)),
+    ];
+
     /// Returns an iterator over all real-time signals supported by the system.
     ///
     /// The iterator yields signal numbers in ascending order. If the system
@@ -213,75 +265,39 @@ pub trait Signals {
     /// The input name should not include the `SIG` prefix, and is case-sensitive.
     #[must_use]
     fn str2sig(&self, name: &str) -> Option<Number> {
-        match name {
-            "ABRT" => Some(Self::SIGABRT),
-            "ALRM" => Some(Self::SIGALRM),
-            "BUS" => Some(Self::SIGBUS),
-            "CHLD" => Some(Self::SIGCHLD),
-            "CLD" => Self::SIGCLD,
-            "CONT" => Some(Self::SIGCONT),
-            "EMT" => Self::SIGEMT,
-            "FPE" => Some(Self::SIGFPE),
-            "HUP" => Some(Self::SIGHUP),
-            "ILL" => Some(Self::SIGILL),
-            "INFO" => Self::SIGINFO,
-            "INT" => Some(Self::SIGINT),
-            "IO" => Self::SIGIO,
-            "IOT" => Some(Self::SIGIOT),
-            "KILL" => Some(Self::SIGKILL),
-            "LOST" => Self::SIGLOST,
-            "PIPE" => Some(Self::SIGPIPE),
-            "POLL" => Self::SIGPOLL,
-            "PROF" => Some(Self::SIGPROF),
-            "PWR" => Self::SIGPWR,
-            "QUIT" => Some(Self::SIGQUIT),
-            "SEGV" => Some(Self::SIGSEGV),
-            "STKFLT" => Self::SIGSTKFLT,
-            "STOP" => Some(Self::SIGSTOP),
-            "SYS" => Some(Self::SIGSYS),
-            "TERM" => Some(Self::SIGTERM),
-            "THR" => Self::SIGTHR,
-            "TRAP" => Some(Self::SIGTRAP),
-            "TSTP" => Some(Self::SIGTSTP),
-            "TTIN" => Some(Self::SIGTTIN),
-            "TTOU" => Some(Self::SIGTTOU),
-            "URG" => Some(Self::SIGURG),
-            "USR1" => Some(Self::SIGUSR1),
-            "USR2" => Some(Self::SIGUSR2),
-            "VTALRM" => Some(Self::SIGVTALRM),
-            "WINCH" => Some(Self::SIGWINCH),
-            "XCPU" => Some(Self::SIGXCPU),
-            "XFSZ" => Some(Self::SIGXFSZ),
-            _ => {
-                enum BaseName {
-                    Rtmin,
-                    Rtmax,
-                }
-                let (basename, suffix) = if let Some(suffix) = name.strip_prefix("RTMIN") {
-                    (BaseName::Rtmin, suffix)
-                } else if let Some(suffix) = name.strip_prefix("RTMAX") {
-                    (BaseName::Rtmax, suffix)
-                } else {
-                    return None;
-                };
-                if !suffix.is_empty() && !suffix.starts_with(['+', '-']) {
-                    return None;
-                }
-                let range = self.sigrt_range()?;
-                let base_raw = match basename {
-                    BaseName::Rtmin => range.start().as_raw(),
-                    BaseName::Rtmax => range.end().as_raw(),
-                };
-                let raw_number = if suffix.is_empty() {
-                    base_raw
-                } else {
-                    let offset: RawNumber = suffix.parse().ok()?;
-                    base_raw.checked_add(offset)?
-                };
-                let number = Number::from_raw_unchecked(NonZero::new(raw_number)?);
-                range.contains(&number).then_some(number)
-            }
+        // Binary search on NAMED_SIGNALS
+        if let Ok(index) = Self::NAMED_SIGNALS.binary_search_by_key(&name, |s| s.0) {
+            return Self::NAMED_SIGNALS[index].1;
         }
+
+        // Handle real-time signals
+        enum BaseName {
+            Rtmin,
+            Rtmax,
+        }
+        let (basename, suffix) = if let Some(suffix) = name.strip_prefix("RTMIN") {
+            (BaseName::Rtmin, suffix)
+        } else if let Some(suffix) = name.strip_prefix("RTMAX") {
+            (BaseName::Rtmax, suffix)
+        } else {
+            return None;
+        };
+        if !suffix.is_empty() && !suffix.starts_with(['+', '-']) {
+            return None;
+        }
+        let range = self.sigrt_range()?;
+        let base_raw = match basename {
+            BaseName::Rtmin => range.start().as_raw(),
+            BaseName::Rtmax => range.end().as_raw(),
+        };
+        let raw_number = if suffix.is_empty() {
+            base_raw
+        } else {
+            let offset: RawNumber = suffix.parse().ok()?;
+            base_raw.checked_add(offset)?
+        };
+        let number = Number::from_raw_unchecked(NonZero::new(raw_number)?);
+        range.contains(&number).then_some(number)
     }
 
     /// Tests if a signal number is valid.

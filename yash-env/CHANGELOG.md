@@ -13,7 +13,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Added
 
-- The `system::Signals` trait now has the `sig2str` and `str2sig` optional
+- The `system::Signals` trait now has the `sig2str` and `str2sig` provided
   methods for converting between signal numbers and names.
 - The `system::Signals` trait now has constants for all possible signals
   (except `SIGRTMIN` and `SIGRTMAX`):
@@ -26,6 +26,8 @@ A _private dependency_ is used internally and not visible to downstream users.
       `SIGTHR` (optional), `SIGTRAP`, `SIGTSTP`, `SIGTTIN`, `SIGTTOU`,
       `SIGURG`, `SIGUSR1`, `SIGUSR2`, `SIGVTALRM`, `SIGWINCH`, `SIGXCPU`,
       `SIGXFSZ`
+- The `system::Signals` trait now has the `NAMED_SIGNALS` provided associated
+  constant that lists all signal names and their corresponding signal numbers.
 - The `system::Signals` trait now has the `sigrt_range` method that returns
   the range of real-time signals supported by the system and the `iter_sigrt`
   method that returns an iterator over those signals.
