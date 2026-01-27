@@ -23,11 +23,11 @@
 
 use super::Signal;
 use crate::common::report::{merge_reports, report_failure};
-use std::num::NonZero;
+use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
-use yash_env::signal::{Name, Number};
+use yash_env::signal::Number;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::{Fcntl, Isatty, Signals, Write};
 
@@ -36,31 +36,20 @@ use yash_env::system::{Fcntl, Isatty, Signals, Write};
 /// The iterator yields pairs of signal names and numbers in the ascending order of
 /// signal numbers. The iterator includes both real-time and non-real-time signals.
 // TODO Most part of this function is duplicated in yash_env::trap::Condition::iter.
-// Consider refactoring to avoid duplication. Note that the two functions require
-// different trait bounds. Also note Condition::iter deduplicates signals.
-fn all_signals<S: Signals>(system: &S) -> impl Iterator<Item = (Name, Number)> + '_ {
-    let names = Name::iter();
-    let non_real_time_count = names.len() - 2;
-    let non_real_time = names
-        .filter(|name| !matches!(name, Name::Rtmin(_) | Name::Rtmax(_)))
-        .filter_map(|name| Some((name, system.signal_number_from_name(name)?)));
+// Consider refactoring to avoid duplication. Note that Condition::iter
+// deduplicates signals while this function does not.
+fn all_signals<S: Signals>(
+    system: &S,
+) -> impl Iterator<Item = (Cow<'static, str>, Number)> + 'static {
+    let non_real_time = S::NAMED_SIGNALS
+        .iter()
+        .filter_map(|&(name, number)| Some((Cow::Borrowed(name), number?)));
+    let non_real_time_count = S::NAMED_SIGNALS.len();
 
-    let rtmin = system.signal_number_from_name(Name::Rtmin(0));
-    let rtmax = system.signal_number_from_name(Name::Rtmax(0));
-    let range = if let (Some(rtmin), Some(rtmax)) = (rtmin, rtmax) {
-        rtmin.as_raw()..=rtmax.as_raw()
-    } else {
-        #[allow(clippy::reversed_empty_ranges)]
-        {
-            0..=-1
-        }
-    };
-    let real_time_count = range.size_hint().1.unwrap_or_default();
-    let real_time = range.into_iter().map(|n| {
-        let number = Number::from_raw_unchecked(NonZero::new(n).unwrap());
-        let name = system.signal_name_from_number(number);
-        (name, number)
-    });
+    let real_time = system
+        .iter_sigrt()
+        .map(|number| (system.sig2str(number).unwrap(), number));
+    let real_time_count = real_time.size_hint().1.unwrap_or_default();
 
     let mut signals = Vec::with_capacity(non_real_time_count + real_time_count);
     signals.extend(non_real_time);
@@ -70,7 +59,7 @@ fn all_signals<S: Signals>(system: &S) -> impl Iterator<Item = (Name, Number)> +
 }
 
 /// Writes the specified signal into the output string.
-fn write_one_signal(name: Name, number: Number, verbose: bool, output: &mut String) {
+fn write_one_signal(name: &str, number: Number, verbose: bool, output: &mut String) {
     use std::fmt::Write as _;
     if verbose {
         // TODO Include the description of the signal
@@ -126,7 +115,7 @@ pub fn print<'a, S: Signals>(
     if signals.is_empty() {
         // Print all signals
         for (name, number) in all_signals(system) {
-            write_one_signal(name, number, verbose, &mut output);
+            write_one_signal(&name, number, verbose, &mut output);
         }
     } else {
         // Print the specified signals
@@ -135,7 +124,8 @@ pub fn print<'a, S: Signals>(
                 errors.push(InvalidSignal { signal, origin });
                 continue;
             };
-            write_one_signal(name, number, verbose, &mut output);
+            let name = name.as_string();
+            write_one_signal(&name, number, verbose, &mut output);
         }
     }
 
@@ -165,6 +155,7 @@ where
 mod tests {
     use super::*;
     use yash_env::semantics::ExitStatus;
+    use yash_env::signal::Name;
     use yash_env::system::r#virtual::SIGKILL;
     use yash_env::system::r#virtual::VirtualSystem;
 
