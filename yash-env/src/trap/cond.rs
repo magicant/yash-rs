@@ -16,14 +16,12 @@
 
 //! Items that define trap conditions
 
-use super::SignalSystem;
 #[cfg(doc)]
 use super::state::Action;
 use crate::signal;
 use crate::system::Signals;
 use itertools::Itertools as _;
 use std::borrow::Cow;
-use std::num::NonZero;
 
 /// Condition under which an [`Action`] is executed
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -80,34 +78,21 @@ impl Condition {
 
     /// Returns an iterator over all possible conditions.
     ///
-    /// The iterator yields all the conditions supported by the given signal
-    /// system. The first condition is [`Condition::Exit`], followed by all the
+    /// The iterator yields all the conditions supported by the given `Signals`
+    /// implementation.
+    /// The iteration starts with [`Condition::Exit`], followed by all the
     /// signals in the ascending order of their signal numbers.
     // TODO Most part of this function is duplicated from yash_builtin::kill::print::all_signals.
-    // Consider refactoring to share the code. Note that all_signals requires a System
-    // while this function requires a SignalSystem. Also note that all_signals does not
+    // Consider refactoring to share the code. Note that all_signals does not
     // deduplicate the signals.
-    pub fn iter<S: SignalSystem>(system: &S) -> impl Iterator<Item = Condition> + '_ {
-        let names = signal::Name::iter();
-        let non_real_time_count = names.len() - 2;
-        let non_real_time = names
-            .filter(|name| !matches!(name, signal::Name::Rtmin(_) | signal::Name::Rtmax(_)))
-            .filter_map(|name| Some(Condition::Signal(system.signal_number_from_name(name)?)));
+    pub fn iter<S: Signals>(system: &S) -> impl Iterator<Item = Condition> + '_ {
+        let non_real_time = S::NAMED_SIGNALS
+            .iter()
+            .filter_map(|&(_, number)| Some(Condition::Signal(number?)));
+        let non_real_time_count = S::NAMED_SIGNALS.len();
 
-        let rtmin = system.signal_number_from_name(signal::Name::Rtmin(0));
-        let rtmax = system.signal_number_from_name(signal::Name::Rtmax(0));
-        let range = if let (Some(rtmin), Some(rtmax)) = (rtmin, rtmax) {
-            rtmin.as_raw()..=rtmax.as_raw()
-        } else {
-            #[allow(clippy::reversed_empty_ranges)]
-            {
-                0..=-1
-            }
-        };
-        let real_time_count = range.size_hint().1.unwrap_or_default();
-        let real_time = range.into_iter().map(|n| {
-            Condition::Signal(signal::Number::from_raw_unchecked(NonZero::new(n).unwrap()))
-        });
+        let real_time = system.iter_sigrt().map(Condition::Signal);
+        let real_time_count = real_time.size_hint().1.unwrap_or_default();
 
         let mut conditions = Vec::with_capacity(1 + non_real_time_count + real_time_count);
         conditions.push(Condition::Exit);
@@ -116,5 +101,26 @@ impl Condition {
         conditions.sort();
         // Some names may share the same number, so deduplicate.
         conditions.into_iter().dedup()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::system::r#virtual::VirtualSystem;
+
+    #[test]
+    fn condition_iter_is_sorted() {
+        let system = VirtualSystem::new();
+        let iter = Condition::iter(&system);
+        assert!(iter.is_sorted());
+    }
+
+    #[test]
+    fn condition_iter_is_unique() {
+        let system = VirtualSystem::new();
+        let iter = Condition::iter(&system);
+        let iter_dedup = Condition::iter(&system).dedup();
+        assert!(iter.eq(iter_dedup));
     }
 }
