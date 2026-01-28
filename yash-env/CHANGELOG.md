@@ -58,6 +58,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `trap::SignalSystem`
 - The `trap::Condition::to_string` and `trap::Condition::iter` methods now
   require a `system::Signals` implementation instead of `trap::SignalSystem`.
+- The `semantics::ExitStatus::to_signal` method now returns `Cow<str>` instead
+  of `signal::Name` for the signal name.
 - `<subshell::Subshell as std::fmt::Debug>::fmt` now includes the `job_control`
   and `ignores_sigint_sigquit` fields in its output.
 
