@@ -394,13 +394,14 @@ fn test_name_from_str() {
 
 /// Signal number
 ///
-/// This is a wrapper type for signal numbers. It is guaranteed to be a positive
-/// integer, so it optimizes the size of `Option<Number>`, etc.
+/// This is a wrapper type for signal numbers. POSIX requires valid signal
+/// numbers to be positive `c_int` values. Therefore, this type wraps a
+/// `NonZero<RawNumber>`, guaranteeing that the signal number is always
+/// non-zero.
 ///
-/// To make sure that all `Number`s are valid, you can only obtain a `Number`
-/// from an instance of [`Signals`]. Use the [`Signals::validate_signal`] and
-/// [`Signals::signal_number_from_name`] methods to create a `Number` from a raw
-/// signal number or a signal name, respectively.
+/// To make sure that all `Number`s are valid, you should only obtain them
+/// from an instance of [`Signals`], which provides constants and methods to
+/// convert between signal names and numbers.
 ///
 /// Signal numbers are specific to the underlying system. Passing a signal
 /// number obtained from [`RealSystem`] to [`VirtualSystem`] (or vice versa) is
@@ -431,15 +432,14 @@ impl Number {
     /// Creates a new `Number` from a raw signal number.
     ///
     /// This is a backdoor method that allows creating a `Number` from an
-    /// arbitrary raw signal number. The caller must ensure that the raw signal
+    /// arbitrary non-zero integer. The caller must ensure that the raw signal
     /// number is a valid signal number.
     ///
     /// This function is not marked `unsafe` because creating an invalid
     /// `Number` does not lead to undefined behavior. However, it is not
     /// recommended to use this function unless you are sure that the raw signal
-    /// number is valid. To make sure that all `Number`s are valid, use the
-    /// [`Signals::validate_signal`] and [`Signals::signal_number_from_name`]
-    /// methods instead.
+    /// number is valid. In most cases, you should obtain `Number`s from an
+    /// instance of [`Signals`].
     #[inline(always)]
     #[must_use]
     pub const fn from_raw_unchecked(raw: NonZero<RawNumber>) -> Self {
