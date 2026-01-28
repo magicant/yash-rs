@@ -164,7 +164,7 @@ pub async fn execute<S>(
 where
     S: Fcntl + Isatty + SendSignal + Signals + Write,
 {
-    let Ok(signal) = signal.to_number(&env.system) else {
+    let Ok(signal_number) = signal.to_number(&env.system) else {
         let origin = signal_origin.unwrap();
         let report = UnsupportedSignal { signal, origin };
         return report_failure(env, &report).await;
@@ -172,8 +172,14 @@ where
 
     let mut errors = Vec::new();
     for target in targets {
-        if let Err(error) = send(env, signal, target).await {
-            errors.push(TargetError { target, error });
+        match send(env, signal_number, target).await {
+            Ok(()) => (),
+            Err(Error::System(Errno::EINVAL)) => {
+                let origin = signal_origin.unwrap();
+                let report = UnsupportedSignal { signal, origin };
+                return report_failure(env, &report).await;
+            }
+            Err(error) => errors.push(TargetError { target, error }),
         }
     }
 
