@@ -124,7 +124,6 @@ pub fn print<'a, S: Signals>(
                 errors.push(InvalidSignal { signal, origin });
                 continue;
             };
-            let name = name.as_string();
             write_one_signal(&name, number, verbose, &mut output);
         }
     }

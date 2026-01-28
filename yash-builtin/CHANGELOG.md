@@ -15,6 +15,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Public dependency versions:
     - yash-env 0.11.0 → 0.12.0
+- The `kill::Signal::to_name_and_number` method now returns `Cow<str>` instead
+  of `yash_env::signal::Name`.
 
 ## [0.14.0] - 2026-01-16
 

@@ -104,9 +104,9 @@ impl Signal {
     /// as an exit status and converted to a signal number. The function returns
     /// `None` if `self` does not represent a valid signal.
     #[must_use]
-    pub fn to_name_and_number<S: Signals>(self, system: &S) -> Option<(Name, Number)> {
+    pub fn to_name_and_number<S: Signals>(self, system: &S) -> Option<(Cow<'static, str>, Number)> {
         match self {
-            Signal::Name(name) => Some((name, system.signal_number_from_name(name)?)),
+            Signal::Name(name) => Some((name.as_string(), system.signal_number_from_name(name)?)),
             Signal::Number(number) => {
                 ExitStatus(number).to_signal(system, /* exact = */ false)
             }
