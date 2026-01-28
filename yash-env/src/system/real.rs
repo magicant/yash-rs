@@ -850,18 +850,13 @@ impl CaughtSignals for RealSystem {
             // Need a fence to ensure we examine the slots in order.
             compiler_fence(Ordering::Acquire);
 
-            let signal = slot.swap(0, Ordering::Relaxed);
-            if signal == 0 {
+            let number = slot.swap(0, Ordering::Relaxed);
+            let Some(number) = NonZero::new(number as signal::RawNumber) else {
                 // The `catch_signal` function always fills the first unused
                 // slot, so there is no more slot filled with a signal.
                 break;
-            }
-
-            if let Some((_name, number)) = self.validate_signal(signal as signal::RawNumber) {
-                signals.push(number)
-            } else {
-                // ignore unknown signal
-            }
+            };
+            signals.push(signal::Number::from_raw_unchecked(number));
         }
         signals
     }
