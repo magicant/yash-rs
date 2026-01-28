@@ -42,7 +42,7 @@ use self::state::{EnterSubshellOption, GrandState};
 use crate::Env;
 use crate::signal;
 use crate::source::Location;
-use crate::system::{Disposition, Errno};
+use crate::system::{Disposition, Errno, Signals};
 #[cfg(doc)]
 use crate::system::{SharedSystem, System};
 use std::collections::BTreeMap;
@@ -50,32 +50,7 @@ use std::collections::btree_map::Entry;
 use std::pin::Pin;
 
 /// System interface for signal handling configuration
-pub trait SignalSystem {
-    /// Returns the name of a signal from its number.
-    #[must_use]
-    fn signal_name_from_number(&self, number: signal::Number) -> signal::Name;
-
-    /// Returns the signal number from its name.
-    ///
-    /// This function returns the signal number corresponding to the signal name
-    /// in the system. If the signal name is not supported, it returns `None`.
-    ///
-    /// Note that the `TrapSet` implementation assumes that the system supports
-    /// all the following signals:
-    ///
-    /// - `SIGCHLD`
-    /// - `SIGINT`
-    /// - `SIGTERM`
-    /// - `SIGQUIT`
-    /// - `SIGTSTP`
-    /// - `SIGTTIN`
-    /// - `SIGTTOU`
-    ///
-    /// If this method returns `None` for any of these signals, `TrapSet` will
-    /// panic.
-    #[must_use]
-    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number>;
-
+pub trait SignalSystem: Signals {
     /// Returns the current disposition for a signal.
     ///
     /// This function returns the current disposition for the specified signal like
@@ -543,27 +518,64 @@ mod tests {
     use super::*;
     use crate::job::ProcessState;
     use crate::system::SendSignal as _;
-    use crate::system::Signals as _;
-    use crate::system::r#virtual::VirtualSystem;
     use crate::system::r#virtual::{
-        SIGCHLD, SIGINT, SIGKILL, SIGQUIT, SIGSTOP, SIGTERM, SIGTSTP, SIGTTIN, SIGTTOU, SIGUSR1,
-        SIGUSR2,
+        SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCONT, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGIOT,
+        SIGKILL, SIGPIPE, SIGPROF, SIGQUIT, SIGSEGV, SIGSTOP, SIGSYS, SIGTERM, SIGTRAP, SIGTSTP,
+        SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU, SIGXFSZ,
     };
     use crate::tests::in_virtual_system;
     use std::collections::HashMap;
+    use std::ops::RangeInclusive;
 
     #[derive(Default)]
     pub struct DummySystem(pub HashMap<signal::Number, Disposition>);
 
+    impl Signals for DummySystem {
+        const SIGABRT: signal::Number = SIGABRT;
+        const SIGALRM: signal::Number = SIGALRM;
+        const SIGBUS: signal::Number = SIGBUS;
+        const SIGCHLD: signal::Number = SIGCHLD;
+        const SIGCLD: Option<signal::Number> = None;
+        const SIGCONT: signal::Number = SIGCONT;
+        const SIGEMT: Option<signal::Number> = None;
+        const SIGFPE: signal::Number = SIGFPE;
+        const SIGHUP: signal::Number = SIGHUP;
+        const SIGILL: signal::Number = SIGILL;
+        const SIGINFO: Option<signal::Number> = None;
+        const SIGINT: signal::Number = SIGINT;
+        const SIGIO: Option<signal::Number> = None;
+        const SIGIOT: signal::Number = SIGIOT;
+        const SIGKILL: signal::Number = SIGKILL;
+        const SIGLOST: Option<signal::Number> = None;
+        const SIGPIPE: signal::Number = SIGPIPE;
+        const SIGPOLL: Option<signal::Number> = None;
+        const SIGPROF: signal::Number = SIGPROF;
+        const SIGPWR: Option<signal::Number> = None;
+        const SIGQUIT: signal::Number = SIGQUIT;
+        const SIGSEGV: signal::Number = SIGSEGV;
+        const SIGSTKFLT: Option<signal::Number> = None;
+        const SIGSTOP: signal::Number = SIGSTOP;
+        const SIGSYS: signal::Number = SIGSYS;
+        const SIGTERM: signal::Number = SIGTERM;
+        const SIGTHR: Option<signal::Number> = None;
+        const SIGTRAP: signal::Number = SIGTRAP;
+        const SIGTSTP: signal::Number = SIGTSTP;
+        const SIGTTIN: signal::Number = SIGTTIN;
+        const SIGTTOU: signal::Number = SIGTTOU;
+        const SIGURG: signal::Number = SIGURG;
+        const SIGUSR1: signal::Number = SIGUSR1;
+        const SIGUSR2: signal::Number = SIGUSR2;
+        const SIGVTALRM: signal::Number = SIGVTALRM;
+        const SIGWINCH: signal::Number = SIGWINCH;
+        const SIGXCPU: signal::Number = SIGXCPU;
+        const SIGXFSZ: signal::Number = SIGXFSZ;
+
+        fn sigrt_range(&self) -> Option<RangeInclusive<signal::Number>> {
+            None
+        }
+    }
+
     impl SignalSystem for DummySystem {
-        fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
-            VirtualSystem::new().signal_name_from_number(number)
-        }
-
-        fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
-            VirtualSystem::new().signal_number_from_name(name)
-        }
-
         fn get_disposition(&self, signal: signal::Number) -> Result<Disposition, Errno> {
             Ok(self.0.get(&signal).copied().unwrap_or_default())
         }

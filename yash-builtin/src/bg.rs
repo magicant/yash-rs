@@ -50,7 +50,6 @@ use yash_env::job::id::parse;
 use yash_env::option::Option::Monitor;
 use yash_env::option::State::Off;
 use yash_env::semantics::Field;
-use yash_env::signal;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::{Errno, Fcntl, Isatty, SendSignal, Signals, Write};
 
@@ -132,9 +131,7 @@ where
 
     if job.state.is_alive() {
         let pgid = -job.pid;
-        let sigcont = env.system.signal_number_from_name(signal::Name::Cont);
-        let sigcont = sigcont.ok_or(Errno::EINVAL)?;
-        env.system.kill(pgid, Some(sigcont)).await?;
+        env.system.kill(pgid, Some(S::SIGCONT)).await?;
 
         // We've just reported that the job is resumed, so there is no need to
         // report the same thing in the usual pre-prompt message.

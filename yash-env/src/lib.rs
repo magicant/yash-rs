@@ -424,16 +424,12 @@ impl<S> Env<S> {
         self.traps
             .enable_internal_disposition_for_sigchld(&mut self.system)?;
 
-        let sigchld = self
-            .system
-            .signal_number_from_name(signal::Name::Chld)
-            .unwrap();
         loop {
             if let Some((pid, state)) = self.system.wait(target)? {
                 self.jobs.update_status(pid, state);
                 return Ok((pid, state));
             }
-            self.wait_for_signal(sigchld).await;
+            self.wait_for_signal(S::SIGCHLD).await;
         }
     }
 

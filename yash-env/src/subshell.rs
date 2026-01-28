@@ -308,20 +308,13 @@ impl<'a, S: Signals + Sigmask> MaskGuard<'a, S> {
     fn block_sigint_sigquit(&mut self) -> bool {
         assert_eq!(self.old_mask, None);
 
-        let Some(sigint) = self.env.system.signal_number_from_name(signal::Name::Int) else {
-            return false;
-        };
-        let Some(sigquit) = self.env.system.signal_number_from_name(signal::Name::Quit) else {
-            return false;
-        };
-
         let mut old_mask = Vec::new();
 
         let success = self
             .env
             .system
             .sigmask(
-                Some((SigmaskOp::Add, &[sigint, sigquit])),
+                Some((SigmaskOp::Add, &[S::SIGINT, S::SIGQUIT])),
                 Some(&mut old_mask),
             )
             .is_ok();
