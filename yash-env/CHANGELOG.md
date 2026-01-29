@@ -31,6 +31,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `system::Signals` trait now has the `sigrt_range` method that returns
   the range of real-time signals supported by the system and the `iter_sigrt`
   method that returns an iterator over those signals.
+- The `system::Signals` trait now has the `to_signal_number` method for
+  checking if a given number is a valid signal number.
 - The `system::Signals::validate_signal` and
   `system::Signals::signal_number_from_name` methods now have default
   implementation.

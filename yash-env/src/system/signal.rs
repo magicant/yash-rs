@@ -178,6 +178,26 @@ pub trait Signals {
         range.filter_map(|raw| NonZero::new(raw).map(Number::from_raw_unchecked))
     }
 
+    /// Tests if a signal number is valid and returns its signal number.
+    ///
+    /// This function returns `Some(number)` if the signal number refers to a valid
+    /// signal supported by the system. Otherwise, it returns `None`.
+    #[must_use]
+    fn to_signal_number<N: Into<RawNumber>>(&self, number: N) -> Option<Number> {
+        fn inner<S: Signals + ?Sized>(system: &S, raw_number: RawNumber) -> Option<Number> {
+            let non_zero = NonZero::new(raw_number)?;
+            let number = Number::from_raw_unchecked(non_zero);
+            (S::NAMED_SIGNALS
+                .iter()
+                .any(|signal| signal.1 == Some(number))
+                || system
+                    .sigrt_range()
+                    .is_some_and(|range| range.contains(&number)))
+            .then_some(number)
+        }
+        inner(self, number.into())
+    }
+
     /// Converts a signal number to its string representation.
     ///
     /// This function returns `Some(name)` if the signal number refers to a valid
@@ -187,7 +207,7 @@ pub trait Signals {
     /// Note that one signal number can have multiple names, in which case it is
     /// unspecified which name is returned.
     #[must_use]
-    fn sig2str<S: Into<RawNumber>>(&self, signal: S) -> Option<Cow<'static, str>> {
+    fn sig2str<N: Into<RawNumber>>(&self, signal: N) -> Option<Cow<'static, str>> {
         fn inner<S: Signals + ?Sized>(
             system: &S,
             raw_number: RawNumber,
@@ -300,13 +320,16 @@ pub trait Signals {
         range.contains(&number).then_some(number)
     }
 
-    /// Tests if a signal number is valid.
+    /// Tests if a signal number is valid and returns its name and number.
     ///
     /// This function returns `Some((name, number))` if the signal number refers
     /// to a valid signal supported by the system. Otherwise, it returns `None`.
     ///
     /// Note that one signal number can have multiple names, in which case this
     /// function returns the name that is considered the most common.
+    ///
+    /// If you only need to tell whether a signal number is valid, use
+    /// [`to_signal_number`](Self::to_signal_number), which is more efficient.
     #[must_use]
     fn validate_signal(&self, number: RawNumber) -> Option<(Name, Number)> {
         let number = Number::from_raw_unchecked(NonZero::new(number)?);
