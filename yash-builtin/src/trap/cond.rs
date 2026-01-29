@@ -16,6 +16,7 @@
 
 //! Definition of `CondSpec`
 
+use std::num::NonZero;
 use yash_env::signal;
 use yash_env::system::Signals;
 use yash_env::trap::Condition;
@@ -55,8 +56,10 @@ impl CondSpec {
             Self::SignalName(name) => {
                 Some(Condition::Signal(system.signal_number_from_name(*name)?))
             }
-            Self::Number(0) => Some(Condition::Exit),
-            Self::Number(number) => Some(Condition::Signal(system.validate_signal(*number)?.1)),
+            Self::Number(number) => match NonZero::new(*number) {
+                None /* number == 0 */ => Some(Condition::Exit),
+                Some(non_zero) => Some(Condition::Signal(system.to_signal_number(non_zero)?)),
+            },
         }
     }
 
