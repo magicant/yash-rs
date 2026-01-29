@@ -56,6 +56,7 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `system::Sigmask`
     - `system::Wait`
     - `trap::SignalSystem`
+- `system::virtual::VirtualSystem::kill` now rejects negative signal numbers.
 - The `trap::Condition::to_string` and `trap::Condition::iter` methods now
   require a `system::Signals` implementation instead of `trap::SignalSystem`.
 - The `semantics::ExitStatus::to_signal` method now returns `Cow<str>` instead

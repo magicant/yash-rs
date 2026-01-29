@@ -825,6 +825,10 @@ impl CaughtSignals for VirtualSystem {
 impl SendSignal for VirtualSystem {
     /// Sends a signal to the target process.
     ///
+    /// The current implementation accepts any positive signal number and `None`
+    /// (no signal) for `signal`. Negative signal numbers are rejected with
+    /// `Errno::EINVAL`.
+    ///
     /// This function returns a future that enables the executor to block the
     /// calling thread until the current process is ready to proceed. If the
     /// signal is sent to the current process and it causes the process to stop,
@@ -836,34 +840,51 @@ impl SendSignal for VirtualSystem {
         target: Pid,
         signal: Option<signal::Number>,
     ) -> impl Future<Output = Result<()>> + use<> {
-        let result = match target {
-            Pid::MY_PROCESS_GROUP => {
-                let target_pgid = self.current_process().pgid;
-                send_signal_to_processes(&mut self.state.borrow_mut(), Some(target_pgid), signal)
-            }
-
-            Pid::ALL => send_signal_to_processes(&mut self.state.borrow_mut(), None, signal),
-
-            Pid(raw_pid) if raw_pid >= 0 => {
-                let mut state = self.state.borrow_mut();
-                match state.processes.get_mut(&target) {
-                    Some(process) => {
-                        if let Some(signal) = signal {
-                            let result = process.raise_signal(signal);
-                            if result.process_state_changed {
-                                let parent_pid = process.ppid;
-                                raise_sigchld(&mut state, parent_pid);
-                            }
-                        }
-                        Ok(())
-                    }
-                    None => Err(Errno::ESRCH),
+        let result = 'result: {
+            if let Some(signal) = signal {
+                // Validate the signal number
+                if signal.as_raw() < 0 {
+                    break 'result Err(Errno::EINVAL);
                 }
             }
 
-            Pid(negative_pgid) => {
-                let target_pgid = Pid(-negative_pgid);
-                send_signal_to_processes(&mut self.state.borrow_mut(), Some(target_pgid), signal)
+            match target {
+                Pid::MY_PROCESS_GROUP => {
+                    let target_pgid = self.current_process().pgid;
+                    send_signal_to_processes(
+                        &mut self.state.borrow_mut(),
+                        Some(target_pgid),
+                        signal,
+                    )
+                }
+
+                Pid::ALL => send_signal_to_processes(&mut self.state.borrow_mut(), None, signal),
+
+                Pid(raw_pid) if raw_pid >= 0 => {
+                    let mut state = self.state.borrow_mut();
+                    match state.processes.get_mut(&target) {
+                        Some(process) => {
+                            if let Some(signal) = signal {
+                                let result = process.raise_signal(signal);
+                                if result.process_state_changed {
+                                    let parent_pid = process.ppid;
+                                    raise_sigchld(&mut state, parent_pid);
+                                }
+                            }
+                            Ok(())
+                        }
+                        None => Err(Errno::ESRCH),
+                    }
+                }
+
+                Pid(negative_pgid) => {
+                    let target_pgid = Pid(-negative_pgid);
+                    send_signal_to_processes(
+                        &mut self.state.borrow_mut(),
+                        Some(target_pgid),
+                        signal,
+                    )
+                }
             }
         };
 

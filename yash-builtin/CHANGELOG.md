@@ -15,6 +15,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Public dependency versions:
     - yash-env 0.11.0 → 0.12.0
+- The `kill::Signal::to_number` method no longer returns an error when an
+  invalid signal number is specified. It now only returns an error when an
+  invalid signal name is specified.
 - The `kill::Signal::to_name_and_number` method now returns `Cow<str>` instead
   of `yash_env::signal::Name`.
 
