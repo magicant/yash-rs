@@ -16,6 +16,11 @@ A _private dependency_ is used internally and not visible to downstream users.
 - Public dependency versions:
     - yash-env 0.11.0 → 0.12.0
 
+### Fixed
+
+- Error messages from the `kill` built-in no longer include debugging details
+  when reporting unknown options or invalid signals.
+
 ## [0.14.0] - 2026-01-16
 
 ### Added
