@@ -42,7 +42,6 @@ use yash_env::option::Option::Interactive;
 use yash_env::option::State::On;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::signal::Name::{Kill, Stop};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::{Fcntl, Isatty, SharedSystem, Sigaction, Sigmask, Signals, Write};
 use yash_env::trap::Action;
@@ -133,8 +132,7 @@ pub fn display_all_traps<S: SignalSystem>(
     let mut output = String::new();
     for cond in Condition::iter(system) {
         if let Condition::Signal(number) = cond {
-            let name = system.signal_name_from_number(number);
-            if name == Kill || name == Stop {
+            if number == S::SIGKILL || number == S::SIGSTOP {
                 continue;
             }
         }
