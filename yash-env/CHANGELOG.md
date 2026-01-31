@@ -63,6 +63,13 @@ A _private dependency_ is used internally and not visible to downstream users.
   require a `system::Signals` implementation instead of `trap::SignalSystem`.
 - The `semantics::ExitStatus::to_signal` method now returns `Cow<str>` instead
   of `signal::Name` for the signal name.
+- `job::fmt::State`: This type now uses `Cow<str>` to represent
+  signal names instead of `signal::Number`. A lifetime parameter has been added
+  to the type to represent the lifetime of the borrowed signal name. The
+  variants have been changed as follows:
+    - `State::Stopped(signal::Number)` → `State::Stopped { signal: Cow<str> }`
+    - `State::Signaled { signal: signal::Number, core_dump: bool }` →
+      `State::Signaled { signal: Cow<str>, core_dump: bool }`
 - `<subshell::Subshell as std::fmt::Debug>::fmt` now includes the `job_control`
   and `ignores_sigint_sigquit` fields in its output.
 
@@ -81,6 +88,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   `system::GetSigaction` trait.
 - `impl<T: Fork> Fork for SharedSystem<T>`: This implementation had not been
   working since 0.11.0.
+- `impl Copy for job::fmt::State`: This implementation has been removed because
+  `State` now contains a `Cow<str>`, which does not implement `Copy`.
 
 ## [0.11.0] - 2026-01-16
 
