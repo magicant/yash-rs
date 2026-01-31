@@ -201,11 +201,12 @@ impl TrapSet {
         origin: Location,
         override_ignore: bool,
     ) -> Result<(), SetActionError> {
-        if let Condition::Signal(number) = cond {
-            match system.signal_name_from_number(number) {
-                signal::Name::Kill => return Err(SetActionError::SIGKILL),
-                signal::Name::Stop => return Err(SetActionError::SIGSTOP),
-                _ => {}
+        if let Condition::Signal(signal) = cond {
+            if signal == S::SIGKILL {
+                return Err(SetActionError::SIGKILL);
+            }
+            if signal == S::SIGSTOP {
+                return Err(SetActionError::SIGSTOP);
             }
         }
 
@@ -284,18 +285,21 @@ impl TrapSet {
         for (&cond, state) in &mut self.traps {
             let option = match cond {
                 Condition::Exit => EnterSubshellOption::ClearInternalDisposition,
-                Condition::Signal(number) => {
-                    use signal::Name::*;
-                    match system.signal_name_from_number(number) {
-                        Chld => EnterSubshellOption::KeepInternalDisposition,
-                        Int | Quit if ignore_sigint_sigquit => EnterSubshellOption::Ignore,
-                        Tstp | Ttin | Ttou
-                            if keep_internal_dispositions_for_stoppers
-                                && state.internal_disposition() != Disposition::Default =>
-                        {
-                            EnterSubshellOption::Ignore
-                        }
-                        _ => EnterSubshellOption::ClearInternalDisposition,
+                Condition::Signal(signal) =>
+                {
+                    #[allow(clippy::if_same_then_else)]
+                    if signal == S::SIGCHLD {
+                        EnterSubshellOption::KeepInternalDisposition
+                    } else if ignore_sigint_sigquit && (signal == S::SIGINT || signal == S::SIGQUIT)
+                    {
+                        EnterSubshellOption::Ignore
+                    } else if keep_internal_dispositions_for_stoppers
+                        && (signal == S::SIGTSTP || signal == S::SIGTTIN || signal == S::SIGTTOU)
+                        && state.internal_disposition() != Disposition::Default
+                    {
+                        EnterSubshellOption::Ignore
+                    } else {
+                        EnterSubshellOption::ClearInternalDisposition
                     }
                 }
             };
