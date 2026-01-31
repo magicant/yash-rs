@@ -21,8 +21,10 @@ use crate::common::syntax::{OptionOccurrence, OptionSpec};
 use itertools::Itertools;
 use thiserror::Error;
 use yash_env::semantics::Field;
+use yash_env::signal::RawNumber;
 use yash_env::source::pretty::{Footnote, FootnoteType, Report, ReportType, Snippet};
-use yash_env::trap::Action;
+use yash_env::system::Signals;
+use yash_env::trap::{Action, Condition};
 
 /// Command line options for the trap built-in
 pub const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('p').long("print")];
@@ -81,6 +83,30 @@ impl<'a> From<&'a Error> for Report<'a> {
     }
 }
 
+/// Parses a single condition from a command line operand.
+///
+/// On success, returns the parsed `Condition` and the original `Field`.
+/// On failure, returns `Error::UnknownCondition`.
+///
+/// A condition can be `0` or `EXIT` for [`Condition::Exit`], or a signal
+/// name/number for [`Condition::Signal`].
+fn parse_condition<S: Signals>(field: Field, system: &S) -> Result<(Condition, Field), Error> {
+    // TODO Case-insensitive parse
+    // TODO Allow SIG prefix
+    match field.value.parse::<RawNumber>() {
+        Ok(0) => Ok((Condition::Exit, field)),
+        Ok(number) => match system.to_signal_number(number) {
+            Some(number) => Ok((Condition::Signal(number), field)),
+            None => Err(Error::UnknownCondition(field)),
+        },
+        Err(_) if field.value == "EXIT" => Ok((Condition::Exit, field)),
+        Err(_) => match system.str2sig(&field.value) {
+            Some(number) => Ok((Condition::Signal(number), field)),
+            None => Err(Error::UnknownCondition(field)),
+        },
+    }
+}
+
 /// Converts parsed command line arguments into a `Command`.
 ///
 /// The result of [`parse_arguments`](crate::common::syntax::parse_arguments)
@@ -89,9 +115,10 @@ impl<'a> From<&'a Error> for Report<'a> {
 /// On failure, returns a non-empty list of errors.
 ///
 /// If a given option occurrence is not recognized, it is ignored.
-pub fn interpret(
+pub fn interpret<S: Signals>(
     options: Vec<OptionOccurrence>,
     operands: Vec<Field>,
+    system: &S,
 ) -> Result<Command, Vec<Error>> {
     let mut print = false;
     let mut operands = operands.into_iter().peekable();
@@ -116,13 +143,8 @@ pub fn interpret(
         });
 
     // Parse the remaining operands as conditions
-    // TODO Case-insensitive parse
-    // TODO Allow SIG prefix
     let (conditions, errors): (Vec<_>, Vec<_>) = operands
-        .map(|operand| match operand.value.parse() {
-            Ok(condition) => Ok((condition, operand)),
-            Err(_) => Err(Error::UnknownCondition(operand)),
-        })
+        .map(|operand| parse_condition(operand, system))
         .partition_result();
 
     if !errors.is_empty() {
@@ -155,14 +177,78 @@ fn is_non_negative_integer(s: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::super::CondSpec;
     use super::*;
-    use yash_env::signal::Name;
+    use std::num::NonZero;
+    use yash_env::signal::Number;
     use yash_env::source::Location;
+    use yash_env::system::r#virtual::VirtualSystem;
+
+    #[test]
+    fn parse_condition_exit_numeric() {
+        let system = VirtualSystem::new();
+        let field = Field::dummy("0");
+        let result = parse_condition(field.clone(), &system);
+        assert_eq!(result, Ok((Condition::Exit, field)));
+    }
+
+    #[test]
+    fn parse_condition_exit_named() {
+        let system = VirtualSystem::new();
+        let field = Field::dummy("EXIT");
+        let result = parse_condition(field.clone(), &system);
+        assert_eq!(result, Ok((Condition::Exit, field)));
+    }
+
+    #[test]
+    fn parse_condition_signal_by_name() {
+        let system = VirtualSystem::new();
+        let field = Field::dummy("INT");
+        let result = parse_condition(field.clone(), &system);
+        assert_eq!(
+            result,
+            Ok((Condition::Signal(VirtualSystem::SIGINT), field))
+        );
+    }
+
+    #[test]
+    fn parse_condition_signal_by_number() {
+        let system = VirtualSystem::new();
+        let field = Field::dummy("2");
+        let result = parse_condition(field.clone(), &system);
+        assert_eq!(
+            result,
+            Ok((Condition::Signal(VirtualSystem::SIGINT), field))
+        );
+    }
+
+    #[test]
+    fn parse_condition_unknown_name() {
+        let system = VirtualSystem::new();
+        let field = Field::dummy("FOOBAR");
+        let result = parse_condition(field.clone(), &system);
+        assert_eq!(result, Err(Error::UnknownCondition(field)));
+    }
+
+    #[test]
+    fn parse_condition_invalid_signal_number() {
+        let system = VirtualSystem::new();
+        let field = Field::dummy("9999999999");
+        let result = parse_condition(field.clone(), &system);
+        assert_eq!(result, Err(Error::UnknownCondition(field)));
+    }
+
+    #[test]
+    fn parse_condition_negative_number() {
+        let system = VirtualSystem::new();
+        let field = Field::dummy("-1");
+        let result = parse_condition(field.clone(), &system);
+        assert_eq!(result, Err(Error::UnknownCondition(field)));
+    }
 
     #[test]
     fn print_all_not_including_default() {
-        let result = interpret(vec![], vec![]);
+        let system = VirtualSystem::new();
+        let result = interpret(vec![], vec![], &system);
         assert_eq!(
             result,
             Ok(Command::PrintAll {
@@ -173,12 +259,13 @@ mod tests {
 
     #[test]
     fn print_all_including_default() {
+        let system = VirtualSystem::new();
         let print = OptionOccurrence {
             spec: &OptionSpec::new().short('p').long("print"),
             location: Location::dummy("-p"),
             argument: None,
         };
-        let result = interpret(vec![print], vec![]);
+        let result = interpret(vec![print], vec![], &system);
         assert_eq!(
             result,
             Ok(Command::PrintAll {
@@ -189,35 +276,50 @@ mod tests {
 
     #[test]
     fn print_one_condition() {
+        let system = VirtualSystem::new();
         let print = OptionOccurrence {
             spec: &OptionSpec::new().short('p').long("print"),
             location: Location::dummy("-p"),
             argument: None,
         };
-        let result = interpret(vec![print], Field::dummies(["INT"]));
+        let result = interpret(vec![print], Field::dummies(["INT"]), &system);
         assert_eq!(
             result,
             Ok(Command::Print {
-                conditions: vec![(CondSpec::SignalName(Name::Int), Field::dummy("INT"))]
+                conditions: vec![(
+                    Condition::Signal(VirtualSystem::SIGINT),
+                    Field::dummy("INT")
+                )]
             })
         )
     }
 
     #[test]
     fn print_multiple_conditions() {
+        let system = VirtualSystem::new();
         let print = OptionOccurrence {
             spec: &OptionSpec::new().short('p').long("print"),
             location: Location::dummy("-p"),
             argument: None,
         };
-        let result = interpret(vec![print], Field::dummies(["HUP", "EXIT", "QUIT"]));
+        let result = interpret(
+            vec![print],
+            Field::dummies(["HUP", "EXIT", "QUIT"]),
+            &system,
+        );
         assert_eq!(
             result,
             Ok(Command::Print {
                 conditions: vec![
-                    (CondSpec::SignalName(Name::Hup), Field::dummy("HUP")),
-                    (CondSpec::Exit, Field::dummy("EXIT")),
-                    (CondSpec::SignalName(Name::Quit), Field::dummy("QUIT")),
+                    (
+                        Condition::Signal(VirtualSystem::SIGHUP),
+                        Field::dummy("HUP")
+                    ),
+                    (Condition::Exit, Field::dummy("EXIT")),
+                    (
+                        Condition::Signal(VirtualSystem::SIGQUIT),
+                        Field::dummy("QUIT")
+                    ),
                 ]
             })
         )
@@ -225,51 +327,73 @@ mod tests {
 
     #[test]
     fn default_action_with_one_condition() {
-        let result = interpret(vec![], Field::dummies(["-", "INT"]));
+        let system = VirtualSystem::new();
+        let result = interpret(vec![], Field::dummies(["-", "INT"]), &system);
         assert_eq!(
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
-                conditions: vec![(CondSpec::SignalName(Name::Int), Field::dummy("INT"))]
+                conditions: vec![(
+                    Condition::Signal(VirtualSystem::SIGINT),
+                    Field::dummy("INT")
+                )]
             })
         );
     }
 
     #[test]
     fn ignore_action() {
-        let result = interpret(vec![], Field::dummies(["", "INT"]));
+        let system = VirtualSystem::new();
+        let result = interpret(vec![], Field::dummies(["", "INT"]), &system);
         assert_eq!(
             result,
             Ok(Command::SetAction {
                 action: Action::Ignore,
-                conditions: vec![(CondSpec::SignalName(Name::Int), Field::dummy("INT"))]
+                conditions: vec![(
+                    Condition::Signal(VirtualSystem::SIGINT),
+                    Field::dummy("INT")
+                )]
             })
         );
     }
 
     #[test]
     fn command_action() {
-        let result = interpret(vec![], Field::dummies(["echo", "INT"]));
+        let system = VirtualSystem::new();
+        let result = interpret(vec![], Field::dummies(["echo", "INT"]), &system);
         assert_eq!(
             result,
             Ok(Command::SetAction {
                 action: Action::Command("echo".into()),
-                conditions: vec![(CondSpec::SignalName(Name::Int), Field::dummy("INT"))]
+                conditions: vec![(
+                    Condition::Signal(VirtualSystem::SIGINT),
+                    Field::dummy("INT")
+                )]
             })
         );
     }
 
     #[test]
     fn action_with_multiple_conditions() {
-        let result = interpret(vec![], Field::dummies(["-", "HUP", "2", "TERM"]));
+        let system = VirtualSystem::new();
+        let result = interpret(vec![], Field::dummies(["-", "HUP", "2", "TERM"]), &system);
         assert_eq!(
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
                 conditions: vec![
-                    (CondSpec::SignalName(Name::Hup), Field::dummy("HUP")),
-                    (CondSpec::Number(2), Field::dummy("2")),
-                    (CondSpec::SignalName(Name::Term), Field::dummy("TERM")),
+                    (
+                        Condition::Signal(VirtualSystem::SIGHUP),
+                        Field::dummy("HUP")
+                    ),
+                    (
+                        Condition::Signal(Number::from_raw_unchecked(NonZero::new(2).unwrap())),
+                        Field::dummy("2")
+                    ),
+                    (
+                        Condition::Signal(VirtualSystem::SIGTERM),
+                        Field::dummy("TERM")
+                    ),
                 ]
             })
         );
@@ -277,64 +401,82 @@ mod tests {
 
     #[test]
     fn action_with_different_signal_name_conditions() {
-        let result = interpret(vec![], Field::dummies(["", "HUP"]));
+        let system = VirtualSystem::new();
+        let result = interpret(vec![], Field::dummies(["", "HUP"]), &system);
         assert_eq!(
             result,
             Ok(Command::SetAction {
                 action: Action::Ignore,
-                conditions: vec![(CondSpec::SignalName(Name::Hup), Field::dummy("HUP"))]
+                conditions: vec![(
+                    Condition::Signal(VirtualSystem::SIGHUP),
+                    Field::dummy("HUP")
+                )]
             })
         );
 
-        let result = interpret(vec![], Field::dummies(["", "QUIT"]));
+        let result = interpret(vec![], Field::dummies(["", "QUIT"]), &system);
         assert_eq!(
             result,
             Ok(Command::SetAction {
                 action: Action::Ignore,
-                conditions: vec![(CondSpec::SignalName(Name::Quit), Field::dummy("QUIT"))]
+                conditions: vec![(
+                    Condition::Signal(VirtualSystem::SIGQUIT),
+                    Field::dummy("QUIT")
+                )]
             })
         );
     }
 
     #[test]
     fn action_with_signal_number_condition() {
-        let result = interpret(vec![], Field::dummies(["-", "1"]));
+        let system = VirtualSystem::new();
+        let result = interpret(vec![], Field::dummies(["-", "1"]), &system);
         assert_eq!(
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
-                conditions: vec![(CondSpec::Number(1), Field::dummy("1"))]
+                conditions: vec![(
+                    Condition::Signal(Number::from_raw_unchecked(NonZero::new(1).unwrap())),
+                    Field::dummy("1")
+                )]
             })
         );
     }
 
     #[test]
     fn action_with_named_exit_condition() {
-        let result = interpret(vec![], Field::dummies(["-", "EXIT"]));
+        let system = VirtualSystem::new();
+        let result = interpret(vec![], Field::dummies(["-", "EXIT"]), &system);
         assert_eq!(
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
-                conditions: vec![(CondSpec::Exit, Field::dummy("EXIT"))]
+                conditions: vec![(Condition::Exit, Field::dummy("EXIT"))]
             })
         );
     }
 
     #[test]
     fn action_with_numeric_exit_condition() {
-        let result = interpret(vec![], Field::dummies(["-", "0"]));
+        let system = VirtualSystem::new();
+        let result = interpret(vec![], Field::dummies(["-", "0"]), &system);
         assert_eq!(
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
-                conditions: vec![(CondSpec::Number(0), Field::dummy("0"))]
+                conditions: vec![(Condition::Exit, Field::dummy("0"))]
             })
         );
     }
 
     #[test]
     fn action_with_unknown_conditions() {
-        let result = interpret(vec![], Field::dummies(["-", "FOOBAR", "INT", "9999999999"]));
+        let system = VirtualSystem::new();
+        let result = interpret(
+            vec![],
+            Field::dummies(["-", "FOOBAR", "INT", "9999999999"]),
+            &system,
+        );
         assert_eq!(
             result,
             Err(vec![
@@ -346,43 +488,50 @@ mod tests {
 
     #[test]
     fn signal_number_condition_without_action() {
-        let result = interpret(vec![], Field::dummies(["1"]));
+        let system = VirtualSystem::new();
+        let result = interpret(vec![], Field::dummies(["1"]), &system);
         assert_eq!(
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
-                conditions: vec![(CondSpec::Number(1), Field::dummy("1"))]
+                conditions: vec![(
+                    Condition::Signal(Number::from_raw_unchecked(NonZero::new(1).unwrap())),
+                    Field::dummy("1")
+                )]
             })
         );
     }
 
     #[test]
     fn numeric_exit_condition_without_action() {
-        let result = interpret(vec![], Field::dummies(["0"]));
+        let system = VirtualSystem::new();
+        let result = interpret(vec![], Field::dummies(["0"]), &system);
         assert_eq!(
             result,
             Ok(Command::SetAction {
                 action: Action::Default,
-                conditions: vec![(CondSpec::Number(0), Field::dummy("0"))]
+                conditions: vec![(Condition::Exit, Field::dummy("0"))]
             })
         );
     }
 
     #[test]
     fn action_that_looks_like_negative_number() {
-        let result = interpret(vec![], Field::dummies(["-1", "0"]));
+        let system = VirtualSystem::new();
+        let result = interpret(vec![], Field::dummies(["-1", "0"]), &system);
         assert_eq!(
             result,
             Ok(Command::SetAction {
                 action: Action::Command("-1".into()),
-                conditions: vec![(CondSpec::Number(0), Field::dummy("0"))]
+                conditions: vec![(Condition::Exit, Field::dummy("0"))]
             })
         );
     }
 
     #[test]
     fn missing_condition() {
-        let result = interpret(vec![], Field::dummies(["echo"]));
+        let system = VirtualSystem::new();
+        let result = interpret(vec![], Field::dummies(["echo"]), &system);
         assert_eq!(
             result,
             Err(vec![Error::MissingCondition {

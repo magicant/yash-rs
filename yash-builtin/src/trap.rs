@@ -27,9 +27,6 @@
 //! are cleared when the built-in modifies any trap in the subshell. See
 //! [`TrapSet::enter_subshell`] and [`TrapSet::set_action`] for details.
 
-mod cond;
-
-pub use self::cond::CondSpec;
 use crate::common::report::merge_reports;
 use crate::common::report::report_error;
 use crate::common::report::report_failure;
@@ -65,7 +62,7 @@ pub enum Command {
     /// Print traps for one or more conditions
     Print {
         /// The conditions for which to print traps
-        conditions: Vec<(CondSpec, Field)>,
+        conditions: Vec<(Condition, Field)>,
     },
 
     /// Set an action for one or more conditions
@@ -73,7 +70,7 @@ pub enum Command {
         /// The action to set
         action: Action,
         /// The conditions for which the action should be set
-        conditions: Vec<(CondSpec, Field)>,
+        conditions: Vec<(Condition, Field)>,
     },
 }
 
@@ -146,6 +143,9 @@ pub fn display_all_traps<S: SignalSystem>(
 #[non_exhaustive]
 pub enum ErrorCause {
     /// The specified condition is not supported.
+    ///
+    /// **Note:** Unsupported signals are now detected in [`syntax::interpret`],
+    /// so this error cause no longer occurs.
     #[error("signal not supported on this system")]
     UnsupportedSignal,
     /// An error occurred while [setting a trap](TrapSet::set_action).
@@ -159,7 +159,7 @@ pub struct Error {
     /// The cause of the error
     pub cause: ErrorCause,
     /// The condition on which the error occurred
-    pub cond: CondSpec,
+    pub cond: Condition,
     /// The field that specifies the condition
     pub field: Field,
 }
@@ -193,21 +193,13 @@ impl<'a> From<&'a Error> for Report<'a> {
     }
 }
 
-/// Resolves a condition specification to a condition.
-fn resolve<S: Signals>(cond: CondSpec, field: Field, system: &S) -> Result<Condition, Error> {
-    cond.to_condition(system).ok_or_else(|| {
-        let cause = ErrorCause::UnsupportedSignal;
-        Error { cause, cond, field }
-    })
-}
-
 /// Updates an action for a condition in the trap set.
 ///
 /// This is a utility function for implementing [`Command::execute`].
 fn set_action<S>(
     traps: &mut TrapSet,
     system: &mut SharedSystem<S>,
-    cond: CondSpec,
+    cond: Condition,
     field: Field,
     action: Action,
     override_ignore: bool,
@@ -215,14 +207,10 @@ fn set_action<S>(
 where
     S: Signals + Sigmask + Sigaction,
 {
-    let Some(cond2) = cond.to_condition(system) else {
-        let cause = ErrorCause::UnsupportedSignal;
-        return Err(Error { cause, cond, field });
-    };
     traps
         .set_action(
             system,
-            cond2,
+            cond,
             action.clone(),
             field.origin.clone(),
             override_ignore,
@@ -251,21 +239,10 @@ impl Command {
 
             Self::Print { conditions } => {
                 let mut output = String::new();
-
-                let ((), errors): ((), Vec<Error>) = conditions
-                    .into_iter()
-                    .map(|(cond, field)| {
-                        let cond = resolve(cond, field, &env.system)?;
-                        display_trap(&mut env.traps, &env.system, cond, true, &mut output).unwrap();
-                        Ok(())
-                    })
-                    .partition_result();
-
-                if errors.is_empty() {
-                    Ok(output)
-                } else {
-                    Err(errors)
+                for (cond, _field) in conditions {
+                    display_trap(&mut env.traps, &env.system, cond, true, &mut output).unwrap();
                 }
+                Ok(output)
             }
 
             Self::SetAction { action, conditions } => {
@@ -306,7 +283,7 @@ where
         Err(error) => return report_error(env, &error).await,
     };
 
-    let command = match syntax::interpret(options, operands) {
+    let command = match syntax::interpret(options, operands, &env.system) {
         Ok(command) => command,
         Err(errors) => {
             let is_soft_failure = errors
