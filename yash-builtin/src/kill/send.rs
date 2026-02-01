@@ -20,16 +20,15 @@
 //! [`send`] uses [`resolve_target`] to determine the argument to the
 //! [`kill`](SendSignal::kill) system call.
 
-use super::Signal;
 use crate::common::report::{merge_reports, report_failure};
-use std::num::ParseIntError;
+use std::num::{NonZero, ParseIntError};
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::job::Pid;
 use yash_env::job::id::parse_tail;
 use yash_env::job::{JobList, id::FindError};
 use yash_env::semantics::Field;
-use yash_env::signal;
+use yash_env::signal::{Number, RawNumber};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::{Errno, Fcntl, Isatty, SendSignal, Signals, Write};
 
@@ -82,7 +81,7 @@ pub fn resolve_target(jobs: &JobList, target: &str) -> Result<Pid, Error> {
 /// Sends the specified signal to the specified target.
 pub async fn send<S: SendSignal>(
     env: &mut Env<S>,
-    signal: Option<signal::Number>,
+    signal: Option<Number>,
     target: &Field,
 ) -> Result<(), Error> {
     let pid = resolve_target(&env.jobs, &target.value)?;
@@ -93,7 +92,7 @@ pub async fn send<S: SendSignal>(
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 #[error("signal {signal} not supported on this system")]
 struct UnsupportedSignal<'a> {
-    signal: Signal,
+    signal: RawNumber,
     // TODO Consider: origin: &'a Location,
     origin: &'a Field,
 }
@@ -157,18 +156,14 @@ impl<'a> From<&'a TargetError<'a>> for Report<'a> {
 /// it is `None` and the `signal` is not supported, the function panics.
 pub async fn execute<S>(
     env: &mut Env<S>,
-    signal: Signal,
+    signal: RawNumber,
     signal_origin: Option<&Field>,
     targets: &[Field],
 ) -> crate::Result
 where
     S: Fcntl + Isatty + SendSignal + Signals + Write,
 {
-    let Ok(signal_number) = signal.to_number(&env.system) else {
-        let origin = signal_origin.unwrap();
-        let report = UnsupportedSignal { signal, origin };
-        return report_failure(env, &report).await;
-    };
+    let signal_number = NonZero::new(signal).map(Number::from_raw_unchecked);
 
     let mut errors = Vec::new();
     for target in targets {
@@ -291,7 +286,7 @@ mod tests {
         let mut env = Env::with_system(system);
         let result = execute(
             &mut env,
-            Signal::Number(-1),
+            -1,
             Some(&Field::dummy("-1")),
             &Field::dummies([pid]),
         )

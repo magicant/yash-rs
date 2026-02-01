@@ -23,20 +23,31 @@
 use crate::common::report::report_error;
 use yash_env::Env;
 use yash_env::semantics::Field;
+use yash_env::signal::RawNumber;
 use yash_env::system::{Fcntl, Isatty, SendSignal, Signals, Write};
 
-mod signal;
-
-pub use signal::Signal;
-
 /// Parsed command line arguments
+///
+/// # Design notes
+///
+/// `Command::Print::signals` contains raw operands received as command-line
+/// arguments. Since determining whether a number represents a signal number or
+/// an exit status falls within the semantics of [`mod@print`], these operands
+/// remain unconverted to specific signals by the time arguments are parsed as
+/// `Command::Print`. In contrast, `Command::Send` requires signal name
+/// validation during command-line option parsing, so even when signals are
+/// specified by name, `Command::Send::signal` already contains a signal
+/// converted to its numerical value.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum Command {
     /// Sends a signal to processes
     Send {
         /// Signal to send
-        signal: Signal,
+        ///
+        /// This signal number may represent an invalid signal if it was
+        /// specified by number on the command line.
+        signal: RawNumber,
         /// Parameter that specified the signal, if any
         signal_origin: Option<Field>,
         /// Target processes
