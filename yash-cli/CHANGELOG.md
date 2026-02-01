@@ -13,7 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Internal improvements only; no user-visible changes.
+- The `kill` built-in no longer filters out invalid signals when they are
+  specified by number. Instead, it now attempts to send the specified signal
+  number as is, and lets the operating system handle invalid signal numbers.
+  This change allows sending custom signals that are not recognized by the
+  shell, if the operating system supports them.
 
 ## [3.0.4] - 2025-11-07
 

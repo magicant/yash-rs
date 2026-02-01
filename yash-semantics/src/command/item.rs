@@ -334,14 +334,10 @@ mod tests {
     }
 
     fn ignore_sigttin(env: &mut Env<VirtualSystem>) {
-        let signal = env
-            .system
-            .signal_number_from_name(yash_env::signal::Name::Ttin)
-            .unwrap();
         env.traps
             .set_action(
                 &mut env.system,
-                signal,
+                VirtualSystem::SIGTTIN,
                 yash_env::trap::Action::Ignore,
                 Location::dummy(""),
                 false,

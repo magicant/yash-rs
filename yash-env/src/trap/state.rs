@@ -443,22 +443,91 @@ impl GrandState {
 mod tests {
     use super::super::tests::DummySystem;
     use super::*;
-    use crate::system::r#virtual::{SIGCHLD, SIGQUIT, SIGTSTP, SIGTTOU, SIGUSR1};
+    use crate::system::Signals;
+    use crate::system::r#virtual::{
+        SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCONT, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGIOT,
+        SIGKILL, SIGPIPE, SIGPROF, SIGQUIT, SIGSEGV, SIGSTOP, SIGSYS, SIGTERM, SIGTRAP, SIGTSTP,
+        SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU, SIGXFSZ,
+    };
     use assert_matches::assert_matches;
-    use std::collections::BTreeMap;
+    use std::borrow::Cow;
+    use std::{collections::BTreeMap, ops::RangeInclusive};
 
     struct UnusedSystem;
 
-    impl SignalSystem for UnusedSystem {
+    impl Signals for UnusedSystem {
+        const SIGABRT: crate::signal::Number = SIGABRT;
+        const SIGALRM: crate::signal::Number = SIGALRM;
+        const SIGBUS: crate::signal::Number = SIGBUS;
+        const SIGCHLD: crate::signal::Number = SIGCHLD;
+        const SIGCLD: Option<crate::signal::Number> = None;
+        const SIGCONT: crate::signal::Number = SIGCONT;
+        const SIGEMT: Option<crate::signal::Number> = None;
+        const SIGFPE: crate::signal::Number = SIGFPE;
+        const SIGHUP: crate::signal::Number = SIGHUP;
+        const SIGILL: crate::signal::Number = SIGILL;
+        const SIGINFO: Option<crate::signal::Number> = None;
+        const SIGINT: crate::signal::Number = SIGINT;
+        const SIGIO: Option<crate::signal::Number> = None;
+        const SIGIOT: crate::signal::Number = SIGIOT;
+        const SIGKILL: crate::signal::Number = SIGKILL;
+        const SIGLOST: Option<crate::signal::Number> = None;
+        const SIGPIPE: crate::signal::Number = SIGPIPE;
+        const SIGPOLL: Option<crate::signal::Number> = None;
+        const SIGPROF: crate::signal::Number = SIGPROF;
+        const SIGPWR: Option<crate::signal::Number> = None;
+        const SIGQUIT: crate::signal::Number = SIGQUIT;
+        const SIGSEGV: crate::signal::Number = SIGSEGV;
+        const SIGSTKFLT: Option<crate::signal::Number> = None;
+        const SIGSTOP: crate::signal::Number = SIGSTOP;
+        const SIGSYS: crate::signal::Number = SIGSYS;
+        const SIGTERM: crate::signal::Number = SIGTERM;
+        const SIGTHR: Option<crate::signal::Number> = None;
+        const SIGTRAP: crate::signal::Number = SIGTRAP;
+        const SIGTSTP: crate::signal::Number = SIGTSTP;
+        const SIGTTIN: crate::signal::Number = SIGTTIN;
+        const SIGTTOU: crate::signal::Number = SIGTTOU;
+        const SIGURG: crate::signal::Number = SIGURG;
+        const SIGUSR1: crate::signal::Number = SIGUSR1;
+        const SIGUSR2: crate::signal::Number = SIGUSR2;
+        const SIGVTALRM: crate::signal::Number = SIGVTALRM;
+        const SIGWINCH: crate::signal::Number = SIGWINCH;
+        const SIGXCPU: crate::signal::Number = SIGXCPU;
+        const SIGXFSZ: crate::signal::Number = SIGXFSZ;
+
+        fn sigrt_range(&self) -> Option<RangeInclusive<crate::signal::Number>> {
+            unreachable!()
+        }
+        fn iter_sigrt(&self) -> impl DoubleEndedIterator<Item = crate::signal::Number> + use<> {
+            unreachable!() as std::iter::Empty<_>
+        }
+        fn sig2str<S: Into<crate::signal::RawNumber>>(
+            &self,
+            signal: S,
+        ) -> Option<Cow<'static, str>> {
+            unreachable!("sig2str({:?})", signal.into())
+        }
+        fn str2sig(&self, name: &str) -> Option<crate::signal::Number> {
+            unreachable!("str2sig({name:?})")
+        }
+        fn validate_signal(
+            &self,
+            number: crate::signal::RawNumber,
+        ) -> Option<(crate::signal::Name, crate::signal::Number)> {
+            unreachable!("validate_signal({number:?})")
+        }
         fn signal_name_from_number(&self, number: crate::signal::Number) -> crate::signal::Name {
-            unreachable!("signal_name_from_number({number})")
+            unreachable!("signal_name_from_number({number:?})")
         }
         fn signal_number_from_name(
             &self,
             name: crate::signal::Name,
         ) -> Option<crate::signal::Number> {
-            unreachable!("signal_number_from_name({name})")
+            unreachable!("signal_number_from_name({name:?})")
         }
+    }
+
+    impl SignalSystem for UnusedSystem {
         fn get_disposition(&self, signal: crate::signal::Number) -> Result<Disposition, Errno> {
             unreachable!("get_disposition({signal})")
         }

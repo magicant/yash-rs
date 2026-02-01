@@ -164,7 +164,7 @@ pub async fn execute<S>(
 where
     S: Fcntl + Isatty + SendSignal + Signals + Write,
 {
-    let Ok(signal) = signal.to_number(&env.system) else {
+    let Ok(signal_number) = signal.to_number(&env.system) else {
         let origin = signal_origin.unwrap();
         let report = UnsupportedSignal { signal, origin };
         return report_failure(env, &report).await;
@@ -172,8 +172,14 @@ where
 
     let mut errors = Vec::new();
     for target in targets {
-        if let Err(error) = send(env, signal, target).await {
-            errors.push(TargetError { target, error });
+        match send(env, signal_number, target).await {
+            Ok(()) => (),
+            Err(Error::System(Errno::EINVAL)) => {
+                let origin = signal_origin.unwrap();
+                let report = UnsupportedSignal { signal, origin };
+                return report_failure(env, &report).await;
+            }
+            Err(error) => errors.push(TargetError { target, error }),
         }
     }
 
@@ -280,11 +286,17 @@ mod tests {
     #[test]
     fn execute_unsupported_signal() {
         let system = VirtualSystem::new();
+        let pid = system.process_id.to_string();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let result = execute(&mut env, Signal::Number(-1), Some(&Field::dummy("-1")), &[])
-            .now_or_never()
-            .unwrap();
+        let result = execute(
+            &mut env,
+            Signal::Number(-1),
+            Some(&Field::dummy("-1")),
+            &Field::dummies([pid]),
+        )
+        .now_or_never()
+        .unwrap();
         assert_eq!(result, crate::Result::from(ExitStatus::FAILURE));
         assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }

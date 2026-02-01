@@ -34,7 +34,6 @@ use yash_env::Env;
 use yash_env::RealSystem;
 use yash_env::option::{Interactive, On};
 use yash_env::semantics::{Divert, ExitStatus, exit_or_raise};
-use yash_env::signal;
 use yash_env::system::resource::GetRlimit;
 use yash_env::system::{
     Chdir, Disposition, Errno, Fcntl, GetCwd, GetUid, Isatty, Sigaction, Signals, Sysconf,
@@ -143,11 +142,9 @@ pub fn main() -> ! {
     // Rust by default sets SIGPIPE to SIG_IGN, which is not desired.
     // As an imperfect workaround, we set SIGPIPE to SIG_DFL here.
     // TODO Use unix_sigpipe: https://github.com/rust-lang/rust/issues/97889
-    let sigpipe = env
-        .system
-        .signal_number_from_name(signal::Name::Pipe)
-        .unwrap();
-    _ = env.system.sigaction(sigpipe, Disposition::Default);
+    env.system
+        .sigaction(RealSystem::SIGPIPE, Disposition::Default)
+        .ok();
 
     let system = env.system.clone();
     let executor = Executor::new();

@@ -22,8 +22,10 @@ use crate::source::Location;
 use crate::system::resource::{LimitPair, Resource, SetRlimit};
 use crate::system::r#virtual::SignalEffect;
 use crate::system::{Disposition, Exit, SendSignal, Sigaction, Sigmask, SigmaskOp, Signals};
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::ffi::c_int;
+use std::num::NonZero;
 use std::ops::ControlFlow;
 use std::pin::Pin;
 use std::process::ExitCode;
@@ -131,14 +133,16 @@ impl ExitStatus {
         self,
         system: &S,
         exact: bool,
-    ) -> Option<(signal::Name, signal::Number)> {
+    ) -> Option<(Cow<'static, str>, signal::Number)> {
         fn convert<S: Signals + ?Sized>(
             exit_status: ExitStatus,
             offset: c_int,
             system: &S,
-        ) -> Option<(signal::Name, signal::Number)> {
+        ) -> Option<(Cow<'static, str>, signal::Number)> {
             let number = exit_status.0.checked_sub(offset)?;
-            system.validate_signal(number)
+            let number = signal::Number::from_raw_unchecked(NonZero::new(number)?);
+            let name = system.sig2str(number)?;
+            Some((name, number))
         }
 
         if let Some(signal) = convert(self, 0x180, system) {
@@ -352,14 +356,18 @@ where
         let Some(signal) = exit_status.to_signal(system, /* exact */ true) else {
             return Ok(());
         };
-        if !matches!(SignalEffect::of(signal.0), SignalEffect::Terminate { .. }) {
+
+        let Ok(name) = signal.0.parse() else {
+            return Ok(());
+        };
+        if !matches!(SignalEffect::of(name), SignalEffect::Terminate { .. }) {
             return Ok(());
         }
 
         // Disable core dump
         system.setrlimit(Resource::CORE, LimitPair { soft: 0, hard: 0 })?;
 
-        if signal.0 != signal::Name::Kill {
+        if signal.1 != S::SIGKILL {
             // Reset signal disposition
             system.sigaction(signal.1, Disposition::Default)?;
         }
@@ -392,13 +400,13 @@ mod tests {
 
         assert_eq!(
             ExitStatus(SIGINT.as_raw()).to_signal(&system, false),
-            Some((signal::Name::Int, SIGINT))
+            Some(("INT".into(), SIGINT))
         );
         assert_eq!(ExitStatus(SIGINT.as_raw()).to_signal(&system, true), None);
 
         assert_eq!(
             ExitStatus(SIGINT.as_raw() + 0x80).to_signal(&system, false),
-            Some((signal::Name::Int, SIGINT))
+            Some(("INT".into(), SIGINT))
         );
         assert_eq!(
             ExitStatus(SIGINT.as_raw() + 0x80).to_signal(&system, true),
@@ -407,20 +415,20 @@ mod tests {
 
         assert_eq!(
             ExitStatus(SIGINT.as_raw() + 0x180).to_signal(&system, false),
-            Some((signal::Name::Int, SIGINT))
+            Some(("INT".into(), SIGINT))
         );
         assert_eq!(
             ExitStatus(SIGINT.as_raw() + 0x180).to_signal(&system, true),
-            Some((signal::Name::Int, SIGINT))
+            Some(("INT".into(), SIGINT))
         );
 
         assert_eq!(
             ExitStatus(SIGTERM.as_raw() + 0x180).to_signal(&system, false),
-            Some((signal::Name::Term, SIGTERM))
+            Some(("TERM".into(), SIGTERM))
         );
         assert_eq!(
             ExitStatus(SIGTERM.as_raw() + 0x180).to_signal(&system, true),
-            Some((signal::Name::Term, SIGTERM))
+            Some(("TERM".into(), SIGTERM))
         );
     }
 }

@@ -21,6 +21,7 @@
 
 use std::borrow::Cow;
 use std::fmt::Display;
+use std::num::NonZero;
 use std::str::FromStr;
 use yash_env::semantics::ExitStatus;
 use yash_env::signal::{Name, Number, RawNumber};
@@ -77,22 +78,24 @@ impl Signal {
     /// Returns the signal number to be sent.
     ///
     /// If the signal is specified by name, the signal number is resolved from
-    /// the name. If the signal is specified by number, the number is validated
-    /// and returned. The special signal number 0 represents a dummy signal that
-    /// is not actually sent. The function returns `Ok(None)` for this signal.
+    /// the name. If the signal is specified by number, the number is returned
+    /// intact. The special signal number 0 represents a dummy signal that is
+    /// not actually sent. The function returns `Ok(None)` for this signal.
     ///
-    /// If the signal is not supported by the system, the function returns an
-    /// error.
+    /// If the signal name is not recognized by the system,
+    /// `Err(UnsupportedSignal)` is returned. Note that this function does not
+    /// check whether the signal number is supported by the system when the
+    /// signal is specified by number. The invalid signal number should be
+    /// detected when the signal is sent.
     pub fn to_number<S: Signals>(self, system: &S) -> Result<Option<Number>, UnsupportedSignal> {
         match self {
             Signal::Name(name) => match system.signal_number_from_name(name) {
                 Some(number) => Ok(Some(number)),
                 None => Err(UnsupportedSignal),
             },
-            Signal::Number(0) => Ok(None),
-            Signal::Number(number) => match system.validate_signal(number) {
-                Some((_name, number)) => Ok(Some(number)),
-                None => Err(UnsupportedSignal),
+            Signal::Number(number) => match NonZero::new(number) {
+                None => Ok(None),
+                Some(number) => Ok(Some(Number::from_raw_unchecked(number))),
             },
         }
     }
@@ -104,9 +107,9 @@ impl Signal {
     /// as an exit status and converted to a signal number. The function returns
     /// `None` if `self` does not represent a valid signal.
     #[must_use]
-    pub fn to_name_and_number<S: Signals>(self, system: &S) -> Option<(Name, Number)> {
+    pub fn to_name_and_number<S: Signals>(self, system: &S) -> Option<(Cow<'static, str>, Number)> {
         match self {
-            Signal::Name(name) => Some((name, system.signal_number_from_name(name)?)),
+            Signal::Name(name) => Some((name.as_string(), system.signal_number_from_name(name)?)),
             Signal::Number(number) => {
                 ExitStatus(number).to_signal(system, /* exact = */ false)
             }
@@ -193,7 +196,7 @@ mod tests {
     }
 
     #[test]
-    fn signal_number_to_number_supported() {
+    fn signal_number_to_number() {
         let system = VirtualSystem::new();
         assert_eq!(
             Signal::Number(SIGHUP.as_raw()).to_number(&system),
@@ -214,18 +217,12 @@ mod tests {
             Signal::Number(prev.as_raw()).to_number(&system),
             Ok(Some(prev))
         );
-    }
 
-    #[test]
-    fn signal_number_to_number_unsupported() {
-        let system = VirtualSystem::new();
         assert_eq!(
-            Signal::Number(-1).to_number(&system),
-            Err(UnsupportedSignal)
-        );
-        assert_eq!(
-            Signal::Number(RawNumber::MAX).to_number(&system),
-            Err(UnsupportedSignal)
+            Signal::Number(9999).to_number(&system),
+            Ok(Some(Number::from_raw_unchecked(
+                NonZero::new(9999).unwrap()
+            )))
         );
     }
 }

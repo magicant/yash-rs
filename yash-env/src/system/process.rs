@@ -16,7 +16,7 @@
 
 //! Items related to process management
 
-use super::{ExitStatus, Result};
+use super::{ExitStatus, Result, Signals};
 use crate::Env;
 #[cfg(all(doc, unix))]
 use crate::RealSystem;
@@ -132,7 +132,7 @@ pub trait Fork {
 }
 
 /// Trait for waiting for child processes
-pub trait Wait {
+pub trait Wait: Signals {
     /// Reports updated status of a child process.
     ///
     /// This is a low-level function used internally by
