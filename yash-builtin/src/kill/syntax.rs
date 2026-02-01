@@ -38,7 +38,7 @@ pub enum Error {
     #[error("unknown option")]
     UnknownOption(Field),
 
-    /// The signal to send is specified and the `-l` or `-v` options is also
+    /// The signal to send is specified and the `-l` or `-v` option is also
     /// specified.
     #[error("invalid option combination")]
     ConflictingOptions {
