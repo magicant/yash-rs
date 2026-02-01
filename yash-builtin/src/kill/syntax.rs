@@ -223,23 +223,9 @@ fn invalid_signal_to_unknown_option(error: Error) -> Error {
     }
 }
 
-/// Parses operands to the `-l` or `-v` option.
-fn parse_signals<I: Iterator<Item = Field>>(
-    operands: I,
-    allow_sig_prefix: bool,
-) -> Result<Vec<(Signal, Field)>, Error> {
-    let parse_one = |operand: Field| match parse_signal(&operand.value, allow_sig_prefix) {
-        Some(signal) => Ok((signal, operand)),
-        None => Err(Error::InvalidSignal(operand)),
-    };
-
-    operands.map(parse_one).collect()
-}
-
 /// Parses operands after the `-l` or `-v` option, returning the final command.
 fn parse_list_case<I: Iterator<Item = Field>>(
     operands: I,
-    allow_sig_prefix: bool,
     signal_origin: Option<Field>,
     list_option_name: char,
     list_option_location: Location,
@@ -252,7 +238,7 @@ fn parse_list_case<I: Iterator<Item = Field>>(
             list_option_location,
         })
     } else {
-        let signals = parse_signals(operands, allow_sig_prefix)?;
+        let signals = operands.collect();
         Ok(Command::Print { signals, verbose })
     }
 }
@@ -327,23 +313,9 @@ pub fn parse<S>(_env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
 
     // Parse operands and compute the result
     if let Some(option_location) = verbose {
-        parse_list_case(
-            args,
-            allow_sig_prefix,
-            signal_origin,
-            'v',
-            option_location,
-            true,
-        )
+        parse_list_case(args, signal_origin, 'v', option_location, true)
     } else if let Some(option_location) = list {
-        parse_list_case(
-            args,
-            allow_sig_prefix,
-            signal_origin,
-            'l',
-            option_location,
-            false,
-        )
+        parse_list_case(args, signal_origin, 'l', option_location, false)
     } else {
         // Command::Send case
         if args.peek().is_none() {
@@ -455,7 +427,7 @@ mod tests {
         assert_eq!(
             result,
             Ok(Command::Print {
-                signals: vec![(Signal::Number(9), Field::dummy("9"))],
+                signals: Field::dummies(["9"]),
                 verbose: false,
             })
         );
@@ -606,10 +578,7 @@ mod tests {
         assert_eq!(
             result,
             Ok(Command::Print {
-                signals: vec![
-                    (Signal::Name(signal::Name::Term), Field::dummy("Term")),
-                    (Signal::Number(1), Field::dummy("1")),
-                ],
+                signals: Field::dummies(["Term", "1"]),
                 verbose: false,
             })
         );
@@ -806,28 +775,6 @@ mod tests {
         let env = Env::new_virtual();
         let result = parse(&env, Field::dummies(["-sTERM1", "123"]));
         assert_eq!(result, Err(Error::InvalidSignal(Field::dummy("-sTERM1"))));
-    }
-
-    #[test]
-    fn invalid_signal_operand_with_option_l() {
-        let env = Env::new_virtual();
-
-        let result = parse(&env, Field::dummies(["-l", "TERM1"]));
-        assert_eq!(result, Err(Error::InvalidSignal(Field::dummy("TERM1"))));
-
-        let result = parse(&env, Field::dummies(["-l", "TERM", "0A", "1"]));
-        assert_eq!(result, Err(Error::InvalidSignal(Field::dummy("0A"))));
-    }
-
-    #[test]
-    fn invalid_signal_operand_with_option_v() {
-        let env = Env::new_virtual();
-
-        let result = parse(&env, Field::dummies(["-v", "TERM1"]));
-        assert_eq!(result, Err(Error::InvalidSignal(Field::dummy("TERM1"))));
-
-        let result = parse(&env, Field::dummies(["-v", "TERM", "0A", "1"]));
-        assert_eq!(result, Err(Error::InvalidSignal(Field::dummy("0A"))));
     }
 
     #[test]

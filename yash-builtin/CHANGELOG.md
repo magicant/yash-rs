@@ -15,6 +15,12 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Public dependency versions:
     - yash-env 0.11.0 → 0.12.0
+- The `kill::Command::Print::signals` field now contains a vector of `Field`
+  instead of a vector of `(Signal, Field)` tuples. The `signals` argument to
+  `kill::print::print` and `kill::print::execute` has also been changed
+  accordingly.
+- The `kill::print::InvalidSignal` struct is now a tuple struct that only
+  contains a `Field`. The `signal` field has been removed.
 - The `kill::Signal::to_number` method no longer returns an error when an
   invalid signal number is specified. It now only returns an error when an
   invalid signal name is specified.

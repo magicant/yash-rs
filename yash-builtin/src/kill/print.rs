@@ -21,13 +21,12 @@
 //!
 //! [`print`]: print()
 
-use super::Signal;
 use crate::common::report::{merge_reports, report_failure};
 use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::Env;
-use yash_env::semantics::Field;
-use yash_env::signal::Number;
+use yash_env::semantics::{ExitStatus, Field};
+use yash_env::signal::{Number, RawNumber};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::{Fcntl, Isatty, Signals, Write};
 
@@ -73,13 +72,11 @@ fn write_one_signal(name: &str, number: Number, verbose: bool, output: &mut Stri
 ///
 /// This error may be returned from [`print`](print()).
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
-#[error("{:?} does not represent a valid signal", .origin.value)]
-pub struct InvalidSignal<'a> {
-    /// The signal that is not recognized
-    pub signal: Signal,
+#[error("{:?} does not represent a valid signal", .0.value)]
+pub struct InvalidSignal<'a>(
     /// The operand that specified the signal
-    pub origin: &'a Field,
-}
+    pub &'a Field,
+);
 
 impl InvalidSignal<'_> {
     /// Converts this error to a [`Report`].
@@ -88,7 +85,7 @@ impl InvalidSignal<'_> {
         let mut report = Report::new();
         report.r#type = ReportType::Error;
         report.title = "unrecognized operand".into();
-        report.snippets = Snippet::with_primary_span(&self.origin.origin, self.to_string().into());
+        report.snippets = Snippet::with_primary_span(&self.0.origin, self.to_string().into());
         report
     }
 }
@@ -100,13 +97,28 @@ impl<'a> From<&'a InvalidSignal<'a>> for Report<'a> {
     }
 }
 
+/// Converts a signal specification string to a signal name and number.
+fn to_name_and_number<'a, S: Signals>(system: &S, spec: &'a str) -> Option<(Cow<'a, str>, Number)> {
+    // TODO Skip any SIG prefix when specified by name
+    // TODO Case-insensitive comparison when specified by name
+    if let Ok(number) = spec.parse::<RawNumber>() {
+        // Specified by number
+        ExitStatus(number).to_signal(system, /* exact = */ false)
+    } else {
+        // Specified by name
+        system
+            .str2sig(spec)
+            .map(|number| (Cow::Borrowed(spec), number))
+    }
+}
+
 /// Lists the specified signals into a string.
 ///
 /// If `signals` is empty, all signals are listed.
 /// If `signals` contains invalid signals, the function returns an error.
 pub fn print<'a, S: Signals>(
     system: &S,
-    signals: &'a [(Signal, Field)],
+    signals: &'a [Field],
     verbose: bool,
 ) -> Result<String, Vec<InvalidSignal<'a>>> {
     let mut output = String::new();
@@ -119,9 +131,9 @@ pub fn print<'a, S: Signals>(
         }
     } else {
         // Print the specified signals
-        for &(signal, ref origin) in signals {
-            let Some((name, number)) = signal.to_name_and_number(system) else {
-                errors.push(InvalidSignal { signal, origin });
+        for signal_spec in signals {
+            let Some((name, number)) = to_name_and_number(system, &signal_spec.value) else {
+                errors.push(InvalidSignal(signal_spec));
                 continue;
             };
             write_one_signal(&name, number, verbose, &mut output);
@@ -136,11 +148,7 @@ pub fn print<'a, S: Signals>(
 }
 
 /// Executes the `Print` command.
-pub async fn execute<S>(
-    env: &mut Env<S>,
-    signals: &[(Signal, Field)],
-    verbose: bool,
-) -> crate::Result
+pub async fn execute<S>(env: &mut Env<S>, signals: &[Field], verbose: bool) -> crate::Result
 where
     S: Fcntl + Isatty + Signals + Write,
 {
@@ -153,65 +161,82 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use yash_env::semantics::ExitStatus;
-    use yash_env::signal::Name;
-    use yash_env::system::r#virtual::SIGKILL;
     use yash_env::system::r#virtual::VirtualSystem;
+
+    #[test]
+    fn to_name_and_number_from_number() {
+        let system = VirtualSystem::new();
+
+        // Direct signal number
+        let result = to_name_and_number(&system, "9");
+        assert_eq!(
+            result,
+            Some((Cow::Borrowed("KILL"), VirtualSystem::SIGKILL))
+        );
+
+        // Exit status representing a signal
+        let result = to_name_and_number(&system, "386");
+        assert_eq!(result, Some((Cow::Borrowed("INT"), VirtualSystem::SIGINT)));
+
+        // Invalid number
+        let result = to_name_and_number(&system, "0");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn to_name_and_number_from_name() {
+        let system = VirtualSystem::new();
+
+        // Valid name
+        let result = to_name_and_number(&system, "TERM");
+        assert_eq!(
+            result,
+            Some((Cow::Borrowed("TERM"), VirtualSystem::SIGTERM))
+        );
+
+        // Invalid name
+        let result = to_name_and_number(&system, "FOO");
+        assert_eq!(result, None);
+    }
 
     #[test]
     fn print_one_non_verbose() {
         let system = &VirtualSystem::new();
-        let signals = &[(Signal::Name(Name::Int), Field::dummy("INT"))];
+        let signals = Field::dummies(["INT"]);
 
-        let result = print(system, signals, false).unwrap();
+        let result = print(system, &signals, false).unwrap();
         assert_eq!(result, "INT\n");
     }
 
     #[test]
     fn print_some_non_verbose() {
         let system = &VirtualSystem::new();
-        let signals = &[
-            (Signal::Name(Name::Term), Field::dummy("SIGTERM")),
-            (
-                Signal::Number(ExitStatus::from(SIGKILL).0),
-                Field::dummy("9"),
-            ),
-        ];
+        let signals = Field::dummies(["TERM", "9"]);
 
-        let result = print(system, signals, false).unwrap();
+        let result = print(system, &signals, false).unwrap();
         assert_eq!(result, "TERM\nKILL\n");
     }
 
     #[test]
     fn print_one_verbose() {
         let system = &VirtualSystem::new();
-        let signals = &[(Signal::Name(Name::Int), Field::dummy("INT"))];
+        let signals = Field::dummies(["INT"]);
 
-        let result = print(system, signals, true).unwrap();
+        let result = print(system, &signals, true).unwrap();
         assert_eq!(result, "2\tINT\n");
     }
 
     #[test]
     fn print_some_unknown() {
         let system = &VirtualSystem::new();
-        let signals = &[
-            (Signal::Number(0), Field::dummy("0")),
-            (Signal::Name(Name::Int), Field::dummy("INT")),
-            (Signal::Name(Name::Rtmin(-1)), Field::dummy("RTMIN-1")),
-        ];
+        let signals = Field::dummies(["0", "INT", "RTMIN-1"]);
 
-        let errors = print(system, signals, false).unwrap_err();
+        let errors = print(system, &signals, false).unwrap_err();
         assert_eq!(
             errors,
             [
-                InvalidSignal {
-                    signal: Signal::Number(0),
-                    origin: &Field::dummy("0")
-                },
-                InvalidSignal {
-                    signal: Signal::Name(Name::Rtmin(-1)),
-                    origin: &Field::dummy("RTMIN-1")
-                },
+                InvalidSignal(&Field::dummy("0")),
+                InvalidSignal(&Field::dummy("RTMIN-1")),
             ]
         );
     }

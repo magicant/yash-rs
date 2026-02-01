@@ -42,12 +42,19 @@ pub enum Command {
         /// Target processes
         targets: Vec<Field>,
     },
+
     /// Lists signal names or descriptions
     Print {
         /// Signals to list
         ///
+        /// Field values can be:
+        ///
+        /// - Signal names, e.g., `HUP`, `TERM`;
+        /// - Signal numbers, e.g., `1`, `15`; or
+        /// - Exit statuses representing signals, e.g., `386` for `SIGINT`.
+        ///
         /// If empty, all signals are listed.
-        signals: Vec<(Signal, Field)>,
+        signals: Vec<Field>,
         /// Whether to print descriptions
         verbose: bool,
     },
