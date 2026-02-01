@@ -87,7 +87,7 @@ impl Error {
         report.snippets = match self {
             Self::UnknownOption(field) => Snippet::with_primary_span(
                 &field.origin,
-                format!("{field:?} is not a valid option").into(),
+                format!("{field} is not a valid option").into(),
             ),
 
             Self::ConflictingOptions {
@@ -123,14 +123,14 @@ impl Error {
             Self::MultipleSignals(field1, field2) => {
                 let mut snippets = Snippet::with_primary_span(
                     &field1.origin,
-                    format!("first signal {field1:?}").into(),
+                    format!("first signal {field1}").into(),
                 );
                 add_span(
                     &field2.origin.code,
                     Span {
                         range: field2.origin.byte_range(),
                         role: SpanRole::Primary {
-                            label: format!("second signal {field2:?}").into(),
+                            label: format!("second signal {field2}").into(),
                         },
                     },
                     &mut snippets,
@@ -140,7 +140,7 @@ impl Error {
 
             Self::InvalidSignal(field) => Snippet::with_primary_span(
                 &field.origin,
-                format!("{field:?} is not a valid signal name or number").into(),
+                format!("{field} is not a valid signal name or number").into(),
             ),
 
             Self::MissingTarget => vec![],

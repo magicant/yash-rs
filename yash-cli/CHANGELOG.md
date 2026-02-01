@@ -11,9 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.0.5] - Unreleased
 
-### Changed
+### Fixed
 
-- Internal improvements only; no user-visible changes.
+- Error messages from the `kill` built-in no longer include debugging details
+  when reporting unknown options or invalid signals.
 
 ## [3.0.4] - 2025-11-07
 
