@@ -307,11 +307,8 @@ impl TrapSet {
         }
 
         if ignore_sigint_sigquit {
-            for name in [signal::Name::Int, signal::Name::Quit] {
-                let number = system
-                    .signal_number_from_name(name)
-                    .unwrap_or_else(|| panic!("missing support for signal {name}"));
-                match self.traps.entry(Condition::Signal(number)) {
+            for signal in [S::SIGINT, S::SIGQUIT] {
+                match self.traps.entry(Condition::Signal(signal)) {
                     Entry::Vacant(vacant) => _ = GrandState::ignore(system, vacant),
                     // If the entry is occupied, the signal is already ignored in the loop above.
                     Entry::Occupied(_) => {}
@@ -335,7 +332,7 @@ impl TrapSet {
     /// Returns the [`TrapState`] if the flag was set.
     pub fn take_signal_if_caught(&mut self, signal: signal::Number) -> Option<&TrapState> {
         self.traps
-            .get_mut(&signal.into())
+            .get_mut(&Condition::Signal(signal))
             .and_then(|state| state.handle_if_caught())
     }
 
@@ -355,14 +352,11 @@ impl TrapSet {
 
     fn set_internal_disposition<S: SignalSystem>(
         &mut self,
-        signal: signal::Name,
+        signal: signal::Number,
         disposition: Disposition,
         system: &mut S,
     ) -> Result<(), Errno> {
-        let number = system
-            .signal_number_from_name(signal)
-            .unwrap_or_else(|| panic!("missing support for signal {signal}"));
-        let entry = self.traps.entry(Condition::Signal(number));
+        let entry = self.traps.entry(Condition::Signal(signal));
         GrandState::set_internal_disposition(system, entry, disposition)
     }
 
@@ -379,7 +373,7 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        self.set_internal_disposition(signal::Name::Chld, Disposition::Catch, system)
+        self.set_internal_disposition(S::SIGCHLD, Disposition::Catch, system)
     }
 
     /// Installs the internal dispositions for `SIGINT`, `SIGTERM`, and `SIGQUIT`.
@@ -394,9 +388,9 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        self.set_internal_disposition(signal::Name::Int, Disposition::Catch, system)?;
-        self.set_internal_disposition(signal::Name::Term, Disposition::Ignore, system)?;
-        self.set_internal_disposition(signal::Name::Quit, Disposition::Ignore, system)
+        self.set_internal_disposition(S::SIGINT, Disposition::Catch, system)?;
+        self.set_internal_disposition(S::SIGTERM, Disposition::Ignore, system)?;
+        self.set_internal_disposition(S::SIGQUIT, Disposition::Ignore, system)
     }
 
     /// Installs the internal dispositions for `SIGTSTP`, `SIGTTIN`, and `SIGTTOU`.
@@ -411,9 +405,9 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        self.set_internal_disposition(signal::Name::Tstp, Disposition::Ignore, system)?;
-        self.set_internal_disposition(signal::Name::Ttin, Disposition::Ignore, system)?;
-        self.set_internal_disposition(signal::Name::Ttou, Disposition::Ignore, system)
+        self.set_internal_disposition(S::SIGTSTP, Disposition::Ignore, system)?;
+        self.set_internal_disposition(S::SIGTTIN, Disposition::Ignore, system)?;
+        self.set_internal_disposition(S::SIGTTOU, Disposition::Ignore, system)
     }
 
     /// Uninstalls the internal dispositions for `SIGINT`, `SIGTERM`, and `SIGQUIT`.
@@ -421,9 +415,9 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        self.set_internal_disposition(signal::Name::Int, Disposition::Default, system)?;
-        self.set_internal_disposition(signal::Name::Term, Disposition::Default, system)?;
-        self.set_internal_disposition(signal::Name::Quit, Disposition::Default, system)
+        self.set_internal_disposition(S::SIGINT, Disposition::Default, system)?;
+        self.set_internal_disposition(S::SIGTERM, Disposition::Default, system)?;
+        self.set_internal_disposition(S::SIGQUIT, Disposition::Default, system)
     }
 
     /// Uninstalls the internal dispositions for `SIGTSTP`, `SIGTTIN`, and `SIGTTOU`.
@@ -431,9 +425,9 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        self.set_internal_disposition(signal::Name::Tstp, Disposition::Default, system)?;
-        self.set_internal_disposition(signal::Name::Ttin, Disposition::Default, system)?;
-        self.set_internal_disposition(signal::Name::Ttou, Disposition::Default, system)
+        self.set_internal_disposition(S::SIGTSTP, Disposition::Default, system)?;
+        self.set_internal_disposition(S::SIGTTIN, Disposition::Default, system)?;
+        self.set_internal_disposition(S::SIGTTOU, Disposition::Default, system)
     }
 
     /// Uninstalls all internal dispositions.
@@ -445,7 +439,7 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        self.set_internal_disposition(signal::Name::Chld, Disposition::Default, system)?;
+        self.set_internal_disposition(S::SIGCHLD, Disposition::Default, system)?;
         self.disable_internal_dispositions_for_terminators(system)?;
         self.disable_internal_dispositions_for_stoppers(system)
     }
