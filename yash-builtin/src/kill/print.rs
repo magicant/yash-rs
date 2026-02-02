@@ -47,7 +47,7 @@ fn all_signals<S: Signals>(
 
     let real_time = system
         .iter_sigrt()
-        .map(|number| (system.sig2str(number).unwrap(), number));
+        .filter_map(|number| Some((system.sig2str(number)?, number)));
     let real_time_count = real_time.size_hint().1.unwrap_or_default();
 
     let mut signals = Vec::with_capacity(non_real_time_count + real_time_count);
