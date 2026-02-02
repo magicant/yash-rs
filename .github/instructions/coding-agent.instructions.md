@@ -1,3 +1,8 @@
+---
+applyTo: "**"
+excludeAgent: "code-review"
+---
+
 # Yash-rs Copilot Instructions
 
 ## Project Overview
