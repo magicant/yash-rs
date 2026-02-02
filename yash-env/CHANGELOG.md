@@ -70,6 +70,9 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `State::Stopped(signal::Number)` → `State::Stopped { signal: Cow<str> }`
     - `State::Signaled { signal: signal::Number, core_dump: bool }` →
       `State::Signaled { signal: Cow<str>, core_dump: bool }`
+- `job::fmt::State::from_process_state` now uses `???` for names of unknown
+  signals. The previous documentation incorrectly stated that it used
+  `Rtmin(-1)` while the actual implementation panicked in that case.
 - `<subshell::Subshell as std::fmt::Debug>::fmt` now includes the `job_control`
   and `ignores_sigint_sigquit` fields in its output.
 

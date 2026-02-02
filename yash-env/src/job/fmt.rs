@@ -140,8 +140,8 @@ impl State<'_> {
     ///
     /// This function converts a [`ProcessState`] into a `State` by converting
     /// the contained signal number into a signal name using the given system.
-    /// If the signal number is not recognized, the signal name `Rtmin(-1)` is
-    /// used as a fallback replacement.
+    /// If the signal number is not recognized, the signal name `???` is used as
+    /// a fallback replacement.
     #[must_use]
     pub fn from_process_state<S: Signals>(state: ProcessState, system: &S) -> Self {
         match state {
