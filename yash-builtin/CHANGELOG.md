@@ -37,7 +37,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `trap::Command` now uses `yash_env::trap::Condition` instead of
   `trap::CondSpec` to represent conditions.
 
-## Removed
+### Removed
 
 - The `kill::Signal` enum has been removed. Signals are now represented using
   `RawNumber` and `Number` from the `yash_env::signal` module.
