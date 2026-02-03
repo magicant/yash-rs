@@ -112,20 +112,16 @@ Review Rust code changes comprehensively from every angle, focusing on issues th
 - Performance with large inputs
 - Unicode and special character handling
 
-### Executor Changes (`yash-executor`)
-- Signal handling correctness
-- File descriptor management
-- Process lifecycle management
-- Resource cleanup on errors
-
 ### Builtin Changes (`yash-builtin`)
 - POSIX compliance
-- Error messages and exit codes
-- Interaction with shell state
 - Option parsing correctness
+- Interaction with shell state
+- Error messages and exit codes
+- Minimizing trait bounds required by functions 
 
 ### Environment Changes (`yash-env`)
 - State management correctness
-- Thread safety considerations
-- Memory management
-- API consistency
+- Keeping environment components independent
+
+### Semantics Changes (`yash-semantics`)
+- Minimizing trait bounds required by functions 
