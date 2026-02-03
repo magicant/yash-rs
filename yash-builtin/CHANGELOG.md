@@ -44,6 +44,11 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `trap::CondSpec` enum has been removed. Use `yash_env::trap::Condition`
   instead.
 
+### Fixed
+
+- `kill::syntax::Error::to_report` now correctly formats error messages for
+  invalid options and signal specifications.
+
 ## [0.14.0] - 2026-01-16
 
 ### Added
