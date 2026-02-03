@@ -20,18 +20,322 @@
 use super::SharedSystem;
 use super::{Pid, Result};
 pub use crate::signal::{Name, Number, RawNumber};
+use std::borrow::Cow;
+use std::num::NonZero;
+use std::ops::RangeInclusive;
 
 /// Trait for managing available signals
 pub trait Signals {
-    /// Tests if a signal number is valid.
+    /// The signal number for `SIGABRT`
+    const SIGABRT: Number;
+    /// The signal number for `SIGALRM`
+    const SIGALRM: Number;
+    /// The signal number for `SIGBUS`
+    const SIGBUS: Number;
+    /// The signal number for `SIGCHLD`
+    const SIGCHLD: Number;
+    /// The signal number for `SIGCLD`, if available on the system
+    const SIGCLD: Option<Number>;
+    /// The signal number for `SIGCONT`
+    const SIGCONT: Number;
+    /// The signal number for `SIGEMT`, if available on the system
+    const SIGEMT: Option<Number>;
+    /// The signal number for `SIGFPE`
+    const SIGFPE: Number;
+    /// The signal number for `SIGHUP`
+    const SIGHUP: Number;
+    /// The signal number for `SIGILL`
+    const SIGILL: Number;
+    /// The signal number for `SIGINFO`, if available on the system
+    const SIGINFO: Option<Number>;
+    /// The signal number for `SIGINT`
+    const SIGINT: Number;
+    /// The signal number for `SIGIO`, if available on the system
+    const SIGIO: Option<Number>;
+    /// The signal number for `SIGIOT`
+    const SIGIOT: Number;
+    /// The signal number for `SIGKILL`
+    const SIGKILL: Number;
+    /// The signal number for `SIGLOST`, if available on the system
+    const SIGLOST: Option<Number>;
+    /// The signal number for `SIGPIPE`
+    const SIGPIPE: Number;
+    /// The signal number for `SIGPOLL`, if available on the system
+    const SIGPOLL: Option<Number>;
+    /// The signal number for `SIGPROF`
+    const SIGPROF: Number;
+    /// The signal number for `SIGPWR`, if available on the system
+    const SIGPWR: Option<Number>;
+    /// The signal number for `SIGQUIT`
+    const SIGQUIT: Number;
+    /// The signal number for `SIGSEGV`
+    const SIGSEGV: Number;
+    /// The signal number for `SIGSTKFLT`, if available on the system
+    const SIGSTKFLT: Option<Number>;
+    /// The signal number for `SIGSTOP`
+    const SIGSTOP: Number;
+    /// The signal number for `SIGSYS`
+    const SIGSYS: Number;
+    /// The signal number for `SIGTERM`
+    const SIGTERM: Number;
+    /// The signal number for `SIGTHR`, if available on the system
+    const SIGTHR: Option<Number>;
+    /// The signal number for `SIGTRAP`
+    const SIGTRAP: Number;
+    /// The signal number for `SIGTSTP`
+    const SIGTSTP: Number;
+    /// The signal number for `SIGTTIN`
+    const SIGTTIN: Number;
+    /// The signal number for `SIGTTOU`
+    const SIGTTOU: Number;
+    /// The signal number for `SIGURG`
+    const SIGURG: Number;
+    /// The signal number for `SIGUSR1`
+    const SIGUSR1: Number;
+    /// The signal number for `SIGUSR2`
+    const SIGUSR2: Number;
+    /// The signal number for `SIGVTALRM`
+    const SIGVTALRM: Number;
+    /// The signal number for `SIGWINCH`
+    const SIGWINCH: Number;
+    /// The signal number for `SIGXCPU`
+    const SIGXCPU: Number;
+    /// The signal number for `SIGXFSZ`
+    const SIGXFSZ: Number;
+
+    /// Returns the range of real-time signals supported by the system.
+    ///
+    /// If the system does not support real-time signals, returns `None`.
+    ///
+    /// The range is provided as a method rather than associated constants
+    /// because some systems determine the range at runtime.
+    #[must_use]
+    fn sigrt_range(&self) -> Option<RangeInclusive<Number>>;
+
+    /// List of all signal names and their numbers, excluding real-time signals
+    ///
+    /// This list contains all named signals declared in this trait, except for
+    /// real-time signals. Each entry is a tuple of the signal name (without the
+    /// `SIG` prefix) and its corresponding signal number. If a signal is not
+    /// available on the system, its number is `None`.
+    ///
+    /// The signals are listed in alphabetical order by name (without the `SIG`
+    /// prefix). Implementations that override this constant must preserve this
+    /// ordering because the default implementation of
+    /// [`str2sig`](Self::str2sig) relies on it to perform a binary search.
+    const NAMED_SIGNALS: &'static [(&'static str, Option<Number>)] = &[
+        ("ABRT", Some(Self::SIGABRT)),
+        ("ALRM", Some(Self::SIGALRM)),
+        ("BUS", Some(Self::SIGBUS)),
+        ("CHLD", Some(Self::SIGCHLD)),
+        ("CLD", Self::SIGCLD),
+        ("CONT", Some(Self::SIGCONT)),
+        ("EMT", Self::SIGEMT),
+        ("FPE", Some(Self::SIGFPE)),
+        ("HUP", Some(Self::SIGHUP)),
+        ("ILL", Some(Self::SIGILL)),
+        ("INFO", Self::SIGINFO),
+        ("INT", Some(Self::SIGINT)),
+        ("IO", Self::SIGIO),
+        ("IOT", Some(Self::SIGIOT)),
+        ("KILL", Some(Self::SIGKILL)),
+        ("LOST", Self::SIGLOST),
+        ("PIPE", Some(Self::SIGPIPE)),
+        ("POLL", Self::SIGPOLL),
+        ("PROF", Some(Self::SIGPROF)),
+        ("PWR", Self::SIGPWR),
+        ("QUIT", Some(Self::SIGQUIT)),
+        ("SEGV", Some(Self::SIGSEGV)),
+        ("STKFLT", Self::SIGSTKFLT),
+        ("STOP", Some(Self::SIGSTOP)),
+        ("SYS", Some(Self::SIGSYS)),
+        ("TERM", Some(Self::SIGTERM)),
+        ("THR", Self::SIGTHR),
+        ("TRAP", Some(Self::SIGTRAP)),
+        ("TSTP", Some(Self::SIGTSTP)),
+        ("TTIN", Some(Self::SIGTTIN)),
+        ("TTOU", Some(Self::SIGTTOU)),
+        ("URG", Some(Self::SIGURG)),
+        ("USR1", Some(Self::SIGUSR1)),
+        ("USR2", Some(Self::SIGUSR2)),
+        ("VTALRM", Some(Self::SIGVTALRM)),
+        ("WINCH", Some(Self::SIGWINCH)),
+        ("XCPU", Some(Self::SIGXCPU)),
+        ("XFSZ", Some(Self::SIGXFSZ)),
+    ];
+
+    /// Returns an iterator over all real-time signals supported by the system.
+    ///
+    /// The iterator yields signal numbers in ascending order. If the system
+    /// does not support real-time signals, the iterator yields no items.
+    fn iter_sigrt(&self) -> impl DoubleEndedIterator<Item = Number> + use<Self> {
+        let range = match self.sigrt_range() {
+            Some(range) => range.start().as_raw()..=range.end().as_raw(),
+            #[allow(clippy::reversed_empty_ranges)]
+            None => 0..=-1,
+        };
+        // If NonZero implemented Step, we could use range.map(...)
+        range.filter_map(|raw| NonZero::new(raw).map(Number::from_raw_unchecked))
+    }
+
+    /// Tests if a signal number is valid and returns its signal number.
+    ///
+    /// This function returns `Some(number)` if the signal number refers to a valid
+    /// signal supported by the system. Otherwise, it returns `None`.
+    #[must_use]
+    fn to_signal_number<N: Into<RawNumber>>(&self, number: N) -> Option<Number> {
+        fn inner<S: Signals + ?Sized>(system: &S, raw_number: RawNumber) -> Option<Number> {
+            let non_zero = NonZero::new(raw_number)?;
+            let number = Number::from_raw_unchecked(non_zero);
+            (S::NAMED_SIGNALS
+                .iter()
+                .any(|signal| signal.1 == Some(number))
+                || system
+                    .sigrt_range()
+                    .is_some_and(|range| range.contains(&number)))
+            .then_some(number)
+        }
+        inner(self, number.into())
+    }
+
+    /// Converts a signal number to its string representation.
+    ///
+    /// This function returns `Some(name)` if the signal number refers to a valid
+    /// signal supported by the system. Otherwise, it returns `None`.
+    ///
+    /// The returned name does not include the `SIG` prefix.
+    /// Note that one signal number can have multiple names, in which case it is
+    /// unspecified which name is returned.
+    #[must_use]
+    fn sig2str<N: Into<RawNumber>>(&self, signal: N) -> Option<Cow<'static, str>> {
+        fn inner<S: Signals + ?Sized>(
+            system: &S,
+            raw_number: RawNumber,
+        ) -> Option<Cow<'static, str>> {
+            let number = Number::from_raw_unchecked(NonZero::new(raw_number)?);
+            // The signals below are ordered roughly by frequency of use
+            // so that common names are preferred for signals with multiple names.
+            match () {
+                () if number == S::SIGABRT => Some(Cow::Borrowed("ABRT")),
+                () if number == S::SIGALRM => Some(Cow::Borrowed("ALRM")),
+                () if number == S::SIGBUS => Some(Cow::Borrowed("BUS")),
+                () if number == S::SIGCHLD => Some(Cow::Borrowed("CHLD")),
+                () if number == S::SIGCONT => Some(Cow::Borrowed("CONT")),
+                () if number == S::SIGFPE => Some(Cow::Borrowed("FPE")),
+                () if number == S::SIGHUP => Some(Cow::Borrowed("HUP")),
+                () if number == S::SIGILL => Some(Cow::Borrowed("ILL")),
+                () if number == S::SIGINT => Some(Cow::Borrowed("INT")),
+                () if number == S::SIGKILL => Some(Cow::Borrowed("KILL")),
+                () if number == S::SIGPIPE => Some(Cow::Borrowed("PIPE")),
+                () if number == S::SIGQUIT => Some(Cow::Borrowed("QUIT")),
+                () if number == S::SIGSEGV => Some(Cow::Borrowed("SEGV")),
+                () if number == S::SIGSTOP => Some(Cow::Borrowed("STOP")),
+                () if number == S::SIGTERM => Some(Cow::Borrowed("TERM")),
+                () if number == S::SIGTSTP => Some(Cow::Borrowed("TSTP")),
+                () if number == S::SIGTTIN => Some(Cow::Borrowed("TTIN")),
+                () if number == S::SIGTTOU => Some(Cow::Borrowed("TTOU")),
+                () if number == S::SIGUSR1 => Some(Cow::Borrowed("USR1")),
+                () if number == S::SIGUSR2 => Some(Cow::Borrowed("USR2")),
+                () if Some(number) == S::SIGPOLL => Some(Cow::Borrowed("POLL")),
+                () if number == S::SIGPROF => Some(Cow::Borrowed("PROF")),
+                () if number == S::SIGSYS => Some(Cow::Borrowed("SYS")),
+                () if number == S::SIGTRAP => Some(Cow::Borrowed("TRAP")),
+                () if number == S::SIGURG => Some(Cow::Borrowed("URG")),
+                () if number == S::SIGVTALRM => Some(Cow::Borrowed("VTALRM")),
+                () if number == S::SIGWINCH => Some(Cow::Borrowed("WINCH")),
+                () if number == S::SIGXCPU => Some(Cow::Borrowed("XCPU")),
+                () if number == S::SIGXFSZ => Some(Cow::Borrowed("XFSZ")),
+                () if Some(number) == S::SIGEMT => Some(Cow::Borrowed("EMT")),
+                () if Some(number) == S::SIGINFO => Some(Cow::Borrowed("INFO")),
+                () if Some(number) == S::SIGIO => Some(Cow::Borrowed("IO")),
+                () if Some(number) == S::SIGLOST => Some(Cow::Borrowed("LOST")),
+                () if Some(number) == S::SIGPWR => Some(Cow::Borrowed("PWR")),
+                () if Some(number) == S::SIGSTKFLT => Some(Cow::Borrowed("STKFLT")),
+                () if Some(number) == S::SIGTHR => Some(Cow::Borrowed("THR")),
+                _ => {
+                    let range = system.sigrt_range()?;
+                    if number == *range.start() {
+                        Some(Cow::Borrowed("RTMIN"))
+                    } else if number == *range.end() {
+                        Some(Cow::Borrowed("RTMAX"))
+                    } else if range.contains(&number) {
+                        let rtmin = range.start().as_raw();
+                        let rtmax = range.end().as_raw();
+                        if raw_number <= rtmin.midpoint(rtmax) {
+                            let offset = raw_number - rtmin;
+                            Some(Cow::Owned(format!("RTMIN+{}", offset)))
+                        } else {
+                            let offset = rtmax - raw_number;
+                            Some(Cow::Owned(format!("RTMAX-{}", offset)))
+                        }
+                    } else {
+                        None
+                    }
+                }
+            }
+        }
+        inner(self, signal.into())
+    }
+
+    /// Converts a string representation of a signal to its signal number.
+    ///
+    /// This function returns `Some(number)` if the signal name is supported by
+    /// the system. Otherwise, it returns `None`.
+    ///
+    /// The input name should not include the `SIG` prefix, and is case-sensitive.
+    #[must_use]
+    fn str2sig(&self, name: &str) -> Option<Number> {
+        // Binary search on NAMED_SIGNALS
+        if let Ok(index) = Self::NAMED_SIGNALS.binary_search_by_key(&name, |s| s.0) {
+            return Self::NAMED_SIGNALS[index].1;
+        }
+
+        // Handle real-time signals
+        enum BaseName {
+            Rtmin,
+            Rtmax,
+        }
+        let (basename, suffix) = if let Some(suffix) = name.strip_prefix("RTMIN") {
+            (BaseName::Rtmin, suffix)
+        } else if let Some(suffix) = name.strip_prefix("RTMAX") {
+            (BaseName::Rtmax, suffix)
+        } else {
+            return None;
+        };
+        if !suffix.is_empty() && !suffix.starts_with(['+', '-']) {
+            return None;
+        }
+        let range = self.sigrt_range()?;
+        let base_raw = match basename {
+            BaseName::Rtmin => range.start().as_raw(),
+            BaseName::Rtmax => range.end().as_raw(),
+        };
+        let raw_number = if suffix.is_empty() {
+            base_raw
+        } else {
+            let offset: RawNumber = suffix.parse().ok()?;
+            base_raw.checked_add(offset)?
+        };
+        let number = Number::from_raw_unchecked(NonZero::new(raw_number)?);
+        range.contains(&number).then_some(number)
+    }
+
+    /// Tests if a signal number is valid and returns its name and number.
     ///
     /// This function returns `Some((name, number))` if the signal number refers
     /// to a valid signal supported by the system. Otherwise, it returns `None`.
     ///
     /// Note that one signal number can have multiple names, in which case this
     /// function returns the name that is considered the most common.
+    ///
+    /// If you only need to tell whether a signal number is valid, use
+    /// [`to_signal_number`](Self::to_signal_number), which is more efficient.
     #[must_use]
-    fn validate_signal(&self, number: RawNumber) -> Option<(Name, Number)>;
+    fn validate_signal(&self, number: RawNumber) -> Option<(Name, Number)> {
+        let number = Number::from_raw_unchecked(NonZero::new(number)?);
+        let str_name = self.sig2str(number)?;
+        Some((str_name.parse().ok()?, number))
+    }
 
     /// Returns the signal name for the signal number.
     ///
@@ -53,7 +357,9 @@ pub trait Signals {
     /// This function returns the signal number corresponding to the signal name
     /// in the system. If the signal name is not supported, it returns `None`.
     #[must_use]
-    fn signal_number_from_name(&self, name: Name) -> Option<Number>;
+    fn signal_number_from_name(&self, name: Name) -> Option<Number> {
+        self.str2sig(&name.as_string())
+    }
 }
 
 /// Operation applied to the signal blocking mask
@@ -72,7 +378,7 @@ pub enum SigmaskOp {
 }
 
 /// Trait for managing signal blocking mask
-pub trait Sigmask {
+pub trait Sigmask: Signals {
     /// Gets and/or sets the signal blocking mask.
     ///
     /// This is a low-level function used internally by [`SharedSystem`]. You
@@ -108,8 +414,8 @@ pub enum Disposition {
     Catch,
 }
 
-/// Trait for managing signal dispositions
-pub trait Sigaction {
+/// Trait for getting signal dispositions
+pub trait GetSigaction: Signals {
     /// Gets the disposition for a signal.
     ///
     /// This is a low-level function used internally by
@@ -122,9 +428,12 @@ pub trait Sigaction {
     /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigaction.html).
     /// This function returns the current disposition if successful.
     ///
-    /// To change the disposition, use [`sigaction`](Self::sigaction).
+    /// To change the disposition, use [`Sigaction::sigaction`].
     fn get_sigaction(&self, signal: Number) -> Result<Disposition>;
+}
 
+/// Trait for managing signal dispositions
+pub trait Sigaction: GetSigaction {
     /// Gets and sets the disposition for a signal.
     ///
     /// This is a low-level function used internally by [`SharedSystem`]. You
@@ -142,7 +451,7 @@ pub trait Sigaction {
     /// [`caught_signals`](CaughtSignals::caught_signals).
     ///
     /// To get the current disposition without changing it, use
-    /// [`get_sigaction`](Self::get_sigaction).
+    /// [`GetSigaction::get_sigaction`].
     fn sigaction(&self, signal: Number, action: Disposition) -> Result<Disposition>;
 }
 
@@ -150,7 +459,7 @@ pub trait Sigaction {
 ///
 /// Implementors of this trait usually also implement [`Sigaction`] to allow
 /// setting which signals are caught.
-pub trait CaughtSignals {
+pub trait CaughtSignals: Signals {
     /// Returns signals this process has caught, if any.
     ///
     /// This is a low-level function used internally by
@@ -179,7 +488,7 @@ pub trait CaughtSignals {
 }
 
 /// Trait for sending signals to processes
-pub trait SendSignal {
+pub trait SendSignal: Signals {
     /// Sends a signal.
     ///
     /// This is a thin wrapper around the [`kill` system

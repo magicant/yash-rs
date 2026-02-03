@@ -35,6 +35,7 @@ use super::GetCwd;
 use super::GetPid;
 use super::GetPw;
 use super::GetRlimit;
+use super::GetSigaction;
 use super::GetUid;
 use super::Gid;
 use super::IsExecutableFile;
@@ -89,6 +90,7 @@ use std::ffi::CString;
 use std::ffi::c_int;
 use std::future::poll_fn;
 use std::io::SeekFrom;
+use std::ops::RangeInclusive;
 use std::rc::Rc;
 use std::task::Poll;
 use std::time::Duration;
@@ -522,11 +524,55 @@ impl<T: SetPgid> SetPgid for SharedSystem<T> {
 
 /// Delegates `Signals` methods to the contained implementor.
 impl<T: Signals> Signals for SharedSystem<T> {
+    const SIGABRT: signal::Number = T::SIGABRT;
+    const SIGALRM: signal::Number = T::SIGALRM;
+    const SIGBUS: signal::Number = T::SIGBUS;
+    const SIGCHLD: signal::Number = T::SIGCHLD;
+    const SIGCLD: Option<signal::Number> = T::SIGCLD;
+    const SIGCONT: signal::Number = T::SIGCONT;
+    const SIGEMT: Option<signal::Number> = T::SIGEMT;
+    const SIGFPE: signal::Number = T::SIGFPE;
+    const SIGHUP: signal::Number = T::SIGHUP;
+    const SIGILL: signal::Number = T::SIGILL;
+    const SIGINFO: Option<signal::Number> = T::SIGINFO;
+    const SIGINT: signal::Number = T::SIGINT;
+    const SIGIO: Option<signal::Number> = T::SIGIO;
+    const SIGIOT: signal::Number = T::SIGIOT;
+    const SIGKILL: signal::Number = T::SIGKILL;
+    const SIGLOST: Option<signal::Number> = T::SIGLOST;
+    const SIGPIPE: signal::Number = T::SIGPIPE;
+    const SIGPOLL: Option<signal::Number> = T::SIGPOLL;
+    const SIGPROF: signal::Number = T::SIGPROF;
+    const SIGPWR: Option<signal::Number> = T::SIGPWR;
+    const SIGQUIT: signal::Number = T::SIGQUIT;
+    const SIGSEGV: signal::Number = T::SIGSEGV;
+    const SIGSTKFLT: Option<signal::Number> = T::SIGSTKFLT;
+    const SIGSTOP: signal::Number = T::SIGSTOP;
+    const SIGSYS: signal::Number = T::SIGSYS;
+    const SIGTERM: signal::Number = T::SIGTERM;
+    const SIGTHR: Option<signal::Number> = T::SIGTHR;
+    const SIGTRAP: signal::Number = T::SIGTRAP;
+    const SIGTSTP: signal::Number = T::SIGTSTP;
+    const SIGTTIN: signal::Number = T::SIGTTIN;
+    const SIGTTOU: signal::Number = T::SIGTTOU;
+    const SIGURG: signal::Number = T::SIGURG;
+    const SIGUSR1: signal::Number = T::SIGUSR1;
+    const SIGUSR2: signal::Number = T::SIGUSR2;
+    const SIGVTALRM: signal::Number = T::SIGVTALRM;
+    const SIGWINCH: signal::Number = T::SIGWINCH;
+    const SIGXCPU: signal::Number = T::SIGXCPU;
+    const SIGXFSZ: signal::Number = T::SIGXFSZ;
+
+    fn sigrt_range(&self) -> Option<RangeInclusive<signal::Number>> {
+        self.0.borrow().sigrt_range()
+    }
+
+    fn iter_sigrt(&self) -> impl DoubleEndedIterator<Item = signal::Number> + use<T> {
+        self.0.borrow().iter_sigrt()
+    }
+
     fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
         self.0.borrow().validate_signal(number)
-    }
-    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
-        self.0.borrow().signal_number_from_name(name)
     }
 }
 
@@ -541,11 +587,15 @@ impl<T: Sigmask> Sigmask for SharedSystem<T> {
     }
 }
 
-/// Delegates `Sigaction` methods to the contained implementor.
-impl<T: Sigaction> Sigaction for SharedSystem<T> {
+/// Delegates `GetSigaction` methods to the contained implementor.
+impl<T: Sigaction> GetSigaction for SharedSystem<T> {
     fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
         self.0.borrow().get_sigaction(signal)
     }
+}
+
+/// Delegates `Sigaction` methods to the contained implementor.
+impl<T: Sigaction> Sigaction for SharedSystem<T> {
     fn sigaction(&self, signal: signal::Number, action: Disposition) -> Result<Disposition> {
         self.0.borrow().sigaction(signal, action)
     }
@@ -684,16 +734,6 @@ impl<T: SetRlimit> SetRlimit for SharedSystem<T> {
 }
 
 impl<S: Signals + Sigmask + Sigaction> SignalSystem for SharedSystem<S> {
-    #[inline]
-    fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
-        Signals::signal_name_from_number(self, number)
-    }
-
-    #[inline]
-    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
-        Signals::signal_number_from_name(self, name)
-    }
-
     #[inline]
     fn get_disposition(&self, signal: signal::Number) -> Result<Disposition> {
         self.0.borrow().get_disposition(signal)

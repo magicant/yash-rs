@@ -86,6 +86,7 @@ use super::GetCwd;
 use super::GetPid;
 use super::GetPw;
 use super::GetRlimit;
+use super::GetSigaction;
 use super::GetUid;
 use super::Gid;
 use super::IsExecutableFile;
@@ -148,8 +149,8 @@ use std::future::pending;
 use std::future::poll_fn;
 use std::future::ready;
 use std::io::SeekFrom;
-use std::num::NonZero;
 use std::ops::DerefMut as _;
+use std::ops::RangeInclusive;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::Context;
@@ -672,15 +673,47 @@ impl Times for VirtualSystem {
 }
 
 impl Signals for VirtualSystem {
-    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
-        let non_zero = NonZero::new(number)?;
-        let name = signal::Name::try_from_raw_virtual(number)?;
-        Some((name, signal::Number::from_raw_unchecked(non_zero)))
-    }
+    const SIGABRT: signal::Number = signal::SIGABRT;
+    const SIGALRM: signal::Number = signal::SIGALRM;
+    const SIGBUS: signal::Number = signal::SIGBUS;
+    const SIGCHLD: signal::Number = signal::SIGCHLD;
+    const SIGCLD: Option<signal::Number> = Some(signal::SIGCLD);
+    const SIGCONT: signal::Number = signal::SIGCONT;
+    const SIGEMT: Option<signal::Number> = Some(signal::SIGEMT);
+    const SIGFPE: signal::Number = signal::SIGFPE;
+    const SIGHUP: signal::Number = signal::SIGHUP;
+    const SIGILL: signal::Number = signal::SIGILL;
+    const SIGINFO: Option<signal::Number> = Some(signal::SIGINFO);
+    const SIGINT: signal::Number = signal::SIGINT;
+    const SIGIO: Option<signal::Number> = Some(signal::SIGIO);
+    const SIGIOT: signal::Number = signal::SIGIOT;
+    const SIGKILL: signal::Number = signal::SIGKILL;
+    const SIGLOST: Option<signal::Number> = Some(signal::SIGLOST);
+    const SIGPIPE: signal::Number = signal::SIGPIPE;
+    const SIGPOLL: Option<signal::Number> = Some(signal::SIGPOLL);
+    const SIGPROF: signal::Number = signal::SIGPROF;
+    const SIGPWR: Option<signal::Number> = Some(signal::SIGPWR);
+    const SIGQUIT: signal::Number = signal::SIGQUIT;
+    const SIGSEGV: signal::Number = signal::SIGSEGV;
+    const SIGSTKFLT: Option<signal::Number> = Some(signal::SIGSTKFLT);
+    const SIGSTOP: signal::Number = signal::SIGSTOP;
+    const SIGSYS: signal::Number = signal::SIGSYS;
+    const SIGTERM: signal::Number = signal::SIGTERM;
+    const SIGTHR: Option<signal::Number> = Some(signal::SIGTHR);
+    const SIGTRAP: signal::Number = signal::SIGTRAP;
+    const SIGTSTP: signal::Number = signal::SIGTSTP;
+    const SIGTTIN: signal::Number = signal::SIGTTIN;
+    const SIGTTOU: signal::Number = signal::SIGTTOU;
+    const SIGURG: signal::Number = signal::SIGURG;
+    const SIGUSR1: signal::Number = signal::SIGUSR1;
+    const SIGUSR2: signal::Number = signal::SIGUSR2;
+    const SIGVTALRM: signal::Number = signal::SIGVTALRM;
+    const SIGWINCH: signal::Number = signal::SIGWINCH;
+    const SIGXCPU: signal::Number = signal::SIGXCPU;
+    const SIGXFSZ: signal::Number = signal::SIGXFSZ;
 
-    #[inline(always)]
-    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
-        name.to_raw_virtual()
+    fn sigrt_range(&self) -> Option<RangeInclusive<Number>> {
+        Some(signal::SIGRTMIN..=signal::SIGRTMAX)
     }
 }
 
@@ -769,12 +802,14 @@ impl Sigmask for VirtualSystem {
     }
 }
 
-impl Sigaction for VirtualSystem {
+impl GetSigaction for VirtualSystem {
     fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
         let process = self.current_process();
         Ok(process.disposition(signal))
     }
+}
 
+impl Sigaction for VirtualSystem {
     fn sigaction(&self, signal: signal::Number, disposition: Disposition) -> Result<Disposition> {
         let mut process = self.current_process_mut();
         Ok(process.set_disposition(signal, disposition))
@@ -790,6 +825,10 @@ impl CaughtSignals for VirtualSystem {
 impl SendSignal for VirtualSystem {
     /// Sends a signal to the target process.
     ///
+    /// The current implementation accepts any positive signal number and `None`
+    /// (no signal) for `signal`. Negative signal numbers are rejected with
+    /// `Errno::EINVAL`.
+    ///
     /// This function returns a future that enables the executor to block the
     /// calling thread until the current process is ready to proceed. If the
     /// signal is sent to the current process and it causes the process to stop,
@@ -801,34 +840,51 @@ impl SendSignal for VirtualSystem {
         target: Pid,
         signal: Option<signal::Number>,
     ) -> impl Future<Output = Result<()>> + use<> {
-        let result = match target {
-            Pid::MY_PROCESS_GROUP => {
-                let target_pgid = self.current_process().pgid;
-                send_signal_to_processes(&mut self.state.borrow_mut(), Some(target_pgid), signal)
-            }
-
-            Pid::ALL => send_signal_to_processes(&mut self.state.borrow_mut(), None, signal),
-
-            Pid(raw_pid) if raw_pid >= 0 => {
-                let mut state = self.state.borrow_mut();
-                match state.processes.get_mut(&target) {
-                    Some(process) => {
-                        if let Some(signal) = signal {
-                            let result = process.raise_signal(signal);
-                            if result.process_state_changed {
-                                let parent_pid = process.ppid;
-                                raise_sigchld(&mut state, parent_pid);
-                            }
-                        }
-                        Ok(())
-                    }
-                    None => Err(Errno::ESRCH),
+        let result = 'result: {
+            if let Some(signal) = signal {
+                // Validate the signal number
+                if signal.as_raw() < 0 {
+                    break 'result Err(Errno::EINVAL);
                 }
             }
 
-            Pid(negative_pgid) => {
-                let target_pgid = Pid(-negative_pgid);
-                send_signal_to_processes(&mut self.state.borrow_mut(), Some(target_pgid), signal)
+            match target {
+                Pid::MY_PROCESS_GROUP => {
+                    let target_pgid = self.current_process().pgid;
+                    send_signal_to_processes(
+                        &mut self.state.borrow_mut(),
+                        Some(target_pgid),
+                        signal,
+                    )
+                }
+
+                Pid::ALL => send_signal_to_processes(&mut self.state.borrow_mut(), None, signal),
+
+                Pid(raw_pid) if raw_pid >= 0 => {
+                    let mut state = self.state.borrow_mut();
+                    match state.processes.get_mut(&target) {
+                        Some(process) => {
+                            if let Some(signal) = signal {
+                                let result = process.raise_signal(signal);
+                                if result.process_state_changed {
+                                    let parent_pid = process.ppid;
+                                    raise_sigchld(&mut state, parent_pid);
+                                }
+                            }
+                            Ok(())
+                        }
+                        None => Err(Errno::ESRCH),
+                    }
+                }
+
+                Pid(negative_pgid) => {
+                    let target_pgid = Pid(-negative_pgid);
+                    send_signal_to_processes(
+                        &mut self.state.borrow_mut(),
+                        Some(target_pgid),
+                        signal,
+                    )
+                }
             }
         };
 

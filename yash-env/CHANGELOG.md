@@ -11,6 +11,36 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.12.0] - Unreleased
 
+### Added
+
+- The `system::Signals` trait now has the `sig2str` and `str2sig` provided
+  methods for converting between signal numbers and names.
+- The `system::Signals` trait now has constants for all possible signals
+  (except `SIGRTMIN` and `SIGRTMAX`):
+    - `SIGABRT`, `SIGALRM`, `SIGBUS`, `SIGCHLD`, `SIGCLD` (optional),
+      `SIGCONT`, `SIGEMT` (optional), `SIGFPE`, `SIGHUP`, `SIGILL`,
+      `SIGINFO` (optional), `SIGINT`, `SIGIO` (optional), `SIGIOT`,
+      `SIGKILL`, `SIGLOST` (optional), `SIGPIPE`, `SIGPOLL` (optional),
+      `SIGPROF`, `SIGPWR` (optional), `SIGQUIT`, `SIGSEGV`,
+      `SIGSTKFLT` (optional), `SIGSTOP`, `SIGSYS`, `SIGTERM`,
+      `SIGTHR` (optional), `SIGTRAP`, `SIGTSTP`, `SIGTTIN`, `SIGTTOU`,
+      `SIGURG`, `SIGUSR1`, `SIGUSR2`, `SIGVTALRM`, `SIGWINCH`, `SIGXCPU`,
+      `SIGXFSZ`
+- The `system::Signals` trait now has the `NAMED_SIGNALS` provided associated
+  constant that lists all signal names and their corresponding signal numbers.
+- The `system::Signals` trait now has the `sigrt_range` method that returns
+  the range of real-time signals supported by the system and the `iter_sigrt`
+  method that returns an iterator over those signals.
+- The `system::Signals` trait now has the `to_signal_number` method for
+  checking if a given number is a valid signal number.
+- The `system::Signals::validate_signal` and
+  `system::Signals::signal_number_from_name` methods now have default
+  implementation.
+- The `system::GetSigaction` trait has been added to declare the `get_sigaction`
+  method, which has been moved from the `system::Sigaction` trait.
+- `impl From<signal::Number> for std::num::NonZero<signal::RawNumber>`
+- `impl From<signal::Number> for signal::RawNumber`
+
 ### Changed
 
 - The following trait methods now return `impl Future` instead of the concrete
@@ -20,9 +50,31 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `system::SendSignal::kill`
     - `system::SendSignal::raise`
     - `system::TcSetPgrp::tcsetpgrp`
+- The `system::Sigaction` trait now has the `system::GetSigaction` supertrait.
+- The following traits now have the `system::Signals` supertrait:
+    - `system::CaughtSignals`
+    - `system::Select`
+    - `system::SendSignal`
+    - `system::Sigmask`
+    - `system::Wait`
+    - `trap::SignalSystem`
+- `system::virtual::VirtualSystem::kill` now rejects negative signal numbers.
+- The `trap::Condition::to_string` and `trap::Condition::iter` methods now
+  require a `system::Signals` implementation instead of `trap::SignalSystem`.
+- The `semantics::ExitStatus::to_signal` method now returns `Cow<str>` instead
+  of `signal::Name` for the signal name.
+- `job::fmt::State`: This type now uses `Cow<str>` to represent
+  signal names instead of `signal::Number`. A lifetime parameter has been added
+  to the type to represent the lifetime of the borrowed signal name. The
+  variants have been changed as follows:
+    - `State::Stopped(signal::Number)` → `State::Stopped { signal: Cow<str> }`
+    - `State::Signaled { signal: signal::Number, core_dump: bool }` →
+      `State::Signaled { signal: Cow<str>, core_dump: bool }`
+- `job::fmt::State::from_process_state` now uses `???` for names of unknown
+  signals. The previous documentation incorrectly stated that it used
+  `Rtmin(-1)` while the actual implementation panicked in that case.
 - `<subshell::Subshell as std::fmt::Debug>::fmt` now includes the `job_control`
   and `ignores_sigint_sigquit` fields in its output.
-  
 
 ### Deprecated
 
@@ -31,7 +83,16 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Removed
 
-- `impl<T: Fork> Fork for SharedSystem<T>`: This implementation had not been working since 0.11.0.
+- The following trait methods of `trap::SignalSystem` have been removed as they
+  are now provided by the `system::Signals` supertrait:
+    - `signal_name_from_number`
+    - `signal_number_from_name`
+- `system::Sigaction::get_sigaction`: This method has been moved to the new
+  `system::GetSigaction` trait.
+- `impl<T: Fork> Fork for SharedSystem<T>`: This implementation had not been
+  working since 0.11.0.
+- `impl Copy for job::fmt::State`: This implementation has been removed because
+  `State` now contains a `Cow<str>`, which does not implement `Copy`.
 
 ## [0.11.0] - 2026-01-16
 

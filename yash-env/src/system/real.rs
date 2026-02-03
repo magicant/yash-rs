@@ -50,6 +50,7 @@ use super::GetCwd;
 use super::GetPid;
 use super::GetPw;
 use super::GetRlimit;
+use super::GetSigaction;
 use super::GetUid;
 use super::Gid;
 use super::IsExecutableFile;
@@ -105,6 +106,7 @@ use std::future::ready;
 use std::io::SeekFrom;
 use std::mem::MaybeUninit;
 use std::num::NonZero;
+use std::ops::RangeInclusive;
 use std::os::unix::ffi::OsStrExt as _;
 use std::os::unix::io::IntoRawFd;
 use std::ptr::NonNull;
@@ -574,17 +576,203 @@ impl SetPgid for RealSystem {
     }
 }
 
+const fn to_signal_number(sig: c_int) -> signal::Number {
+    signal::Number::from_raw_unchecked(NonZero::new(sig).unwrap())
+}
+
 impl Signals for RealSystem {
-    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
-        let non_zero = NonZero::new(number)?;
-        let name = signal::Name::try_from_raw_real(number)?;
-        Some((name, signal::Number::from_raw_unchecked(non_zero)))
+    const SIGABRT: signal::Number = to_signal_number(libc::SIGABRT);
+    const SIGALRM: signal::Number = to_signal_number(libc::SIGALRM);
+    const SIGBUS: signal::Number = to_signal_number(libc::SIGBUS);
+    const SIGCHLD: signal::Number = to_signal_number(libc::SIGCHLD);
+    #[cfg(any(
+        target_os = "aix",
+        target_os = "horizon",
+        target_os = "illumos",
+        target_os = "solaris",
+    ))]
+    const SIGCLD: Option<signal::Number> = Some(to_signal_number(libc::SIGCLD));
+    #[cfg(not(any(
+        target_os = "aix",
+        target_os = "horizon",
+        target_os = "illumos",
+        target_os = "solaris",
+    )))]
+    const SIGCLD: Option<signal::Number> = None;
+    const SIGCONT: signal::Number = to_signal_number(libc::SIGCONT);
+    #[cfg(not(any(
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "haiku",
+        target_os = "linux",
+        target_os = "redox",
+    )))]
+    const SIGEMT: Option<signal::Number> = Some(to_signal_number(libc::SIGEMT));
+    #[cfg(any(
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "haiku",
+        target_os = "linux",
+        target_os = "redox",
+    ))]
+    const SIGEMT: Option<signal::Number> = None;
+    const SIGFPE: signal::Number = to_signal_number(libc::SIGFPE);
+    const SIGHUP: signal::Number = to_signal_number(libc::SIGHUP);
+    const SIGILL: signal::Number = to_signal_number(libc::SIGILL);
+    #[cfg(not(any(
+        target_os = "aix",
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "haiku",
+        target_os = "linux",
+        target_os = "redox",
+    )))]
+    const SIGINFO: Option<signal::Number> = Some(to_signal_number(libc::SIGINFO));
+    #[cfg(any(
+        target_os = "aix",
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "haiku",
+        target_os = "linux",
+        target_os = "redox",
+    ))]
+    const SIGINFO: Option<signal::Number> = None;
+    const SIGINT: signal::Number = to_signal_number(libc::SIGINT);
+    #[cfg(any(
+        target_os = "aix",
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "horizon",
+        target_os = "illumos",
+        target_os = "linux",
+        target_os = "nto",
+        target_os = "solaris",
+    ))]
+    const SIGIO: Option<signal::Number> = Some(to_signal_number(libc::SIGIO));
+    #[cfg(not(any(
+        target_os = "aix",
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "horizon",
+        target_os = "illumos",
+        target_os = "linux",
+        target_os = "nto",
+        target_os = "solaris",
+    )))]
+    const SIGIO: Option<signal::Number> = None;
+    const SIGIOT: signal::Number = to_signal_number(libc::SIGIOT);
+    const SIGKILL: signal::Number = to_signal_number(libc::SIGKILL);
+    #[cfg(target_os = "horizon")]
+    const SIGLOST: Option<signal::Number> = Some(to_signal_number(libc::SIGLOST));
+    #[cfg(not(target_os = "horizon"))]
+    const SIGLOST: Option<signal::Number> = None;
+    const SIGPIPE: signal::Number = to_signal_number(libc::SIGPIPE);
+    #[cfg(any(
+        target_os = "aix",
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "haiku",
+        target_os = "horizon",
+        target_os = "illumos",
+        target_os = "linux",
+        target_os = "nto",
+        target_os = "solaris",
+    ))]
+    const SIGPOLL: Option<signal::Number> = Some(to_signal_number(libc::SIGPOLL));
+    #[cfg(not(any(
+        target_os = "aix",
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "haiku",
+        target_os = "horizon",
+        target_os = "illumos",
+        target_os = "linux",
+        target_os = "nto",
+        target_os = "solaris",
+    )))]
+    const SIGPOLL: Option<signal::Number> = None;
+    const SIGPROF: signal::Number = to_signal_number(libc::SIGPROF);
+    #[cfg(any(
+        target_os = "aix",
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "illumos",
+        target_os = "linux",
+        target_os = "nto",
+        target_os = "redox",
+        target_os = "solaris",
+    ))]
+    const SIGPWR: Option<signal::Number> = Some(to_signal_number(libc::SIGPWR));
+    #[cfg(not(any(
+        target_os = "aix",
+        target_os = "android",
+        target_os = "emscripten",
+        target_os = "fuchsia",
+        target_os = "illumos",
+        target_os = "linux",
+        target_os = "nto",
+        target_os = "redox",
+        target_os = "solaris",
+    )))]
+    const SIGPWR: Option<signal::Number> = None;
+    const SIGQUIT: signal::Number = to_signal_number(libc::SIGQUIT);
+    const SIGSEGV: signal::Number = to_signal_number(libc::SIGSEGV);
+    #[cfg(all(
+        any(
+            target_os = "android",
+            target_os = "emscripten",
+            target_os = "fuchsia",
+            target_os = "linux"
+        ),
+        not(any(target_arch = "mips", target_arch = "mips64", target_arch = "sparc64"))
+    ))]
+    const SIGSTKFLT: Option<signal::Number> = Some(to_signal_number(libc::SIGSTKFLT));
+    #[cfg(not(all(
+        any(
+            target_os = "android",
+            target_os = "emscripten",
+            target_os = "fuchsia",
+            target_os = "linux"
+        ),
+        not(any(target_arch = "mips", target_arch = "mips64", target_arch = "sparc64"))
+    )))]
+    const SIGSTKFLT: Option<signal::Number> = None;
+    const SIGSTOP: signal::Number = to_signal_number(libc::SIGSTOP);
+    const SIGSYS: signal::Number = to_signal_number(libc::SIGSYS);
+    const SIGTERM: signal::Number = to_signal_number(libc::SIGTERM);
+    #[cfg(target_os = "freebsd")]
+    const SIGTHR: Option<signal::Number> = Some(to_signal_number(libc::SIGTHR));
+    #[cfg(not(target_os = "freebsd"))]
+    const SIGTHR: Option<signal::Number> = None;
+    const SIGTRAP: signal::Number = to_signal_number(libc::SIGTRAP);
+    const SIGTSTP: signal::Number = to_signal_number(libc::SIGTSTP);
+    const SIGTTIN: signal::Number = to_signal_number(libc::SIGTTIN);
+    const SIGTTOU: signal::Number = to_signal_number(libc::SIGTTOU);
+    const SIGURG: signal::Number = to_signal_number(libc::SIGURG);
+    const SIGUSR1: signal::Number = to_signal_number(libc::SIGUSR1);
+    const SIGUSR2: signal::Number = to_signal_number(libc::SIGUSR2);
+    const SIGVTALRM: signal::Number = to_signal_number(libc::SIGVTALRM);
+    const SIGWINCH: signal::Number = to_signal_number(libc::SIGWINCH);
+    const SIGXCPU: signal::Number = to_signal_number(libc::SIGXCPU);
+    const SIGXFSZ: signal::Number = to_signal_number(libc::SIGXFSZ);
+
+    fn sigrt_range(&self) -> Option<RangeInclusive<signal::Number>> {
+        let raw_range = signal::rt_range();
+        let start = signal::Number::from_raw_unchecked(NonZero::new(*raw_range.start())?);
+        let end = signal::Number::from_raw_unchecked(NonZero::new(*raw_range.end())?);
+        Some(start..=end).filter(|range| !range.is_empty())
     }
 
-    #[inline(always)]
-    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
-        name.to_raw_real()
-    }
+    // TODO: Implement sig2str and str2sig methods
 }
 
 impl Sigmask for RealSystem {
@@ -643,11 +831,13 @@ impl Sigmask for RealSystem {
     }
 }
 
-impl Sigaction for RealSystem {
+impl GetSigaction for RealSystem {
     fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
         sigaction_impl(signal, None)
     }
+}
 
+impl Sigaction for RealSystem {
     fn sigaction(&self, signal: signal::Number, handling: Disposition) -> Result<Disposition> {
         sigaction_impl(signal, Some(handling))
     }
@@ -660,18 +850,13 @@ impl CaughtSignals for RealSystem {
             // Need a fence to ensure we examine the slots in order.
             compiler_fence(Ordering::Acquire);
 
-            let signal = slot.swap(0, Ordering::Relaxed);
-            if signal == 0 {
+            let number = slot.swap(0, Ordering::Relaxed);
+            let Some(number) = NonZero::new(number as signal::RawNumber) else {
                 // The `catch_signal` function always fills the first unused
                 // slot, so there is no more slot filled with a signal.
                 break;
-            }
-
-            if let Some((_name, number)) = self.validate_signal(signal as signal::RawNumber) {
-                signals.push(number)
-            } else {
-                // ignore unknown signal
-            }
+            };
+            signals.push(signal::Number::from_raw_unchecked(number));
         }
         signals
     }

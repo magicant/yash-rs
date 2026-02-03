@@ -15,6 +15,34 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Public dependency versions:
     - yash-env 0.11.0 → 0.12.0
+- The `kill::Command::Print::signals` field now contains a vector of `Field`
+  instead of a vector of `(Signal, Field)` tuples. The `signals` parameter to
+  `kill::print::print` and `kill::print::execute` has also been changed
+  accordingly.
+- The `kill::Command::Send::signal` field now contains a `RawNumber` instead of
+  a `Signal`. The `signal` parameter to `kill::send::execute` has also been
+  changed accordingly.
+- The `kill::print::InvalidSignal` struct is now a tuple struct that only
+  contains a `Field`. The `signal` field has been removed.
+- The `kill::syntax::parse_signal` function now takes a `system: &S where S:
+  yash_env::system::Signals` parameter and returns
+  `Option<yash_env::signal::RawNumber>` instead of `Option<Signal>`. It now
+  requires the system object to validate signal names using the system's signal
+  configuration.
+- The `kill::syntax::parse` function now requires `S: yash_env::system::Signals`
+  bound on its generic type parameter.
+- The `trap::syntax::interpret` function now takes one more argument,
+  `system: &S where S: yash_env::system::Signals`, to check the validity of
+  signal names and numbers.
+- The `trap::Command` now uses `yash_env::trap::Condition` instead of
+  `trap::CondSpec` to represent conditions.
+
+### Removed
+
+- The `kill::Signal` enum has been removed. Signals are now represented using
+  `RawNumber` and `Number` from the `yash_env::signal` module.
+- The `trap::CondSpec` enum has been removed. Use `yash_env::trap::Condition`
+  instead.
 
 ## [0.14.0] - 2026-01-16
 

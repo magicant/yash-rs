@@ -54,8 +54,8 @@ use super::Pid;
 use super::ProcessResult;
 use super::ProcessState;
 use crate::semantics::ExitStatus;
-use crate::signal;
 use crate::system::Signals;
+use std::borrow::Cow;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
@@ -93,25 +93,25 @@ impl Display for Marker {
 /// This enumeration represents the state of a job. The string representation of
 /// the state is used in the job status report.
 ///
-/// This type is similar to the [`ProcessState`] type, but it uses
-/// [`signal::Name`] instead of [`signal::Number`] to represent signals so that
-/// the signal names are shown in the job status report.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum State {
+/// This type is similar to the [`ProcessState`] type, but it uses [`Cow<str>`]
+/// instead of [`crate::signal::Number`] to represent signals so that the signal
+/// names can be shown in the job status report.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum State<'a> {
     /// The job is running.
     Running,
     /// The process has been stopped by a signal.
-    Stopped(signal::Name),
+    Stopped { signal: Cow<'a, str> },
     /// The process has exited.
     Exited(ExitStatus),
     /// The process has been terminated by a signal.
     Signaled {
-        signal: signal::Name,
+        signal: Cow<'a, str>,
         core_dump: bool,
     },
 }
 
-impl std::fmt::Display for State {
+impl std::fmt::Display for State<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Self::Running => "Running".fmt(f),
@@ -121,7 +121,7 @@ impl std::fmt::Display for State {
             // Not using write!(f, ...) to honor padding
             Self::Exited(exit_status) => format!("Done({exit_status})").fmt(f),
 
-            Self::Stopped(signal) => format!("Stopped(SIG{signal})").fmt(f),
+            Self::Stopped { signal } => format!("Stopped(SIG{signal})").fmt(f),
 
             Self::Signaled {
                 signal,
@@ -136,13 +136,13 @@ impl std::fmt::Display for State {
     }
 }
 
-impl State {
+impl State<'_> {
     /// Creates a `State` from a process state.
     ///
     /// This function converts a [`ProcessState`] into a `State` by converting
     /// the contained signal number into a signal name using the given system.
-    /// If the signal number is not recognized, the signal name `Rtmin(-1)` is
-    /// used as a fallback replacement.
+    /// If the signal number is not recognized, the signal name `???` is used as
+    /// a fallback replacement.
     #[must_use]
     pub fn from_process_state<S: Signals>(state: ProcessState, system: &S) -> Self {
         match state {
@@ -150,10 +150,11 @@ impl State {
             ProcessState::Halted(result) => match result {
                 ProcessResult::Exited(status) => Self::Exited(status),
                 ProcessResult::Stopped(signal) => {
-                    Self::Stopped(system.signal_name_from_number(signal))
+                    let signal = system.sig2str(signal).unwrap_or(Cow::Borrowed("???"));
+                    Self::Stopped { signal }
                 }
                 ProcessResult::Signaled { signal, core_dump } => {
-                    let signal = system.signal_name_from_number(signal);
+                    let signal = system.sig2str(signal).unwrap_or(Cow::Borrowed("???"));
                     Self::Signaled { signal, core_dump }
                 }
             },
@@ -182,7 +183,7 @@ pub struct Report<'a> {
     pub pid: Option<Pid>,
 
     /// Current state of the job
-    pub state: State,
+    pub state: State<'a>,
 
     /// Job name
     pub name: &'a str,
@@ -308,19 +309,21 @@ mod tests {
     fn state_display() {
         let state = State::Running;
         assert_eq!(state.to_string(), "Running");
-        let state = State::Stopped(signal::Name::Stop);
+        let state = State::Stopped {
+            signal: Cow::Borrowed("STOP"),
+        };
         assert_eq!(state.to_string(), "Stopped(SIGSTOP)");
         let state = State::Exited(ExitStatus::SUCCESS);
         assert_eq!(state.to_string(), "Done");
         let state = State::Exited(ExitStatus::NOT_FOUND);
         assert_eq!(state.to_string(), "Done(127)");
         let state = State::Signaled {
-            signal: signal::Name::Kill,
+            signal: Cow::Borrowed("KILL"),
             core_dump: false,
         };
         assert_eq!(state.to_string(), "Killed(SIGKILL)");
         let state = State::Signaled {
-            signal: signal::Name::Quit,
+            signal: Cow::Borrowed("QUIT"),
             core_dump: true,
         };
         assert_eq!(state.to_string(), "Killed(SIGQUIT: core dumped)");

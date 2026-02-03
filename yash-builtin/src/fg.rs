@@ -46,10 +46,9 @@ use yash_env::option::State::Off;
 use yash_env::semantics::Divert::Interrupt;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::signal;
 use yash_env::system::{
-    Close, Dup, Errno, Fcntl, Isatty, Open, SendSignal, Sigaction, Sigmask, Signals, TcSetPgrp,
-    Wait, Write,
+    Close, Dup, Fcntl, Isatty, Open, SendSignal, Sigaction, Sigmask, Signals, TcSetPgrp, Wait,
+    Write,
 };
 
 /// Resumes the job at the specified index.
@@ -107,9 +106,7 @@ where
             }
 
             let pgid = -job.pid;
-            let sigcont = env.system.signal_number_from_name(signal::Name::Cont);
-            let sigcont = sigcont.ok_or(Errno::EINVAL)?;
-            env.system.kill(pgid, Some(sigcont)).await?;
+            env.system.kill(pgid, Some(S::SIGCONT)).await?;
 
             // Wait for the job to finish (or suspend again).
             let result = env.wait_for_subshell_to_halt(job.pid).await?.1;

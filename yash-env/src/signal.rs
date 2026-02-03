@@ -17,30 +17,28 @@
 //! Type definitions for signals
 //!
 //! Signals are a method of inter-process communication used to notify a process
-//! that a specific event has occurred. This module provides a list of signals
-//! defined by POSIX with additional support for some non-standard signals.
+//! that a specific event has occurred. This module provides types for
+//! representing signals.
 //!
-//! This module defines two abstractions for signals: [`Name`] and [`Number`].
-//! The `Name` type identifies a signal by its name, while the `Number` type
-//! represents a signal by its number. This reflects the fact that different
-//! systems may use different signal numbers for the same signal name and that
-//! some exotic signals may not be available on all systems.
+//! At the OS API level, signals are represented simply as integers.
+//! [`RawNumber`] is an alias for the integer type. To distinguish signals from
+//! other integers, this module provides the [`Number`] type. Signal values and
+//! their meanings vary by system. `Number` is designed to represent only the
+//! values actually available on a given system.
 //!
-//! A [`Name`] can represent a single signal name, such as `SIGINT`
-//! ([`Name::Int`]), regardless of whether the signal is available on
-//! [`Signals`] implementors representing specific systems. This makes `Name`s
-//! suitable for user-facing applications that need to display or parse signal
-//! names.
+//! For clarity, signals are assigned names such as `SIGINT` and `SIGTERM`. To
+//! convert between signal names and their numerical values, you can use the
+//! constants and methods defined in the [`Signals`] trait.
 //!
-//! A [`Number`] represents a signal that is available on a specific system
-//! implementing the [`Signals`] trait. It is a thin wrapper around a raw
-//! signal number. The number is guaranteed to be a positive integer, so it
-//! optimizes the size of `Option<Number>`, etc. `Number`s are used in most
-//! signal-related functions of the `Signals` and related traits to efficiently
-//! interact with the underlying system calls.
+//! This module also provides an enum called [`Name`]. It is a compact value
+//! for identifying signal names without using strings (`str`). This is an
+//! somewhat obsolete type previously used as an intermediate representation for
+//! converting between signal names and numbers. With the addition in `Signals`
+//! of direct conversion methods between signal names and numbers, there remains
+//! little practical need for using `Name`.
 //!
-//! All proper signal names start with `"SIG"`. However, the names defined,
-//! parsed, and displayed in this module do not include the `"SIG"` prefix.
+//! All proper signal names start with `"SIG"`. However, functions that
+//! operate on signal names usually expect names without the `"SIG"` prefix.
 
 use crate::system::Errno;
 #[cfg(doc)]
@@ -68,6 +66,10 @@ pub type RawNumber = c_int;
 /// Use the [`Signals::validate_signal`] function to obtain a `Name` from a
 /// signal number. The [`Signals::signal_number_from_name`] function can be used
 /// to convert a `Name` to a `Number`.
+///
+/// This type is soft-deprecated. In most cases, you should use ordinary
+/// strings to represent signal names, and use the conversion methods in
+/// [`Signals`] to convert between names and numbers.
 #[derive(Clone, Copy, Debug, EnumIter, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Name {
@@ -394,13 +396,14 @@ fn test_name_from_str() {
 
 /// Signal number
 ///
-/// This is a wrapper type for signal numbers. It is guaranteed to be a positive
-/// integer, so it optimizes the size of `Option<Number>`, etc.
+/// This is a wrapper type for signal numbers. POSIX requires valid signal
+/// numbers to be positive `c_int` values. Therefore, this type wraps a
+/// `NonZero<RawNumber>`, guaranteeing that the signal number is always
+/// non-zero.
 ///
-/// To make sure that all `Number`s are valid, you can only obtain a `Number`
-/// from an instance of [`Signals`]. Use the [`Signals::validate_signal`] and
-/// [`Signals::signal_number_from_name`] methods to create a `Number` from a raw
-/// signal number or a signal name, respectively.
+/// To make sure that all `Number`s are valid, you should only obtain them
+/// from an instance of [`Signals`], which provides constants and methods to
+/// convert between signal names and numbers.
 ///
 /// Signal numbers are specific to the underlying system. Passing a signal
 /// number obtained from [`RealSystem`] to [`VirtualSystem`] (or vice versa) is
@@ -431,19 +434,32 @@ impl Number {
     /// Creates a new `Number` from a raw signal number.
     ///
     /// This is a backdoor method that allows creating a `Number` from an
-    /// arbitrary raw signal number. The caller must ensure that the raw signal
+    /// arbitrary non-zero integer. The caller must ensure that the raw signal
     /// number is a valid signal number.
     ///
     /// This function is not marked `unsafe` because creating an invalid
     /// `Number` does not lead to undefined behavior. However, it is not
     /// recommended to use this function unless you are sure that the raw signal
-    /// number is valid. To make sure that all `Number`s are valid, use the
-    /// [`Signals::validate_signal`] and [`Signals::signal_number_from_name`]
-    /// methods instead.
+    /// number is valid. In most cases, you should obtain `Number`s from an
+    /// instance of [`Signals`].
     #[inline(always)]
     #[must_use]
     pub const fn from_raw_unchecked(raw: NonZero<RawNumber>) -> Self {
         Self(raw)
+    }
+}
+
+impl From<Number> for NonZero<RawNumber> {
+    #[inline(always)]
+    fn from(number: Number) -> Self {
+        number.0
+    }
+}
+
+impl From<Number> for RawNumber {
+    #[inline(always)]
+    fn from(number: Number) -> Self {
+        number.0.get()
     }
 }
 

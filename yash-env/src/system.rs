@@ -43,6 +43,8 @@
 //! - [`GetPid`]: Declares the `getpid` and other methods for getting process IDs
 //!   and other attributes.
 //! - [`GetPw`]: Declares methods for getting user information.
+//! - [`GetSigaction`]: Declares the `get_sigaction` method for querying signal
+//!   dispositions.
 //! - [`GetUid`]: Declares the `getuid`, `geteuid`, `getgid`, and
 //!   `getegid` methods for getting user and group IDs.
 //! - [`IsExecutableFile`]: Declares the `is_executable_file` method for checking
@@ -139,7 +141,7 @@ use self::select::SelectSystem;
 use self::select::SignalStatus;
 pub use self::shared::SharedSystem;
 pub use self::signal::{
-    CaughtSignals, Disposition, SendSignal, Sigaction, Sigmask, SigmaskOp, Signals,
+    CaughtSignals, Disposition, GetSigaction, SendSignal, Sigaction, Sigmask, SigmaskOp, Signals,
 };
 pub use self::sysconf::{ShellPath, Sysconf};
 pub use self::terminal::{Isatty, TcGetPgrp, TcSetPgrp};

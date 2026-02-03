@@ -42,7 +42,7 @@ use self::state::{EnterSubshellOption, GrandState};
 use crate::Env;
 use crate::signal;
 use crate::source::Location;
-use crate::system::{Disposition, Errno};
+use crate::system::{Disposition, Errno, Signals};
 #[cfg(doc)]
 use crate::system::{SharedSystem, System};
 use std::collections::BTreeMap;
@@ -50,32 +50,7 @@ use std::collections::btree_map::Entry;
 use std::pin::Pin;
 
 /// System interface for signal handling configuration
-pub trait SignalSystem {
-    /// Returns the name of a signal from its number.
-    #[must_use]
-    fn signal_name_from_number(&self, number: signal::Number) -> signal::Name;
-
-    /// Returns the signal number from its name.
-    ///
-    /// This function returns the signal number corresponding to the signal name
-    /// in the system. If the signal name is not supported, it returns `None`.
-    ///
-    /// Note that the `TrapSet` implementation assumes that the system supports
-    /// all the following signals:
-    ///
-    /// - `SIGCHLD`
-    /// - `SIGINT`
-    /// - `SIGTERM`
-    /// - `SIGQUIT`
-    /// - `SIGTSTP`
-    /// - `SIGTTIN`
-    /// - `SIGTTOU`
-    ///
-    /// If this method returns `None` for any of these signals, `TrapSet` will
-    /// panic.
-    #[must_use]
-    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number>;
-
+pub trait SignalSystem: Signals {
     /// Returns the current disposition for a signal.
     ///
     /// This function returns the current disposition for the specified signal like
@@ -226,11 +201,12 @@ impl TrapSet {
         origin: Location,
         override_ignore: bool,
     ) -> Result<(), SetActionError> {
-        if let Condition::Signal(number) = cond {
-            match system.signal_name_from_number(number) {
-                signal::Name::Kill => return Err(SetActionError::SIGKILL),
-                signal::Name::Stop => return Err(SetActionError::SIGSTOP),
-                _ => {}
+        if let Condition::Signal(signal) = cond {
+            if signal == S::SIGKILL {
+                return Err(SetActionError::SIGKILL);
+            }
+            if signal == S::SIGSTOP {
+                return Err(SetActionError::SIGSTOP);
             }
         }
 
@@ -309,18 +285,21 @@ impl TrapSet {
         for (&cond, state) in &mut self.traps {
             let option = match cond {
                 Condition::Exit => EnterSubshellOption::ClearInternalDisposition,
-                Condition::Signal(number) => {
-                    use signal::Name::*;
-                    match system.signal_name_from_number(number) {
-                        Chld => EnterSubshellOption::KeepInternalDisposition,
-                        Int | Quit if ignore_sigint_sigquit => EnterSubshellOption::Ignore,
-                        Tstp | Ttin | Ttou
-                            if keep_internal_dispositions_for_stoppers
-                                && state.internal_disposition() != Disposition::Default =>
-                        {
-                            EnterSubshellOption::Ignore
-                        }
-                        _ => EnterSubshellOption::ClearInternalDisposition,
+                Condition::Signal(signal) =>
+                {
+                    #[allow(clippy::if_same_then_else)]
+                    if signal == S::SIGCHLD {
+                        EnterSubshellOption::KeepInternalDisposition
+                    } else if ignore_sigint_sigquit && (signal == S::SIGINT || signal == S::SIGQUIT)
+                    {
+                        EnterSubshellOption::Ignore
+                    } else if keep_internal_dispositions_for_stoppers
+                        && (signal == S::SIGTSTP || signal == S::SIGTTIN || signal == S::SIGTTOU)
+                        && state.internal_disposition() != Disposition::Default
+                    {
+                        EnterSubshellOption::Ignore
+                    } else {
+                        EnterSubshellOption::ClearInternalDisposition
                     }
                 }
             };
@@ -328,11 +307,8 @@ impl TrapSet {
         }
 
         if ignore_sigint_sigquit {
-            for name in [signal::Name::Int, signal::Name::Quit] {
-                let number = system
-                    .signal_number_from_name(name)
-                    .unwrap_or_else(|| panic!("missing support for signal {name}"));
-                match self.traps.entry(Condition::Signal(number)) {
+            for signal in [S::SIGINT, S::SIGQUIT] {
+                match self.traps.entry(Condition::Signal(signal)) {
                     Entry::Vacant(vacant) => _ = GrandState::ignore(system, vacant),
                     // If the entry is occupied, the signal is already ignored in the loop above.
                     Entry::Occupied(_) => {}
@@ -356,7 +332,7 @@ impl TrapSet {
     /// Returns the [`TrapState`] if the flag was set.
     pub fn take_signal_if_caught(&mut self, signal: signal::Number) -> Option<&TrapState> {
         self.traps
-            .get_mut(&signal.into())
+            .get_mut(&Condition::Signal(signal))
             .and_then(|state| state.handle_if_caught())
     }
 
@@ -376,14 +352,11 @@ impl TrapSet {
 
     fn set_internal_disposition<S: SignalSystem>(
         &mut self,
-        signal: signal::Name,
+        signal: signal::Number,
         disposition: Disposition,
         system: &mut S,
     ) -> Result<(), Errno> {
-        let number = system
-            .signal_number_from_name(signal)
-            .unwrap_or_else(|| panic!("missing support for signal {signal}"));
-        let entry = self.traps.entry(Condition::Signal(number));
+        let entry = self.traps.entry(Condition::Signal(signal));
         GrandState::set_internal_disposition(system, entry, disposition)
     }
 
@@ -400,7 +373,7 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        self.set_internal_disposition(signal::Name::Chld, Disposition::Catch, system)
+        self.set_internal_disposition(S::SIGCHLD, Disposition::Catch, system)
     }
 
     /// Installs the internal dispositions for `SIGINT`, `SIGTERM`, and `SIGQUIT`.
@@ -415,9 +388,9 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        self.set_internal_disposition(signal::Name::Int, Disposition::Catch, system)?;
-        self.set_internal_disposition(signal::Name::Term, Disposition::Ignore, system)?;
-        self.set_internal_disposition(signal::Name::Quit, Disposition::Ignore, system)
+        self.set_internal_disposition(S::SIGINT, Disposition::Catch, system)?;
+        self.set_internal_disposition(S::SIGTERM, Disposition::Ignore, system)?;
+        self.set_internal_disposition(S::SIGQUIT, Disposition::Ignore, system)
     }
 
     /// Installs the internal dispositions for `SIGTSTP`, `SIGTTIN`, and `SIGTTOU`.
@@ -432,9 +405,9 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        self.set_internal_disposition(signal::Name::Tstp, Disposition::Ignore, system)?;
-        self.set_internal_disposition(signal::Name::Ttin, Disposition::Ignore, system)?;
-        self.set_internal_disposition(signal::Name::Ttou, Disposition::Ignore, system)
+        self.set_internal_disposition(S::SIGTSTP, Disposition::Ignore, system)?;
+        self.set_internal_disposition(S::SIGTTIN, Disposition::Ignore, system)?;
+        self.set_internal_disposition(S::SIGTTOU, Disposition::Ignore, system)
     }
 
     /// Uninstalls the internal dispositions for `SIGINT`, `SIGTERM`, and `SIGQUIT`.
@@ -442,9 +415,9 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        self.set_internal_disposition(signal::Name::Int, Disposition::Default, system)?;
-        self.set_internal_disposition(signal::Name::Term, Disposition::Default, system)?;
-        self.set_internal_disposition(signal::Name::Quit, Disposition::Default, system)
+        self.set_internal_disposition(S::SIGINT, Disposition::Default, system)?;
+        self.set_internal_disposition(S::SIGTERM, Disposition::Default, system)?;
+        self.set_internal_disposition(S::SIGQUIT, Disposition::Default, system)
     }
 
     /// Uninstalls the internal dispositions for `SIGTSTP`, `SIGTTIN`, and `SIGTTOU`.
@@ -452,9 +425,9 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        self.set_internal_disposition(signal::Name::Tstp, Disposition::Default, system)?;
-        self.set_internal_disposition(signal::Name::Ttin, Disposition::Default, system)?;
-        self.set_internal_disposition(signal::Name::Ttou, Disposition::Default, system)
+        self.set_internal_disposition(S::SIGTSTP, Disposition::Default, system)?;
+        self.set_internal_disposition(S::SIGTTIN, Disposition::Default, system)?;
+        self.set_internal_disposition(S::SIGTTOU, Disposition::Default, system)
     }
 
     /// Uninstalls all internal dispositions.
@@ -466,7 +439,7 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        self.set_internal_disposition(signal::Name::Chld, Disposition::Default, system)?;
+        self.set_internal_disposition(S::SIGCHLD, Disposition::Default, system)?;
         self.disable_internal_dispositions_for_terminators(system)?;
         self.disable_internal_dispositions_for_stoppers(system)
     }
@@ -543,27 +516,64 @@ mod tests {
     use super::*;
     use crate::job::ProcessState;
     use crate::system::SendSignal as _;
-    use crate::system::Signals as _;
-    use crate::system::r#virtual::VirtualSystem;
     use crate::system::r#virtual::{
-        SIGCHLD, SIGINT, SIGKILL, SIGQUIT, SIGSTOP, SIGTERM, SIGTSTP, SIGTTIN, SIGTTOU, SIGUSR1,
-        SIGUSR2,
+        SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCONT, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGIOT,
+        SIGKILL, SIGPIPE, SIGPROF, SIGQUIT, SIGSEGV, SIGSTOP, SIGSYS, SIGTERM, SIGTRAP, SIGTSTP,
+        SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU, SIGXFSZ,
     };
     use crate::tests::in_virtual_system;
     use std::collections::HashMap;
+    use std::ops::RangeInclusive;
 
     #[derive(Default)]
     pub struct DummySystem(pub HashMap<signal::Number, Disposition>);
 
+    impl Signals for DummySystem {
+        const SIGABRT: signal::Number = SIGABRT;
+        const SIGALRM: signal::Number = SIGALRM;
+        const SIGBUS: signal::Number = SIGBUS;
+        const SIGCHLD: signal::Number = SIGCHLD;
+        const SIGCLD: Option<signal::Number> = None;
+        const SIGCONT: signal::Number = SIGCONT;
+        const SIGEMT: Option<signal::Number> = None;
+        const SIGFPE: signal::Number = SIGFPE;
+        const SIGHUP: signal::Number = SIGHUP;
+        const SIGILL: signal::Number = SIGILL;
+        const SIGINFO: Option<signal::Number> = None;
+        const SIGINT: signal::Number = SIGINT;
+        const SIGIO: Option<signal::Number> = None;
+        const SIGIOT: signal::Number = SIGIOT;
+        const SIGKILL: signal::Number = SIGKILL;
+        const SIGLOST: Option<signal::Number> = None;
+        const SIGPIPE: signal::Number = SIGPIPE;
+        const SIGPOLL: Option<signal::Number> = None;
+        const SIGPROF: signal::Number = SIGPROF;
+        const SIGPWR: Option<signal::Number> = None;
+        const SIGQUIT: signal::Number = SIGQUIT;
+        const SIGSEGV: signal::Number = SIGSEGV;
+        const SIGSTKFLT: Option<signal::Number> = None;
+        const SIGSTOP: signal::Number = SIGSTOP;
+        const SIGSYS: signal::Number = SIGSYS;
+        const SIGTERM: signal::Number = SIGTERM;
+        const SIGTHR: Option<signal::Number> = None;
+        const SIGTRAP: signal::Number = SIGTRAP;
+        const SIGTSTP: signal::Number = SIGTSTP;
+        const SIGTTIN: signal::Number = SIGTTIN;
+        const SIGTTOU: signal::Number = SIGTTOU;
+        const SIGURG: signal::Number = SIGURG;
+        const SIGUSR1: signal::Number = SIGUSR1;
+        const SIGUSR2: signal::Number = SIGUSR2;
+        const SIGVTALRM: signal::Number = SIGVTALRM;
+        const SIGWINCH: signal::Number = SIGWINCH;
+        const SIGXCPU: signal::Number = SIGXCPU;
+        const SIGXFSZ: signal::Number = SIGXFSZ;
+
+        fn sigrt_range(&self) -> Option<RangeInclusive<signal::Number>> {
+            None
+        }
+    }
+
     impl SignalSystem for DummySystem {
-        fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
-            VirtualSystem::new().signal_name_from_number(number)
-        }
-
-        fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
-            VirtualSystem::new().signal_number_from_name(name)
-        }
-
         fn get_disposition(&self, signal: signal::Number) -> Result<Disposition, Errno> {
             Ok(self.0.get(&signal).copied().unwrap_or_default())
         }
