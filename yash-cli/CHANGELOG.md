@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   This change allows sending custom signals that are not recognized by the
   shell, if the operating system supports them.
 
+### Fixed
+
+- The `kill` built-in now correctly formats error messages for invalid options
+  and signal specifications.
+
 ## [3.0.4] - 2025-11-07
 
 ### Changed
