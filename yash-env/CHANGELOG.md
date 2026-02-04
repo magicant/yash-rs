@@ -9,6 +9,14 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.12.1] - Unreleased
+
+### Fixed
+
+- `system::virtual::VirtualSystem::kill` now correctly succeeds when sending a
+  dummy signal (i.e., `None`) to an existing process group or all processes.
+  Previously, it incorrectly returned `Err(Errno::ESRCH)` in such cases.
+
 ## [0.12.0] - 2026-02-04
 
 ### Added
@@ -854,6 +862,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Initial implementation of the `yash-env` crate
 
+[0.12.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.12.1
 [0.12.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.12.0
 [0.11.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.11.0
 [0.10.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.10.1

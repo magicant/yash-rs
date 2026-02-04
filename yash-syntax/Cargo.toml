@@ -1,6 +1,6 @@
 [package]
 name = "yash-syntax"
-version = "0.19.0"
+version = "0.19.1"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2024"
 rust-version = "1.87.0"
