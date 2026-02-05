@@ -1248,12 +1248,14 @@ fn send_signal_to_processes(
 ) -> Result<()> {
     let mut results = Vec::new();
 
-    if let Some(signal) = signal {
-        for (&_pid, process) in &mut state.processes {
-            if target_pgid.is_none_or(|target_pgid| process.pgid == target_pgid) {
-                let result = process.raise_signal(signal);
-                results.push((result, process.ppid));
-            }
+    for (&_pid, process) in &mut state.processes {
+        if target_pgid.is_none_or(|target_pgid| process.pgid == target_pgid) {
+            let result = if let Some(signal) = signal {
+                process.raise_signal(signal)
+            } else {
+                SignalResult::default()
+            };
+            results.push((result, process.ppid));
         }
     }
 
@@ -2163,6 +2165,26 @@ mod tests {
             .unwrap();
         let state = system.state.borrow();
         assert_eq!(state.processes[&Pid(10)].state, ProcessState::Running);
+    }
+
+    #[test]
+    fn kill_dummy_signal_to_my_group() {
+        let system = VirtualSystem::new();
+
+        let result = system
+            .kill(Pid::MY_PROCESS_GROUP, None)
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, Ok(()));
+        assert_eq!(system.current_process().state(), ProcessState::Running);
+    }
+
+    #[test]
+    fn kill_dummy_signal_to_non_existent_group() {
+        let system = VirtualSystem::new();
+        let result = system.kill(Pid(-9999), None).now_or_never().unwrap();
+        assert_eq!(result, Err(Errno::ESRCH));
     }
 
     #[test]
