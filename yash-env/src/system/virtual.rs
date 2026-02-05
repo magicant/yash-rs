@@ -107,7 +107,6 @@ use super::Sigaction;
 use super::Sigmask;
 use super::SigmaskOp;
 use super::Signals;
-use super::Stat;
 use super::Sysconf;
 use super::TcGetPgrp;
 use super::TcSetPgrp;

@@ -16,7 +16,7 @@
 
 //! Items about file systems
 
-use super::{Gid, Result, Uid};
+use super::Result;
 use crate::io::Fd;
 use crate::path::{Path, PathBuf};
 use crate::str::UnixStr;
@@ -168,47 +168,8 @@ pub enum FileType {
     Other,
 }
 
-/// File status
-///
-/// This type is a collection of file status information. It is similar to the
-/// `stat` structure defined in the POSIX standard, but it is simplified and
-/// does not include all fields of the `stat` structure.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[non_exhaustive]
-pub struct Stat {
-    /// Device ID
-    pub dev: u64,
-    /// Inode number
-    pub ino: u64,
-    /// Access permissions
-    ///
-    /// Note that this field does not include the file type bits.
-    /// The file type is stored in the `type` field.
-    pub mode: Mode,
-    /// File type
-    pub r#type: FileType,
-    /// Number of hard links
-    pub nlink: u64,
-    /// User ID of the file owner
-    pub uid: Uid,
-    /// Group ID of the file owner
-    pub gid: Gid,
-    /// Length of the file in bytes
-    pub size: u64,
-    // TODO: atime, mtime, ctime, (birthtime)
-}
-
-impl Stat {
-    /// Returns the device ID and inode number as a tuple
-    ///
-    /// This method is useful for testing whether two `Stat` objects refer to
-    /// the same file.
-    #[inline]
-    #[must_use]
-    pub const fn identity(&self) -> (u64, u64) {
-        (self.dev, self.ino)
-    }
-}
+// FIXME
+pub use super::r#virtual::Stat;
 
 /// Trait for retrieving file metadata
 ///
