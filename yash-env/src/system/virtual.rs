@@ -360,6 +360,8 @@ impl Default for VirtualSystem {
 }
 
 impl Fstat for VirtualSystem {
+    type Stat = Stat;
+
     fn fstat(&self, fd: Fd) -> Result<Stat> {
         self.with_open_file_description(fd, |ofd| Ok(ofd.file.borrow().stat()))
     }

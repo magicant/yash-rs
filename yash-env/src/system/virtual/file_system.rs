@@ -346,6 +346,41 @@ impl Stat {
     }
 }
 
+impl super::super::Stat for Stat {
+    #[inline(always)]
+    fn dev(&self) -> u64 {
+        self.dev
+    }
+    #[inline(always)]
+    fn ino(&self) -> u64 {
+        self.ino
+    }
+    #[inline(always)]
+    fn mode(&self) -> Mode {
+        self.mode
+    }
+    #[inline(always)]
+    fn r#type(&self) -> FileType {
+        self.r#type
+    }
+    #[inline(always)]
+    fn nlink(&self) -> u64 {
+        self.nlink
+    }
+    #[inline(always)]
+    fn uid(&self) -> Uid {
+        self.uid
+    }
+    #[inline(always)]
+    fn gid(&self) -> Gid {
+        self.gid
+    }
+    #[inline(always)]
+    fn size(&self) -> u64 {
+        self.size
+    }
+}
+
 /// Implementor of [`Dir`] for virtual file system
 #[derive(Clone, Debug)]
 pub struct VirtualDir<I> {

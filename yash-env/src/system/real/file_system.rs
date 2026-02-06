@@ -16,7 +16,7 @@
 
 //! Extension to [`crate::system::file_system`] for the real system
 
-use super::super::{FileType, Gid, Mode, RawMode, Stat, Uid};
+use super::super::{FileType, Gid, Mode, RawMode, Uid};
 use std::mem::MaybeUninit;
 
 impl FileType {
@@ -35,6 +35,13 @@ impl FileType {
     }
 }
 
+/// Metadata of a file in the real file system
+///
+/// This is an implementation of the [`Stat` trait](super::super::Stat) for the
+/// [`RealSystem`](super::RealSystem).
+#[repr(transparent)]
+pub struct Stat(MaybeUninit<libc::stat>);
+
 impl Stat {
     /// Converts a raw `stat` structure to a `Stat` object.
     ///
@@ -42,19 +49,82 @@ impl Stat {
     /// `stat` system call, but it is passed as `MaybeUninit` because of
     /// possible padding or extension fields in the structure which may not be
     /// initialized by the system call.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the provided `stat` structure is properly
+    /// initialized by a system call like `stat`, `fstat`, or `lstat`.
     #[must_use]
-    pub(super) const unsafe fn from_raw(stat: &MaybeUninit<libc::stat>) -> Self {
-        let ptr = stat.as_ptr();
-        let raw_mode = unsafe { (*ptr).st_mode };
-        Self {
-            dev: unsafe { (*ptr).st_dev } as _,
-            ino: unsafe { (*ptr).st_ino } as _,
-            mode: Mode::from_bits_truncate(raw_mode),
-            r#type: FileType::from_raw(raw_mode),
-            nlink: unsafe { (*ptr).st_nlink } as _,
-            uid: Uid(unsafe { (*ptr).st_uid }),
-            gid: Gid(unsafe { (*ptr).st_gid }),
-            size: unsafe { (*ptr).st_size } as _,
-        }
+    pub(super) const unsafe fn from_raw(stat: MaybeUninit<libc::stat>) -> Self {
+        Self(stat)
+    }
+}
+
+// The actual types of the fields in `libc::stat` may vary across platforms,
+// so some casts may be necessary.
+#[allow(clippy::unnecessary_cast)]
+impl super::super::Stat for Stat {
+    #[inline(always)]
+    fn dev(&self) -> u64 {
+        unsafe { *self.0.as_ptr() }.st_dev as u64
+    }
+    #[inline(always)]
+    fn ino(&self) -> u64 {
+        unsafe { *self.0.as_ptr() }.st_ino as u64
+    }
+    #[inline(always)]
+    fn mode(&self) -> Mode {
+        let raw_mode = unsafe { *self.0.as_ptr() }.st_mode;
+        Mode::from_bits_truncate(raw_mode)
+    }
+    #[inline(always)]
+    fn r#type(&self) -> FileType {
+        let raw_mode = unsafe { *self.0.as_ptr() }.st_mode;
+        FileType::from_raw(raw_mode)
+    }
+    #[inline(always)]
+    fn nlink(&self) -> u64 {
+        unsafe { *self.0.as_ptr() }.st_nlink as u64
+    }
+    #[inline(always)]
+    fn uid(&self) -> Uid {
+        Uid(unsafe { *self.0.as_ptr() }.st_uid)
+    }
+    #[inline(always)]
+    fn gid(&self) -> Gid {
+        Gid(unsafe { *self.0.as_ptr() }.st_gid)
+    }
+    #[inline(always)]
+    fn size(&self) -> u64 {
+        unsafe { *self.0.as_ptr() }.st_size as u64
+    }
+
+    fn is_regular_file(&self) -> bool {
+        let raw_mode = unsafe { *self.0.as_ptr() }.st_mode;
+        raw_mode & libc::S_IFMT == libc::S_IFREG
+    }
+    fn is_directory(&self) -> bool {
+        let raw_mode = unsafe { *self.0.as_ptr() }.st_mode;
+        raw_mode & libc::S_IFMT == libc::S_IFDIR
+    }
+    fn is_symlink(&self) -> bool {
+        let raw_mode = unsafe { *self.0.as_ptr() }.st_mode;
+        raw_mode & libc::S_IFMT == libc::S_IFLNK
+    }
+    fn is_fifo(&self) -> bool {
+        let raw_mode = unsafe { *self.0.as_ptr() }.st_mode;
+        raw_mode & libc::S_IFMT == libc::S_IFIFO
+    }
+    fn is_block_device(&self) -> bool {
+        let raw_mode = unsafe { *self.0.as_ptr() }.st_mode;
+        raw_mode & libc::S_IFMT == libc::S_IFBLK
+    }
+    fn is_character_device(&self) -> bool {
+        let raw_mode = unsafe { *self.0.as_ptr() }.st_mode;
+        raw_mode & libc::S_IFMT == libc::S_IFCHR
+    }
+    fn is_socket(&self) -> bool {
+        let raw_mode = unsafe { *self.0.as_ptr() }.st_mode;
+        raw_mode & libc::S_IFMT == libc::S_IFSOCK
     }
 }

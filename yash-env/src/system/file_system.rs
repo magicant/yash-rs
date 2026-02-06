@@ -16,7 +16,7 @@
 
 //! Items about file systems
 
-use super::Result;
+use super::{Gid, Result, Uid};
 use crate::io::Fd;
 use crate::path::{Path, PathBuf};
 use crate::str::UnixStr;
@@ -168,20 +168,110 @@ pub enum FileType {
     Other,
 }
 
-// FIXME
-pub use super::r#virtual::Stat;
+/// Metadata of a file
+///
+/// Implementations of this trait represent metadata of a file, such as its
+/// type, permissions, owner, size, etc. The [`Fstat`] trait provides methods to
+/// retrieve `Stat` objects for files.
+pub trait Stat {
+    /// Device ID
+    #[must_use]
+    fn dev(&self) -> u64;
+    /// Inode number
+    #[must_use]
+    fn ino(&self) -> u64;
+    /// File mode (permission bits)
+    ///
+    /// Note that this field does not include the file type bits.
+    /// Use [`type`](Self::type) to get the file type.
+    /// You can also use [`is_regular_file`](Self::is_regular_file) and other
+    /// similar methods to check the file type.
+    #[must_use]
+    fn mode(&self) -> Mode;
+    /// File type
+    #[must_use]
+    fn r#type(&self) -> FileType;
+    /// Number of hard links
+    #[must_use]
+    fn nlink(&self) -> u64;
+    /// User ID of the file owner
+    #[must_use]
+    fn uid(&self) -> Uid;
+    /// Group ID of the file owner
+    #[must_use]
+    fn gid(&self) -> Gid;
+    /// Size of the file in bytes
+    #[must_use]
+    fn size(&self) -> u64;
+    // TODO: atime, mtime, ctime, (birthtime)
+
+    /// Returns the device ID and inode number as a tuple.
+    ///
+    /// This method is useful for testing whether two `Stat` objects refer to
+    /// the same file.
+    #[inline(always)]
+    #[must_use]
+    fn identity(&self) -> (u64, u64) {
+        (self.dev(), self.ino())
+    }
+
+    /// Whether the file is a regular file
+    #[inline(always)]
+    #[must_use]
+    fn is_regular_file(&self) -> bool {
+        self.r#type() == FileType::Regular
+    }
+    /// Whether the file is a directory
+    #[inline(always)]
+    #[must_use]
+    fn is_directory(&self) -> bool {
+        self.r#type() == FileType::Directory
+    }
+    /// Whether the file is a symbolic link
+    #[inline(always)]
+    #[must_use]
+    fn is_symlink(&self) -> bool {
+        self.r#type() == FileType::Symlink
+    }
+    /// Whether the file is a pipe
+    #[inline(always)]
+    #[must_use]
+    fn is_fifo(&self) -> bool {
+        self.r#type() == FileType::Fifo
+    }
+    /// Whether the file is a block device
+    #[inline(always)]
+    #[must_use]
+    fn is_block_device(&self) -> bool {
+        self.r#type() == FileType::BlockDevice
+    }
+    /// Whether the file is a character device
+    #[inline(always)]
+    #[must_use]
+    fn is_character_device(&self) -> bool {
+        self.r#type() == FileType::CharacterDevice
+    }
+    /// Whether the file is a socket
+    #[inline(always)]
+    #[must_use]
+    fn is_socket(&self) -> bool {
+        self.r#type() == FileType::Socket
+    }
+}
 
 /// Trait for retrieving file metadata
 ///
 /// See also [`IsExecutableFile`].
 pub trait Fstat {
+    type Stat: Stat;
+
     /// Retrieves metadata of a file.
     ///
     /// This method wraps the [`fstat` system
     /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/fstat.html).
     /// It takes a file descriptor and returns a `Stat` object containing the
     /// file metadata.
-    fn fstat(&self, fd: Fd) -> Result<Stat>;
+    fn fstat(&self, fd: Fd) -> Result<Self::Stat>;
 
     /// Retrieves metadata of a file.
     ///
@@ -191,20 +281,19 @@ pub trait Fstat {
     /// whether to follow symbolic links. It returns a `Stat` object containing
     /// the file metadata. The file path is interpreted relative to the
     /// directory represented by the directory file descriptor.
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat>;
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Self::Stat>;
 
     /// Whether there is a directory at the specified path.
     #[must_use]
     fn is_directory(&self, path: &CStr) -> bool {
         self.fstatat(AT_FDCWD, path, /* follow_symlinks */ true)
-            .is_ok_and(|stat| stat.r#type == FileType::Directory)
+            .is_ok_and(|stat| stat.is_directory())
     }
 
     /// Tests if a file descriptor is a pipe.
     #[must_use]
     fn fd_is_pipe(&self, fd: Fd) -> bool {
-        self.fstat(fd)
-            .is_ok_and(|stat| stat.r#type == FileType::Fifo)
+        self.fstat(fd).is_ok_and(|stat| stat.is_fifo())
     }
 }
 
