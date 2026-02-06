@@ -9,12 +9,13 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
-## [0.15.1] - Unreleased
+## [0.16.0] - Unreleased
 
 ### Changed
 
 - Public dependency versions:
-    - yash-env 0.12.0 → 0.12.1
+    - yash-env 0.12.0 → 0.13.0
+    - yash-semantics (optional) 0.14.0 → 0.15.0
 
 ## [0.15.0] - 2026-02-04
 
@@ -22,6 +23,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Public dependency versions:
     - yash-env 0.11.0 → 0.12.0
+    - yash-semantics (optional) 0.13.0 → 0.14.0
 - The `kill::Command::Print::signals` field now contains a vector of `Field`
   instead of a vector of `(Signal, Field)` tuples. The `signals` parameter to
   `kill::print::print` and `kill::print::execute` has also been changed
@@ -67,6 +69,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 - Public dependency versions:
     - Rust 1.86.0 → 1.87.0
     - yash-env 0.10.0 → 0.11.0
+    - yash-semantics (optional) 0.12.0 → 0.13.0
 - Many types and functions now take type parameters representing the required
   system interface due to the introduction of the type parameter to `Env` in
   the `yash-env` crate.
@@ -658,7 +661,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
-[0.15.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.15.1
+[0.16.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.16.0
 [0.15.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.15.0
 [0.14.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.14.0
 [0.13.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.13.0
