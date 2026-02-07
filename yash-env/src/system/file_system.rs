@@ -263,6 +263,7 @@ pub trait Stat {
 ///
 /// See also [`IsExecutableFile`].
 pub trait Fstat {
+    /// Metadata type returned by [`fstat`](Self::fstat) and [`fstatat`](Self::fstatat)
     type Stat: Stat;
 
     /// Retrieves metadata of a file.
