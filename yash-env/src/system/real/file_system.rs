@@ -66,65 +66,65 @@ impl Stat {
 impl super::super::Stat for Stat {
     #[inline(always)]
     fn dev(&self) -> u64 {
-        unsafe { *self.0.as_ptr() }.st_dev as u64
+        (unsafe { (*self.0.as_ptr()).st_dev }) as u64
     }
     #[inline(always)]
     fn ino(&self) -> u64 {
-        unsafe { *self.0.as_ptr() }.st_ino as u64
+        (unsafe { (*self.0.as_ptr()).st_ino }) as u64
     }
     #[inline(always)]
     fn mode(&self) -> Mode {
-        let raw_mode = unsafe { *self.0.as_ptr() }.st_mode;
+        let raw_mode = unsafe { (*self.0.as_ptr()).st_mode };
         Mode::from_bits_truncate(raw_mode)
     }
     #[inline(always)]
     fn r#type(&self) -> FileType {
-        let raw_mode = unsafe { *self.0.as_ptr() }.st_mode;
+        let raw_mode = unsafe { (*self.0.as_ptr()).st_mode };
         FileType::from_raw(raw_mode)
     }
     #[inline(always)]
     fn nlink(&self) -> u64 {
-        unsafe { *self.0.as_ptr() }.st_nlink as u64
+        (unsafe { (*self.0.as_ptr()).st_nlink }) as u64
     }
     #[inline(always)]
     fn uid(&self) -> Uid {
-        Uid(unsafe { *self.0.as_ptr() }.st_uid)
+        Uid(unsafe { (*self.0.as_ptr()).st_uid })
     }
     #[inline(always)]
     fn gid(&self) -> Gid {
-        Gid(unsafe { *self.0.as_ptr() }.st_gid)
+        Gid(unsafe { (*self.0.as_ptr()).st_gid })
     }
     #[inline(always)]
     fn size(&self) -> u64 {
-        unsafe { *self.0.as_ptr() }.st_size as u64
+        (unsafe { (*self.0.as_ptr()).st_size }) as u64
     }
 
     fn is_regular_file(&self) -> bool {
-        let raw_mode = unsafe { *self.0.as_ptr() }.st_mode;
+        let raw_mode = unsafe { (*self.0.as_ptr()).st_mode };
         raw_mode & libc::S_IFMT == libc::S_IFREG
     }
     fn is_directory(&self) -> bool {
-        let raw_mode = unsafe { *self.0.as_ptr() }.st_mode;
+        let raw_mode = unsafe { (*self.0.as_ptr()).st_mode };
         raw_mode & libc::S_IFMT == libc::S_IFDIR
     }
     fn is_symlink(&self) -> bool {
-        let raw_mode = unsafe { *self.0.as_ptr() }.st_mode;
+        let raw_mode = unsafe { (*self.0.as_ptr()).st_mode };
         raw_mode & libc::S_IFMT == libc::S_IFLNK
     }
     fn is_fifo(&self) -> bool {
-        let raw_mode = unsafe { *self.0.as_ptr() }.st_mode;
+        let raw_mode = unsafe { (*self.0.as_ptr()).st_mode };
         raw_mode & libc::S_IFMT == libc::S_IFIFO
     }
     fn is_block_device(&self) -> bool {
-        let raw_mode = unsafe { *self.0.as_ptr() }.st_mode;
+        let raw_mode = unsafe { (*self.0.as_ptr()).st_mode };
         raw_mode & libc::S_IFMT == libc::S_IFBLK
     }
     fn is_character_device(&self) -> bool {
-        let raw_mode = unsafe { *self.0.as_ptr() }.st_mode;
+        let raw_mode = unsafe { (*self.0.as_ptr()).st_mode };
         raw_mode & libc::S_IFMT == libc::S_IFCHR
     }
     fn is_socket(&self) -> bool {
-        let raw_mode = unsafe { *self.0.as_ptr() }.st_mode;
+        let raw_mode = unsafe { (*self.0.as_ptr()).st_mode };
         raw_mode & libc::S_IFMT == libc::S_IFSOCK
     }
 }
