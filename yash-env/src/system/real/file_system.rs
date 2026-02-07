@@ -39,8 +39,11 @@ impl FileType {
 ///
 /// This is an implementation of the [`Stat` trait](super::super::Stat) for the
 /// [`RealSystem`](super::RealSystem).
+#[derive(Clone, Debug)]
 #[repr(transparent)]
 pub struct Stat(MaybeUninit<libc::stat>);
+// TODO: The auto-derived Debug implementation does not provide useful information.
+// Consider implementing a custom Debug that shows the contents.
 
 impl Stat {
     /// Converts a raw `stat` structure to a `Stat` object.
