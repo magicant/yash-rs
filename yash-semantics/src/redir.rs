@@ -97,7 +97,7 @@ use yash_env::option::Option::Clobber;
 use yash_env::option::State::Off;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::system::Stat;
+use yash_env::system::Stat as _;
 use yash_env::system::{Close, Dup, Errno, Fcntl, FdFlag, Fstat, Mode, OfdAccess, Open, OpenFlag};
 use yash_quote::quoted;
 use yash_syntax::source::Location;
