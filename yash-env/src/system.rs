@@ -299,8 +299,7 @@ pub trait SystemEx: System {
         since = "0.11.0"
     )]
     fn fd_is_pipe(&self, fd: Fd) -> bool {
-        self.fstat(fd)
-            .is_ok_and(|stat| stat.r#type == FileType::Fifo)
+        crate::system::Fstat::fd_is_pipe(self, fd)
     }
 
     /// Switches the foreground process group with SIGTTOU blocked.

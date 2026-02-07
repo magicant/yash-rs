@@ -97,9 +97,8 @@ use yash_env::option::Option::Clobber;
 use yash_env::option::State::Off;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::system::{
-    Close, Dup, Errno, Fcntl, FdFlag, FileType, Fstat, Mode, OfdAccess, Open, OpenFlag,
-};
+use yash_env::system::Stat as _;
+use yash_env::system::{Close, Dup, Errno, Fcntl, FdFlag, Fstat, Mode, OfdAccess, Open, OpenFlag};
 use yash_quote::quoted;
 use yash_syntax::source::Location;
 use yash_syntax::source::pretty::{Report, ReportType, Snippet};
@@ -336,9 +335,7 @@ where
     // Okay, it seems there is an existing file. Try opening it.
     match system.open(&path, OfdAccess::WriteOnly, EnumSet::empty(), MODE) {
         Ok(fd) => {
-            let is_regular = system
-                .fstat(fd)
-                .is_ok_and(|stat| stat.r#type == FileType::Regular);
+            let is_regular = system.fstat(fd).is_ok_and(|stat| stat.is_regular_file());
             if is_regular {
                 // We opened the FD without the O_CREAT flag, so somebody else
                 // must have created this file. Failure.

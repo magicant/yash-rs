@@ -43,7 +43,6 @@ use super::Exec;
 use super::Exit;
 use super::Fcntl;
 use super::FdFlag;
-use super::FileType;
 use super::Fork;
 use super::Fstat;
 use super::GetCwd;
@@ -72,7 +71,7 @@ use super::Sigaction;
 use super::Sigmask;
 use super::SigmaskOp;
 use super::Signals;
-use super::Stat;
+use super::Stat as _;
 use super::Sysconf;
 use super::TcGetPgrp;
 use super::TcSetPgrp;
@@ -95,6 +94,7 @@ use crate::semantics::ExitStatus;
 use crate::str::UnixStr;
 use crate::str::UnixString;
 use enumset::EnumSet;
+pub use file_system::Stat;
 use libc::DIR;
 use std::convert::Infallible;
 use std::convert::TryInto;
@@ -247,11 +247,6 @@ impl RealSystem {
         RealSystem(())
     }
 
-    fn file_has_type(&self, path: &CStr, r#type: FileType) -> bool {
-        self.fstatat(AT_FDCWD, path, true)
-            .is_ok_and(|stat| stat.r#type == r#type)
-    }
-
     // TODO Should use AT_EACCESS on all platforms
     #[cfg(not(target_os = "redox"))]
     fn has_execute_permission(&self, path: &CStr) -> bool {
@@ -265,14 +260,16 @@ impl RealSystem {
 }
 
 impl Fstat for RealSystem {
-    fn fstat(&self, fd: Fd) -> Result<Stat> {
+    type Stat = file_system::Stat;
+
+    fn fstat(&self, fd: Fd) -> Result<file_system::Stat> {
         let mut stat = MaybeUninit::<libc::stat>::uninit();
         unsafe { libc::fstat(fd.0, stat.as_mut_ptr()) }.errno_if_m1()?;
-        let stat = unsafe { Stat::from_raw(&stat) };
+        let stat = unsafe { file_system::Stat::from_raw(stat) };
         Ok(stat)
     }
 
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<file_system::Stat> {
         let flags = if follow_symlinks {
             0
         } else {
@@ -282,14 +279,16 @@ impl Fstat for RealSystem {
         let mut stat = MaybeUninit::<libc::stat>::uninit();
         unsafe { libc::fstatat(dir_fd.0, path.as_ptr(), stat.as_mut_ptr(), flags) }
             .errno_if_m1()?;
-        let stat = unsafe { Stat::from_raw(&stat) };
+        let stat = unsafe { file_system::Stat::from_raw(stat) };
         Ok(stat)
     }
 }
 
 impl IsExecutableFile for RealSystem {
     fn is_executable_file(&self, path: &CStr) -> bool {
-        self.file_has_type(path, FileType::Regular) && self.has_execute_permission(path)
+        self.fstatat(AT_FDCWD, path, true)
+            .is_ok_and(|stat| stat.is_regular_file())
+            && self.has_execute_permission(path)
     }
 }
 

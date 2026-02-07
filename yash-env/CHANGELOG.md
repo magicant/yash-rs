@@ -9,6 +9,25 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.13.0] - Unreleased
+
+### Added
+
+- The `system::Stat` trait has been added to represent file metadata.
+- The `system::Fstat` trait now has the associated type `Stat` to represent
+  the type of file metadata returned by `fstat` and `fstatat` methods.
+- The `system::real::Stat` struct has been added to represent file metadata
+  in the real system implementation.
+- `impl system::Stat for system::real::Stat`
+- `impl system::Stat for system::virtual::Stat`
+
+### Changed
+
+- The `Stat` struct has been moved from the `system` module to the
+  `system::virtual` module.
+- The `system::Fstat` trait methods `fstat` and `fstatat` now return
+  `Self::Stat` instead of the concrete `system::virtual::Stat` type.
+
 ## [0.12.1] - 2026-02-06
 
 ### Fixed
@@ -862,6 +881,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Initial implementation of the `yash-env` crate
 
+[0.13.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.13.0
 [0.12.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.12.1
 [0.12.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.12.0
 [0.11.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.11.0

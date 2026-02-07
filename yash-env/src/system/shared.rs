@@ -64,7 +64,6 @@ use super::SigmaskOp;
 use super::SignalStatus;
 use super::SignalSystem;
 use super::Signals;
-use super::Stat;
 use super::Sysconf;
 use super::TcGetPgrp;
 use super::TcSetPgrp;
@@ -365,10 +364,12 @@ impl<S> Clone for SharedSystem<S> {
 
 /// Delegates `Fstat` methods to the contained implementor.
 impl<T: Fstat> Fstat for SharedSystem<T> {
-    fn fstat(&self, fd: Fd) -> Result<Stat> {
+    type Stat = T::Stat;
+
+    fn fstat(&self, fd: Fd) -> Result<Self::Stat> {
         self.0.borrow().fstat(fd)
     }
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Self::Stat> {
         self.0.borrow().fstatat(dir_fd, path, follow_symlinks)
     }
 }
