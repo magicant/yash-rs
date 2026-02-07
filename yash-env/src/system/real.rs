@@ -94,6 +94,7 @@ use crate::semantics::ExitStatus;
 use crate::str::UnixStr;
 use crate::str::UnixString;
 use enumset::EnumSet;
+pub use file_system::Stat;
 use libc::DIR;
 use std::convert::Infallible;
 use std::convert::TryInto;
