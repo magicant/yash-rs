@@ -106,7 +106,7 @@ Time: ~17 seconds (output in `target/doc/`)
 ```
 **Prerequisites:** Install first with:
 ```sh
-cargo install cargo-tomlfmt cargo-semver-checks
+cargo install taplo-cli cargo-semver-checks
 ```
 This script verifies:
 - TOML formatting (all Cargo.toml files)
@@ -145,7 +145,7 @@ The CI pipeline (`.github/workflows/ci.yml`) runs on push/PR to master with 6 jo
 
 1. **check**: Runs `./check.sh -v` with `-D warnings` (fail on warnings)
 2. **clippy**: Lints code with GitHub PR review integration
-3. **extra**: Runs `./check-extra.sh -v` (requires cargo-tomlfmt, cargo-semver-checks)
+3. **extra**: Runs `./check-extra.sh -v` (requires taplo-cli, cargo-semver-checks)
 4. **msrv**: Tests MSRV on Ubuntu + macOS with `./check-msrv.sh -v`
 5. **windows**: Tests portable crates on Windows (yash-arith, yash-executor, yash-fnmatch, yash-quote, yash-syntax, yash-env, etc.)
 6. **docs**: Builds and tests documentation with `./check-docs.sh`
@@ -232,7 +232,7 @@ For yash-cli CHANGELOG: Include changes in observable behavior even if yash-cli 
 
 5. **Don't add dependencies lightly**: The `check-extra.sh` script enforces no unused dependencies with `RUSTFLAGS='-D unused_crate_dependencies'`.
 
-6. **Formatting is strict**: All Cargo.toml files must be formatted with `cargo-tomlfmt`.
+6. **Formatting is strict**: All Cargo.toml files must be formatted and linted with `taplo`.
 
 7. **Scripted tests are integration tests**: Located in `yash-cli/tests/scripted_test/`, these test actual shell behavior with `.sh` files.
 
