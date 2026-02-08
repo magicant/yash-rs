@@ -17,6 +17,8 @@
 //! Signal implementation for the real system
 
 use super::Disposition;
+use super::ErrnoIfM1 as _;
+use super::Result;
 pub use crate::signal::*;
 use std::ffi::c_int;
 use std::mem::MaybeUninit;
@@ -282,6 +284,44 @@ pub(super) fn sigset_to_vec(set: *const libc::sigset_t, vec: &mut Vec<Number>) {
     vec.extend(
         all_signals().filter(|number| unsafe { libc::sigismember(set, number.as_raw()) == 1 }),
     );
+}
+
+/// Signal set for the real system
+///
+/// This is an implementation of the [`Sigset` trait](super::super::Sigset) for the
+/// [`RealSystem`](super::RealSystem).
+#[derive(Clone, Debug)]
+#[repr(transparent)]
+pub struct Sigset(MaybeUninit<libc::sigset_t>);
+
+impl Default for Sigset {
+    fn default() -> Self {
+        let mut set = MaybeUninit::<libc::sigset_t>::uninit();
+        unsafe { libc::sigemptyset(set.as_mut_ptr()) }
+            .errno_if_m1()
+            .expect("sigemptyset failed");
+        Self(set)
+    }
+}
+
+impl super::super::Sigset for Sigset {
+    fn add(&mut self, signal: Number) -> Result<()> {
+        unsafe { libc::sigaddset(self.0.as_mut_ptr(), signal.as_raw()) }
+            .errno_if_m1()
+            .map(drop)
+    }
+
+    fn remove(&mut self, signal: Number) -> Result<()> {
+        unsafe { libc::sigdelset(self.0.as_mut_ptr(), signal.as_raw()) }
+            .errno_if_m1()
+            .map(drop)
+    }
+
+    fn contains(&self, signal: Number) -> Result<bool> {
+        unsafe { libc::sigismember(self.0.as_ptr(), signal.as_raw()) }
+            .errno_if_m1()
+            .map(|result| result != 0)
+    }
 }
 
 impl Disposition {

@@ -20,6 +20,10 @@ A _private dependency_ is used internally and not visible to downstream users.
   in the real system implementation.
 - `impl system::Stat for system::real::Stat`
 - `impl system::Stat for system::virtual::Stat`
+- The `system::Sigset` trait has been added to represent a set of signals.
+- The `system::real::Sigset` struct has been added to represent a set of signals
+  in the real system.
+- `impl system::Sigset for system::real::Sigset`
 
 ### Changed
 

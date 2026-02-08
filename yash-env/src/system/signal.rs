@@ -377,6 +377,55 @@ pub enum SigmaskOp {
     Set,
 }
 
+/// Set of signals
+///
+/// This trait represents a set of signals. It is used as a parameter type in
+/// the [`Sigmask::sigmask`] method.
+///
+/// The [`Default`] trait bound allows creating an empty signal set using
+/// `Sigset::default()`, which is equivalent to `Sigset::new()`. These calls
+/// abstract the `sigemptyset` system function.
+pub trait Sigset: Clone + Default {
+    /// Creates a new, empty signal set.
+    ///
+    /// The default implementation calls [`Default::default()`].
+    #[inline(always)]
+    #[must_use]
+    fn new() -> Self {
+        Default::default()
+    }
+
+    /*
+    The `full` function is not supported because it cannot be implemented
+    independently of the system, as the set of all signals depends on the
+    system. Specifically, available real-time signals may depend on runtime
+    configuration.
+    /// Creates a signal set containing all signals.
+    ///
+    /// This function abstracts the `sigfillset` system function.
+    #[must_use]
+    fn full() -> Self;
+    */
+
+    /// Adds a signal to the set.
+    ///
+    /// This function abstracts the `sigaddset` system function. Note that
+    /// adding an invalid signal number may (or may not) result in an error.
+    fn add(&mut self, signal: Number) -> Result<()>;
+
+    /// Removes a signal from the set.
+    ///
+    /// This function abstracts the `sigdelset` system function. Note that
+    /// removing an invalid signal number may (or may not) result in an error.
+    fn remove(&mut self, signal: Number) -> Result<()>;
+
+    /// Tests if a signal is in the set.
+    ///
+    /// This function abstracts the `sigismember` system function. Note that
+    /// testing an invalid signal number may (or may not) result in an error.
+    fn contains(&self, signal: Number) -> Result<bool>;
+}
+
 /// Trait for managing signal blocking mask
 pub trait Sigmask: Signals {
     /// Gets and/or sets the signal blocking mask.

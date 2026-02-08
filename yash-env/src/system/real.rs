@@ -27,6 +27,8 @@ mod open_flag;
 mod resource;
 mod signal;
 
+pub use self::file_system::Stat;
+pub use self::signal::Sigset;
 use super::AT_FDCWD;
 use super::CaughtSignals;
 use super::Chdir;
@@ -94,7 +96,6 @@ use crate::semantics::ExitStatus;
 use crate::str::UnixStr;
 use crate::str::UnixString;
 use enumset::EnumSet;
-pub use file_system::Stat;
 use libc::DIR;
 use std::convert::Infallible;
 use std::convert::TryInto;

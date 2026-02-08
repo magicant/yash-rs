@@ -17,6 +17,7 @@
 //! Functions about signals
 
 pub(super) use crate::signal::*;
+use std::collections::BTreeSet;
 use std::num::NonZero;
 
 /// Signal number for `SIGABRT` in the virtual system
@@ -342,5 +343,21 @@ impl SignalEffect {
             Name::Xfsz => Self::Terminate { core_dump: true },
             Name::Rtmin(_) | Name::Rtmax(_) => Self::Terminate { core_dump: false },
         }
+    }
+}
+
+impl super::super::Sigset for BTreeSet<Number> {
+    fn add(&mut self, signal: Number) -> crate::system::Result<()> {
+        self.insert(signal);
+        Ok(())
+    }
+
+    fn remove(&mut self, signal: Number) -> crate::system::Result<()> {
+        self.remove(&signal);
+        Ok(())
+    }
+
+    fn contains(&self, signal: Number) -> crate::system::Result<bool> {
+        Ok(self.contains(&signal))
     }
 }
