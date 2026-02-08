@@ -50,8 +50,8 @@ jobs:
     - uses: actions/checkout@v6
     - uses: dtolnay/rust-toolchain@stable
     - uses: Swatinem/rust-cache@v2
-    - name: Install cargo-tomlfmt and cargo-semver-checks
-      run: cargo install cargo-tomlfmt cargo-semver-checks
+    - name: Install cargo-semver-checks
+      run: cargo install cargo-semver-checks
     - name: Run extra tests
       run: ./check-extra.sh -v
   msrv:

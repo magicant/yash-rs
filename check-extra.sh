@@ -4,18 +4,13 @@ if [ "$*" = "" ]; then quiet='--quiet'; else quiet=''; fi
 
 set -x
 
-cargo tomlfmt --dryrun --path Cargo.toml
-cargo tomlfmt --dryrun --path yash-arith/Cargo.toml
-cargo tomlfmt --dryrun --path yash-builtin/Cargo.toml
-cargo tomlfmt --dryrun --path yash-cli/Cargo.toml
-cargo tomlfmt --dryrun --path yash-env/Cargo.toml
-cargo tomlfmt --dryrun --path yash-env-test-helper/Cargo.toml
-cargo tomlfmt --dryrun --path yash-executor/Cargo.toml
-cargo tomlfmt --dryrun --path yash-fnmatch/Cargo.toml
-cargo tomlfmt --dryrun --path yash-prompt/Cargo.toml
-cargo tomlfmt --dryrun --path yash-quote/Cargo.toml
-cargo tomlfmt --dryrun --path yash-semantics/Cargo.toml
-cargo tomlfmt --dryrun --path yash-syntax/Cargo.toml
+if { ! taplo help && command -v npx; } >/dev/null 2>&1; then
+    taplo() { npx @taplo/cli "$@"; }
+fi
+
+# Check that all TOML files are properly formatted and linted.
+taplo format --check $(git ls-files | grep '\.toml$')
+taplo lint $(git ls-files | grep '\.toml$')
 
 # Make sure we don't have any unnecessary dependencies in Cargo.toml.
 RUSTFLAGS='-D unused_crate_dependencies' cargo check --lib --all-features
