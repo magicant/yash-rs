@@ -21,6 +21,7 @@ use super::SharedSystem;
 use super::{Pid, Result};
 pub use crate::signal::{Name, Number, RawNumber};
 use std::borrow::Cow;
+use std::fmt::Debug;
 use std::num::NonZero;
 use std::ops::RangeInclusive;
 
@@ -428,6 +429,9 @@ pub trait Sigset: Clone + Default {
 
 /// Trait for managing signal blocking mask
 pub trait Sigmask: Signals {
+    /// The signal set type used by this system
+    type Sigset: Sigset + Debug;
+
     /// Gets and/or sets the signal blocking mask.
     ///
     /// This is a low-level function used internally by [`SharedSystem`]. You
@@ -443,8 +447,8 @@ pub trait Sigmask: Signals {
     /// If `old_mask` is `Some`, this function sets the previous mask to it.
     fn sigmask(
         &self,
-        op: Option<(SigmaskOp, &[Number])>,
-        old_mask: Option<&mut Vec<Number>>,
+        op: Option<(SigmaskOp, &Self::Sigset)>,
+        old_mask: Option<&mut Self::Sigset>,
     ) -> Result<()>;
 }
 

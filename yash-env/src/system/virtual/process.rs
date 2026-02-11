@@ -427,25 +427,40 @@ impl Process {
     /// that case, the caller must send a SIGCHLD to the parent process of this
     /// process.
     #[must_use = "send SIGCHLD if process state has changed"]
-    pub fn block_signals(&mut self, how: SigmaskOp, signals: &[signal::Number]) -> SignalResult {
-        match how {
-            SigmaskOp::Set => self.blocked_signals = signals.iter().copied().collect(),
-            SigmaskOp::Add => self.blocked_signals.extend(signals),
-            SigmaskOp::Remove => {
-                for signal in signals {
-                    self.blocked_signals.remove(signal);
+    pub fn block_signals<I: IntoIterator<Item = signal::Number>>(
+        &mut self,
+        how: SigmaskOp,
+        signals: I,
+    ) -> SignalResult {
+        fn update_blocked_signals<I: Iterator<Item = signal::Number>>(
+            blocked_signals: &mut BTreeSet<signal::Number>,
+            how: SigmaskOp,
+            signals: I,
+        ) {
+            match how {
+                SigmaskOp::Set => *blocked_signals = signals.collect(),
+                SigmaskOp::Add => blocked_signals.extend(signals),
+                SigmaskOp::Remove => {
+                    for signal in signals {
+                        blocked_signals.remove(&signal);
+                    }
                 }
             }
         }
 
-        let signals_to_deliver = self.pending_signals.difference(&self.blocked_signals);
-        let signals_to_deliver = signals_to_deliver.copied().collect::<Vec<signal::Number>>();
-        let mut result = SignalResult::default();
-        for signal in signals_to_deliver {
-            self.pending_signals.remove(&signal);
-            result |= self.deliver_signal(signal);
+        fn deliver(process: &mut Process) -> SignalResult {
+            let signals_to_deliver = process.pending_signals.difference(&process.blocked_signals);
+            let signals_to_deliver = signals_to_deliver.copied().collect::<Vec<signal::Number>>();
+            let mut result = SignalResult::default();
+            for signal in signals_to_deliver {
+                process.pending_signals.remove(&signal);
+                result |= process.deliver_signal(signal);
+            }
+            result
         }
-        result
+
+        update_blocked_signals(&mut self.blocked_signals, how, signals.into_iter());
+        deliver(self)
     }
 
     /// Returns the current disposition for a signal.

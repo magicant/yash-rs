@@ -136,6 +136,7 @@ use std::cell::Ref;
 use std::cell::RefCell;
 use std::cell::RefMut;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::convert::Infallible;
@@ -775,10 +776,12 @@ impl SetPgid for VirtualSystem {
 }
 
 impl Sigmask for VirtualSystem {
+    type Sigset = BTreeSet<signal::Number>;
+
     fn sigmask(
         &self,
-        op: Option<(SigmaskOp, &[signal::Number])>,
-        old_mask: Option<&mut Vec<signal::Number>>,
+        op: Option<(SigmaskOp, &Self::Sigset)>,
+        old_mask: Option<&mut Self::Sigset>,
     ) -> Result<()> {
         let mut state = self.state.borrow_mut();
         let process = state
@@ -787,12 +790,11 @@ impl Sigmask for VirtualSystem {
             .expect("current process not found");
 
         if let Some(old_mask) = old_mask {
-            old_mask.clear();
-            old_mask.extend(process.blocked_signals());
+            old_mask.clone_from(process.blocked_signals());
         }
 
         if let Some((op, mask)) = op {
-            let result = process.block_signals(op, mask);
+            let result = process.block_signals(op, mask.iter().cloned());
             if result.process_state_changed {
                 let parent_pid = process.ppid;
                 raise_sigchld(&mut state, parent_pid);
@@ -933,8 +935,8 @@ impl Select for VirtualSystem {
                 .iter()
                 .copied()
                 .collect::<Vec<signal::Number>>();
-            let result_1 = process.block_signals(SigmaskOp::Set, signal_mask);
-            let result_2 = process.block_signals(SigmaskOp::Set, &save_mask);
+            let result_1 = process.block_signals(SigmaskOp::Set, signal_mask.iter().copied());
+            let result_2 = process.block_signals(SigmaskOp::Set, save_mask);
             assert!(!result_2.delivered);
             if result_1.caught {
                 return Err(Errno::EINTR);
@@ -2287,7 +2289,7 @@ mod tests {
     fn system_for_catching_sigchld() -> VirtualSystem {
         let system = VirtualSystem::new();
         system
-            .sigmask(Some((SigmaskOp::Add, &[SIGCHLD])), None)
+            .sigmask(Some((SigmaskOp::Add, &[SIGCHLD].into())), None)
             .unwrap();
         system.sigaction(SIGCHLD, Disposition::Catch).unwrap();
         system

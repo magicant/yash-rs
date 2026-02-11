@@ -292,7 +292,7 @@ pub(super) fn sigset_to_vec(set: *const libc::sigset_t, vec: &mut Vec<Number>) {
 /// [`RealSystem`](super::RealSystem).
 #[derive(Clone, Debug)]
 #[repr(transparent)]
-pub struct Sigset(MaybeUninit<libc::sigset_t>);
+pub struct Sigset(pub(super) MaybeUninit<libc::sigset_t>);
 
 impl Default for Sigset {
     fn default() -> Self {

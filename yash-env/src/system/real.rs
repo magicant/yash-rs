@@ -776,58 +776,31 @@ impl Signals for RealSystem {
 }
 
 impl Sigmask for RealSystem {
+    type Sigset = Sigset;
+
     fn sigmask(
         &self,
-        op: Option<(SigmaskOp, &[signal::Number])>,
-        old_mask: Option<&mut Vec<signal::Number>>,
+        op: Option<(SigmaskOp, &Self::Sigset)>,
+        old_mask: Option<&mut Self::Sigset>,
     ) -> Result<()> {
-        unsafe {
-            let (how, raw_mask) = match op {
-                None => (libc::SIG_BLOCK, None),
-                Some((op, mask)) => {
-                    let how = match op {
-                        SigmaskOp::Add => libc::SIG_BLOCK,
-                        SigmaskOp::Remove => libc::SIG_UNBLOCK,
-                        SigmaskOp::Set => libc::SIG_SETMASK,
-                    };
-
-                    let mut raw_mask = MaybeUninit::<libc::sigset_t>::uninit();
-                    libc::sigemptyset(raw_mask.as_mut_ptr()).errno_if_m1()?;
-                    for &signal in mask {
-                        libc::sigaddset(raw_mask.as_mut_ptr(), signal.as_raw()).errno_if_m1()?;
-                    }
-
-                    (how, Some(raw_mask))
-                }
-            };
-            let mut old_mask_pair = match old_mask {
-                None => None,
-                Some(old_mask) => {
-                    let mut raw_old_mask = MaybeUninit::<libc::sigset_t>::uninit();
-                    // POSIX requires *all* sigset_t objects to be initialized before use.
-                    libc::sigemptyset(raw_old_mask.as_mut_ptr()).errno_if_m1()?;
-                    Some((old_mask, raw_old_mask))
-                }
-            };
-
-            let raw_set_ptr = raw_mask
-                .as_ref()
-                .map_or(std::ptr::null(), |raw_set| raw_set.as_ptr());
-            let raw_old_set_ptr = old_mask_pair
-                .as_mut()
-                .map_or(std::ptr::null_mut(), |(_, raw_old_mask)| {
-                    raw_old_mask.as_mut_ptr()
-                });
-            let result = libc::sigprocmask(how, raw_set_ptr, raw_old_set_ptr);
-            result.errno_if_m1().map(drop)?;
-
-            if let Some((old_mask, raw_old_mask)) = old_mask_pair {
-                old_mask.clear();
-                signal::sigset_to_vec(raw_old_mask.as_ptr(), old_mask);
+        let (how, set) = match op {
+            None => (libc::SIG_BLOCK, std::ptr::null()),
+            Some((op, mask)) => {
+                let how = match op {
+                    SigmaskOp::Add => libc::SIG_BLOCK,
+                    SigmaskOp::Remove => libc::SIG_UNBLOCK,
+                    SigmaskOp::Set => libc::SIG_SETMASK,
+                };
+                (how, mask.0.as_ptr())
             }
+        };
+        let oldset = match old_mask {
+            None => std::ptr::null_mut(),
+            Some(old_mask) => old_mask.0.as_mut_ptr(),
+        };
 
-            Ok(())
-        }
+        let result = unsafe { libc::sigprocmask(how, set, oldset) };
+        result.errno_if_m1().map(drop)
     }
 }
 
