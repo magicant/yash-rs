@@ -42,12 +42,14 @@ use crate::system::GetPid;
 use crate::system::Open;
 use crate::system::SendSignal;
 use crate::system::SetPgid;
+use crate::system::SharedSystem;
 use crate::system::Sigaction;
 use crate::system::Sigmask;
 use crate::system::SigmaskOp;
 use crate::system::Signals;
 use crate::system::TcSetPgrp;
 use crate::system::Wait;
+use crate::system::{CaughtSignals, Clock, Select};
 use crate::system::resource::SetRlimit;
 use std::marker::PhantomData;
 use std::pin::Pin;
@@ -245,7 +247,33 @@ where
 
         Ok((child_pid, job_control))
     }
+}
 
+impl<T, F> Subshell<SharedSystem<T>, F>
+where
+    T: Close
+        + Dup
+        + Exit
+        + Fork
+        + GetPid
+        + Open
+        + SendSignal
+        + SetPgid
+        + SetRlimit
+        + Sigaction
+        + Sigmask
+        + Signals
+        + TcSetPgrp
+        + Select
+        + CaughtSignals
+        + Clock
+        + Wait,
+    F: for<'a> FnOnce(
+            &'a mut Env<SharedSystem<T>>,
+            Option<JobControl>,
+        ) -> Pin<Box<dyn Future<Output = ()> + 'a>>
+        + 'static,
+{
     /// Starts the subshell and waits for it to finish.
     ///
     /// This function [starts](Self::start) `self` and
@@ -265,10 +293,10 @@ where
     ///
     /// When a job-controlled subshell suspends, this function does not add it
     /// to `env.jobs`. You have to do it for yourself if necessary.
-    pub async fn start_and_wait(self, env: &mut Env<S>) -> Result<(Pid, ProcessResult), Errno>
-    where
-        S: Wait,
-    {
+    pub async fn start_and_wait(
+        self,
+        env: &mut Env<SharedSystem<T>>,
+    ) -> Result<(Pid, ProcessResult), Errno> {
         let (pid, job_control) = self.start(env).await?;
         let result = loop {
             let result = env.wait_for_subshell_to_halt(pid).await?.1;

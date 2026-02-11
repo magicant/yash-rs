@@ -92,15 +92,14 @@ pub use unix_str as str;
 ///
 /// The shell execution environment consists of application-managed parts and
 /// system-managed parts. Application-managed parts are directly implemented in
-/// the `Env` instance. System-managed parts are managed by a [`SharedSystem`]
-/// that contains an instance of `S` that implements [`System`].
+/// the `Env` instance. System-managed parts are accessed through the `system`
+/// field which contains an instance of `S` that implements [`System`].
 ///
 /// # Cloning
 ///
 /// `Env::clone` effectively clones the application-managed parts of the
-/// environment. Since [`SharedSystem`] is reference-counted, you will not get a
-/// deep copy of the system-managed parts. See also
-/// [`clone_with_system`](Self::clone_with_system).
+/// environment and the system instance using `S::clone`.
+/// See also [`clone_with_system`](Self::clone_with_system).
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct Env<S> {
@@ -154,7 +153,7 @@ pub struct Env<S> {
     pub any: DataSet,
 
     /// Interface to the system-managed parts of the environment
-    pub system: SharedSystem<S>,
+    pub system: S,
 }
 
 impl<S> Env<S> {
@@ -162,12 +161,14 @@ impl<S> Env<S> {
     ///
     /// Members of the new environments are default-constructed except that:
     /// - `main_pid` is initialized as `system.getpid()`
-    /// - `system` is initialized as `SharedSystem::new(system)`
+    /// - `system` is initialized with the provided system instance
     #[must_use]
     pub fn with_system(system: S) -> Self
     where
         S: GetPid,
     {
+        let main_pgid = system.getpgrp();
+        let main_pid = system.getpid();
         Env {
             aliases: Default::default(),
             arg0: Default::default(),
@@ -175,15 +176,15 @@ impl<S> Env<S> {
             exit_status: Default::default(),
             functions: Default::default(),
             jobs: Default::default(),
-            main_pgid: system.getpgrp(),
-            main_pid: system.getpid(),
+            main_pgid,
+            main_pid,
             options: Default::default(),
             stack: Default::default(),
             traps: Default::default(),
             tty: Default::default(),
             variables: Default::default(),
             any: Default::default(),
-            system: SharedSystem::new(system),
+            system,
         }
     }
 
@@ -209,7 +210,7 @@ impl<S> Env<S> {
             tty: self.tty,
             variables: self.variables.clone(),
             any: self.any.clone(),
-            system: SharedSystem::new(system),
+            system,
         }
     }
 }
@@ -219,6 +220,169 @@ impl Env<VirtualSystem> {
     #[must_use]
     pub fn new_virtual() -> Self {
         Env::with_system(VirtualSystem::default())
+    }
+}
+
+impl<T> Env<SharedSystem<T>>
+where
+    T: Select + CaughtSignals + Clock + Signals + Sigmask + Sigaction,
+{
+    /// Waits for some signals to be caught in the current process.
+    ///
+    /// Returns an array of signals caught.
+    ///
+    /// Before the function returns, it passes the results to
+    /// [`TrapSet::catch_signal`] so the trap set can remember the signals
+    /// caught to be handled later.
+    pub async fn wait_for_signals(&mut self) -> Rc<[signal::Number]> {
+        let result = self.system.wait_for_signals().await;
+        for signal in result.iter().copied() {
+            self.traps.catch_signal(signal);
+        }
+        result
+    }
+
+    /// Waits for a specific signal to be caught in the current process.
+    ///
+    /// This function calls [`wait_for_signals`](Self::wait_for_signals)
+    /// repeatedly until it returns results containing the specified `signal`.
+    pub async fn wait_for_signal(&mut self, signal: signal::Number) {
+        while !self.wait_for_signals().await.contains(&signal) {}
+    }
+
+    /// Returns signals that have been caught.
+    ///
+    /// This function is similar to
+    /// [`wait_for_signals`](Self::wait_for_signals) but does not wait for
+    /// signals to be caught. Instead, it only checks if any signals have been
+    /// caught but not yet consumed.
+    pub fn poll_signals(&mut self) -> Option<Rc<[signal::Number]>> {
+        let system = self.system.clone();
+
+        let mut future = std::pin::pin!(self.wait_for_signals());
+
+        let mut context = Context::from_waker(Waker::noop());
+        if let Poll::Ready(signals) = future.as_mut().poll(&mut context) {
+            return Some(signals);
+        }
+
+        system.select(true).ok();
+        if let Poll::Ready(signals) = future.poll(&mut context) {
+            return Some(signals);
+        }
+        None
+    }
+}
+
+impl<T> Env<SharedSystem<T>>
+where
+    T: Open + Dup + Close + GetPid + Signals + Sigmask + Sigaction + TcSetPgrp,
+{
+    /// Ensures the shell is in the foreground.
+    ///
+    /// If the current process belongs to the same process group as the session
+    /// leader, this function forces the current process to be in the foreground
+    /// by calling [`job::tcsetpgrp_with_block`]. Otherwise, this function
+    /// suspends the process until it is resumed in the foreground by another
+    /// job-controlling process (see [`job::tcsetpgrp_without_block`]).
+    ///
+    /// This function returns an error if the process does not have a controlling
+    /// terminal, that is, [`get_tty`](Self::get_tty) returns `Err(_)`.
+    ///
+    /// # Note on POSIX conformance
+    ///
+    /// This function implements part of the initialization of the job-control
+    /// shell. POSIX says that the shell should bring itself into the foreground
+    /// only if it is started as the controlling process (that is, the session
+    /// leader) for the terminal session. However, this function also brings the
+    /// shell into the foreground if the shell is in the same process group as
+    /// the session leader because it is unlikely that there is another
+    /// job-controlling process that can bring the shell into the foreground.
+    pub async fn ensure_foreground(&mut self) -> Result<(), Errno> {
+        let fd = self.get_tty()?;
+
+        if self.system.getsid(Pid(0)) == Ok(self.main_pgid) {
+            job::tcsetpgrp_with_block(&self.system, fd, self.main_pgid).await
+        } else {
+            job::tcsetpgrp_without_block(&self.system, fd, self.main_pgid).await
+        }
+    }
+}
+
+impl<T> Env<SharedSystem<T>>
+where
+    T: Select + CaughtSignals + Clock + Signals + Sigmask + Sigaction + Wait,
+{
+    /// Waits for a subshell to terminate, suspend, or resume.
+    ///
+    /// This function waits for a subshell to change its execution state. The
+    /// `target` parameter specifies which child to wait for:
+    ///
+    /// - `-1`: any child
+    /// - `0`: any child in the same process group as the current process
+    /// - `pid`: the child whose process ID is `pid`
+    /// - `-pgid`: any child in the process group whose process group ID is `pgid`
+    ///
+    /// When [`self.system.wait`](system::Wait::wait) returned a new state of the
+    /// target, it is sent to `self.jobs` ([`JobList::update_status`]) before
+    /// being returned from this function.
+    ///
+    /// If there is no matching target, this function returns
+    /// `Err(Errno::ECHILD)`.
+    ///
+    /// If the target subshell is not job-controlled, you may want to use
+    /// [`wait_for_subshell_to_finish`](Self::wait_for_subshell_to_finish)
+    /// instead.
+    pub async fn wait_for_subshell(&mut self, target: Pid) -> Result<(Pid, ProcessState), Errno> {
+        // We need to set the internal disposition before calling `wait` so we don't
+        // miss any `SIGCHLD` that may arrive between `wait` and `wait_for_signal`.
+        self.traps
+            .enable_internal_disposition_for_sigchld(&mut self.system)?;
+
+        loop {
+            if let Some((pid, state)) = self.system.wait(target)? {
+                self.jobs.update_status(pid, state);
+                return Ok((pid, state));
+            }
+            self.wait_for_signal(T::SIGCHLD).await;
+        }
+    }
+
+    /// Wait for a subshell to terminate or suspend.
+    ///
+    /// This function is similar to
+    /// [`wait_for_subshell`](Self::wait_for_subshell), but returns only when
+    /// the target is finished (either exited or killed by a signal) or
+    /// suspended.
+    pub async fn wait_for_subshell_to_halt(
+        &mut self,
+        target: Pid,
+    ) -> Result<(Pid, ProcessResult), Errno> {
+        loop {
+            let (pid, state) = self.wait_for_subshell(target).await?;
+            if let ProcessState::Halted(result) = state {
+                return Ok((pid, result));
+            }
+        }
+    }
+
+    /// Wait for a subshell to terminate.
+    ///
+    /// This function is similar to
+    /// [`wait_for_subshell`](Self::wait_for_subshell), but returns only when
+    /// the target is finished (either exited or killed by a signal).
+    ///
+    /// Returns the process ID of the awaited process and its exit status.
+    pub async fn wait_for_subshell_to_finish(
+        &mut self,
+        target: Pid,
+    ) -> Result<(Pid, ExitStatus), Errno> {
+        loop {
+            let (pid, result) = self.wait_for_subshell_to_halt(target).await?;
+            if !result.is_stopped() {
+                return Ok((pid, result.into()));
+            }
+        }
     }
 }
 
@@ -250,56 +414,6 @@ impl<S> Env<S> {
             .ok();
 
         self.prepare_pwd().ok();
-    }
-
-    /// Waits for some signals to be caught in the current process.
-    ///
-    /// Returns an array of signals caught.
-    ///
-    /// This function is a wrapper for [`SharedSystem::wait_for_signals`].
-    /// Before the function returns, it passes the results to
-    /// [`TrapSet::catch_signal`] so the trap set can remember the signals
-    /// caught to be handled later.
-    pub async fn wait_for_signals(&mut self) -> Rc<[signal::Number]> {
-        let result = self.system.wait_for_signals().await;
-        for signal in result.iter().copied() {
-            self.traps.catch_signal(signal);
-        }
-        result
-    }
-
-    /// Waits for a specific signal to be caught in the current process.
-    ///
-    /// This function calls [`wait_for_signals`](Self::wait_for_signals)
-    /// repeatedly until it returns results containing the specified `signal`.
-    pub async fn wait_for_signal(&mut self, signal: signal::Number) {
-        while !self.wait_for_signals().await.contains(&signal) {}
-    }
-
-    /// Returns signals that have been caught.
-    ///
-    /// This function is similar to
-    /// [`wait_for_signals`](Self::wait_for_signals) but does not wait for
-    /// signals to be caught. Instead, it only checks if any signals have been
-    /// caught but not yet consumed in the [`SharedSystem`].
-    pub fn poll_signals(&mut self) -> Option<Rc<[signal::Number]>>
-    where
-        S: Select + CaughtSignals + Clock,
-    {
-        let system = self.system.clone();
-
-        let mut future = std::pin::pin!(self.wait_for_signals());
-
-        let mut context = Context::from_waker(Waker::noop());
-        if let Poll::Ready(signals) = future.as_mut().poll(&mut context) {
-            return Some(signals);
-        }
-
-        system.select(true).ok();
-        if let Poll::Ready(signals) = future.poll(&mut context) {
-            return Some(signals);
-        }
-        None
     }
 
     /// Whether error messages should be printed in color
@@ -360,120 +474,6 @@ impl<S> Env<S> {
         let final_fd = io::move_fd_internal(&self.system, first_fd);
         self.tty = final_fd.ok();
         final_fd
-    }
-
-    /// Ensures the shell is in the foreground.
-    ///
-    /// If the current process belongs to the same process group as the session
-    /// leader, this function forces the current process to be in the foreground
-    /// by calling [`job::tcsetpgrp_with_block`]. Otherwise, this function
-    /// suspends the process until it is resumed in the foreground by another
-    /// job-controlling process (see [`job::tcsetpgrp_without_block`]).
-    ///
-    /// This function returns an error if the process does not have a controlling
-    /// terminal, that is, [`get_tty`](Self::get_tty) returns `Err(_)`.
-    ///
-    /// # Note on POSIX conformance
-    ///
-    /// This function implements part of the initialization of the job-control
-    /// shell. POSIX says that the shell should bring itself into the foreground
-    /// only if it is started as the controlling process (that is, the session
-    /// leader) for the terminal session. However, this function also brings the
-    /// shell into the foreground if the shell is in the same process group as
-    /// the session leader because it is unlikely that there is another
-    /// job-controlling process that can bring the shell into the foreground.
-    pub async fn ensure_foreground(&mut self) -> Result<(), Errno>
-    where
-        S: Open + Dup + Close + GetPid + Signals + Sigmask + Sigaction + TcSetPgrp,
-    {
-        let fd = self.get_tty()?;
-
-        if self.system.getsid(Pid(0)) == Ok(self.main_pgid) {
-            job::tcsetpgrp_with_block(&self.system, fd, self.main_pgid).await
-        } else {
-            job::tcsetpgrp_without_block(&self.system, fd, self.main_pgid).await
-        }
-    }
-
-    /// Waits for a subshell to terminate, suspend, or resume.
-    ///
-    /// This function waits for a subshell to change its execution state. The
-    /// `target` parameter specifies which child to wait for:
-    ///
-    /// - `-1`: any child
-    /// - `0`: any child in the same process group as the current process
-    /// - `pid`: the child whose process ID is `pid`
-    /// - `-pgid`: any child in the process group whose process group ID is `pgid`
-    ///
-    /// When [`self.system.wait`](system::Wait::wait) returned a new state of the
-    /// target, it is sent to `self.jobs` ([`JobList::update_status`]) before
-    /// being returned from this function.
-    ///
-    /// If there is no matching target, this function returns
-    /// `Err(Errno::ECHILD)`.
-    ///
-    /// If the target subshell is not job-controlled, you may want to use
-    /// [`wait_for_subshell_to_finish`](Self::wait_for_subshell_to_finish)
-    /// instead.
-    pub async fn wait_for_subshell(&mut self, target: Pid) -> Result<(Pid, ProcessState), Errno>
-    where
-        S: Signals + Sigmask + Sigaction + Wait,
-    {
-        // We need to set the internal disposition before calling `wait` so we don't
-        // miss any `SIGCHLD` that may arrive between `wait` and `wait_for_signal`.
-        self.traps
-            .enable_internal_disposition_for_sigchld(&mut self.system)?;
-
-        loop {
-            if let Some((pid, state)) = self.system.wait(target)? {
-                self.jobs.update_status(pid, state);
-                return Ok((pid, state));
-            }
-            self.wait_for_signal(S::SIGCHLD).await;
-        }
-    }
-
-    /// Wait for a subshell to terminate or suspend.
-    ///
-    /// This function is similar to
-    /// [`wait_for_subshell`](Self::wait_for_subshell), but returns only when
-    /// the target is finished (either exited or killed by a signal) or
-    /// suspended.
-    pub async fn wait_for_subshell_to_halt(
-        &mut self,
-        target: Pid,
-    ) -> Result<(Pid, ProcessResult), Errno>
-    where
-        S: Signals + Sigmask + Sigaction + Wait,
-    {
-        loop {
-            let (pid, state) = self.wait_for_subshell(target).await?;
-            if let ProcessState::Halted(result) = state {
-                return Ok((pid, result));
-            }
-        }
-    }
-
-    /// Wait for a subshell to terminate.
-    ///
-    /// This function is similar to
-    /// [`wait_for_subshell`](Self::wait_for_subshell), but returns only when
-    /// the target is finished (either exited or killed by a signal).
-    ///
-    /// Returns the process ID of the awaited process and its exit status.
-    pub async fn wait_for_subshell_to_finish(
-        &mut self,
-        target: Pid,
-    ) -> Result<(Pid, ExitStatus), Errno>
-    where
-        S: Signals + Sigmask + Sigaction + Wait,
-    {
-        loop {
-            let (pid, result) = self.wait_for_subshell_to_halt(target).await?;
-            if !result.is_stopped() {
-                return Ok((pid, result.into()));
-            }
-        }
     }
 
     /// Applies all job status updates to jobs in `self.jobs`.
@@ -621,7 +621,7 @@ mod tests {
     /// Helper function to perform a test in a virtual system with an executor.
     pub fn in_virtual_system<F, Fut, T>(f: F) -> T
     where
-        F: FnOnce(Env<VirtualSystem>, Rc<RefCell<SystemState>>) -> Fut,
+        F: FnOnce(Env<SharedSystem<VirtualSystem>>, Rc<RefCell<SystemState>>) -> Fut,
         Fut: Future<Output = T> + 'static,
         T: 'static,
     {
@@ -630,7 +630,7 @@ mod tests {
         let mut executor = futures_executor::LocalPool::new();
         state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
 
-        let env = Env::with_system(system);
+        let env = Env::with_system(SharedSystem::new(system));
         let shared_system = env.system.clone();
         let task = f(env, Rc::clone(&state));
         let mut task = executor.spawner().spawn_local_with_handle(task).unwrap();
@@ -681,9 +681,9 @@ mod tests {
         })
     }
 
-    fn poll_signals_env() -> (Env<VirtualSystem>, VirtualSystem) {
+    fn poll_signals_env() -> (Env<SharedSystem<VirtualSystem>>, VirtualSystem) {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(SharedSystem::new(system.clone()));
         env.traps
             .set_action(
                 &mut env.system,

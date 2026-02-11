@@ -20,7 +20,7 @@ use super::{Context, Input, Result};
 use crate::Env;
 use crate::option::Option::Verbose;
 use crate::option::State::On;
-use crate::system::{Fcntl, Write};
+use crate::system::{Fcntl, SharedSystem, Write};
 use std::cell::RefCell;
 
 /// `Input` decorator that echoes the input.
@@ -60,7 +60,7 @@ impl<S, T: Clone> Clone for Echo<'_, '_, S, T> {
     }
 }
 
-impl<S: Fcntl + Write, T: Input> Input for Echo<'_, '_, S, T> {
+impl<T: Fcntl + Write, U: Input> Input for Echo<'_, '_, SharedSystem<T>, U> {
     // The RefCell should be local to the calling read-eval loop, so it is safe
     // to keep the mutable borrow across await points.
     #[allow(clippy::await_holding_refcell_ref)]
