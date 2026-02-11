@@ -85,7 +85,7 @@ pub trait Select: Signals {
 /// appropriate arguments and wake up the wakers when the corresponding events
 /// occur.
 #[derive(Debug)]
-pub struct SelectSystem<S> {
+pub struct SelectSystem<S: Sigmask> {
     /// System instance that performs actual system calls
     system: S,
     /// Helper for `select`ing on file descriptors
@@ -98,23 +98,23 @@ pub struct SelectSystem<S> {
     ///
     /// This is the mask the shell inherited from the parent shell minus the
     /// signals the shell wants to catch.
-    wait_mask: Option<Vec<signal::Number>>,
+    wait_mask: Option<<S as Sigmask>::Sigset>,
 }
 
-impl<S> Deref for SelectSystem<S> {
+impl<S: Sigmask> Deref for SelectSystem<S> {
     type Target = S;
     fn deref(&self) -> &S {
         &self.system
     }
 }
 
-impl<S> DerefMut for SelectSystem<S> {
+impl<S: Sigmask> DerefMut for SelectSystem<S> {
     fn deref_mut(&mut self) -> &mut S {
         &mut self.system
     }
 }
 
-impl<S> SelectSystem<S> {
+impl<S: Sigmask> SelectSystem<S> {
     /// Creates a new `SelectSystem` that wraps the given `System`.
     pub fn new(system: S) -> Self {
         SelectSystem {
@@ -131,21 +131,27 @@ impl<S> SelectSystem<S> {
     where
         S: Sigmask,
     {
+        use crate::system::Sigset as _;
+        let sigset = {
+            let mut sigset = <S as Sigmask>::Sigset::new();
+            sigset.add(signal);
+            sigset
+        };
+
         match &mut self.wait_mask {
             None => {
                 // This is the first call to sigmask. We need to get the current
                 // signal mask (which is the mask inherited from the parent shell) and
                 // remove the signal from it.
-                let mut mask = Vec::new();
-                self.system
-                    .sigmask(Some((op, &[signal])), Some(&mut mask))?;
-                mask.retain(|&s| s != signal);
+                let mut mask = <S as Sigmask>::Sigset::new();
+                self.system.sigmask(Some((op, &sigset)), Some(&mut mask))?;
+                mask.remove(signal);
                 self.wait_mask = Some(mask);
             }
             Some(wait_mask) => {
                 // We have already called sigmask. We just need to update the mask.
-                self.system.sigmask(Some((op, &[signal])), None)?;
-                wait_mask.retain(|&s| s != signal);
+                self.system.sigmask(Some((op, &sigset)), None)?;
+                wait_mask.remove(signal);
             }
         }
         Ok(())
@@ -261,7 +267,7 @@ impl<S> SelectSystem<S> {
             &mut readers,
             &mut writers,
             timeout,
-            self.wait_mask.as_deref(),
+            todo!(), /* self.wait_mask.as_deref() */
         );
         let final_result = match inner_result {
             Ok(_) => {

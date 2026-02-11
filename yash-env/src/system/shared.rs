@@ -157,9 +157,9 @@ use std::time::Instant;
 /// [`System`]: crate::system::System
 /// [`VirtualSystem`]: crate::system::virtual::VirtualSystem
 #[derive(Debug)]
-pub struct SharedSystem<S>(pub(super) Rc<RefCell<SelectSystem<S>>>);
+pub struct SharedSystem<S: Sigmask>(pub(super) Rc<RefCell<SelectSystem<S>>>);
 
-impl<S> SharedSystem<S> {
+impl<S: Sigmask> SharedSystem<S> {
     /// Creates a new shared system.
     pub fn new(system: S) -> Self {
         SharedSystem(Rc::new(RefCell::new(SelectSystem::new(system))))
@@ -356,14 +356,14 @@ impl<S> SharedSystem<S> {
     }
 }
 
-impl<S> Clone for SharedSystem<S> {
+impl<S: Sigmask> Clone for SharedSystem<S> {
     fn clone(&self) -> Self {
         SharedSystem(self.0.clone())
     }
 }
 
 /// Delegates `Fstat` methods to the contained implementor.
-impl<T: Fstat> Fstat for SharedSystem<T> {
+impl<T: Fstat + Sigmask> Fstat for SharedSystem<T> {
     type Stat = T::Stat;
 
     fn fstat(&self, fd: Fd) -> Result<Self::Stat> {
@@ -375,21 +375,21 @@ impl<T: Fstat> Fstat for SharedSystem<T> {
 }
 
 /// Delegates `IsExecutableFile` methods to the contained implementor.
-impl<T: IsExecutableFile> IsExecutableFile for SharedSystem<T> {
+impl<T: IsExecutableFile + Sigmask> IsExecutableFile for SharedSystem<T> {
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.0.borrow().is_executable_file(path)
     }
 }
 
 /// Delegates `Pipe` methods to the contained implementor.
-impl<T: Pipe> Pipe for SharedSystem<T> {
+impl<T: Pipe + Sigmask> Pipe for SharedSystem<T> {
     fn pipe(&self) -> Result<(Fd, Fd)> {
         self.0.borrow().pipe()
     }
 }
 
 /// Delegates `Dup` methods to the contained implementor.
-impl<T: Dup> Dup for SharedSystem<T> {
+impl<T: Dup + Sigmask> Dup for SharedSystem<T> {
     fn dup(&self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
         self.0.borrow().dup(from, to_min, flags)
     }
@@ -398,7 +398,7 @@ impl<T: Dup> Dup for SharedSystem<T> {
     }
 }
 
-impl<T: Open> Open for SharedSystem<T> {
+impl<T: Open + Sigmask> Open for SharedSystem<T> {
     fn open(
         &self,
         path: &CStr,
@@ -419,14 +419,14 @@ impl<T: Open> Open for SharedSystem<T> {
     }
 }
 
-impl<T: Close> Close for SharedSystem<T> {
+impl<T: Close + Sigmask> Close for SharedSystem<T> {
     fn close(&self, fd: Fd) -> Result<()> {
         self.0.borrow().close(fd)
     }
 }
 
 /// Delegates `Fcntl` methods to the contained implementor.
-impl<T: Fcntl> Fcntl for SharedSystem<T> {
+impl<T: Fcntl + Sigmask> Fcntl for SharedSystem<T> {
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
         self.0.borrow().ofd_access(fd)
     }
@@ -442,63 +442,63 @@ impl<T: Fcntl> Fcntl for SharedSystem<T> {
 }
 
 /// Delegates `Read` methods to the contained implementor.
-impl<T: Read> Read for SharedSystem<T> {
+impl<T: Read + Sigmask> Read for SharedSystem<T> {
     fn read(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
         self.0.borrow().read(fd, buffer)
     }
 }
 
 /// Delegates `Write` methods to the contained implementor.
-impl<T: Write> Write for SharedSystem<T> {
+impl<T: Write + Sigmask> Write for SharedSystem<T> {
     fn write(&self, fd: Fd, buffer: &[u8]) -> Result<usize> {
         self.0.borrow().write(fd, buffer)
     }
 }
 
 /// Delegates `Seek` methods to the contained implementor.
-impl<T: Seek> Seek for SharedSystem<T> {
+impl<T: Seek + Sigmask> Seek for SharedSystem<T> {
     fn lseek(&self, fd: Fd, position: SeekFrom) -> Result<u64> {
         self.0.borrow().lseek(fd, position)
     }
 }
 
 /// Delegates `Umask` methods to the contained implementor.
-impl<T: Umask> Umask for SharedSystem<T> {
+impl<T: Umask + Sigmask> Umask for SharedSystem<T> {
     fn umask(&self, new_mask: Mode) -> Mode {
         self.0.borrow().umask(new_mask)
     }
 }
 
 /// Delegates `GetCwd` methods to the contained implementor.
-impl<T: GetCwd> GetCwd for SharedSystem<T> {
+impl<T: GetCwd + Sigmask> GetCwd for SharedSystem<T> {
     fn getcwd(&self) -> Result<PathBuf> {
         self.0.borrow().getcwd()
     }
 }
 
 /// Delegates `Chdir` methods to the contained implementor.
-impl<T: Chdir> Chdir for SharedSystem<T> {
+impl<T: Chdir + Sigmask> Chdir for SharedSystem<T> {
     fn chdir(&self, path: &CStr) -> Result<()> {
         self.0.borrow().chdir(path)
     }
 }
 
 /// Delegates `Time` methods to the contained implementor.
-impl<T: Clock> Clock for SharedSystem<T> {
+impl<T: Clock + Sigmask> Clock for SharedSystem<T> {
     fn now(&self) -> Instant {
         self.0.borrow().now()
     }
 }
 
 /// Delegates `Times` methods to the contained implementor.
-impl<T: Times> Times for SharedSystem<T> {
+impl<T: Times + Sigmask> Times for SharedSystem<T> {
     fn times(&self) -> Result<CpuTimes> {
         self.0.borrow().times()
     }
 }
 
 /// Delegates `GetPid` methods to the contained implementor.
-impl<T: GetPid> GetPid for SharedSystem<T> {
+impl<T: GetPid + Sigmask> GetPid for SharedSystem<T> {
     fn getsid(&self, pid: Pid) -> Result<Pid> {
         self.0.borrow().getsid(pid)
     }
@@ -517,14 +517,14 @@ impl<T: GetPid> GetPid for SharedSystem<T> {
 }
 
 /// Delegates `SetPgid` methods to the contained implementor.
-impl<T: SetPgid> SetPgid for SharedSystem<T> {
+impl<T: SetPgid + Sigmask> SetPgid for SharedSystem<T> {
     fn setpgid(&self, pid: Pid, pgid: Pid) -> Result<()> {
         self.0.borrow().setpgid(pid, pgid)
     }
 }
 
 /// Delegates `Signals` methods to the contained implementor.
-impl<T: Signals> Signals for SharedSystem<T> {
+impl<T: Sigmask> Signals for SharedSystem<T> {
     const SIGABRT: signal::Number = T::SIGABRT;
     const SIGALRM: signal::Number = T::SIGALRM;
     const SIGBUS: signal::Number = T::SIGBUS;
@@ -579,38 +579,40 @@ impl<T: Signals> Signals for SharedSystem<T> {
 
 /// Delegates `Sigmask` methods to the contained implementor.
 impl<T: Sigmask> Sigmask for SharedSystem<T> {
+    type Sigset = T::Sigset;
+
     fn sigmask(
         &self,
-        op: Option<(SigmaskOp, &[signal::Number])>,
-        old_mask: Option<&mut Vec<signal::Number>>,
+        op: Option<(SigmaskOp, &Self::Sigset)>,
+        old_mask: Option<&mut Self::Sigset>,
     ) -> Result<()> {
         (**self.0.borrow()).sigmask(op, old_mask)
     }
 }
 
 /// Delegates `GetSigaction` methods to the contained implementor.
-impl<T: Sigaction> GetSigaction for SharedSystem<T> {
+impl<T: Sigaction + Sigmask> GetSigaction for SharedSystem<T> {
     fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
         self.0.borrow().get_sigaction(signal)
     }
 }
 
 /// Delegates `Sigaction` methods to the contained implementor.
-impl<T: Sigaction> Sigaction for SharedSystem<T> {
+impl<T: Sigaction + Sigmask> Sigaction for SharedSystem<T> {
     fn sigaction(&self, signal: signal::Number, action: Disposition) -> Result<Disposition> {
         self.0.borrow().sigaction(signal, action)
     }
 }
 
 /// Delegates `CaughtSignals` methods to the contained implementor.
-impl<T: CaughtSignals> CaughtSignals for SharedSystem<T> {
+impl<T: CaughtSignals + Sigmask> CaughtSignals for SharedSystem<T> {
     fn caught_signals(&self) -> Vec<signal::Number> {
         self.0.borrow().caught_signals()
     }
 }
 
 /// Delegates `SendSignal` methods to the contained implementor.
-impl<T: SendSignal> SendSignal for SharedSystem<T> {
+impl<T: SendSignal + Sigmask> SendSignal for SharedSystem<T> {
     fn kill(
         &self,
         target: Pid,
@@ -624,7 +626,7 @@ impl<T: SendSignal> SendSignal for SharedSystem<T> {
 }
 
 /// Delegates `Select` methods to the contained implementor.
-impl<T: Select> Select for SharedSystem<T> {
+impl<T: Select + Sigmask> Select for SharedSystem<T> {
     fn select(
         &self,
         readers: &mut Vec<Fd>,
@@ -637,35 +639,35 @@ impl<T: Select> Select for SharedSystem<T> {
 }
 
 /// Delegates `Isatty` methods to the contained implementor.
-impl<T: Isatty> Isatty for SharedSystem<T> {
+impl<T: Isatty + Sigmask> Isatty for SharedSystem<T> {
     fn isatty(&self, fd: Fd) -> bool {
         self.0.borrow().isatty(fd)
     }
 }
 
 /// Delegates `TcGetPgrp` methods to the contained implementor.
-impl<T: TcGetPgrp> TcGetPgrp for SharedSystem<T> {
+impl<T: TcGetPgrp + Sigmask> TcGetPgrp for SharedSystem<T> {
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
         self.0.borrow().tcgetpgrp(fd)
     }
 }
 
 /// Delegates `TcSetPgrp` methods to the contained implementor.
-impl<T: TcSetPgrp> TcSetPgrp for SharedSystem<T> {
+impl<T: TcSetPgrp + Sigmask> TcSetPgrp for SharedSystem<T> {
     fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> + use<T> {
         self.0.borrow().tcsetpgrp(fd, pgid)
     }
 }
 
 /// Delegates `Wait` methods to the contained implementor.
-impl<T: Wait> Wait for SharedSystem<T> {
+impl<T: Wait + Sigmask> Wait for SharedSystem<T> {
     fn wait(&self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         self.0.borrow().wait(target)
     }
 }
 
 /// Delegates `Exec` methods to the contained implementor.
-impl<T: Exec> Exec for SharedSystem<T> {
+impl<T: Exec + Sigmask> Exec for SharedSystem<T> {
     fn execve(
         &self,
         path: &CStr,
@@ -677,14 +679,14 @@ impl<T: Exec> Exec for SharedSystem<T> {
 }
 
 /// Delegates `Exit` methods to the contained implementor.
-impl<T: Exit> Exit for SharedSystem<T> {
+impl<T: Exit + Sigmask> Exit for SharedSystem<T> {
     fn exit(&self, exit_status: ExitStatus) -> impl Future<Output = Infallible> + use<T> {
         self.0.borrow().exit(exit_status)
     }
 }
 
 /// Delegates `GetUid` methods to the contained implementor.
-impl<T: GetUid> GetUid for SharedSystem<T> {
+impl<T: GetUid + Sigmask> GetUid for SharedSystem<T> {
     fn getuid(&self) -> Uid {
         self.0.borrow().getuid()
     }
@@ -700,35 +702,35 @@ impl<T: GetUid> GetUid for SharedSystem<T> {
 }
 
 /// Delegates `GetPw` methods to the contained implementor.
-impl<T: GetPw> GetPw for SharedSystem<T> {
+impl<T: GetPw + Sigmask> GetPw for SharedSystem<T> {
     fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
         self.0.borrow().getpwnam_dir(name)
     }
 }
 
 /// Delegates `Sysconf` methods to the contained implementor.
-impl<T: Sysconf> Sysconf for SharedSystem<T> {
+impl<T: Sysconf + Sigmask> Sysconf for SharedSystem<T> {
     fn confstr_path(&self) -> Result<UnixString> {
         self.0.borrow().confstr_path()
     }
 }
 
 /// Delegates `ShellPath` methods to the contained implementor.
-impl<T: ShellPath> ShellPath for SharedSystem<T> {
+impl<T: ShellPath + Sigmask> ShellPath for SharedSystem<T> {
     fn shell_path(&self) -> CString {
         self.0.borrow().shell_path()
     }
 }
 
 /// Delegates `GetRlimit` methods to the contained implementor.
-impl<T: GetRlimit> GetRlimit for SharedSystem<T> {
+impl<T: GetRlimit + Sigmask> GetRlimit for SharedSystem<T> {
     fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
         self.0.borrow().getrlimit(resource)
     }
 }
 
 /// Delegates `SetRlimit` methods to the contained implementor.
-impl<T: SetRlimit> SetRlimit for SharedSystem<T> {
+impl<T: SetRlimit + Sigmask> SetRlimit for SharedSystem<T> {
     fn setrlimit(&self, resource: Resource, limits: LimitPair) -> Result<()> {
         self.0.borrow().setrlimit(resource, limits)
     }

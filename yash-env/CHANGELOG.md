@@ -31,6 +31,16 @@ A _private dependency_ is used internally and not visible to downstream users.
   `system::virtual` module.
 - The `system::Fstat` trait methods `fstat` and `fstatat` now return
   `Self::Stat` instead of the concrete `system::virtual::Stat` type.
+- The `system::SharedSystem<S>` struct now requires `S: system::Sigmask`.
+- The `input::FdReader<S>` struct now requires `S: system::Sigmask`.
+- `impl input::Input for input::Echo<'_, '_, S, T>` now additionally requires
+  `S: system::Sigmask`.
+- `impl input::Input for input::IgnoreEof<'_, '_, S, T>` now additionally
+  requires `S: system::Sigmask`.
+- `impl input::Input for input::Reporter<'_, '_, S, T>` now additionally
+  requires `S: system::Sigmask` instead of `S: system::Signals`
+- The `io::print_report` and `io::print_error` functions now additionally
+  require `S: system::Sigmask`.
 
 ## [0.12.1] - 2026-02-06
 

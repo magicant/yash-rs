@@ -19,7 +19,7 @@
 use super::{Context, Input, Result};
 use crate::io::Fd;
 use crate::option::State;
-use crate::system::{Fcntl, Read, SharedSystem, Write};
+use crate::system::{Fcntl, Read, SharedSystem, Sigmask, Write};
 use std::cell::Cell;
 use std::rc::Rc;
 use std::slice::from_mut;
@@ -35,7 +35,7 @@ use std::slice::from_mut;
 /// one instance will affect the next read from the other.
 #[derive(Debug)]
 #[must_use = "FdReader does nothing unless used by a parser"]
-pub struct FdReader<S> {
+pub struct FdReader<S: Sigmask> {
     /// File descriptor to read from
     fd: Fd,
     /// System to interact with the FD
@@ -44,7 +44,7 @@ pub struct FdReader<S> {
     echo: Option<Rc<Cell<State>>>,
 }
 
-impl<S> FdReader<S> {
+impl<S: Sigmask> FdReader<S> {
     /// Creates a new `FdReader` instance.
     ///
     /// The `fd` argument is the file descriptor to read from. It should be
@@ -80,7 +80,7 @@ impl<S> FdReader<S> {
 }
 
 // Not derived automatically because S may not implement Clone
-impl<S> Clone for FdReader<S> {
+impl<S: Sigmask> Clone for FdReader<S> {
     fn clone(&self) -> Self {
         Self {
             fd: self.fd,
@@ -90,7 +90,7 @@ impl<S> Clone for FdReader<S> {
     }
 }
 
-impl<S: Fcntl + Read + Write> Input for FdReader<S> {
+impl<S: Fcntl + Read + Sigmask + Write> Input for FdReader<S> {
     async fn next_line(&mut self, _context: &Context) -> Result {
         // TODO Read many bytes at once if seekable
 

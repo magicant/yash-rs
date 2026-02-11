@@ -45,6 +45,7 @@ use crate::Env;
 use crate::io::Fd;
 use crate::semantics::{Divert, ExitStatus};
 use crate::signal;
+use crate::system::Sigset as _;
 use crate::system::{Disposition, Sigaction, Sigmask, SigmaskOp, Signals, TcSetPgrp};
 use slab::Slab;
 use std::collections::HashMap;
@@ -940,9 +941,14 @@ pub async fn tcsetpgrp_with_block<S>(system: &S, fd: Fd, pgid: Pid) -> crate::sy
 where
     S: Signals + Sigmask + TcSetPgrp + ?Sized,
 {
-    let mut old_mask = Vec::new();
+    let mask = {
+        let mut mask = <S as Sigmask>::Sigset::new();
+        mask.add(S::SIGTTOU)?;
+        mask
+    };
+    let mut old_mask = <S as Sigmask>::Sigset::new();
 
-    system.sigmask(Some((SigmaskOp::Add, &[S::SIGTTOU])), Some(&mut old_mask))?;
+    system.sigmask(Some((SigmaskOp::Add, &mask)), Some(&mut old_mask))?;
 
     let result = system.tcsetpgrp(fd, pgid).await;
 
@@ -977,11 +983,15 @@ where
     match system.sigaction(S::SIGTTOU, Disposition::Default) {
         Err(e) => Err(e),
         Ok(old_handling) => {
-            let mut old_mask = Vec::new();
-            let result = match system.sigmask(
-                Some((SigmaskOp::Remove, &[S::SIGTTOU])),
-                Some(&mut old_mask),
-            ) {
+            let mask = {
+                let mut mask = <S as Sigmask>::Sigset::new();
+                mask.add(S::SIGTTOU).unwrap();
+                mask
+            };
+            let mut old_mask = <S as Sigmask>::Sigset::new();
+
+            let result = match system.sigmask(Some((SigmaskOp::Remove, &mask)), Some(&mut old_mask))
+            {
                 Err(e) => Err(e),
                 Ok(()) => {
                     let result = system.tcsetpgrp(fd, pgid).await;

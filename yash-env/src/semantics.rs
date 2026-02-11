@@ -373,7 +373,13 @@ where
         }
 
         // Unblock the signal
-        system.sigmask(Some((SigmaskOp::Remove, &[signal.1])), None)?;
+        let sigset = {
+            use crate::system::Sigset as _;
+            let mut sigset = <S as Sigmask>::Sigset::new();
+            sigset.add(signal.1);
+            sigset
+        };
+        system.sigmask(Some((SigmaskOp::Remove, &sigset)), None)?;
 
         // Send the signal to the current process
         system.raise(signal.1).await?;
