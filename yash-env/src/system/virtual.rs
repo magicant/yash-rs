@@ -102,6 +102,7 @@ use super::Select;
 use super::SendSignal;
 use super::SetPgid;
 use super::SetRlimit;
+use super::SharedSystem;
 use super::ShellPath;
 use super::Sigaction;
 use super::Sigmask;
@@ -1045,18 +1046,19 @@ impl Fork for VirtualSystem {
 
         let state = Rc::clone(&self.state);
         Ok(Box::new(move |parent_env, task| {
-            let system = VirtualSystem { state, process_id };
+            let virtual_system = VirtualSystem { state, process_id };
+            let system = SharedSystem::new(virtual_system.clone());
             let mut child_env = parent_env.clone_with_system(system.clone());
 
             {
-                let mut process = system.current_process_mut();
-                process.selector = Rc::downgrade(&child_env.system.0);
+                let mut process = virtual_system.current_process_mut();
+                process.selector = Rc::downgrade(&system.0);
             }
 
             let run_task_and_set_exit_status = Box::pin(async move {
                 let runner = ProcessRunner {
                     task: task(&mut child_env),
-                    system,
+                    system: virtual_system,
                     waker: Rc::new(Cell::new(None)),
                 };
                 runner.await;

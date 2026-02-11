@@ -118,7 +118,10 @@ pub fn report_to_string<S: Isatty>(env: &Env<S>, report: &Report<'_>) -> String 
 ///
 /// This function converts the `report` into a string by using
 /// [`report_to_string`], and prints the result to the standard error.
-pub async fn print_report<S: Isatty + Fcntl + Write>(env: &mut Env<S>, report: &Report<'_>) {
+pub async fn print_report<T: Isatty + Fcntl + Write>(
+    env: &mut Env<SharedSystem<T>>,
+    report: &Report<'_>,
+) {
     let report_str = report_to_string(env, report);
     env.system.print_error(&report_str).await;
 }
@@ -127,8 +130,8 @@ pub async fn print_report<S: Isatty + Fcntl + Write>(env: &mut Env<S>, report: &
 ///
 /// This function constructs a temporary [`Report`] based on the given `title`,
 /// `label`, and `location`. The message is printed using [`print_report`].
-pub async fn print_error<S: Isatty + Fcntl + Write>(
-    env: &mut Env<S>,
+pub async fn print_error<T: Isatty + Fcntl + Write>(
+    env: &mut Env<SharedSystem<T>>,
     title: Cow<'_, str>,
     label: Cow<'_, str>,
     location: &Location,

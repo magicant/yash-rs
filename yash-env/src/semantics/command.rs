@@ -29,9 +29,10 @@ use crate::source::pretty::{Report, ReportType, Snippet};
 use crate::subshell::{JobControl, Subshell};
 use crate::system::resource::SetRlimit;
 use crate::system::{
-    Close, Dup, Errno, Exec, Exit, Fork, GetPid, Open, SendSignal, SetPgid, ShellPath, Sigaction,
-    Sigmask, Signals, TcSetPgrp, Wait,
+    CaughtSignals, Clock, Close, Dup, Errno, Exec, Exit, Fork, GetPid, Open, Select, SendSignal,
+    SetPgid, SharedSystem, ShellPath, Sigaction, Sigmask, Signals, TcSetPgrp, Wait,
 };
+use crate::trap;
 use itertools::Itertools as _;
 use std::convert::Infallible;
 use std::ffi::CString;
@@ -138,7 +139,9 @@ pub struct ReplaceCurrentProcessError {
 ///
 /// This function is for implementing the simple command execution semantics and
 /// the `exec` built-in utility.
-pub async fn replace_current_process<S: Exec + ShellPath + Signals + Sigmask + Sigaction>(
+pub async fn replace_current_process<
+    S: Exec + ShellPath + Signals + Sigmask + Sigaction + trap::SignalSystem,
+>(
     env: &mut Env<S>,
     path: CString,
     args: Vec<Field>,
@@ -241,19 +244,19 @@ impl<'a> From<&'a StartSubshellError> for Report<'a> {
 /// This function is for implementing the simple command execution semantics and
 /// the `command` built-in utility. This function internally uses
 /// [`replace_current_process`] to execute the utility in the subshell.
-pub async fn run_external_utility_in_subshell<S>(
-    env: &mut Env<S>,
+pub async fn run_external_utility_in_subshell<T>(
+    env: &mut Env<SharedSystem<T>>,
     path: CString,
     args: Vec<Field>,
-    handle_start_subshell_error: fn(&mut Env<S>, StartSubshellError) -> PinFuture<'_>,
+    handle_start_subshell_error: fn(&mut Env<SharedSystem<T>>, StartSubshellError) -> PinFuture<'_>,
     handle_replace_current_process_error: fn(
-        &mut Env<S>,
+        &mut Env<SharedSystem<T>>,
         ReplaceCurrentProcessError,
         Location,
     ) -> PinFuture<'_>,
 ) -> Result<ExitStatus>
 where
-    S: Close
+    T: Close
         + Dup
         + Exec
         + Exit
@@ -269,6 +272,9 @@ where
         + Signals
         + TcSetPgrp
         + Wait
+        + Select
+        + CaughtSignals
+        + Clock
         + 'static,
 {
     let utility = args[0].clone();

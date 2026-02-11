@@ -66,6 +66,7 @@ use super::Select;
 use super::SendSignal;
 use super::SetPgid;
 use super::SetRlimit;
+use super::SharedSystem;
 use super::ShellPath;
 use super::Sigaction;
 use super::Sigmask;
@@ -229,7 +230,7 @@ fn sigaction_impl(signal: signal::Number, disposition: Option<Disposition>) -> R
 /// Those methods block the current thread until the underlying system calls
 /// complete and then return ready futures.
 /// See also the [`system` module](super) documentation.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct RealSystem(());
 
 impl RealSystem {
@@ -986,7 +987,7 @@ impl Fork for RealSystem {
 
         // Child process
         Ok(Box::new(|env, task| {
-            let system = env.system.clone();
+            let system = SharedSystem::new(env.system.clone());
             // Here we create a new executor to run the task. This makes sure that any
             // other concurrent tasks in the parent process do not interfere with the
             // child process.

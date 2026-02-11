@@ -51,6 +51,7 @@ use crate::system::TcSetPgrp;
 use crate::system::Wait;
 use crate::system::{CaughtSignals, Clock, Select};
 use crate::system::resource::SetRlimit;
+use crate::trap;
 use std::marker::PhantomData;
 use std::pin::Pin;
 
@@ -97,7 +98,8 @@ where
         + Sigaction
         + Sigmask
         + Signals
-        + TcSetPgrp,
+        + TcSetPgrp
+        + trap::SignalSystem,
     F: for<'a> FnOnce(&'a mut Env<S>, Option<JobControl>) -> Pin<Box<dyn Future<Output = ()> + 'a>>
         + 'static,
     // TODO Revisit to simplify this function type when impl Future is allowed in return type
