@@ -388,13 +388,6 @@ impl<T: Pipe> Pipe for SharedSystem<T> {
     }
 }
 
-/// Delegates `Fork` methods to the contained implementor.
-impl<T: Fork> Fork for SharedSystem<T> {
-    fn new_child_process(&self) -> Result<ChildProcessStarter<Self>> {
-        self.0.borrow().new_child_process()
-    }
-}
-
 /// Delegates `Dup` methods to the contained implementor.
 impl<T: Dup> Dup for SharedSystem<T> {
     fn dup(&self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
