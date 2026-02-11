@@ -112,7 +112,41 @@ pub type ChildProcessStarter<S> = Box<dyn FnOnce(&mut Env<S>, ChildProcessTask<S
 
 /// Trait for spawning new processes
 pub trait Fork {
-    // XXX: This method needs refactoring! (#662)
+    /// Runs a task in a new child process.
+    ///
+    /// This is a low-level wrapper around the [`fork` system
+    /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/fork.html).
+    /// You should generally use [`Subshell`](crate::subshell::Subshell) instead
+    /// of this method to create a subshell, so that the environment can
+    /// condition the state of the child process before it starts running.
+    ///
+    /// There are two notable differences from the standard `fork` system call:
+    ///
+    /// 1. This method takes a task to be executed in the child process, and
+    ///    does not return in the child process. This makes the
+    ///    [`VirtualSystem`] implementation easier, as it does not need to copy
+    ///    the calling stack to create a new virtual process.
+    /// 2. This method allows passing shared data between the parent and child
+    ///    processes. In the parent process, the data is returned intact along
+    ///    with the child process ID. In the child process, the data is passed
+    ///    to the task, which may be a clone of the original data in
+    ///    [`VirtualSystem`] that runs the task in the same real process.
+    ///
+    /// The asynchronicity of the child task must be used only for simulating
+    /// process suspension and abortion in [`VirtualSystem`]. In a real child
+    /// process created by [`RealSystem`], the task must run to completion
+    /// without yielding (that is, [`Future::poll`] must not return
+    /// `Poll::Pending`).
+    ///
+    /// [`RealSystem`]: crate::system::real::RealSystem
+    /// [`VirtualSystem`]: crate::system::virtual::VirtualSystem
+    fn run_in_child_process<D, F>(&self, shared_data: D, child_task: F) -> Result<(Pid, D)>
+    where
+        Self: Sized,
+        D: Clone + 'static,
+        F: AsyncFnOnce(Self, D) -> ExitStatus + 'static;
+
+    // XXX: This method should be deprecated and removed (#662)
     /// Creates a new child process.
     ///
     /// This is a wrapper around the [`fork` system

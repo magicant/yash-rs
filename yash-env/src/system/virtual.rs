@@ -1018,6 +1018,62 @@ impl TcSetPgrp for VirtualSystem {
 }
 
 impl Fork for VirtualSystem {
+    /// Runs a task in a new child process.
+    ///
+    /// This method implements [`Fork::run_in_child_process`] by adding a new
+    /// process to the system state and running the given task concurrently in
+    /// the same real process. It does not create any real child process.
+    ///
+    /// To run the concurrent task, this function needs an executor that has
+    /// been set in the [`SystemState`]. If the system state does not have an
+    /// executor, this function fails with `Errno::ENOSYS`.
+    ///
+    /// The process ID of the child will be the maximum of existing process IDs
+    /// plus 1. If there are no other processes, it will be 2.
+    fn run_in_child_process<D, F>(&self, shared_data: D, child_task: F) -> Result<(Pid, D)>
+    where
+        Self: Sized,
+        D: Clone + 'static,
+        F: AsyncFnOnce(Self, D) -> ExitStatus + 'static,
+    {
+        let mut state = self.state.borrow_mut();
+        let executor = state.executor.clone().ok_or(Errno::ENOSYS)?;
+        let child_process_id = state
+            .processes
+            .keys()
+            .max()
+            .map_or(Pid(2), |pid| Pid(pid.0 + 1));
+        let parent_process = &state.processes[&self.process_id];
+        let child_process = Process::fork_from(self.process_id, parent_process);
+        // TODO: We cannot set the selector here because we don't have the Env here.
+        // What's the implication of this?
+        state.processes.insert(child_process_id, child_process);
+        drop(state);
+
+        let child_system = VirtualSystem {
+            state: Rc::clone(&self.state),
+            process_id: child_process_id,
+        };
+        let child_system_2 = child_system.clone();
+        let data_clone = shared_data.clone();
+        let task_future = Box::pin(async move {
+            let child_system_3 = child_system_2.clone();
+            let exit_status = child_task(child_system_2, data_clone).await;
+            child_system_3.exit(exit_status).await
+        });
+        let runner = ProcessRunner {
+            task: task_future,
+            system: child_system,
+            waker: Rc::new(Cell::new(None)),
+        };
+
+        executor
+            .spawn(Box::pin(runner))
+            .expect("the executor failed to start the child process task");
+
+        Ok((child_process_id, shared_data))
+    }
+
     /// Creates a new child process.
     ///
     /// This implementation does not create any real child process. Instead,
@@ -1393,7 +1449,7 @@ pub trait Executor: Debug {
 
 /// Concurrent task that manages the execution of a process.
 ///
-/// This struct is a helper for [`VirtualSystem::new_child_process`].
+/// This struct is a helper for [`VirtualSystem::run_in_child_process`].
 /// It basically runs the given task, but pauses or cancels it depending on
 /// the state of the process.
 struct ProcessRunner<'a> {
