@@ -351,6 +351,36 @@ impl VirtualSystem {
         })
         .await
     }
+
+    /// Creates a new file descriptor in the current process.
+    ///
+    /// This is a helper function used internally by [`Self::open`], etc.
+    fn create_fd(
+        &self,
+        file: Rc<RefCell<Inode>>,
+        flags: EnumSet<OpenFlag>,
+        is_readable: bool,
+        is_writable: bool,
+    ) -> std::result::Result<Fd, Errno> {
+        let open_file_description = Rc::new(RefCell::new(OpenFileDescription {
+            file,
+            offset: 0,
+            is_readable,
+            is_writable,
+            is_appending: flags.contains(OpenFlag::Append),
+        }));
+        let body = FdBody {
+            open_file_description,
+            flags: if flags.contains(OpenFlag::CloseOnExec) {
+                EnumSet::only(FdFlag::CloseOnExec)
+            } else {
+                EnumSet::empty()
+            },
+        };
+        self.current_process_mut()
+            .open_fd(body)
+            .map_err(|_| Errno::EMFILE)
+    }
 }
 
 impl Default for VirtualSystem {
@@ -484,6 +514,7 @@ impl Open for VirtualSystem {
             }
             Err(errno) => return Err(errno),
         };
+        drop(state);
 
         let (is_readable, is_writable) = match access {
             OfdAccess::ReadOnly => (true, false),
@@ -504,23 +535,7 @@ impl Open for VirtualSystem {
             }
         }
 
-        let open_file_description = Rc::new(RefCell::new(OpenFileDescription {
-            file,
-            offset: 0,
-            is_readable,
-            is_writable,
-            is_appending: flags.contains(OpenFlag::Append),
-        }));
-        let body = FdBody {
-            open_file_description,
-            flags: if flags.contains(OpenFlag::CloseOnExec) {
-                EnumSet::only(FdFlag::CloseOnExec)
-            } else {
-                EnumSet::empty()
-            },
-        };
-        let process = state.processes.get_mut(&self.process_id).unwrap();
-        process.open_fd(body).map_err(|_| Errno::EMFILE)
+        self.create_fd(file, flags, is_readable, is_writable)
     }
 
     fn open_tmpfile(&self, _parent_dir: &Path) -> Result<Fd> {
@@ -536,9 +551,9 @@ impl Open for VirtualSystem {
             open_file_description,
             flags: EnumSet::empty(),
         };
-        let mut state = self.state.borrow_mut();
-        let process = state.processes.get_mut(&self.process_id).unwrap();
-        process.open_fd(body).map_err(|_| Errno::EMFILE)
+        self.current_process_mut()
+            .open_fd(body)
+            .map_err(|_| Errno::EMFILE)
     }
 
     fn fdopendir(&self, fd: Fd) -> Result<impl Dir + use<>> {
