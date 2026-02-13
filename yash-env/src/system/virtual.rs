@@ -352,6 +352,57 @@ impl VirtualSystem {
         .await
     }
 
+    /// Resolves a file for opening.
+    ///
+    /// This is a helper function used internally by [`Self::open`], etc.
+    fn resolve_file(
+        &self,
+        path: &CStr,
+        access: OfdAccess,
+        flags: EnumSet<OpenFlag>,
+        mode: Mode,
+    ) -> Result<(Rc<RefCell<Inode>>, bool, bool)> {
+        let path = self.resolve_relative_path(Path::new(UnixStr::from_bytes(path.to_bytes())));
+        let umask = self.current_process().umask;
+
+        let mut state = self.state.borrow_mut();
+        let file = match state.file_system.get(&path) {
+            Ok(inode) => {
+                if flags.contains(OpenFlag::Exclusive) {
+                    return Err(Errno::EEXIST);
+                }
+                if flags.contains(OpenFlag::Directory)
+                    && !matches!(inode.borrow().body, FileBody::Directory { .. })
+                {
+                    return Err(Errno::ENOTDIR);
+                }
+                if flags.contains(OpenFlag::Truncate) {
+                    if let FileBody::Regular { content, .. } = &mut inode.borrow_mut().body {
+                        content.clear();
+                    };
+                }
+                inode
+            }
+            Err(Errno::ENOENT) if flags.contains(OpenFlag::Create) => {
+                let mut inode = Inode::new([]);
+                inode.permissions = mode.difference(umask);
+                let inode = Rc::new(RefCell::new(inode));
+                state.file_system.save(&path, Rc::clone(&inode))?;
+                inode
+            }
+            Err(errno) => return Err(errno),
+        };
+
+        let (is_readable, is_writable) = match access {
+            OfdAccess::ReadOnly => (true, false),
+            OfdAccess::WriteOnly => (false, true),
+            OfdAccess::ReadWrite => (true, true),
+            OfdAccess::Exec | OfdAccess::Search => (false, false),
+        };
+
+        Ok((file, is_readable, is_writable))
+    }
+
     /// Creates a new file descriptor in the current process.
     ///
     /// This is a helper function used internally by [`Self::open`], etc.
@@ -484,44 +535,7 @@ impl Open for VirtualSystem {
         flags: EnumSet<OpenFlag>,
         mode: Mode,
     ) -> Result<Fd> {
-        let path = self.resolve_relative_path(Path::new(UnixStr::from_bytes(path.to_bytes())));
-        let umask = self.current_process().umask;
-
-        let mut state = self.state.borrow_mut();
-        let file = match state.file_system.get(&path) {
-            Ok(inode) => {
-                if flags.contains(OpenFlag::Exclusive) {
-                    return Err(Errno::EEXIST);
-                }
-                if flags.contains(OpenFlag::Directory)
-                    && !matches!(inode.borrow().body, FileBody::Directory { .. })
-                {
-                    return Err(Errno::ENOTDIR);
-                }
-                if flags.contains(OpenFlag::Truncate) {
-                    if let FileBody::Regular { content, .. } = &mut inode.borrow_mut().body {
-                        content.clear();
-                    };
-                }
-                inode
-            }
-            Err(Errno::ENOENT) if flags.contains(OpenFlag::Create) => {
-                let mut inode = Inode::new([]);
-                inode.permissions = mode.difference(umask);
-                let inode = Rc::new(RefCell::new(inode));
-                state.file_system.save(&path, Rc::clone(&inode))?;
-                inode
-            }
-            Err(errno) => return Err(errno),
-        };
-        drop(state);
-
-        let (is_readable, is_writable) = match access {
-            OfdAccess::ReadOnly => (true, false),
-            OfdAccess::WriteOnly => (false, true),
-            OfdAccess::ReadWrite => (true, true),
-            OfdAccess::Exec | OfdAccess::Search => (false, false),
-        };
+        let (file, is_readable, is_writable) = self.resolve_file(path, access, flags, mode)?;
 
         if let FileBody::Fifo {
             readers, writers, ..
@@ -565,12 +579,19 @@ impl Open for VirtualSystem {
     }
 
     fn opendir(&self, path: &CStr) -> Result<impl Dir + use<>> {
-        let fd = self.open(
+        let (file, is_readable, is_writable) = self.resolve_file(
             path,
             OfdAccess::ReadOnly,
             OpenFlag::Directory.into(),
             Mode::empty(),
         )?;
+
+        debug_assert!(
+            matches!(file.borrow().body, FileBody::Directory { .. }),
+            "resolved file is not a directory"
+        );
+
+        let fd = self.create_fd(file, OpenFlag::Directory.into(), is_readable, is_writable)?;
         self.fdopendir(fd)
     }
 }
