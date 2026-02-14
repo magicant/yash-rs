@@ -50,7 +50,7 @@ impl Command {
     {
         let env = &mut *env.push_frame(Frame::DotScript);
 
-        let fd = match find_and_open_file(env, &self.file.value) {
+        let fd = match find_and_open_file(env, &self.file.value).await {
             Ok(fd) => fd,
             Err(errno) => return report_find_and_open_file_failure(env, &self.file, errno).await,
         };
@@ -85,7 +85,7 @@ impl Command {
 ///
 /// If the name does not contain a slash, this function searches the file in the
 /// `$PATH` variable.
-fn find_and_open_file<S>(env: &mut Env<S>, filename: &str) -> Result<Fd, Errno>
+async fn find_and_open_file<S>(env: &mut Env<S>, filename: &str) -> Result<Fd, Errno>
 where
     S: Open + Close + Dup,
 {
@@ -101,22 +101,24 @@ where
 
     // Iterate over the directories trying to open the file in each directory
     // and return the first successfully opened file descriptor.
-    dirs.filter_map(|dir| {
+    for dir in dirs {
         let path = PathBuf::from_iter([dir, filename])
             .into_unix_string()
             .into_vec();
-        let c_path = CString::new(path).ok()?;
-        open_file(&mut env.system, &c_path).ok()
-    })
-    .next()
-    .ok_or(Errno::ENOENT)
+        if let Ok(c_path) = CString::new(path) {
+            if let Ok(fd) = open_file(&mut env.system, &c_path).await {
+                return Ok(fd);
+            }
+        }
+    }
+    Err(Errno::ENOENT)
 }
 
 /// Opens the file to be executed.
 ///
 /// The returned file descriptor is opened with the `O_CLOEXEC` flag and is at
 /// least [`MIN_INTERNAL_FD`](yash_env::io::MIN_INTERNAL_FD).
-fn open_file<S>(system: &mut S, path: &CStr) -> Result<Fd, Errno>
+async fn open_file<S>(system: &mut S, path: &CStr) -> Result<Fd, Errno>
 where
     S: Open + Close + Dup + ?Sized,
 {
@@ -205,7 +207,9 @@ mod tests {
 
         // The pathname parameter contains a slash, so the file is not searched
         // in the $PATH variable.
-        let result = find_and_open_file(&mut env, "./file");
+        let result = find_and_open_file(&mut env, "./file")
+            .now_or_never()
+            .unwrap();
 
         // The expected file is "/file" since the default working directory is
         // "/".
@@ -237,7 +241,7 @@ mod tests {
 
         // The pathname parameter does not contain a slash, so the file is
         // searched in the $PATH variable.
-        let result = find_and_open_file(&mut env, "file");
+        let result = find_and_open_file(&mut env, "file").now_or_never().unwrap();
 
         // The expected file is "/bar/file".
         let fd = result.unwrap();
@@ -250,14 +254,17 @@ mod tests {
     #[test]
     fn open_file_result_lower_bound() {
         let mut system = system_with_file("/foo/file", "");
-        let result = open_file(&mut system, c"/foo/file");
+        let result = open_file(&mut system, c"/foo/file").now_or_never().unwrap();
         assert_matches!(result, Ok(fd) if fd >= MIN_INTERNAL_FD);
     }
 
     #[test]
     fn open_file_result_cloexec() {
         let mut system = system_with_file("/foo/file", "");
-        let fd = open_file(&mut system, c"/foo/file").unwrap();
+        let fd = open_file(&mut system, c"/foo/file")
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         let process = system.current_process();
         let fd_body = process.get_fd(fd).unwrap();
