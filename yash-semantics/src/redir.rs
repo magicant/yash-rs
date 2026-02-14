@@ -295,7 +295,7 @@ fn into_c_string_value_and_origin(field: Field) -> Result<(CString, Location), E
 }
 
 /// Opens a file for redirection.
-fn open_file<S: Open>(
+async fn open_file<S: Open>(
     env: &mut Env<S>,
     access: OfdAccess,
     flags: EnumSet<OpenFlag>,
@@ -313,7 +313,7 @@ fn open_file<S: Open>(
 }
 
 /// Opens a file for writing with the `noclobber` option.
-fn open_file_noclobber<S>(env: &mut Env<S>, path: Field) -> Result<(FdSpec, Location), Error>
+async fn open_file_noclobber<S>(env: &mut Env<S>, path: Field) -> Result<(FdSpec, Location), Error>
 where
     S: Open + Fstat + Close,
 {
@@ -435,21 +435,21 @@ where
 {
     use RedirOp::*;
     match operator {
-        FileIn => open_file(env, OfdAccess::ReadOnly, EnumSet::empty(), operand),
-        FileOut if env.options.get(Clobber) == Off => open_file_noclobber(env, operand),
+        FileIn => open_file(env, OfdAccess::ReadOnly, EnumSet::empty(), operand).await,
+        FileOut if env.options.get(Clobber) == Off => open_file_noclobber(env, operand).await,
         FileOut | FileClobber => open_file(
             env,
             OfdAccess::WriteOnly,
             OpenFlag::Create | OpenFlag::Truncate,
             operand,
-        ),
+        ).await,
         FileAppend => open_file(
             env,
             OfdAccess::WriteOnly,
             OpenFlag::Create | OpenFlag::Append,
             operand,
-        ),
-        FileInOut => open_file(env, OfdAccess::ReadWrite, OpenFlag::Create.into(), operand),
+        ).await,
+        FileInOut => open_file(env, OfdAccess::ReadWrite, OpenFlag::Create.into(), operand).await,
         FdIn => copy_fd(env, operand, OfdAccess::ReadOnly),
         FdOut => copy_fd(env, operand, OfdAccess::WriteOnly),
         Pipe => Err(Error {

@@ -120,7 +120,7 @@ async fn async_body<S: Runtime + 'static>(
     and_or: &AndOrList,
 ) {
     if job_control.is_none() {
-        nullify_stdin(env).ok();
+        nullify_stdin(env).await.ok();
     }
     let result = and_or.execute(env).await;
     env.apply_result(result);
@@ -128,7 +128,7 @@ async fn async_body<S: Runtime + 'static>(
     run_exit_trap(env).await;
 }
 
-fn nullify_stdin<S: Open + Close>(
+async fn nullify_stdin<S: Open + Close>(
     env: &mut Env<S>,
 ) -> std::result::Result<(), yash_env::system::Errno> {
     env.system.close(Fd::STDIN)?;
