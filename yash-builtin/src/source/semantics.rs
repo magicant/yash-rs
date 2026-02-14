@@ -207,7 +207,9 @@ mod tests {
 
         // The pathname parameter contains a slash, so the file is not searched
         // in the $PATH variable.
-        let result = find_and_open_file(&mut env, "./file").now_or_never().unwrap();
+        let result = find_and_open_file(&mut env, "./file")
+            .now_or_never()
+            .unwrap();
 
         // The expected file is "/file" since the default working directory is
         // "/".
@@ -259,7 +261,10 @@ mod tests {
     #[test]
     fn open_file_result_cloexec() {
         let mut system = system_with_file("/foo/file", "");
-        let fd = open_file(&mut system, c"/foo/file").now_or_never().unwrap().unwrap();
+        let fd = open_file(&mut system, c"/foo/file")
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         let process = system.current_process();
         let fd_body = process.get_fd(fd).unwrap();

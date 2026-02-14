@@ -437,18 +437,24 @@ where
     match operator {
         FileIn => open_file(env, OfdAccess::ReadOnly, EnumSet::empty(), operand).await,
         FileOut if env.options.get(Clobber) == Off => open_file_noclobber(env, operand).await,
-        FileOut | FileClobber => open_file(
-            env,
-            OfdAccess::WriteOnly,
-            OpenFlag::Create | OpenFlag::Truncate,
-            operand,
-        ).await,
-        FileAppend => open_file(
-            env,
-            OfdAccess::WriteOnly,
-            OpenFlag::Create | OpenFlag::Append,
-            operand,
-        ).await,
+        FileOut | FileClobber => {
+            open_file(
+                env,
+                OfdAccess::WriteOnly,
+                OpenFlag::Create | OpenFlag::Truncate,
+                operand,
+            )
+            .await
+        }
+        FileAppend => {
+            open_file(
+                env,
+                OfdAccess::WriteOnly,
+                OpenFlag::Create | OpenFlag::Append,
+                operand,
+            )
+            .await
+        }
         FileInOut => open_file(env, OfdAccess::ReadWrite, OpenFlag::Create.into(), operand).await,
         FdIn => copy_fd(env, operand, OfdAccess::ReadOnly),
         FdOut => copy_fd(env, operand, OfdAccess::WriteOnly),
