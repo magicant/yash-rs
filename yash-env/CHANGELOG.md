@@ -27,7 +27,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   `system::virtual` module.
 - The `system::Fstat` trait methods `fstat` and `fstatat` now return
   `Self::Stat` instead of the concrete `system::virtual::Stat` type.
-- The `Env::get_tty` method is now async. Callers must await the method call.
+- The `system::Open::open` method is now async.
+- The `Env::get_tty` method is now async.
 
 ## [0.12.1] - 2026-02-06
 

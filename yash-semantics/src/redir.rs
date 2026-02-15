@@ -303,7 +303,7 @@ async fn open_file<S: Open>(
 ) -> Result<(FdSpec, Location), Error> {
     let system = &mut env.system;
     let (path, origin) = into_c_string_value_and_origin(path)?;
-    match system.open(&path, access, flags, MODE) {
+    match system.open(&path, access, flags, MODE).await {
         Ok(fd) => Ok((FdSpec::Owned(fd), origin)),
         Err(errno) => Err(Error {
             cause: ErrorCause::OpenFile(path, errno),
@@ -321,7 +321,10 @@ where
     let (path, origin) = into_c_string_value_and_origin(path)?;
 
     const FLAGS_EXCL: EnumSet<OpenFlag> = enum_set!(OpenFlag::Create | OpenFlag::Exclusive);
-    match system.open(&path, OfdAccess::WriteOnly, FLAGS_EXCL, MODE) {
+    match system
+        .open(&path, OfdAccess::WriteOnly, FLAGS_EXCL, MODE)
+        .await
+    {
         Ok(fd) => return Ok((FdSpec::Owned(fd), origin)),
         Err(Errno::EEXIST) => (),
         Err(errno) => {
@@ -333,7 +336,10 @@ where
     }
 
     // Okay, it seems there is an existing file. Try opening it.
-    match system.open(&path, OfdAccess::WriteOnly, EnumSet::empty(), MODE) {
+    match system
+        .open(&path, OfdAccess::WriteOnly, EnumSet::empty(), MODE)
+        .await
+    {
         Ok(fd) => {
             let is_regular = system.fstat(fd).is_ok_and(|stat| stat.is_regular_file());
             if is_regular {
@@ -950,6 +956,8 @@ mod tests {
                 OpenFlag::Create.into(),
                 Mode::ALL_9,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         env.system
             .fcntl_setfd(fd, FdFlag::CloseOnExec.into())

@@ -136,7 +136,8 @@ async fn nullify_stdin<S: Open + Close>(
     let path = c"/dev/null";
     let fd = env
         .system
-        .open(path, OfdAccess::ReadOnly, Default::default(), Mode::empty())?;
+        .open(path, OfdAccess::ReadOnly, Default::default(), Mode::empty())
+        .await?;
     assert_eq!(fd, Fd::STDIN);
     Ok(())
 }
