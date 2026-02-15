@@ -79,7 +79,7 @@ pub struct PrepareInputError<'a> {
 /// consumes the input and executes the parsed commands.
 ///
 /// [`Verbose`]: yash_env::option::Verbose
-pub fn prepare_input<'s, 'i, 'e, S>(
+pub async fn prepare_input<'s, 'i, 'e, S>(
     env: &'i RefCell<&mut Env<S>>,
     source: &'s Source,
 ) -> Result<Lexer<'i>, PrepareInputError<'e>>
@@ -126,6 +126,7 @@ where
                     OpenFlag::CloseOnExec.into(),
                     Mode::empty(),
                 )
+                .await
                 .and_then(|fd| move_fd_internal(&system, fd))
                 .map_err(|errno| PrepareInputError { errno, path })?;
 

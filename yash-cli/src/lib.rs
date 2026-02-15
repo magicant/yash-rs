@@ -93,7 +93,7 @@ where
 
     // Prepare the input for the main read-eval loop
     let ref_env = RefCell::new(env);
-    let lexer = match prepare_input(&ref_env, &work.source) {
+    let lexer = match prepare_input(&ref_env, &work.source).await {
         Ok(lexer) => lexer,
         Err(e) => {
             let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());

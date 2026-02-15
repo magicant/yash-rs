@@ -75,7 +75,7 @@ where
         + Wait
         + Write,
 {
-    let tty = env.get_tty().ok();
+    let tty = env.get_tty().await.ok();
 
     let job = &env.jobs[index];
     if !job.is_owned {
@@ -241,7 +241,7 @@ mod tests {
                     suspend(env).await;
 
                     // When resumed, the subshell should be in the foreground.
-                    let tty = env.get_tty().unwrap();
+                    let tty = env.get_tty().await.unwrap();
                     assert_eq!(env.system.tcgetpgrp(tty).unwrap(), env.system.getpid());
                     reached2.set(true);
                 })

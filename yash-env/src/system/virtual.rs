@@ -351,6 +351,87 @@ impl VirtualSystem {
         })
         .await
     }
+
+    /// Resolves a file for opening.
+    ///
+    /// This is a helper function used internally by [`Self::open`], etc.
+    fn resolve_file(
+        &self,
+        path: &CStr,
+        access: OfdAccess,
+        flags: EnumSet<OpenFlag>,
+        mode: Mode,
+    ) -> Result<(Rc<RefCell<Inode>>, bool, bool)> {
+        let path = self.resolve_relative_path(Path::new(UnixStr::from_bytes(path.to_bytes())));
+        let umask = self.current_process().umask;
+
+        let mut state = self.state.borrow_mut();
+        let file = match state.file_system.get(&path) {
+            Ok(inode) => {
+                if flags.contains(OpenFlag::Exclusive) {
+                    return Err(Errno::EEXIST);
+                }
+                if flags.contains(OpenFlag::Directory)
+                    && !matches!(inode.borrow().body, FileBody::Directory { .. })
+                {
+                    return Err(Errno::ENOTDIR);
+                }
+                if flags.contains(OpenFlag::Truncate) {
+                    if let FileBody::Regular { content, .. } = &mut inode.borrow_mut().body {
+                        content.clear();
+                    };
+                }
+                inode
+            }
+            Err(Errno::ENOENT) if flags.contains(OpenFlag::Create) => {
+                let mut inode = Inode::new([]);
+                inode.permissions = mode.difference(umask);
+                let inode = Rc::new(RefCell::new(inode));
+                state.file_system.save(&path, Rc::clone(&inode))?;
+                inode
+            }
+            Err(errno) => return Err(errno),
+        };
+
+        let (is_readable, is_writable) = match access {
+            OfdAccess::ReadOnly => (true, false),
+            OfdAccess::WriteOnly => (false, true),
+            OfdAccess::ReadWrite => (true, true),
+            OfdAccess::Exec | OfdAccess::Search => (false, false),
+        };
+
+        Ok((file, is_readable, is_writable))
+    }
+
+    /// Creates a new file descriptor in the current process.
+    ///
+    /// This is a helper function used internally by [`Self::open`], etc.
+    fn create_fd(
+        &self,
+        file: Rc<RefCell<Inode>>,
+        flags: EnumSet<OpenFlag>,
+        is_readable: bool,
+        is_writable: bool,
+    ) -> std::result::Result<Fd, Errno> {
+        let open_file_description = Rc::new(RefCell::new(OpenFileDescription {
+            file,
+            offset: 0,
+            is_readable,
+            is_writable,
+            is_appending: flags.contains(OpenFlag::Append),
+        }));
+        let body = FdBody {
+            open_file_description,
+            flags: if flags.contains(OpenFlag::CloseOnExec) {
+                EnumSet::only(FdFlag::CloseOnExec)
+            } else {
+                EnumSet::empty()
+            },
+        };
+        self.current_process_mut()
+            .open_fd(body)
+            .map_err(|_| Errno::EMFILE)
+    }
 }
 
 impl Default for VirtualSystem {
@@ -392,6 +473,7 @@ impl Pipe for VirtualSystem {
                 content: VecDeque::new(),
                 readers: 1,
                 writers: 1,
+                awaiters: Vec::new(),
             },
             permissions: Mode::default(),
         }));
@@ -447,80 +529,65 @@ impl Dup for VirtualSystem {
 }
 
 impl Open for VirtualSystem {
+    /// Opens a file and returns a new file descriptor for it.
+    ///
+    /// The returned future will be pending until the file is ready to be
+    /// opened. For example, if the file is a FIFO, the future will be pending
+    /// until the other end of the FIFO is opened, unless `OpenFlag::NonBlock`
+    /// is specified.
     fn open(
         &self,
         path: &CStr,
         access: OfdAccess,
         flags: EnumSet<OpenFlag>,
         mode: Mode,
-    ) -> Result<Fd> {
-        let path = self.resolve_relative_path(Path::new(UnixStr::from_bytes(path.to_bytes())));
-        let umask = self.current_process().umask;
+    ) -> impl Future<Output = Result<Fd>> + use<> {
+        let resolution = self.resolve_file(path, access, flags, mode);
+        let system = self.clone();
 
-        let mut state = self.state.borrow_mut();
-        let file = match state.file_system.get(&path) {
-            Ok(inode) => {
-                if flags.contains(OpenFlag::Exclusive) {
-                    return Err(Errno::EEXIST);
+        async move {
+            let (file, is_readable, is_writable) = resolution?;
+
+            if let FileBody::Fifo {
+                readers, writers, ..
+            } = &mut file.borrow_mut().body
+            {
+                if is_readable {
+                    *readers += 1;
                 }
-                if flags.contains(OpenFlag::Directory)
-                    && !matches!(inode.borrow().body, FileBody::Directory { .. })
-                {
-                    return Err(Errno::ENOTDIR);
+                if is_writable {
+                    *writers += 1;
                 }
-                if flags.contains(OpenFlag::Truncate) {
-                    if let FileBody::Regular { content, .. } = &mut inode.borrow_mut().body {
-                        content.clear();
+            }
+
+            if !flags.contains(OpenFlag::NonBlock) {
+                // If the file is a FIFO, block until the other end is opened.
+                poll_fn(|context| {
+                    let FileBody::Fifo {
+                        readers,
+                        writers,
+                        ref mut awaiters,
+                        ..
+                    } = file.borrow_mut().body
+                    else {
+                        return Poll::Ready(());
                     };
-                }
-                inode
-            }
-            Err(Errno::ENOENT) if flags.contains(OpenFlag::Create) => {
-                let mut inode = Inode::new([]);
-                inode.permissions = mode.difference(umask);
-                let inode = Rc::new(RefCell::new(inode));
-                state.file_system.save(&path, Rc::clone(&inode))?;
-                inode
-            }
-            Err(errno) => return Err(errno),
-        };
 
-        let (is_readable, is_writable) = match access {
-            OfdAccess::ReadOnly => (true, false),
-            OfdAccess::WriteOnly => (false, true),
-            OfdAccess::ReadWrite => (true, true),
-            OfdAccess::Exec | OfdAccess::Search => (false, false),
-        };
+                    if readers == 0 || writers == 0 {
+                        awaiters.push(context.waker().clone());
+                        Poll::Pending
+                    } else {
+                        for task in awaiters.drain(..) {
+                            task.wake();
+                        }
+                        Poll::Ready(())
+                    }
+                })
+                .await;
+            }
 
-        if let FileBody::Fifo {
-            readers, writers, ..
-        } = &mut file.borrow_mut().body
-        {
-            if is_readable {
-                *readers += 1;
-            }
-            if is_writable {
-                *writers += 1;
-            }
+            system.create_fd(file, flags, is_readable, is_writable)
         }
-
-        let open_file_description = Rc::new(RefCell::new(OpenFileDescription {
-            file,
-            offset: 0,
-            is_readable,
-            is_writable,
-            is_appending: flags.contains(OpenFlag::Append),
-        }));
-        let body = FdBody {
-            open_file_description,
-            flags: if flags.contains(OpenFlag::CloseOnExec) {
-                EnumSet::only(FdFlag::CloseOnExec)
-            } else {
-                EnumSet::empty()
-            },
-        };
-        let process = state.processes.get_mut(&self.process_id).unwrap();
-        process.open_fd(body).map_err(|_| Errno::EMFILE)
     }
 
     fn open_tmpfile(&self, _parent_dir: &Path) -> Result<Fd> {
@@ -536,9 +603,9 @@ impl Open for VirtualSystem {
             open_file_description,
             flags: EnumSet::empty(),
         };
-        let mut state = self.state.borrow_mut();
-        let process = state.processes.get_mut(&self.process_id).unwrap();
-        process.open_fd(body).map_err(|_| Errno::EMFILE)
+        self.current_process_mut()
+            .open_fd(body)
+            .map_err(|_| Errno::EMFILE)
     }
 
     fn fdopendir(&self, fd: Fd) -> Result<impl Dir + use<>> {
@@ -550,12 +617,19 @@ impl Open for VirtualSystem {
     }
 
     fn opendir(&self, path: &CStr) -> Result<impl Dir + use<>> {
-        let fd = self.open(
+        let (file, is_readable, is_writable) = self.resolve_file(
             path,
             OfdAccess::ReadOnly,
             OpenFlag::Directory.into(),
             Mode::empty(),
         )?;
+
+        debug_assert!(
+            matches!(file.borrow().body, FileBody::Directory { .. }),
+            "resolved file is not a directory"
+        );
+
+        let fd = self.create_fd(file, OpenFlag::Directory.into(), is_readable, is_writable)?;
         self.fdopendir(fd)
     }
 }
@@ -1507,6 +1581,7 @@ mod tests {
                 content: [17; 42].into(),
                 readers: 0,
                 writers: 0,
+                awaiters: Vec::new(),
             },
             permissions: Mode::default(),
         }));
@@ -1659,24 +1734,30 @@ mod tests {
     #[test]
     fn open_non_existing_file_no_creation() {
         let system = VirtualSystem::new();
-        let result = system.open(
-            c"/no/such/file",
-            OfdAccess::ReadOnly,
-            EnumSet::empty(),
-            Mode::empty(),
-        );
+        let result = system
+            .open(
+                c"/no/such/file",
+                OfdAccess::ReadOnly,
+                EnumSet::empty(),
+                Mode::empty(),
+            )
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Err(Errno::ENOENT));
     }
 
     #[test]
     fn open_creating_non_existing_file() {
         let system = VirtualSystem::new();
-        let result = system.open(
-            c"new_file",
-            OfdAccess::WriteOnly,
-            OpenFlag::Create.into(),
-            Mode::empty(),
-        );
+        let result = system
+            .open(
+                c"new_file",
+                OfdAccess::WriteOnly,
+                OpenFlag::Create.into(),
+                Mode::empty(),
+            )
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(Fd(3)));
 
         system.write(Fd(3), &[42, 123]).unwrap();
@@ -1699,6 +1780,8 @@ mod tests {
                 OpenFlag::Create.into(),
                 Mode::ALL_9,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
         let file = system.state.borrow().file_system.get("file").unwrap();
@@ -1716,15 +1799,20 @@ mod tests {
                 OpenFlag::Create.into(),
                 Mode::empty(),
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         system.write(fd, &[75, 96, 133]).unwrap();
 
-        let result = system.open(
-            c"file",
-            OfdAccess::ReadOnly,
-            EnumSet::empty(),
-            Mode::empty(),
-        );
+        let result = system
+            .open(
+                c"file",
+                OfdAccess::ReadOnly,
+                EnumSet::empty(),
+                Mode::empty(),
+            )
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(Fd(4)));
 
         let mut buffer = [0; 5];
@@ -1738,20 +1826,26 @@ mod tests {
     #[test]
     fn open_existing_file_excl() {
         let system = VirtualSystem::new();
-        let first = system.open(
-            c"my_file",
-            OfdAccess::WriteOnly,
-            OpenFlag::Create | OpenFlag::Exclusive,
-            Mode::empty(),
-        );
+        let first = system
+            .open(
+                c"my_file",
+                OfdAccess::WriteOnly,
+                OpenFlag::Create | OpenFlag::Exclusive,
+                Mode::empty(),
+            )
+            .now_or_never()
+            .unwrap();
         assert_eq!(first, Ok(Fd(3)));
 
-        let second = system.open(
-            c"my_file",
-            OfdAccess::WriteOnly,
-            OpenFlag::Create | OpenFlag::Exclusive,
-            Mode::empty(),
-        );
+        let second = system
+            .open(
+                c"my_file",
+                OfdAccess::WriteOnly,
+                OpenFlag::Create | OpenFlag::Exclusive,
+                Mode::empty(),
+            )
+            .now_or_never()
+            .unwrap();
         assert_eq!(second, Err(Errno::EEXIST));
     }
 
@@ -1765,15 +1859,20 @@ mod tests {
                 OpenFlag::Create.into(),
                 Mode::ALL_9,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         system.write(fd, &[1, 2, 3]).unwrap();
 
-        let result = system.open(
-            c"file",
-            OfdAccess::WriteOnly,
-            OpenFlag::Truncate.into(),
-            Mode::empty(),
-        );
+        let result = system
+            .open(
+                c"file",
+                OfdAccess::WriteOnly,
+                OpenFlag::Truncate.into(),
+                Mode::empty(),
+            )
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(Fd(4)));
 
         let reader = system
@@ -1783,6 +1882,8 @@ mod tests {
                 EnumSet::empty(),
                 Mode::empty(),
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         let count = system.read(reader, &mut [0; 1]).unwrap();
         assert_eq!(count, 0);
@@ -1798,15 +1899,20 @@ mod tests {
                 OpenFlag::Create.into(),
                 Mode::ALL_9,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         system.write(fd, &[1, 2, 3]).unwrap();
 
-        let result = system.open(
-            c"file",
-            OfdAccess::WriteOnly,
-            OpenFlag::Append.into(),
-            Mode::empty(),
-        );
+        let result = system
+            .open(
+                c"file",
+                OfdAccess::WriteOnly,
+                OpenFlag::Append.into(),
+                Mode::empty(),
+            )
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(Fd(4)));
         system.write(Fd(4), &[4, 5, 6]).unwrap();
 
@@ -1817,6 +1923,8 @@ mod tests {
                 EnumSet::empty(),
                 Mode::empty(),
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         let mut buffer = [0; 7];
         let count = system.read(reader, &mut buffer).unwrap();
@@ -1829,19 +1937,25 @@ mod tests {
         let system = VirtualSystem::new();
 
         // Create a regular file and its parent directory
-        let _ = system.open(
-            c"/dir/file",
-            OfdAccess::WriteOnly,
-            OpenFlag::Create.into(),
-            Mode::empty(),
-        );
+        let _ = system
+            .open(
+                c"/dir/file",
+                OfdAccess::WriteOnly,
+                OpenFlag::Create.into(),
+                Mode::empty(),
+            )
+            .now_or_never()
+            .unwrap();
 
-        let result = system.open(
-            c"/dir",
-            OfdAccess::ReadOnly,
-            OpenFlag::Directory.into(),
-            Mode::empty(),
-        );
+        let result = system
+            .open(
+                c"/dir",
+                OfdAccess::ReadOnly,
+                OpenFlag::Directory.into(),
+                Mode::empty(),
+            )
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(Fd(4)));
     }
 
@@ -1850,19 +1964,25 @@ mod tests {
         let system = VirtualSystem::new();
 
         // Create a regular file
-        let _ = system.open(
-            c"/file",
-            OfdAccess::WriteOnly,
-            OpenFlag::Create.into(),
-            Mode::empty(),
-        );
+        let _ = system
+            .open(
+                c"/file",
+                OfdAccess::WriteOnly,
+                OpenFlag::Create.into(),
+                Mode::empty(),
+            )
+            .now_or_never()
+            .unwrap();
 
-        let result = system.open(
-            c"/file/file",
-            OfdAccess::WriteOnly,
-            OpenFlag::Create.into(),
-            Mode::empty(),
-        );
+        let result = system
+            .open(
+                c"/file/file",
+                OfdAccess::WriteOnly,
+                OpenFlag::Create.into(),
+                Mode::empty(),
+            )
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Err(Errno::ENOTDIR));
     }
 
@@ -1871,19 +1991,25 @@ mod tests {
         let system = VirtualSystem::new();
 
         // Create a regular file
-        let _ = system.open(
-            c"/file",
-            OfdAccess::WriteOnly,
-            OpenFlag::Create.into(),
-            Mode::empty(),
-        );
+        let _ = system
+            .open(
+                c"/file",
+                OfdAccess::WriteOnly,
+                OpenFlag::Create.into(),
+                Mode::empty(),
+            )
+            .now_or_never()
+            .unwrap();
 
-        let result = system.open(
-            c"/file",
-            OfdAccess::ReadOnly,
-            OpenFlag::Directory.into(),
-            Mode::empty(),
-        );
+        let result = system
+            .open(
+                c"/file",
+                OfdAccess::ReadOnly,
+                OpenFlag::Directory.into(),
+                Mode::empty(),
+            )
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Err(Errno::ENOTDIR));
     }
 
@@ -1892,20 +2018,26 @@ mod tests {
         // The default working directory is the root directory.
         let system = VirtualSystem::new();
 
-        let writer = system.open(
-            c"/dir/file",
-            OfdAccess::WriteOnly,
-            OpenFlag::Create.into(),
-            Mode::ALL_9,
-        );
+        let writer = system
+            .open(
+                c"/dir/file",
+                OfdAccess::WriteOnly,
+                OpenFlag::Create.into(),
+                Mode::ALL_9,
+            )
+            .now_or_never()
+            .unwrap();
         system.write(writer.unwrap(), &[1, 2, 3, 42]).unwrap();
 
-        let reader = system.open(
-            c"./dir/file",
-            OfdAccess::ReadOnly,
-            EnumSet::empty(),
-            Mode::empty(),
-        );
+        let reader = system
+            .open(
+                c"./dir/file",
+                OfdAccess::ReadOnly,
+                EnumSet::empty(),
+                Mode::empty(),
+            )
+            .now_or_never()
+            .unwrap();
         let mut buffer = [0; 10];
         let count = system.read(reader.unwrap(), &mut buffer).unwrap();
         assert_eq!(count, 4);
@@ -1964,12 +2096,15 @@ mod tests {
         // The default working directory is the root directory.
         let system = VirtualSystem::new();
 
-        let _ = system.open(
-            c"/dir/file",
-            OfdAccess::WriteOnly,
-            OpenFlag::Create.into(),
-            Mode::ALL_9,
-        );
+        let _ = system
+            .open(
+                c"/dir/file",
+                OfdAccess::WriteOnly,
+                OpenFlag::Create.into(),
+                Mode::ALL_9,
+            )
+            .now_or_never()
+            .unwrap();
 
         let mut dir = system.opendir(c"./dir").unwrap();
         let mut files = Vec::new();
@@ -2331,7 +2466,7 @@ mod tests {
         );
     }
 
-    fn virtual_system_with_executor() -> (VirtualSystem, LocalPool) {
+    pub(super) fn virtual_system_with_executor() -> (VirtualSystem, LocalPool) {
         let system = VirtualSystem::new();
         let executor = LocalPool::new();
         system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
@@ -2823,12 +2958,15 @@ mod tests {
         let system = VirtualSystem::new();
 
         // Create a regular file and its parent directory
-        let _ = system.open(
-            c"/dir/file",
-            OfdAccess::WriteOnly,
-            OpenFlag::Create.into(),
-            Mode::empty(),
-        );
+        let _ = system
+            .open(
+                c"/dir/file",
+                OfdAccess::WriteOnly,
+                OpenFlag::Create.into(),
+                Mode::empty(),
+            )
+            .now_or_never()
+            .unwrap();
 
         let result = system.chdir(c"/dir");
         assert_eq!(result, Ok(()));
@@ -2848,12 +2986,15 @@ mod tests {
         let system = VirtualSystem::new();
 
         // Create a regular file and its parent directory
-        let _ = system.open(
-            c"/dir/file",
-            OfdAccess::WriteOnly,
-            OpenFlag::Create.into(),
-            Mode::empty(),
-        );
+        let _ = system
+            .open(
+                c"/dir/file",
+                OfdAccess::WriteOnly,
+                OpenFlag::Create.into(),
+                Mode::empty(),
+            )
+            .now_or_never()
+            .unwrap();
 
         let result = system.chdir(c"/dir/file");
         assert_eq!(result, Err(Errno::ENOTDIR));
@@ -2931,3 +3072,6 @@ mod tests {
         assert_eq!(result, LimitPair { soft: 1, hard: 1 });
     }
 }
+
+#[cfg(test)]
+mod fifo_tests;

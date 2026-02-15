@@ -365,13 +365,18 @@ pub trait Open {
     ///
     /// This is a thin wrapper around the [`open` system
     /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/open.html).
+    ///
+    /// This function returns a future because opening a pipeline or device file
+    /// may block the calling task until another process opens the other end of
+    /// the pipeline or the device file is ready.
+    /// See the [module-level documentation](super) for details.
     fn open(
         &self,
         path: &CStr,
         access: OfdAccess,
         flags: EnumSet<OpenFlag>,
         mode: Mode,
-    ) -> Result<Fd>;
+    ) -> impl Future<Output = Result<Fd>> + use<Self>;
 
     /// Opens a file descriptor associated with an anonymous temporary file.
     ///

@@ -634,6 +634,7 @@ mod tests {
                 content: VecDeque::new(),
                 readers: 1,
                 writers: 1,
+                awaiters: Vec::new(),
             },
             permissions: Mode::default(),
         }));
