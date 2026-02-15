@@ -473,6 +473,7 @@ impl Pipe for VirtualSystem {
                 content: VecDeque::new(),
                 readers: 1,
                 writers: 1,
+                awaiters: Vec::new(),
             },
             permissions: Mode::default(),
         }));
@@ -1545,6 +1546,7 @@ mod tests {
                 content: [17; 42].into(),
                 readers: 0,
                 writers: 0,
+                awaiters: Vec::new(),
             },
             permissions: Mode::default(),
         }));

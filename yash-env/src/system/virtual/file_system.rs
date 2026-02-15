@@ -24,6 +24,7 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::rc::Rc;
+use std::task::Waker;
 
 const DEFAULT_DIRECTORY_MODE: Mode = Mode::USER_ALL.union(Mode::ALL_READ).union(Mode::ALL_EXEC);
 
@@ -211,7 +212,7 @@ impl Inode {
 }
 
 /// Filetype-specific content of a file
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, derive_more::Eq, derive_more::PartialEq)]
 #[non_exhaustive]
 pub enum FileBody {
     /// Regular file
@@ -239,6 +240,19 @@ pub enum FileBody {
         readers: usize,
         /// Number of open file descriptions writing to this pipe
         writers: usize,
+        /// Wakers of tasks waiting for this pipe to be updated
+        ///
+        /// This field is used to notify the following events:
+        ///
+        /// - A new reader is opened: tasks attempting to open the pipe for writing will be notified.
+        /// - A new writer is opened: tasks attempting to open the pipe for reading will be notified.
+        /// - The content is filled: tasks attempting to read from the pipe will be notified.
+        /// - The content is drained: tasks attempting to write to the pipe will be notified.
+        /// - A reader is closed: tasks attempting to write to the pipe will be notified.
+        /// - A writer is closed: tasks attempting to read from the pipe will be notified.
+        #[eq(ignore)]
+        #[partial_eq(ignore)]
+        awaiters: Vec<Waker>,
     },
     /// Symbolic link
     Symlink {
