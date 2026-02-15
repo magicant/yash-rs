@@ -126,6 +126,7 @@ where
                     OpenFlag::CloseOnExec.into(),
                     Mode::empty(),
                 )
+                .await
                 .and_then(|fd| move_fd_internal(&system, fd))
                 .map_err(|errno| PrepareInputError { errno, path })?;
 

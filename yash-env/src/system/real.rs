@@ -331,20 +331,23 @@ impl Open for RealSystem {
         access: OfdAccess,
         flags: EnumSet<OpenFlag>,
         mode: Mode,
-    ) -> Result<Fd> {
-        let mut raw_flags = access.to_real_flag().ok_or(Errno::EINVAL)?;
-        for flag in flags {
-            raw_flags |= flag.to_real_flag().ok_or(Errno::EINVAL)?;
-        }
+    ) -> impl Future<Output = Result<Fd>> + use<> {
+        ready((|| {
+            let mut raw_flags = access.to_real_flag().ok_or(Errno::EINVAL)?;
+            for flag in flags {
+                raw_flags |= flag.to_real_flag().ok_or(Errno::EINVAL)?;
+            }
 
-        #[cfg(not(target_os = "redox"))]
-        let mode_bits = mode.bits() as std::ffi::c_uint;
-        #[cfg(target_os = "redox")]
-        let mode_bits = mode.bits() as c_int;
+            // Rust does not perform default argument promotion for C variadic
+            // functions, so we need to promote manually.
+            #[cfg(not(target_os = "redox"))]
+            let mode_bits = mode.bits() as std::ffi::c_uint;
+            #[cfg(target_os = "redox")]
+            let mode_bits = mode.bits() as c_int;
 
-        unsafe { libc::open(path.as_ptr(), raw_flags, mode_bits) }
-            .errno_if_m1()
-            .map(Fd)
+            let result = unsafe { libc::open(path.as_ptr(), raw_flags, mode_bits) };
+            result.errno_if_m1().map(Fd)
+        })())
     }
 
     fn open_tmpfile(&self, parent_dir: &Path) -> Result<Fd> {

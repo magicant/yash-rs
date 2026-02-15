@@ -163,12 +163,14 @@ where
         S: Close + Dup + Open,
     {
         let c_path = CString::new(path).map_err(|_| Errno::EILSEQ)?;
-        let fd = system.open(
-            &c_path,
-            OfdAccess::ReadOnly,
-            OpenFlag::CloseOnExec.into(),
-            Mode::empty(),
-        )?;
+        let fd = system
+            .open(
+                &c_path,
+                OfdAccess::ReadOnly,
+                OpenFlag::CloseOnExec.into(),
+                Mode::empty(),
+            )
+            .await?;
         move_fd_internal(system, fd)
     }
 

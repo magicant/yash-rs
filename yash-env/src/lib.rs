@@ -338,21 +338,27 @@ impl<S> Env<S> {
             // assumption that a job-control shell may not have a control
             // terminal. The shell should not make an arbitrary terminal its
             // control terminal, so we open /dev/tty with NoCtty.
-            let mut result = self.system.open(
-                c"/dev/tty",
-                OfdAccess::ReadWrite,
-                OpenFlag::CloseOnExec | OpenFlag::NoCtty,
-                Mode::empty(),
-            );
+            let mut result = self
+                .system
+                .open(
+                    c"/dev/tty",
+                    OfdAccess::ReadWrite,
+                    OpenFlag::CloseOnExec | OpenFlag::NoCtty,
+                    Mode::empty(),
+                )
+                .await;
             if result == Err(Errno::EINVAL) {
                 // However, some systems do not support NoCtty. In that case,
                 // we open /dev/tty without NoCtty.
-                result = self.system.open(
-                    c"/dev/tty",
-                    OfdAccess::ReadWrite,
-                    OpenFlag::CloseOnExec.into(),
-                    Mode::empty(),
-                );
+                result = self
+                    .system
+                    .open(
+                        c"/dev/tty",
+                        OfdAccess::ReadWrite,
+                        OpenFlag::CloseOnExec.into(),
+                        Mode::empty(),
+                    )
+                    .await;
             }
             result?
         };
