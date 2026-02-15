@@ -529,6 +529,12 @@ impl Dup for VirtualSystem {
 }
 
 impl Open for VirtualSystem {
+    /// Opens a file and returns a new file descriptor for it.
+    ///
+    /// The returned future will be pending until the file is ready to be
+    /// opened. For example, if the file is a FIFO, the future will be pending
+    /// until the other end of the FIFO is opened, unless `OpenFlag::NonBlock`
+    /// is specified.
     fn open(
         &self,
         path: &CStr,
@@ -536,8 +542,11 @@ impl Open for VirtualSystem {
         flags: EnumSet<OpenFlag>,
         mode: Mode,
     ) -> impl Future<Output = Result<Fd>> + use<> {
-        ready((|| {
-            let (file, is_readable, is_writable) = self.resolve_file(path, access, flags, mode)?;
+        let resolution = self.resolve_file(path, access, flags, mode);
+        let system = self.clone();
+
+        async move {
+            let (file, is_readable, is_writable) = resolution?;
 
             if let FileBody::Fifo {
                 readers, writers, ..
@@ -551,8 +560,44 @@ impl Open for VirtualSystem {
                 }
             }
 
-            self.create_fd(file, flags, is_readable, is_writable)
-        })())
+            if !flags.contains(OpenFlag::NonBlock) {
+                // If the file is a FIFO, block until the other end is opened.
+                poll_fn(|context| {
+                    let mut file = file.borrow_mut();
+                    let FileBody::Fifo {
+                        readers,
+                        writers,
+                        ref mut awaiters,
+                        ..
+                    } = file.body
+                    else {
+                        return Poll::Ready(());
+                    };
+
+                    if readers == 0 || writers == 0 {
+                        // Register the current task as an awaiter if it's not already registered.
+                        let waker = context.waker();
+                        if !awaiters.iter().any(|existing| existing.will_wake(waker)) {
+                            awaiters.push(waker.clone());
+                        }
+
+                        Poll::Pending
+                    } else {
+                        // Wake all awaiters when the FIFO becomes ready.
+                        let awaiters = std::mem::take(awaiters);
+                        drop(file); // Avoid potential double borrow
+                        for task in awaiters {
+                            task.wake();
+                        }
+
+                        Poll::Ready(())
+                    }
+                })
+                .await;
+            }
+
+            system.create_fd(file, flags, is_readable, is_writable)
+        }
     }
 
     fn open_tmpfile(&self, _parent_dir: &Path) -> Result<Fd> {
@@ -2431,7 +2476,7 @@ mod tests {
         );
     }
 
-    fn virtual_system_with_executor() -> (VirtualSystem, LocalPool) {
+    pub(super) fn virtual_system_with_executor() -> (VirtualSystem, LocalPool) {
         let system = VirtualSystem::new();
         let executor = LocalPool::new();
         system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
@@ -3037,3 +3082,6 @@ mod tests {
         assert_eq!(result, LimitPair { soft: 1, hard: 1 });
     }
 }
+
+#[cfg(test)]
+mod fifo_tests;
