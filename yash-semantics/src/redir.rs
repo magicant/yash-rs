@@ -1167,6 +1167,7 @@ mod tests {
                 content: Default::default(),
                 readers: 1,
                 writers: 0,
+                awaiters: Vec::new(),
             },
             permissions: Default::default(),
         };
