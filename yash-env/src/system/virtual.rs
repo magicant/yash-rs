@@ -554,7 +554,10 @@ impl Open for VirtualSystem {
             {
                 // POSIX: Opening a FIFO with O_NONBLOCK | O_WRONLY should fail with
                 // ENXIO if there are no readers
-                if flags.contains(OpenFlag::NonBlock) && is_writable && !is_readable && *readers == 0
+                if flags.contains(OpenFlag::NonBlock)
+                    && is_writable
+                    && !is_readable
+                    && *readers == 0
                 {
                     return Err(Errno::ENXIO);
                 }
