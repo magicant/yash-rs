@@ -188,11 +188,12 @@ fn open_fifo_reading_nonblocking() {
 }
 
 #[test]
-fn open_fifo_writing_nonblocking() {
+fn open_fifo_writing_nonblocking_without_readers() {
     let system = VirtualSystem::new();
     create_fifo(&system);
 
-    // Open the FIFO for writing with O_NONBLOCK
+    // Open the FIFO for writing with O_NONBLOCK without readers
+    // POSIX specifies that this should fail with ENXIO
     let result = system
         .open(
             c"/myfifo",
@@ -203,5 +204,36 @@ fn open_fifo_writing_nonblocking() {
         .now_or_never()
         .unwrap();
 
-    assert_matches!(result, Ok(_));
+    assert_matches!(result, Err(Errno::ENXIO));
+}
+
+#[test]
+fn open_fifo_writing_nonblocking_with_readers() {
+    let system = VirtualSystem::new();
+    create_fifo(&system);
+
+    // First, open the FIFO for reading
+    let read_result = system
+        .open(
+            c"/myfifo",
+            OfdAccess::ReadOnly,
+            EnumSet::only(OpenFlag::NonBlock),
+            Mode::empty(),
+        )
+        .now_or_never()
+        .unwrap();
+    assert_matches!(read_result, Ok(_));
+
+    // Now open the FIFO for writing with O_NONBLOCK (should succeed)
+    let write_result = system
+        .open(
+            c"/myfifo",
+            OfdAccess::WriteOnly,
+            EnumSet::only(OpenFlag::NonBlock),
+            Mode::empty(),
+        )
+        .now_or_never()
+        .unwrap();
+
+    assert_matches!(write_result, Ok(_));
 }
