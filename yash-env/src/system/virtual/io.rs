@@ -79,6 +79,18 @@ impl OpenFileDescription {
         is_writable: bool,
         is_appending: bool,
     ) -> Self {
+        if let FileBody::Fifo {
+            readers, writers, ..
+        } = &mut file.borrow_mut().body
+        {
+            if is_readable {
+                *readers += 1;
+            }
+            if is_writable {
+                *writers += 1;
+            }
+        }
+
         Self {
             file,
             offset,

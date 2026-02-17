@@ -405,18 +405,9 @@ impl VirtualSystem {
     /// This is a helper function used internally by [`Self::open`], etc.
     fn create_fd(
         &self,
-        file: Rc<RefCell<Inode>>,
+        open_file_description: Rc<RefCell<OpenFileDescription>>,
         flags: EnumSet<OpenFlag>,
-        is_readable: bool,
-        is_writable: bool,
     ) -> std::result::Result<Fd, Errno> {
-        let open_file_description = Rc::new(RefCell::new(OpenFileDescription::new(
-            file,
-            /* offset = */ 0,
-            /* is_readable = */ is_readable,
-            /* is_writable = */ is_writable,
-            /* is_appending = */ flags.contains(OpenFlag::Append),
-        )));
         let body = FdBody {
             open_file_description,
             flags: if flags.contains(OpenFlag::CloseOnExec) {
@@ -468,8 +459,8 @@ impl Pipe for VirtualSystem {
         let file = Rc::new(RefCell::new(Inode {
             body: FileBody::Fifo {
                 content: VecDeque::new(),
-                readers: 1,
-                writers: 1,
+                readers: 0,
+                writers: 0,
                 awaiters: Vec::new(),
             },
             permissions: Mode::default(),
@@ -545,10 +536,7 @@ impl Open for VirtualSystem {
         async move {
             let (file, is_readable, is_writable) = resolution?;
 
-            if let FileBody::Fifo {
-                readers, writers, ..
-            } = &mut file.borrow_mut().body
-            {
+            if let FileBody::Fifo { readers, .. } = &mut file.borrow_mut().body {
                 // POSIX: Opening a FIFO with O_NONBLOCK | O_WRONLY should fail with
                 // ENXIO if there are no readers
                 if flags.contains(OpenFlag::NonBlock)
@@ -558,19 +546,22 @@ impl Open for VirtualSystem {
                 {
                     return Err(Errno::ENXIO);
                 }
-
-                if is_readable {
-                    *readers += 1;
-                }
-                if is_writable {
-                    *writers += 1;
-                }
             }
+
+            // If the file is a FIFO, OpenFileDescription::new increments the reader/writer count,
+            // which must be done before the following blocking operation.
+            let open_file_description = OpenFileDescription::new(
+                file,
+                /* offset = */ 0,
+                is_readable,
+                is_writable,
+                /* is_appending = */ flags.contains(OpenFlag::Append),
+            );
 
             if !flags.contains(OpenFlag::NonBlock) {
                 // If the file is a FIFO, block until the other end is opened.
                 poll_fn(|context| {
-                    let mut file = file.borrow_mut();
+                    let mut file = open_file_description.file().borrow_mut();
                     let FileBody::Fifo {
                         readers,
                         writers,
@@ -603,7 +594,7 @@ impl Open for VirtualSystem {
                 .await;
             }
 
-            system.create_fd(file, flags, is_readable, is_writable)
+            system.create_fd(Rc::new(RefCell::new(open_file_description)), flags)
         }
     }
 
@@ -643,7 +634,14 @@ impl Open for VirtualSystem {
             "resolved file is not a directory"
         );
 
-        let fd = self.create_fd(file, OpenFlag::Directory.into(), is_readable, is_writable)?;
+        let open_file_description = Rc::new(RefCell::new(OpenFileDescription::new(
+            file,
+            /* offset = */ 0,
+            is_readable,
+            is_writable,
+            /* is_appending = */ false,
+        )));
+        let fd = self.create_fd(open_file_description, OpenFlag::Directory.into())?;
         self.fdopendir(fd)
     }
 }

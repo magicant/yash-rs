@@ -632,8 +632,8 @@ mod tests {
         let file = Rc::new(RefCell::new(Inode {
             body: FileBody::Fifo {
                 content: VecDeque::new(),
-                readers: 1,
-                writers: 1,
+                readers: 0,
+                writers: 0,
                 awaiters: Vec::new(),
             },
             permissions: Mode::default(),
