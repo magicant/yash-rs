@@ -202,13 +202,10 @@ impl VirtualSystem {
             let file = Rc::new(RefCell::new(Inode::new([])));
             state.file_system.save(path, Rc::clone(&file)).unwrap();
             let body = FdBody {
-                open_file_description: Rc::new(RefCell::new(OpenFileDescription {
-                    file,
-                    offset: 0,
-                    is_readable: true,
-                    is_writable: true,
-                    is_appending: true,
-                })),
+                open_file_description: Rc::new(RefCell::new(OpenFileDescription::new(
+                    file, /* offset = */ 0, /* is_readable = */ true,
+                    /* is_writable = */ true, /* is_appending = */ true,
+                ))),
                 flags: EnumSet::empty(),
             };
             process.set_fd(fd, body).unwrap();
@@ -413,13 +410,13 @@ impl VirtualSystem {
         is_readable: bool,
         is_writable: bool,
     ) -> std::result::Result<Fd, Errno> {
-        let open_file_description = Rc::new(RefCell::new(OpenFileDescription {
+        let open_file_description = Rc::new(RefCell::new(OpenFileDescription::new(
             file,
-            offset: 0,
-            is_readable,
-            is_writable,
-            is_appending: flags.contains(OpenFlag::Append),
-        }));
+            /* offset = */ 0,
+            /* is_readable = */ is_readable,
+            /* is_writable = */ is_writable,
+            /* is_appending = */ flags.contains(OpenFlag::Append),
+        )));
         let body = FdBody {
             open_file_description,
             flags: if flags.contains(OpenFlag::CloseOnExec) {
@@ -444,7 +441,7 @@ impl Fstat for VirtualSystem {
     type Stat = Stat;
 
     fn fstat(&self, fd: Fd) -> Result<Stat> {
-        self.with_open_file_description(fd, |ofd| Ok(ofd.file.borrow().stat()))
+        self.with_open_file_description(fd, |ofd| Ok(ofd.file().borrow().stat()))
     }
 
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
@@ -477,20 +474,20 @@ impl Pipe for VirtualSystem {
             },
             permissions: Mode::default(),
         }));
-        let reader = OpenFileDescription {
-            file: Rc::clone(&file),
-            offset: 0,
-            is_readable: true,
-            is_writable: false,
-            is_appending: false,
-        };
-        let writer = OpenFileDescription {
-            file: Rc::clone(&file),
-            offset: 0,
-            is_readable: false,
-            is_writable: true,
-            is_appending: false,
-        };
+        let reader = OpenFileDescription::new(
+            Rc::clone(&file),
+            /* offset = */ 0,
+            /* is_readable = */ true,
+            /* is_writable = */ false,
+            /* is_appending = */ false,
+        );
+        let writer = OpenFileDescription::new(
+            Rc::clone(&file),
+            /* offset = */ 0,
+            /* is_readable = */ false,
+            /* is_writable = */ true,
+            /* is_appending = */ false,
+        );
 
         let reader = FdBody {
             open_file_description: Rc::new(RefCell::new(reader)),
@@ -612,13 +609,10 @@ impl Open for VirtualSystem {
 
     fn open_tmpfile(&self, _parent_dir: &Path) -> Result<Fd> {
         let file = Rc::new(RefCell::new(Inode::new([])));
-        let open_file_description = Rc::new(RefCell::new(OpenFileDescription {
-            file,
-            offset: 0,
-            is_readable: true,
-            is_writable: true,
-            is_appending: false,
-        }));
+        let open_file_description = Rc::new(RefCell::new(OpenFileDescription::new(
+            file, /* offset = */ 0, /* is_readable = */ true,
+            /* is_writable = */ true, /* is_appending = */ false,
+        )));
         let body = FdBody {
             open_file_description,
             flags: EnumSet::empty(),
@@ -667,7 +661,7 @@ impl Fcntl for VirtualSystem {
             matches!(file_body, FileBody::Directory { .. })
         }
 
-        self.with_open_file_description(fd, |ofd| match (ofd.is_readable, ofd.is_writable) {
+        self.with_open_file_description(fd, |ofd| match (ofd.is_readable(), ofd.is_writable()) {
             (true, false) => Ok(OfdAccess::ReadOnly),
             (false, true) => Ok(OfdAccess::WriteOnly),
             (true, true) => Ok(OfdAccess::ReadWrite),
@@ -1065,7 +1059,10 @@ impl Select for VirtualSystem {
 impl Isatty for VirtualSystem {
     fn isatty(&self, fd: Fd) -> bool {
         self.with_open_file_description(fd, |ofd| {
-            Ok(matches!(&ofd.file.borrow().body, FileBody::Terminal { .. }))
+            Ok(matches!(
+                &ofd.file().borrow().body,
+                FileBody::Terminal { .. }
+            ))
         })
         .unwrap_or(false)
     }

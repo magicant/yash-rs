@@ -638,20 +638,20 @@ mod tests {
             },
             permissions: Mode::default(),
         }));
-        let reader = OpenFileDescription {
-            file: Rc::clone(&file),
-            offset: 0,
-            is_readable: true,
-            is_writable: false,
-            is_appending: false,
-        };
-        let writer = OpenFileDescription {
-            file: Rc::clone(&file),
-            offset: 0,
-            is_readable: false,
-            is_writable: true,
-            is_appending: false,
-        };
+        let reader = OpenFileDescription::new(
+            Rc::clone(&file),
+            /* offset = */ 0,
+            /* is_readable = */ true,
+            /* is_writable = */ false,
+            /* is_appending = */ false,
+        );
+        let writer = OpenFileDescription::new(
+            Rc::clone(&file),
+            /* offset = */ 0,
+            /* is_readable = */ false,
+            /* is_writable = */ true,
+            /* is_appending = */ false,
+        );
 
         let reader = FdBody {
             open_file_description: Rc::new(RefCell::new(reader)),

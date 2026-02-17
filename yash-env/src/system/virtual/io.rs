@@ -40,20 +40,18 @@ pub const PIPE_SIZE: usize = PIPE_BUF * 2;
 
 /// State of a file opened for reading and/or writing
 #[derive(Clone, Debug)]
-#[non_exhaustive]
 pub struct OpenFileDescription {
     /// File content and metadata
-    pub(crate) file: Rc<RefCell<Inode>>,
+    file: Rc<RefCell<Inode>>,
     /// Position in bytes to perform next I/O operation at
-    pub(crate) offset: usize,
+    offset: usize,
     /// Whether this file is opened for reading
-    pub(crate) is_readable: bool,
+    is_readable: bool,
     /// Whether this file is opened for writing
-    pub(crate) is_writable: bool,
+    is_writable: bool,
     /// Whether this file is opened for appending
-    pub(crate) is_appending: bool,
+    is_appending: bool,
     // TODO is_nonblocking
-    // TODO consider making these fields public
 }
 
 impl Drop for OpenFileDescription {
@@ -73,6 +71,29 @@ impl Drop for OpenFileDescription {
 }
 
 impl OpenFileDescription {
+    /// Creates a new open file description.
+    pub(crate) fn new(
+        file: Rc<RefCell<Inode>>,
+        offset: usize,
+        is_readable: bool,
+        is_writable: bool,
+        is_appending: bool,
+    ) -> Self {
+        Self {
+            file,
+            offset,
+            is_readable,
+            is_writable,
+            is_appending,
+        }
+    }
+
+    /// Returns the i-node this open file description is operating on.
+    #[must_use]
+    pub(crate) fn file(&self) -> &Rc<RefCell<Inode>> {
+        &self.file
+    }
+
     /// Returns true if you can read from this open file description.
     #[must_use]
     pub fn is_readable(&self) -> bool {
