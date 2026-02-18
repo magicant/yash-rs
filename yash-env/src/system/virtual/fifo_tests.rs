@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Tests related with FIFO files
+//! Tests related to FIFO files
 
 use super::tests::virtual_system_with_executor;
 use super::*;
@@ -30,7 +30,7 @@ fn create_fifo(system: &VirtualSystem) {
             "/myfifo",
             Rc::new(RefCell::new(Inode {
                 body: FileBody::Fifo {
-                    content: [0; 0].into(),
+                    content: VecDeque::new(),
                     readers: 0,
                     writers: 0,
                     awaiters: Vec::new(),
