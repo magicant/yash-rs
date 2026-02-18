@@ -572,24 +572,16 @@ impl Open for VirtualSystem {
                         return Poll::Ready(());
                     };
 
-                    if readers == 0 || writers == 0 {
-                        // Register the current task as an awaiter if it's not already registered.
-                        let waker = context.waker();
-                        if !awaiters.iter().any(|existing| existing.will_wake(waker)) {
-                            awaiters.push(waker.clone());
-                        }
-
-                        Poll::Pending
-                    } else {
-                        // Wake all awaiters when the FIFO becomes ready.
-                        let awaiters = std::mem::take(awaiters);
-                        drop(file); // Avoid potential double borrow
-                        for task in awaiters {
-                            task.wake();
-                        }
-
-                        Poll::Ready(())
+                    if readers > 0 && writers > 0 {
+                        return Poll::Ready(());
                     }
+
+                    // Register the current task as an awaiter if it's not already registered.
+                    let waker = context.waker();
+                    if !awaiters.iter().any(|existing| existing.will_wake(waker)) {
+                        awaiters.push(waker.clone());
+                    }
+                    Poll::Pending
                 })
                 .await;
             }
