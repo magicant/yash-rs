@@ -420,6 +420,43 @@ impl VirtualSystem {
             .open_fd(body)
             .map_err(|_| Errno::EMFILE)
     }
+
+    /// Blocks until the FIFO in the given open file description is ready.
+    ///
+    /// This is a helper function used internally by [`Self::open`] when opening
+    /// a FIFO without `OpenFlag::NonBlock`. POSIX requires that opening a FIFO
+    /// for reading blocks until there is a writer, and opening a FIFO for
+    /// writing blocks until there is a reader. This function implements this
+    /// behavior.
+    ///
+    /// This function does nothing if the file is not a FIFO.
+    async fn wait_for_fifo_to_become_ready(open_file_description: &OpenFileDescription) {
+        // If the file is a FIFO, block until the other end is opened.
+        poll_fn(|context| {
+            let mut file = open_file_description.file().borrow_mut();
+            let FileBody::Fifo {
+                readers,
+                writers,
+                ref mut awaiters,
+                ..
+            } = file.body
+            else {
+                return Poll::Ready(());
+            };
+
+            if readers > 0 && writers > 0 {
+                return Poll::Ready(());
+            }
+
+            // Register the current task as an awaiter if it's not already registered.
+            let waker = context.waker();
+            if !awaiters.iter().any(|existing| existing.will_wake(waker)) {
+                awaiters.push(waker.clone());
+            }
+            Poll::Pending
+        })
+        .await;
+    }
 }
 
 impl Default for VirtualSystem {
@@ -549,7 +586,7 @@ impl Open for VirtualSystem {
             }
 
             // If the file is a FIFO, OpenFileDescription::new increments the reader/writer count,
-            // which must be done before the following blocking operation.
+            // which must be done before `wait_for_fifo_to_become_ready`.
             let open_file_description = OpenFileDescription::new(
                 file,
                 /* offset = */ 0,
@@ -559,31 +596,7 @@ impl Open for VirtualSystem {
             );
 
             if !flags.contains(OpenFlag::NonBlock) {
-                // If the file is a FIFO, block until the other end is opened.
-                poll_fn(|context| {
-                    let mut file = open_file_description.file().borrow_mut();
-                    let FileBody::Fifo {
-                        readers,
-                        writers,
-                        ref mut awaiters,
-                        ..
-                    } = file.body
-                    else {
-                        return Poll::Ready(());
-                    };
-
-                    if readers > 0 && writers > 0 {
-                        return Poll::Ready(());
-                    }
-
-                    // Register the current task as an awaiter if it's not already registered.
-                    let waker = context.waker();
-                    if !awaiters.iter().any(|existing| existing.will_wake(waker)) {
-                        awaiters.push(waker.clone());
-                    }
-                    Poll::Pending
-                })
-                .await;
+                Self::wait_for_fifo_to_become_ready(&open_file_description).await;
             }
 
             system.create_fd(Rc::new(RefCell::new(open_file_description)), flags)
