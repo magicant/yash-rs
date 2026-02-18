@@ -154,16 +154,16 @@ mod tests {
             .set_fd(
                 Fd::STDIN,
                 FdBody {
-                    open_file_description: Rc::new(RefCell::new(OpenFileDescription {
-                        file: Rc::new(RefCell::new(Inode {
+                    open_file_description: Rc::new(RefCell::new(OpenFileDescription::new(
+                        Rc::new(RefCell::new(Inode {
                             body: FileBody::Terminal { content: vec![] },
                             permissions: Mode::empty(),
                         })),
-                        offset: 0,
-                        is_readable: true,
-                        is_writable: true,
-                        is_appending: false,
-                    })),
+                        /* offset = */ 0,
+                        /* is_readable = */ true,
+                        /* is_writable = */ true,
+                        /* is_appending = */ false,
+                    ))),
                     flags: EnumSet::empty(),
                 },
             )
@@ -176,19 +176,19 @@ mod tests {
             .set_fd(
                 Fd::STDIN,
                 FdBody {
-                    open_file_description: Rc::new(RefCell::new(OpenFileDescription {
-                        file: Rc::new(RefCell::new(Inode {
+                    open_file_description: Rc::new(RefCell::new(OpenFileDescription::new(
+                        Rc::new(RefCell::new(Inode {
                             body: FileBody::Regular {
                                 content: vec![],
                                 is_native_executable: false,
                             },
                             permissions: Mode::empty(),
                         })),
-                        offset: 0,
-                        is_readable: true,
-                        is_writable: true,
-                        is_appending: false,
-                    })),
+                        /* offset = */ 0,
+                        /* is_readable = */ true,
+                        /* is_writable = */ true,
+                        /* is_appending = */ false,
+                    ))),
                     flags: EnumSet::empty(),
                 },
             )

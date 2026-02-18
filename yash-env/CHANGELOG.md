@@ -20,6 +20,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   in the real system implementation.
 - `impl system::Stat for system::real::Stat`
 - `impl system::Stat for system::virtual::Stat`
+- The `awaiters: Vec<Waker>` field has been added to the
+  `system::virtual::FileBody::Fifo` variant to allow the virtual system to
+  notify tasks waiting on the pipe when certain events occur.
 
 ### Changed
 
@@ -27,6 +30,13 @@ A _private dependency_ is used internally and not visible to downstream users.
   `system::virtual` module.
 - The `system::Fstat` trait methods `fstat` and `fstatat` now return
   `Self::Stat` instead of the concrete `system::virtual::Stat` type.
+- The `system::Open::open` method is now async. The `VirtualSystem`
+  implementation of this method will block until the file can be opened.
+  Specifically, if the file is a FIFO, the method will block until the other end
+  of the FIFO is opened, unless `OpenFlag::NonBlock` is specified.
+- The `Env::get_tty` method is now async.
+- Private dependency versions:
+    - derive_more 2.0.1 → 2.1.0
 
 ## [0.12.1] - 2026-02-06
 

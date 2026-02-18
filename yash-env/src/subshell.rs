@@ -184,7 +184,7 @@ where
         let tty = match job_control {
             None | Some(JobControl::Background) => None,
             // Open the tty in the parent process so we can reuse the FD for other jobs
-            Some(JobControl::Foreground) => env.get_tty().ok(),
+            Some(JobControl::Foreground) => env.get_tty().await.ok(),
         };
         // Block SIGINT and SIGQUIT before forking the child process to prevent
         // the child from being killed by those signals until the child starts

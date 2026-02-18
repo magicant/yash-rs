@@ -405,7 +405,7 @@ impl<T: Open> Open for SharedSystem<T> {
         access: OfdAccess,
         flags: EnumSet<OpenFlag>,
         mode: Mode,
-    ) -> Result<Fd> {
+    ) -> impl Future<Output = Result<Fd>> + use<T> {
         self.0.borrow().open(path, access, flags, mode)
     }
     fn open_tmpfile(&self, parent_dir: &Path) -> Result<Fd> {

@@ -234,6 +234,8 @@ mod tests {
                 OpenFlag::CloseOnExec.into(),
                 Mode::empty(),
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         let mut reader = FdReader::new(fd, system);
 

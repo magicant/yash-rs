@@ -158,21 +158,23 @@ where
         return;
     }
 
-    fn open_fd<S>(system: &mut S, path: String) -> Result<Fd, Errno>
+    async fn open_fd<S>(system: &mut S, path: String) -> Result<Fd, Errno>
     where
         S: Close + Dup + Open,
     {
         let c_path = CString::new(path).map_err(|_| Errno::EILSEQ)?;
-        let fd = system.open(
-            &c_path,
-            OfdAccess::ReadOnly,
-            OpenFlag::CloseOnExec.into(),
-            Mode::empty(),
-        )?;
+        let fd = system
+            .open(
+                &c_path,
+                OfdAccess::ReadOnly,
+                OpenFlag::CloseOnExec.into(),
+                Mode::empty(),
+            )
+            .await?;
         move_fd_internal(system, fd)
     }
 
-    let fd = match open_fd(&mut env.system, path.to_owned()) {
+    let fd = match open_fd(&mut env.system, path.to_owned()).await {
         Ok(fd) => fd,
         Err(errno) => {
             env.system

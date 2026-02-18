@@ -295,7 +295,7 @@ fn into_c_string_value_and_origin(field: Field) -> Result<(CString, Location), E
 }
 
 /// Opens a file for redirection.
-fn open_file<S: Open>(
+async fn open_file<S: Open>(
     env: &mut Env<S>,
     access: OfdAccess,
     flags: EnumSet<OpenFlag>,
@@ -303,7 +303,7 @@ fn open_file<S: Open>(
 ) -> Result<(FdSpec, Location), Error> {
     let system = &mut env.system;
     let (path, origin) = into_c_string_value_and_origin(path)?;
-    match system.open(&path, access, flags, MODE) {
+    match system.open(&path, access, flags, MODE).await {
         Ok(fd) => Ok((FdSpec::Owned(fd), origin)),
         Err(errno) => Err(Error {
             cause: ErrorCause::OpenFile(path, errno),
@@ -313,7 +313,7 @@ fn open_file<S: Open>(
 }
 
 /// Opens a file for writing with the `noclobber` option.
-fn open_file_noclobber<S>(env: &mut Env<S>, path: Field) -> Result<(FdSpec, Location), Error>
+async fn open_file_noclobber<S>(env: &mut Env<S>, path: Field) -> Result<(FdSpec, Location), Error>
 where
     S: Open + Fstat + Close,
 {
@@ -321,7 +321,10 @@ where
     let (path, origin) = into_c_string_value_and_origin(path)?;
 
     const FLAGS_EXCL: EnumSet<OpenFlag> = enum_set!(OpenFlag::Create | OpenFlag::Exclusive);
-    match system.open(&path, OfdAccess::WriteOnly, FLAGS_EXCL, MODE) {
+    match system
+        .open(&path, OfdAccess::WriteOnly, FLAGS_EXCL, MODE)
+        .await
+    {
         Ok(fd) => return Ok((FdSpec::Owned(fd), origin)),
         Err(Errno::EEXIST) => (),
         Err(errno) => {
@@ -333,7 +336,10 @@ where
     }
 
     // Okay, it seems there is an existing file. Try opening it.
-    match system.open(&path, OfdAccess::WriteOnly, EnumSet::empty(), MODE) {
+    match system
+        .open(&path, OfdAccess::WriteOnly, EnumSet::empty(), MODE)
+        .await
+    {
         Ok(fd) => {
             let is_regular = system.fstat(fd).is_ok_and(|stat| stat.is_regular_file());
             if is_regular {
@@ -435,21 +441,27 @@ where
 {
     use RedirOp::*;
     match operator {
-        FileIn => open_file(env, OfdAccess::ReadOnly, EnumSet::empty(), operand),
-        FileOut if env.options.get(Clobber) == Off => open_file_noclobber(env, operand),
-        FileOut | FileClobber => open_file(
-            env,
-            OfdAccess::WriteOnly,
-            OpenFlag::Create | OpenFlag::Truncate,
-            operand,
-        ),
-        FileAppend => open_file(
-            env,
-            OfdAccess::WriteOnly,
-            OpenFlag::Create | OpenFlag::Append,
-            operand,
-        ),
-        FileInOut => open_file(env, OfdAccess::ReadWrite, OpenFlag::Create.into(), operand),
+        FileIn => open_file(env, OfdAccess::ReadOnly, EnumSet::empty(), operand).await,
+        FileOut if env.options.get(Clobber) == Off => open_file_noclobber(env, operand).await,
+        FileOut | FileClobber => {
+            open_file(
+                env,
+                OfdAccess::WriteOnly,
+                OpenFlag::Create | OpenFlag::Truncate,
+                operand,
+            )
+            .await
+        }
+        FileAppend => {
+            open_file(
+                env,
+                OfdAccess::WriteOnly,
+                OpenFlag::Create | OpenFlag::Append,
+                operand,
+            )
+            .await
+        }
+        FileInOut => open_file(env, OfdAccess::ReadWrite, OpenFlag::Create.into(), operand).await,
         FdIn => copy_fd(env, operand, OfdAccess::ReadOnly),
         FdOut => copy_fd(env, operand, OfdAccess::WriteOnly),
         Pipe => Err(Error {
@@ -944,6 +956,8 @@ mod tests {
                 OpenFlag::Create.into(),
                 Mode::ALL_9,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         env.system
             .fcntl_setfd(fd, FdFlag::CloseOnExec.into())
@@ -1153,6 +1167,7 @@ mod tests {
                 content: Default::default(),
                 readers: 1,
                 writers: 0,
+                awaiters: Vec::new(),
             },
             permissions: Default::default(),
         };

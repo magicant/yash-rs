@@ -325,7 +325,7 @@ impl<S> Env<S> {
     ///
     /// This function returns `self.tty` if it is `Some` FD. Otherwise, it
     /// opens `/dev/tty` and saves the new FD to `self.tty` before returning it.
-    pub fn get_tty(&mut self) -> Result<Fd, Errno>
+    pub async fn get_tty(&mut self) -> Result<Fd, Errno>
     where
         S: Open + Dup + Close,
     {
@@ -338,21 +338,27 @@ impl<S> Env<S> {
             // assumption that a job-control shell may not have a control
             // terminal. The shell should not make an arbitrary terminal its
             // control terminal, so we open /dev/tty with NoCtty.
-            let mut result = self.system.open(
-                c"/dev/tty",
-                OfdAccess::ReadWrite,
-                OpenFlag::CloseOnExec | OpenFlag::NoCtty,
-                Mode::empty(),
-            );
+            let mut result = self
+                .system
+                .open(
+                    c"/dev/tty",
+                    OfdAccess::ReadWrite,
+                    OpenFlag::CloseOnExec | OpenFlag::NoCtty,
+                    Mode::empty(),
+                )
+                .await;
             if result == Err(Errno::EINVAL) {
                 // However, some systems do not support NoCtty. In that case,
                 // we open /dev/tty without NoCtty.
-                result = self.system.open(
-                    c"/dev/tty",
-                    OfdAccess::ReadWrite,
-                    OpenFlag::CloseOnExec.into(),
-                    Mode::empty(),
-                );
+                result = self
+                    .system
+                    .open(
+                        c"/dev/tty",
+                        OfdAccess::ReadWrite,
+                        OpenFlag::CloseOnExec.into(),
+                        Mode::empty(),
+                    )
+                    .await;
             }
             result?
         };
@@ -386,7 +392,7 @@ impl<S> Env<S> {
     where
         S: Open + Dup + Close + GetPid + Signals + Sigmask + Sigaction + TcSetPgrp,
     {
-        let fd = self.get_tty()?;
+        let fd = self.get_tty().await?;
 
         if self.system.getsid(Pid(0)) == Ok(self.main_pgid) {
             job::tcsetpgrp_with_block(&self.system, fd, self.main_pgid).await
@@ -729,7 +735,7 @@ mod tests {
             .unwrap();
         let mut env = Env::with_system(system.clone());
 
-        let fd = env.get_tty().unwrap();
+        let fd = env.get_tty().now_or_never().unwrap().unwrap();
         assert!(
             fd >= MIN_INTERNAL_FD,
             "get_tty returned {fd}, which should be >= {MIN_INTERNAL_FD}"
@@ -744,7 +750,7 @@ mod tests {
         system.state.borrow_mut().file_system = Default::default();
 
         // get_tty returns cached FD
-        let fd = env.get_tty().unwrap();
+        let fd = env.get_tty().now_or_never().unwrap().unwrap();
         system
             .with_open_file_description(fd, |ofd| {
                 assert!(Rc::ptr_eq(ofd.inode(), &tty));

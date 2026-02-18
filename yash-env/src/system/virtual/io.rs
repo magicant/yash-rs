@@ -40,27 +40,29 @@ pub const PIPE_SIZE: usize = PIPE_BUF * 2;
 
 /// State of a file opened for reading and/or writing
 #[derive(Clone, Debug)]
-#[non_exhaustive]
 pub struct OpenFileDescription {
     /// File content and metadata
-    pub(crate) file: Rc<RefCell<Inode>>,
+    file: Rc<RefCell<Inode>>,
     /// Position in bytes to perform next I/O operation at
-    pub(crate) offset: usize,
+    offset: usize,
     /// Whether this file is opened for reading
-    pub(crate) is_readable: bool,
+    is_readable: bool,
     /// Whether this file is opened for writing
-    pub(crate) is_writable: bool,
+    is_writable: bool,
     /// Whether this file is opened for appending
-    pub(crate) is_appending: bool,
+    is_appending: bool,
     // TODO is_nonblocking
-    // TODO consider making these fields public
 }
 
 impl Drop for OpenFileDescription {
     fn drop(&mut self) {
+        let mut file = self.file.borrow_mut();
         if let FileBody::Fifo {
-            readers, writers, ..
-        } = &mut self.file.borrow_mut().body
+            readers,
+            writers,
+            awaiters,
+            ..
+        } = &mut file.body
         {
             if self.is_readable {
                 *readers -= 1;
@@ -68,11 +70,66 @@ impl Drop for OpenFileDescription {
             if self.is_writable {
                 *writers -= 1;
             }
+
+            // Notify other tasks waiting for this FIFO to become ready for reading or writing.
+            let awaiters = std::mem::take(awaiters);
+            drop(file); // Avoid potential double borrow
+            for task in awaiters {
+                task.wake();
+            }
         }
     }
 }
 
 impl OpenFileDescription {
+    /// Creates a new open file description.
+    pub(crate) fn new(
+        file: Rc<RefCell<Inode>>,
+        offset: usize,
+        is_readable: bool,
+        is_writable: bool,
+        is_appending: bool,
+    ) -> Self {
+        let mut file_borrow = file.borrow_mut();
+        if let FileBody::Fifo {
+            readers,
+            writers,
+            awaiters,
+            ..
+        } = &mut file_borrow.body
+        {
+            if is_readable {
+                *readers += 1;
+            }
+            if is_writable {
+                *writers += 1;
+            }
+
+            // Notify other tasks waiting for this FIFO to be opened for reading or writing.
+            let awaiters = std::mem::take(awaiters);
+            drop(file_borrow); // Avoid potential double borrow
+            for task in awaiters {
+                task.wake();
+            }
+        } else {
+            drop(file_borrow);
+        }
+
+        Self {
+            file,
+            offset,
+            is_readable,
+            is_writable,
+            is_appending,
+        }
+    }
+
+    /// Returns the i-node this open file description is operating on.
+    #[must_use]
+    pub(crate) fn file(&self) -> &Rc<RefCell<Inode>> {
+        &self.file
+    }
+
     /// Returns true if you can read from this open file description.
     #[must_use]
     pub fn is_readable(&self) -> bool {
@@ -521,6 +578,7 @@ mod tests {
                 content: VecDeque::new(),
                 readers: 1,
                 writers: 1,
+                awaiters: Vec::new(),
             },
             permissions: Mode::default(),
         }));
@@ -546,6 +604,7 @@ mod tests {
                 content: VecDeque::new(),
                 readers: 1,
                 writers: 1,
+                awaiters: Vec::new(),
             },
             permissions: Mode::default(),
         }));
@@ -571,6 +630,7 @@ mod tests {
                 content: VecDeque::new(),
                 readers: 1,
                 writers: 1,
+                awaiters: Vec::new(),
             },
             permissions: Mode::default(),
         }));
@@ -607,6 +667,7 @@ mod tests {
                     content: VecDeque::new(),
                     readers: 1,
                     writers: 0,
+                    awaiters: Vec::new(),
                 },
                 permissions: Mode::default(),
             })),
@@ -629,6 +690,7 @@ mod tests {
                     content: VecDeque::from([1, 5, 7, 3, 42, 7, 6]),
                     readers: 1,
                     writers: 0,
+                    awaiters: Vec::new(),
                 },
                 permissions: Mode::default(),
             })),
@@ -659,6 +721,7 @@ mod tests {
                     content: VecDeque::new(),
                     readers: 1,
                     writers: 1,
+                    awaiters: Vec::new(),
                 },
                 permissions: Mode::default(),
             })),
@@ -680,6 +743,7 @@ mod tests {
                 content: VecDeque::new(),
                 readers: 1,
                 writers: 1,
+                awaiters: Vec::new(),
             },
             permissions: Mode::default(),
         }));
@@ -710,6 +774,7 @@ mod tests {
                     content: VecDeque::new(),
                     readers: 1,
                     writers: 1,
+                    awaiters: Vec::new(),
                 },
                 permissions: Mode::default(),
             })),
@@ -739,6 +804,7 @@ mod tests {
                 content: VecDeque::new(),
                 readers: 1,
                 writers: 1,
+                awaiters: Vec::new(),
             },
             permissions: Mode::default(),
         }));
@@ -771,6 +837,7 @@ mod tests {
                     content: VecDeque::new(),
                     readers: 1,
                     writers: 1,
+                    awaiters: Vec::new(),
                 },
                 permissions: Mode::default(),
             })),
@@ -798,6 +865,7 @@ mod tests {
                     content: VecDeque::new(),
                     readers: 0,
                     writers: 1,
+                    awaiters: Vec::new(),
                 },
                 permissions: Mode::default(),
             })),
