@@ -1160,7 +1160,11 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        env.system.write(Fd(3), &[42, 123, 57]).unwrap();
+        env.system
+            .write(Fd(3), &[42, 123, 57])
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         let file = state.borrow().file_system.get("foo").unwrap();
         let file = file.borrow();
@@ -1261,7 +1265,7 @@ mod tests {
             ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
         );
         assert_eq!(e.location, redir.body.operand().location);
-        let e = env.system.write(Fd(3), &[0x20]).unwrap_err();
+        let e = env.system.write(Fd(3), &[0x20]).now_or_never().unwrap().unwrap_err();
         assert_eq!(e, Errno::EBADF);
     }
 
@@ -1277,7 +1281,11 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        env.system.write(Fd(3), &[42, 123, 57]).unwrap();
+        env.system
+            .write(Fd(3), &[42, 123, 57])
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         let file = state.borrow().file_system.get("foo").unwrap();
         let file = file.borrow();
@@ -1326,7 +1334,7 @@ mod tests {
             ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
         );
         assert_eq!(e.location, redir.body.operand().location);
-        let e = env.system.write(Fd(3), &[0x20]).unwrap_err();
+        let e = env.system.write(Fd(3), &[0x20]).now_or_never().unwrap().unwrap_err();
         assert_eq!(e, Errno::EBADF);
     }
 
@@ -1342,7 +1350,11 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        env.system.write(Fd(3), &[42, 123, 57]).unwrap();
+        env.system
+            .write(Fd(3), &[42, 123, 57])
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         let file = state.borrow().file_system.get("foo").unwrap();
         let file = file.borrow();
@@ -1366,7 +1378,11 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        env.system.write(Fd::STDOUT, "two\n".as_bytes()).unwrap();
+        env.system
+            .write(Fd::STDOUT, "two\n".as_bytes())
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
@@ -1390,7 +1406,7 @@ mod tests {
             ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
         );
         assert_eq!(e.location, redir.body.operand().location);
-        let e = env.system.write(Fd(3), &[0x20]).unwrap_err();
+        let e = env.system.write(Fd(3), &[0x20]).now_or_never().unwrap().unwrap_err();
         assert_eq!(e, Errno::EBADF);
     }
 
@@ -1405,7 +1421,11 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        env.system.write(Fd(3), &[230, 175, 26]).unwrap();
+        env.system
+            .write(Fd(3), &[230, 175, 26])
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         let file = state.borrow().file_system.get("foo").unwrap();
         let file = file.borrow();
@@ -1456,7 +1476,7 @@ mod tests {
             ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
         );
         assert_eq!(e.location, redir.body.operand().location);
-        let e = env.system.write(Fd(3), &[0x20]).unwrap_err();
+        let e = env.system.write(Fd(3), &[0x20]).now_or_never().unwrap().unwrap_err();
         assert_eq!(e, Errno::EBADF);
     }
 
@@ -1604,7 +1624,11 @@ mod tests {
                 .unwrap()
                 .unwrap();
 
-            env.system.write(fd, &[7, 6, 91]).unwrap();
+            env.system
+                .write(fd, &[7, 6, 91])
+                .now_or_never()
+                .unwrap()
+                .unwrap();
             let file = state.borrow().file_system.get("/dev/stdout").unwrap();
             let file = file.borrow();
             assert_matches!(&file.body, FileBody::Regular { content, .. } => {
@@ -1702,7 +1726,12 @@ mod tests {
             ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
         );
         assert_eq!(e.location, redir.body.operand().location);
-        let write_count = env.system.write(Fd(1), &[0x20]).unwrap();
+        let write_count = env
+            .system
+            .write(Fd(1), &[0x20])
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(write_count, 1);
     }
 

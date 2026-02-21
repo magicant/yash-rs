@@ -233,25 +233,34 @@ impl<S> SharedSystem<S> {
         // is aborted.
         let waker = Rc::new(RefCell::new(None));
 
-        let result = poll_fn(|context| {
-            let mut inner = self.0.borrow_mut();
-            match inner.write(fd, buffer) {
+        let result = loop {
+            match self.write(fd, buffer).await {
                 Ok(count) => {
                     written += count;
                     buffer = &buffer[count..];
                     if buffer.is_empty() {
-                        return Poll::Ready(Ok(written));
+                        break Ok(written);
                     }
                 }
                 Err(Errno::EAGAIN | Errno::EINTR) => (),
-                Err(error) => return Poll::Ready(Err(error)),
+                Err(error) => break Err(error),
             }
 
-            *waker.borrow_mut() = Some(context.waker().clone());
-            inner.add_writer(fd, Rc::downgrade(&waker));
-            Poll::Pending
-        })
-        .await;
+            let mut first_time = true;
+            poll_fn(|context| {
+                if first_time {
+                    // Suspend the current task until the FD is ready for writing.
+                    first_time = false;
+                    *waker.borrow_mut() = Some(context.waker().clone());
+                    self.0.borrow_mut().add_writer(fd, Rc::downgrade(&waker));
+                    Poll::Pending
+                } else {
+                    // When resumed, proceed to try writing again.
+                    Poll::Ready(())
+                }
+            })
+            .await;
+        };
 
         self.get_and_set_nonblocking(fd, was_nonblocking).ok();
 
@@ -463,7 +472,11 @@ impl<T: Read> Read for SharedSystem<T> {
 
 /// Delegates `Write` methods to the contained implementor.
 impl<T: Write> Write for SharedSystem<T> {
-    fn write(&self, fd: Fd, buffer: &[u8]) -> Result<usize> {
+    fn write<'a>(
+        &self,
+        fd: Fd,
+        buffer: &'a [u8],
+    ) -> impl Future<Output = Result<usize>> + use<'a, T> {
         self.0.borrow().write(fd, buffer)
     }
 }
@@ -780,7 +793,7 @@ mod tests {
     fn shared_system_read_async_ready() {
         let system = SharedSystem::new(VirtualSystem::new());
         let (reader, writer) = system.pipe().unwrap();
-        system.write(writer, &[42]).unwrap();
+        system.write(writer, &[42]).now_or_never().unwrap().unwrap();
 
         let mut buffer = [0; 2];
         let result = system.read_async(reader, &mut buffer).now_or_never();
@@ -1075,7 +1088,7 @@ mod tests {
         assert_eq!(result, Poll::Pending);
         let result = signal_future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
-        system_3.write(writer, &[42]).unwrap();
+        system_3.write(writer, &[42]).now_or_never().unwrap().unwrap();
         system_3.select(false).unwrap();
 
         let result = read_future.as_mut().poll(&mut context);

@@ -710,8 +710,12 @@ impl Read for VirtualSystem {
 }
 
 impl Write for VirtualSystem {
-    fn write(&self, fd: Fd, buffer: &[u8]) -> Result<usize> {
-        self.with_open_file_description_mut(fd, |ofd| ofd.write(buffer))
+    fn write<'a>(
+        &self,
+        fd: Fd,
+        buffer: &'a [u8],
+    ) -> impl Future<Output = Result<usize>> + use<'a> {
+        ready(self.with_open_file_description_mut(fd, |ofd| ofd.write(buffer)))
     }
 }
 
@@ -1690,7 +1694,7 @@ mod tests {
     fn pipe_read_write() {
         let system = VirtualSystem::new();
         let (reader, writer) = system.pipe().unwrap();
-        let result = system.write(writer, &[5, 42, 29]);
+        let result = system.write(writer, &[5, 42, 29]).now_or_never().unwrap();
         assert_eq!(result, Ok(3));
 
         let mut buffer = [1; 4];
@@ -1784,7 +1788,7 @@ mod tests {
             .unwrap();
         assert_eq!(result, Ok(Fd(3)));
 
-        system.write(Fd(3), &[42, 123]).unwrap();
+        system.write(Fd(3), &[42, 123]).now_or_never().unwrap().unwrap();
         let file = system.state.borrow().file_system.get("new_file").unwrap();
         let file = file.borrow();
         assert_eq!(file.permissions, Mode::empty());
@@ -1826,7 +1830,7 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        system.write(fd, &[75, 96, 133]).unwrap();
+        system.write(fd, &[75, 96, 133]).now_or_never().unwrap().unwrap();
 
         let result = system
             .open(
@@ -1894,7 +1898,7 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        system.write(fd, &[1, 2, 3]).unwrap();
+        system.write(fd, &[1, 2, 3]).now_or_never().unwrap().unwrap();
 
         let result = system
             .open(
@@ -1938,7 +1942,7 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        system.write(fd, &[1, 2, 3]).unwrap();
+        system.write(fd, &[1, 2, 3]).now_or_never().unwrap().unwrap();
 
         let result = system
             .open(
@@ -1950,7 +1954,7 @@ mod tests {
             .now_or_never()
             .unwrap();
         assert_eq!(result, Ok(Fd(4)));
-        system.write(Fd(4), &[4, 5, 6]).unwrap();
+        system.write(Fd(4), &[4, 5, 6]).now_or_never().unwrap().unwrap();
 
         let reader = system
             .open(
@@ -2067,7 +2071,7 @@ mod tests {
             )
             .now_or_never()
             .unwrap();
-        system.write(writer.unwrap(), &[1, 2, 3, 42]).unwrap();
+        system.write(writer.unwrap(), &[1, 2, 3, 42]).now_or_never().unwrap().unwrap();
 
         let reader = system
             .open(
@@ -2092,7 +2096,7 @@ mod tests {
     fn open_tmpfile() {
         let system = VirtualSystem::new();
         let fd = system.open_tmpfile(Path::new("")).unwrap();
-        system.write(fd, &[42, 17, 75]).unwrap();
+        system.write(fd, &[42, 17, 75]).now_or_never().unwrap().unwrap();
         system.lseek(fd, SeekFrom::Start(0)).unwrap();
         let mut buffer = [0; 4];
         let count = system
@@ -2401,7 +2405,7 @@ mod tests {
     fn select_pipe_reader_is_ready_if_something_has_been_written() {
         let system = VirtualSystem::new();
         let (reader, writer) = system.pipe().unwrap();
-        system.write(writer, &[0]).unwrap();
+        system.write(writer, &[0]).now_or_never().unwrap().unwrap();
         let mut readers = vec![reader];
         let mut writers = vec![];
 
