@@ -110,15 +110,19 @@ pub trait Read {
     /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/read.html).
     /// If successful, returns the number of bytes read.
     ///
-    /// This function may perform blocking I/O, especially if the `O_NONBLOCK`
-    /// flag is not set for the FD. Use [`SharedSystem::read_async`] to support
-    /// concurrent I/O in an `async` function context.
-    ///
-    /// [`SharedSystem::read_async`]: super::SharedSystem::read_async
-    ///
-    /// TODO: This function should return a `Future` to support simulating
-    /// blocking I/O in virtual systems.
-    fn read(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize>;
+    /// This function may perform blocking I/O, specifically if the `O_NONBLOCK`
+    /// flag is not set for the FD. The return type is a `Future` to support
+    /// simulating blocking I/O in [virtual systems](super::virtual). In the
+    /// [real system](super::real), this function does not work asynchronously
+    /// and returns a ready `Future` with the result of the underlying system
+    /// call. See the [module-level documentation](super) for details. Use
+    /// [`SharedSystem::read_async`](super::SharedSystem::read_async) for
+    /// concurrent read operations in an `async` function context.
+    fn read<'a>(
+        &self,
+        fd: Fd,
+        buffer: &'a mut [u8],
+    ) -> impl Future<Output = Result<usize>> + use<'a, Self>;
 }
 
 /// Trait for writing to file descriptors

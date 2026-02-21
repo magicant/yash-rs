@@ -181,18 +181,27 @@ impl<S> SharedSystem<S> {
         // is aborted.
         let waker = Rc::new(RefCell::new(None));
 
-        let result = poll_fn(|context| {
-            let mut inner = self.0.borrow_mut();
-            match inner.read(fd, buffer) {
+        let result = loop {
+            match self.read(fd, buffer).await {
                 Err(Errno::EAGAIN) => {
-                    *waker.borrow_mut() = Some(context.waker().clone());
-                    inner.add_reader(fd, Rc::downgrade(&waker));
-                    Poll::Pending
+                    let mut first_time = true;
+                    poll_fn(|context| {
+                        if first_time {
+                            // Suspend the current task until the FD is ready for reading.
+                            first_time = false;
+                            *waker.borrow_mut() = Some(context.waker().clone());
+                            self.0.borrow_mut().add_reader(fd, Rc::downgrade(&waker));
+                            Poll::Pending
+                        } else {
+                            // When resumed, proceed to try reading again.
+                            Poll::Ready(())
+                        }
+                    })
+                    .await;
                 }
-                result => Poll::Ready(result),
+                result => break result,
             }
-        })
-        .await;
+        };
 
         self.get_and_set_nonblocking(fd, was_nonblocking).ok();
 
@@ -443,7 +452,11 @@ impl<T: Fcntl> Fcntl for SharedSystem<T> {
 
 /// Delegates `Read` methods to the contained implementor.
 impl<T: Read> Read for SharedSystem<T> {
-    fn read(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
+    fn read<'a>(
+        &self,
+        fd: Fd,
+        buffer: &'a mut [u8],
+    ) -> impl Future<Output = Result<usize>> + use<'a, T> {
         self.0.borrow().read(fd, buffer)
     }
 }
@@ -815,7 +828,11 @@ mod tests {
         assert_eq!(result, Ok(1));
 
         let mut buffer = [0; 2];
-        system.read(reader, &mut buffer).unwrap();
+        system
+            .read(reader, &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(buffer[..1], [17]);
     }
 

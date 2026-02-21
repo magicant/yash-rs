@@ -762,7 +762,12 @@ mod tests {
         assert_eq!(result, None);
 
         let mut buffer = [0; 4];
-        let read_count = env.system.read(Fd(3), &mut buffer).unwrap();
+        let read_count = env
+            .system
+            .read(Fd(3), &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(read_count, 3);
         assert_eq!(buffer, [42, 123, 254, 0]);
     }
@@ -783,11 +788,21 @@ mod tests {
             .unwrap();
 
         let mut buffer = [0; 4];
-        let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
+        let read_count = env
+            .system
+            .read(Fd::STDIN, &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(read_count, 3);
         assert_eq!(buffer, [42, 123, 254, 0]);
 
-        let e = env.system.read(Fd(3), &mut buffer).unwrap_err();
+        let e = env
+            .system
+            .read(Fd(3), &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
         assert_eq!(e, Errno::EBADF);
     }
 
@@ -815,7 +830,12 @@ mod tests {
         drop(redir_env);
 
         let mut buffer = [0; 2];
-        let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
+        let read_count = env
+            .system
+            .read(Fd::STDIN, &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(read_count, 1);
         assert_eq!(buffer[0], 17);
     }
@@ -844,9 +864,19 @@ mod tests {
         drop(redir_env);
 
         let mut buffer = [0; 2];
-        let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
+        let read_count = env
+            .system
+            .read(Fd::STDIN, &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(read_count, 0);
-        let e = env.system.read(MIN_INTERNAL_FD, &mut buffer).unwrap_err();
+        let e = env
+            .system
+            .read(MIN_INTERNAL_FD, &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
         assert_eq!(e, Errno::EBADF);
     }
 
@@ -868,7 +898,12 @@ mod tests {
         drop(redir_env);
 
         let mut buffer = [0; 1];
-        let e = env.system.read(Fd(4), &mut buffer).unwrap_err();
+        let e = env
+            .system
+            .read(Fd(4), &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
         assert_eq!(e, Errno::EBADF);
     }
 
@@ -910,10 +945,20 @@ mod tests {
             .unwrap();
 
         let mut buffer = [0; 1];
-        let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
+        let read_count = env
+            .system
+            .read(Fd::STDIN, &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(read_count, 1);
         assert_eq!(buffer, [100]);
-        let read_count = env.system.read(Fd(3), &mut buffer).unwrap();
+        let read_count = env
+            .system
+            .read(Fd(3), &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(read_count, 1);
         assert_eq!(buffer, [200]);
     }
@@ -940,7 +985,12 @@ mod tests {
             .unwrap();
 
         let mut buffer = [0; 1];
-        let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
+        let read_count = env
+            .system
+            .read(Fd::STDIN, &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(read_count, 1);
         assert_eq!(buffer, [200]);
     }
@@ -1009,7 +1059,12 @@ mod tests {
             assert_eq!(result, Some(ExitStatus(42)));
 
             let mut buffer = [0; 10];
-            let count = env.system.read(Fd(4), &mut buffer).unwrap();
+            let count = env
+                .system
+                .read(Fd(4), &mut buffer)
+                .now_or_never()
+                .unwrap()
+                .unwrap();
             assert_eq!(count, 7);
             assert_eq!(&buffer[..7], b"foobar\n");
         })
@@ -1085,7 +1140,12 @@ mod tests {
         );
         assert_eq!(e.location, redir.body.operand().location);
         let mut buffer = [0; 1];
-        let e = env.system.read(Fd(3), &mut buffer).unwrap_err();
+        let e = env
+            .system
+            .read(Fd(3), &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
         assert_eq!(e, Errno::EBADF);
     }
 
@@ -1370,7 +1430,12 @@ mod tests {
             .unwrap();
 
         let mut buffer = [0; 4];
-        let read_count = env.system.read(Fd(3), &mut buffer).unwrap();
+        let read_count = env
+            .system
+            .read(Fd(3), &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(read_count, 3);
         assert_eq!(buffer, [132, 79, 210, 0]);
     }
@@ -1416,7 +1481,12 @@ mod tests {
                 .unwrap();
 
             let mut buffer = [0; 4];
-            let read_count = env.system.read(fd, &mut buffer).unwrap();
+            let read_count = env
+                .system
+                .read(fd, &mut buffer)
+                .now_or_never()
+                .unwrap()
+                .unwrap();
             assert_eq!(read_count, 3);
             assert_eq!(buffer, [1, 2, 42, 0]);
         }
@@ -1433,7 +1503,12 @@ mod tests {
             .unwrap();
 
         let mut buffer = [0; 1];
-        let e = env.system.read(Fd::STDIN, &mut buffer).unwrap_err();
+        let e = env
+            .system
+            .read(Fd::STDIN, &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
         assert_eq!(e, Errno::EBADF);
     }
 
@@ -1507,7 +1582,12 @@ mod tests {
         );
         assert_eq!(e.location, redir.body.operand().location);
         let mut buffer = [0; 1];
-        let read_count = env.system.read(Fd(0), &mut buffer).unwrap();
+        let read_count = env
+            .system
+            .read(Fd(0), &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(read_count, 0);
     }
 
@@ -1544,7 +1624,12 @@ mod tests {
             .unwrap();
 
         let mut buffer = [0; 1];
-        let e = env.system.read(Fd::STDOUT, &mut buffer).unwrap_err();
+        let e = env
+            .system
+            .read(Fd::STDOUT, &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
         assert_eq!(e, Errno::EBADF);
     }
 

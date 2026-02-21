@@ -70,7 +70,12 @@ mod tests {
             .unwrap();
 
         let mut buffer = [0; 30];
-        let count = env.system.read(fd, &mut buffer).unwrap();
+        let count = env
+            .system
+            .read(fd, &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(std::str::from_utf8(&buffer[..count]), Ok(text));
     }
 }

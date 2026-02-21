@@ -700,8 +700,12 @@ impl Fcntl for VirtualSystem {
 }
 
 impl Read for VirtualSystem {
-    fn read(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
-        self.with_open_file_description_mut(fd, |ofd| ofd.read(buffer))
+    fn read<'a>(
+        &self,
+        fd: Fd,
+        buffer: &'a mut [u8],
+    ) -> impl Future<Output = Result<usize>> + use<'a> {
+        ready(self.with_open_file_description_mut(fd, |ofd| ofd.read(buffer)))
     }
 }
 
@@ -1690,14 +1694,14 @@ mod tests {
         assert_eq!(result, Ok(3));
 
         let mut buffer = [1; 4];
-        let result = system.read(reader, &mut buffer);
+        let result = system.read(reader, &mut buffer).now_or_never().unwrap();
         assert_eq!(result, Ok(3));
         assert_eq!(buffer, [5, 42, 29, 1]);
 
         let result = system.close(writer);
         assert_eq!(result, Ok(()));
 
-        let result = system.read(reader, &mut buffer);
+        let result = system.read(reader, &mut buffer).now_or_never().unwrap();
         assert_eq!(result, Ok(0));
     }
 
@@ -1836,10 +1840,18 @@ mod tests {
         assert_eq!(result, Ok(Fd(4)));
 
         let mut buffer = [0; 5];
-        let count = system.read(Fd(4), &mut buffer).unwrap();
+        let count = system
+            .read(Fd(4), &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(count, 3);
         assert_eq!(buffer, [75, 96, 133, 0, 0]);
-        let count = system.read(Fd(4), &mut buffer).unwrap();
+        let count = system
+            .read(Fd(4), &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(count, 0);
     }
 
@@ -1905,7 +1917,11 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        let count = system.read(reader, &mut [0; 1]).unwrap();
+        let count = system
+            .read(reader, &mut [0; 1])
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(count, 0);
     }
 
@@ -1947,7 +1963,11 @@ mod tests {
             .unwrap()
             .unwrap();
         let mut buffer = [0; 7];
-        let count = system.read(reader, &mut buffer).unwrap();
+        let count = system
+            .read(reader, &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(count, 6);
         assert_eq!(buffer, [1, 2, 3, 4, 5, 6, 0]);
     }
@@ -2059,7 +2079,11 @@ mod tests {
             .now_or_never()
             .unwrap();
         let mut buffer = [0; 10];
-        let count = system.read(reader.unwrap(), &mut buffer).unwrap();
+        let count = system
+            .read(reader.unwrap(), &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(count, 4);
         assert_eq!(buffer[0..4], [1, 2, 3, 42]);
     }
@@ -2071,7 +2095,11 @@ mod tests {
         system.write(fd, &[42, 17, 75]).unwrap();
         system.lseek(fd, SeekFrom::Start(0)).unwrap();
         let mut buffer = [0; 4];
-        let count = system.read(fd, &mut buffer).unwrap();
+        let count = system
+            .read(fd, &mut buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(count, 3);
         assert_eq!(buffer[..3], [42, 17, 75]);
     }

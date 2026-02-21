@@ -34,6 +34,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   implementation of this method will block until the file can be opened.
   Specifically, if the file is a FIFO, the method will block until the other end
   of the FIFO is opened, unless `OpenFlag::NonBlock` is specified.
+- The `system::Read::read` method is now async. The `VirtualSystem`
+  implementation of this method will block until data can be read from the file
+  descriptor.
 - The `Env::get_tty` method is now async.
 - Private dependency versions:
     - derive_more 2.0.1 → 2.1.0

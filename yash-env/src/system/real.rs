@@ -430,14 +430,18 @@ impl Fcntl for RealSystem {
 }
 
 impl Read for RealSystem {
-    fn read(&self, fd: Fd, buffer: &mut [u8]) -> Result<usize> {
-        loop {
+    fn read<'a>(
+        &self,
+        fd: Fd,
+        buffer: &'a mut [u8],
+    ) -> impl Future<Output = Result<usize>> + use<'a> {
+        ready(loop {
             let result =
                 unsafe { libc::read(fd.0, buffer.as_mut_ptr().cast(), buffer.len()) }.errno_if_m1();
             if result != Err(Errno::EINTR) {
-                return Ok(result?.try_into().unwrap());
+                break result.map(|len| len.try_into().unwrap());
             }
-        }
+        })
     }
 }
 
