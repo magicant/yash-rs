@@ -183,7 +183,9 @@ impl<S> SharedSystem<S> {
 
         let result = loop {
             match self.read(fd, buffer).await {
-                Err(Errno::EAGAIN) => {
+                // EWOULDBLOCK is unreachable if it has the same value as EAGAIN.
+                #[allow(unreachable_patterns)]
+                Err(Errno::EAGAIN | Errno::EWOULDBLOCK) => {
                     let mut first_time = true;
                     poll_fn(|context| {
                         if first_time {
@@ -199,6 +201,9 @@ impl<S> SharedSystem<S> {
                     })
                     .await;
                 }
+
+                Err(Errno::EINTR) => (),
+
                 result => break result,
             }
         };
