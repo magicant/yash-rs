@@ -34,12 +34,12 @@ A _private dependency_ is used internally and not visible to downstream users.
   implementation of this method will block until the file can be opened.
   Specifically, if the file is a FIFO, the method will block until the other end
   of the FIFO is opened, unless `OpenFlag::NonBlock` is specified.
-- The `system::Read::read` method is now async. The `VirtualSystem`
-  implementation of this method will block until data can be read from the file
+- The `system::Read::read` method is now async. This allows the `VirtualSystem`
+  implementation of this method to block until data can be read from the file
   descriptor.
-- The `system::Write::write` method is now async. The `VirtualSystem`
-  implementation of this method will block until data can be written to the file
-  descriptor.
+- The `system::Write::write` method is now async. This allows the
+  `VirtualSystem` implementation of this method to block until data can be
+  written to the file descriptor.
 - The `Env::get_tty` method is now async.
 - The `system::SharedSystem::read_async` and `system::SharedSystem::write_all`
   methods now handle `EWOULDBLOCK` and `EINTR` by retrying the operation instead
