@@ -134,13 +134,16 @@ pub trait Write {
     /// If successful, returns the number of bytes written.
     ///
     /// This function may write only part of the `buffer` and block if the
-    /// `O_NONBLOCK` flag is not set for the FD. Use [`SharedSystem::write_all`]
-    /// to support concurrent I/O in an `async` function context and ensure the
-    /// whole `buffer` is written.
-    ///
-    /// [`SharedSystem::write_all`]: super::SharedSystem::write_all
-    ///
-    /// TODO: This function should return a `Future` to support simulating
-    /// blocking I/O in virtual systems.
-    fn write(&self, fd: Fd, buffer: &[u8]) -> Result<usize>;
+    /// `O_NONBLOCK` flag is not set for the FD. The return type is a `Future`
+    /// to support simulating blocking I/O in [virtual systems](super::virtual).
+    /// In the [real system](super::real), this function does not work
+    /// asynchronously and returns a ready `Future` with the result of the
+    /// underlying system call. See the [module-level documentation](super) for
+    /// details. Use [`SharedSystem::write_all`](super::SharedSystem::write_all)
+    /// for concurrent write operations in an `async` function context.
+    fn write<'a>(
+        &self,
+        fd: Fd,
+        buffer: &'a [u8],
+    ) -> impl Future<Output = Result<usize>> + use<'a, Self>;
 }

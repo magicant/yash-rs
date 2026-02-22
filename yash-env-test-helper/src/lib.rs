@@ -100,16 +100,20 @@ pub fn stub_tty(state: &RefCell<SystemState>) {
 ///
 /// ```
 /// # use std::rc::Rc;
+/// # use futures_util::FutureExt as _;
 /// # use yash_env::Env;
 /// # use yash_env::io::Fd;
 /// # use yash_env::system::Write as _;
 /// # use yash_env::system::r#virtual::VirtualSystem;
 /// # use yash_env_test_helper::assert_stdout;
+/// # async fn f() {
 /// let system = VirtualSystem::new();
 /// let state = Rc::clone(&system.state);
 /// let mut env = Env::with_system(system);
-/// env.system.write(Fd::STDOUT, b"Hello, world!\n").unwrap();
+/// env.system.write(Fd::STDOUT, b"Hello, world!\n").await.unwrap();
 /// assert_stdout(&state, |stdout| assert_eq!(stdout, "Hello, world!\n"));
+/// # }
+/// # f().now_or_never().unwrap();
 /// ```
 pub fn assert_stdout<F, T>(state: &RefCell<SystemState>, f: F) -> T
 where

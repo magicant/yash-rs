@@ -256,6 +256,7 @@ impl OpenFileDescription {
                 let room = PIPE_SIZE - content.len();
                 if room < buffer.len() {
                     if room == 0 || buffer.len() <= PIPE_BUF {
+                        // TODO: Support blocking write
                         return Err(Errno::EAGAIN);
                     }
                     buffer = &buffer[..room];
