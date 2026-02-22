@@ -446,14 +446,14 @@ impl Read for RealSystem {
 }
 
 impl Write for RealSystem {
-    fn write(&self, fd: Fd, buffer: &[u8]) -> Result<usize> {
-        loop {
+    fn write<'a>(&self, fd: Fd, buffer: &'a [u8]) -> impl Future<Output = Result<usize>> + use<'a> {
+        ready(loop {
             let result =
                 unsafe { libc::write(fd.0, buffer.as_ptr().cast(), buffer.len()) }.errno_if_m1();
             if result != Err(Errno::EINTR) {
-                return Ok(result?.try_into().unwrap());
+                break result.map(|len| len.try_into().unwrap());
             }
-        }
+        })
     }
 }
 
