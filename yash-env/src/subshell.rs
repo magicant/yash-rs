@@ -186,13 +186,16 @@ where
             // Open the tty in the parent process so we can reuse the FD for other jobs
             Some(JobControl::Foreground) => env.get_tty().await.ok(),
         };
+
         // Block SIGINT and SIGQUIT before forking the child process to prevent
         // the child from being killed by those signals until the child starts
         // ignoring them.
-        let mut mask_guard = MaskGuard::new(env);
-        let ignore_sigint_sigquit = self.ignores_sigint_sigquit
-            && job_control.is_none()
-            && mask_guard.block_sigint_sigquit();
+        let original_mask = if self.ignores_sigint_sigquit && job_control.is_none() {
+            block_sigint_sigquit(&env.system).await.ok()
+        } else {
+            None
+        };
+        let ignore_sigint_sigquit = original_mask.is_some();
         let keep_internal_dispositions_for_stoppers = job_control.is_none();
 
         // Define the child process task
@@ -229,15 +232,23 @@ where
         });
 
         // Start the child
-        let child = mask_guard.env.system.new_child_process()?;
-        let child_pid = child(mask_guard.env, task);
+        let result = env.system.new_child_process().map(|child| child(env, task));
+
+        // Restore the original signal mask in the parent process. Need to do
+        // this before returning the error if the child process creation failed,
+        // to avoid leaving the parent process with an unexpected signal mask.
+        if let Some(mask) = original_mask {
+            restore_sigmask(&env.system, &mask).await.ok();
+        }
+
+        let child_pid = result?;
 
         // The finishing
         if job_control.is_some() {
             // We should setpgid not only in the child but also in the parent to
             // make sure the child is in a new process group before the parent
             // returns from the start function.
-            let _ = mask_guard.env.system.setpgid(child_pid, ME);
+            let _ = env.system.setpgid(child_pid, ME);
 
             // We don't tcsetpgrp in the parent. It would mess up the child
             // which may have started another shell doing its own job control.
@@ -289,51 +300,17 @@ where
     }
 }
 
-/// Guard object for temporarily blocking signals
-///
-/// This object blocks SIGINT and SIGQUIT and remembers the previous signal
-/// blocking mask, which is restored when the object is dropped.
-#[derive(Debug)]
-struct MaskGuard<'a, S: Signals + Sigmask> {
-    env: &'a mut Env<S>,
-    old_mask: Option<Vec<signal::Number>>,
+async fn block_sigint_sigquit<S: Sigmask>(system: &S) -> Result<Vec<signal::Number>, Errno> {
+    let mut old_mask = Vec::new();
+    system.sigmask(
+        Some((SigmaskOp::Add, &[S::SIGINT, S::SIGQUIT])),
+        Some(&mut old_mask),
+    )?;
+    Ok(old_mask)
 }
 
-impl<'a, S: Signals + Sigmask> MaskGuard<'a, S> {
-    fn new(env: &'a mut Env<S>) -> Self {
-        let old_mask = None;
-        Self { env, old_mask }
-    }
-
-    fn block_sigint_sigquit(&mut self) -> bool {
-        assert_eq!(self.old_mask, None);
-
-        let mut old_mask = Vec::new();
-
-        let success = self
-            .env
-            .system
-            .sigmask(
-                Some((SigmaskOp::Add, &[S::SIGINT, S::SIGQUIT])),
-                Some(&mut old_mask),
-            )
-            .is_ok();
-        if success {
-            self.old_mask = Some(old_mask);
-        }
-        success
-    }
-}
-
-impl<S: Signals + Sigmask> Drop for MaskGuard<'_, S> {
-    fn drop(&mut self) {
-        if let Some(old_mask) = &self.old_mask {
-            self.env
-                .system
-                .sigmask(Some((SigmaskOp::Set, old_mask)), None)
-                .ok();
-        }
-    }
+async fn restore_sigmask<S: Sigmask>(system: &S, mask: &[signal::Number]) -> Result<(), Errno> {
+    system.sigmask(Some((SigmaskOp::Set, mask)), None)
 }
 
 #[cfg(test)]
