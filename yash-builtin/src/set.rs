@@ -75,16 +75,18 @@ pub mod syntax;
 
 /// Enables or disables the internal dispositions for the "stopper" signals
 /// depending on the `Interactive` and `Monitor` option states.
-fn update_internal_dispositions_for_stoppers<S>(env: &mut Env<S>)
+async fn update_internal_dispositions_for_stoppers<S>(env: &mut Env<S>)
 where
     S: Signals + Sigmask + Sigaction,
 {
     if env.options.get(Interactive) == State::On && env.options.get(Monitor) == State::On {
         env.traps
             .enable_internal_dispositions_for_stoppers(&mut env.system)
+            .await
     } else {
         env.traps
             .disable_internal_dispositions_for_stoppers(&mut env.system)
+            .await
     }
     .ok();
 }
@@ -119,7 +121,7 @@ async fn modify<S>(
     if monitor_changed && !env.stack.contains(&Subshell) {
         // We ignore errors in theses functions because they are not essential
         // for updating the options.
-        update_internal_dispositions_for_stoppers(env);
+        update_internal_dispositions_for_stoppers(env).await;
         ensure_foreground(env).await;
     }
 

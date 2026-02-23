@@ -220,11 +220,13 @@ where
                 }
                 env.jobs.disown_all();
 
-                env.traps.enter_subshell(
-                    &mut env.system,
-                    ignore_sigint_sigquit,
-                    keep_internal_dispositions_for_stoppers,
-                );
+                env.traps
+                    .enter_subshell(
+                        &mut env.system,
+                        ignore_sigint_sigquit,
+                        keep_internal_dispositions_for_stoppers,
+                    )
+                    .await;
 
                 (self.task)(env, job_control).await;
                 exit_or_raise(&env.system, env.exit_status).await
@@ -407,6 +409,7 @@ mod tests {
                     Location::dummy(""),
                     false,
                 )
+                .await
                 .unwrap();
             let subshell = Subshell::new(|env, _job_control| {
                 Box::pin(async {
@@ -728,6 +731,7 @@ mod tests {
             parent_env
                 .traps
                 .enable_internal_dispositions_for_stoppers(&mut parent_env.system)
+                .await
                 .unwrap();
             stub_tty(&state);
 
@@ -757,6 +761,7 @@ mod tests {
             parent_env
                 .traps
                 .enable_internal_dispositions_for_stoppers(&mut parent_env.system)
+                .await
                 .unwrap();
             stub_tty(&state);
 

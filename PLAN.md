@@ -37,7 +37,7 @@ Validation is performed within each task; there is no separate validation-only t
 
 Convert these methods to async (add `async` keyword, change return type):
 - `pub async fn set_action(...) -> impl Future<Output = Result<(), SetActionError>> + use<Self, S>`
-- `pub async fn enter_subshell(...) -> impl Future<Output = Result<(), Errno>> + use<Self, S>`  
+- `pub async fn enter_subshell(...)` (returns `()`, not Result - errors are ignored)
 - `pub async fn enable_internal_disposition_for_sigchld(...) -> impl Future<Output = Result<(), Errno>> + use<Self, S>`
 - `pub async fn enable_internal_dispositions_for_terminators(...) -> impl Future<Output = Result<(), Errno>> + use<Self, S>`
 - `pub async fn enable_internal_dispositions_for_stoppers(...) -> impl Future<Output = Result<(), Errno>> + use<Self, S>`
@@ -82,7 +82,27 @@ Functions like `replace_current_process()` that call trap methods:
 
 Ensure all test functions properly use `.now_or_never().unwrap().unwrap()` pattern for async calls with DummySystem.
 
-### 1.6: Validation for Task 1
+### 1.6: Clippy attributes to remove
+
+**IMPORTANT:** The following `#[allow(clippy::unused_async)]` attributes were added temporarily because Task 1 makes methods async before their internal calls become truly async. These MUST be removed when completing Task 2 (making SignalSystem::set_disposition async):
+
+- `yash-env/src/trap.rs`: 
+  - `TrapSet::set_action` (~line 189)
+  - `TrapSet::enable_internal_disposition_for_sigchld` (~line 340)
+  - `TrapSet::enable_internal_dispositions_for_terminators` (~line 370)
+  - `TrapSet::enable_internal_dispositions_for_stoppers` (~line 412)
+  - `TrapSet::disable_internal_dispositions_for_terminators` (~line 424)
+  - `TrapSet::disable_internal_dispositions_for_stoppers` (~line 436)
+
+- `yash-env/src/trap/state.rs`:
+  - `GrandState::set_action` (~line 215)
+  - `GrandState::set_internal_disposition` (~line 296)
+  - `GrandState::enter_subshell` (~line 340)
+  - `GrandState::ignore` (~line 399)
+
+**Action item for Task 2:** Search for all `#[allow(clippy::unused_async)]` attributes in yash-env and remove them after SignalSystem methods are truly async.
+
+### 1.7: Validation for Task 1
 
 Run after completing all subtasks:
 ```bash
