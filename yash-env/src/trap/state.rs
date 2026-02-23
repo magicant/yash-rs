@@ -211,7 +211,6 @@ impl GrandState {
     }
 
     /// Updates the entry with the new action.
-    #[allow(clippy::unused_async)]
     pub async fn set_action<S: SignalSystem>(
         system: &mut S,
         entry: Entry<'_, Condition, GrandState>,
@@ -232,7 +231,7 @@ impl GrandState {
                 if let Condition::Signal(signal) = cond {
                     if !override_ignore {
                         let initial_disposition =
-                            system.set_disposition(signal, Disposition::Ignore)?;
+                            system.set_disposition(signal, Disposition::Ignore).await?;
                         if initial_disposition == Disposition::Ignore {
                             vacant.insert(GrandState {
                                 current_state: TrapState::from_initial_disposition(
@@ -246,7 +245,7 @@ impl GrandState {
                     }
 
                     if override_ignore || disposition != Disposition::Ignore {
-                        system.set_disposition(signal, disposition)?;
+                        system.set_disposition(signal, disposition).await?;
                     }
                 }
 
@@ -271,7 +270,7 @@ impl GrandState {
                     let old_disposition = internal.max((&state.current_state.action).into());
                     let new_disposition = internal.max(disposition);
                     if old_disposition != new_disposition {
-                        system.set_disposition(signal, new_disposition)?;
+                        system.set_disposition(signal, new_disposition).await?;
                     }
                 }
 
@@ -292,7 +291,6 @@ impl GrandState {
     ///
     /// The condition of the given entry must be a signal, or this function
     /// panics.
-    #[allow(clippy::unused_async)]
     pub async fn set_internal_disposition<S: SignalSystem>(
         system: &mut S,
         entry: Entry<'_, Condition, GrandState>,
@@ -307,7 +305,7 @@ impl GrandState {
             Entry::Vacant(_) if disposition == Disposition::Default => (),
 
             Entry::Vacant(vacant) => {
-                let initial_disposition = system.set_disposition(signal, disposition)?;
+                let initial_disposition = system.set_disposition(signal, disposition).await?;
                 vacant.insert(GrandState {
                     current_state: TrapState::from_initial_disposition(initial_disposition),
                     parent_state: None,
@@ -321,7 +319,7 @@ impl GrandState {
                 let old_disposition = state.internal_disposition.max(setting);
                 let new_disposition = disposition.max(setting);
                 if old_disposition != new_disposition {
-                    system.set_disposition(signal, new_disposition)?;
+                    system.set_disposition(signal, new_disposition).await?;
                 }
                 state.internal_disposition = disposition;
             }
@@ -337,7 +335,6 @@ impl GrandState {
     /// (`Action::Command(_)`), it is saved in the parent state and reset to the
     /// default. Additionally, the signal disposition is updated depending on the
     /// `option`.
-    #[allow(clippy::unused_async)]
     pub async fn enter_subshell<S: SignalSystem>(
         &mut self,
         system: &mut S,
@@ -371,7 +368,7 @@ impl GrandState {
         };
         if old_disposition != new_disposition {
             if let Condition::Signal(signal) = cond {
-                system.set_disposition(signal, new_disposition)?;
+                system.set_disposition(signal, new_disposition).await?;
             }
         }
         self.internal_disposition = match option {
@@ -395,7 +392,6 @@ impl GrandState {
     /// there is no entry for the condition yet.
     ///
     /// This function panics if the condition is not a signal.
-    #[allow(clippy::unused_async)]
     pub async fn ignore<S: SignalSystem>(
         system: &mut S,
         vacant: VacantEntry<'_, Condition, GrandState>,
@@ -404,7 +400,7 @@ impl GrandState {
             Condition::Signal(signal) => signal,
             Condition::Exit => panic!("exit condition cannot be ignored"),
         };
-        let initial_disposition = system.set_disposition(signal, Disposition::Ignore)?;
+        let initial_disposition = system.set_disposition(signal, Disposition::Ignore).await?;
         let origin = match initial_disposition {
             Disposition::Default => Origin::Subshell,
             Disposition::Ignore => Origin::Inherited,
@@ -537,11 +533,11 @@ mod tests {
             unreachable!("get_disposition({signal})")
         }
         fn set_disposition(
-            &mut self,
+            &self,
             signal: crate::signal::Number,
             disposition: Disposition,
-        ) -> Result<Disposition, Errno> {
-            unreachable!("set_disposition({signal}, {disposition:?})")
+        ) -> impl Future<Output = Result<Disposition, Errno>> + use<> {
+            async move { unreachable!("set_disposition({signal}, {disposition:?})") }
         }
     }
 
@@ -565,8 +561,8 @@ mod tests {
 
     #[test]
     fn insertion_with_inherited_disposition_of_ignore() {
-        let mut system = DummySystem::default();
-        system.0.insert(SIGCHLD, Disposition::Ignore);
+        let system = DummySystem::default();
+        system.0.borrow_mut().insert(SIGCHLD, Disposition::Ignore);
         let mut map = BTreeMap::new();
         let entry = map.entry(SIGCHLD.into());
         let state = GrandState::insert_from_system_if_vacant(&system, entry).unwrap();
@@ -648,7 +644,7 @@ mod tests {
             }
         );
         assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
-        assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Ignore);
     }
 
     #[test]
@@ -672,7 +668,7 @@ mod tests {
             }
         );
         assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
-        assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Ignore);
     }
 
     #[test]
@@ -697,7 +693,7 @@ mod tests {
             }
         );
         assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
-        assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Catch);
     }
 
     #[test]
@@ -727,13 +723,13 @@ mod tests {
             }
         );
         assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
-        assert_eq!(system.0[&SIGCHLD], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Default);
     }
 
     #[test]
     fn resetting_trap_from_ignore_no_override() {
         let mut system = DummySystem::default();
-        system.0.insert(SIGCHLD, Disposition::Ignore);
+        system.0.borrow_mut().insert(SIGCHLD, Disposition::Ignore);
         let mut map = BTreeMap::new();
         let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("foo");
@@ -759,13 +755,13 @@ mod tests {
             }
         );
         assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
-        assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Ignore);
     }
 
     #[test]
     fn resetting_trap_from_ignore_override() {
         let mut system = DummySystem::default();
-        system.0.insert(SIGCHLD, Disposition::Ignore);
+        system.0.borrow_mut().insert(SIGCHLD, Disposition::Ignore);
         let mut map = BTreeMap::new();
         let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("origin");
@@ -783,7 +779,7 @@ mod tests {
             }
         );
         assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
-        assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Ignore);
     }
 
     #[test]
@@ -809,7 +805,7 @@ mod tests {
             }
         );
         assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
-        assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Ignore);
     }
 
     #[test]
@@ -835,7 +831,7 @@ mod tests {
             }
         );
         assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
-        assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Catch);
     }
 
     #[test]
@@ -867,7 +863,7 @@ mod tests {
             }
         );
         assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
-        assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Catch);
     }
 
     #[test]
@@ -900,7 +896,7 @@ mod tests {
             }
         );
         assert_eq!(map[&SIGCHLD.into()].parent_state(), None);
-        assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Catch);
     }
 
     #[test]
@@ -934,13 +930,13 @@ mod tests {
             }
         );
         assert_eq!(map[&SIGTTOU.into()].parent_state(), None);
-        assert_eq!(system.0[&SIGTTOU], Disposition::Catch);
+        assert_eq!(system.0.borrow()[&SIGTTOU], Disposition::Catch);
     }
 
     #[test]
     fn set_internal_disposition_for_initially_ignored_signal_then_reject_override() {
         let mut system = DummySystem::default();
-        system.0.insert(SIGTTOU, Disposition::Ignore);
+        system.0.borrow_mut().insert(SIGTTOU, Disposition::Ignore);
         let mut map = BTreeMap::new();
         let cond = SIGTTOU.into();
         let entry = map.entry(cond);
@@ -966,7 +962,7 @@ mod tests {
             }
         );
         assert_eq!(map[&cond].parent_state(), None);
-        assert_eq!(system.0[&SIGTTOU], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTTOU], Disposition::Ignore);
     }
 
     #[test]
@@ -1000,7 +996,7 @@ mod tests {
             }
         );
         assert_eq!(map[&cond].parent_state(), None);
-        assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Catch);
     }
 
     #[test]
@@ -1035,7 +1031,7 @@ mod tests {
             }
         );
         assert_eq!(map[&cond].parent_state(), None);
-        assert_eq!(system.0[&SIGCHLD], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Default);
     }
 
     #[test]
@@ -1071,7 +1067,7 @@ mod tests {
             }
         );
         assert_eq!(map[&cond].parent_state(), None);
-        assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Ignore);
     }
 
     #[test]
@@ -1112,7 +1108,7 @@ mod tests {
             }
         );
         assert_eq!(map[&cond].parent_state(), None);
-        assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Ignore);
     }
 
     #[test]
@@ -1156,7 +1152,7 @@ mod tests {
                 pending: false
             })
         );
-        assert_eq!(system.0[&SIGCHLD], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Default);
     }
 
     #[test]
@@ -1205,7 +1201,7 @@ mod tests {
                 pending: false
             })
         );
-        assert_eq!(system.0[&SIGTSTP], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTSTP], Disposition::Ignore);
     }
 
     #[test]
@@ -1254,7 +1250,7 @@ mod tests {
                 pending: false
             })
         );
-        assert_eq!(system.0[&SIGTSTP], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGTSTP], Disposition::Default);
     }
 
     #[test]
@@ -1294,7 +1290,7 @@ mod tests {
                 pending: false
             })
         );
-        assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGQUIT], Disposition::Ignore);
     }
 
     #[test]
@@ -1318,7 +1314,7 @@ mod tests {
             }
         );
         assert_eq!(map[&cond].parent_state(), None);
-        assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGQUIT], Disposition::Ignore);
 
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
@@ -1332,7 +1328,7 @@ mod tests {
     #[test]
     fn ignoring_initially_ignored_signal() {
         let mut system = DummySystem::default();
-        system.0.insert(SIGQUIT, Disposition::Ignore);
+        system.0.borrow_mut().insert(SIGQUIT, Disposition::Ignore);
         let mut map = BTreeMap::new();
         let cond = SIGQUIT.into();
         let entry = map.entry(cond);
@@ -1351,7 +1347,7 @@ mod tests {
             }
         );
         assert_eq!(map[&cond].parent_state(), None);
-        assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGQUIT], Disposition::Ignore);
 
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
