@@ -428,7 +428,8 @@ impl<S> Env<S> {
         // We need to set the internal disposition before calling `wait` so we don't
         // miss any `SIGCHLD` that may arrive between `wait` and `wait_for_signal`.
         self.traps
-            .enable_internal_disposition_for_sigchld(&mut self.system)?;
+            .enable_internal_disposition_for_sigchld(&mut self.system)
+            .await?;
 
         loop {
             if let Some((pid, state)) = self.system.wait(target)? {
@@ -673,6 +674,7 @@ mod tests {
                     Location::dummy(""),
                     false,
                 )
+                .await
                 .unwrap();
             {
                 let mut state = state.borrow_mut();
@@ -698,6 +700,8 @@ mod tests {
                 Location::dummy(""),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         (env, system)
     }

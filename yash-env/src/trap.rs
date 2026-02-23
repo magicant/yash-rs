@@ -182,7 +182,7 @@ impl TrapSet {
     /// This function clears all parent states remembered when [entering a
     /// subshell](Self::enter_subshell), not only for the specified condition
     /// but also for all other conditions.
-    pub fn set_action<S: SignalSystem, C: Into<Condition>>(
+    pub async fn set_action<S: SignalSystem, C: Into<Condition>>(
         &mut self,
         system: &mut S,
         cond: C,
@@ -191,9 +191,10 @@ impl TrapSet {
         override_ignore: bool,
     ) -> Result<(), SetActionError> {
         self.set_action_impl(system, cond.into(), action, origin, override_ignore)
+            .await
     }
 
-    fn set_action_impl<S: SignalSystem>(
+    async fn set_action_impl<S: SignalSystem>(
         &mut self,
         system: &mut S,
         cond: Condition,
@@ -213,7 +214,7 @@ impl TrapSet {
         self.clear_parent_states();
 
         let entry = self.traps.entry(cond);
-        GrandState::set_action(system, entry, action, origin, override_ignore)
+        GrandState::set_action(system, entry, action, origin, override_ignore).await
     }
 
     fn clear_parent_states(&mut self) {
@@ -274,7 +275,7 @@ impl TrapSet {
     ///
     /// This function ignores any errors that may occur when setting signal
     /// dispositions.
-    pub fn enter_subshell<S: SignalSystem>(
+    pub async fn enter_subshell<S: SignalSystem>(
         &mut self,
         system: &mut S,
         ignore_sigint_sigquit: bool,
@@ -303,13 +304,15 @@ impl TrapSet {
                     }
                 }
             };
-            _ = state.enter_subshell(system, cond, option);
+            state.enter_subshell(system, cond, option).await.ok();
         }
 
         if ignore_sigint_sigquit {
             for signal in [S::SIGINT, S::SIGQUIT] {
                 match self.traps.entry(Condition::Signal(signal)) {
-                    Entry::Vacant(vacant) => _ = GrandState::ignore(system, vacant),
+                    Entry::Vacant(vacant) => {
+                        GrandState::ignore(system, vacant).await.unwrap_or_default()
+                    }
                     // If the entry is occupied, the signal is already ignored in the loop above.
                     Entry::Occupied(_) => {}
                 }
@@ -350,14 +353,14 @@ impl TrapSet {
         })
     }
 
-    fn set_internal_disposition<S: SignalSystem>(
+    async fn set_internal_disposition<S: SignalSystem>(
         &mut self,
         signal: signal::Number,
         disposition: Disposition,
         system: &mut S,
     ) -> Result<(), Errno> {
         let entry = self.traps.entry(Condition::Signal(signal));
-        GrandState::set_internal_disposition(system, entry, disposition)
+        GrandState::set_internal_disposition(system, entry, disposition).await
     }
 
     /// Installs the internal disposition for `SIGCHLD`.
@@ -369,11 +372,12 @@ impl TrapSet {
     ///
     /// This function remembers that the disposition has been installed, so a
     /// second call to the function will be a no-op.
-    pub fn enable_internal_disposition_for_sigchld<S: SignalSystem>(
+    pub async fn enable_internal_disposition_for_sigchld<S: SignalSystem>(
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
         self.set_internal_disposition(S::SIGCHLD, Disposition::Catch, system)
+            .await
     }
 
     /// Installs the internal dispositions for `SIGINT`, `SIGTERM`, and `SIGQUIT`.
@@ -384,13 +388,16 @@ impl TrapSet {
     ///
     /// This function remembers that the dispositions have been installed, so a
     /// second call to the function will be a no-op.
-    pub fn enable_internal_dispositions_for_terminators<S: SignalSystem>(
+    pub async fn enable_internal_dispositions_for_terminators<S: SignalSystem>(
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        self.set_internal_disposition(S::SIGINT, Disposition::Catch, system)?;
-        self.set_internal_disposition(S::SIGTERM, Disposition::Ignore, system)?;
+        self.set_internal_disposition(S::SIGINT, Disposition::Catch, system)
+            .await?;
+        self.set_internal_disposition(S::SIGTERM, Disposition::Ignore, system)
+            .await?;
         self.set_internal_disposition(S::SIGQUIT, Disposition::Ignore, system)
+            .await
     }
 
     /// Installs the internal dispositions for `SIGTSTP`, `SIGTTIN`, and `SIGTTOU`.
@@ -401,33 +408,42 @@ impl TrapSet {
     ///
     /// This function remembers that the dispositions have been installed, so a
     /// second call to the function will be a no-op.
-    pub fn enable_internal_dispositions_for_stoppers<S: SignalSystem>(
+    pub async fn enable_internal_dispositions_for_stoppers<S: SignalSystem>(
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        self.set_internal_disposition(S::SIGTSTP, Disposition::Ignore, system)?;
-        self.set_internal_disposition(S::SIGTTIN, Disposition::Ignore, system)?;
+        self.set_internal_disposition(S::SIGTSTP, Disposition::Ignore, system)
+            .await?;
+        self.set_internal_disposition(S::SIGTTIN, Disposition::Ignore, system)
+            .await?;
         self.set_internal_disposition(S::SIGTTOU, Disposition::Ignore, system)
+            .await
     }
 
     /// Uninstalls the internal dispositions for `SIGINT`, `SIGTERM`, and `SIGQUIT`.
-    pub fn disable_internal_dispositions_for_terminators<S: SignalSystem>(
+    pub async fn disable_internal_dispositions_for_terminators<S: SignalSystem>(
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        self.set_internal_disposition(S::SIGINT, Disposition::Default, system)?;
-        self.set_internal_disposition(S::SIGTERM, Disposition::Default, system)?;
+        self.set_internal_disposition(S::SIGINT, Disposition::Default, system)
+            .await?;
+        self.set_internal_disposition(S::SIGTERM, Disposition::Default, system)
+            .await?;
         self.set_internal_disposition(S::SIGQUIT, Disposition::Default, system)
+            .await
     }
 
     /// Uninstalls the internal dispositions for `SIGTSTP`, `SIGTTIN`, and `SIGTTOU`.
-    pub fn disable_internal_dispositions_for_stoppers<S: SignalSystem>(
+    pub async fn disable_internal_dispositions_for_stoppers<S: SignalSystem>(
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        self.set_internal_disposition(S::SIGTSTP, Disposition::Default, system)?;
-        self.set_internal_disposition(S::SIGTTIN, Disposition::Default, system)?;
+        self.set_internal_disposition(S::SIGTSTP, Disposition::Default, system)
+            .await?;
+        self.set_internal_disposition(S::SIGTTIN, Disposition::Default, system)
+            .await?;
         self.set_internal_disposition(S::SIGTTOU, Disposition::Default, system)
+            .await
     }
 
     /// Uninstalls all internal dispositions.
@@ -435,13 +451,16 @@ impl TrapSet {
     /// This function removes all internal dispositions that have been
     /// previously installed by `self`, except for the `SIGCHLD` signal.
     /// Dispositions for any existing user-defined traps are not affected.
-    pub fn disable_internal_dispositions<S: SignalSystem>(
+    pub async fn disable_internal_dispositions<S: SignalSystem>(
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        self.set_internal_disposition(S::SIGCHLD, Disposition::Default, system)?;
-        self.disable_internal_dispositions_for_terminators(system)?;
+        self.set_internal_disposition(S::SIGCHLD, Disposition::Default, system)
+            .await?;
+        self.disable_internal_dispositions_for_terminators(system)
+            .await?;
         self.disable_internal_dispositions_for_stoppers(system)
+            .await
     }
 }
 
@@ -522,6 +541,7 @@ mod tests {
         SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU, SIGXFSZ,
     };
     use crate::tests::in_virtual_system;
+    use futures_util::FutureExt as _;
     use std::collections::HashMap;
     use std::ops::RangeInclusive;
 
@@ -598,24 +618,30 @@ mod tests {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let origin_1 = Location::dummy("foo");
-        let result = trap_set.set_action(
-            &mut system,
-            SIGUSR1,
-            Action::Ignore,
-            origin_1.clone(),
-            false,
-        );
+        let result = trap_set
+            .set_action(
+                &mut system,
+                SIGUSR1,
+                Action::Ignore,
+                origin_1.clone(),
+                false,
+            )
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(()));
 
         let command = Action::Command("echo".into());
         let origin_2 = Location::dummy("bar");
-        let result = trap_set.set_action(
-            &mut system,
-            SIGUSR2,
-            command.clone(),
-            origin_2.clone(),
-            false,
-        );
+        let result = trap_set
+            .set_action(
+                &mut system,
+                SIGUSR2,
+                command.clone(),
+                origin_2.clone(),
+                false,
+            )
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(()));
 
         assert_eq!(
@@ -649,7 +675,10 @@ mod tests {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let origin = Location::dummy("origin");
-        let result = trap_set.set_action(&mut system, SIGKILL, Action::Ignore, origin, false);
+        let result = trap_set
+            .set_action(&mut system, SIGKILL, Action::Ignore, origin, false)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Err(SetActionError::SIGKILL));
         assert_eq!(trap_set.get_state(SIGKILL), (None, None));
         assert_eq!(system.0.get(&SIGKILL), None);
@@ -660,7 +689,10 @@ mod tests {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let origin = Location::dummy("origin");
-        let result = trap_set.set_action(&mut system, SIGSTOP, Action::Ignore, origin, false);
+        let result = trap_set
+            .set_action(&mut system, SIGSTOP, Action::Ignore, origin, false)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Err(SetActionError::SIGSTOP));
         assert_eq!(trap_set.get_state(SIGSTOP), (None, None));
         assert_eq!(system.0.get(&SIGSTOP), None);
@@ -705,8 +737,13 @@ mod tests {
         let command = Action::Command("echo".into());
         trap_set
             .set_action(&mut system, SIGUSR1, command.clone(), origin.clone(), false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
-        trap_set.enter_subshell(&mut system, false, false);
+        trap_set
+            .enter_subshell(&mut system, false, false)
+            .now_or_never()
+            .unwrap();
 
         let result = trap_set.peek_state(&system, SIGUSR1);
         assert_eq!(
@@ -732,6 +769,8 @@ mod tests {
                 origin_1.clone(),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         let command = Action::Command("echo".into());
         let origin_2 = Location::dummy("bar");
@@ -743,6 +782,8 @@ mod tests {
                 origin_2.clone(),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
         let mut i = trap_set.iter();
@@ -772,6 +813,8 @@ mod tests {
                 origin_1.clone(),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         let command = Action::Command("echo".into());
         let origin_2 = Location::dummy("bar");
@@ -783,8 +826,13 @@ mod tests {
                 origin_2.clone(),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
-        trap_set.enter_subshell(&mut system, false, false);
+        trap_set
+            .enter_subshell(&mut system, false, false)
+            .now_or_never()
+            .unwrap();
 
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
@@ -809,8 +857,13 @@ mod tests {
         let command = Action::Command("echo".into());
         trap_set
             .set_action(&mut system, SIGUSR1, command, origin_1, false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
-        trap_set.enter_subshell(&mut system, false, false);
+        trap_set
+            .enter_subshell(&mut system, false, false)
+            .now_or_never()
+            .unwrap();
         let origin_2 = Location::dummy("bar");
         let command = Action::Command("ls".into());
         trap_set
@@ -821,6 +874,8 @@ mod tests {
                 origin_2.clone(),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
         let mut i = trap_set.iter();
@@ -845,9 +900,14 @@ mod tests {
         let origin = Location::dummy("origin");
         trap_set
             .set_action(&mut system, SIGCHLD, action.clone(), origin.clone(), false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
-        trap_set.enter_subshell(&mut system, false, false);
+        trap_set
+            .enter_subshell(&mut system, false, false)
+            .now_or_never()
+            .unwrap();
         assert_eq!(
             trap_set.get_state(SIGCHLD),
             (
@@ -873,9 +933,14 @@ mod tests {
         let origin = Location::dummy("origin");
         trap_set
             .set_action(&mut system, SIGCHLD, Action::Ignore, origin.clone(), false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
-        trap_set.enter_subshell(&mut system, false, false);
+        trap_set
+            .enter_subshell(&mut system, false, false)
+            .now_or_never()
+            .unwrap();
         assert_eq!(
             trap_set.get_state(SIGCHLD),
             (
@@ -898,12 +963,19 @@ mod tests {
         let origin = Location::dummy("origin");
         trap_set
             .set_action(&mut system, SIGCHLD, action.clone(), origin.clone(), false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_disposition_for_sigchld(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
-        trap_set.enter_subshell(&mut system, false, false);
+        trap_set
+            .enter_subshell(&mut system, false, false)
+            .now_or_never()
+            .unwrap();
         assert_eq!(
             trap_set.get_state(SIGCHLD),
             (
@@ -930,12 +1002,19 @@ mod tests {
         let origin = Location::dummy("origin");
         trap_set
             .set_action(&mut system, SIGINT, action.clone(), origin.clone(), false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_terminators(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
-        trap_set.enter_subshell(&mut system, false, false);
+        trap_set
+            .enter_subshell(&mut system, false, false)
+            .now_or_never()
+            .unwrap();
         assert_eq!(
             trap_set.get_state(SIGINT),
             (
@@ -962,12 +1041,19 @@ mod tests {
         let origin = Location::dummy("origin");
         trap_set
             .set_action(&mut system, SIGTERM, action.clone(), origin.clone(), false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_terminators(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
-        trap_set.enter_subshell(&mut system, false, false);
+        trap_set
+            .enter_subshell(&mut system, false, false)
+            .now_or_never()
+            .unwrap();
         assert_eq!(
             trap_set.get_state(SIGTERM),
             (
@@ -994,12 +1080,19 @@ mod tests {
         let origin = Location::dummy("origin");
         trap_set
             .set_action(&mut system, SIGQUIT, action.clone(), origin.clone(), false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_terminators(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
-        trap_set.enter_subshell(&mut system, false, false);
+        trap_set
+            .enter_subshell(&mut system, false, false)
+            .now_or_never()
+            .unwrap();
         assert_eq!(
             trap_set.get_state(SIGQUIT),
             (
@@ -1026,12 +1119,19 @@ mod tests {
         let origin = Location::dummy("origin");
         trap_set
             .set_action(&mut system, SIGTSTP, action.clone(), origin.clone(), false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_terminators(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
-        trap_set.enter_subshell(&mut system, false, false);
+        trap_set
+            .enter_subshell(&mut system, false, false)
+            .now_or_never()
+            .unwrap();
         assert_eq!(
             trap_set.get_state(SIGTSTP),
             (
@@ -1058,12 +1158,19 @@ mod tests {
         let origin = Location::dummy("origin");
         trap_set
             .set_action(&mut system, SIGTTIN, action.clone(), origin.clone(), false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_terminators(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
-        trap_set.enter_subshell(&mut system, false, false);
+        trap_set
+            .enter_subshell(&mut system, false, false)
+            .now_or_never()
+            .unwrap();
         assert_eq!(
             trap_set.get_state(SIGTTIN),
             (
@@ -1090,12 +1197,19 @@ mod tests {
         let origin = Location::dummy("origin");
         trap_set
             .set_action(&mut system, SIGTTOU, action.clone(), origin.clone(), false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_terminators(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
-        trap_set.enter_subshell(&mut system, false, false);
+        trap_set
+            .enter_subshell(&mut system, false, false)
+            .now_or_never()
+            .unwrap();
         assert_eq!(
             trap_set.get_state(SIGTTOU),
             (
@@ -1122,13 +1236,20 @@ mod tests {
         let command = Action::Command("echo 1".into());
         trap_set
             .set_action(&mut system, SIGUSR1, command, origin_1, false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         let origin_2 = Location::dummy("bar");
         let command = Action::Command("echo 2".into());
         trap_set
             .set_action(&mut system, SIGUSR2, command, origin_2, false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
-        trap_set.enter_subshell(&mut system, false, false);
+        trap_set
+            .enter_subshell(&mut system, false, false)
+            .now_or_never()
+            .unwrap();
 
         let command = Action::Command("echo 9".into());
         let origin_3 = Location::dummy("qux");
@@ -1140,6 +1261,8 @@ mod tests {
                 origin_3.clone(),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
         assert_eq!(
@@ -1176,14 +1299,24 @@ mod tests {
         let command = Action::Command("echo 1".into());
         trap_set
             .set_action(&mut system, SIGUSR1, command, origin_1, false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         let origin_2 = Location::dummy("bar");
         let command = Action::Command("echo 2".into());
         trap_set
             .set_action(&mut system, SIGUSR2, command, origin_2, false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
-        trap_set.enter_subshell(&mut system, false, false);
-        trap_set.enter_subshell(&mut system, false, false);
+        trap_set
+            .enter_subshell(&mut system, false, false)
+            .now_or_never()
+            .unwrap();
+        trap_set
+            .enter_subshell(&mut system, false, false)
+            .now_or_never()
+            .unwrap();
 
         assert_eq!(
             trap_set.get_state(SIGUSR1),
@@ -1222,9 +1355,10 @@ mod tests {
                     Location::dummy(""),
                     false,
                 )
+                .await
                 .unwrap();
             env.system.kill(env.main_pid, Some(SIGINT)).await.unwrap();
-            env.traps.enter_subshell(&mut env.system, true, false);
+            env.traps.enter_subshell(&mut env.system, true, false).await;
 
             let state = state.borrow();
             let process = &state.processes[&env.main_pid];
@@ -1244,9 +1378,10 @@ mod tests {
                     Location::dummy(""),
                     false,
                 )
+                .await
                 .unwrap();
             env.system.kill(env.main_pid, Some(SIGQUIT)).await.unwrap();
-            env.traps.enter_subshell(&mut env.system, true, false);
+            env.traps.enter_subshell(&mut env.system, true, false).await;
 
             let state = state.borrow();
             let process = &state.processes[&env.main_pid];
@@ -1259,7 +1394,10 @@ mod tests {
     fn ignoring_sigint_and_sigquit_on_entering_subshell_without_action_set() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
-        trap_set.enter_subshell(&mut system, true, false);
+        trap_set
+            .enter_subshell(&mut system, true, false)
+            .now_or_never()
+            .unwrap();
         assert_eq!(system.0[&SIGINT], Disposition::Ignore);
         assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
     }
@@ -1276,15 +1414,17 @@ mod tests {
                         Location::dummy(""),
                         false,
                     )
+                    .await
                     .unwrap();
             }
             env.traps
                 .enable_internal_dispositions_for_stoppers(&mut env.system)
+                .await
                 .unwrap();
             for signal in [SIGTSTP, SIGTTIN, SIGTTOU] {
                 env.system.kill(env.main_pid, Some(signal)).await.unwrap();
             }
-            env.traps.enter_subshell(&mut env.system, false, true);
+            env.traps.enter_subshell(&mut env.system, false, true).await;
 
             let state = state.borrow();
             let process = &state.processes[&env.main_pid];
@@ -1307,9 +1447,10 @@ mod tests {
                         Location::dummy(""),
                         false,
                     )
+                    .await
                     .unwrap();
             }
-            env.traps.enter_subshell(&mut env.system, false, true);
+            env.traps.enter_subshell(&mut env.system, false, true).await;
 
             let state = state.borrow();
             let process = &state.processes[&env.main_pid];
@@ -1327,11 +1468,15 @@ mod tests {
         let origin = Location::dummy("origin");
         trap_set
             .set_action(&mut system, SIGINT, command, origin, false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         let command = Action::Command("echo TERM".into());
         let origin = Location::dummy("origin");
         trap_set
             .set_action(&mut system, SIGTERM, command, origin, false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
         trap_set.catch_signal(SIGCHLD);
@@ -1351,6 +1496,8 @@ mod tests {
         let origin = Location::dummy("origin");
         trap_set
             .set_action(&mut system, SIGINT, command, origin, false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
         let result = trap_set.take_signal_if_caught(SIGINT);
@@ -1375,16 +1522,22 @@ mod tests {
         let origin = Location::dummy("origin");
         trap_set
             .set_action(&mut system, SIGINT, command, origin, false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         let command = Action::Command("echo TERM".into());
         let origin = Location::dummy("origin");
         trap_set
             .set_action(&mut system, SIGTERM, command, origin, false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         let command = Action::Command("echo USR1".into());
         let origin = Location::dummy("origin");
         trap_set
             .set_action(&mut system, SIGUSR1, command, origin, false)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         assert_eq!(trap_set.take_caught_signal(), None);
 
@@ -1424,6 +1577,8 @@ mod tests {
         let mut trap_set = TrapSet::default();
         trap_set
             .enable_internal_disposition_for_sigchld(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
     }
@@ -1434,6 +1589,8 @@ mod tests {
         let mut trap_set = TrapSet::default();
         trap_set
             .enable_internal_dispositions_for_terminators(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         assert_eq!(system.0[&SIGINT], Disposition::Catch);
         assert_eq!(system.0[&SIGTERM], Disposition::Ignore);
@@ -1446,6 +1603,8 @@ mod tests {
         let mut trap_set = TrapSet::default();
         trap_set
             .enable_internal_dispositions_for_stoppers(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         assert_eq!(system.0[&SIGTSTP], Disposition::Ignore);
         assert_eq!(system.0[&SIGTTIN], Disposition::Ignore);
@@ -1458,14 +1617,24 @@ mod tests {
         let mut trap_set = TrapSet::default();
         trap_set
             .enable_internal_disposition_for_sigchld(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_terminators(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_stoppers(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
-        trap_set.disable_internal_dispositions(&mut system).unwrap();
+        trap_set
+            .disable_internal_dispositions(&mut system)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(system.0[&SIGCHLD], Disposition::Default);
         assert_eq!(system.0[&SIGINT], Disposition::Default);
         assert_eq!(system.0[&SIGTERM], Disposition::Default);
@@ -1490,14 +1659,24 @@ mod tests {
         let mut trap_set = TrapSet::default();
         trap_set
             .enable_internal_disposition_for_sigchld(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_terminators(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_stoppers(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
-        trap_set.disable_internal_dispositions(&mut system).unwrap();
+        trap_set
+            .disable_internal_dispositions(&mut system)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
         assert_eq!(system.0[&SIGINT], Disposition::Ignore);
         assert_eq!(system.0[&SIGTERM], Disposition::Ignore);
@@ -1514,23 +1693,39 @@ mod tests {
         let mut trap_set = TrapSet::default();
         trap_set
             .enable_internal_disposition_for_sigchld(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_disposition_for_sigchld(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_terminators(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_terminators(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_stoppers(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_stoppers(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
-        trap_set.disable_internal_dispositions(&mut system).unwrap();
+        trap_set
+            .disable_internal_dispositions(&mut system)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
         assert_eq!(system.0[&SIGINT], Disposition::Ignore);
         assert_eq!(system.0[&SIGTERM], Disposition::Ignore);
@@ -1545,7 +1740,11 @@ mod tests {
         let mut system = DummySystem::default();
         ignore_signals(&mut system);
         let mut trap_set = TrapSet::default();
-        trap_set.disable_internal_dispositions(&mut system).unwrap();
+        trap_set
+            .disable_internal_dispositions(&mut system)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
         assert_eq!(system.0[&SIGINT], Disposition::Ignore);
         assert_eq!(system.0[&SIGTERM], Disposition::Ignore);
@@ -1561,31 +1760,53 @@ mod tests {
         let mut trap_set = TrapSet::default();
         trap_set
             .enable_internal_disposition_for_sigchld(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_disposition_for_sigchld(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_terminators(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_terminators(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_stoppers(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_stoppers(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
-        trap_set.disable_internal_dispositions(&mut system).unwrap();
+        trap_set
+            .disable_internal_dispositions(&mut system)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         trap_set
             .enable_internal_disposition_for_sigchld(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_terminators(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_stoppers(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
         assert_eq!(system.0[&SIGINT], Disposition::Catch);
@@ -1602,9 +1823,14 @@ mod tests {
         let mut trap_set = TrapSet::default();
         trap_set
             .enable_internal_disposition_for_sigchld(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         let origin = Location::dummy("origin");
-        let result = trap_set.set_action(&mut system, SIGCHLD, Action::Ignore, origin, false);
+        let result = trap_set
+            .set_action(&mut system, SIGCHLD, Action::Ignore, origin, false)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(()));
         assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
     }
@@ -1616,23 +1842,35 @@ mod tests {
         let mut trap_set = TrapSet::default();
         trap_set
             .enable_internal_disposition_for_sigchld(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_terminators(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_stoppers(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
         for signal in [SIGCHLD, SIGINT] {
             let origin = Location::dummy("origin");
-            let result = trap_set.set_action(&mut system, signal, Action::Default, origin, false);
+            let result = trap_set
+                .set_action(&mut system, signal, Action::Default, origin, false)
+                .now_or_never()
+                .unwrap();
             assert_eq!(result, Err(SetActionError::InitiallyIgnored));
             assert_eq!(system.0[&signal], Disposition::Catch);
         }
         for signal in [SIGTERM, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU] {
             let origin = Location::dummy("origin");
-            let result = trap_set.set_action(&mut system, signal, Action::Default, origin, false);
+            let result = trap_set
+                .set_action(&mut system, signal, Action::Default, origin, false)
+                .now_or_never()
+                .unwrap();
             assert_eq!(result, Err(SetActionError::InitiallyIgnored));
             assert_eq!(system.0[&signal], Disposition::Ignore);
         }
@@ -1645,18 +1883,26 @@ mod tests {
         let mut trap_set = TrapSet::default();
         trap_set
             .enable_internal_disposition_for_sigchld(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_terminators(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_stoppers(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
         for signal in [SIGCHLD, SIGINT] {
             let origin = Location::dummy("origin");
-            let result =
-                trap_set.set_action(&mut system, signal, Action::Ignore, origin.clone(), true);
+            let result = trap_set
+                .set_action(&mut system, signal, Action::Ignore, origin.clone(), true)
+                .now_or_never()
+                .unwrap();
             assert_eq!(result, Ok(()));
             assert_eq!(
                 trap_set.get_state(signal),
@@ -1673,8 +1919,10 @@ mod tests {
         }
         for signal in [SIGTERM, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU] {
             let origin = Location::dummy("origin");
-            let result =
-                trap_set.set_action(&mut system, signal, Action::Ignore, origin.clone(), true);
+            let result = trap_set
+                .set_action(&mut system, signal, Action::Ignore, origin.clone(), true)
+                .now_or_never()
+                .unwrap();
             assert_eq!(result, Ok(()));
             assert_eq!(
                 trap_set.get_state(signal),
@@ -1699,17 +1947,27 @@ mod tests {
         let mut trap_set = TrapSet::default();
         trap_set
             .enable_internal_disposition_for_sigchld(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         trap_set
             .enable_internal_dispositions_for_terminators(&mut system)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         let origin = Location::dummy("origin");
         for signal in signals {
             trap_set
                 .set_action(&mut system, signal, Action::Ignore, origin.clone(), false)
+                .now_or_never()
+                .unwrap()
                 .unwrap();
         }
-        trap_set.disable_internal_dispositions(&mut system).unwrap();
+        trap_set
+            .disable_internal_dispositions(&mut system)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         for signal in signals {
             assert_eq!(

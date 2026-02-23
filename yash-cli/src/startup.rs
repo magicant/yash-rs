@@ -100,10 +100,12 @@ where
     if env.options.get(Interactive) == On {
         env.traps
             .enable_internal_dispositions_for_terminators(&mut env.system)
+            .await
             .ok();
         if env.options.get(Monitor) == On {
             env.traps
                 .enable_internal_dispositions_for_stoppers(&mut env.system)
+                .await
                 .ok();
         }
     }

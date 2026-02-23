@@ -136,6 +136,8 @@ mod tests {
                 Location::dummy(""),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         (env, system)
     }
@@ -233,6 +235,8 @@ mod tests {
                 Location::dummy(""),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         raise_signal(&system, SIGINT);
         let _ = run_traps_for_caught_signals(&mut env)
@@ -263,6 +267,8 @@ mod tests {
                     Location::dummy(""),
                     false,
                 )
+                .now_or_never()
+                .unwrap()
                 .unwrap();
         }
         env.exit_status = ExitStatus(123);
@@ -288,6 +294,8 @@ mod tests {
                 Location::dummy(""),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         raise_signal(&system, SIGUSR1);
         env.exit_status = ExitStatus(42);
@@ -310,6 +318,8 @@ mod tests {
                 Location::dummy(""),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         raise_signal(&system, SIGUSR1);
         env.exit_status = ExitStatus(42);

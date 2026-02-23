@@ -88,6 +88,8 @@ mod tests {
                 Location::dummy(""),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
         run_exit_trap(&mut env).now_or_never().unwrap();
@@ -118,6 +120,8 @@ mod tests {
                 Location::dummy(""),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         run_exit_trap(&mut env).now_or_never().unwrap();
     }
@@ -134,6 +138,8 @@ mod tests {
                 Location::dummy(""),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         env.exit_status = ExitStatus(42);
 
@@ -155,6 +161,8 @@ mod tests {
                 Location::dummy(""),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         env.exit_status = ExitStatus(123);
 
@@ -174,6 +182,8 @@ mod tests {
                 Location::dummy(""),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
         run_exit_trap(&mut env).now_or_never().unwrap();
@@ -193,6 +203,8 @@ mod tests {
                 Location::dummy(""),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
         run_exit_trap(&mut env).now_or_never().unwrap();
@@ -212,6 +224,8 @@ mod tests {
                 Location::dummy(""),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         env.exit_status = ExitStatus(72);
 

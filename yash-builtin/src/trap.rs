@@ -32,7 +32,6 @@ use crate::common::report::report_error;
 use crate::common::report::report_failure;
 use crate::common::syntax::Mode;
 use crate::common::syntax::parse_arguments;
-use itertools::Itertools as _;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::option::Option::Interactive;
@@ -196,7 +195,7 @@ impl<'a> From<&'a Error> for Report<'a> {
 /// Updates an action for a condition in the trap set.
 ///
 /// This is a utility function for implementing [`Command::execute`].
-fn set_action<S>(
+async fn set_action<S>(
     traps: &mut TrapSet,
     system: &mut SharedSystem<S>,
     cond: Condition,
@@ -215,6 +214,7 @@ where
             field.origin.clone(),
             override_ignore,
         )
+        .await
         .map_err(|cause| {
             let cause = cause.into();
             Error { cause, cond, field }
@@ -226,7 +226,7 @@ impl Command {
     ///
     /// If successful, returns a string that should be printed to the standard
     /// output. On failure, returns a non-empty list of errors.
-    pub fn execute<S>(self, env: &mut Env<S>) -> Result<String, Vec<Error>>
+    pub async fn execute<S>(self, env: &mut Env<S>) -> Result<String, Vec<Error>>
     where
         S: Signals + Sigmask + Sigaction,
     {
@@ -248,19 +248,21 @@ impl Command {
             Self::SetAction { action, conditions } => {
                 let override_ignore = env.options.get(Interactive) == On;
 
-                let ((), errors): ((), Vec<Error>) = conditions
-                    .into_iter()
-                    .map(|(cond, field)| {
-                        set_action(
-                            &mut env.traps,
-                            &mut env.system,
-                            cond,
-                            field,
-                            action.clone(),
-                            override_ignore,
-                        )
-                    })
-                    .partition_result();
+                let mut errors = Vec::new();
+                for (cond, field) in conditions {
+                    if let Err(error) = set_action(
+                        &mut env.traps,
+                        &mut env.system,
+                        cond,
+                        field,
+                        action.clone(),
+                        override_ignore,
+                    )
+                    .await
+                    {
+                        errors.push(error);
+                    }
+                }
 
                 if errors.is_empty() {
                     Ok(String::new())
@@ -298,7 +300,7 @@ where
         }
     };
 
-    match command.execute(env) {
+    match command.execute(env).await {
         Ok(output) => crate::common::output(env, &output).await,
         Err(mut errors) => {
             // For now, we ignore the InitiallyIgnored error since it is not
@@ -577,7 +579,10 @@ mod tests {
         let _ = main(&mut env, args).now_or_never().unwrap();
         let args = Field::dummies(["", "TERM"]);
         let _ = main(&mut env, args).now_or_never().unwrap();
-        env.traps.enter_subshell(&mut env.system, false, false);
+        env.traps
+            .enter_subshell(&mut env.system, false, false)
+            .now_or_never()
+            .unwrap();
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
@@ -595,7 +600,10 @@ mod tests {
         let _ = main(&mut env, args).now_or_never().unwrap();
         let args = Field::dummies(["", "TERM"]);
         let _ = main(&mut env, args).now_or_never().unwrap();
-        env.traps.enter_subshell(&mut env.system, false, false);
+        env.traps
+            .enter_subshell(&mut env.system, false, false)
+            .now_or_never()
+            .unwrap();
         let args = Field::dummies(["ls", "QUIT"]);
         let _ = main(&mut env, args).now_or_never().unwrap();
 

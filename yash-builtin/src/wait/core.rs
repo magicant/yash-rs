@@ -73,7 +73,8 @@ where
     // don't miss any `SIGCHLD` that may arrive between `wait` and
     // `wait_for_signals`.  See also Env::wait_for_subshell.
     env.traps
-        .enable_internal_disposition_for_sigchld(&mut env.system)?;
+        .enable_internal_disposition_for_sigchld(&mut env.system)
+        .await?;
 
     loop {
         // Poll for a job state change. Note that this `wait` call returns
@@ -213,6 +214,7 @@ mod tests {
                     Location::dummy("somewhere"),
                     false,
                 )
+                .await
                 .unwrap();
 
             {

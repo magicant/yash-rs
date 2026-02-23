@@ -145,6 +145,7 @@ pub async fn replace_current_process<S: Exec + ShellPath + Signals + Sigmask + S
 ) -> std::result::Result<Infallible, ReplaceCurrentProcessError> {
     env.traps
         .disable_internal_dispositions(&mut env.system)
+        .await
         .ok();
 
     let args = to_c_strings(args);
