@@ -63,10 +63,10 @@ pub trait SignalSystem: Signals {
     /// This function updates the signal blocking mask and the disposition for
     /// the specified signal, and returns the previous disposition.
     fn set_disposition(
-        &mut self,
+        &self,
         signal: signal::Number,
         disposition: Disposition,
-    ) -> Result<Disposition, Errno>;
+    ) -> impl Future<Output = Result<Disposition, Errno>> + use<Self>;
 }
 
 /// Iterator of trap actions configured in a [trap set](TrapSet).
@@ -542,11 +542,13 @@ mod tests {
     };
     use crate::tests::in_virtual_system;
     use futures_util::FutureExt as _;
+    use std::cell::RefCell;
     use std::collections::HashMap;
+    use std::future::ready;
     use std::ops::RangeInclusive;
 
     #[derive(Default)]
-    pub struct DummySystem(pub HashMap<signal::Number, Disposition>);
+    pub struct DummySystem(pub RefCell<HashMap<signal::Number, Disposition>>);
 
     impl Signals for DummySystem {
         const SIGABRT: signal::Number = SIGABRT;
@@ -595,15 +597,19 @@ mod tests {
 
     impl SignalSystem for DummySystem {
         fn get_disposition(&self, signal: signal::Number) -> Result<Disposition, Errno> {
-            Ok(self.0.get(&signal).copied().unwrap_or_default())
+            Ok(self.0.borrow().get(&signal).copied().unwrap_or_default())
         }
 
         fn set_disposition(
-            &mut self,
+            &self,
             signal: signal::Number,
             disposition: Disposition,
-        ) -> Result<Disposition, Errno> {
-            Ok(self.0.insert(signal, disposition).unwrap_or_default())
+        ) -> impl Future<Output = Result<Disposition, Errno>> + use<> {
+            ready(Ok(self
+                .0
+                .borrow_mut()
+                .insert(signal, disposition)
+                .unwrap_or_default()))
         }
     }
 
@@ -666,8 +672,8 @@ mod tests {
                 None
             )
         );
-        assert_eq!(system.0[&SIGUSR1], Disposition::Ignore);
-        assert_eq!(system.0[&SIGUSR2], Disposition::Catch);
+        assert_eq!(system.0.borrow()[&SIGUSR1], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGUSR2], Disposition::Catch);
     }
 
     #[test]
@@ -681,7 +687,7 @@ mod tests {
             .unwrap();
         assert_eq!(result, Err(SetActionError::SIGKILL));
         assert_eq!(trap_set.get_state(SIGKILL), (None, None));
-        assert_eq!(system.0.get(&SIGKILL), None);
+        assert_eq!(system.0.borrow().get(&SIGKILL), None);
     }
 
     #[test]
@@ -695,7 +701,7 @@ mod tests {
             .unwrap();
         assert_eq!(result, Err(SetActionError::SIGSTOP));
         assert_eq!(trap_set.get_state(SIGSTOP), (None, None));
-        assert_eq!(system.0.get(&SIGSTOP), None);
+        assert_eq!(system.0.borrow().get(&SIGSTOP), None);
     }
 
     #[test]
@@ -715,8 +721,8 @@ mod tests {
 
     #[test]
     fn peeking_state_with_inherited_disposition_of_ignore() {
-        let mut system = DummySystem::default();
-        system.0.insert(SIGCHLD, Disposition::Ignore);
+        let system = DummySystem::default();
+        system.0.borrow_mut().insert(SIGCHLD, Disposition::Ignore);
         let mut trap_set = TrapSet::default();
         let result = trap_set.peek_state(&system, SIGCHLD);
         assert_eq!(
@@ -923,7 +929,7 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&SIGCHLD], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Default);
     }
 
     #[test]
@@ -952,7 +958,7 @@ mod tests {
                 None
             )
         );
-        assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Ignore);
     }
 
     #[test]
@@ -991,7 +997,7 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Catch);
     }
 
     #[test]
@@ -1030,7 +1036,7 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&SIGINT], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGINT], Disposition::Default);
     }
 
     #[test]
@@ -1069,7 +1075,7 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&SIGTERM], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGTERM], Disposition::Default);
     }
 
     #[test]
@@ -1108,7 +1114,7 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&SIGQUIT], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGQUIT], Disposition::Default);
     }
 
     #[test]
@@ -1147,7 +1153,7 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&SIGTSTP], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGTSTP], Disposition::Default);
     }
 
     #[test]
@@ -1186,7 +1192,7 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&SIGTTIN], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGTTIN], Disposition::Default);
     }
 
     #[test]
@@ -1225,7 +1231,7 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&SIGTTOU], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGTTOU], Disposition::Default);
     }
 
     #[test]
@@ -1287,8 +1293,8 @@ mod tests {
                 None
             )
         );
-        assert_eq!(system.0[&SIGUSR1], Disposition::Catch);
-        assert_eq!(system.0[&SIGUSR2], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGUSR1], Disposition::Catch);
+        assert_eq!(system.0.borrow()[&SIGUSR2], Disposition::Default);
     }
 
     #[test]
@@ -1340,8 +1346,8 @@ mod tests {
                 None
             )
         );
-        assert_eq!(system.0[&SIGUSR1], Disposition::Default);
-        assert_eq!(system.0[&SIGUSR2], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGUSR1], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGUSR2], Disposition::Default);
     }
 
     #[test]
@@ -1398,8 +1404,8 @@ mod tests {
             .enter_subshell(&mut system, true, false)
             .now_or_never()
             .unwrap();
-        assert_eq!(system.0[&SIGINT], Disposition::Ignore);
-        assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGINT], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGQUIT], Disposition::Ignore);
     }
 
     #[test]
@@ -1580,7 +1586,7 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Catch);
     }
 
     #[test]
@@ -1592,9 +1598,9 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        assert_eq!(system.0[&SIGINT], Disposition::Catch);
-        assert_eq!(system.0[&SIGTERM], Disposition::Ignore);
-        assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGINT], Disposition::Catch);
+        assert_eq!(system.0.borrow()[&SIGTERM], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGQUIT], Disposition::Ignore);
     }
 
     #[test]
@@ -1606,9 +1612,9 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        assert_eq!(system.0[&SIGTSTP], Disposition::Ignore);
-        assert_eq!(system.0[&SIGTTIN], Disposition::Ignore);
-        assert_eq!(system.0[&SIGTTOU], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTSTP], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTTIN], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTTOU], Disposition::Ignore);
     }
 
     #[test]
@@ -1635,17 +1641,17 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        assert_eq!(system.0[&SIGCHLD], Disposition::Default);
-        assert_eq!(system.0[&SIGINT], Disposition::Default);
-        assert_eq!(system.0[&SIGTERM], Disposition::Default);
-        assert_eq!(system.0[&SIGQUIT], Disposition::Default);
-        assert_eq!(system.0[&SIGTSTP], Disposition::Default);
-        assert_eq!(system.0[&SIGTTIN], Disposition::Default);
-        assert_eq!(system.0[&SIGTTOU], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGINT], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGTERM], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGQUIT], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGTSTP], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGTTIN], Disposition::Default);
+        assert_eq!(system.0.borrow()[&SIGTTOU], Disposition::Default);
     }
 
     fn ignore_signals(system: &mut DummySystem) {
-        system.0.extend(
+        system.0.borrow_mut().extend(
             [SIGCHLD, SIGINT, SIGTERM, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU]
                 .into_iter()
                 .map(|signal| (signal, Disposition::Ignore)),
@@ -1677,13 +1683,13 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
-        assert_eq!(system.0[&SIGINT], Disposition::Ignore);
-        assert_eq!(system.0[&SIGTERM], Disposition::Ignore);
-        assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
-        assert_eq!(system.0[&SIGTSTP], Disposition::Ignore);
-        assert_eq!(system.0[&SIGTTIN], Disposition::Ignore);
-        assert_eq!(system.0[&SIGTTOU], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGINT], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTERM], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGQUIT], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTSTP], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTTIN], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTTOU], Disposition::Ignore);
     }
 
     #[test]
@@ -1726,13 +1732,13 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
-        assert_eq!(system.0[&SIGINT], Disposition::Ignore);
-        assert_eq!(system.0[&SIGTERM], Disposition::Ignore);
-        assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
-        assert_eq!(system.0[&SIGTSTP], Disposition::Ignore);
-        assert_eq!(system.0[&SIGTTIN], Disposition::Ignore);
-        assert_eq!(system.0[&SIGTTOU], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGINT], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTERM], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGQUIT], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTSTP], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTTIN], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTTOU], Disposition::Ignore);
     }
 
     #[test]
@@ -1745,13 +1751,13 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        assert_eq!(system.0[&SIGCHLD], Disposition::Ignore);
-        assert_eq!(system.0[&SIGINT], Disposition::Ignore);
-        assert_eq!(system.0[&SIGTERM], Disposition::Ignore);
-        assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
-        assert_eq!(system.0[&SIGTSTP], Disposition::Ignore);
-        assert_eq!(system.0[&SIGTTIN], Disposition::Ignore);
-        assert_eq!(system.0[&SIGTTOU], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGINT], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTERM], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGQUIT], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTSTP], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTTIN], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTTOU], Disposition::Ignore);
     }
 
     #[test]
@@ -1808,13 +1814,13 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
-        assert_eq!(system.0[&SIGINT], Disposition::Catch);
-        assert_eq!(system.0[&SIGTERM], Disposition::Ignore);
-        assert_eq!(system.0[&SIGQUIT], Disposition::Ignore);
-        assert_eq!(system.0[&SIGTSTP], Disposition::Ignore);
-        assert_eq!(system.0[&SIGTTIN], Disposition::Ignore);
-        assert_eq!(system.0[&SIGTTOU], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Catch);
+        assert_eq!(system.0.borrow()[&SIGINT], Disposition::Catch);
+        assert_eq!(system.0.borrow()[&SIGTERM], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGQUIT], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTSTP], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTTIN], Disposition::Ignore);
+        assert_eq!(system.0.borrow()[&SIGTTOU], Disposition::Ignore);
     }
 
     #[test]
@@ -1832,7 +1838,7 @@ mod tests {
             .now_or_never()
             .unwrap();
         assert_eq!(result, Ok(()));
-        assert_eq!(system.0[&SIGCHLD], Disposition::Catch);
+        assert_eq!(system.0.borrow()[&SIGCHLD], Disposition::Catch);
     }
 
     #[test]
@@ -1863,7 +1869,7 @@ mod tests {
                 .now_or_never()
                 .unwrap();
             assert_eq!(result, Err(SetActionError::InitiallyIgnored));
-            assert_eq!(system.0[&signal], Disposition::Catch);
+            assert_eq!(system.0.borrow()[&signal], Disposition::Catch);
         }
         for signal in [SIGTERM, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU] {
             let origin = Location::dummy("origin");
@@ -1872,7 +1878,7 @@ mod tests {
                 .now_or_never()
                 .unwrap();
             assert_eq!(result, Err(SetActionError::InitiallyIgnored));
-            assert_eq!(system.0[&signal], Disposition::Ignore);
+            assert_eq!(system.0.borrow()[&signal], Disposition::Ignore);
         }
     }
 
@@ -1915,7 +1921,7 @@ mod tests {
                     None
                 )
             );
-            assert_eq!(system.0[&signal], Disposition::Catch);
+            assert_eq!(system.0.borrow()[&signal], Disposition::Catch);
         }
         for signal in [SIGTERM, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU] {
             let origin = Location::dummy("origin");
@@ -1935,7 +1941,7 @@ mod tests {
                     None
                 )
             );
-            assert_eq!(system.0[&signal], Disposition::Ignore);
+            assert_eq!(system.0.borrow()[&signal], Disposition::Ignore);
         }
     }
 
@@ -1981,7 +1987,7 @@ mod tests {
                     None
                 )
             );
-            assert_eq!(system.0[&signal], Disposition::Ignore);
+            assert_eq!(system.0.borrow()[&signal], Disposition::Ignore);
         }
     }
 }

@@ -119,13 +119,14 @@ Expected: yash-env tests pass, no compiler errors or clippy warnings.
 
 # Task 2: Make SignalSystem::set_disposition Async
 
+**Status: COMPLETED** (implemented in this branch)
+
 **Goal:** Convert the `SignalSystem` trait's `set_disposition` method to return a Future. This happens after TrapSet is async.
 
-**Files to modify:**
-- yash-env/src/trap.rs
-- yash-env/src/system/shared.rs
-- yash-env/src/system/select.rs
-- yash-env/src/system/virtual.rs (if needed)
+**Files modified:**
+- yash-env/src/trap.rs (trait definition, DummySystem test impl)
+- yash-env/src/system/shared.rs (SharedSystem impl, test updates)
+- yash-env/src/trap/state.rs (GrandState methods, UnusedSystem test impl)
 
 ## Subtasks
 
