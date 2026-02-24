@@ -26,6 +26,20 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- The `trap::SignalSystem::set_disposition` method signature has changed:
+    - The receiver is now `&self` instead of `&mut self`.
+    - The return type is now
+      `impl Future<Output = Result<Disposition, Errno>> + use<Self>` instead of
+      `Result<Disposition, Errno>`, making the method async.
+- The following `trap::TrapSet` methods are now async:
+    - `set_action`
+    - `enter_subshell`
+    - `enable_internal_disposition_for_sigchld`
+    - `enable_internal_dispositions_for_terminators`
+    - `enable_internal_dispositions_for_stoppers`
+    - `disable_internal_dispositions`
+    - `disable_internal_dispositions_for_terminators`
+    - `disable_internal_dispositions_for_stoppers`
 - The `Stat` struct has been moved from the `system` module to the
   `system::virtual` module.
 - The `system::Fstat` trait methods `fstat` and `fstatat` now return
