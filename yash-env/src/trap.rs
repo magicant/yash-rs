@@ -62,6 +62,11 @@ pub trait SignalSystem: Signals {
     ///
     /// This function updates the signal blocking mask and the disposition for
     /// the specified signal, and returns the previous disposition.
+    ///
+    /// The return type is a future so that
+    /// [virtual systems](crate::system::virtual) can simulate termination or
+    /// suspension of the process that may be caused by a signal delivered as a
+    /// result of changing the disposition.
     fn set_disposition(
         &self,
         signal: signal::Number,
