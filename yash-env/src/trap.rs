@@ -449,7 +449,7 @@ impl TrapSet {
     /// Uninstalls all internal dispositions.
     ///
     /// This function removes all internal dispositions that have been
-    /// previously installed by `self`, except for the `SIGCHLD` signal.
+    /// previously installed by `self`.
     /// Dispositions for any existing user-defined traps are not affected.
     pub async fn disable_internal_dispositions<S: SignalSystem>(
         &mut self,
