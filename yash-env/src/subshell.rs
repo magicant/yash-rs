@@ -187,15 +187,15 @@ where
             Some(JobControl::Foreground) => env.get_tty().await.ok(),
         };
 
-        // Block SIGINT and SIGQUIT before forking the child process to prevent
-        // the child from being killed by those signals until the child starts
-        // ignoring them.
-        let original_mask = if self.ignores_sigint_sigquit && job_control.is_none() {
-            block_sigint_sigquit(&env.system).await.ok()
+        let ignore_sigint_sigquit = self.ignores_sigint_sigquit && job_control.is_none();
+        let original_mask = if ignore_sigint_sigquit {
+            // Block SIGINT and SIGQUIT before forking the child process to
+            // prevent the child from being killed by those signals until the
+            // child starts ignoring them.
+            Some(block_sigint_sigquit(&env.system).await?)
         } else {
             None
         };
-        let ignore_sigint_sigquit = original_mask.is_some();
         let keep_internal_dispositions_for_stoppers = job_control.is_none();
 
         // Define the child process task
