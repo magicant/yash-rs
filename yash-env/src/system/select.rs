@@ -127,7 +127,11 @@ impl<S> SelectSystem<S> {
     }
 
     /// Calls `sigmask` and updates `self.wait_mask`.
-    fn sigmask(&mut self, op: SigmaskOp, signal: signal::Number) -> Result<()>
+    fn sigmask(
+        &mut self,
+        op: SigmaskOp,
+        signal: signal::Number,
+    ) -> impl Future<Output = Result<()>> + use<S>
     where
         S: Sigmask,
     {
@@ -137,18 +141,18 @@ impl<S> SelectSystem<S> {
                 // signal mask (which is the mask inherited from the parent shell) and
                 // remove the signal from it.
                 let mut mask = Vec::new();
-                self.system
-                    .sigmask(Some((op, &[signal])), Some(&mut mask))?;
+                let future = self.system.sigmask(Some((op, &[signal])), Some(&mut mask));
                 mask.retain(|&s| s != signal);
                 self.wait_mask = Some(mask);
+                future
             }
             Some(wait_mask) => {
                 // We have already called sigmask. We just need to update the mask.
-                self.system.sigmask(Some((op, &[signal])), None)?;
+                let future = self.system.sigmask(Some((op, &[signal])), None);
                 wait_mask.retain(|&s| s != signal);
+                future
             }
         }
-        Ok(())
     }
 
     /// Implements signal disposition query.
@@ -169,7 +173,7 @@ impl<S> SelectSystem<S> {
         &mut self,
         signal: signal::Number,
         handling: Disposition,
-    ) -> Result<Disposition>
+    ) -> impl Future<Output = Result<Disposition>> + use<S>
     where
         S: Sigaction + Sigmask,
     {
@@ -177,16 +181,27 @@ impl<S> SelectSystem<S> {
         // from being caught. The signal must be caught only when the select
         // function temporarily unblocks the signal. This is to avoid race
         // condition.
-        match handling {
+        let (result, sigmask_future) = match handling {
             Disposition::Default | Disposition::Ignore => {
-                let old_handling = self.system.sigaction(signal, handling)?;
-                self.sigmask(SigmaskOp::Remove, signal)?;
-                Ok(old_handling)
+                let result = self.system.sigaction(signal, handling);
+                let sigmask_future = if result.is_ok() {
+                    Some(self.sigmask(SigmaskOp::Remove, signal))
+                } else {
+                    None
+                };
+                (result, sigmask_future)
             }
             Disposition::Catch => {
-                self.sigmask(SigmaskOp::Add, signal)?;
-                self.system.sigaction(signal, handling)
+                let sigmask_future = self.sigmask(SigmaskOp::Add, signal);
+                let result = self.system.sigaction(signal, handling);
+                (result, Some(sigmask_future))
             }
+        };
+        async move {
+            if let Some(f) = sigmask_future {
+                f.await?;
+            }
+            result
         }
     }
 

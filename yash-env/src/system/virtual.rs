@@ -884,27 +884,38 @@ impl Sigmask for VirtualSystem {
         &self,
         op: Option<(SigmaskOp, &[signal::Number])>,
         old_mask: Option<&mut Vec<signal::Number>>,
-    ) -> Result<()> {
-        let mut state = self.state.borrow_mut();
-        let process = state
-            .processes
-            .get_mut(&self.process_id)
-            .expect("current process not found");
+    ) -> impl Future<Output = Result<()>> + use<> {
+        let state_changed = {
+            let mut state = self.state.borrow_mut();
+            let process = state
+                .processes
+                .get_mut(&self.process_id)
+                .expect("current process not found");
 
-        if let Some(old_mask) = old_mask {
-            old_mask.clear();
-            old_mask.extend(process.blocked_signals());
-        }
-
-        if let Some((op, mask)) = op {
-            let result = process.block_signals(op, mask);
-            if result.process_state_changed {
-                let parent_pid = process.ppid;
-                raise_sigchld(&mut state, parent_pid);
+            if let Some(old_mask) = old_mask {
+                old_mask.clear();
+                old_mask.extend(process.blocked_signals());
             }
-        }
 
-        Ok(())
+            if let Some((op, mask)) = op {
+                let result = process.block_signals(op, mask);
+                if result.process_state_changed {
+                    let parent_pid = process.ppid;
+                    raise_sigchld(&mut state, parent_pid);
+                }
+                result.process_state_changed
+            } else {
+                false
+            }
+        };
+
+        let system = self.clone();
+        async move {
+            if state_changed {
+                system.block_until_running().await;
+            }
+            Ok(())
+        }
     }
 }
 
@@ -2509,6 +2520,8 @@ mod tests {
         let system = VirtualSystem::new();
         system
             .sigmask(Some((SigmaskOp::Add, &[SIGCHLD])), None)
+            .now_or_never()
+            .unwrap()
             .unwrap();
         system.sigaction(SIGCHLD, Disposition::Catch).unwrap();
         system

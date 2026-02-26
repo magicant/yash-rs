@@ -942,11 +942,15 @@ where
 {
     let mut old_mask = Vec::new();
 
-    system.sigmask(Some((SigmaskOp::Add, &[S::SIGTTOU])), Some(&mut old_mask))?;
+    system
+        .sigmask(Some((SigmaskOp::Add, &[S::SIGTTOU])), Some(&mut old_mask))
+        .await?;
 
     let result = system.tcsetpgrp(fd, pgid).await;
 
-    let result_2 = system.sigmask(Some((SigmaskOp::Set, &old_mask)), None);
+    let result_2 = system
+        .sigmask(Some((SigmaskOp::Set, &old_mask)), None)
+        .await;
 
     result.and(result_2)
 }
@@ -978,15 +982,20 @@ where
         Err(e) => Err(e),
         Ok(old_handling) => {
             let mut old_mask = Vec::new();
-            let result = match system.sigmask(
-                Some((SigmaskOp::Remove, &[S::SIGTTOU])),
-                Some(&mut old_mask),
-            ) {
+            let result = match system
+                .sigmask(
+                    Some((SigmaskOp::Remove, &[S::SIGTTOU])),
+                    Some(&mut old_mask),
+                )
+                .await
+            {
                 Err(e) => Err(e),
                 Ok(()) => {
                     let result = system.tcsetpgrp(fd, pgid).await;
 
-                    let result_2 = system.sigmask(Some((SigmaskOp::Set, &old_mask)), None);
+                    let result_2 = system
+                        .sigmask(Some((SigmaskOp::Set, &old_mask)), None)
+                        .await;
 
                     result.and(result_2)
                 }
