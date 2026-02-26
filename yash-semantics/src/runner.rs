@@ -436,6 +436,8 @@ mod tests {
                 Location::dummy(""),
                 false,
             )
+            .now_or_never()
+            .unwrap()
             .unwrap();
         let _ = state
             .borrow_mut()

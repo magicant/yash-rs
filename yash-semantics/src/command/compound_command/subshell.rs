@@ -219,6 +219,7 @@ mod tests {
                         Location::dummy(""),
                         false,
                     )
+                    .await
                     .unwrap();
                 yash_env::builtin::Result::default()
             })

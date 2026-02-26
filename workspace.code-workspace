@@ -137,7 +137,13 @@
 			"**/target/**": true
 		},
 		"rust.clippy_preference": "on",
-		"git-blame.gitWebUrl": ""
+		"git-blame.gitWebUrl": "",
+		"chat.tools.terminal.autoApprove": {
+			"./check.sh": true,
+			"cargo check": true,
+			"cargo fmt": true,
+			"cargo test": true
+		}
 	},
 	"extensions": {
 		"recommendations": [

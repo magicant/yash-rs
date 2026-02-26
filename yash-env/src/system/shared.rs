@@ -779,11 +779,11 @@ impl<S: Signals + Sigmask + Sigaction> SignalSystem for SharedSystem<S> {
 
     #[inline]
     fn set_disposition(
-        &mut self,
+        &self,
         signal: signal::Number,
         disposition: Disposition,
-    ) -> Result<Disposition> {
-        self.0.borrow_mut().set_disposition(signal, disposition)
+    ) -> impl Future<Output = Result<Disposition>> + use<S> {
+        std::future::ready(self.0.borrow_mut().set_disposition(signal, disposition))
     }
 }
 
@@ -969,10 +969,22 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(system);
-        system.set_disposition(SIGCHLD, Disposition::Catch).unwrap();
-        system.set_disposition(SIGINT, Disposition::Catch).unwrap();
-        system.set_disposition(SIGUSR1, Disposition::Catch).unwrap();
+        let system = SharedSystem::new(system);
+        system
+            .set_disposition(SIGCHLD, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        system
+            .set_disposition(SIGINT, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        system
+            .set_disposition(SIGUSR1, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         let mut context = Context::from_waker(Waker::noop());
         let mut future = Box::pin(system.wait_for_signals());
@@ -1005,8 +1017,12 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(system);
-        system.set_disposition(SIGCHLD, Disposition::Catch).unwrap();
+        let system = SharedSystem::new(system);
+        system
+            .set_disposition(SIGCHLD, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         let mut context = Context::from_waker(Waker::noop());
         let mut future = Box::pin(system.wait_for_signal(SIGCHLD));
@@ -1032,9 +1048,17 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(system);
-        system.set_disposition(SIGINT, Disposition::Catch).unwrap();
-        system.set_disposition(SIGTERM, Disposition::Catch).unwrap();
+        let system = SharedSystem::new(system);
+        system
+            .set_disposition(SIGINT, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        system
+            .set_disposition(SIGTERM, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         let mut context = Context::from_waker(Waker::noop());
         let mut future = Box::pin(system.wait_for_signal(SIGINT));
@@ -1058,9 +1082,17 @@ mod tests {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = SharedSystem::new(system);
-        system.set_disposition(SIGINT, Disposition::Catch).unwrap();
-        system.set_disposition(SIGTERM, Disposition::Catch).unwrap();
+        let system = SharedSystem::new(system);
+        system
+            .set_disposition(SIGINT, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        system
+            .set_disposition(SIGTERM, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         {
             let mut state = state.borrow_mut();
@@ -1084,11 +1116,13 @@ mod tests {
     fn shared_system_select_does_not_wake_signal_waiters_on_io() {
         let system = VirtualSystem::new();
         let system_1 = SharedSystem::new(system);
-        let mut system_2 = system_1.clone();
+        let system_2 = system_1.clone();
         let system_3 = system_1.clone();
         let (reader, writer) = system_1.pipe().unwrap();
         system_2
             .set_disposition(SIGCHLD, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
             .unwrap();
 
         let mut buffer = [0];
