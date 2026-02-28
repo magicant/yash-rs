@@ -57,6 +57,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `system::Sigmask::sigmask` method is now async. The `VirtualSystem`
   implementation of this method will block until the process is running again
   if unblocking a signal causes the process to stop.
+- The `system::Select::select` method is now async. The `VirtualSystem`
+  implementation of this method will block until the process is running again
+  if temporarily changing the signal mask causes the process to stop.
 - The `Env::get_tty` method is now async.
 - The `system::SharedSystem::read_async` and `system::SharedSystem::write_all`
   methods now handle `EWOULDBLOCK` and `EINTR` by retrying the operation instead

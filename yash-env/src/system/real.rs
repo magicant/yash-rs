@@ -893,67 +893,69 @@ impl Select for RealSystem {
         writers: &mut Vec<Fd>,
         timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
-    ) -> Result<c_int> {
-        use std::ptr::{null, null_mut};
+    ) -> impl Future<Output = Result<c_int>> + use<> {
+        ready((|| {
+            use std::ptr::{null, null_mut};
 
-        let max_fd = readers.iter().chain(writers.iter()).max();
-        let nfds = max_fd
-            .map(|fd| fd.0.checked_add(1).ok_or(Errno::EBADF))
-            .transpose()?
-            .unwrap_or(0);
+            let max_fd = readers.iter().chain(writers.iter()).max();
+            let nfds = max_fd
+                .map(|fd| fd.0.checked_add(1).ok_or(Errno::EBADF))
+                .transpose()?
+                .unwrap_or(0);
 
-        fn to_raw_fd_set(fds: &[Fd]) -> MaybeUninit<libc::fd_set> {
-            let mut raw_fds = MaybeUninit::<libc::fd_set>::uninit();
-            unsafe {
-                libc::FD_ZERO(raw_fds.as_mut_ptr());
-                for fd in fds {
-                    libc::FD_SET(fd.0, raw_fds.as_mut_ptr());
+            fn to_raw_fd_set(fds: &[Fd]) -> MaybeUninit<libc::fd_set> {
+                let mut raw_fds = MaybeUninit::<libc::fd_set>::uninit();
+                unsafe {
+                    libc::FD_ZERO(raw_fds.as_mut_ptr());
+                    for fd in fds {
+                        libc::FD_SET(fd.0, raw_fds.as_mut_ptr());
+                    }
                 }
+                raw_fds
             }
-            raw_fds
-        }
-        let mut raw_readers = to_raw_fd_set(readers);
-        let mut raw_writers = to_raw_fd_set(writers);
-        let readers_ptr = raw_readers.as_mut_ptr();
-        let writers_ptr = raw_writers.as_mut_ptr();
-        let errors = null_mut();
+            let mut raw_readers = to_raw_fd_set(readers);
+            let mut raw_writers = to_raw_fd_set(writers);
+            let readers_ptr = raw_readers.as_mut_ptr();
+            let writers_ptr = raw_writers.as_mut_ptr();
+            let errors = null_mut();
 
-        let timeout_spec = to_timespec(timeout.unwrap_or_default());
-        let timeout_ptr = if timeout.is_some() {
-            timeout_spec.as_ptr()
-        } else {
-            null()
-        };
+            let timeout_spec = to_timespec(timeout.unwrap_or_default());
+            let timeout_ptr = if timeout.is_some() {
+                timeout_spec.as_ptr()
+            } else {
+                null()
+            };
 
-        let mut raw_mask = MaybeUninit::<libc::sigset_t>::uninit();
-        let raw_mask_ptr = match signal_mask {
-            None => null(),
-            Some(signal_mask) => {
-                unsafe { libc::sigemptyset(raw_mask.as_mut_ptr()) }.errno_if_m1()?;
-                for &signal in signal_mask {
-                    unsafe { libc::sigaddset(raw_mask.as_mut_ptr(), signal.as_raw()) }
-                        .errno_if_m1()?;
+            let mut raw_mask = MaybeUninit::<libc::sigset_t>::uninit();
+            let raw_mask_ptr = match signal_mask {
+                None => null(),
+                Some(signal_mask) => {
+                    unsafe { libc::sigemptyset(raw_mask.as_mut_ptr()) }.errno_if_m1()?;
+                    for &signal in signal_mask {
+                        unsafe { libc::sigaddset(raw_mask.as_mut_ptr(), signal.as_raw()) }
+                            .errno_if_m1()?;
+                    }
+                    raw_mask.as_ptr()
                 }
-                raw_mask.as_ptr()
+            };
+
+            let count = unsafe {
+                libc::pselect(
+                    nfds,
+                    readers_ptr,
+                    writers_ptr,
+                    errors,
+                    timeout_ptr,
+                    raw_mask_ptr,
+                )
             }
-        };
+            .errno_if_m1()?;
 
-        let count = unsafe {
-            libc::pselect(
-                nfds,
-                readers_ptr,
-                writers_ptr,
-                errors,
-                timeout_ptr,
-                raw_mask_ptr,
-            )
-        }
-        .errno_if_m1()?;
+            readers.retain(|fd| unsafe { libc::FD_ISSET(fd.0, readers_ptr) });
+            writers.retain(|fd| unsafe { libc::FD_ISSET(fd.0, writers_ptr) });
 
-        readers.retain(|fd| unsafe { libc::FD_ISSET(fd.0, readers_ptr) });
-        writers.retain(|fd| unsafe { libc::FD_ISSET(fd.0, writers_ptr) });
-
-        Ok(count)
+            Ok(count)
+        })())
     }
 }
 
