@@ -131,6 +131,11 @@ impl<S> SelectSystem<S> {
     /// This helper is the async version of the signal mask update. It calls
     /// `system.sigmask` and, after the future succeeds, updates `wait_mask`.
     /// The borrow of `this` is released between each await point.
+    ///
+    /// This function relies on the fact that the future returned by
+    /// `S::sigmask` does not borrow from `&mut self`. This is guaranteed by the
+    /// `Sigmask` trait signature, which uses `use<Self>` (not `use<'_, Self>`),
+    /// so the future cannot capture the `'_` lifetime of `&mut self`.
     async fn sigmask_async(
         this: &RefCell<SelectSystem<S>>,
         op: SigmaskOp,

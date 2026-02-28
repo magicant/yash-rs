@@ -2222,6 +2222,81 @@ mod tests {
     // TODO Test sigmask
 
     #[test]
+    fn sigmask_suspends_on_pending_stop_signal() {
+        let system = VirtualSystem::new();
+        // Block SIGTSTP first
+        system
+            .sigmask(Some((SigmaskOp::Add, &[SIGTSTP])), None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        // Put SIGTSTP in the pending queue
+        let _ = system.current_process_mut().raise_signal(SIGTSTP);
+        // Unblocking SIGTSTP should deliver it, stopping the process
+        let result = system
+            .sigmask(Some((SigmaskOp::Remove, &[SIGTSTP])), None)
+            .now_or_never();
+        // The future should be pending because the process is stopped
+        assert_eq!(result, None);
+        assert_eq!(
+            system.current_process().state(),
+            ProcessState::stopped(SIGTSTP),
+        );
+    }
+
+    #[test]
+    fn sigmask_resumes_after_sigcont() {
+        let (system, mut executor) = virtual_system_with_executor();
+        let state = Rc::clone(&system.state);
+
+        let child_process = system.new_child_process();
+        let mut env = Env::with_system(system);
+        let child_process = child_process.unwrap();
+        let pid = child_process(
+            &mut env,
+            Box::new(|env| {
+                Box::pin(async move {
+                    // Block SIGTSTP (signal will become pending when raised)
+                    env.system
+                        .sigmask(Some((SigmaskOp::Add, &[SIGTSTP])), None)
+                        .await
+                        .unwrap();
+                    // Raise SIGTSTP; since it is blocked, it becomes pending
+                    env.system.raise(SIGTSTP).await.unwrap();
+                    // Unblocking SIGTSTP delivers it, stopping the process; the
+                    // future suspends until the process is resumed
+                    env.system
+                        .sigmask(Some((SigmaskOp::Remove, &[SIGTSTP])), None)
+                        .await
+                        .unwrap();
+                    // After being resumed, exit cleanly
+                    env.system.exit(ExitStatus(0)).await
+                })
+            }),
+        );
+        executor.run_until_stalled();
+
+        // The child should now be stopped
+        assert_eq!(
+            state.borrow().processes[&pid].state,
+            ProcessState::stopped(SIGTSTP),
+        );
+
+        // Resume the child with SIGCONT
+        env.system
+            .kill(pid, Some(SIGCONT))
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        executor.run_until_stalled();
+
+        // The child should have exited
+        let result = env.system.wait(pid);
+        assert_eq!(result, Ok(Some((pid, ProcessState::exited(0)))));
+    }
+
+    #[test]
     fn kill_process() {
         let system = VirtualSystem::new();
         system
