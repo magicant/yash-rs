@@ -783,7 +783,8 @@ impl<S: Signals + Sigmask + Sigaction> SignalSystem for SharedSystem<S> {
         signal: signal::Number,
         disposition: Disposition,
     ) -> impl Future<Output = Result<Disposition>> + use<S> {
-        self.0.borrow_mut().set_disposition(signal, disposition)
+        let this = Rc::clone(&self.0);
+        async move { SelectSystem::set_disposition(&this, signal, disposition).await }
     }
 }
 

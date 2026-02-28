@@ -126,33 +126,49 @@ impl<S> SelectSystem<S> {
         }
     }
 
-    /// Calls `sigmask` and updates `self.wait_mask`.
-    fn sigmask(
-        &mut self,
+    /// Updates the actual signal mask and `self.wait_mask`.
+    ///
+    /// This helper is the async version of the signal mask update. It calls
+    /// `system.sigmask` and, after the future succeeds, updates `wait_mask`.
+    /// The borrow of `cell` is released between each await point.
+    async fn sigmask_async(
+        this: &RefCell<SelectSystem<S>>,
         op: SigmaskOp,
         signal: signal::Number,
-    ) -> impl Future<Output = Result<()>> + use<S>
+    ) -> Result<()>
     where
         S: Sigmask,
     {
-        match &mut self.wait_mask {
-            None => {
-                // This is the first call to sigmask. We need to get the current
-                // signal mask (which is the mask inherited from the parent shell) and
-                // remove the signal from it.
-                let mut mask = Vec::new();
-                let future = self.system.sigmask(Some((op, &[signal])), Some(&mut mask));
-                mask.retain(|&s| s != signal);
-                self.wait_mask = Some(mask);
-                future
-            }
-            Some(wait_mask) => {
-                // We have already called sigmask. We just need to update the mask.
-                let future = self.system.sigmask(Some((op, &[signal])), None);
-                wait_mask.retain(|&s| s != signal);
-                future
-            }
+        let is_first = this.borrow().wait_mask.is_none();
+
+        if is_first {
+            // This is the first call to sigmask. We need to get the current
+            // signal mask (which is the mask inherited from the parent shell) and
+            // remove the signal from it.
+            let mut mask = Vec::new();
+            // Note: the borrow_mut() temporary is dropped at the end of this statement.
+            let future = this
+                .borrow_mut()
+                .system
+                .sigmask(Some((op, &[signal])), Some(&mut mask));
+            // Await after releasing the borrow.
+            future.await?;
+            // Update wait_mask only on success.
+            mask.retain(|&s| s != signal);
+            this.borrow_mut().wait_mask = Some(mask);
+        } else {
+            // We have already called sigmask. We just need to update the mask.
+            let future = this
+                .borrow_mut()
+                .system
+                .sigmask(Some((op, &[signal])), None);
+            // Await after releasing the borrow.
+            future.await?;
+            // Update wait_mask only on success.
+            let mut borrow = this.borrow_mut();
+            borrow.wait_mask.as_mut().unwrap().retain(|&s| s != signal);
         }
+        Ok(())
     }
 
     /// Implements signal disposition query.
@@ -169,11 +185,11 @@ impl<S> SelectSystem<S> {
     /// Implements signal disposition update.
     ///
     /// See [`SharedSystem::set_disposition`].
-    pub fn set_disposition(
-        &mut self,
+    pub async fn set_disposition(
+        this: &RefCell<SelectSystem<S>>,
         signal: signal::Number,
         handling: Disposition,
-    ) -> impl Future<Output = Result<Disposition>> + use<S>
+    ) -> Result<Disposition>
     where
         S: Sigaction + Sigmask,
     {
@@ -181,27 +197,16 @@ impl<S> SelectSystem<S> {
         // from being caught. The signal must be caught only when the select
         // function temporarily unblocks the signal. This is to avoid race
         // condition.
-        let (result, sigmask_future) = match handling {
+        match handling {
             Disposition::Default | Disposition::Ignore => {
-                let result = self.system.sigaction(signal, handling);
-                let sigmask_future = if result.is_ok() {
-                    Some(self.sigmask(SigmaskOp::Remove, signal))
-                } else {
-                    None
-                };
-                (result, sigmask_future)
+                let old_handling = this.borrow_mut().system.sigaction(signal, handling)?;
+                Self::sigmask_async(this, SigmaskOp::Remove, signal).await?;
+                Ok(old_handling)
             }
             Disposition::Catch => {
-                let sigmask_future = self.sigmask(SigmaskOp::Add, signal);
-                let result = self.system.sigaction(signal, handling);
-                (result, Some(sigmask_future))
+                Self::sigmask_async(this, SigmaskOp::Add, signal).await?;
+                this.borrow_mut().system.sigaction(signal, handling)
             }
-        };
-        async move {
-            if let Some(f) = sigmask_future {
-                f.await?;
-            }
-            result
         }
     }
 
