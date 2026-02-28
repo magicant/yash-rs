@@ -396,10 +396,10 @@ pub trait Sigmask: Signals {
     /// The return type is a future so that
     /// [virtual systems](crate::system::virtual) can simulate termination or
     /// suspension of the process that may be caused by a signal delivered as a
-    /// result of changing the disposition. In the [real system](super::real),
-    /// this function does not work asynchronously and returns a ready `Future`
-    /// with the result of the underlying system call. See the [module-level
-    /// documentation](super) for details.
+    /// result of changing (for example, unblocking) the signal mask. In the
+    /// [real system](super::real), this function does not work asynchronously
+    /// and returns a ready `Future` with the result of the underlying system
+    /// call. See the [module-level documentation](super) for details.
     fn sigmask(
         &self,
         op: Option<(SigmaskOp, &[Number])>,
