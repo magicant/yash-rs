@@ -304,15 +304,17 @@ where
 
 async fn block_sigint_sigquit<S: Sigmask>(system: &S) -> Result<Vec<signal::Number>, Errno> {
     let mut old_mask = Vec::new();
-    system.sigmask(
-        Some((SigmaskOp::Add, &[S::SIGINT, S::SIGQUIT])),
-        Some(&mut old_mask),
-    )?;
+    system
+        .sigmask(
+            Some((SigmaskOp::Add, &[S::SIGINT, S::SIGQUIT])),
+            Some(&mut old_mask),
+        )
+        .await?;
     Ok(old_mask)
 }
 
 async fn restore_sigmask<S: Sigmask>(system: &S, mask: &[signal::Number]) -> Result<(), Errno> {
-    system.sigmask(Some((SigmaskOp::Set, mask)), None)
+    system.sigmask(Some((SigmaskOp::Set, mask)), None).await
 }
 
 #[cfg(test)]

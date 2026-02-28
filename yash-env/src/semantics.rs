@@ -373,7 +373,9 @@ where
         }
 
         // Unblock the signal
-        system.sigmask(Some((SigmaskOp::Remove, &[signal.1])), None)?;
+        system
+            .sigmask(Some((SigmaskOp::Remove, &[signal.1])), None)
+            .await?;
 
         // Send the signal to the current process
         system.raise(signal.1).await?;

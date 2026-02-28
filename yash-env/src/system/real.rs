@@ -786,8 +786,8 @@ impl Sigmask for RealSystem {
         &self,
         op: Option<(SigmaskOp, &[signal::Number])>,
         old_mask: Option<&mut Vec<signal::Number>>,
-    ) -> Result<()> {
-        unsafe {
+    ) -> impl Future<Output = Result<()>> + use<> {
+        ready((|| unsafe {
             let (how, raw_mask) = match op {
                 None => (libc::SIG_BLOCK, None),
                 Some((op, mask)) => {
@@ -833,7 +833,7 @@ impl Sigmask for RealSystem {
             }
 
             Ok(())
-        }
+        })())
     }
 }
 

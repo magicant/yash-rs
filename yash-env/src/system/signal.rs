@@ -392,11 +392,19 @@ pub trait Sigmask: Signals {
     /// applying the given `SigmaskOp` and signal set to the current mask. If
     /// `op` is `None`, this function does not change the mask.
     /// If `old_mask` is `Some`, this function sets the previous mask to it.
+    ///
+    /// The return type is a future so that
+    /// [virtual systems](crate::system::virtual) can simulate termination or
+    /// suspension of the process that may be caused by a signal delivered as a
+    /// result of changing (for example, unblocking) the signal mask. In the
+    /// [real system](super::real), this function does not work asynchronously
+    /// and returns a ready `Future` with the result of the underlying system
+    /// call. See the [module-level documentation](super) for details.
     fn sigmask(
         &self,
         op: Option<(SigmaskOp, &[Number])>,
         old_mask: Option<&mut Vec<Number>>,
-    ) -> Result<()>;
+    ) -> impl Future<Output = Result<()>> + use<Self>;
 }
 
 /// How the shell process responds to a signal

@@ -126,27 +126,52 @@ impl<S> SelectSystem<S> {
         }
     }
 
-    /// Calls `sigmask` and updates `self.wait_mask`.
-    fn sigmask(&mut self, op: SigmaskOp, signal: signal::Number) -> Result<()>
+    /// Updates the actual signal mask and `self.wait_mask`.
+    ///
+    /// This helper is the async version of the signal mask update. It calls
+    /// `system.sigmask` and, after the future succeeds, updates `wait_mask`.
+    /// The borrow of `this` is released between each await point.
+    ///
+    /// This function relies on the fact that the future returned by
+    /// `S::sigmask` does not borrow from `&mut self`. This is guaranteed by the
+    /// `Sigmask` trait signature, which uses `use<Self>` (not `use<'_, Self>`),
+    /// so the future cannot capture the `'_` lifetime of `&mut self`.
+    async fn sigmask_async(
+        this: &RefCell<SelectSystem<S>>,
+        op: SigmaskOp,
+        signal: signal::Number,
+    ) -> Result<()>
     where
         S: Sigmask,
     {
-        match &mut self.wait_mask {
-            None => {
-                // This is the first call to sigmask. We need to get the current
-                // signal mask (which is the mask inherited from the parent shell) and
-                // remove the signal from it.
-                let mut mask = Vec::new();
-                self.system
-                    .sigmask(Some((op, &[signal])), Some(&mut mask))?;
-                mask.retain(|&s| s != signal);
-                self.wait_mask = Some(mask);
-            }
-            Some(wait_mask) => {
-                // We have already called sigmask. We just need to update the mask.
-                self.system.sigmask(Some((op, &[signal])), None)?;
-                wait_mask.retain(|&s| s != signal);
-            }
+        let is_first = this.borrow().wait_mask.is_none();
+
+        if is_first {
+            // This is the first call to sigmask. We need to get the current
+            // signal mask (which is the mask inherited from the parent shell) and
+            // remove the signal from it.
+            let mut mask = Vec::new();
+            // Note: the borrow_mut() temporary is dropped at the end of this statement.
+            let future = this
+                .borrow_mut()
+                .system
+                .sigmask(Some((op, &[signal])), Some(&mut mask));
+            // Await after releasing the borrow.
+            future.await?;
+            // Update wait_mask only on success.
+            mask.retain(|&s| s != signal);
+            this.borrow_mut().wait_mask = Some(mask);
+        } else {
+            // We have already called sigmask. We just need to update the mask.
+            let future = this
+                .borrow_mut()
+                .system
+                .sigmask(Some((op, &[signal])), None);
+            // Await after releasing the borrow.
+            future.await?;
+            // Update wait_mask only on success.
+            let mut borrow = this.borrow_mut();
+            borrow.wait_mask.as_mut().unwrap().retain(|&s| s != signal);
         }
         Ok(())
     }
@@ -165,8 +190,8 @@ impl<S> SelectSystem<S> {
     /// Implements signal disposition update.
     ///
     /// See [`SharedSystem::set_disposition`].
-    pub fn set_disposition(
-        &mut self,
+    pub async fn set_disposition(
+        this: &RefCell<SelectSystem<S>>,
         signal: signal::Number,
         handling: Disposition,
     ) -> Result<Disposition>
@@ -179,13 +204,13 @@ impl<S> SelectSystem<S> {
         // condition.
         match handling {
             Disposition::Default | Disposition::Ignore => {
-                let old_handling = self.system.sigaction(signal, handling)?;
-                self.sigmask(SigmaskOp::Remove, signal)?;
+                let old_handling = this.borrow_mut().system.sigaction(signal, handling)?;
+                Self::sigmask_async(this, SigmaskOp::Remove, signal).await?;
                 Ok(old_handling)
             }
             Disposition::Catch => {
-                self.sigmask(SigmaskOp::Add, signal)?;
-                self.system.sigaction(signal, handling)
+                Self::sigmask_async(this, SigmaskOp::Add, signal).await?;
+                this.borrow_mut().system.sigaction(signal, handling)
             }
         }
     }

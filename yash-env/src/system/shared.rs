@@ -620,7 +620,7 @@ impl<T: Sigmask> Sigmask for SharedSystem<T> {
         &self,
         op: Option<(SigmaskOp, &[signal::Number])>,
         old_mask: Option<&mut Vec<signal::Number>>,
-    ) -> Result<()> {
+    ) -> impl Future<Output = Result<()>> + use<T> {
         (**self.0.borrow()).sigmask(op, old_mask)
     }
 }
@@ -783,7 +783,8 @@ impl<S: Signals + Sigmask + Sigaction> SignalSystem for SharedSystem<S> {
         signal: signal::Number,
         disposition: Disposition,
     ) -> impl Future<Output = Result<Disposition>> + use<S> {
-        std::future::ready(self.0.borrow_mut().set_disposition(signal, disposition))
+        let this = Rc::clone(&self.0);
+        async move { SelectSystem::set_disposition(&this, signal, disposition).await }
     }
 }
 
