@@ -130,7 +130,7 @@ impl<S> SelectSystem<S> {
     ///
     /// This helper is the async version of the signal mask update. It calls
     /// `system.sigmask` and, after the future succeeds, updates `wait_mask`.
-    /// The borrow of `cell` is released between each await point.
+    /// The borrow of `this` is released between each await point.
     async fn sigmask_async(
         this: &RefCell<SelectSystem<S>>,
         op: SigmaskOp,
