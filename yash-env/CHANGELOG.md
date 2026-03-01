@@ -67,6 +67,12 @@ A _private dependency_ is used internally and not visible to downstream users.
 - Private dependency versions:
     - derive_more 2.0.1 → 2.1.0
 
+### Fixed
+
+- `system::virtual::VirtualSystem::select` now correctly sends SIGCHLD to the
+  parent process when temporarily changing the signal mask causes the process
+  state to change.
+
 ## [0.12.1] - 2026-02-06
 
 ### Fixed
