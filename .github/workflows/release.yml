@@ -1,18 +1,31 @@
 name: Release
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - yash-cli-[0-9]+.*
+
+permissions:
+  contents: write
 
 env:
   CARGO_TERM_COLOR: always
   CARGO_TERM_VERBOSE: true
 
 jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Create GitHub Release
+        uses: taiki-e/create-gh-release-action@v1
+        with:
+          prefix: yash-cli
+          changelog: yash-cli/CHANGELOG.md
+          draft: true
+          token: ${{ secrets.GITHUB_TOKEN }}
   upload-assets:
-    permissions:
-      contents: write
-    if: ${{ startsWith(github.ref, 'refs/tags/yash-cli-') }}
+    needs: create-release
     strategy:
       matrix:
         include:
@@ -27,8 +40,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
-      - name: Build and upload Rust binary to GitHub Releases
-        uses: taiki-e/upload-rust-binary-action@v1.28.0
+      - name: Build and upload Rust binary to GitHub Release
+        uses: taiki-e/upload-rust-binary-action@v1
         with:
           bin: yash3
           target: ${{ matrix.target }}

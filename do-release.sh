@@ -156,5 +156,6 @@ printf 'confirm and commit the changes to the above files:\n'
 printf 'git commit --message "Prevent accidental publishing"\n'
 
 if [ "$released_cli" ]; then
-    printf 'make a release at: https://github.com/magicant/yash-rs/releases/tag/%s\n' "$released_cli"
+    printf 'confirm and publish the release when a draft is ready:\n'
+    printf 'https://github.com/magicant/yash-rs/releases\n'
 fi
