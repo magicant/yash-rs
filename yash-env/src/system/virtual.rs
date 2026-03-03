@@ -99,6 +99,7 @@ use super::Read;
 use super::Result;
 use super::Seek;
 use super::Select;
+use super::SelectSystem;
 use super::SendSignal;
 use super::SetPgid;
 use super::SetRlimit;
@@ -1022,7 +1023,10 @@ impl Select for VirtualSystem {
     /// Waits for a next event.
     ///
     /// The `VirtualSystem` implementation for this method does not actually
-    /// block the calling thread. The method returns immediately in any case.
+    /// block the calling thread. The method returns immediately in any case,
+    /// except when temporarily changing the signal mask causes the process to
+    /// stop, in which case the returned future will be pending until the
+    /// process is running again.
     ///
     /// The `timeout` is ignored if this function returns because of a ready FD
     /// or a caught signal. Otherwise, the timeout is added to
@@ -1033,54 +1037,87 @@ impl Select for VirtualSystem {
         writers: &mut Vec<Fd>,
         timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
-    ) -> Result<c_int> {
-        let mut process = self.current_process_mut();
+    ) -> impl Future<Output = Result<c_int>> + use<> {
+        let mut state_changed = false;
+        let result;
 
-        // Detect invalid FDs first. POSIX requires that the arguments are
-        // not modified if an error occurs.
-        let fds = readers.iter().chain(writers.iter());
-        if { fds }.any(|fd| !process.fds().contains_key(fd)) {
-            return Err(Errno::EBADF);
-        }
+        {
+            let mut state = self.state.borrow_mut();
+            let process = state
+                .processes
+                .get_mut(&self.process_id)
+                .expect("current process not found");
 
-        if let Some(signal_mask) = signal_mask {
-            let save_mask = process
-                .blocked_signals()
-                .iter()
-                .copied()
-                .collect::<Vec<signal::Number>>();
-            let result_1 = process.block_signals(SigmaskOp::Set, signal_mask);
-            let result_2 = process.block_signals(SigmaskOp::Set, &save_mask);
-            assert!(!result_2.delivered);
-            if result_1.caught {
-                return Err(Errno::EINTR);
-            }
-        }
+            // Detect invalid FDs first. POSIX requires that the arguments are
+            // not modified if an error occurs.
+            let fds = readers.iter().chain(writers.iter());
+            let bad_fd = { fds }.any(|fd| !process.fds().contains_key(fd));
 
-        readers.retain(|fd| {
-            // We already checked that the FD is open, so it's safe to access by index.
-            let ofd = process.fds()[fd].open_file_description.borrow();
-            !ofd.is_readable() || ofd.is_ready_for_reading()
-        });
-        writers.retain(|fd| {
-            let ofd = process.fds()[fd].open_file_description.borrow();
-            !ofd.is_writable() || ofd.is_ready_for_writing()
-        });
+            if bad_fd {
+                result = Err(Errno::EBADF);
+            } else {
+                let mut caught = false;
+                let mut parent_pid_for_sigchld = None;
 
-        drop(process);
+                if let Some(signal_mask) = signal_mask {
+                    let save_mask = process
+                        .blocked_signals()
+                        .iter()
+                        .copied()
+                        .collect::<Vec<signal::Number>>();
+                    let result_1 = process.block_signals(SigmaskOp::Set, signal_mask);
+                    let result_2 = process.block_signals(SigmaskOp::Set, &save_mask);
+                    assert!(!result_2.delivered);
+                    caught = result_1.caught;
 
-        let count = (readers.len() + writers.len()).try_into().unwrap();
-        if count == 0 {
-            if let Some(duration) = timeout {
-                if !duration.is_zero() {
-                    let mut state = self.state.borrow_mut();
-                    let now = state.now.as_mut();
-                    let now = now.expect("now time unspecified; cannot add timeout duration");
-                    *now += duration;
+                    if result_1.process_state_changed {
+                        parent_pid_for_sigchld = Some(process.ppid);
+                        state_changed = true;
+                    }
+                }
+
+                if caught {
+                    result = Err(Errno::EINTR);
+                } else {
+                    readers.retain(|fd| {
+                        // We already checked that the FD is open, so it's safe
+                        // to access by index.
+                        let ofd = process.fds()[fd].open_file_description.borrow();
+                        !ofd.is_readable() || ofd.is_ready_for_reading()
+                    });
+                    writers.retain(|fd| {
+                        let ofd = process.fds()[fd].open_file_description.borrow();
+                        !ofd.is_writable() || ofd.is_ready_for_writing()
+                    });
+
+                    let count = (readers.len() + writers.len()).try_into().unwrap();
+                    if count == 0 {
+                        if let Some(duration) = timeout {
+                            if !duration.is_zero() {
+                                let now = state.now.as_mut();
+                                let now =
+                                    now.expect("now time unspecified; cannot add timeout duration");
+                                *now += duration;
+                            }
+                        }
+                    }
+                    result = Ok(count);
+                }
+
+                // NLL: process is no longer used after this point
+                if let Some(parent_pid) = parent_pid_for_sigchld {
+                    raise_sigchld(&mut state, parent_pid);
                 }
             }
         }
-        Ok(count)
+
+        let system = self.clone();
+        async move {
+            if state_changed {
+                system.block_until_running().await;
+            }
+            result
+        }
     }
 }
 
@@ -1445,6 +1482,7 @@ impl SystemState {
     /// The `RefCell` must not have been borrowed, or this function will panic
     /// with a double borrow.
     pub fn select_all(this: &RefCell<Self>) {
+        use std::task::{Context, Poll, Waker};
         let mut selectors = Vec::new();
         for process in this.borrow().processes.values() {
             if let Some(selector) = process.selector.upgrade() {
@@ -1453,9 +1491,13 @@ impl SystemState {
         }
         // To avoid double borrowing, SelectSystem::select must be called after
         // dropping the borrow for `this`
+        let mut context = Context::from_waker(Waker::noop());
         for selector in selectors {
             // TODO merge advances of `now` performed by each select
-            selector.borrow_mut().select(false).ok();
+            let mut future = std::pin::pin!(SelectSystem::select(&selector, false));
+            if let Poll::Ready(result) = future.as_mut().poll(&mut context) {
+                result.ok();
+            }
         }
     }
 
@@ -2501,7 +2543,10 @@ mod tests {
         let mut readers = vec![Fd::STDIN];
         let mut writers = vec![Fd::STDOUT, Fd::STDERR];
 
-        let result = system.select(&mut readers, &mut writers, None, None);
+        let result = system
+            .select(&mut readers, &mut writers, None, None)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(3));
         assert_eq!(readers, [Fd::STDIN]);
         assert_eq!(writers, [Fd::STDOUT, Fd::STDERR]);
@@ -2515,7 +2560,10 @@ mod tests {
         let mut readers = vec![reader];
         let mut writers = vec![];
 
-        let result = system.select(&mut readers, &mut writers, None, None);
+        let result = system
+            .select(&mut readers, &mut writers, None, None)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(1));
         assert_eq!(readers, [reader]);
         assert_eq!(writers, []);
@@ -2529,7 +2577,10 @@ mod tests {
         let mut readers = vec![reader];
         let mut writers = vec![];
 
-        let result = system.select(&mut readers, &mut writers, None, None);
+        let result = system
+            .select(&mut readers, &mut writers, None, None)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(1));
         assert_eq!(readers, [reader]);
         assert_eq!(writers, []);
@@ -2542,7 +2593,10 @@ mod tests {
         let mut readers = vec![reader];
         let mut writers = vec![];
 
-        let result = system.select(&mut readers, &mut writers, None, None);
+        let result = system
+            .select(&mut readers, &mut writers, None, None)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(0));
         assert_eq!(readers, []);
         assert_eq!(writers, []);
@@ -2555,7 +2609,10 @@ mod tests {
         let mut readers = vec![];
         let mut writers = vec![writer];
 
-        let result = system.select(&mut readers, &mut writers, None, None);
+        let result = system
+            .select(&mut readers, &mut writers, None, None)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(1));
         assert_eq!(readers, []);
         assert_eq!(writers, [writer]);
@@ -2566,7 +2623,10 @@ mod tests {
         let system = VirtualSystem::new();
         let (_reader, writer) = system.pipe().unwrap();
         let mut fds = vec![writer];
-        let result = system.select(&mut fds, &mut vec![], None, None);
+        let result = system
+            .select(&mut fds, &mut vec![], None, None)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(1));
         assert_eq!(fds, [writer]);
     }
@@ -2576,7 +2636,10 @@ mod tests {
         let system = VirtualSystem::new();
         let (reader, _writer) = system.pipe().unwrap();
         let mut fds = vec![reader];
-        let result = system.select(&mut vec![], &mut fds, None, None);
+        let result = system
+            .select(&mut vec![], &mut fds, None, None)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(1));
         assert_eq!(fds, [reader]);
     }
@@ -2584,10 +2647,16 @@ mod tests {
     #[test]
     fn select_on_closed_fd() {
         let system = VirtualSystem::new();
-        let result = system.select(&mut vec![Fd(17)], &mut vec![], None, None);
+        let result = system
+            .select(&mut vec![Fd(17)], &mut vec![], None, None)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Err(Errno::EBADF));
 
-        let result = system.select(&mut vec![], &mut vec![Fd(17)], None, None);
+        let result = system
+            .select(&mut vec![], &mut vec![Fd(17)], None, None)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Err(Errno::EBADF));
     }
 
@@ -2605,7 +2674,10 @@ mod tests {
     #[test]
     fn select_on_non_pending_signal() {
         let system = system_for_catching_sigchld();
-        let result = system.select(&mut vec![], &mut vec![], None, Some(&[]));
+        let result = system
+            .select(&mut vec![], &mut vec![], None, Some(&[]))
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(0));
         assert_eq!(system.caught_signals(), []);
     }
@@ -2614,7 +2686,10 @@ mod tests {
     fn select_on_pending_signal() {
         let system = system_for_catching_sigchld();
         let _ = system.current_process_mut().raise_signal(SIGCHLD);
-        let result = system.select(&mut vec![], &mut vec![], None, Some(&[]));
+        let result = system
+            .select(&mut vec![], &mut vec![], None, Some(&[]))
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Err(Errno::EINTR));
         assert_eq!(system.caught_signals(), [SIGCHLD]);
     }
@@ -2630,7 +2705,10 @@ mod tests {
         let mut writers = vec![];
         let timeout = Duration::new(42, 195);
 
-        let result = system.select(&mut readers, &mut writers, Some(timeout), None);
+        let result = system
+            .select(&mut readers, &mut writers, Some(timeout), None)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(0));
         assert_eq!(readers, []);
         assert_eq!(writers, []);

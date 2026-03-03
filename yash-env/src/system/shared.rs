@@ -371,7 +371,13 @@ impl<S> SharedSystem<S> {
     where
         S: Select + CaughtSignals + Clock,
     {
-        self.0.borrow_mut().select(poll)
+        use std::task::{Context, Poll, Waker};
+        let mut future = std::pin::pin!(SelectSystem::select(&self.0, poll));
+        let mut context = Context::from_waker(Waker::noop());
+        match future.as_mut().poll(&mut context) {
+            Poll::Ready(result) => result,
+            Poll::Pending => Ok(()),
+        }
     }
 
     /// Creates a new child process.
@@ -668,7 +674,7 @@ impl<T: Select> Select for SharedSystem<T> {
         writers: &mut Vec<Fd>,
         timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
-    ) -> Result<c_int> {
+    ) -> impl Future<Output = Result<c_int>> + use<T> {
         (**self.0.borrow()).select(readers, writers, timeout, signal_mask)
     }
 }

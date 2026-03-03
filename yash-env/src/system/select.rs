@@ -31,6 +31,7 @@ use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::collections::binary_heap::PeekMut;
 use std::ffi::c_int;
+use std::future::Future;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::rc::Rc;
@@ -68,13 +69,21 @@ pub trait Select: Signals {
     ///
     /// If `signal_mask` is `Some` list of signals, it is used as the signal
     /// blocking mask while waiting and restored when the function returns.
+    ///
+    /// The return type is a future so that
+    /// [virtual systems](crate::system::virtual) can simulate suspension of the
+    /// process that may be caused by a signal delivered as a result of
+    /// temporarily changing the signal mask. In the
+    /// [real system](super::real), this function does not work asynchronously
+    /// and returns a ready `Future` with the result of the underlying system
+    /// call. See the [module-level documentation](super) for details.
     fn select(
         &self,
         readers: &mut Vec<Fd>,
         writers: &mut Vec<Fd>,
         timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
-    ) -> Result<c_int>;
+    ) -> impl Future<Output = Result<c_int>> + use<Self>;
 }
 
 /// [System] extended with internal state to support asynchronous functions.
@@ -268,43 +277,54 @@ impl<S> SelectSystem<S> {
     /// Implements the select function for `SharedSystem`.
     ///
     /// See [`SharedSystem::select`].
-    pub fn select(&mut self, poll: bool) -> Result<()>
+    ///
+    /// This function relies on the fact that the future returned by
+    /// `S::select` does not borrow from `&self`. This is guaranteed by the
+    /// `Select` trait signature, which uses `use<Self>` (not `use<'_, Self>`),
+    /// so the future cannot capture the `'_` lifetime of `&self`.
+    pub async fn select(this: &RefCell<SelectSystem<S>>, poll: bool) -> Result<()>
     where
         S: Select + CaughtSignals + Clock,
     {
-        let mut readers = self.io.readers();
-        let mut writers = self.io.writers();
-        let timeout = if poll {
-            Some(Duration::ZERO)
-        } else {
-            self.time
-                .first_target()
-                .map(|instant| instant.saturating_duration_since(self.now()))
+        let (readers, writers, future) = {
+            let me = this.borrow();
+            let mut readers = me.io.readers();
+            let mut writers = me.io.writers();
+            let timeout = if poll {
+                Some(Duration::ZERO)
+            } else {
+                me.time
+                    .first_target()
+                    .map(|instant| instant.saturating_duration_since(me.now()))
+            };
+
+            let future =
+                me.system
+                    .select(&mut readers, &mut writers, timeout, me.wait_mask.as_deref());
+            (readers, writers, future)
         };
 
-        let inner_result = self.system.select(
-            &mut readers,
-            &mut writers,
-            timeout,
-            self.wait_mask.as_deref(),
-        );
+        // Await after releasing the borrow.
+        let inner_result = future.await;
+
+        let mut me = this.borrow_mut();
         let final_result = match inner_result {
             Ok(_) => {
-                self.io.wake(&readers, &writers);
+                me.io.wake(&readers, &writers);
                 Ok(())
             }
             Err(Errno::EBADF) => {
                 // Some of the readers and writers are invalid but we cannot
                 // tell which, so we wake up everything.
-                self.io.wake_all();
+                me.io.wake_all();
                 Err(Errno::EBADF)
             }
             Err(Errno::EINTR) => Ok(()),
             Err(error) => Err(error),
         };
-        self.io.gc();
-        self.wake_timeouts();
-        self.wake_on_signals();
+        me.io.gc();
+        me.wake_timeouts();
+        me.wake_on_signals();
         final_result
     }
 }
