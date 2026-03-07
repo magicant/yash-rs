@@ -235,7 +235,6 @@ impl Pattern {
             } => {
                 let reject_initial_dot =
                     self.config.literal_period && !starts_with_literal_dot && text.starts_with('.');
-                #[allow(clippy::bool_to_int_with_if)]
                 let at_index = if reject_initial_dot { 1 } else { 0 };
                 regex.is_match_at(text, at_index)
             }
@@ -261,7 +260,6 @@ impl Pattern {
             } => {
                 let reject_initial_dot =
                     self.config.literal_period && !starts_with_literal_dot && text.starts_with('.');
-                #[allow(clippy::bool_to_int_with_if)]
                 let at_index = if reject_initial_dot { 1 } else { 0 };
                 regex.find_at(text, at_index).map(|m| m.range())
             }
