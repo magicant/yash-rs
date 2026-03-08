@@ -114,6 +114,10 @@ pub struct Process {
     /// to the `SelectSystem` for the child is set.
     pub(crate) selector: Weak<RefCell<SelectSystem<VirtualSystem>>>,
 
+    /// Condition for resuming this process when it is virtually blocked by a
+    /// `select` or similar operation
+    resume_condition: Option<ResumeCondition>,
+
     /// Copy of arguments passed to [`execve`](crate::System::execve)
     pub(crate) last_exec: Option<(CString, Vec<CString>, Vec<CString>)>,
 }
@@ -159,6 +163,7 @@ impl Process {
             caught_signals: Vec::new(),
             resource_limits: HashMap::new(),
             selector: Weak::new(),
+            resume_condition: None,
             last_exec: None,
         }
     }
@@ -555,6 +560,21 @@ impl Process {
     pub fn last_exec(&self) -> &Option<(CString, Vec<CString>, Vec<CString>)> {
         &self.last_exec
     }
+}
+
+/// Condition for resuming a process virtually blocked by a `select` or similar
+/// operation.
+#[derive(Clone, Debug)]
+struct ResumeCondition {
+    /// Waker to be notified when the process should resume
+    waker: Waker,
+
+    /// Time at which the process should resume
+    ///
+    /// If `None`, the process will not be resumed by a timer.
+    time: Option<std::time::Instant>,
+    // TODO: Other conditions to resume the process, such as receiving a signal or
+    // a file descriptor becoming ready
 }
 
 /// Result of operations that may deliver a signal to a process.
