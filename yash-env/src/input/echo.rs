@@ -81,7 +81,7 @@ mod tests {
     use super::super::Memory;
     use super::*;
     use crate::system::r#virtual::VirtualSystem;
-    use crate::tests::assert_stderr;
+    use crate::test_helper::assert_stderr;
     use futures_util::FutureExt;
     use std::rc::Rc;
 

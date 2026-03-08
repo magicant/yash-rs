@@ -616,55 +616,13 @@ mod tests {
     use crate::job::Job;
     use crate::source::Location;
     use crate::subshell::Subshell;
-    use crate::system::r#virtual::FileBody;
     use crate::system::r#virtual::Inode;
     use crate::system::r#virtual::SIGCHLD;
-    use crate::system::r#virtual::SystemState;
+    use crate::test_helper::in_virtual_system;
     use crate::trap::Action;
-    use assert_matches::assert_matches;
     use futures_executor::LocalPool;
     use futures_util::FutureExt as _;
-    use futures_util::task::LocalSpawnExt as _;
     use std::cell::RefCell;
-    use std::str::from_utf8;
-
-    /// Helper function to perform a test in a virtual system with an executor.
-    pub fn in_virtual_system<F, Fut, T>(f: F) -> T
-    where
-        F: FnOnce(Env<VirtualSystem>, Rc<RefCell<SystemState>>) -> Fut,
-        Fut: Future<Output = T> + 'static,
-        T: 'static,
-    {
-        let system = VirtualSystem::new();
-        let state = Rc::clone(&system.state);
-        let mut executor = futures_executor::LocalPool::new();
-        state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
-
-        let env = Env::with_system(system);
-        let shared_system = env.system.clone();
-        let task = f(env, Rc::clone(&state));
-        let mut task = executor.spawner().spawn_local_with_handle(task).unwrap();
-        loop {
-            if let Some(result) = (&mut task).now_or_never() {
-                return result;
-            }
-            executor.run_until_stalled();
-            shared_system.select(false).unwrap();
-            SystemState::select_all(&state);
-        }
-    }
-
-    /// Helper function for asserting on the content of /dev/stderr.
-    pub fn assert_stderr<F, T>(state: &RefCell<SystemState>, f: F) -> T
-    where
-        F: FnOnce(&str) -> T,
-    {
-        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
-        let stderr = stderr.borrow();
-        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
-            f(from_utf8(content).unwrap())
-        })
-    }
 
     #[test]
     fn wait_for_signal_remembers_signal_in_trap_set() {
