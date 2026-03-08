@@ -24,6 +24,8 @@ cargo build --package 'yash-builtin' --all-targets --no-default-features
 cargo build --package 'yash-builtin' --all-targets --no-default-features --features yash-semantics
 cargo build --package 'yash-cli' --all-targets
 cargo build --package 'yash-env' --all-targets
+cargo build --package 'yash-env' --all-targets --no-default-features
+cargo build --package 'yash-env' --all-targets --no-default-features --features test-helper
 cargo build --package 'yash-env-test-helper' --all-targets
 cargo build --package 'yash-executor' --all-targets
 cargo build --package 'yash-fnmatch' --all-targets
@@ -38,6 +40,7 @@ cargo build --package 'yash-syntax' --all-targets
 cargo test --package 'yash-builtin' --features yash-semantics -- $quiet
 #cargo test --package 'yash-cli' -- $quiet
 #cargo test --package 'yash-env' -- $quiet
+cargo test --package 'yash-env' --features test-helper -- $quiet
 #cargo test --package 'yash-fnmatch' -- $quiet
 #cargo test --package 'yash-prompt' -- $quiet
 #cargo test --package 'yash-quote' -- $quiet

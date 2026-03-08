@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! This crate contains utility functions for use in tests that interact with
-//! the shell environment ([`yash_env::Env`]).
+//! Utilities for performing tests that interact with the shell environment.
 //!
-//! **This crate has been deprecated in favor of the `test-helper` feature of
-//! the `yash-env` crate.**
+//! This module is conditionally compiled when the `test-helper` feature is enabled.
 
+use crate::Env;
+use crate::system::r#virtual::{Executor, FileBody, Inode, SystemState, VirtualSystem};
 use assert_matches::assert_matches;
 use futures_executor::LocalSpawner;
 use futures_util::FutureExt as _;
@@ -28,8 +28,6 @@ use std::cell::RefCell;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::str::from_utf8;
-use yash_env::Env;
-use yash_env::system::r#virtual::{Executor, FileBody, Inode, SystemState, VirtualSystem};
 
 /// Adapter for [`LocalSpawner`] to [`Executor`]
 #[derive(Clone, Debug)]
@@ -108,7 +106,7 @@ pub fn stub_tty(state: &RefCell<SystemState>) {
 /// # use yash_env::io::Fd;
 /// # use yash_env::system::Write as _;
 /// # use yash_env::system::r#virtual::VirtualSystem;
-/// # use yash_env_test_helper::assert_stdout;
+/// # use yash_env::test_helper::assert_stdout;
 /// # async fn f() {
 /// let system = VirtualSystem::new();
 /// let state = Rc::clone(&system.state);

@@ -606,6 +606,9 @@ pub mod system;
 pub mod trap;
 pub mod variable;
 
+#[cfg(any(test, feature = "test-helper"))]
+pub mod test_helper;
+
 #[cfg(test)]
 mod tests {
     use super::*;

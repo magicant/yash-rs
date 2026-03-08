@@ -16,6 +16,15 @@ A _private dependency_ is used internally and not visible to downstream users.
 - Public dependency versions:
     - yash-env 0.12.0 → 0.13.0
 
+### Deprecated
+
+- The `yash-env-test-helper` crate itself has been deprecated in favor of the
+  `test-helper` feature of the `yash-env` crate. This means that all
+  functionality previously provided by this crate is now available directly
+  within `yash-env` when the `test-helper` feature is enabled. Users are
+  encouraged to migrate to using `yash-env` with the `test-helper` feature for
+  their testing needs.
+
 ## [0.10.0] - 2026-02-04
 
 ### Changed
