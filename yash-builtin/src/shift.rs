@@ -134,7 +134,7 @@ mod tests {
     use yash_env::source::Location;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
-    use yash_env_test_helper::assert_stderr;
+    use yash_env::test_helper::assert_stderr;
 
     #[test]
     fn shifting_without_operand() {

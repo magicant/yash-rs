@@ -396,7 +396,7 @@ mod tests {
     use yash_env::function::Function;
     use yash_env::source::Location;
     use yash_env::system::r#virtual::VirtualSystem;
-    use yash_env_test_helper::function::FunctionBodyStub;
+    use yash_env::test_helper::function::FunctionBodyStub;
 
     #[test]
     fn normalize_absolute_executable() {

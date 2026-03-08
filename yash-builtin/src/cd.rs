@@ -167,7 +167,7 @@ mod tests {
     use futures_util::FutureExt as _;
     use std::rc::Rc;
     use yash_env::VirtualSystem;
-    use yash_env_test_helper::assert_stderr;
+    use yash_env::test_helper::assert_stderr;
 
     #[test]
     fn report_pwd_error_with_ensure_pwd() {

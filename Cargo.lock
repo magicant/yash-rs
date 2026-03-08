@@ -782,7 +782,6 @@ dependencies = [
  "itertools",
  "thiserror",
  "yash-env",
- "yash-env-test-helper",
  "yash-quote",
  "yash-semantics",
  "yash-syntax",

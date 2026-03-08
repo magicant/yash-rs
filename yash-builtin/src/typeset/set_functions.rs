@@ -78,7 +78,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use yash_env::function::Function;
-    use yash_env_test_helper::function::FunctionBodyStub;
+    use yash_env::test_helper::function::FunctionBodyStub;
 
     #[test]
     fn making_existing_functions_readonly() {

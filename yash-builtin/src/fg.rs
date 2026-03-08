@@ -219,10 +219,10 @@ mod tests {
     use yash_env::system::TcGetPgrp as _;
     use yash_env::system::r#virtual::Process;
     use yash_env::system::r#virtual::SIGSTOP;
-    use yash_env_test_helper::assert_stderr;
-    use yash_env_test_helper::assert_stdout;
-    use yash_env_test_helper::in_virtual_system;
-    use yash_env_test_helper::stub_tty;
+    use yash_env::test_helper::assert_stderr;
+    use yash_env::test_helper::assert_stdout;
+    use yash_env::test_helper::in_virtual_system;
+    use yash_env::test_helper::stub_tty;
 
     async fn suspend(env: &mut Env<VirtualSystem>) {
         let target = env.system.getpid();

@@ -403,7 +403,7 @@ mod tests {
     }
 
     fn dummy_function<S>(name: &str) -> Function<S> {
-        let body = yash_env_test_helper::function::FunctionBodyStub::rc_dyn();
+        let body = yash_env::test_helper::function::FunctionBodyStub::rc_dyn();
         Function::new(name, body, Location::dummy(name))
     }
 

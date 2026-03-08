@@ -223,10 +223,10 @@ mod tests {
     use yash_env::option::State::*;
     use yash_env::system::Disposition;
     use yash_env::system::r#virtual::SIGTSTP;
+    use yash_env::test_helper::assert_stderr;
+    use yash_env::test_helper::assert_stdout;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
-    use yash_env_test_helper::assert_stderr;
-    use yash_env_test_helper::assert_stdout;
     use yash_semantics::command::Command as _;
     use yash_syntax::syntax::List;
 

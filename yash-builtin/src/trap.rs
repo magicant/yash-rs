@@ -330,8 +330,8 @@ mod tests {
     use yash_env::stack::Frame;
     use yash_env::system::Disposition;
     use yash_env::system::r#virtual::{SIGINT, SIGPIPE, SIGUSR1, SIGUSR2};
-    use yash_env_test_helper::assert_stderr;
-    use yash_env_test_helper::assert_stdout;
+    use yash_env::test_helper::assert_stderr;
+    use yash_env::test_helper::assert_stdout;
 
     #[test]
     fn setting_trap_to_ignore() {

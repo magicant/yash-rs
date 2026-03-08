@@ -118,7 +118,7 @@ mod tests {
     use yash_env::source::Location;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
-    use yash_env_test_helper::{assert_stderr, assert_stdout};
+    use yash_env::test_helper::{assert_stderr, assert_stdout};
 
     #[test]
     fn set_oldpwd_new() {

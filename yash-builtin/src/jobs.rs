@@ -138,8 +138,8 @@ mod tests {
     use yash_env::stack::Frame;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::system::r#virtual::{SIGINT, SIGQUIT, SIGSTOP, SIGTSTP};
-    use yash_env_test_helper::assert_stderr;
-    use yash_env_test_helper::assert_stdout;
+    use yash_env::test_helper::assert_stderr;
+    use yash_env::test_helper::assert_stdout;
 
     #[test]
     fn no_operands_no_jobs() {

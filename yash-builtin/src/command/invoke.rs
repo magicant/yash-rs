@@ -170,8 +170,8 @@ mod tests {
     use yash_env::function::{Function, FunctionBody, FunctionBodyObject};
     use yash_env::semantics::Field;
     use yash_env::source::Location;
-    use yash_env_test_helper::assert_stderr;
-    use yash_env_test_helper::assert_stdout;
+    use yash_env::test_helper::assert_stderr;
+    use yash_env::test_helper::assert_stdout;
     use yash_semantics::Divert::Return;
     use yash_semantics::Runtime;
     use yash_syntax::syntax::FullCompoundCommand;
