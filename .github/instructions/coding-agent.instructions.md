@@ -101,7 +101,7 @@ Time: ~17 seconds (output in `target/doc/`)
 
 **Extra checks (requires additional tools):**
 ```sh
-./check-extra.sh -v
+./check-extra.sh
 ```
 **Prerequisites:** Install first with:
 ```sh
@@ -115,7 +115,7 @@ This script verifies:
 
 **MSRV checks (Minimum Supported Rust Version):**
 ```sh
-./check-msrv.sh -v
+./check-msrv.sh
 ```
 **Prerequisites:** Requires nightly and 1.87.0 toolchains
 Tests each crate with minimal dependency versions at their MSRV.
@@ -223,23 +223,21 @@ For yash-cli CHANGELOG: Include changes in observable behavior even if yash-cli 
 
 1. **Always run `./check.sh` before committing** to catch formatting, tests, docs, and clippy issues.
 
-2. **Tests run quietly by default** (`--quiet` flag). Use `-v` flag with check scripts for verbose output.
+2. **Windows support is limited**: Only specific crates (executor, fnmatch, quote, syntax, env, arith) are tested on Windows. Most shell functionality requires Unix-like systems.
 
-3. **Windows support is limited**: Only specific crates (executor, fnmatch, quote, syntax, env, arith) are tested on Windows. Most shell functionality requires Unix-like systems.
+3. **Feature flags matter**: Some crates have feature combinations that must all build correctly. `yash-env` has the `test-helper` feature that enables additional test utilities, but it should not be used in production code. `yash-builtin` has `yash-semantics` as an optional dependency.
 
-4. **Feature flags matter**: Some crates have feature combinations that must all build correctly. `yash-env` has the `test-helper` feature that enables additional test utilities, but it should not be used in production code. `yash-builtin` has `yash-semantics` as an optional dependency.
+4. **Don't add dependencies lightly**: The `check-extra.sh` script enforces no unused dependencies with `RUSTFLAGS='-D unused_crate_dependencies'`.
 
-5. **Don't add dependencies lightly**: The `check-extra.sh` script enforces no unused dependencies with `RUSTFLAGS='-D unused_crate_dependencies'`.
+5. **Formatting is strict**: All Cargo.toml files must be formatted and linted with `taplo`.
 
-6. **Formatting is strict**: All Cargo.toml files must be formatted and linted with `taplo`.
+6. **Scripted tests are integration tests**: Located in `yash-cli/tests/scripted_test/`, these test actual shell behavior with `.sh` files.
 
-7. **Scripted tests are integration tests**: Located in `yash-cli/tests/scripted_test/`, these test actual shell behavior with `.sh` files.
+7. **Build artifacts**: Git ignores `./target` and `./docs/book`. Don't commit build artifacts.
 
-8. **Build artifacts**: Git ignores `./target` and `./docs/book`. Don't commit build artifacts.
+8. **Documentation is versioned**: When adding features, mention the yash-cli version number in docs (unless it's a bug fix).
 
-9. **Documentation is versioned**: When adding features, mention the yash-cli version number in docs (unless it's a bug fix).
-
-10. **Semantic versioning is enforced**: `cargo semver-checks` runs in CI to prevent accidental breaking changes.
+9. **Semantic versioning is enforced**: `cargo semver-checks` runs in CI to prevent accidental breaking changes.
 
 ## Trust These Instructions
 
