@@ -114,10 +114,10 @@ mod tests {
     use yash_env::input::Memory;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::system::r#virtual::VirtualSystem;
+    use yash_env::test_helper::assert_stderr;
     use yash_env::variable::PS1;
     use yash_env::variable::PS1_INITIAL_VALUE_NON_ROOT;
     use yash_env::variable::Value;
-    use yash_env_test_helper::assert_stderr;
 
     fn define_variable<S, N: Into<String>, V: Into<Value>>(env: &mut Env<S>, name: N, value: V) {
         env.variables
