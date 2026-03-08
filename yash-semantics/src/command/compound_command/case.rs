@@ -134,10 +134,10 @@ mod tests {
     use yash_env::option::State::On;
     use yash_env::semantics::Divert;
     use yash_env::system::r#virtual::SystemState;
+    use yash_env::test_helper::assert_stderr;
+    use yash_env::test_helper::assert_stdout;
+    use yash_env::test_helper::in_virtual_system;
     use yash_env::variable::Scope;
-    use yash_env_test_helper::assert_stderr;
-    use yash_env_test_helper::assert_stdout;
-    use yash_env_test_helper::in_virtual_system;
     use yash_syntax::syntax::CompoundCommand;
 
     fn fixture() -> (Env<VirtualSystem>, Rc<RefCell<SystemState>>) {

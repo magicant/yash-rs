@@ -120,8 +120,8 @@ mod tests {
     use yash_env::signal;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::system::r#virtual::{SIGINT, SIGTERM, SIGUSR1, SIGUSR2};
+    use yash_env::test_helper::assert_stdout;
     use yash_env::trap::Action;
-    use yash_env_test_helper::assert_stdout;
     use yash_syntax::source::Location;
 
     fn signal_env() -> (Env<VirtualSystem>, VirtualSystem) {

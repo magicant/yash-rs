@@ -195,7 +195,7 @@ mod tests {
     use yash_env::job::ProcessState;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::r#virtual::VirtualSystem;
-    use yash_env_test_helper::assert_stderr;
+    use yash_env::test_helper::assert_stderr;
 
     #[test]
     fn resolve_target_process_ids() {

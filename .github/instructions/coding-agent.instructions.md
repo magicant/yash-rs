@@ -29,7 +29,6 @@ This is a Cargo workspace with the following crates (all in the workspace root (
 - **yash-quote**: String quoting utilities (MIT/Apache-2.0)
 - **yash-arith**: Arithmetic expression evaluation
 - **yash-prompt**: Prompt rendering
-- **yash-env-test-helper**: Test utilities for environment
 
 Each crate has:
 - `Cargo.toml` - Package configuration
@@ -228,7 +227,7 @@ For yash-cli CHANGELOG: Include changes in observable behavior even if yash-cli 
 
 3. **Windows support is limited**: Only specific crates (executor, fnmatch, quote, syntax, env, arith) are tested on Windows. Most shell functionality requires Unix-like systems.
 
-4. **Feature flags matter**: Some crates have feature combinations that must all build correctly. `yash-builtin` has `default = ["yash-prompt", "yash-semantics"]` with conditional features. `yash-syntax` has optional `annotate-snippets` feature.
+4. **Feature flags matter**: Some crates have feature combinations that must all build correctly. `yash-env` has the `test-helper` feature that enables additional test utilities, but it should not be used in production code. `yash-builtin` has `yash-semantics` as an optional dependency.
 
 5. **Don't add dependencies lightly**: The `check-extra.sh` script enforces no unused dependencies with `RUSTFLAGS='-D unused_crate_dependencies'`.
 

@@ -144,8 +144,8 @@ mod tests {
     use yash_env::system::SendSignal as _;
     use yash_env::system::r#virtual::SIGSTOP;
     use yash_env::system::r#virtual::VirtualSystem;
+    use yash_env::test_helper::{in_virtual_system, stub_tty};
     use yash_env::trap::RunSignalTrapIfCaught;
-    use yash_env_test_helper::{in_virtual_system, stub_tty};
 
     pub(super) fn stub_run_signal_trap_if_caught<S: 'static>(env: &mut Env<S>) {
         env.any.insert(Box::new(RunSignalTrapIfCaught::<S>(|_, _| {

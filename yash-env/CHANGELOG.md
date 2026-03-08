@@ -23,6 +23,13 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `awaiters: Vec<Waker>` field has been added to the
   `system::virtual::FileBody::Fifo` variant to allow the virtual system to
   notify tasks waiting on the pipe when certain events occur.
+- The `test_helper` module has been added with items migrated from the
+  `yash-env-test-helper` crate. This module is conditionally compiled when the
+  new `test-helper` feature is enabled.
+- Private dependencies:
+    - assert_matches (optional) 1.5.0
+    - futures-executor (optional) 0.3.31
+    - futures-util (optional) 0.3.31
 
 ### Changed
 

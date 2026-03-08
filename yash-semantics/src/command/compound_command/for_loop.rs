@@ -129,8 +129,8 @@ mod tests {
     use yash_env::builtin::Builtin;
     use yash_env::option::Option::ErrExit;
     use yash_env::option::State::On;
-    use yash_env_test_helper::assert_stderr;
-    use yash_env_test_helper::assert_stdout;
+    use yash_env::test_helper::assert_stderr;
+    use yash_env::test_helper::assert_stdout;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::CompoundCommand;
 

@@ -315,9 +315,9 @@ mod tests {
     use futures_util::FutureExt;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::Errno;
+    use yash_env::test_helper::in_virtual_system;
     use yash_env::variable::Scope::Global;
     use yash_env::variable::Value::Scalar;
-    use yash_env_test_helper::in_virtual_system;
 
     #[test]
     fn var_env_get_variable_success() {

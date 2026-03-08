@@ -122,7 +122,7 @@ mod tests {
     use crate::option::On;
     use crate::system::Mode;
     use crate::system::r#virtual::{FdBody, FileBody, Inode, OpenFileDescription, VirtualSystem};
-    use crate::tests::assert_stderr;
+    use crate::test_helper::assert_stderr;
     use enumset::EnumSet;
     use futures_util::FutureExt as _;
     use std::rc::Rc;

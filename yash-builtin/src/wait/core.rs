@@ -124,9 +124,9 @@ mod tests {
     use yash_env::subshell::Subshell;
     use yash_env::system::SendSignal as _;
     use yash_env::system::r#virtual::{SIGSTOP, SIGTERM};
+    use yash_env::test_helper::in_virtual_system;
     use yash_env::trap::Action;
     use yash_env::variable::Value;
-    use yash_env_test_helper::in_virtual_system;
 
     #[test]
     fn running_job() {

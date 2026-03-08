@@ -97,7 +97,7 @@ mod tests {
     use crate::job::{Job, Pid, ProcessState};
     use crate::option::On;
     use crate::system::r#virtual::SystemState;
-    use crate::tests::assert_stderr;
+    use crate::test_helper::assert_stderr;
     use futures_util::FutureExt as _;
     use std::rc::Rc;
 

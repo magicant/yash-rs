@@ -545,7 +545,7 @@ mod tests {
         SIGKILL, SIGPIPE, SIGPROF, SIGQUIT, SIGSEGV, SIGSTOP, SIGSYS, SIGTERM, SIGTRAP, SIGTSTP,
         SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU, SIGXFSZ,
     };
-    use crate::tests::in_virtual_system;
+    use crate::test_helper::in_virtual_system;
     use futures_util::FutureExt as _;
     use std::cell::RefCell;
     use std::collections::HashMap;

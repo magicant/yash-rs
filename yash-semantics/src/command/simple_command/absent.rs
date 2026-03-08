@@ -110,10 +110,10 @@ mod tests {
     use yash_env::VirtualSystem;
     use yash_env::option::State::On;
     use yash_env::system::r#virtual::FileBody;
+    use yash_env::test_helper::assert_stderr;
+    use yash_env::test_helper::in_virtual_system;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
-    use yash_env_test_helper::assert_stderr;
-    use yash_env_test_helper::in_virtual_system;
     use yash_syntax::source::Location;
     use yash_syntax::syntax;
 

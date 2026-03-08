@@ -171,8 +171,8 @@ mod tests {
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
     use yash_env::system::r#virtual::FileBody;
-    use yash_env_test_helper::assert_stderr;
-    use yash_env_test_helper::assert_stdout;
+    use yash_env::test_helper::assert_stderr;
+    use yash_env::test_helper::assert_stdout;
 
     #[test]
     fn stack_in_condition() {

@@ -122,10 +122,10 @@ mod tests {
     use yash_env::system::Mode;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::Inode;
+    use yash_env::test_helper::assert_stderr;
+    use yash_env::test_helper::assert_stdout;
     use yash_env::variable::Scope::Global;
     use yash_env::variable::Value;
-    use yash_env_test_helper::assert_stderr;
-    use yash_env_test_helper::assert_stdout;
     use yash_syntax::syntax;
 
     #[test]

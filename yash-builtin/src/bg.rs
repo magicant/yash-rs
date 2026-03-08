@@ -211,8 +211,8 @@ mod tests {
     use yash_env::semantics::ExitStatus;
     use yash_env::system::r#virtual::Process;
     use yash_env::system::r#virtual::{SIGSTOP, SIGTSTP, SIGTTIN};
-    use yash_env_test_helper::assert_stderr;
-    use yash_env_test_helper::assert_stdout;
+    use yash_env::test_helper::assert_stderr;
+    use yash_env::test_helper::assert_stdout;
 
     #[test]
     fn resume_job_by_index_sends_sigcont() {

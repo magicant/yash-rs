@@ -306,8 +306,8 @@ mod tests {
     use crate::tests::echo_builtin;
     use futures_util::FutureExt;
     use yash_env::system::r#virtual::VirtualSystem;
+    use yash_env::test_helper::in_virtual_system;
     use yash_env::variable::Scope::Global;
-    use yash_env_test_helper::in_virtual_system;
 
     #[test]
     fn tracing_some_fields() {

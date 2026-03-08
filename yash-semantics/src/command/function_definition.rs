@@ -151,8 +151,8 @@ mod tests {
     use yash_env::option::On;
     use yash_env::option::Option::ErrExit;
     use yash_env::semantics::Divert;
-    use yash_env_test_helper::assert_stderr;
-    use yash_env_test_helper::function::FunctionBodyStub;
+    use yash_env::test_helper::assert_stderr;
+    use yash_env::test_helper::function::FunctionBodyStub;
     use yash_syntax::source::Location;
 
     #[test]

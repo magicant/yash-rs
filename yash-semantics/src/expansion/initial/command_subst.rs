@@ -181,7 +181,7 @@ mod tests {
     use crate::tests::return_builtin;
     use futures_util::FutureExt;
     use yash_env::semantics::ExitStatus;
-    use yash_env_test_helper::in_virtual_system;
+    use yash_env::test_helper::in_virtual_system;
 
     #[test]
     fn empty_substitution() {

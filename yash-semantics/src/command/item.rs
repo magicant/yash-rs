@@ -160,11 +160,11 @@ mod tests {
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::Inode;
     use yash_env::system::r#virtual::SystemState;
-    use yash_env_test_helper::LocalExecutor;
-    use yash_env_test_helper::assert_stderr;
-    use yash_env_test_helper::assert_stdout;
-    use yash_env_test_helper::in_virtual_system;
-    use yash_env_test_helper::stub_tty;
+    use yash_env::test_helper::LocalExecutor;
+    use yash_env::test_helper::assert_stderr;
+    use yash_env::test_helper::assert_stdout;
+    use yash_env::test_helper::in_virtual_system;
+    use yash_env::test_helper::stub_tty;
 
     #[test]
     fn item_execute_sync() {

@@ -72,8 +72,8 @@ mod tests {
     use yash_env::semantics::Field;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
-    use yash_env_test_helper::assert_stderr;
-    use yash_env_test_helper::assert_stdout;
+    use yash_env::test_helper::assert_stderr;
+    use yash_env::test_helper::assert_stdout;
 
     fn result_with_divert(exit_status: ExitStatus, divert: Divert) -> Result {
         let mut result = Result::new(exit_status);

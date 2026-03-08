@@ -18,10 +18,7 @@ publish = false
 all-features = true
 
 [dependencies]
-assert_matches = { workspace = true }
-futures-executor = { workspace = true }
-futures-util = { workspace = true, features = ["channel"] }
-yash-env = { workspace = true }
+yash-env = { workspace = true, features = ["test-helper"] }
 
 [lints]
 workspace = true

@@ -516,8 +516,8 @@ mod tests {
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
+    use yash_env::test_helper::in_virtual_system;
     use yash_env::variable::Scope;
-    use yash_env_test_helper::in_virtual_system;
 
     #[test]
     fn from_error_for_report() {
