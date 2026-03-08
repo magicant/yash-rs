@@ -98,7 +98,7 @@ mod tests {
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
-    use yash_env_test_helper::assert_stdout;
+    use yash_env::test_helper::assert_stdout;
 
     #[test]
     fn single_pipeline_list() {

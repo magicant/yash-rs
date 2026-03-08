@@ -883,7 +883,6 @@ dependencies = [
  "thiserror",
  "yash-arith",
  "yash-env",
- "yash-env-test-helper",
  "yash-fnmatch",
  "yash-quote",
  "yash-syntax",

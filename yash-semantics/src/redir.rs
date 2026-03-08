@@ -726,7 +726,7 @@ mod tests {
     use yash_env::system::resource::SetRlimit as _;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::Inode;
-    use yash_env_test_helper::in_virtual_system;
+    use yash_env::test_helper::in_virtual_system;
     use yash_syntax::syntax::Text;
 
     /// Returns a virtual system with a file descriptor limit.

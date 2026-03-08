@@ -116,9 +116,9 @@ mod tests {
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
     use yash_env::system::r#virtual::SystemState;
+    use yash_env::test_helper::assert_stdout;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
-    use yash_env_test_helper::assert_stdout;
     use yash_syntax::syntax::CompoundCommand;
 
     fn fixture() -> (Env<VirtualSystem>, Rc<RefCell<SystemState>>) {

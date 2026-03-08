@@ -62,7 +62,7 @@ mod tests {
     use yash_env::VirtualSystem;
     use yash_env::semantics::Divert;
     use yash_env::system::r#virtual::SystemState;
-    use yash_env_test_helper::assert_stdout;
+    use yash_env::test_helper::assert_stdout;
     use yash_syntax::syntax::CompoundCommand;
 
     fn fixture() -> (Env<VirtualSystem>, Rc<RefCell<SystemState>>) {
