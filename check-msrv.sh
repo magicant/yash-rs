@@ -17,14 +17,16 @@ check() {
         set ''
     fi
 
+    # Make $package the only member of the workspace
+    # to avoid influence from other packages' dependencies
     sed -e '/^members = / s;".*";"'"$package"'";' Cargo.toml >| Cargo.toml.tmp
     mv Cargo.toml.tmp Cargo.toml
-    cargo +nightly update -Z direct-minimal-versions
     msrv=$(cargo metadata --format-version=1 |
         jq -r ".packages[] | select(.name == \"$package\") | .rust_version")
 
+    # Ensure the package builds with the MSRV and oldest possible dependencies
     for options do
-        cargo +$msrv test --package "$package" $options -- $quiet
+        cargo +"$msrv" minimal-versions check --direct --package "$package" $options
     done
 }
 
