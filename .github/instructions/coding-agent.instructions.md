@@ -117,8 +117,11 @@ This script verifies:
 ```sh
 ./check-msrv.sh
 ```
-**Prerequisites:** Requires nightly and 1.87.0 toolchains
-Tests each crate with minimal dependency versions at their MSRV.
+**Prerequisites:** Install first with:
+```sh
+cargo install --locked cargo-hack cargo-minimal-versions
+```
+This script checks if each crate builds with minimal dependency versions at their MSRV.
 
 **Documentation checks:**
 ```sh
