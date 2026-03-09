@@ -1,0 +1,11 @@
+{
+  "image": "mcr.microsoft.com/devcontainers/rust:latest",
+  "features": {
+    "ghcr.io/wxw-matt/devcontainer-features/script_runner:0": {
+      "script1": "install_cargo_binstall#https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh"
+    },
+    "ghcr.io/wxw-matt/devcontainer-features/command_runner:latest": {
+      "command1": "cargo binstall --no-confirm cargo-semver-checks cargo-hack cargo-minimal-versions mdbook"
+    }
+  }
+}
