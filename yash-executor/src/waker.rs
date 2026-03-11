@@ -49,3 +49,71 @@ pub(crate) fn into_waker(task: Rc<Task>) -> Waker {
     let raw_waker = RawWaker::new(data, VTABLE);
     unsafe { Waker::from_raw(raw_waker) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Task;
+    use alloc::boxed::Box;
+    use alloc::rc::Weak;
+    use core::cell::RefCell;
+
+    fn dummy_task() -> Rc<Task<'static>> {
+        Rc::new(Task {
+            executor: Weak::new(),
+            future: RefCell::new(Some(Box::pin(async { unreachable!() }))),
+        })
+    }
+
+    #[test]
+    fn clone_increments_strong_count() {
+        let task = dummy_task();
+        let waker = into_waker(Rc::clone(&task));
+        assert_eq!(Rc::strong_count(&task), 2);
+
+        let clone = waker.clone();
+        assert_eq!(Rc::strong_count(&task), 3);
+
+        core::mem::drop(clone);
+        assert_eq!(Rc::strong_count(&task), 2);
+
+        core::mem::drop(waker);
+        assert_eq!(Rc::strong_count(&task), 1);
+    }
+
+    #[test]
+    fn wake_consumes_one_ref() {
+        let task = dummy_task();
+        let waker = into_waker(Rc::clone(&task));
+        assert_eq!(Rc::strong_count(&task), 2);
+
+        waker.wake();
+
+        assert_eq!(Rc::strong_count(&task), 1);
+    }
+
+    #[test]
+    fn wake_by_ref_does_not_consume_ref() {
+        let task = dummy_task();
+        let waker = into_waker(Rc::clone(&task));
+        assert_eq!(Rc::strong_count(&task), 2);
+
+        waker.wake_by_ref();
+
+        assert_eq!(Rc::strong_count(&task), 2);
+
+        core::mem::drop(waker);
+        assert_eq!(Rc::strong_count(&task), 1);
+    }
+
+    #[test]
+    fn drop_decrements_strong_count() {
+        let task = dummy_task();
+        let waker = into_waker(Rc::clone(&task));
+        assert_eq!(Rc::strong_count(&task), 2);
+
+        core::mem::drop(waker);
+
+        assert_eq!(Rc::strong_count(&task), 1);
+    }
+}
