@@ -60,6 +60,15 @@ if [ "$(uname)" = Darwin ]; then
     exit
 fi
 
+umask 777
+
+if mkdir dir.test; test "$(ls -dl dir.test | cut -c 1-10)" != "d---------"; then
+    # On GitHub Codespaces (and possibly other environments), the umask is not
+    # honored by the system, so the test cases that rely on umask will fail.
+    # Skip them in that case.
+    skip="true"
+fi
+
 # $1 = $LINENO, $2 = expected permission, $3 = umask
 test_symbolic_operand() {
     testcase "$1" "symbolic operand $3" 3<<__IN__ 4<<__OUT__ 5</dev/null
@@ -70,8 +79,6 @@ __IN__
 $2
 __OUT__
 }
-
-umask 777
 
 test_symbolic_operand "$LINENO" d--------- u+
 test_symbolic_operand "$LINENO" dr-------- u+r
