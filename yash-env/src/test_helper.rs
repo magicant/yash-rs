@@ -149,3 +149,6 @@ where
 }
 
 pub mod function;
+mod wake_flag;
+
+pub use wake_flag::WakeFlag;

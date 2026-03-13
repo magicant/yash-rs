@@ -639,10 +639,10 @@ impl AsyncSignal {
 mod tests {
     use super::super::r#virtual::{SIGCHLD, SIGINT, SIGUSR1};
     use super::*;
+    use crate::test_helper::WakeFlag;
     use assert_matches::assert_matches;
     use std::sync::Arc;
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::task::Wake;
+    use std::sync::atomic::Ordering;
 
     #[test]
     fn async_io_has_no_default_readers_or_writers() {
@@ -751,18 +751,11 @@ mod tests {
 
     #[test]
     fn async_signal_wait_and_wake() {
-        struct WakeFlag(AtomicBool);
-        impl Wake for WakeFlag {
-            fn wake(self: Arc<Self>) {
-                self.0.store(true, Ordering::Relaxed);
-            }
-        }
-
         let mut async_signal = AsyncSignal::new();
         let status_1 = async_signal.wait_for_signals();
         let status_2 = async_signal.wait_for_signals();
-        let wake_flag_1 = Arc::new(WakeFlag(AtomicBool::new(false)));
-        let wake_flag_2 = Arc::new(WakeFlag(AtomicBool::new(false)));
+        let wake_flag_1 = Arc::new(WakeFlag::new());
+        let wake_flag_2 = Arc::new(WakeFlag::new());
         assert_matches!(&mut *status_1.borrow_mut(), SignalStatus::Expected(waker) => {
             assert!(waker.is_none());
             *waker = Some(wake_flag_1.clone().into());
@@ -811,16 +804,9 @@ mod tests {
 
     #[test]
     fn async_signal_empty_wake() {
-        struct WakeFlag(AtomicBool);
-        impl Wake for WakeFlag {
-            fn wake(self: Arc<Self>) {
-                self.0.store(true, Ordering::Relaxed);
-            }
-        }
-
         let mut async_signal = AsyncSignal::new();
         let status = async_signal.wait_for_signals();
-        let wake_flag = Arc::new(WakeFlag(AtomicBool::new(false)));
+        let wake_flag = Arc::new(WakeFlag::new());
         assert_matches!(&mut *status.borrow_mut(), SignalStatus::Expected(waker) => {
             assert!(waker.is_none());
             *waker = Some(wake_flag.clone().into());
@@ -828,12 +814,12 @@ mod tests {
 
         async_signal.wake(vec![]);
 
-        assert!(!wake_flag.0.load(Ordering::Relaxed));
+        assert!(!wake_flag.is_woken());
         // to assert that the waker is not modified, we wake the waker ourself
         assert_matches!(&*status.borrow(), SignalStatus::Expected(Some(waker)) => {
             waker.wake_by_ref();
         });
-        assert!(wake_flag.0.load(Ordering::Relaxed));
+        assert!(wake_flag.is_woken());
     }
 
     #[test]
