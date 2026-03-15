@@ -34,13 +34,13 @@ impl Select for VirtualSystem {
     /// or a caught signal. Otherwise, the timeout is added to
     /// [`SystemState::now`](super::SystemState::now), which must not be `None`
     /// then.
-    fn select(
+    fn select<'a>(
         &self,
-        readers: &mut Vec<Fd>,
-        writers: &mut Vec<Fd>,
+        readers: &'a mut Vec<Fd>,
+        writers: &'a mut Vec<Fd>,
         timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
-    ) -> impl Future<Output = Result<c_int>> + use<> {
+    ) -> impl Future<Output = Result<c_int>> + use<'a> {
         let mut state_changed = false;
         let result;
 

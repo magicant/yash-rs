@@ -77,13 +77,13 @@ pub trait Select: Signals {
     /// [real system](super::real), this function does not work asynchronously
     /// and returns a ready `Future` with the result of the underlying system
     /// call. See the [module-level documentation](super) for details.
-    fn select(
+    fn select<'a>(
         &self,
-        readers: &mut Vec<Fd>,
-        writers: &mut Vec<Fd>,
+        readers: &'a mut Vec<Fd>,
+        writers: &'a mut Vec<Fd>,
         timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
-    ) -> impl Future<Output = Result<c_int>> + use<Self>;
+    ) -> impl Future<Output = Result<c_int>> + use<'a, Self>;
 }
 
 /// [System] extended with internal state to support asynchronous functions.
@@ -282,27 +282,27 @@ impl<S> SelectSystem<S> {
     /// `S::select` does not borrow from `&self`. This is guaranteed by the
     /// `Select` trait signature, which uses `use<Self>` (not `use<'_, Self>`),
     /// so the future cannot capture the `'_` lifetime of `&self`.
+    #[allow(clippy::await_holding_refcell_ref)] // false positive
     pub async fn select(this: &RefCell<SelectSystem<S>>, poll: bool) -> Result<()>
     where
         S: Select + CaughtSignals + Clock,
     {
-        let (readers, writers, future) = {
-            let me = this.borrow();
-            let mut readers = me.io.readers();
-            let mut writers = me.io.writers();
-            let timeout = if poll {
-                Some(Duration::ZERO)
-            } else {
-                me.time
-                    .first_target()
-                    .map(|instant| instant.saturating_duration_since(me.now()))
-            };
-
-            let future =
-                me.system
-                    .select(&mut readers, &mut writers, timeout, me.wait_mask.as_deref());
-            (readers, writers, future)
+        let me = this.borrow();
+        let mut readers = me.io.readers();
+        let mut writers = me.io.writers();
+        let timeout = if poll {
+            Some(Duration::ZERO)
+        } else {
+            me.time
+                .first_target()
+                .map(|instant| instant.saturating_duration_since(me.now()))
         };
+
+        let future = me
+            .system
+            .select(&mut readers, &mut writers, timeout, me.wait_mask.as_deref());
+
+        drop(me);
 
         // Await after releasing the borrow.
         let inner_result = future.await;

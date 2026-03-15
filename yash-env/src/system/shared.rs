@@ -668,13 +668,13 @@ impl<T: SendSignal> SendSignal for SharedSystem<T> {
 
 /// Delegates `Select` methods to the contained implementor.
 impl<T: Select> Select for SharedSystem<T> {
-    fn select(
+    fn select<'a>(
         &self,
-        readers: &mut Vec<Fd>,
-        writers: &mut Vec<Fd>,
+        readers: &'a mut Vec<Fd>,
+        writers: &'a mut Vec<Fd>,
         timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
-    ) -> impl Future<Output = Result<c_int>> + use<T> {
+    ) -> impl Future<Output = Result<c_int>> + use<'a, T> {
         (**self.0.borrow()).select(readers, writers, timeout, signal_mask)
     }
 }
