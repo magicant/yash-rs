@@ -23,6 +23,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `awaiters: Vec<Waker>` field has been added to the
   `system::virtual::FileBody::Fifo` variant to allow the virtual system to
   notify tasks waiting on the pipe when certain events occur.
+- The `system::virtual::VirtualSystem::get_open_file_description` method has
+  been added to retrieve the open file description for a given file descriptor
+  in the current process.
 - The `test_helper` module has been added with items migrated from the
   `yash-env-test-helper` crate. This module is conditionally compiled when the
   new `test-helper` feature is enabled.
@@ -71,6 +74,12 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `system::SharedSystem::read_async` and `system::SharedSystem::write_all`
   methods now handle `EWOULDBLOCK` and `EINTR` by retrying the operation instead
   of returning an error.
+- The `with_open_file_description` and `with_open_file_description_mut` methods
+  of `system::virtual::VirtualSystem` internally borrow the system's state to
+  retrieve the open file description for the given file descriptor. These
+  methods previously held the borrow across the call to the provided closure,
+  but they now drop the borrow before calling the closure to allow the closure
+  to perform operations that may require borrowing the system's state again.
 - Private dependency versions:
     - derive_more 2.0.1 → 2.1.0
 

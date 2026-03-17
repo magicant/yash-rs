@@ -259,30 +259,51 @@ impl VirtualSystem {
         })
     }
 
-    /// Calls the given closure passing the open file description for the FD.
+    /// Returns the open file description for the given FD.
     ///
+    /// This is a helper function for obtaining the open file description for a
+    /// given file descriptor in the current process.
     /// Returns `Err(Errno::EBADF)` if the FD is not open.
-    pub fn with_open_file_description<F, R>(&self, fd: Fd, f: F) -> Result<R>
-    where
-        F: FnOnce(&OpenFileDescription) -> Result<R>,
-    {
+    pub fn get_open_file_description(&self, fd: Fd) -> Result<Rc<RefCell<OpenFileDescription>>> {
         let process = self.current_process();
         let body = process.get_fd(fd).ok_or(Errno::EBADF)?;
-        let ofd = body.open_file_description.borrow();
-        f(&ofd)
+        Ok(Rc::clone(&body.open_file_description))
     }
 
     /// Calls the given closure passing the open file description for the FD.
     ///
+    /// This is a helper function for performing an operation on the open file
+    /// description for a given file descriptor in the current process. The
+    /// closure is passed a reference to the open file description, and can
+    /// perform any operation on it, such as checking its state. The return
+    /// value of the closure is returned as the result of this function.
+    ///
     /// Returns `Err(Errno::EBADF)` if the FD is not open.
+    /// Panics if the open file description is already mutably borrowed.
+    pub fn with_open_file_description<F, R>(&self, fd: Fd, f: F) -> Result<R>
+    where
+        F: FnOnce(&OpenFileDescription) -> Result<R>,
+    {
+        let ofd = self.get_open_file_description(fd)?;
+        f(&ofd.borrow())
+    }
+
+    /// Calls the given closure passing the open file description for the FD.
+    ///
+    /// This is a helper function for performing a mutable operation on the open
+    /// file description for a given file descriptor in the current process. The
+    /// closure is passed a mutable reference to the open file description, and
+    /// can perform any operation on it, such as reading and writing. The return
+    /// value of the closure is returned as the result of this function.
+    ///
+    /// Returns `Err(Errno::EBADF)` if the FD is not open.
+    /// Panics if the open file description is already borrowed.
     pub fn with_open_file_description_mut<F, R>(&self, fd: Fd, f: F) -> Result<R>
     where
         F: FnOnce(&mut OpenFileDescription) -> Result<R>,
     {
-        let mut process = self.current_process_mut();
-        let body = process.get_fd_mut(fd).ok_or(Errno::EBADF)?;
-        let mut ofd = body.open_file_description.borrow_mut();
-        f(&mut ofd)
+        let ofd = self.get_open_file_description(fd)?;
+        f(&mut ofd.borrow_mut())
     }
 
     fn resolve_relative_path<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
