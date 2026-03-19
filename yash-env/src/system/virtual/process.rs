@@ -634,7 +634,7 @@ mod tests {
                 content: VecDeque::new(),
                 readers: 0,
                 writers: 0,
-                awaiters: Vec::new(),
+                pending_open_wakers: Vec::new(),
             },
             permissions: Mode::default(),
         }));

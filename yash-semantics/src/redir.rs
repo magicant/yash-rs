@@ -1231,7 +1231,7 @@ mod tests {
                 content: Default::default(),
                 readers: 1,
                 writers: 0,
-                awaiters: Vec::new(),
+                pending_open_wakers: Vec::new(),
             },
             permissions: Default::default(),
         };

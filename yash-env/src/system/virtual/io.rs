@@ -58,10 +58,7 @@ impl Drop for OpenFileDescription {
     fn drop(&mut self) {
         let mut file = self.file.borrow_mut();
         if let FileBody::Fifo {
-            readers,
-            writers,
-            awaiters,
-            ..
+            readers, writers, ..
         } = &mut file.body
         {
             if self.is_readable {
@@ -69,13 +66,6 @@ impl Drop for OpenFileDescription {
             }
             if self.is_writable {
                 *writers -= 1;
-            }
-
-            // Notify other tasks waiting for this FIFO to become ready for reading or writing.
-            let awaiters = std::mem::take(awaiters);
-            drop(file); // Avoid potential double borrow
-            for task in awaiters {
-                task.wake();
             }
         }
     }
@@ -94,7 +84,7 @@ impl OpenFileDescription {
         if let FileBody::Fifo {
             readers,
             writers,
-            awaiters,
+            pending_open_wakers,
             ..
         } = &mut file_borrow.body
         {
@@ -106,7 +96,7 @@ impl OpenFileDescription {
             }
 
             // Notify other tasks waiting for this FIFO to be opened for reading or writing.
-            let awaiters = std::mem::take(awaiters);
+            let awaiters = std::mem::take(pending_open_wakers);
             drop(file_borrow); // Avoid potential double borrow
             for task in awaiters {
                 task.wake();
@@ -580,7 +570,7 @@ mod tests {
                 content: VecDeque::new(),
                 readers: 1,
                 writers: 1,
-                awaiters: Vec::new(),
+                pending_open_wakers: Vec::new(),
             },
             permissions: Mode::default(),
         }));
@@ -606,7 +596,7 @@ mod tests {
                 content: VecDeque::new(),
                 readers: 1,
                 writers: 1,
-                awaiters: Vec::new(),
+                pending_open_wakers: Vec::new(),
             },
             permissions: Mode::default(),
         }));
@@ -632,7 +622,7 @@ mod tests {
                 content: VecDeque::new(),
                 readers: 1,
                 writers: 1,
-                awaiters: Vec::new(),
+                pending_open_wakers: Vec::new(),
             },
             permissions: Mode::default(),
         }));
@@ -669,7 +659,7 @@ mod tests {
                     content: VecDeque::new(),
                     readers: 1,
                     writers: 0,
-                    awaiters: Vec::new(),
+                    pending_open_wakers: Vec::new(),
                 },
                 permissions: Mode::default(),
             })),
@@ -692,7 +682,7 @@ mod tests {
                     content: VecDeque::from([1, 5, 7, 3, 42, 7, 6]),
                     readers: 1,
                     writers: 0,
-                    awaiters: Vec::new(),
+                    pending_open_wakers: Vec::new(),
                 },
                 permissions: Mode::default(),
             })),
@@ -723,7 +713,7 @@ mod tests {
                     content: VecDeque::new(),
                     readers: 1,
                     writers: 1,
-                    awaiters: Vec::new(),
+                    pending_open_wakers: Vec::new(),
                 },
                 permissions: Mode::default(),
             })),
@@ -745,7 +735,7 @@ mod tests {
                 content: VecDeque::new(),
                 readers: 1,
                 writers: 1,
-                awaiters: Vec::new(),
+                pending_open_wakers: Vec::new(),
             },
             permissions: Mode::default(),
         }));
@@ -776,7 +766,7 @@ mod tests {
                     content: VecDeque::new(),
                     readers: 1,
                     writers: 1,
-                    awaiters: Vec::new(),
+                    pending_open_wakers: Vec::new(),
                 },
                 permissions: Mode::default(),
             })),
@@ -806,7 +796,7 @@ mod tests {
                 content: VecDeque::new(),
                 readers: 1,
                 writers: 1,
-                awaiters: Vec::new(),
+                pending_open_wakers: Vec::new(),
             },
             permissions: Mode::default(),
         }));
@@ -839,7 +829,7 @@ mod tests {
                     content: VecDeque::new(),
                     readers: 1,
                     writers: 1,
-                    awaiters: Vec::new(),
+                    pending_open_wakers: Vec::new(),
                 },
                 permissions: Mode::default(),
             })),
@@ -867,7 +857,7 @@ mod tests {
                     content: VecDeque::new(),
                     readers: 0,
                     writers: 1,
-                    awaiters: Vec::new(),
+                    pending_open_wakers: Vec::new(),
                 },
                 permissions: Mode::default(),
             })),

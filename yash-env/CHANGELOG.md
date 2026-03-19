@@ -20,9 +20,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   in the real system implementation.
 - `impl system::Stat for system::real::Stat`
 - `impl system::Stat for system::virtual::Stat`
-- The `awaiters: Vec<Waker>` field has been added to the
+- The `pending_open_wakers: Vec<Waker>` field has been added to the
   `system::virtual::FileBody::Fifo` variant to allow the virtual system to
-  notify tasks waiting on the pipe when certain events occur.
+  notify tasks waiting to open the pipe.
 - The `system::virtual::VirtualSystem::get_open_file_description` method has
   been added to retrieve the open file description for a given file descriptor
   in the current process.

@@ -459,7 +459,7 @@ impl VirtualSystem {
             let FileBody::Fifo {
                 readers,
                 writers,
-                ref mut awaiters,
+                ref mut pending_open_wakers,
                 ..
             } = file.body
             else {
@@ -470,10 +470,14 @@ impl VirtualSystem {
                 return Poll::Ready(());
             }
 
-            // Register the current task as an awaiter if it's not already registered.
+            // Register the current task's waker to be notified when a new reader or writer
+            // is opened on the FIFO, unless it's already registered.
             let waker = context.waker();
-            if !awaiters.iter().any(|existing| existing.will_wake(waker)) {
-                awaiters.push(waker.clone());
+            if !pending_open_wakers
+                .iter()
+                .any(|existing| existing.will_wake(waker))
+            {
+                pending_open_wakers.push(waker.clone());
             }
             Poll::Pending
         })
@@ -520,7 +524,7 @@ impl Pipe for VirtualSystem {
                 content: VecDeque::new(),
                 readers: 0,
                 writers: 0,
-                awaiters: Vec::new(),
+                pending_open_wakers: Vec::new(),
             },
             permissions: Mode::default(),
         }));
@@ -1587,7 +1591,7 @@ mod tests {
                 content: [17; 42].into(),
                 readers: 0,
                 writers: 0,
-                awaiters: Vec::new(),
+                pending_open_wakers: Vec::new(),
             },
             permissions: Mode::default(),
         }));

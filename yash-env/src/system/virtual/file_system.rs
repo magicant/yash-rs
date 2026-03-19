@@ -240,19 +240,16 @@ pub enum FileBody {
         readers: usize,
         /// Number of open file descriptions writing to this pipe
         writers: usize,
-        /// Wakers of tasks waiting for this pipe to be updated
+        /// Wakers of tasks waiting to open the pipe for reading or writing
         ///
-        /// This field is used to notify the following events:
-        ///
-        /// - A new reader is opened: tasks attempting to open the pipe for writing will be notified.
-        /// - A new writer is opened: tasks attempting to open the pipe for reading will be notified.
-        /// - The content is filled: tasks attempting to read from the pipe will be notified.
-        /// - The content is drained: tasks attempting to write to the pipe will be notified.
-        /// - A reader is closed: tasks attempting to write to the pipe will be notified.
-        /// - A writer is closed: tasks attempting to read from the pipe will be notified.
+        /// A reader and a writer of a pipe are opened synchronously: when a
+        /// task attempts to open the pipe for reading, it will wait until
+        /// another task opens the pipe for writing, and vice versa. This field
+        /// is used to store the wakers of tasks waiting to open the pipe, so
+        /// that they can be notified when a new reader or writer is opened.
         #[eq(ignore)]
         #[partial_eq(ignore)]
-        awaiters: Vec<Waker>,
+        pending_open_wakers: Vec<Waker>,
     },
     /// Symbolic link
     Symlink {
