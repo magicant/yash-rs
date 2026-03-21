@@ -20,6 +20,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   in the real system implementation.
 - `impl system::Stat for system::real::Stat`
 - `impl system::Stat for system::virtual::Stat`
+- The `system::virtual::FileBody` enum now has the following methods:
+    - `is_seekable`: Returns whether the file supports seeking.
 - The `pending_open_wakers: Vec<Waker>` field has been added to the
   `system::virtual::FileBody::Fifo` variant to allow the virtual system to
   notify tasks waiting to open the pipe.

@@ -153,4 +153,16 @@ impl FileBody {
             Self::Terminal { .. } => 0,
         }
     }
+
+    /// Returns whether the file supports seeking.
+    #[must_use]
+    pub fn is_seekable(&self) -> bool {
+        match self {
+            Self::Regular { .. } => true,
+            Self::Directory { .. } => false,
+            Self::Fifo { .. } => false,
+            Self::Symlink { .. } => false,
+            Self::Terminal { .. } => false,
+        }
+    }
 }
