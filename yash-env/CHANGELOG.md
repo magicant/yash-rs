@@ -82,6 +82,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   methods previously held the borrow across the call to the provided closure,
   but they now drop the borrow before calling the closure to allow the closure
   to perform operations that may require borrowing the system's state again.
+- The `is_ready_for_reading` and `is_ready_for_writing` methods of
+  `system::virtual::OpenFileDescription` now return `true` for symbolic links.
 - Private dependency versions:
     - derive_more 2.0.1 → 2.1.0
 

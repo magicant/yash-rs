@@ -20,23 +20,12 @@ use super::super::Errno;
 use super::FdFlag;
 use super::FileBody;
 use super::Inode;
+use super::{PIPE_BUF, PIPE_SIZE};
 use enumset::EnumSet;
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::io::SeekFrom;
 use std::rc::Rc;
-
-/// Maximum number of bytes guaranteed to be atomic when writing to a pipe.
-///
-/// This value is for the virtual system implementation.
-/// The real system may have a different configuration.
-pub const PIPE_BUF: usize = 512;
-
-/// Maximum number of bytes a pipe can hold at a time.
-///
-/// This value is for the virtual system implementation.
-/// The real system may have a different configuration.
-pub const PIPE_SIZE: usize = PIPE_BUF * 2;
 
 /// State of a file opened for reading and/or writing
 #[derive(Clone, Debug)]
@@ -132,34 +121,22 @@ impl OpenFileDescription {
         self.is_writable
     }
 
-    /// Returns true if you can read from this open file description without
-    /// blocking.
+    /// Returns true if a read operation on this open file description would not
+    /// block.
     #[must_use]
     pub fn is_ready_for_reading(&self) -> bool {
-        match &self.file.borrow().body {
-            FileBody::Regular { .. } | FileBody::Directory { .. } | FileBody::Terminal { .. } => {
-                true
-            }
-            FileBody::Fifo {
-                content, writers, ..
-            } => !self.is_readable || !content.is_empty() || *writers == 0,
-            FileBody::Symlink { target: _ } => false,
-        }
+        // If this file is not readable, it is considered ready for reading
+        // because any read operation on it would immediately fail.
+        !self.is_readable || self.file.borrow().body.is_ready_for_reading()
     }
 
-    /// Returns true if you can write to this open file description without
-    /// blocking.
+    /// Returns true if a write operation on this open file description would
+    /// not block.
     #[must_use]
     pub fn is_ready_for_writing(&self) -> bool {
-        match &self.file.borrow().body {
-            FileBody::Regular { .. } | FileBody::Directory { .. } | FileBody::Terminal { .. } => {
-                true
-            }
-            FileBody::Fifo {
-                content, readers, ..
-            } => *readers == 0 || PIPE_SIZE - content.len() >= PIPE_BUF,
-            FileBody::Symlink { target: _ } => false,
-        }
+        // If this file is not writable, it is considered ready for writing
+        // because any write operation on it would immediately fail.
+        !self.is_writable || self.file.borrow().body.is_ready_for_writing()
     }
 
     /// Reads from this open file description.

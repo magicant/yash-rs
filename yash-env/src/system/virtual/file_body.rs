@@ -26,6 +26,18 @@ use std::collections::VecDeque;
 use std::rc::Rc;
 use std::task::Waker;
 
+/// Maximum number of bytes guaranteed to be atomic when writing to a pipe.
+///
+/// This value is for the virtual system implementation.
+/// The real system may have a different configuration.
+pub const PIPE_BUF: usize = 512;
+
+/// Maximum number of bytes a pipe can hold at a time.
+///
+/// This value is for the virtual system implementation.
+/// The real system may have a different configuration.
+pub const PIPE_SIZE: usize = PIPE_BUF * 2;
+
 /// Filetype-specific content of a file
 #[derive(Clone, derive_more::Debug, derive_more::Eq, derive_more::PartialEq)]
 #[non_exhaustive]
@@ -151,6 +163,36 @@ impl FileBody {
             Self::Fifo { content, .. } => content.len(),
             Self::Symlink { target } => target.as_unix_str().len(),
             Self::Terminal { .. } => 0,
+        }
+    }
+
+    /// Returns true if a read operation on this open file description would not
+    /// block.
+    #[must_use]
+    pub(super) fn is_ready_for_reading(&self) -> bool {
+        match self {
+            Self::Regular { .. }
+            | Self::Directory { .. }
+            | Self::Terminal { .. }
+            | Self::Symlink { .. } => true,
+            Self::Fifo {
+                content, writers, ..
+            } => *writers == 0 || !content.is_empty(),
+        }
+    }
+
+    /// Returns true if a write operation on this open file description would
+    /// not block.
+    #[must_use]
+    pub(super) fn is_ready_for_writing(&self) -> bool {
+        match self {
+            Self::Regular { .. }
+            | Self::Directory { .. }
+            | Self::Terminal { .. }
+            | Self::Symlink { .. } => true,
+            Self::Fifo {
+                content, readers, ..
+            } => *readers == 0 || PIPE_SIZE - content.len() >= PIPE_BUF,
         }
     }
 
