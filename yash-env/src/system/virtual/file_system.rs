@@ -19,7 +19,7 @@
 use super::super::{Dir, DirEntry, Errno, FileType, Gid, Uid};
 use crate::path::{Component, Path, PathBuf};
 use crate::str::UnixStr;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fmt::Debug;
@@ -212,7 +212,7 @@ impl Inode {
 }
 
 /// Filetype-specific content of a file
-#[derive(Clone, Debug, derive_more::Eq, derive_more::PartialEq)]
+#[derive(Clone, derive_more::Debug, derive_more::Eq, derive_more::PartialEq)]
 #[non_exhaustive]
 pub enum FileBody {
     /// Regular file
@@ -250,6 +250,35 @@ pub enum FileBody {
         #[eq(ignore)]
         #[partial_eq(ignore)]
         pending_open_wakers: Vec<Waker>,
+        /// Wakers of tasks waiting to read from the pipe
+        ///
+        /// When a task attempts to read from an empty pipe, it will wait until
+        /// another task writes to the pipe. This field is used to store the
+        /// wakers of such tasks, so that they can be notified when new content
+        /// is written.
+        ///
+        /// The waker is wrapped in `Rc<Cell<Option<Waker>>>` to allow it to be
+        /// shared among multiple wake conditions like timeouts and signals, and
+        /// to allow it to be taken when waking up the task. When the waker is
+        /// `None`, it means the task has already been woken up (possibly by
+        /// other conditions) and the item can be removed from the queue.
+        #[debug("[{} wakers]", pending_read_wakers.len())]
+        #[eq(ignore)]
+        #[partial_eq(ignore)]
+        pending_read_wakers: Vec<Rc<Cell<Option<Waker>>>>,
+        /// Wakers of tasks waiting to write to the pipe
+        ///
+        /// When a task attempts to write to a full pipe, it will wait until
+        /// another task reads from the pipe. This field is used to store the
+        /// wakers of such tasks, so that they can be notified when content is
+        /// read and space is available for writing.
+        ///
+        /// See the comment on `pending_read_wakers` for the reason why the
+        /// waker is wrapped in `Rc<Cell<Option<Waker>>>`.
+        #[debug("[{} wakers]", pending_write_wakers.len())]
+        #[eq(ignore)]
+        #[partial_eq(ignore)]
+        pending_write_wakers: Vec<Rc<Cell<Option<Waker>>>>,
     },
     /// Symbolic link
     Symlink {
@@ -278,6 +307,7 @@ impl Default for FileBody {
 
 impl FileBody {
     /// Creates a regular file body with the given content.
+    #[must_use]
     pub fn new<T: Into<Vec<u8>>>(bytes: T) -> Self {
         FileBody::Regular {
             content: bytes.into(),

@@ -635,6 +635,8 @@ mod tests {
                 readers: 0,
                 writers: 0,
                 pending_open_wakers: Vec::new(),
+                pending_read_wakers: Vec::new(),
+                pending_write_wakers: Vec::new(),
             },
             permissions: Mode::default(),
         }));
