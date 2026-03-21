@@ -57,6 +57,7 @@
 //!
 //! TBD: Explain how to use `VirtualSystem` with an executor.
 
+mod file_body;
 mod file_system;
 mod io;
 mod process;
@@ -64,6 +65,7 @@ mod select;
 mod signal;
 mod timer;
 
+pub use self::file_body::*;
 pub use self::file_system::*;
 pub use self::io::*;
 pub use self::process::*;

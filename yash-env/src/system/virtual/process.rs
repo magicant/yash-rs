@@ -593,7 +593,9 @@ impl BitOrAssign for SignalResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::system::r#virtual::file_system::{FileBody, Inode, Mode};
+    use crate::system::file_system::Mode;
+    use crate::system::r#virtual::file_body::FileBody;
+    use crate::system::r#virtual::file_system::Inode;
     use crate::system::r#virtual::io::OpenFileDescription;
     use enumset::EnumSet;
     use futures_util::FutureExt;
