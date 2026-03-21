@@ -34,7 +34,7 @@ use std::task::Waker;
 /// use std::task::Waker;
 /// use yash_env::test_helper::WakeFlag;
 ///
-/// let wake_flag = Arc::new(WakeFlag::default());
+/// let wake_flag = Arc::new(WakeFlag::new());
 /// let waker = Waker::from(wake_flag.clone());
 /// assert!(!wake_flag.is_woken());
 /// waker.wake();

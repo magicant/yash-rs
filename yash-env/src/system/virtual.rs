@@ -62,11 +62,13 @@ mod io;
 mod process;
 mod select;
 mod signal;
+mod timer;
 
 pub use self::file_system::*;
 pub use self::io::*;
 pub use self::process::*;
 pub use self::signal::*;
+pub use self::timer::*;
 use super::AT_FDCWD;
 use super::CaughtSignals;
 use super::Chdir;
@@ -1358,11 +1360,18 @@ fn raise_sigchld(state: &mut SystemState, target_pid: Pid) {
     }
 }
 
-/// State of the virtual system.
+/// State of the virtual system
 #[derive(Clone, Debug, Default)]
 pub struct SystemState {
     /// Current time
+    ///
+    /// To make sure scheduled wakers are woken up at the right time, use
+    /// [`advance_time`](Self::advance_time) to update the current time instead
+    /// of directly modifying this field.
     pub now: Option<Instant>,
+
+    /// Priority queue of wakers scheduled to be woken up at specific times
+    pub scheduled_wakers: ScheduledWakerQueue,
 
     /// Consumed CPU time statistics
     pub times: CpuTimes,
@@ -1397,6 +1406,13 @@ pub struct SystemState {
 }
 
 impl SystemState {
+    /// Sets the current time to `new_current_time` and wakes up any wakers
+    /// scheduled to be woken up by that time.
+    pub fn advance_time(&mut self, new_current_time: Instant) {
+        self.now = Some(new_current_time);
+        self.scheduled_wakers.wake(new_current_time);
+    }
+
     /// Performs [`select`](crate::system::SharedSystem::select) on all
     /// processes in the system.
     ///
