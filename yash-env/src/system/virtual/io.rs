@@ -148,8 +148,8 @@ impl OpenFileDescription {
     /// for reading, it returns `Err(Errno::EAGAIN)`. Use
     /// [`poll_read`](Self::poll_read) for polling support.
     pub fn read(&mut self, buffer: &mut [u8]) -> Result<usize, Errno> {
-        let mut context = Context::from_waker(Waker::noop());
-        match self.poll_read(&mut context, buffer) {
+        let context = Context::from_waker(Waker::noop());
+        match self.poll_read(&context, buffer) {
             Poll::Ready(result) => result,
             Poll::Pending => Err(Errno::EAGAIN),
         }
@@ -165,7 +165,7 @@ impl OpenFileDescription {
     /// up, when this method should be called again.
     pub fn poll_read(
         &mut self,
-        context: &mut Context<'_>,
+        context: &Context<'_>,
         buffer: &mut [u8],
     ) -> Poll<Result<usize, Errno>> {
         if !self.is_readable {
@@ -186,8 +186,8 @@ impl OpenFileDescription {
     ///
     /// Returns the number of bytes successfully written.
     pub fn write(&mut self, buffer: &[u8]) -> Result<usize, Errno> {
-        let mut context = Context::from_waker(Waker::noop());
-        match self.poll_write(&mut context, buffer) {
+        let context = Context::from_waker(Waker::noop());
+        match self.poll_write(&context, buffer) {
             Poll::Ready(result) => result,
             Poll::Pending => Err(Errno::EAGAIN),
         }
@@ -203,7 +203,7 @@ impl OpenFileDescription {
     /// woken up, when this method should be called again.
     pub fn poll_write(
         &mut self,
-        context: &mut Context<'_>,
+        context: &Context<'_>,
         buffer: &[u8],
     ) -> Poll<Result<usize, Errno>> {
         if !self.is_writable {
