@@ -168,6 +168,56 @@ impl FileBody {
         }
     }
 
+    /// Notifies the file body that a new open file description has been opened
+    /// for this file, with the given access mode.
+    pub(super) fn open(&mut self, is_readable: bool, is_writable: bool) {
+        if let Self::Fifo {
+            readers,
+            writers,
+            pending_open_wakers,
+            ..
+        } = self
+        {
+            if is_readable {
+                *readers += 1;
+            }
+            if is_writable {
+                *writers += 1;
+            }
+            pending_open_wakers.drain(..).for_each(Waker::wake);
+        }
+    }
+
+    /// Notifies the file body that an open file description has been closed for
+    /// this file, with the given access mode.
+    pub(super) fn close(&mut self, is_readable: bool, is_writable: bool) {
+        if let Self::Fifo {
+            readers,
+            writers,
+            pending_read_wakers,
+            pending_write_wakers,
+            ..
+        } = self
+        {
+            if is_readable {
+                *readers -= 1;
+                if *readers == 0 {
+                    // Let writers know that there are no readers,
+                    // so they can return an error instead of blocking.
+                    wake_all(pending_write_wakers);
+                }
+            }
+            if is_writable {
+                *writers -= 1;
+                if *writers == 0 {
+                    // Let readers know that there are no writers,
+                    // so they can return EOF instead of blocking.
+                    wake_all(pending_read_wakers);
+                }
+            }
+        }
+    }
+
     /// Returns true if a read operation on this open file description would not
     /// block.
     #[must_use]
@@ -359,7 +409,137 @@ fn wake_all(pending_wakers: &mut Vec<Rc<Cell<Option<Waker>>>>) {
 mod tests {
     use super::*;
     use crate::test_helper::WakeFlag;
+    use assert_matches::assert_matches;
     use std::sync::Arc;
+
+    #[test]
+    fn fifo_file_body_open_increments_readers_and_writers() {
+        let mut body = FileBody::Fifo {
+            content: VecDeque::new(),
+            readers: 0,
+            writers: 0,
+            pending_open_wakers: Vec::new(),
+            pending_read_wakers: Vec::new(),
+            pending_write_wakers: Vec::new(),
+        };
+
+        body.open(true, false);
+        assert_matches!(
+            &body,
+            FileBody::Fifo { readers, writers, .. } if *readers == 1 && *writers == 0
+        );
+
+        body.open(false, true);
+        assert_matches!(
+            &body,
+            FileBody::Fifo { readers, writers, .. } if *readers == 1 && *writers == 1
+        );
+
+        body.open(true, true);
+        assert_matches!(
+            &body,
+            FileBody::Fifo { readers, writers, .. } if *readers == 2 && *writers == 2
+        );
+    }
+
+    #[test]
+    fn fifo_file_body_open_wakes_pending_open_wakers() {
+        let wake_flag_1 = Arc::new(WakeFlag::new());
+        let wake_flag_2 = Arc::new(WakeFlag::new());
+        let waker_1 = Waker::from(wake_flag_1.clone());
+        let waker_2 = Waker::from(wake_flag_2.clone());
+        let mut body = FileBody::Fifo {
+            content: VecDeque::new(),
+            readers: 0,
+            writers: 0,
+            pending_open_wakers: vec![waker_1, waker_2],
+            pending_read_wakers: Vec::new(),
+            pending_write_wakers: Vec::new(),
+        };
+        body.open(true, false);
+        assert!(wake_flag_1.is_woken());
+        assert!(wake_flag_2.is_woken());
+        assert_matches!(
+            &body,
+            FileBody::Fifo { pending_open_wakers, .. } if pending_open_wakers.is_empty()
+        );
+    }
+
+    #[test]
+    fn fifo_file_body_close_decrements_readers_and_writers() {
+        let mut body = FileBody::Fifo {
+            content: VecDeque::new(),
+            readers: 2,
+            writers: 2,
+            pending_open_wakers: Vec::new(),
+            pending_read_wakers: Vec::new(),
+            pending_write_wakers: Vec::new(),
+        };
+
+        body.close(true, false);
+        assert_matches!(
+            &body,
+            FileBody::Fifo { readers, writers, .. } if *readers == 1 && *writers == 2
+        );
+
+        body.close(false, true);
+        assert_matches!(
+            &body,
+            FileBody::Fifo { readers, writers, .. } if *readers == 1 && *writers == 1
+        );
+
+        body.close(true, true);
+        assert_matches!(
+            &body,
+            FileBody::Fifo { readers, writers, .. } if *readers == 0 && *writers == 0
+        );
+    }
+
+    #[test]
+    fn fifo_file_body_wakes_pending_read_wakers_if_no_writers_remain() {
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Waker::from(wake_flag.clone());
+        let mut body = FileBody::Fifo {
+            content: VecDeque::new(),
+            readers: 1,
+            writers: 2,
+            pending_open_wakers: Vec::new(),
+            pending_read_wakers: vec![Rc::new(Cell::new(Some(waker)))],
+            pending_write_wakers: Vec::new(),
+        };
+
+        // One writer is closed, but there is still another writer,
+        // so the pending read waker should not be woken up.
+        body.close(false, true);
+        assert!(!wake_flag.is_woken());
+
+        // The other writer is closed, so the pending read waker should be woken up.
+        body.close(false, true);
+        assert!(wake_flag.is_woken());
+    }
+
+    #[test]
+    fn fifo_file_body_wakes_pending_write_wakers_if_no_readers_remain() {
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Waker::from(wake_flag.clone());
+        let mut body = FileBody::Fifo {
+            content: VecDeque::new(),
+            readers: 2,
+            writers: 1,
+            pending_open_wakers: Vec::new(),
+            pending_read_wakers: Vec::new(),
+            pending_write_wakers: vec![Rc::new(Cell::new(Some(waker)))],
+        };
+
+        // One reader is closed, but there is still another reader,
+        // so the pending write waker should not be woken up.
+        body.close(true, false);
+        assert!(!wake_flag.is_woken());
+
+        // The other reader is closed, so the pending write waker should be woken up.
+        body.close(true, false);
+        assert!(wake_flag.is_woken());
+    }
 
     #[test]
     fn fifo_file_body_is_ready_for_reading() {

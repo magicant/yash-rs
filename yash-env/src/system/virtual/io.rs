@@ -47,17 +47,7 @@ pub struct OpenFileDescription {
 impl Drop for OpenFileDescription {
     fn drop(&mut self) {
         let mut file = self.file.borrow_mut();
-        if let FileBody::Fifo {
-            readers, writers, ..
-        } = &mut file.body
-        {
-            if self.is_readable {
-                *readers -= 1;
-            }
-            if self.is_writable {
-                *writers -= 1;
-            }
-        }
+        file.body.close(self.is_readable, self.is_writable);
     }
 }
 
@@ -70,30 +60,7 @@ impl OpenFileDescription {
         is_writable: bool,
         is_appending: bool,
     ) -> Self {
-        let mut file_borrow = file.borrow_mut();
-        if let FileBody::Fifo {
-            readers,
-            writers,
-            pending_open_wakers,
-            ..
-        } = &mut file_borrow.body
-        {
-            if is_readable {
-                *readers += 1;
-            }
-            if is_writable {
-                *writers += 1;
-            }
-
-            // Notify other tasks waiting for this FIFO to be opened for reading or writing.
-            let awaiters = std::mem::take(pending_open_wakers);
-            drop(file_borrow); // Avoid potential double borrow
-            for task in awaiters {
-                task.wake();
-            }
-        } else {
-            drop(file_borrow);
-        }
+        file.borrow_mut().body.open(is_readable, is_writable);
 
         Self {
             file,
