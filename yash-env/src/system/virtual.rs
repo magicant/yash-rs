@@ -733,16 +733,16 @@ impl Fcntl for VirtualSystem {
 
 impl Read for VirtualSystem {
     /// Reads data from the file descriptor into the buffer.
-    ///
-    /// The current implementation of this method does not yet support blocking
-    /// behavior, and immediately returns `Err(Errno::EAGAIN)` if the file
-    /// descriptor is not ready for reading.
     fn read<'a>(
         &self,
         fd: Fd,
         buffer: &'a mut [u8],
     ) -> impl Future<Output = Result<usize>> + use<'a> {
-        ready(self.with_open_file_description_mut(fd, |ofd| ofd.read(buffer)))
+        let ofd = self.get_open_file_description(fd);
+        async move {
+            let ofd = ofd?;
+            poll_fn(|context| ofd.borrow_mut().poll_read(context, buffer)).await
+        }
     }
 }
 

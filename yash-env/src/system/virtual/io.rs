@@ -26,6 +26,8 @@ use std::cell::RefCell;
 use std::fmt::Debug;
 use std::io::SeekFrom;
 use std::rc::Rc;
+use std::task::Waker;
+use std::task::{Context, Poll};
 
 /// State of a file opened for reading and/or writing
 #[derive(Clone, Debug)]
@@ -142,48 +144,43 @@ impl OpenFileDescription {
     /// Reads from this open file description.
     ///
     /// Returns the number of bytes successfully read.
-    pub fn read(&mut self, mut buffer: &mut [u8]) -> Result<usize, Errno> {
+    ///
+    /// This function does not support blocking read. If the file is not ready
+    /// for reading, it returns `Err(Errno::EAGAIN)`. Use
+    /// [`poll_read`](Self::poll_read) for polling support.
+    pub fn read(&mut self, buffer: &mut [u8]) -> Result<usize, Errno> {
+        let mut context = Context::from_waker(Waker::noop());
+        match self.poll_read(&mut context, buffer) {
+            Poll::Ready(result) => result,
+            Poll::Pending => Err(Errno::EAGAIN),
+        }
+    }
+
+    /// Polls for the result of reading from this open file description.
+    ///
+    /// The returned `Poll` indicates whether the read operation has completed
+    /// or is still pending. If it is `Poll::Ready`, the contained `Result`
+    /// indicates whether the read was successful and how many bytes were read,
+    /// or if it failed with an error. If it is `Poll::Pending`, it means a
+    /// waker has been registered and the caller should wait until it is woken
+    /// up, when this method should be called again.
+    pub fn poll_read(
+        &mut self,
+        context: &mut Context<'_>,
+        buffer: &mut [u8],
+    ) -> Poll<Result<usize, Errno>> {
         if !self.is_readable {
-            return Err(Errno::EBADF);
+            return Poll::Ready(Err(Errno::EBADF));
         }
-        match &mut self.file.borrow_mut().body {
-            FileBody::Regular { content, .. } | FileBody::Terminal { content } => {
-                let len = content.len();
-                if self.offset >= len {
-                    return Ok(0);
-                }
-                let limit = len - self.offset;
-                if buffer.len() > limit {
-                    buffer = &mut buffer[..limit];
-                }
-                let count = buffer.len();
-                let src = &content[self.offset..][..count];
-                buffer.copy_from_slice(src);
-                self.offset += count;
-                Ok(count)
-            }
-            FileBody::Fifo {
-                content, writers, ..
-            } => {
-                let limit = content.len();
-                if limit == 0 && *writers > 0 {
-                    // TODO: Support blocking read
-                    return Err(Errno::EAGAIN);
-                }
-                let mut count = 0;
-                for to in buffer {
-                    if let Some(from) = content.pop_front() {
-                        *to = from;
-                        count += 1;
-                    } else {
-                        break;
-                    }
-                }
-                Ok(count)
-            }
-            FileBody::Directory { .. } => Err(Errno::EISDIR),
-            FileBody::Symlink { target: _ } => Err(Errno::ENOTSUP),
+
+        let file = self.file.borrow_mut();
+        let poll = { file }.body.poll_read(context, buffer, self.offset);
+
+        if let Poll::Ready(Ok(count)) = poll {
+            self.offset += count;
         }
+
+        poll
     }
 
     /// Writes to this open file description.
@@ -311,27 +308,6 @@ mod tests {
     }
 
     #[test]
-    fn regular_file_read_beyond_file_length() {
-        let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode::new([1]))),
-            offset: 1,
-            is_readable: true,
-            is_writable: false,
-            is_appending: false,
-        };
-
-        let mut buffer = [0];
-        let result = open_file.read(&mut buffer);
-        assert_eq!(result, Ok(0));
-        assert_eq!(open_file.offset, 1);
-
-        open_file.offset = 2;
-        let result = open_file.read(&mut buffer);
-        assert_eq!(result, Ok(0));
-        assert_eq!(open_file.offset, 2);
-    }
-
-    #[test]
     fn regular_file_read_more_than_content() {
         let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(Inode::new([1, 2, 3]))),
@@ -346,23 +322,6 @@ mod tests {
         assert_eq!(result, Ok(2));
         assert_eq!(open_file.offset, 3);
         assert_eq!(buffer[..2], [2, 3]);
-    }
-
-    #[test]
-    fn regular_file_read_less_than_content() {
-        let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode::new([1, 2, 3, 4, 5]))),
-            offset: 1,
-            is_readable: true,
-            is_writable: false,
-            is_appending: false,
-        };
-
-        let mut buffer = [0; 3];
-        let result = open_file.read(&mut buffer);
-        assert_eq!(result, Ok(3));
-        assert_eq!(open_file.offset, 4);
-        assert_eq!(buffer, [2, 3, 4]);
     }
 
     #[test]
@@ -632,31 +591,6 @@ mod tests {
             *readers = 0;
         });
         assert!(open_file.is_ready_for_writing());
-    }
-
-    #[test]
-    fn fifo_read_empty() {
-        let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode {
-                body: FileBody::Fifo {
-                    content: VecDeque::new(),
-                    readers: 1,
-                    writers: 0,
-                    pending_open_wakers: Vec::new(),
-                    pending_read_wakers: Vec::new(),
-                    pending_write_wakers: Vec::new(),
-                },
-                permissions: Mode::default(),
-            })),
-            offset: 0,
-            is_readable: true,
-            is_writable: false,
-            is_appending: false,
-        };
-
-        let mut buffer = [100; 5];
-        let result = open_file.read(&mut buffer);
-        assert_eq!(result, Ok(0));
     }
 
     #[test]

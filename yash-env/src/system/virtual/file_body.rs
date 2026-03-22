@@ -20,11 +20,13 @@ use super::super::FileType;
 use super::Inode;
 use crate::path::PathBuf;
 use crate::str::UnixStr;
+use crate::system::Errno;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::rc::Rc;
-use std::task::Waker;
+use std::task::Poll::Ready;
+use std::task::{Context, Poll, Waker};
 
 /// Maximum number of bytes guaranteed to be atomic when writing to a pipe.
 ///
@@ -206,5 +208,222 @@ impl FileBody {
             Self::Symlink { .. } => false,
             Self::Terminal { .. } => false,
         }
+    }
+
+    /// Polls for the result of a read operation on this file.
+    ///
+    /// The `offset` parameter is the offset from which to read, and is only
+    /// relevant for seekable files. For non-seekable files, it can be ignored
+    /// or set to any value.
+    ///
+    /// The returned `Poll` indicates whether the read operation has completed
+    /// or is still pending. If it is `Poll::Ready`, the contained `Result`
+    /// indicates whether the read was successful and how many bytes were read,
+    /// or if it failed with an error. If it is `Poll::Pending`, it means a
+    /// waker has been registered and the caller should wait until it is woken
+    /// up, when this method should be called again.
+    pub(super) fn poll_read(
+        &mut self,
+        _context: &mut Context<'_>,
+        mut buffer: &mut [u8],
+        offset: usize,
+    ) -> Poll<Result<usize, Errno>> {
+        match self {
+            FileBody::Regular { content, .. } | FileBody::Terminal { content } => {
+                let len = content.len();
+                if offset >= len {
+                    return Ready(Ok(0));
+                }
+                let limit = len - offset;
+                if buffer.len() > limit {
+                    buffer = &mut buffer[..limit];
+                }
+                let count = buffer.len();
+                let src = &content[offset..][..count];
+                buffer.copy_from_slice(src);
+                Ready(Ok(count))
+            }
+
+            FileBody::Fifo {
+                content, writers, ..
+            } => {
+                let limit = content.len();
+                if limit == 0 && *writers > 0 {
+                    // TODO: Support blocking read
+                    return Ready(Err(Errno::EAGAIN));
+                }
+                let mut count = 0;
+                for to in buffer {
+                    if let Some(from) = content.pop_front() {
+                        *to = from;
+                        count += 1;
+                    } else {
+                        break;
+                    }
+                }
+                Ready(Ok(count))
+            }
+
+            FileBody::Directory { .. } => Ready(Err(Errno::EISDIR)),
+
+            FileBody::Symlink { target: _ } => Ready(Err(Errno::ENOTSUP)),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fifo_file_body_is_ready_for_reading() {
+        // When there are no writers, the FIFO is always ready for reading
+        // since it will return EOF.
+        let body = FileBody::Fifo {
+            content: VecDeque::new(),
+            readers: 0,
+            writers: 0,
+            pending_open_wakers: Vec::new(),
+            pending_read_wakers: Vec::new(),
+            pending_write_wakers: Vec::new(),
+        };
+        assert!(body.is_ready_for_reading());
+
+        // When there are writers, the FIFO is ready for reading if and only if
+        // it has content.
+        let body = FileBody::Fifo {
+            content: VecDeque::new(),
+            readers: 0,
+            writers: 1,
+            pending_open_wakers: Vec::new(),
+            pending_read_wakers: Vec::new(),
+            pending_write_wakers: Vec::new(),
+        };
+        assert!(!body.is_ready_for_reading());
+        let body = FileBody::Fifo {
+            content: VecDeque::from([0]),
+            readers: 0,
+            writers: 1,
+            pending_open_wakers: Vec::new(),
+            pending_read_wakers: Vec::new(),
+            pending_write_wakers: Vec::new(),
+        };
+        assert!(body.is_ready_for_reading());
+    }
+
+    #[test]
+    fn fifo_file_body_is_ready_for_writing() {
+        // When there are no readers, the FIFO is always ready for writing
+        // since it will return EPIPE.
+        let body = FileBody::Fifo {
+            content: VecDeque::new(),
+            readers: 0,
+            writers: 0,
+            pending_open_wakers: Vec::new(),
+            pending_read_wakers: Vec::new(),
+            pending_write_wakers: Vec::new(),
+        };
+        assert!(body.is_ready_for_writing());
+
+        // When there are readers, the FIFO is ready for writing if and only if
+        // it has enough space for at least one atomic write.
+        let body = FileBody::Fifo {
+            content: VecDeque::from([0; PIPE_SIZE - PIPE_BUF]),
+            readers: 1,
+            writers: 0,
+            pending_open_wakers: Vec::new(),
+            pending_read_wakers: Vec::new(),
+            pending_write_wakers: Vec::new(),
+        };
+        assert!(body.is_ready_for_writing());
+        let body = FileBody::Fifo {
+            content: VecDeque::from([0; PIPE_SIZE - PIPE_BUF + 1]),
+            readers: 1,
+            writers: 0,
+            pending_open_wakers: Vec::new(),
+            pending_read_wakers: Vec::new(),
+            pending_write_wakers: Vec::new(),
+        };
+        assert!(!body.is_ready_for_writing());
+    }
+
+    #[test]
+    fn regular_file_body_read_beyond_file_length() {
+        let mut body = FileBody::new(b"hello");
+        let mut context = Context::from_waker(Waker::noop());
+        let mut buffer = [0; 10];
+        assert_eq!(body.poll_read(&mut context, &mut buffer, 5), Ready(Ok(0)));
+        assert_eq!(body.poll_read(&mut context, &mut buffer, 10), Ready(Ok(0)));
+    }
+
+    #[test]
+    fn regular_file_body_read_more_than_content() {
+        let mut body = FileBody::new(b"hello");
+        let mut context = Context::from_waker(Waker::noop());
+        let mut buffer = [0; 10];
+        assert_eq!(body.poll_read(&mut context, &mut buffer, 2), Ready(Ok(3)));
+        assert_eq!(&buffer[..3], b"llo");
+    }
+
+    #[test]
+    fn regular_file_body_read_less_than_content() {
+        let mut body = FileBody::new(b"hello");
+        let mut context = Context::from_waker(Waker::noop());
+        let mut buffer = [0; 3];
+        assert_eq!(body.poll_read(&mut context, &mut buffer, 1), Ready(Ok(3)));
+        assert_eq!(&buffer, b"ell");
+    }
+
+    #[test]
+    fn fifo_file_body_read_eof() {
+        // With no writers, the FIFO returns EOF.
+        let mut body = FileBody::Fifo {
+            content: VecDeque::new(),
+            readers: 0,
+            writers: 0,
+            pending_open_wakers: Vec::new(),
+            pending_read_wakers: Vec::new(),
+            pending_write_wakers: Vec::new(),
+        };
+        let mut context = Context::from_waker(Waker::noop());
+        let mut buffer = [0; 10];
+        assert_eq!(body.poll_read(&mut context, &mut buffer, 0), Ready(Ok(0)));
+    }
+
+    #[test]
+    fn fifo_file_body_read_empty() {
+        // The FIFO content is empty but there are writers that may write to it,
+        // so the read operation would block.
+        let mut body = FileBody::Fifo {
+            content: VecDeque::new(),
+            readers: 0,
+            writers: 1,
+            pending_open_wakers: Vec::new(),
+            pending_read_wakers: Vec::new(),
+            pending_write_wakers: Vec::new(),
+        };
+        let mut context = Context::from_waker(Waker::noop());
+        let mut buffer = [0; 10];
+        assert_eq!(
+            body.poll_read(&mut context, &mut buffer, 0),
+            Ready(Err(Errno::EAGAIN))
+        );
+        // TODO: Test blocking read once it is implemented
+    }
+
+    #[test]
+    fn fifo_file_body_read_non_empty() {
+        let mut body = FileBody::Fifo {
+            content: VecDeque::from(*b"hello"),
+            readers: 0,
+            writers: 0,
+            pending_open_wakers: Vec::new(),
+            pending_read_wakers: Vec::new(),
+            pending_write_wakers: Vec::new(),
+        };
+        let mut context = Context::from_waker(Waker::noop());
+        let mut buffer = [0; 10];
+        assert_eq!(body.poll_read(&mut context, &mut buffer, 0), Ready(Ok(5)));
+        assert_eq!(&buffer[..5], b"hello");
     }
 }
