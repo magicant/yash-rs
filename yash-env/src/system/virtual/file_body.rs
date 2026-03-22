@@ -25,7 +25,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::rc::Rc;
-use std::task::Poll::Ready;
+use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll, Waker};
 
 /// Maximum number of bytes guaranteed to be atomic when writing to a pipe.
@@ -224,7 +224,7 @@ impl FileBody {
     /// up, when this method should be called again.
     pub(super) fn poll_read(
         &mut self,
-        _context: &mut Context<'_>,
+        context: &mut Context<'_>,
         mut buffer: &mut [u8],
         offset: usize,
     ) -> Poll<Result<usize, Errno>> {
@@ -245,13 +245,19 @@ impl FileBody {
             }
 
             FileBody::Fifo {
-                content, writers, ..
+                content,
+                writers,
+                pending_read_wakers,
+                pending_write_wakers,
+                ..
             } => {
                 let limit = content.len();
                 if limit == 0 && *writers > 0 {
-                    // TODO: Support blocking read
-                    return Ready(Err(Errno::EAGAIN));
+                    // Block until any writer writes to the pipe or all writers are closed.
+                    pending_read_wakers.push(Rc::new(Cell::new(Some(context.waker().clone()))));
+                    return Pending;
                 }
+
                 let mut count = 0;
                 for to in buffer {
                     if let Some(from) = content.pop_front() {
@@ -261,6 +267,7 @@ impl FileBody {
                         break;
                     }
                 }
+                wake_all(pending_write_wakers);
                 Ready(Ok(count))
             }
 
@@ -284,7 +291,7 @@ impl FileBody {
     /// woken up, when this method should be called again.
     pub(super) fn poll_write(
         &mut self,
-        _context: &mut Context<'_>,
+        context: &mut Context<'_>,
         mut buffer: &[u8],
         offset: usize,
     ) -> Poll<Result<usize, Errno>> {
@@ -306,7 +313,11 @@ impl FileBody {
             }
 
             FileBody::Fifo {
-                content, readers, ..
+                content,
+                readers,
+                pending_read_wakers,
+                pending_write_wakers,
+                ..
             } => {
                 if *readers == 0 {
                     // TODO SIGPIPE
@@ -315,14 +326,17 @@ impl FileBody {
                 let room = PIPE_SIZE - content.len();
                 if room < buffer.len() {
                     if room == 0 || buffer.len() <= PIPE_BUF {
-                        // TODO: Support blocking write
-                        return Ready(Err(Errno::EAGAIN));
+                        // Block until any reader reads from the pipe or all readers are closed.
+                        pending_write_wakers
+                            .push(Rc::new(Cell::new(Some(context.waker().clone()))));
+                        return Pending;
                     }
                     buffer = &buffer[..room];
                 }
                 content.reserve_exact(room);
                 content.extend(buffer);
                 debug_assert!(content.len() <= PIPE_SIZE);
+                wake_all(pending_read_wakers);
                 Ready(Ok(buffer.len()))
             }
 
@@ -333,9 +347,19 @@ impl FileBody {
     }
 }
 
+fn wake_all(pending_wakers: &mut Vec<Rc<Cell<Option<Waker>>>>) {
+    for waker in pending_wakers.drain(..) {
+        if let Some(waker) = waker.take() {
+            waker.wake();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_helper::WakeFlag;
+    use std::sync::Arc;
 
     #[test]
     fn fifo_file_body_is_ready_for_reading() {
@@ -458,19 +482,35 @@ mod tests {
         // so the read operation would block.
         let mut body = FileBody::Fifo {
             content: VecDeque::new(),
-            readers: 0,
+            readers: 1,
             writers: 1,
             pending_open_wakers: Vec::new(),
             pending_read_wakers: Vec::new(),
             pending_write_wakers: Vec::new(),
         };
-        let mut context = Context::from_waker(Waker::noop());
         let mut buffer = [0; 10];
-        assert_eq!(
-            body.poll_read(&mut context, &mut buffer, 0),
-            Ready(Err(Errno::EAGAIN))
-        );
-        // TODO: Test blocking read once it is implemented
+
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Waker::from(wake_flag.clone());
+        let mut context = Context::from_waker(&waker);
+        let poll = body.poll_read(&mut context, &mut buffer, 0);
+        assert_eq!(poll, Pending);
+        assert!(!wake_flag.is_woken());
+
+        // When another task writes to the FIFO, the read operation should be woken up.
+        let mut context = Context::from_waker(Waker::noop());
+        let poll = body.poll_write(&mut context, b"hello", 0);
+        assert_eq!(poll, Ready(Ok(5)));
+        assert!(wake_flag.is_woken());
+
+        // After being woken up, the read operation should succeed and read the new content.
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Waker::from(wake_flag.clone());
+        let mut context = Context::from_waker(&waker);
+        let poll = body.poll_read(&mut context, &mut buffer, 0);
+        assert_eq!(poll, Ready(Ok(5)));
+        assert_eq!(&buffer[..5], b"hello");
+        assert!(!wake_flag.is_woken());
     }
 
     #[test]
@@ -568,13 +608,29 @@ mod tests {
             pending_read_wakers: Vec::new(),
             pending_write_wakers: Vec::new(),
         };
-        let mut context = Context::from_waker(Waker::noop());
         let buffer = [0; PIPE_BUF];
-        assert_eq!(
-            body.poll_write(&mut context, &buffer, 0),
-            Ready(Err(Errno::EAGAIN))
-        );
-        // TODO Test blocking write once it is implemented
+
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Waker::from(wake_flag.clone());
+        let mut context = Context::from_waker(&waker);
+        let poll = body.poll_write(&mut context, &buffer, 0);
+        assert_eq!(poll, Pending);
+        assert!(!wake_flag.is_woken());
+
+        // When another task reads from the FIFO, the write operation should be woken up.
+        let mut context = Context::from_waker(Waker::noop());
+        let mut read_buffer = [0; 1];
+        let poll = body.poll_read(&mut context, &mut read_buffer, 0);
+        assert_eq!(poll, Ready(Ok(1)));
+        assert!(wake_flag.is_woken());
+
+        // After being woken up, the write operation successfully writes the content to the FIFO.
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Waker::from(wake_flag.clone());
+        let mut context = Context::from_waker(&waker);
+        let poll = body.poll_write(&mut context, &buffer, 0);
+        assert_eq!(poll, Ready(Ok(PIPE_BUF)));
+        assert!(!wake_flag.is_woken());
     }
 
     #[test]
@@ -608,12 +664,28 @@ mod tests {
             pending_read_wakers: Vec::new(),
             pending_write_wakers: Vec::new(),
         };
-        let mut context = Context::from_waker(Waker::noop());
         let buffer = [0; PIPE_BUF + 1];
-        assert_eq!(
-            body.poll_write(&mut context, &buffer, 0),
-            Ready(Err(Errno::EAGAIN))
-        );
-        // TODO Test blocking write once it is implemented
+
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Waker::from(wake_flag.clone());
+        let mut context = Context::from_waker(&waker);
+        let poll = body.poll_write(&mut context, &buffer, 0);
+        assert_eq!(poll, Pending);
+        assert!(!wake_flag.is_woken());
+
+        // When another task reads from the FIFO, the write operation should be woken up.
+        let mut context = Context::from_waker(Waker::noop());
+        let mut read_buffer = [0; 1];
+        let poll = body.poll_read(&mut context, &mut read_buffer, 0);
+        assert_eq!(poll, Ready(Ok(1)));
+        assert!(wake_flag.is_woken());
+
+        // After being woken up, the write operation successfully writes one byte to the FIFO.
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Waker::from(wake_flag.clone());
+        let mut context = Context::from_waker(&waker);
+        let poll = body.poll_write(&mut context, &buffer, 0);
+        assert_eq!(poll, Ready(Ok(1)));
+        assert!(!wake_flag.is_woken());
     }
 }
