@@ -269,6 +269,68 @@ impl FileBody {
             FileBody::Symlink { target: _ } => Ready(Err(Errno::ENOTSUP)),
         }
     }
+
+    /// Polls for the result of a write operation on this file.
+    ///
+    /// The `offset` parameter is the offset to which to write, and is only
+    /// relevant for seekable files. For non-seekable files, it can be ignored
+    /// or set to any value.
+    ///
+    /// The returned `Poll` indicates whether the write operation has completed
+    /// or is still pending. If it is `Poll::Ready`, the contained `Result`
+    /// indicates whether the write was successful and how many bytes were
+    /// written, or if it failed with an error. If it is `Poll::Pending`, it
+    /// means a waker has been registered and the caller should wait until it is
+    /// woken up, when this method should be called again.
+    pub(super) fn poll_write(
+        &mut self,
+        _context: &mut Context<'_>,
+        mut buffer: &[u8],
+        offset: usize,
+    ) -> Poll<Result<usize, Errno>> {
+        match self {
+            FileBody::Regular { content, .. } | FileBody::Terminal { content } => {
+                let len = content.len();
+                let count = buffer.len();
+                if offset > len {
+                    let zeroes = offset - len;
+                    content.reserve(zeroes + count);
+                    content.resize_with(offset, u8::default);
+                }
+                let limit = count.min(content.len() - offset);
+                let dst = &mut content[offset..][..limit];
+                dst.copy_from_slice(&buffer[..limit]);
+                content.reserve(count - limit);
+                content.extend(&buffer[limit..]);
+                Ready(Ok(count))
+            }
+
+            FileBody::Fifo {
+                content, readers, ..
+            } => {
+                if *readers == 0 {
+                    // TODO SIGPIPE
+                    return Ready(Err(Errno::EPIPE));
+                }
+                let room = PIPE_SIZE - content.len();
+                if room < buffer.len() {
+                    if room == 0 || buffer.len() <= PIPE_BUF {
+                        // TODO: Support blocking write
+                        return Ready(Err(Errno::EAGAIN));
+                    }
+                    buffer = &buffer[..room];
+                }
+                content.reserve_exact(room);
+                content.extend(buffer);
+                debug_assert!(content.len() <= PIPE_SIZE);
+                Ready(Ok(buffer.len()))
+            }
+
+            FileBody::Directory { .. } => Ready(Err(Errno::EISDIR)),
+
+            FileBody::Symlink { target: _ } => Ready(Err(Errno::ENOTSUP)),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -425,5 +487,133 @@ mod tests {
         let mut buffer = [0; 10];
         assert_eq!(body.poll_read(&mut context, &mut buffer, 0), Ready(Ok(5)));
         assert_eq!(&buffer[..5], b"hello");
+    }
+
+    #[test]
+    fn regular_file_body_write_less_than_content() {
+        let mut body = FileBody::new(b"hello");
+        let mut context = Context::from_waker(Waker::noop());
+        let buffer = b"ipp";
+        assert_eq!(body.poll_write(&mut context, buffer, 1), Ready(Ok(3)));
+        assert_eq!(body, FileBody::new(b"hippo"));
+    }
+
+    #[test]
+    fn regular_file_body_write_more_than_content() {
+        let mut body = FileBody::new(b"hello");
+        let mut context = Context::from_waker(Waker::noop());
+        let buffer = b"icopter";
+        assert_eq!(body.poll_write(&mut context, buffer, 3), Ready(Ok(7)));
+        assert_eq!(body, FileBody::new(b"helicopter"));
+    }
+
+    #[test]
+    fn regular_file_body_write_beyond_file_length() {
+        let mut body = FileBody::new(b"hello");
+        let mut context = Context::from_waker(Waker::noop());
+        let buffer = b"world";
+        assert_eq!(body.poll_write(&mut context, buffer, 7), Ready(Ok(5)));
+        assert_eq!(body, FileBody::new(b"hello\0\0world"));
+    }
+
+    #[test]
+    fn fifo_file_body_write_closed() {
+        // When there are no readers, the FIFO returns EPIPE error.
+        let mut body = FileBody::Fifo {
+            content: VecDeque::new(),
+            readers: 0,
+            writers: 0,
+            pending_open_wakers: Vec::new(),
+            pending_read_wakers: Vec::new(),
+            pending_write_wakers: Vec::new(),
+        };
+        let mut context = Context::from_waker(Waker::noop());
+        let buffer = b"hello";
+        assert_eq!(
+            body.poll_write(&mut context, buffer, 0),
+            Ready(Err(Errno::EPIPE))
+        );
+    }
+
+    #[test]
+    fn fifo_file_body_write_atomic_empty() {
+        // When the FIFO has enough space for an atomic write and there are
+        // readers that may read from it, the write operation should succeed.
+        let mut body = FileBody::Fifo {
+            content: VecDeque::from([0; PIPE_SIZE - PIPE_BUF]),
+            readers: 1,
+            writers: 0,
+            pending_open_wakers: Vec::new(),
+            pending_read_wakers: Vec::new(),
+            pending_write_wakers: Vec::new(),
+        };
+        let mut context = Context::from_waker(Waker::noop());
+        let buffer = [0; PIPE_BUF];
+        assert_eq!(
+            body.poll_write(&mut context, &buffer, 0),
+            Ready(Ok(PIPE_BUF))
+        );
+    }
+
+    #[test]
+    fn fifo_file_body_write_atomic_full() {
+        // When the FIFO does not have enough space for an atomic write but
+        // there are readers that may read from it, the write operation would
+        // block.
+        let mut body = FileBody::Fifo {
+            content: VecDeque::from([0; PIPE_SIZE - PIPE_BUF + 1]),
+            readers: 1,
+            writers: 0,
+            pending_open_wakers: Vec::new(),
+            pending_read_wakers: Vec::new(),
+            pending_write_wakers: Vec::new(),
+        };
+        let mut context = Context::from_waker(Waker::noop());
+        let buffer = [0; PIPE_BUF];
+        assert_eq!(
+            body.poll_write(&mut context, &buffer, 0),
+            Ready(Err(Errno::EAGAIN))
+        );
+        // TODO Test blocking write once it is implemented
+    }
+
+    #[test]
+    fn fifo_file_body_write_non_atomic_empty() {
+        // When the write size exceeds PIPE_BUF, the FIFO has space for at least
+        // one byte, but there are readers that may read from the FIFO, the
+        // write operation should succeed and write as much as possible.
+        let mut body = FileBody::Fifo {
+            content: VecDeque::from([0; PIPE_SIZE - 1]),
+            readers: 1,
+            writers: 0,
+            pending_open_wakers: Vec::new(),
+            pending_read_wakers: Vec::new(),
+            pending_write_wakers: Vec::new(),
+        };
+        let mut context = Context::from_waker(Waker::noop());
+        let buffer = [0; PIPE_BUF + 1];
+        assert_eq!(body.poll_write(&mut context, &buffer, 0), Ready(Ok(1)));
+    }
+
+    #[test]
+    fn fifo_file_body_write_non_atomic_full() {
+        // When the write size exceeds PIPE_BUF, the FIFO is full, and there are
+        // readers that may read from it, the write operation should block until
+        // there is space for at least one byte to be written.
+        let mut body = FileBody::Fifo {
+            content: VecDeque::from([0; PIPE_SIZE]),
+            readers: 1,
+            writers: 0,
+            pending_open_wakers: Vec::new(),
+            pending_read_wakers: Vec::new(),
+            pending_write_wakers: Vec::new(),
+        };
+        let mut context = Context::from_waker(Waker::noop());
+        let buffer = [0; PIPE_BUF + 1];
+        assert_eq!(
+            body.poll_write(&mut context, &buffer, 0),
+            Ready(Err(Errno::EAGAIN))
+        );
+        // TODO Test blocking write once it is implemented
     }
 }

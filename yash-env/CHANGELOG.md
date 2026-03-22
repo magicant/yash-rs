@@ -28,6 +28,11 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `system::virtual::VirtualSystem::get_open_file_description` method has
   been added to retrieve the open file description for a given file descriptor
   in the current process.
+- The `system::virtual::OpenFileDescription` struct now has the following methods:
+    - `poll_read`: Polls for the file descriptor to be ready for reading and
+      performs a read operation.
+    - `poll_write`: Polls for the file descriptor to be ready for writing and
+      performs a write operation.
 - The `test_helper` module has been added with items migrated from the
   `yash-env-test-helper` crate. This module is conditionally compiled when the
   new `test-helper` feature is enabled.

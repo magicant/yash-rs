@@ -748,12 +748,12 @@ impl Read for VirtualSystem {
 
 impl Write for VirtualSystem {
     /// Writes data from the buffer to the file descriptor.
-    ///
-    /// The current implementation of this method does not yet support blocking
-    /// behavior, and immediately returns `Err(Errno::EAGAIN)` if the file
-    /// descriptor is not ready for writing.
     fn write<'a>(&self, fd: Fd, buffer: &'a [u8]) -> impl Future<Output = Result<usize>> + use<'a> {
-        ready(self.with_open_file_description_mut(fd, |ofd| ofd.write(buffer)))
+        let ofd = self.get_open_file_description(fd);
+        async move {
+            let ofd = ofd?;
+            poll_fn(|context| ofd.borrow_mut().poll_write(context, buffer)).await
+        }
     }
 }
 

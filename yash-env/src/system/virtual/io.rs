@@ -20,7 +20,6 @@ use super::super::Errno;
 use super::FdFlag;
 use super::FileBody;
 use super::Inode;
-use super::{PIPE_BUF, PIPE_SIZE};
 use enumset::EnumSet;
 use std::cell::RefCell;
 use std::fmt::Debug;
@@ -186,52 +185,44 @@ impl OpenFileDescription {
     /// Writes to this open file description.
     ///
     /// Returns the number of bytes successfully written.
-    pub fn write(&mut self, mut buffer: &[u8]) -> Result<usize, Errno> {
+    pub fn write(&mut self, buffer: &[u8]) -> Result<usize, Errno> {
+        let mut context = Context::from_waker(Waker::noop());
+        match self.poll_write(&mut context, buffer) {
+            Poll::Ready(result) => result,
+            Poll::Pending => Err(Errno::EAGAIN),
+        }
+    }
+
+    /// Polls for the result of writing to this open file description.
+    ///
+    /// The returned `Poll` indicates whether the write operation has completed
+    /// or is still pending. If it is `Poll::Ready`, the contained `Result`
+    /// indicates whether the write was successful and how many bytes were
+    /// written, or if it failed with an error. If it is `Poll::Pending`, it
+    /// means a waker has been registered and the caller should wait until it is
+    /// woken up, when this method should be called again.
+    pub fn poll_write(
+        &mut self,
+        context: &mut Context<'_>,
+        buffer: &[u8],
+    ) -> Poll<Result<usize, Errno>> {
         if !self.is_writable {
-            return Err(Errno::EBADF);
+            return Poll::Ready(Err(Errno::EBADF));
         }
-        match &mut self.file.borrow_mut().body {
-            FileBody::Regular { content, .. } | FileBody::Terminal { content } => {
-                let len = content.len();
-                let count = buffer.len();
-                if self.is_appending {
-                    self.offset = len;
-                }
-                if self.offset > len {
-                    let zeroes = self.offset - len;
-                    content.reserve(zeroes + count);
-                    content.resize_with(self.offset, u8::default);
-                }
-                let limit = count.min(content.len() - self.offset);
-                let dst = &mut content[self.offset..][..limit];
-                dst.copy_from_slice(&buffer[..limit]);
-                content.reserve(count - limit);
-                content.extend(&buffer[limit..]);
-                self.offset += count;
-                Ok(count)
-            }
-            FileBody::Fifo {
-                content, readers, ..
-            } => {
-                if *readers == 0 {
-                    // TODO SIGPIPE
-                    return Err(Errno::EPIPE);
-                }
-                let room = PIPE_SIZE - content.len();
-                if room < buffer.len() {
-                    if room == 0 || buffer.len() <= PIPE_BUF {
-                        // TODO: Support blocking write
-                        return Err(Errno::EAGAIN);
-                    }
-                    buffer = &buffer[..room];
-                }
-                content.extend(buffer);
-                debug_assert!(content.len() <= PIPE_SIZE);
-                Ok(buffer.len())
-            }
-            FileBody::Directory { .. } => Err(Errno::EISDIR),
-            FileBody::Symlink { target: _ } => Err(Errno::ENOTSUP),
+
+        let file = self.file.borrow_mut();
+        let offset = if self.is_appending {
+            file.body.size()
+        } else {
+            self.offset
+        };
+
+        let poll = { file }.body.poll_write(context, buffer, offset);
+        if let Poll::Ready(Ok(count)) = poll {
+            self.offset = offset + count;
         }
+
+        poll
     }
 
     /// Moves the file offset and returns the new offset.
@@ -339,27 +330,6 @@ mod tests {
     }
 
     #[test]
-    fn regular_file_write_less_than_content() {
-        let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode::new([1, 2, 3, 4, 5]))),
-            offset: 1,
-            is_readable: false,
-            is_writable: true,
-            is_appending: false,
-        };
-
-        let result = open_file.write(&[9, 8, 7]);
-        assert_eq!(result, Ok(3));
-        assert_eq!(open_file.offset, 4);
-        assert_matches!(
-            &open_file.file.borrow().body,
-            FileBody::Regular { content, .. } => {
-                assert_eq!(content[..], [1, 9, 8, 7, 5]);
-            }
-        );
-    }
-
-    #[test]
     fn regular_file_write_more_than_content() {
         let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(Inode::new([1, 2, 3]))),
@@ -376,27 +346,6 @@ mod tests {
             &open_file.file.borrow().body,
             FileBody::Regular { content, .. } => {
                 assert_eq!(content[..], [1, 9, 8, 7, 6]);
-            }
-        );
-    }
-
-    #[test]
-    fn regular_file_write_beyond_file_length() {
-        let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode::new([1]))),
-            offset: 3,
-            is_readable: false,
-            is_writable: true,
-            is_appending: false,
-        };
-
-        let result = open_file.write(&[2, 3]);
-        assert_eq!(result, Ok(2));
-        assert_eq!(open_file.offset, 5);
-        assert_matches!(
-            &open_file.file.borrow().body,
-            FileBody::Regular { content, .. } => {
-                assert_eq!(content[..], [1, 0, 0, 2, 3]);
             }
         );
     }
@@ -553,254 +502,5 @@ mod tests {
             assert_eq!(*readers, 1);
             assert_eq!(*writers, 0);
         });
-    }
-
-    #[test]
-    fn fifo_is_ready_for_writing() {
-        let file = Rc::new(RefCell::new(Inode {
-            body: FileBody::Fifo {
-                content: VecDeque::new(),
-                readers: 1,
-                writers: 1,
-                pending_open_wakers: Vec::new(),
-                pending_read_wakers: Vec::new(),
-                pending_write_wakers: Vec::new(),
-            },
-            permissions: Mode::default(),
-        }));
-        let mut open_file = OpenFileDescription {
-            file: Rc::clone(&file),
-            offset: 0,
-            is_readable: false,
-            is_writable: true,
-            is_appending: false,
-        };
-
-        assert!(open_file.is_ready_for_writing());
-
-        let buffer = [42; PIPE_SIZE - PIPE_BUF];
-        let result = open_file.write(&buffer);
-        assert_eq!(result, Ok(PIPE_SIZE - PIPE_BUF));
-        assert!(open_file.is_ready_for_writing());
-
-        let result = open_file.write(&[123]);
-        assert_eq!(result, Ok(1));
-        assert!(!open_file.is_ready_for_writing());
-
-        assert_matches!(&mut file.borrow_mut().body, FileBody::Fifo { readers, .. } => {
-            *readers = 0;
-        });
-        assert!(open_file.is_ready_for_writing());
-    }
-
-    #[test]
-    fn fifo_read_non_empty() {
-        let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode {
-                body: FileBody::Fifo {
-                    content: VecDeque::from([1, 5, 7, 3, 42, 7, 6]),
-                    readers: 1,
-                    writers: 0,
-                    pending_open_wakers: Vec::new(),
-                    pending_read_wakers: Vec::new(),
-                    pending_write_wakers: Vec::new(),
-                },
-                permissions: Mode::default(),
-            })),
-            offset: 0,
-            is_readable: true,
-            is_writable: false,
-            is_appending: false,
-        };
-
-        let mut buffer = [100; 4];
-        let result = open_file.read(&mut buffer);
-        assert_eq!(result, Ok(4));
-        assert_eq!(buffer, [1, 5, 7, 3]);
-
-        let result = open_file.read(&mut buffer);
-        assert_eq!(result, Ok(3));
-        assert_eq!(buffer[..3], [42, 7, 6]);
-
-        let result = open_file.read(&mut buffer);
-        assert_eq!(result, Ok(0));
-    }
-
-    #[test]
-    fn fifo_read_not_ready() {
-        let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode {
-                body: FileBody::Fifo {
-                    content: VecDeque::new(),
-                    readers: 1,
-                    writers: 1,
-                    pending_open_wakers: Vec::new(),
-                    pending_read_wakers: Vec::new(),
-                    pending_write_wakers: Vec::new(),
-                },
-                permissions: Mode::default(),
-            })),
-            offset: 0,
-            is_readable: true,
-            is_writable: false,
-            is_appending: false,
-        };
-
-        let mut buffer = [100; 5];
-        let result = open_file.read(&mut buffer);
-        assert_eq!(result, Err(Errno::EAGAIN));
-    }
-
-    #[test]
-    fn fifo_write_vacant() {
-        let file = Rc::new(RefCell::new(Inode {
-            body: FileBody::Fifo {
-                content: VecDeque::new(),
-                readers: 1,
-                writers: 1,
-                pending_open_wakers: Vec::new(),
-                pending_read_wakers: Vec::new(),
-                pending_write_wakers: Vec::new(),
-            },
-            permissions: Mode::default(),
-        }));
-        let mut open_file = OpenFileDescription {
-            file: Rc::clone(&file),
-            offset: 0,
-            is_readable: false,
-            is_writable: true,
-            is_appending: false,
-        };
-
-        let result = open_file.write(&[1, 1, 2, 3]);
-        assert_eq!(result, Ok(4));
-
-        let result = open_file.write(&[5, 8, 13]);
-        assert_eq!(result, Ok(3));
-
-        assert_matches!(&mut file.borrow_mut().body, FileBody::Fifo { content, .. } => {
-            assert_eq!(content.make_contiguous(), [1, 1, 2, 3, 5, 8, 13]);
-        });
-    }
-
-    #[test]
-    fn fifo_write_full() {
-        let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode {
-                body: FileBody::Fifo {
-                    content: VecDeque::new(),
-                    readers: 1,
-                    writers: 1,
-                    pending_open_wakers: Vec::new(),
-                    pending_read_wakers: Vec::new(),
-                    pending_write_wakers: Vec::new(),
-                },
-                permissions: Mode::default(),
-            })),
-            offset: 0,
-            is_readable: false,
-            is_writable: true,
-            is_appending: false,
-        };
-
-        open_file.write(&[0; PIPE_SIZE]).unwrap();
-
-        // The pipe is full. No more can be written.
-        let result = open_file.write(&[1; 1]);
-        assert_eq!(result, Err(Errno::EAGAIN));
-        let result = open_file.write(&[1; PIPE_BUF + 1]);
-        assert_eq!(result, Err(Errno::EAGAIN));
-
-        // However, empty write should succeed.
-        let result = open_file.write(&[1; 0]);
-        assert_eq!(result, Ok(0));
-    }
-
-    #[test]
-    fn fifo_write_atomic_full() {
-        let file = Rc::new(RefCell::new(Inode {
-            body: FileBody::Fifo {
-                content: VecDeque::new(),
-                readers: 1,
-                writers: 1,
-                pending_open_wakers: Vec::new(),
-                pending_read_wakers: Vec::new(),
-                pending_write_wakers: Vec::new(),
-            },
-            permissions: Mode::default(),
-        }));
-        let mut open_file = OpenFileDescription {
-            file: Rc::clone(&file),
-            offset: 0,
-            is_readable: false,
-            is_writable: true,
-            is_appending: false,
-        };
-
-        const LEN: usize = PIPE_SIZE - PIPE_BUF + 1;
-        open_file.write(&[0; LEN]).unwrap();
-
-        // The remaining room in the pipe is less than the length we're writing,
-        // which is PIPE_BUF. Nothing is written in this case.
-        let result = open_file.write(&[1; PIPE_BUF]);
-        assert_eq!(result, Err(Errno::EAGAIN));
-
-        assert_matches!(&file.borrow().body, FileBody::Fifo { content, .. } => {
-            assert_eq!(content.len(), LEN);
-        });
-    }
-
-    #[test]
-    fn fifo_write_non_atomic_full() {
-        let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode {
-                body: FileBody::Fifo {
-                    content: VecDeque::new(),
-                    readers: 1,
-                    writers: 1,
-                    pending_open_wakers: Vec::new(),
-                    pending_read_wakers: Vec::new(),
-                    pending_write_wakers: Vec::new(),
-                },
-                permissions: Mode::default(),
-            })),
-            offset: 0,
-            is_readable: false,
-            is_writable: true,
-            is_appending: false,
-        };
-
-        const LEN: usize = PIPE_SIZE - PIPE_BUF;
-        open_file.write(&[0; LEN]).unwrap();
-
-        // The remaining room in the pipe is less than the length we're writing,
-        // which exceeds PIPE_BUF. Only as much as possible is written in this
-        // case.
-        let result = open_file.write(&[1; PIPE_BUF + 1]);
-        assert_eq!(result, Ok(PIPE_BUF));
-    }
-
-    #[test]
-    fn fifo_write_orphan() {
-        let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode {
-                body: FileBody::Fifo {
-                    content: VecDeque::new(),
-                    readers: 0,
-                    writers: 1,
-                    pending_open_wakers: Vec::new(),
-                    pending_read_wakers: Vec::new(),
-                    pending_write_wakers: Vec::new(),
-                },
-                permissions: Mode::default(),
-            })),
-            offset: 0,
-            is_readable: false,
-            is_writable: true,
-            is_appending: false,
-        };
-
-        let result = open_file.write(&[1; 1]);
-        assert_eq!(result, Err(Errno::EPIPE));
     }
 }
