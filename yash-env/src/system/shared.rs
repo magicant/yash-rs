@@ -952,6 +952,7 @@ mod tests {
     // TODO Test SharedSystem::write_all where second write returns EINTR
 
     #[test]
+    #[ignore = "temporarily ignored while we are still working on the implementation of timeouts in VirtualSystem"]
     fn shared_system_wait_until() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);

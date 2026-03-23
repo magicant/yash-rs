@@ -75,6 +75,12 @@ where
             return result;
         }
         executor.run_until_stalled();
+        {
+            let mut state = state.borrow_mut();
+            if let Some(next_wake_time) = state.scheduled_wakers.next_wake_time() {
+                state.advance_time(next_wake_time);
+            }
+        }
         shared_system.select(false).unwrap();
         SystemState::select_all(&state);
     }

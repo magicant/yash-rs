@@ -24,21 +24,12 @@ use std::ffi::c_int;
 impl Select for VirtualSystem {
     /// Waits for a next event.
     ///
-    /// The `VirtualSystem` implementation for this method does not actually
-    /// block the calling thread. The method returns immediately in any case,
-    /// except when temporarily changing the signal mask causes the process to
-    /// stop, in which case the returned future will be pending until the
-    /// process is running again.
-    ///
-    /// The `timeout` is ignored if this function returns because of a ready FD
-    /// or a caught signal. Otherwise, the timeout is added to
-    /// [`SystemState::now`](super::SystemState::now), which must not be `None`
-    /// then.
+    /// TBD
     fn select<'a>(
         &self,
         readers: &'a mut Vec<Fd>,
         writers: &'a mut Vec<Fd>,
-        timeout: Option<Duration>,
+        _timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
     ) -> impl Future<Output = Result<c_int>> + use<'a> {
         let mut state_changed = false;
@@ -94,16 +85,6 @@ impl Select for VirtualSystem {
                     });
 
                     let count = (readers.len() + writers.len()).try_into().unwrap();
-                    if count == 0 {
-                        if let Some(duration) = timeout {
-                            if !duration.is_zero() {
-                                let now = state.now.as_mut();
-                                let now =
-                                    now.expect("now time unspecified; cannot add timeout duration");
-                                *now += duration;
-                            }
-                        }
-                    }
                     result = Ok(count);
                 }
 
@@ -310,9 +291,5 @@ mod tests {
         assert_eq!(result, Ok(0));
         assert_eq!(readers, []);
         assert_eq!(writers, []);
-        assert_eq!(
-            system.state.borrow().now,
-            Some(now + Duration::new(42, 195))
-        );
     }
 }
