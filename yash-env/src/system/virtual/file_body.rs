@@ -218,8 +218,19 @@ impl FileBody {
         }
     }
 
-    /// Returns true if a read operation on this open file description would not
-    /// block.
+    /// Returns whether the file supports seeking.
+    #[must_use]
+    pub fn is_seekable(&self) -> bool {
+        match self {
+            Self::Regular { .. } => true,
+            Self::Directory { .. } => false,
+            Self::Fifo { .. } => false,
+            Self::Symlink { .. } => false,
+            Self::Terminal { .. } => false,
+        }
+    }
+
+    /// Returns true if a read operation on this file would not block.
     #[must_use]
     pub(super) fn is_ready_for_reading(&self) -> bool {
         match self {
@@ -233,8 +244,7 @@ impl FileBody {
         }
     }
 
-    /// Returns true if a write operation on this open file description would
-    /// not block.
+    /// Returns true if a write operation on this file would not block.
     #[must_use]
     pub(super) fn is_ready_for_writing(&self) -> bool {
         match self {
@@ -248,15 +258,25 @@ impl FileBody {
         }
     }
 
-    /// Returns whether the file supports seeking.
-    #[must_use]
-    pub fn is_seekable(&self) -> bool {
-        match self {
-            Self::Regular { .. } => true,
-            Self::Directory { .. } => false,
-            Self::Fifo { .. } => false,
-            Self::Symlink { .. } => false,
-            Self::Terminal { .. } => false,
+    /// Registers a waker to be woken up when this file becomes ready for reading.
+    pub(super) fn register_reader_waker(&mut self, waker: Rc<Cell<Option<Waker>>>) {
+        if let Self::Fifo {
+            pending_read_wakers,
+            ..
+        } = self
+        {
+            pending_read_wakers.push(waker);
+        }
+    }
+
+    /// Registers a waker to be woken up when this file becomes ready for writing.
+    pub(super) fn register_writer_waker(&mut self, waker: Rc<Cell<Option<Waker>>>) {
+        if let Self::Fifo {
+            pending_write_wakers,
+            ..
+        } = self
+        {
+            pending_write_wakers.push(waker);
         }
     }
 

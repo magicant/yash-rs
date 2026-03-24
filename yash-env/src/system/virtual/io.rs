@@ -21,6 +21,7 @@ use super::FdFlag;
 use super::FileBody;
 use super::Inode;
 use enumset::EnumSet;
+use std::cell::Cell;
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::io::SeekFrom;
@@ -105,6 +106,26 @@ impl OpenFileDescription {
         // If this file is not writable, it is considered ready for writing
         // because any write operation on it would immediately fail.
         !self.is_writable || self.file.borrow().body.is_ready_for_writing()
+    }
+
+    /// Registers a waker to be woken up when this open file description becomes
+    /// ready for reading.
+    ///
+    /// The caller should ensure that the OFD is not
+    /// [ready for reading](Self::is_ready_for_reading) when calling this
+    /// method, otherwise the waker may never be woken up.
+    pub(super) fn register_reader_waker(&mut self, waker: Rc<Cell<Option<Waker>>>) {
+        self.file.borrow_mut().body.register_reader_waker(waker);
+    }
+
+    /// Registers a waker to be woken up when this open file description becomes
+    /// ready for writing.
+    ///
+    /// The caller should ensure that the OFD is not
+    /// [ready for writing](Self::is_ready_for_writing) when calling this
+    /// method, otherwise the waker may never be woken up.
+    pub(super) fn register_writer_waker(&mut self, waker: Rc<Cell<Option<Waker>>>) {
+        self.file.borrow_mut().body.register_writer_waker(waker);
     }
 
     /// Reads from this open file description.
