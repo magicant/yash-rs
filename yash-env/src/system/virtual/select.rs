@@ -191,7 +191,14 @@ impl Select for VirtualSystem {
                 if let Some(deadline) = deadline {
                     state.scheduled_wakers.push(deadline, waker.clone());
                 }
-                // TODO Register wakers for FIFOs
+                for fd in readers.iter().cloned() {
+                    let mut ofd = proc.fds()[&fd].open_file_description.borrow_mut();
+                    ofd.register_reader_waker(waker.clone());
+                }
+                for fd in writers.iter().cloned() {
+                    let mut ofd = proc.fds()[&fd].open_file_description.borrow_mut();
+                    ofd.register_writer_waker(waker.clone());
+                }
                 Poll::Pending
             })
             .await
@@ -205,9 +212,10 @@ impl Select for VirtualSystem {
 mod tests {
     use super::super::SIGCHLD;
     use super::*;
+    use crate::system::r#virtual::{PIPE_BUF, PIPE_SIZE};
     use crate::system::{
-        CaughtSignals as _, Close as _, Disposition, Pipe as _, Sigaction as _, Sigmask as _,
-        Write as _,
+        CaughtSignals as _, Close as _, Disposition, Pipe as _, Read as _, Sigaction as _,
+        Sigmask as _, Write as _,
     };
     use crate::test_helper::WakeFlag;
     use futures_util::FutureExt as _;
@@ -310,7 +318,6 @@ mod tests {
         assert_eq!(writers, []);
     }
 
-    #[ignore = "todo: temporarily ignored"]
     #[test]
     fn select_pipe_reader_gets_ready_when_some_data_is_written() {
         let system = VirtualSystem::new();
@@ -354,6 +361,51 @@ mod tests {
         {
             let mut select = pin!(system.select(&mut readers, &mut writers, None, None));
 
+            let woken = Arc::new(WakeFlag::new());
+            let waker = Waker::from(Arc::clone(&woken));
+            let mut context = Context::from_waker(&waker);
+            let poll = select.as_mut().poll(&mut context);
+            assert_eq!(poll, Poll::Ready(Ok(1)));
+            assert!(!woken.is_woken());
+        }
+        assert_eq!(readers, []);
+        assert_eq!(writers, [writer]);
+    }
+
+    #[test]
+    fn select_pipe_writer_gets_ready_when_some_data_is_read() {
+        let system = VirtualSystem::new();
+        let (reader, writer) = system.pipe().unwrap();
+        let mut readers = vec![];
+        let mut writers = vec![writer];
+
+        // Fill the pipe buffer.
+        system
+            .write(writer, &[0; PIPE_SIZE])
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        {
+            let mut select = pin!(system.select(&mut readers, &mut writers, None, None));
+
+            // The pipe is full, so the future should not be ready, and it should not be woken up.
+            let woken = Arc::new(WakeFlag::new());
+            let waker = Waker::from(Arc::clone(&woken));
+            let mut context = Context::from_waker(&waker);
+            let poll = select.as_mut().poll(&mut context);
+            assert_eq!(poll, Poll::Pending);
+            assert!(!woken.is_woken());
+
+            // Read some data from the pipe. The future should now be woken up.
+            system
+                .read(reader, &mut [0; PIPE_BUF])
+                .now_or_never()
+                .unwrap()
+                .unwrap();
+            assert!(woken.is_woken());
+
+            // Polling the future should now return ready with the writer FD.
             let woken = Arc::new(WakeFlag::new());
             let waker = Waker::from(Arc::clone(&woken));
             let mut context = Context::from_waker(&waker);
