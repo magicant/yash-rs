@@ -56,26 +56,49 @@ impl ScheduledWakerQueue {
     /// `None` by other wake conditions, reclaiming the memory used by those
     /// items.
     pub fn push(&mut self, wake_time: Instant, waker: Rc<Cell<Option<Waker>>>) {
-        let old_capacity = self.0.capacity();
+        // Before pushing the new item, remove any expired items from the front
+        // of the queue.
+        while let Some(peek) = self.0.peek_mut() {
+            // Since `Waker` is not `Copy`, we need to take it from the
+            // `Cell` to check if it's `None`, and put it back afterward.
+            // let is_expired = peek.waker.get().is_none();
+            let waker = peek.waker.take();
+            let is_gone = waker.is_none();
+            peek.waker.set(waker);
+            if is_gone {
+                PeekMut::pop(peek);
+            } else {
+                break;
+            }
+        }
 
-        self.0.push(ScheduledWaker { wake_time, waker });
-
-        // If the capacity has increased, it means the inner heap performed an
-        // O(n) reallocation, which is a good opportunity to clean up empty
-        // wakers (which also costs O(n)). This way we can amortize the cleanup
-        // cost over multiple insertions, and avoid doing cleanup on every
-        // insertion.
-        if self.0.capacity() > old_capacity {
+        if self.0.capacity() == self.0.len() {
+            // If the queue is full, the inner heap will need to perform an O(n)
+            // reallocation to accommodate the new item. This is a good
+            // opportunity to clean up empty wakers (which also costs O(n)).
+            // This way we can amortize the cleanup cost over multiple
+            // insertions, and avoid doing cleanup on every insertion.
             self.0.retain(|item| {
                 // Since `Waker` is not `Copy`, we need to take it from the
                 // `Cell` to check if it's `None`, and put it back afterward.
                 // item.waker.get().is_some()
                 let waker = item.waker.take();
-                let is_some = waker.is_some();
+                let is_alive = waker.is_some();
                 item.waker.set(waker);
-                is_some
+                is_alive
             });
+
+            // If we removed substantial number of items, we can also shrink
+            // the capacity to save memory and create more opportunities for
+            // cleanup in the future.
+            self.0.shrink_to(std::cmp::max(8, self.0.len() * 2));
+
+            // Make sure the next cleanup does not occur within next `len`
+            // insertions for amortization.
+            self.0.reserve(self.0.len());
         }
+
+        self.0.push(ScheduledWaker { wake_time, waker });
     }
 
     /// Wakes up processes whose scheduled wake time has been reached.
@@ -205,5 +228,103 @@ mod tests {
         assert!(wake_flag_1.is_woken());
         assert!(wake_flag_2.is_woken());
         assert!(!wake_flag_3.is_woken());
+    }
+
+    #[test]
+    fn complex_pushes_and_wakes() {
+        let mut queue = ScheduledWakerQueue::new();
+        let now = Instant::now();
+
+        let wake_flag_1 = Arc::new(WakeFlag::new());
+        let wake_flag_2 = Arc::new(WakeFlag::new());
+        let wake_flag_3 = Arc::new(WakeFlag::new());
+        let waker_1 = Rc::new(Cell::new(Some(Waker::from(wake_flag_1.clone()))));
+        let waker_2 = Rc::new(Cell::new(Some(Waker::from(wake_flag_2.clone()))));
+        let waker_3 = Rc::new(Cell::new(Some(Waker::from(wake_flag_3.clone()))));
+
+        queue.push(now + Duration::from_secs(5), waker_1);
+        queue.push(now + Duration::from_secs(3), waker_2);
+        queue.push(now + Duration::from_secs(10), waker_3);
+
+        // The first two wakers should be triggered, but not the third one
+        queue.wake(now + Duration::from_secs(5));
+        assert!(wake_flag_1.is_woken());
+        assert!(wake_flag_2.is_woken());
+        assert!(!wake_flag_3.is_woken());
+
+        // After waking, the next wake time should be the third one
+        assert_eq!(queue.next_wake_time(), Some(now + Duration::from_secs(10)));
+
+        // The third waker should be triggered now
+        queue.wake(now + Duration::from_secs(15));
+        assert!(wake_flag_3.is_woken());
+
+        // After waking all, the next wake time should be None
+        assert_eq!(queue.next_wake_time(), None);
+    }
+
+    #[test]
+    fn push_trims_expired_entries() {
+        let mut queue = ScheduledWakerQueue::new();
+        let now = Instant::now();
+
+        let wake_flag_1 = Arc::new(WakeFlag::new());
+        let wake_flag_2 = Arc::new(WakeFlag::new());
+        let wake_flag_3 = Arc::new(WakeFlag::new());
+        let wake_flag_4 = Arc::new(WakeFlag::new());
+        let waker_1 = Rc::new(Cell::new(Some(Waker::from(wake_flag_1))));
+        let waker_2 = Rc::new(Cell::new(Some(Waker::from(wake_flag_2))));
+        let waker_3 = Rc::new(Cell::new(Some(Waker::from(wake_flag_3.clone()))));
+        let waker_4 = Rc::new(Cell::new(Some(Waker::from(wake_flag_4.clone()))));
+
+        queue.0.reserve(4);
+        queue.push(now + Duration::from_secs(3), waker_1.clone());
+        queue.push(now + Duration::from_secs(5), waker_2.clone());
+        queue.push(now + Duration::from_secs(7), waker_3);
+
+        // Manually wake the first two wakers to simulate them being woken by other conditions
+        waker_1.take().unwrap().wake();
+        waker_2.take().unwrap().wake();
+
+        // Now push a new waker, which should trigger the cleanup of the expired entries
+        queue.push(now + Duration::from_secs(1), waker_4);
+        assert_eq!(queue.0.len(), 2);
+
+        // The remaining wakers should be the third and fourth ones
+        queue.wake(now + Duration::from_secs(10));
+        assert!(wake_flag_3.is_woken());
+        assert!(wake_flag_4.is_woken());
+    }
+
+    #[test]
+    fn push_occasionally_cleans_up_expired_entries() {
+        let mut queue = ScheduledWakerQueue::new();
+        let now = Instant::now();
+
+        let waker_1 = Rc::new(Cell::new(Some(Waker::noop().clone())));
+        let waker_2 = Rc::new(Cell::new(Some(Waker::noop().clone())));
+        let waker_3 = Rc::new(Cell::new(Some(Waker::noop().clone())));
+        let waker_4 = Rc::new(Cell::new(Some(Waker::noop().clone())));
+
+        queue.0.reserve(10);
+        queue.push(now + Duration::from_secs(3), waker_1);
+        while queue.0.len() + 1 < queue.0.capacity() {
+            let waker = Rc::new(Cell::new(Some(Waker::noop().clone())));
+            queue.push(now + Duration::new(3, queue.0.len() as u32), waker.clone());
+            waker.take().unwrap().wake();
+        }
+        queue.push(now + Duration::from_secs(4), waker_2);
+        assert_eq!(queue.0.len(), queue.0.capacity());
+
+        // The next push should trigger cleanup of expired entries
+        queue.push(now + Duration::from_secs(5), waker_3.clone());
+        assert_eq!(queue.0.len(), 3);
+
+        // Manually wake the last waker to simulate it being woken by other conditions
+        waker_3.take().unwrap().wake();
+
+        // Another push does not trigger cleanup since the capacity is not yet reached
+        queue.push(now + Duration::from_secs(6), waker_4.clone());
+        assert_eq!(queue.0.len(), 4);
     }
 }
