@@ -417,7 +417,6 @@ mod tests {
         assert_eq!(writers, [writer]);
     }
 
-    #[ignore = "todo: temporarily ignored"]
     #[test]
     fn select_on_unreadable_fd() {
         let system = VirtualSystem::new();
@@ -431,7 +430,6 @@ mod tests {
         assert_eq!(fds, [writer]);
     }
 
-    #[ignore = "todo: temporarily ignored"]
     #[test]
     fn select_on_unwritable_fd() {
         let system = VirtualSystem::new();
@@ -519,7 +517,6 @@ mod tests {
         assert_eq!(system.caught_signals(), [SIGCHLD]);
     }
 
-    #[ignore = "todo: temporarily ignored"]
     #[test]
     fn select_timeout() {
         let system = VirtualSystem::new();
