@@ -19,11 +19,12 @@
 use super::{
     Duration, Errno, Fd, Result, Select, SigmaskOp, TryInto, VirtualSystem, raise_sigchld, signal,
 };
+use crate::job::ProcessState;
 use std::cell::Cell;
 use std::ffi::c_int;
 use std::future::poll_fn;
 use std::rc::Rc;
-use std::task::Poll;
+use std::task::{Poll, Waker};
 
 impl Select for VirtualSystem {
     /// Waits for a next event.
@@ -50,17 +51,24 @@ impl Select for VirtualSystem {
             let (old_mask, old_caught_signals) = match signal_mask {
                 None => (None, None),
                 Some(signal_mask) => {
-                    let mut proc = this.current_process_mut();
+                    let state = &mut *this.state.borrow_mut();
+                    let proc = state
+                        .processes
+                        .get_mut(&this.process_id)
+                        .expect("current process not found");
                     let old_mask = proc
                         .blocked_signals()
                         .iter()
                         .copied()
                         .collect::<Vec<signal::Number>>();
                     let old_caught_signals = proc.caught_signals.len();
+
                     let result = proc.block_signals(SigmaskOp::Set, &signal_mask);
                     if result.process_state_changed {
-                        todo!("send SIGCHLD to parent process");
+                        let ppid = proc.ppid;
+                        raise_sigchld(state, ppid);
                     }
+
                     (Some(old_mask), Some(old_caught_signals))
                 }
             };
@@ -75,12 +83,29 @@ impl Select for VirtualSystem {
                 }
             };
 
+            let mut retain_waker: Option<Rc<Cell<Option<Waker>>>> = None;
+
             let result = poll_fn(|context| {
+                // Drop the waker from the previous poll, if any
+                if let Some(waker) = retain_waker.take() {
+                    waker.take();
+                }
+
                 let state = &mut *this.state.borrow_mut();
                 let proc = state
                     .processes
                     .get_mut(&this.process_id)
                     .expect("current process not found");
+
+                // If the process is currently suspended, do nothing until resumed
+                if let ProcessState::Halted(reason) = proc.state() {
+                    if reason.is_stopped() {
+                        let waker = Rc::new(Cell::new(Some(context.waker().clone())));
+                        proc.wake_on_resumption(Rc::downgrade(&waker));
+                        retain_waker = Some(waker);
+                        return Poll::Pending;
+                    }
+                }
 
                 // Check for delivered signals
                 if let Some(old_caught_signals) = &old_caught_signals {
@@ -134,8 +159,6 @@ impl Select for VirtualSystem {
                     return Poll::Ready(Ok(0));
                 }
 
-                // TODO Discard the previous waker
-
                 // Register wakers for the expected events
                 let waker = Rc::new(Cell::new(Some(context.waker().clone())));
                 if old_caught_signals.is_some() {
@@ -152,6 +175,7 @@ impl Select for VirtualSystem {
                 if let Some(deadline) = deadline {
                     state.scheduled_wakers.push(deadline, waker.clone());
                 }
+                retain_waker = Some(waker);
                 Poll::Pending
             })
             .await;
@@ -161,7 +185,7 @@ impl Select for VirtualSystem {
                 let mut proc = this.current_process_mut();
                 let result = proc.block_signals(SigmaskOp::Set, &old_mask);
                 if result.process_state_changed {
-                    todo!("send SIGCHLD to parent process");
+                    raise_sigchld(&mut this.state.borrow_mut(), proc.ppid);
                 }
             }
 
@@ -173,12 +197,13 @@ impl Select for VirtualSystem {
 
 #[cfg(test)]
 mod tests {
-    use super::super::SIGCHLD;
+    use super::super::Process;
+    use super::super::{PIPE_BUF, PIPE_SIZE, SIGCHLD, SIGCONT, SIGTSTP};
     use super::*;
-    use crate::system::r#virtual::{PIPE_BUF, PIPE_SIZE};
+    use crate::job::Pid;
     use crate::system::{
-        CaughtSignals as _, Close as _, Disposition, Pipe as _, Read as _, Sigaction as _,
-        Sigmask as _, Write as _,
+        CaughtSignals as _, Close as _, Disposition, Pipe as _, Read as _, SendSignal as _,
+        Sigaction as _, Sigmask as _, Write as _,
     };
     use crate::test_helper::WakeFlag;
     use futures_util::FutureExt as _;
@@ -596,5 +621,81 @@ mod tests {
         // After a timeout, no readers or writers should be ready
         assert_eq!(readers, []);
         assert_eq!(writers, []);
+    }
+
+    fn virtual_system_with_parent_process() -> VirtualSystem {
+        let system = VirtualSystem::new();
+        let ppid = system.current_process().ppid;
+        let mut parent = Process::with_parent_and_group(Pid(1), Pid(1));
+        parent.set_disposition(SIGCHLD, Disposition::Catch);
+        system.state.borrow_mut().processes.insert(ppid, parent);
+        system
+    }
+
+    /// In this test case, SIGTSTP is blocked and pending when the `select` call
+    /// is made. When the `select` call temporarily unblocks SIGTSTP, the
+    /// pending signal should be delivered, which suspends the process. The
+    /// `select` future should return pending until the process is resumed.
+    #[test]
+    fn select_returns_pending_while_process_is_suspended_1() {
+        let system = virtual_system_with_parent_process();
+        let now = Instant::now();
+        system.state.borrow_mut().now = Some(now);
+        system
+            .sigmask(Some((SigmaskOp::Add, &[SIGTSTP])), None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        // Send SIGTSTP while it is blocked
+        system.raise(SIGTSTP).now_or_never().unwrap().unwrap();
+
+        let mut readers = vec![];
+        let mut writers = vec![];
+
+        let mut select = pin!(system.select(
+            &mut readers,
+            &mut writers,
+            Some(Duration::from_secs(1)),
+            Some(&[])
+        ));
+
+        let woken = Arc::new(WakeFlag::new());
+        let waker = Waker::from(Arc::clone(&woken));
+        let mut context = Context::from_waker(&waker);
+        let poll = select.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Pending);
+        assert!(!woken.is_woken());
+
+        // The select call temporarily unblocks SIGTSTP, so the pending signal should be delivered,
+        // which suspends the process. The parent process should receive a SIGCHLD signal.
+        {
+            let state = system.state.borrow();
+            let ppid = state.processes[&system.process_id].ppid;
+            assert_eq!(state.processes[&ppid].caught_signals, [SIGCHLD]);
+        }
+
+        // Since the process is suspended, the future should not be ready even after the timeout
+        system
+            .state
+            .borrow_mut()
+            .advance_time(now + Duration::from_secs(2));
+        let woken = Arc::new(WakeFlag::new());
+        let waker = Waker::from(Arc::clone(&woken));
+        let mut context = Context::from_waker(&waker);
+        let poll = select.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Pending);
+        assert!(!woken.is_woken());
+
+        // When the process is resumed, the future should be woken up
+        system.raise(SIGCONT).now_or_never().unwrap().unwrap();
+        assert!(woken.is_woken());
+
+        // Polling the future should now return ready
+        let woken = Arc::new(WakeFlag::new());
+        let waker = Waker::from(Arc::clone(&woken));
+        let mut context = Context::from_waker(&waker);
+        let poll = select.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Ready(Ok(0)));
     }
 }
