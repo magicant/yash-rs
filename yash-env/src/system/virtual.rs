@@ -1364,6 +1364,14 @@ fn raise_sigchld(state: &mut SystemState, target_pid: Pid) {
     }
 }
 
+fn wake_all(pending_wakers: &mut Vec<Rc<Cell<Option<Waker>>>>) {
+    for waker in pending_wakers.drain(..) {
+        if let Some(waker) = waker.take() {
+            waker.wake();
+        }
+    }
+}
+
 /// State of the virtual system
 #[derive(Clone, Debug, Default)]
 pub struct SystemState {

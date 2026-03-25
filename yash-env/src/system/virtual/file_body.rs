@@ -18,6 +18,7 @@
 
 use super::super::FileType;
 use super::Inode;
+use super::wake_all;
 use crate::path::PathBuf;
 use crate::str::UnixStr;
 use crate::system::Errno;
@@ -413,14 +414,6 @@ impl FileBody {
             FileBody::Directory { .. } => Ready(Err(Errno::EISDIR)),
 
             FileBody::Symlink { target: _ } => Ready(Err(Errno::ENOTSUP)),
-        }
-    }
-}
-
-fn wake_all(pending_wakers: &mut Vec<Rc<Cell<Option<Waker>>>>) {
-    for waker in pending_wakers.drain(..) {
-        if let Some(waker) = waker.take() {
-            waker.wake();
         }
     }
 }
