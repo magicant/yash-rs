@@ -43,107 +43,27 @@ impl Select for VirtualSystem {
         timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
     ) -> impl Future<Output = Result<c_int>> + use<'a> {
-        // let mut state_changed = false;
-        // let result;
-
-        // {
-        //     let mut state = self.state.borrow_mut();
-        //     let process = state
-        //         .processes
-        //         .get_mut(&self.process_id)
-        //         .expect("current process not found");
-
-        //     // Detect invalid FDs first. POSIX requires that the arguments are
-        //     // not modified if an error occurs.
-        //     let fds = readers.iter().chain(writers.iter());
-        //     let bad_fd = { fds }.any(|fd| !process.fds().contains_key(fd));
-
-        //     if bad_fd {
-        //         result = Err(Errno::EBADF);
-        //     } else {
-        //         let mut caught = false;
-        //         let mut parent_pid_for_sigchld = None;
-
-        //         if let Some(signal_mask) = signal_mask {
-        //             let save_mask = process
-        //                 .blocked_signals()
-        //                 .iter()
-        //                 .copied()
-        //                 .collect::<Vec<signal::Number>>();
-        //             let result_1 = process.block_signals(SigmaskOp::Set, signal_mask);
-        //             let result_2 = process.block_signals(SigmaskOp::Set, &save_mask);
-        //             assert!(!result_2.delivered);
-        //             caught = result_1.caught;
-
-        //             if result_1.process_state_changed {
-        //                 parent_pid_for_sigchld = Some(process.ppid);
-        //                 state_changed = true;
-        //             }
-        //         }
-
-        //         if caught {
-        //             result = Err(Errno::EINTR);
-        //         } else {
-        //             readers.retain(|fd| {
-        //                 // We already checked that the FD is open, so it's safe
-        //                 // to access by index.
-        //                 let ofd = process.fds()[fd].open_file_description.borrow();
-        //                 !ofd.is_readable() || ofd.is_ready_for_reading()
-        //             });
-        //             writers.retain(|fd| {
-        //                 let ofd = process.fds()[fd].open_file_description.borrow();
-        //                 !ofd.is_writable() || ofd.is_ready_for_writing()
-        //             });
-
-        //             let count = (readers.len() + writers.len()).try_into().unwrap();
-        //             if count == 0 {
-        //                 if let Some(duration) = timeout {
-        //                     if !duration.is_zero() {
-        //                         let now = state.now.as_mut();
-        //                         let now =
-        //                             now.expect("now time unspecified; cannot add timeout duration");
-        //                         *now += duration;
-        //                     }
-        //                 }
-        //             }
-        //             result = Ok(count);
-        //         }
-
-        //         // NLL: process is no longer used after this point
-        //         if let Some(parent_pid) = parent_pid_for_sigchld {
-        //             raise_sigchld(&mut state, parent_pid);
-        //         }
-        //     }
-        // }
-
-        // let system = self.clone();
-        // async move {
-        //     if state_changed {
-        //         system.block_until_running().await;
-        //     }
-        //     result
-        // }
-
         let this = self.clone();
         let signal_mask = signal_mask.map(|mask| mask.to_vec());
         async move {
-            if let Some(signal_mask) = &signal_mask {
-                let mut proc = this.current_process_mut();
-                let save_mask = proc
-                    .blocked_signals()
-                    .iter()
-                    .copied()
-                    .collect::<Vec<signal::Number>>();
-                let result_1 = proc.block_signals(SigmaskOp::Set, signal_mask);
-                let result_2 = proc.block_signals(SigmaskOp::Set, &save_mask);
-                assert!(!result_2.delivered);
-                if result_1.process_state_changed {
-                    todo!("send SIGCHLD to parent process");
+            // Apply the signal mask, remembering the previous state
+            let (old_mask, old_caught_signals) = match signal_mask {
+                None => (None, None),
+                Some(signal_mask) => {
+                    let mut proc = this.current_process_mut();
+                    let old_mask = proc
+                        .blocked_signals()
+                        .iter()
+                        .copied()
+                        .collect::<Vec<signal::Number>>();
+                    let old_caught_signals = proc.caught_signals.len();
+                    let result = proc.block_signals(SigmaskOp::Set, &signal_mask);
+                    if result.process_state_changed {
+                        todo!("send SIGCHLD to parent process");
+                    }
+                    (Some(old_mask), Some(old_caught_signals))
                 }
-                if result_1.caught {
-                    return Err(Errno::EINTR);
-                }
-            }
+            };
 
             let deadline = match timeout {
                 // Don't require the now time if the timeout is zero or infinite
@@ -155,12 +75,19 @@ impl Select for VirtualSystem {
                 }
             };
 
-            poll_fn(|context| {
+            let result = poll_fn(|context| {
                 let state = &mut *this.state.borrow_mut();
                 let proc = state
                     .processes
                     .get_mut(&this.process_id)
                     .expect("current process not found");
+
+                // Check for delivered signals
+                if let Some(old_caught_signals) = &old_caught_signals {
+                    if proc.caught_signals.len() != *old_caught_signals {
+                        return Poll::Ready(Err(Errno::EINTR));
+                    }
+                }
 
                 // Find ready FDs
                 let mut ready_readers = Vec::new();
@@ -207,10 +134,12 @@ impl Select for VirtualSystem {
                     return Poll::Ready(Ok(0));
                 }
 
+                // TODO Discard the previous waker
+
                 // Register wakers for the expected events
                 let waker = Rc::new(Cell::new(Some(context.waker().clone())));
-                if let Some(deadline) = deadline {
-                    state.scheduled_wakers.push(deadline, waker.clone());
+                if old_caught_signals.is_some() {
+                    proc.register_signal_waker(waker.clone());
                 }
                 for fd in readers.iter() {
                     let mut ofd = proc.fds()[fd].open_file_description.borrow_mut();
@@ -220,9 +149,23 @@ impl Select for VirtualSystem {
                     let mut ofd = proc.fds()[fd].open_file_description.borrow_mut();
                     ofd.register_writer_waker(waker.clone());
                 }
+                if let Some(deadline) = deadline {
+                    state.scheduled_wakers.push(deadline, waker.clone());
+                }
                 Poll::Pending
             })
-            .await
+            .await;
+
+            // Restore the previous signal mask
+            if let Some(old_mask) = old_mask {
+                let mut proc = this.current_process_mut();
+                let result = proc.block_signals(SigmaskOp::Set, &old_mask);
+                if result.process_state_changed {
+                    todo!("send SIGCHLD to parent process");
+                }
+            }
+
+            result
             // TODO Re-implement block_until_running
         }
     }
@@ -538,16 +481,59 @@ mod tests {
         assert_eq!(mask, [SIGCHLD]);
     }
 
-    #[ignore = "todo: temporarily ignored"]
     #[test]
-    fn select_on_non_pending_signal() {
+    fn select_on_signal_delivered_while_waiting() {
         let system = system_for_catching_sigchld();
-        let result = system
-            .select(&mut vec![], &mut vec![], None, Some(&[]))
+        let mut readers = vec![];
+        let mut writers = vec![];
+
+        let mut select = pin!(system.select(&mut readers, &mut writers, None, Some(&[])));
+
+        // The future should not be ready yet, and it should not be woken up.
+        let woken = Arc::new(WakeFlag::new());
+        let waker = Waker::from(Arc::clone(&woken));
+        let mut context = Context::from_waker(&waker);
+        let poll = select.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Pending);
+        assert!(!woken.is_woken());
+        // While waiting, the signal mask passed to select should be in effect
+        let mut mask = Vec::new();
+        system
+            .sigmask(None, Some(&mut mask))
             .now_or_never()
+            .unwrap()
             .unwrap();
-        assert_eq!(result, Ok(0));
-        assert_eq!(system.caught_signals(), []);
+        assert_eq!(mask, []);
+
+        // Even if not woken, it must be safe to poll the future again,
+        // and it should still not be ready.
+        let woken = Arc::new(WakeFlag::new());
+        let waker = Waker::from(Arc::clone(&woken));
+        let mut context = Context::from_waker(&waker);
+        let poll = select.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Pending);
+        assert!(!woken.is_woken());
+
+        // Raise a signal. The future should now be woken up.
+        let _ = system.current_process_mut().raise_signal(SIGCHLD);
+        assert!(woken.is_woken());
+
+        // Polling the future should now return ready with an EINTR error.
+        let woken = Arc::new(WakeFlag::new());
+        let waker = Waker::from(Arc::clone(&woken));
+        let mut context = Context::from_waker(&waker);
+        let poll = select.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Ready(Err(Errno::EINTR)));
+        assert!(!woken.is_woken());
+        assert_eq!(system.caught_signals(), [SIGCHLD]);
+        // Check that the signal mask is the same as before the select call.
+        let mut mask = Vec::new();
+        system
+            .sigmask(None, Some(&mut mask))
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_eq!(mask, [SIGCHLD]);
     }
 
     #[test]
