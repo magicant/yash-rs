@@ -202,6 +202,8 @@ impl Select for VirtualSystem {
                     }
                 };
                 if expired {
+                    readers.clear();
+                    writers.clear();
                     return Poll::Ready(Ok(0));
                 }
 
@@ -554,46 +556,59 @@ mod tests {
         let now = Instant::now();
         system.state.borrow_mut().now = Some(now);
 
-        let (reader, _writer) = system.pipe().unwrap();
-        let mut readers = vec![reader];
-        let mut writers = vec![];
+        // The first pipe is empty, so the reader is not ready.
+        let (reader_1, _writer_1) = system.pipe().unwrap();
+        // The second pipe is full, so the writer is not ready.
+        let (_reader_2, writer_2) = system.pipe().unwrap();
+        system
+            .write(writer_2, &[0; PIPE_SIZE])
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        let mut readers = vec![reader_1];
+        let mut writers = vec![writer_2];
         let timeout = Duration::new(42, 195);
 
-        let mut select = pin!(system.select(&mut readers, &mut writers, Some(timeout), None));
+        {
+            let mut select = pin!(system.select(&mut readers, &mut writers, Some(timeout), None));
 
-        // On the first poll, the timeout should not have expired yet,
-        // and the future should not be woken up.
-        let woken = Arc::new(WakeFlag::new());
-        let waker = Waker::from(Arc::clone(&woken));
-        let mut context = Context::from_waker(&waker);
-        let poll = select.as_mut().poll(&mut context);
-        assert_eq!(poll, Poll::Pending);
-        assert!(!woken.is_woken());
+            // On the first poll, the timeout should not have expired yet,
+            // and the future should not be woken up.
+            let woken = Arc::new(WakeFlag::new());
+            let waker = Waker::from(Arc::clone(&woken));
+            let mut context = Context::from_waker(&waker);
+            let poll = select.as_mut().poll(&mut context);
+            assert_eq!(poll, Poll::Pending);
+            assert!(!woken.is_woken());
 
-        // Advance time by 42 seconds. The timeout is not yet reached.
-        let time_before_timeout = now + Duration::new(42, 0);
-        system.state.borrow_mut().advance_time(time_before_timeout);
-        assert!(!woken.is_woken());
+            // Advance time by 42 seconds. The timeout is not yet reached.
+            let time_before_timeout = now + Duration::new(42, 0);
+            system.state.borrow_mut().advance_time(time_before_timeout);
+            assert!(!woken.is_woken());
 
-        // Even if not woken, it must be safe to poll the future again,
-        // and it should still not be ready.
-        let woken = Arc::new(WakeFlag::new());
-        let waker = Waker::from(Arc::clone(&woken));
-        let mut context = Context::from_waker(&waker);
-        let poll = select.as_mut().poll(&mut context);
-        assert_eq!(poll, Poll::Pending);
-        assert!(!woken.is_woken());
+            // Even if not woken, it must be safe to poll the future again,
+            // and it should still not be ready.
+            let woken = Arc::new(WakeFlag::new());
+            let waker = Waker::from(Arc::clone(&woken));
+            let mut context = Context::from_waker(&waker);
+            let poll = select.as_mut().poll(&mut context);
+            assert_eq!(poll, Poll::Pending);
+            assert!(!woken.is_woken());
 
-        // Advance time by another 195 nanoseconds.
-        // The timeout should now be reached, and the future should be woken up.
-        system.state.borrow_mut().advance_time(now + timeout);
-        assert!(woken.is_woken());
+            // Advance time by another 195 nanoseconds.
+            // The timeout should now be reached, and the future should be woken up.
+            system.state.borrow_mut().advance_time(now + timeout);
+            assert!(woken.is_woken());
 
-        // Polling the future should now return ready with a timeout result.
-        let woken = Arc::new(WakeFlag::new());
-        let waker = Waker::from(Arc::clone(&woken));
-        let mut context = Context::from_waker(&waker);
-        let poll = select.as_mut().poll(&mut context);
-        assert_eq!(poll, Poll::Ready(Ok(0)));
+            // Polling the future should now return ready with a timeout result.
+            let woken = Arc::new(WakeFlag::new());
+            let waker = Waker::from(Arc::clone(&woken));
+            let mut context = Context::from_waker(&waker);
+            let poll = select.as_mut().poll(&mut context);
+            assert_eq!(poll, Poll::Ready(Ok(0)));
+        }
+        // After a timeout, no readers or writers should be ready
+        assert_eq!(readers, []);
+        assert_eq!(writers, []);
     }
 }
