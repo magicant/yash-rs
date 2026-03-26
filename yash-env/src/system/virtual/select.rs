@@ -182,15 +182,21 @@ impl Select for VirtualSystem {
 
             // Restore the previous signal mask
             if let Some(old_mask) = old_mask {
-                let mut proc = this.current_process_mut();
+                let mut state = this.state.borrow_mut();
+                let proc = state
+                    .processes
+                    .get_mut(&this.process_id)
+                    .expect("current process not found");
                 let result = proc.block_signals(SigmaskOp::Set, &old_mask);
                 if result.process_state_changed {
-                    raise_sigchld(&mut this.state.borrow_mut(), proc.ppid);
+                    let ppid = proc.ppid;
+                    raise_sigchld(&mut state, ppid);
+                    drop(state);
+                    this.block_until_running().await;
                 }
             }
 
             result
-            // TODO Re-implement block_until_running
         }
     }
 }
@@ -692,6 +698,91 @@ mod tests {
         assert!(woken.is_woken());
 
         // Polling the future should now return ready
+        let woken = Arc::new(WakeFlag::new());
+        let waker = Waker::from(Arc::clone(&woken));
+        let mut context = Context::from_waker(&waker);
+        let poll = select.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Ready(Ok(0)));
+    }
+
+    /// In this test case, the process receives a SIGTSTP signal while it is
+    /// waiting in the `select` call that temporarily blocks SIGTSTP. The
+    /// pending signal should be delivered when `select` times out and unblocks
+    /// SIGTSTP, which suspends the process. The `select` future should return
+    /// pending until the process is resumed.
+    #[test]
+    fn select_returns_pending_while_process_is_suspended_2() {
+        let system = virtual_system_with_parent_process();
+        let now = Instant::now();
+        system.state.borrow_mut().now = Some(now);
+
+        let mut readers = vec![];
+        let mut writers = vec![];
+
+        let mut select = pin!(system.select(
+            &mut readers,
+            &mut writers,
+            Some(Duration::from_secs(1)),
+            Some(&[SIGTSTP])
+        ));
+
+        // Initially, the future should not be ready.
+        let woken = Arc::new(WakeFlag::new());
+        let waker = Waker::from(Arc::clone(&woken));
+        let mut context = Context::from_waker(&waker);
+        let poll = select.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Pending);
+        assert!(!woken.is_woken());
+
+        // While waiting, SIGTSTP is blocked by the temporary signal mask.
+        let mut mask = Vec::new();
+        system
+            .sigmask(None, Some(&mut mask))
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_eq!(mask, [SIGTSTP]);
+
+        // Send SIGTSTP while it is blocked. It should remain pending.
+        system.raise(SIGTSTP).now_or_never().unwrap().unwrap();
+        assert!(!woken.is_woken());
+
+        // Polling again should still be pending.
+        let woken = Arc::new(WakeFlag::new());
+        let waker = Waker::from(Arc::clone(&woken));
+        let mut context = Context::from_waker(&waker);
+        let poll = select.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Pending);
+        assert!(!woken.is_woken());
+
+        // Advance time to the timeout. This wakes the future.
+        system
+            .state
+            .borrow_mut()
+            .advance_time(now + Duration::from_secs(1));
+        assert!(woken.is_woken());
+
+        // Timeout unblocks SIGTSTP and delivers it, suspending the process.
+        // The future should remain pending until the process is resumed.
+        let woken = Arc::new(WakeFlag::new());
+        let waker = Waker::from(Arc::clone(&woken));
+        let mut context = Context::from_waker(&waker);
+        let poll = select.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Pending);
+        assert!(!woken.is_woken());
+
+        // The parent process should have caught SIGCHLD for the suspension.
+        {
+            let state = system.state.borrow();
+            let ppid = state.processes[&system.process_id].ppid;
+            assert_eq!(state.processes[&ppid].caught_signals, [SIGCHLD]);
+        }
+
+        // Resuming the process should wake the future.
+        system.raise(SIGCONT).now_or_never().unwrap().unwrap();
+        assert!(woken.is_woken());
+
+        // Polling the future should now return ready with timeout.
         let woken = Arc::new(WakeFlag::new());
         let waker = Waker::from(Arc::clone(&woken));
         let mut context = Context::from_waker(&waker);
