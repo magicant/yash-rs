@@ -180,6 +180,11 @@ impl Select for VirtualSystem {
             })
             .await;
 
+            // Drop the waker from the last poll, if any
+            if let Some(waker) = retain_waker.take() {
+                waker.take();
+            }
+
             // Restore the previous signal mask
             if let Some(old_mask) = old_mask {
                 let mut state = this.state.borrow_mut();
