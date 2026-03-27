@@ -800,8 +800,10 @@ mod tests {
     use super::super::r#virtual::VirtualSystem;
     use super::super::r#virtual::{SIGCHLD, SIGINT, SIGTERM, SIGUSR1};
     use super::*;
+    use crate::test_helper::WakeFlag;
     use assert_matches::assert_matches;
     use futures_util::FutureExt as _;
+    use std::sync::Arc;
     use std::task::Context;
     use std::task::Poll;
     use std::task::Waker;
@@ -952,7 +954,6 @@ mod tests {
     // TODO Test SharedSystem::write_all where second write returns EINTR
 
     #[test]
-    #[ignore = "temporarily ignored while we are still working on the implementation of timeouts in VirtualSystem"]
     fn shared_system_wait_until() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -962,14 +963,23 @@ mod tests {
         let target = start + Duration::from_millis(1_125);
 
         let mut future = Box::pin(system.wait_until(target));
-        let mut context = Context::from_waker(Waker::noop());
+
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Waker::from(wake_flag.clone());
+        let mut context = Context::from_waker(&waker);
         let poll = future.as_mut().poll(&mut context);
         assert_eq!(poll, Poll::Pending);
+        assert!(!wake_flag.is_woken());
 
+        state.borrow_mut().advance_time(target);
         system.select(false).unwrap();
+        assert!(wake_flag.is_woken());
+
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Waker::from(wake_flag.clone());
+        let mut context = Context::from_waker(&waker);
         let poll = future.as_mut().poll(&mut context);
         assert_eq!(poll, Poll::Ready(()));
-        assert_eq!(state.borrow().now, Some(target));
     }
 
     #[test]
