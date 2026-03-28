@@ -21,7 +21,7 @@ use std::cell::Cell;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::collections::binary_heap::PeekMut;
-use std::rc::Rc;
+use std::rc::Weak;
 use std::task::Waker;
 use std::time::Instant;
 
@@ -46,30 +46,38 @@ impl ScheduledWakerQueue {
     /// This method adds a new scheduled waker to the priority queue so that the
     /// associated process can be woken up at the specified time.
     ///
-    /// The waker is wrapped in `Rc<Cell<Option<Waker>>>` to allow it to be
+    /// The waker is wrapped in `Weak<Cell<Option<Waker>>>` to allow it to be
     /// shared among multiple wake conditions. When the waker is
     /// [woken up](Waker::wake), it will be taken from the `Cell` and set to
     /// `None`, indicating that the process has been woken up and the item can
-    /// be removed from the queue.
+    /// be removed from the queue. The strong reference count of the `Weak`
+    /// waker can also be dropped to `0` when the waker is no longer needed,
+    /// which also indicates that the process has been woken up or canceled and
+    /// the item can be removed from the queue.
     ///
-    /// This method may (or may not) remove wakers that have already been set to
-    /// `None` by other wake conditions, reclaiming the memory used by those
-    /// items.
-    pub fn push(&mut self, wake_time: Instant, waker: Rc<Cell<Option<Waker>>>) {
+    /// This method may (or may not) remove such invalidated wakers to reclaim
+    /// the memory.
+    pub fn push(&mut self, wake_time: Instant, waker: Weak<Cell<Option<Waker>>>) {
+        // Helper closure to check if a scheduled waker is still alive
+        // (i.e., has a strong reference and the contained waker is not `None`)
+        let is_alive = |scheduled_waker: &ScheduledWaker| {
+            scheduled_waker.waker.upgrade().is_some_and(|cell| {
+                // Since `Waker` is not `Copy`, we need to take it from the
+                // `Cell` to check if it's `None`, and put it back afterward.
+                let waker = cell.take();
+                let is_alive = waker.is_some();
+                cell.set(waker);
+                is_alive
+            })
+        };
+
         // Before pushing the new item, remove any expired items from the front
         // of the queue.
-        while let Some(peek) = self.0.peek_mut() {
-            // Since `Waker` is not `Copy`, we need to take it from the
-            // `Cell` to check if it's `None`, and put it back afterward.
-            // let is_expired = peek.waker.get().is_none();
-            let waker = peek.waker.take();
-            let is_gone = waker.is_none();
-            peek.waker.set(waker);
-            if is_gone {
-                PeekMut::pop(peek);
-            } else {
+        while let Some(item) = self.0.peek_mut() {
+            if is_alive(&item) {
                 break;
             }
+            PeekMut::pop(item);
         }
 
         if self.0.capacity() == self.0.len() {
@@ -78,15 +86,7 @@ impl ScheduledWakerQueue {
             // opportunity to clean up empty wakers (which also costs O(n)).
             // This way we can amortize the cleanup cost over multiple
             // insertions, and avoid doing cleanup on every insertion.
-            self.0.retain(|item| {
-                // Since `Waker` is not `Copy`, we need to take it from the
-                // `Cell` to check if it's `None`, and put it back afterward.
-                // item.waker.get().is_some()
-                let waker = item.waker.take();
-                let is_alive = waker.is_some();
-                item.waker.set(waker);
-                is_alive
-            });
+            self.0.retain(is_alive);
 
             // If we removed substantial number of items, we can also shrink
             // the capacity to save memory and create more opportunities for
@@ -114,7 +114,7 @@ impl ScheduledWakerQueue {
                 break;
             }
             let item = PeekMut::pop(item);
-            if let Some(waker) = item.waker.take() {
+            if let Some(waker) = item.waker.upgrade().and_then(|cell| cell.take()) {
                 waker.wake();
             }
         }
@@ -147,15 +147,15 @@ struct ScheduledWaker {
 
     /// Waker to wake up the virtual process
     ///
-    /// The waker is shared in `Rc` to allow other wake conditions to share the
-    /// same waker, and wrapped in `Cell` of `Option` to allow it to be taken
-    /// when waking up the process. When the waker is `None`, it means the
-    /// process has already been woken up (possibly by other conditions) and the
-    /// item can be removed from the queue.
-    #[debug(ignore)]
+    /// The waker is shared as a weak reference to allow other wake conditions
+    /// to activate the same waker, and wrapped in `Cell` of `Option` to allow
+    /// it to be taken when waking up the process. When the weak reference has
+    /// no strong references or the waker is `None`, it means the process has
+    /// already been woken up (possibly by other conditions) or canceled, and
+    /// the item can be removed from the queue.
     #[eq(ignore)]
     #[partial_eq(ignore)]
-    pub waker: Rc<Cell<Option<Waker>>>,
+    pub waker: Weak<Cell<Option<Waker>>>,
 }
 
 /// Compares `wake_time` in reverse order to make the earliest wake time the greatest
@@ -180,6 +180,7 @@ impl Ord for ScheduledWaker {
 mod tests {
     use super::*;
     use crate::test_helper::WakeFlag;
+    use std::rc::Rc;
     use std::sync::Arc;
     use std::time::Duration;
 
@@ -197,14 +198,15 @@ mod tests {
     fn next_wake_time_returns_earliest_pending_waker_time() {
         let mut queue = ScheduledWakerQueue::new();
         let now = Instant::now();
+        let waker = dummy_waker();
 
-        queue.push(now + Duration::from_secs(5), dummy_waker());
+        queue.push(now + Duration::from_secs(5), Rc::downgrade(&waker));
         assert_eq!(queue.next_wake_time(), Some(now + Duration::from_secs(5)));
 
-        queue.push(now + Duration::from_secs(3), dummy_waker());
+        queue.push(now + Duration::from_secs(3), Rc::downgrade(&waker));
         assert_eq!(queue.next_wake_time(), Some(now + Duration::from_secs(3)));
 
-        queue.push(now + Duration::from_secs(10), dummy_waker());
+        queue.push(now + Duration::from_secs(10), Rc::downgrade(&waker));
         assert_eq!(queue.next_wake_time(), Some(now + Duration::from_secs(3)));
     }
 
@@ -219,9 +221,9 @@ mod tests {
         let waker_1 = Rc::new(Cell::new(Some(Waker::from(wake_flag_1.clone()))));
         let waker_2 = Rc::new(Cell::new(Some(Waker::from(wake_flag_2.clone()))));
         let waker_3 = Rc::new(Cell::new(Some(Waker::from(wake_flag_3.clone()))));
-        queue.push(now + Duration::from_secs(3), waker_1);
-        queue.push(now + Duration::from_secs(5), waker_2);
-        queue.push(now + Duration::from_secs(6), waker_3);
+        queue.push(now + Duration::from_secs(3), Rc::downgrade(&waker_1));
+        queue.push(now + Duration::from_secs(5), Rc::downgrade(&waker_2));
+        queue.push(now + Duration::from_secs(6), Rc::downgrade(&waker_3));
 
         // The first two wakers should be triggered, but not the third one
         queue.wake(now + Duration::from_secs(5));
@@ -242,9 +244,9 @@ mod tests {
         let waker_2 = Rc::new(Cell::new(Some(Waker::from(wake_flag_2.clone()))));
         let waker_3 = Rc::new(Cell::new(Some(Waker::from(wake_flag_3.clone()))));
 
-        queue.push(now + Duration::from_secs(5), waker_1);
-        queue.push(now + Duration::from_secs(3), waker_2);
-        queue.push(now + Duration::from_secs(10), waker_3);
+        queue.push(now + Duration::from_secs(5), Rc::downgrade(&waker_1));
+        queue.push(now + Duration::from_secs(3), Rc::downgrade(&waker_2));
+        queue.push(now + Duration::from_secs(10), Rc::downgrade(&waker_3));
 
         // The first two wakers should be triggered, but not the third one
         queue.wake(now + Duration::from_secs(5));
@@ -278,16 +280,16 @@ mod tests {
         let waker_4 = Rc::new(Cell::new(Some(Waker::from(wake_flag_4.clone()))));
 
         queue.0.reserve(4);
-        queue.push(now + Duration::from_secs(3), waker_1.clone());
-        queue.push(now + Duration::from_secs(5), waker_2.clone());
-        queue.push(now + Duration::from_secs(7), waker_3);
+        queue.push(now + Duration::from_secs(3), Rc::downgrade(&waker_1));
+        queue.push(now + Duration::from_secs(5), Rc::downgrade(&waker_2));
+        queue.push(now + Duration::from_secs(7), Rc::downgrade(&waker_3));
 
         // Manually wake the first two wakers to simulate them being woken by other conditions
         waker_1.take().unwrap().wake();
         waker_2.take().unwrap().wake();
 
         // Now push a new waker, which should trigger the cleanup of the expired entries
-        queue.push(now + Duration::from_secs(1), waker_4);
+        queue.push(now + Duration::from_secs(1), Rc::downgrade(&waker_4));
         assert_eq!(queue.0.len(), 2);
 
         // The remaining wakers should be the third and fourth ones
@@ -307,24 +309,22 @@ mod tests {
         let waker_4 = Rc::new(Cell::new(Some(Waker::noop().clone())));
 
         queue.0.reserve(10);
-        queue.push(now + Duration::from_secs(3), waker_1);
+        queue.push(now + Duration::from_secs(3), Rc::downgrade(&waker_1));
         while queue.0.len() + 1 < queue.0.capacity() {
-            let waker = Rc::new(Cell::new(Some(Waker::noop().clone())));
-            queue.push(now + Duration::new(3, queue.0.len() as u32), waker.clone());
-            waker.take().unwrap().wake();
+            queue.push(now + Duration::new(3, queue.0.len() as u32), Weak::new());
         }
-        queue.push(now + Duration::from_secs(4), waker_2);
+        queue.push(now + Duration::from_secs(4), Rc::downgrade(&waker_2));
         assert_eq!(queue.0.len(), queue.0.capacity());
 
         // The next push should trigger cleanup of expired entries
-        queue.push(now + Duration::from_secs(5), waker_3.clone());
+        queue.push(now + Duration::from_secs(5), Rc::downgrade(&waker_3));
         assert_eq!(queue.0.len(), 3);
 
         // Manually wake the last waker to simulate it being woken by other conditions
         waker_3.take().unwrap().wake();
 
         // Another push does not trigger cleanup since the capacity is not yet reached
-        queue.push(now + Duration::from_secs(6), waker_4.clone());
+        queue.push(now + Duration::from_secs(6), Rc::downgrade(&waker_4));
         assert_eq!(queue.0.len(), 4);
     }
 }

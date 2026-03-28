@@ -26,8 +26,9 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::rc::Rc;
+use std::rc::Weak;
 use std::task::Poll::{Pending, Ready};
-use std::task::{Context, Poll, Waker};
+use std::task::{Poll, Waker};
 
 /// Maximum number of bytes guaranteed to be atomic when writing to a pipe.
 ///
@@ -87,15 +88,15 @@ pub enum FileBody {
         /// wakers of such tasks, so that they can be notified when new content
         /// is written.
         ///
-        /// The waker is wrapped in `Rc<Cell<Option<Waker>>>` to allow it to be
+        /// The waker is wrapped in `Weak<Cell<Option<Waker>>>` to allow it to be
         /// shared among multiple wake conditions like timeouts and signals, and
-        /// to allow it to be taken when waking up the task. When the waker is
-        /// `None`, it means the task has already been woken up (possibly by
-        /// other conditions) and the item can be removed from the queue.
-        #[debug("[{} wakers]", pending_read_wakers.len())]
+        /// to allow it to be taken when waking up the task. When the weak
+        /// reference has no strong references or the contained waker is `None`,
+        /// it means the task has already been woken up (possibly by other
+        /// conditions) or canceled and the item can be removed from the queue.
         #[eq(ignore)]
         #[partial_eq(ignore)]
-        pending_read_wakers: Vec<Rc<Cell<Option<Waker>>>>,
+        pending_read_wakers: Vec<Weak<Cell<Option<Waker>>>>,
         /// Wakers of tasks waiting to write to the pipe
         ///
         /// When a task attempts to write to a full pipe, it will wait until
@@ -104,11 +105,10 @@ pub enum FileBody {
         /// read and space is available for writing.
         ///
         /// See the comment on `pending_read_wakers` for the reason why the
-        /// waker is wrapped in `Rc<Cell<Option<Waker>>>`.
-        #[debug("[{} wakers]", pending_write_wakers.len())]
+        /// waker is wrapped in `Weak<Cell<Option<Waker>>>`.
         #[eq(ignore)]
         #[partial_eq(ignore)]
-        pending_write_wakers: Vec<Rc<Cell<Option<Waker>>>>,
+        pending_write_wakers: Vec<Weak<Cell<Option<Waker>>>>,
     },
     /// Symbolic link
     Symlink {
@@ -260,7 +260,7 @@ impl FileBody {
     }
 
     /// Registers a waker to be woken up when this file becomes ready for reading.
-    pub(super) fn register_reader_waker(&mut self, waker: Rc<Cell<Option<Waker>>>) {
+    pub(super) fn register_reader_waker(&mut self, waker: Weak<Cell<Option<Waker>>>) {
         if let Self::Fifo {
             pending_read_wakers,
             ..
@@ -271,7 +271,7 @@ impl FileBody {
     }
 
     /// Registers a waker to be woken up when this file becomes ready for writing.
-    pub(super) fn register_writer_waker(&mut self, waker: Rc<Cell<Option<Waker>>>) {
+    pub(super) fn register_writer_waker(&mut self, waker: Weak<Cell<Option<Waker>>>) {
         if let Self::Fifo {
             pending_write_wakers,
             ..
@@ -287,18 +287,34 @@ impl FileBody {
     /// relevant for seekable files. For non-seekable files, it can be ignored
     /// or set to any value.
     ///
+    /// The `get_waker` parameter is a function that returns a weak reference to
+    /// the waker of the current task. It is used to register the waker for
+    /// pending read operations on files like FIFOs. The function is called only
+    /// when the read operation would block, so it can be used to avoid
+    /// unnecessary allocations of wakers when the operation can complete
+    /// immediately. Since the waker is passed as a weak reference, the caller
+    /// must ensure that there is a strong reference to the waker that lives at
+    /// least until the file body wakes it up, otherwise the weak reference may
+    /// become invalid and the task may not be woken up correctly. The waker is
+    /// wrapped in `Cell<Option<Waker>>` to allow it to be shared among multiple
+    /// wake conditions and to allow it to be taken by the first condition that
+    /// wakes the task.
+    ///
     /// The returned `Poll` indicates whether the read operation has completed
     /// or is still pending. If it is `Poll::Ready`, the contained `Result`
     /// indicates whether the read was successful and how many bytes were read,
     /// or if it failed with an error. If it is `Poll::Pending`, it means a
     /// waker has been registered and the caller should wait until it is woken
     /// up, when this method should be called again.
-    pub(super) fn poll_read(
+    pub(super) fn poll_read<F>(
         &mut self,
-        context: &Context<'_>,
         mut buffer: &mut [u8],
         offset: usize,
-    ) -> Poll<Result<usize, Errno>> {
+        mut get_waker: F,
+    ) -> Poll<Result<usize, Errno>>
+    where
+        F: FnMut() -> Weak<Cell<Option<Waker>>>,
+    {
         match self {
             FileBody::Regular { content, .. } | FileBody::Terminal { content } => {
                 let len = content.len();
@@ -325,7 +341,7 @@ impl FileBody {
                 let limit = content.len();
                 if limit == 0 && *writers > 0 {
                     // Block until any writer writes to the pipe or all writers are closed.
-                    pending_read_wakers.push(Rc::new(Cell::new(Some(context.waker().clone()))));
+                    pending_read_wakers.push(get_waker());
                     return Pending;
                 }
 
@@ -354,18 +370,34 @@ impl FileBody {
     /// relevant for seekable files. For non-seekable files, it can be ignored
     /// or set to any value.
     ///
+    /// The `get_waker` parameter is a function that returns a weak reference to
+    /// the waker of the current task. It is used to register the waker for
+    /// pending write operations on files like FIFOs. The function is called
+    /// only when the write operation would block, so it can be used to avoid
+    /// unnecessary allocations of wakers when the operation can complete
+    /// immediately. Since the waker is passed as a weak reference, the caller
+    /// must ensure that there is a strong reference to the waker that lives at
+    /// least until the file body wakes it up, otherwise the weak reference may
+    /// become invalid and the task may not be woken up correctly. The waker is
+    /// wrapped in `Cell<Option<Waker>>` to allow it to be shared among multiple
+    /// wake conditions and to allow it to be taken by the first condition that
+    /// wakes the task.
+    ///
     /// The returned `Poll` indicates whether the write operation has completed
     /// or is still pending. If it is `Poll::Ready`, the contained `Result`
     /// indicates whether the write was successful and how many bytes were
     /// written, or if it failed with an error. If it is `Poll::Pending`, it
     /// means a waker has been registered and the caller should wait until it is
     /// woken up, when this method should be called again.
-    pub(super) fn poll_write(
+    pub(super) fn poll_write<F>(
         &mut self,
-        context: &Context<'_>,
         mut buffer: &[u8],
         offset: usize,
-    ) -> Poll<Result<usize, Errno>> {
+        mut get_waker: F,
+    ) -> Poll<Result<usize, Errno>>
+    where
+        F: FnMut() -> Weak<Cell<Option<Waker>>>,
+    {
         match self {
             FileBody::Regular { content, .. } | FileBody::Terminal { content } => {
                 let len = content.len();
@@ -398,8 +430,7 @@ impl FileBody {
                 if room < buffer.len() {
                     if room == 0 || buffer.len() <= PIPE_BUF {
                         // Block until any reader reads from the pipe or all readers are closed.
-                        pending_write_wakers
-                            .push(Rc::new(Cell::new(Some(context.waker().clone()))));
+                        pending_write_wakers.push(get_waker());
                         return Pending;
                     }
                     buffer = &buffer[..room];
@@ -511,13 +542,13 @@ mod tests {
     #[test]
     fn fifo_file_body_wakes_pending_read_wakers_if_no_writers_remain() {
         let wake_flag = Arc::new(WakeFlag::new());
-        let waker = Waker::from(wake_flag.clone());
+        let waker = Rc::new(Cell::new(Some(Waker::from(wake_flag.clone()))));
         let mut body = FileBody::Fifo {
             content: VecDeque::new(),
             readers: 1,
             writers: 2,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: vec![Rc::new(Cell::new(Some(waker)))],
+            pending_read_wakers: vec![Rc::downgrade(&waker)],
             pending_write_wakers: Vec::new(),
         };
 
@@ -534,14 +565,14 @@ mod tests {
     #[test]
     fn fifo_file_body_wakes_pending_write_wakers_if_no_readers_remain() {
         let wake_flag = Arc::new(WakeFlag::new());
-        let waker = Waker::from(wake_flag.clone());
+        let waker = Rc::new(Cell::new(Some(Waker::from(wake_flag.clone()))));
         let mut body = FileBody::Fifo {
             content: VecDeque::new(),
             readers: 2,
             writers: 1,
             pending_open_wakers: Vec::new(),
             pending_read_wakers: Vec::new(),
-            pending_write_wakers: vec![Rc::new(Cell::new(Some(waker)))],
+            pending_write_wakers: vec![Rc::downgrade(&waker)],
         };
 
         // One reader is closed, but there is still another reader,
@@ -629,27 +660,24 @@ mod tests {
     #[test]
     fn regular_file_body_read_beyond_file_length() {
         let mut body = FileBody::new(b"hello");
-        let context = Context::from_waker(Waker::noop());
         let mut buffer = [0; 10];
-        assert_eq!(body.poll_read(&context, &mut buffer, 5), Ready(Ok(0)));
-        assert_eq!(body.poll_read(&context, &mut buffer, 10), Ready(Ok(0)));
+        assert_eq!(body.poll_read(&mut buffer, 5, Weak::new), Ready(Ok(0)));
+        assert_eq!(body.poll_read(&mut buffer, 10, Weak::new), Ready(Ok(0)));
     }
 
     #[test]
     fn regular_file_body_read_more_than_content() {
         let mut body = FileBody::new(b"hello");
-        let context = Context::from_waker(Waker::noop());
         let mut buffer = [0; 10];
-        assert_eq!(body.poll_read(&context, &mut buffer, 2), Ready(Ok(3)));
+        assert_eq!(body.poll_read(&mut buffer, 2, Weak::new), Ready(Ok(3)));
         assert_eq!(&buffer[..3], b"llo");
     }
 
     #[test]
     fn regular_file_body_read_less_than_content() {
         let mut body = FileBody::new(b"hello");
-        let context = Context::from_waker(Waker::noop());
         let mut buffer = [0; 3];
-        assert_eq!(body.poll_read(&context, &mut buffer, 1), Ready(Ok(3)));
+        assert_eq!(body.poll_read(&mut buffer, 1, Weak::new), Ready(Ok(3)));
         assert_eq!(&buffer, b"ell");
     }
 
@@ -664,9 +692,8 @@ mod tests {
             pending_read_wakers: Vec::new(),
             pending_write_wakers: Vec::new(),
         };
-        let context = Context::from_waker(Waker::noop());
         let mut buffer = [0; 10];
-        assert_eq!(body.poll_read(&context, &mut buffer, 0), Ready(Ok(0)));
+        assert_eq!(body.poll_read(&mut buffer, 0, Weak::new), Ready(Ok(0)));
     }
 
     #[test]
@@ -684,26 +711,21 @@ mod tests {
         let mut buffer = [0; 10];
 
         let wake_flag = Arc::new(WakeFlag::new());
-        let waker = Waker::from(wake_flag.clone());
-        let context = Context::from_waker(&waker);
-        let poll = body.poll_read(&context, &mut buffer, 0);
+        let waker = Rc::new(Cell::new(Some(Waker::from(wake_flag.clone()))));
+        let get_waker = || Rc::downgrade(&waker);
+        let poll = body.poll_read(&mut buffer, 0, get_waker);
         assert_eq!(poll, Pending);
         assert!(!wake_flag.is_woken());
 
         // When another task writes to the FIFO, the read operation should be woken up.
-        let context = Context::from_waker(Waker::noop());
-        let poll = body.poll_write(&context, b"hello", 0);
+        let poll = body.poll_write(b"hello", 0, Weak::new);
         assert_eq!(poll, Ready(Ok(5)));
         assert!(wake_flag.is_woken());
 
         // After being woken up, the read operation should succeed and read the new content.
-        let wake_flag = Arc::new(WakeFlag::new());
-        let waker = Waker::from(wake_flag.clone());
-        let context = Context::from_waker(&waker);
-        let poll = body.poll_read(&context, &mut buffer, 0);
+        let poll = body.poll_read(&mut buffer, 0, Weak::new);
         assert_eq!(poll, Ready(Ok(5)));
         assert_eq!(&buffer[..5], b"hello");
-        assert!(!wake_flag.is_woken());
     }
 
     #[test]
@@ -716,36 +738,32 @@ mod tests {
             pending_read_wakers: Vec::new(),
             pending_write_wakers: Vec::new(),
         };
-        let context = Context::from_waker(Waker::noop());
         let mut buffer = [0; 10];
-        assert_eq!(body.poll_read(&context, &mut buffer, 0), Ready(Ok(5)));
+        assert_eq!(body.poll_read(&mut buffer, 0, Weak::new), Ready(Ok(5)));
         assert_eq!(&buffer[..5], b"hello");
     }
 
     #[test]
     fn regular_file_body_write_less_than_content() {
         let mut body = FileBody::new(b"hello");
-        let context = Context::from_waker(Waker::noop());
         let buffer = b"ipp";
-        assert_eq!(body.poll_write(&context, buffer, 1), Ready(Ok(3)));
+        assert_eq!(body.poll_write(buffer, 1, Weak::new), Ready(Ok(3)));
         assert_eq!(body, FileBody::new(b"hippo"));
     }
 
     #[test]
     fn regular_file_body_write_more_than_content() {
         let mut body = FileBody::new(b"hello");
-        let context = Context::from_waker(Waker::noop());
         let buffer = b"icopter";
-        assert_eq!(body.poll_write(&context, buffer, 3), Ready(Ok(7)));
+        assert_eq!(body.poll_write(buffer, 3, Weak::new), Ready(Ok(7)));
         assert_eq!(body, FileBody::new(b"helicopter"));
     }
 
     #[test]
     fn regular_file_body_write_beyond_file_length() {
         let mut body = FileBody::new(b"hello");
-        let context = Context::from_waker(Waker::noop());
         let buffer = b"world";
-        assert_eq!(body.poll_write(&context, buffer, 7), Ready(Ok(5)));
+        assert_eq!(body.poll_write(buffer, 7, Weak::new), Ready(Ok(5)));
         assert_eq!(body, FileBody::new(b"hello\0\0world"));
     }
 
@@ -760,10 +778,9 @@ mod tests {
             pending_read_wakers: Vec::new(),
             pending_write_wakers: Vec::new(),
         };
-        let context = Context::from_waker(Waker::noop());
         let buffer = b"hello";
         assert_eq!(
-            body.poll_write(&context, buffer, 0),
+            body.poll_write(buffer, 0, Weak::new),
             Ready(Err(Errno::EPIPE))
         );
     }
@@ -780,9 +797,8 @@ mod tests {
             pending_read_wakers: Vec::new(),
             pending_write_wakers: Vec::new(),
         };
-        let context = Context::from_waker(Waker::noop());
         let buffer = [0; PIPE_BUF];
-        assert_eq!(body.poll_write(&context, &buffer, 0), Ready(Ok(PIPE_BUF)));
+        assert_eq!(body.poll_write(&buffer, 0, Weak::new), Ready(Ok(PIPE_BUF)));
     }
 
     #[test]
@@ -801,24 +817,23 @@ mod tests {
         let buffer = [0; PIPE_BUF];
 
         let wake_flag = Arc::new(WakeFlag::new());
-        let waker = Waker::from(wake_flag.clone());
-        let context = Context::from_waker(&waker);
-        let poll = body.poll_write(&context, &buffer, 0);
+        let waker = Rc::new(Cell::new(Some(Waker::from(wake_flag.clone()))));
+        let get_waker = || Rc::downgrade(&waker);
+        let poll = body.poll_write(&buffer, 0, get_waker);
         assert_eq!(poll, Pending);
         assert!(!wake_flag.is_woken());
 
         // When another task reads from the FIFO, the write operation should be woken up.
-        let context = Context::from_waker(Waker::noop());
         let mut read_buffer = [0; 1];
-        let poll = body.poll_read(&context, &mut read_buffer, 0);
+        let poll = body.poll_read(&mut read_buffer, 0, Weak::new);
         assert_eq!(poll, Ready(Ok(1)));
         assert!(wake_flag.is_woken());
 
         // After being woken up, the write operation successfully writes the content to the FIFO.
         let wake_flag = Arc::new(WakeFlag::new());
-        let waker = Waker::from(wake_flag.clone());
-        let context = Context::from_waker(&waker);
-        let poll = body.poll_write(&context, &buffer, 0);
+        let waker = Rc::new(Cell::new(Some(Waker::from(wake_flag.clone()))));
+        let get_waker = || Rc::downgrade(&waker);
+        let poll = body.poll_write(&buffer, 0, get_waker);
         assert_eq!(poll, Ready(Ok(PIPE_BUF)));
         assert!(!wake_flag.is_woken());
     }
@@ -836,9 +851,8 @@ mod tests {
             pending_read_wakers: Vec::new(),
             pending_write_wakers: Vec::new(),
         };
-        let context = Context::from_waker(Waker::noop());
         let buffer = [0; PIPE_BUF + 1];
-        assert_eq!(body.poll_write(&context, &buffer, 0), Ready(Ok(1)));
+        assert_eq!(body.poll_write(&buffer, 0, Weak::new), Ready(Ok(1)));
     }
 
     #[test]
@@ -857,24 +871,23 @@ mod tests {
         let buffer = [0; PIPE_BUF + 1];
 
         let wake_flag = Arc::new(WakeFlag::new());
-        let waker = Waker::from(wake_flag.clone());
-        let context = Context::from_waker(&waker);
-        let poll = body.poll_write(&context, &buffer, 0);
+        let waker = Rc::new(Cell::new(Some(Waker::from(wake_flag.clone()))));
+        let get_waker = || Rc::downgrade(&waker);
+        let poll = body.poll_write(&buffer, 0, get_waker);
         assert_eq!(poll, Pending);
         assert!(!wake_flag.is_woken());
 
         // When another task reads from the FIFO, the write operation should be woken up.
-        let context = Context::from_waker(Waker::noop());
         let mut read_buffer = [0; 1];
-        let poll = body.poll_read(&context, &mut read_buffer, 0);
+        let poll = body.poll_read(&mut read_buffer, 0, Weak::new);
         assert_eq!(poll, Ready(Ok(1)));
         assert!(wake_flag.is_woken());
 
         // After being woken up, the write operation successfully writes one byte to the FIFO.
         let wake_flag = Arc::new(WakeFlag::new());
-        let waker = Waker::from(wake_flag.clone());
-        let context = Context::from_waker(&waker);
-        let poll = body.poll_write(&context, &buffer, 0);
+        let waker = Rc::new(Cell::new(Some(Waker::from(wake_flag.clone()))));
+        let get_waker = || Rc::downgrade(&waker);
+        let poll = body.poll_write(&buffer, 0, get_waker);
         assert_eq!(poll, Ready(Ok(1)));
         assert!(!wake_flag.is_woken());
     }

@@ -26,8 +26,9 @@ use std::cell::RefCell;
 use std::fmt::Debug;
 use std::io::SeekFrom;
 use std::rc::Rc;
+use std::rc::Weak;
+use std::task::Poll;
 use std::task::Waker;
-use std::task::{Context, Poll};
 
 /// State of a file opened for reading and/or writing
 #[derive(Clone, Debug)]
@@ -114,7 +115,7 @@ impl OpenFileDescription {
     /// The caller should ensure that the OFD is not
     /// [ready for reading](Self::is_ready_for_reading) when calling this
     /// method, otherwise the waker may never be woken up.
-    pub(super) fn register_reader_waker(&mut self, waker: Rc<Cell<Option<Waker>>>) {
+    pub(super) fn register_reader_waker(&mut self, waker: Weak<Cell<Option<Waker>>>) {
         self.file.borrow_mut().body.register_reader_waker(waker);
     }
 
@@ -124,7 +125,7 @@ impl OpenFileDescription {
     /// The caller should ensure that the OFD is not
     /// [ready for writing](Self::is_ready_for_writing) when calling this
     /// method, otherwise the waker may never be woken up.
-    pub(super) fn register_writer_waker(&mut self, waker: Rc<Cell<Option<Waker>>>) {
+    pub(super) fn register_writer_waker(&mut self, waker: Weak<Cell<Option<Waker>>>) {
         self.file.borrow_mut().body.register_writer_waker(waker);
     }
 
@@ -136,8 +137,7 @@ impl OpenFileDescription {
     /// for reading, it returns `Err(Errno::EAGAIN)`. Use
     /// [`poll_read`](Self::poll_read) for polling support.
     pub fn read(&mut self, buffer: &mut [u8]) -> Result<usize, Errno> {
-        let context = Context::from_waker(Waker::noop());
-        match self.poll_read(&context, buffer) {
+        match self.poll_read(buffer, Weak::new) {
             Poll::Ready(result) => result,
             Poll::Pending => Err(Errno::EAGAIN),
         }
@@ -145,23 +145,35 @@ impl OpenFileDescription {
 
     /// Polls for the result of reading from this open file description.
     ///
+    /// The `get_waker` parameter is a function that returns a weak reference to
+    /// the waker of the current task. It is used to register the waker for
+    /// pending read operations on files like FIFOs. The function is called only
+    /// when the read operation would block, so it can be used to avoid
+    /// unnecessary allocations of wakers when the operation can complete
+    /// immediately. Since the waker is passed as a weak reference, the caller
+    /// must ensure that there is a strong reference to the waker that lives at
+    /// least until the file body wakes it up, otherwise the weak reference may
+    /// become invalid and the task may not be woken up correctly. The waker is
+    /// wrapped in `Cell<Option<Waker>>` to allow it to be shared among multiple
+    /// wake conditions and to allow it to be taken by the first condition that
+    /// wakes the task.
+    ///
     /// The returned `Poll` indicates whether the read operation has completed
     /// or is still pending. If it is `Poll::Ready`, the contained `Result`
     /// indicates whether the read was successful and how many bytes were read,
     /// or if it failed with an error. If it is `Poll::Pending`, it means a
     /// waker has been registered and the caller should wait until it is woken
     /// up, when this method should be called again.
-    pub fn poll_read(
-        &mut self,
-        context: &Context<'_>,
-        buffer: &mut [u8],
-    ) -> Poll<Result<usize, Errno>> {
+    pub fn poll_read<F>(&mut self, buffer: &mut [u8], get_waker: F) -> Poll<Result<usize, Errno>>
+    where
+        F: FnMut() -> Weak<Cell<Option<Waker>>>,
+    {
         if !self.is_readable {
             return Poll::Ready(Err(Errno::EBADF));
         }
 
         let file = self.file.borrow_mut();
-        let poll = { file }.body.poll_read(context, buffer, self.offset);
+        let poll = { file }.body.poll_read(buffer, self.offset, get_waker);
 
         if let Poll::Ready(Ok(count)) = poll {
             self.offset += count;
@@ -174,8 +186,7 @@ impl OpenFileDescription {
     ///
     /// Returns the number of bytes successfully written.
     pub fn write(&mut self, buffer: &[u8]) -> Result<usize, Errno> {
-        let context = Context::from_waker(Waker::noop());
-        match self.poll_write(&context, buffer) {
+        match self.poll_write(buffer, Weak::new) {
             Poll::Ready(result) => result,
             Poll::Pending => Err(Errno::EAGAIN),
         }
@@ -183,17 +194,29 @@ impl OpenFileDescription {
 
     /// Polls for the result of writing to this open file description.
     ///
+    /// The `get_waker` parameter is a function that returns a weak reference to
+    /// the waker of the current task. It is used to register the waker for
+    /// pending write operations on files like FIFOs. The function is called
+    /// only when the write operation would block, so it can be used to avoid
+    /// unnecessary allocations of wakers when the operation can complete
+    /// immediately. Since the waker is passed as a weak reference, the caller
+    /// must ensure that there is a strong reference to the waker that lives at
+    /// least until the file body wakes it up, otherwise the weak reference may
+    /// become invalid and the task may not be woken up correctly. The waker is
+    /// wrapped in `Cell<Option<Waker>>` to allow it to be shared among multiple
+    /// wake conditions and to allow it to be taken by the first condition that
+    /// wakes the task.
+    ///
     /// The returned `Poll` indicates whether the write operation has completed
     /// or is still pending. If it is `Poll::Ready`, the contained `Result`
     /// indicates whether the write was successful and how many bytes were
     /// written, or if it failed with an error. If it is `Poll::Pending`, it
     /// means a waker has been registered and the caller should wait until it is
     /// woken up, when this method should be called again.
-    pub fn poll_write(
-        &mut self,
-        context: &Context<'_>,
-        buffer: &[u8],
-    ) -> Poll<Result<usize, Errno>> {
+    pub fn poll_write<F>(&mut self, buffer: &[u8], get_waker: F) -> Poll<Result<usize, Errno>>
+    where
+        F: FnMut() -> Weak<Cell<Option<Waker>>>,
+    {
         if !self.is_writable {
             return Poll::Ready(Err(Errno::EBADF));
         }
@@ -205,7 +228,7 @@ impl OpenFileDescription {
             self.offset
         };
 
-        let poll = { file }.body.poll_write(context, buffer, offset);
+        let poll = { file }.body.poll_write(buffer, offset, get_waker);
         if let Poll::Ready(Ok(count)) = poll {
             self.offset = offset + count;
         }

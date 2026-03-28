@@ -138,6 +138,7 @@ use crate::system::ChildProcessStarter;
 use enumset::EnumSet;
 use std::borrow::Cow;
 use std::cell::Cell;
+use std::cell::LazyCell;
 use std::cell::Ref;
 use std::cell::RefCell;
 use std::cell::RefMut;
@@ -157,6 +158,7 @@ use std::ops::DerefMut as _;
 use std::ops::RangeInclusive;
 use std::pin::Pin;
 use std::rc::Rc;
+use std::rc::Weak;
 use std::task::Context;
 use std::task::Poll;
 use std::task::Waker;
@@ -741,7 +743,15 @@ impl Read for VirtualSystem {
         let ofd = self.get_open_file_description(fd);
         async move {
             let ofd = ofd?;
-            poll_fn(|context| ofd.borrow_mut().poll_read(context, buffer)).await
+            let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
+            poll_fn(|context| {
+                let get_waker = || {
+                    waker.set(Some(context.waker().clone()));
+                    Rc::downgrade(&waker)
+                };
+                ofd.borrow_mut().poll_read(buffer, get_waker)
+            })
+            .await
         }
     }
 }
@@ -752,7 +762,15 @@ impl Write for VirtualSystem {
         let ofd = self.get_open_file_description(fd);
         async move {
             let ofd = ofd?;
-            poll_fn(|context| ofd.borrow_mut().poll_write(context, buffer)).await
+            let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
+            poll_fn(|context| {
+                let get_waker = || {
+                    waker.set(Some(context.waker().clone()));
+                    Rc::downgrade(&waker)
+                };
+                ofd.borrow_mut().poll_write(buffer, get_waker)
+            })
+            .await
         }
     }
 }
@@ -1364,9 +1382,9 @@ fn raise_sigchld(state: &mut SystemState, target_pid: Pid) {
     }
 }
 
-fn wake_all(pending_wakers: &mut Vec<Rc<Cell<Option<Waker>>>>) {
-    for waker in pending_wakers.drain(..) {
-        if let Some(waker) = waker.take() {
+fn wake_all(pending_wakers: &mut Vec<Weak<Cell<Option<Waker>>>>) {
+    for weak_ref in pending_wakers.drain(..) {
+        if let Some(waker) = weak_ref.upgrade().and_then(|cell| cell.take()) {
             waker.wake();
         }
     }

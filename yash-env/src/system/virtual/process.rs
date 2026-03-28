@@ -44,7 +44,6 @@ use std::ffi::CString;
 use std::fmt::Debug;
 use std::ops::BitOr;
 use std::ops::BitOrAssign;
-use std::rc::Rc;
 use std::rc::Weak;
 use std::task::Waker;
 
@@ -89,6 +88,13 @@ pub struct Process {
     state_has_changed: bool,
 
     /// Wakers waiting for the state of this process to change to `Running`
+    ///
+    /// The waker is wrapped in `Weak<Cell<Option<Waker>>>` to allow it to be
+    /// shared among multiple wake conditions like timeouts and signals, and to
+    /// allow it to be taken when waking up the task. When the weak reference
+    /// has no strong references or the waker is `None`, it means the task has
+    /// already been woken up (possibly by other conditions) or canceled and the
+    /// item can be removed from the queue.
     resumption_awaiters: Vec<Weak<Cell<Option<Waker>>>>,
 
     /// Current signal dispositions
@@ -113,13 +119,13 @@ pub struct Process {
     /// signals, only one waker is added to the queue and will be woken up when
     /// any of the signals is delivered.
     ///
-    /// The waker is wrapped in `Rc<Cell<Option<Waker>>>` to allow it to be
+    /// The waker is wrapped in `Weak<Cell<Option<Waker>>>` to allow it to be
     /// shared among multiple wake conditions like timeouts and signals, and to
-    /// allow it to be taken when waking up the task. When the waker is `None`,
-    /// it means the task has already been woken up (possibly by other
-    /// conditions) and the item can be removed from the queue.
-    #[debug("[{} wakers]", signal_wakers.len())]
-    signal_wakers: Vec<Rc<Cell<Option<Waker>>>>,
+    /// allow it to be taken when waking up the task. When the weak reference
+    /// has no strong references or the waker is `None`, it means the task has
+    /// already been woken up (possibly by other conditions) or canceled and the
+    /// item can be removed from the queue.
+    signal_wakers: Vec<Weak<Cell<Option<Waker>>>>,
 
     /// Limits for system resources
     pub(crate) resource_limits: HashMap<Resource, LimitPair>,
@@ -388,15 +394,7 @@ impl Process {
             false
         } else {
             match state {
-                ProcessState::Running => {
-                    for weak in self.resumption_awaiters.drain(..) {
-                        if let Some(strong) = weak.upgrade() {
-                            if let Some(waker) = strong.take() {
-                                waker.wake();
-                            }
-                        }
-                    }
-                }
+                ProcessState::Running => wake_all(&mut self.resumption_awaiters),
                 ProcessState::Halted(result) => {
                     if !result.is_stopped() {
                         self.close_fds()
@@ -487,7 +485,7 @@ impl Process {
     }
 
     /// Registers a waker that will be woken up when a signal is delivered to this process.
-    pub(crate) fn register_signal_waker(&mut self, waker: Rc<Cell<Option<Waker>>>) {
+    pub(crate) fn register_signal_waker(&mut self, waker: Weak<Cell<Option<Waker>>>) {
         self.signal_wakers.push(waker);
     }
 
@@ -960,7 +958,8 @@ mod tests {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
         process.set_disposition(signal::SIGCHLD, Disposition::Catch);
         let wake_flag = Arc::new(WakeFlag::new());
-        process.register_signal_waker(Rc::new(Cell::new(Some(Waker::from(wake_flag.clone())))));
+        let waker = Rc::new(Cell::new(Some(Waker::from(wake_flag.clone()))));
+        process.register_signal_waker(Rc::downgrade(&waker));
 
         let result = process.raise_signal(signal::SIGCHLD);
         assert_eq!(

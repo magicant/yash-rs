@@ -20,11 +20,11 @@ use super::{
     Duration, Errno, Fd, Result, Select, SigmaskOp, TryInto, VirtualSystem, raise_sigchld, signal,
 };
 use crate::job::ProcessState;
-use std::cell::Cell;
+use std::cell::{Cell, LazyCell};
 use std::ffi::c_int;
 use std::future::poll_fn;
 use std::rc::Rc;
-use std::task::{Poll, Waker};
+use std::task::Poll;
 
 impl Select for VirtualSystem {
     /// Waits for a next event.
@@ -89,14 +89,9 @@ impl Select for VirtualSystem {
                 (old_mask, old_caught_signals, deadline)
             };
 
-            let mut retain_waker: Option<Rc<Cell<Option<Waker>>>> = None;
+            let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
 
             let result = poll_fn(|context| {
-                // Drop the waker from the previous poll, if any
-                if let Some(waker) = retain_waker.take() {
-                    waker.take();
-                }
-
                 let state = &mut *this.state.borrow_mut();
                 let proc = state
                     .processes
@@ -106,9 +101,9 @@ impl Select for VirtualSystem {
                 // If the process is currently suspended, do nothing until resumed
                 if let ProcessState::Halted(reason) = proc.state() {
                     if reason.is_stopped() {
-                        let waker = Rc::new(Cell::new(Some(context.waker().clone())));
+                        // let waker = Rc::new(Cell::new(Some(context.waker().clone())));
+                        waker.set(Some(context.waker().clone()));
                         proc.wake_on_resumption(Rc::downgrade(&waker));
-                        retain_waker = Some(waker);
                         return Poll::Pending;
                     }
                 }
@@ -164,28 +159,24 @@ impl Select for VirtualSystem {
                 }
 
                 // Register wakers for the expected events
-                let waker = Rc::new(Cell::new(Some(context.waker().clone())));
-                proc.register_signal_waker(waker.clone());
+                waker.set(Some(context.waker().clone()));
+                proc.register_signal_waker(Rc::downgrade(&waker));
                 for fd in readers.iter() {
                     let mut ofd = proc.fds()[fd].open_file_description.borrow_mut();
-                    ofd.register_reader_waker(waker.clone());
+                    ofd.register_reader_waker(Rc::downgrade(&waker));
                 }
                 for fd in writers.iter() {
                     let mut ofd = proc.fds()[fd].open_file_description.borrow_mut();
-                    ofd.register_writer_waker(waker.clone());
+                    ofd.register_writer_waker(Rc::downgrade(&waker));
                 }
                 if let Some(deadline) = deadline {
-                    state.scheduled_wakers.push(deadline, waker.clone());
+                    state.scheduled_wakers.push(deadline, Rc::downgrade(&waker));
                 }
-                retain_waker = Some(waker);
                 Poll::Pending
             })
             .await;
 
-            // Drop the waker from the last poll, if any
-            if let Some(waker) = retain_waker.take() {
-                waker.take();
-            }
+            drop(waker);
 
             // Restore the previous signal mask
             if let Some(old_mask) = old_mask {
