@@ -33,6 +33,8 @@ A _private dependency_ is used internally and not visible to downstream users.
       performs a read operation.
     - `poll_write`: Polls for the file descriptor to be ready for writing and
       performs a write operation.
+- The new module `waker` has been added containing the `WakerSet` and
+  `ScheduledWakerQueue` structs for storing and activating wakers.
 - The `test_helper` module has been added with items migrated from the
   `yash-env-test-helper` crate. This module is conditionally compiled when the
   new `test-helper` feature is enabled.

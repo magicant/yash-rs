@@ -16,64 +16,11 @@
 
 //! Items for managing collections of wakers in the virtual system
 
+use super::WakerEntry;
 use std::cell::Cell;
-use std::cmp::Ordering;
 use std::collections::HashSet;
-use std::hash::{Hash, Hasher};
 use std::rc::Weak;
 use std::task::Waker;
-
-/// Entry of [`WakerSet`]
-///
-/// This is the new type pattern applied to `Weak<Cell<Option<Waker>>>` to
-/// implement `Eq`, `Hash`, and `Ord`. Wakers are compared by their pointer
-/// addresses.  We do not use [`Waker::will_wake`] because actual wakers are
-/// stored in `Cell`s, which support interior mutability and thus may have their
-/// wakers changed after being added to the set.
-#[derive(Clone, Debug)]
-pub(super) struct WakerEntry(pub Weak<Cell<Option<Waker>>>);
-
-impl PartialEq for WakerEntry {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.ptr_eq(&other.0)
-    }
-}
-
-impl Eq for WakerEntry {}
-
-impl Hash for WakerEntry {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.as_ptr().addr().hash(state);
-    }
-}
-
-impl PartialOrd for WakerEntry {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for WakerEntry {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.0.as_ptr().addr().cmp(&other.0.as_ptr().addr())
-    }
-}
-
-impl WakerEntry {
-    /// Checks if a waker entry is alive (i.e., its weak reference can be
-    /// upgraded and its cell contains a waker that has not been consumed).
-    #[must_use]
-    pub fn is_alive(&self) -> bool {
-        self.0.upgrade().is_some_and(|cell| {
-            // Since `Waker` is not `Copy`, we need to take it from the
-            // `Cell` to check if it's `None`, and put it back afterward.
-            let waker = cell.take();
-            let is_alive = waker.is_some();
-            cell.set(waker);
-            is_alive
-        })
-    }
-}
 
 /// Set of wakers to be awakened when a certain event occurs
 ///

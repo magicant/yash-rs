@@ -605,6 +605,7 @@ pub mod subshell;
 pub mod system;
 pub mod trap;
 pub mod variable;
+pub mod waker;
 
 #[cfg(any(test, feature = "test-helper"))]
 pub mod test_helper;
