@@ -21,9 +21,10 @@ use super::Gid;
 use super::Mode;
 use super::SigmaskOp;
 use super::Uid;
+use super::VirtualSystem;
+use super::WakerSet;
 use super::io::FdBody;
 use super::signal::{self, SignalEffect};
-use super::wake_all;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessResult;
@@ -34,7 +35,6 @@ use crate::system::SelectSystem;
 use crate::system::resource::INFINITY;
 use crate::system::resource::LimitPair;
 use crate::system::resource::Resource;
-use crate::system::r#virtual::VirtualSystem;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -88,14 +88,7 @@ pub struct Process {
     state_has_changed: bool,
 
     /// Wakers waiting for the state of this process to change to `Running`
-    ///
-    /// The waker is wrapped in `Weak<Cell<Option<Waker>>>` to allow it to be
-    /// shared among multiple wake conditions like timeouts and signals, and to
-    /// allow it to be taken when waking up the task. When the weak reference
-    /// has no strong references or the waker is `None`, it means the task has
-    /// already been woken up (possibly by other conditions) or canceled and the
-    /// item can be removed from the queue.
-    resumption_awaiters: Vec<Weak<Cell<Option<Waker>>>>,
+    resumption_awaiters: WakerSet,
 
     /// Current signal dispositions
     ///
@@ -114,18 +107,11 @@ pub struct Process {
 
     /// Wakers of tasks waiting for signals to be delivered to this process
     ///
-    /// When a signal is delivered to this process, all wakers in this queue are
-    /// woken up and the queue is cleared. When a task is waiting for multiple
-    /// signals, only one waker is added to the queue and will be woken up when
+    /// When a signal is delivered to this process, all wakers in this set are
+    /// woken up and the set is cleared. When a task is waiting for multiple
+    /// signals, only one waker is added to the set and will be woken up when
     /// any of the signals is delivered.
-    ///
-    /// The waker is wrapped in `Weak<Cell<Option<Waker>>>` to allow it to be
-    /// shared among multiple wake conditions like timeouts and signals, and to
-    /// allow it to be taken when waking up the task. When the weak reference
-    /// has no strong references or the waker is `None`, it means the task has
-    /// already been woken up (possibly by other conditions) or canceled and the
-    /// item can be removed from the queue.
-    signal_wakers: Vec<Weak<Cell<Option<Waker>>>>,
+    signal_wakers: WakerSet,
 
     /// Limits for system resources
     pub(crate) resource_limits: HashMap<Resource, LimitPair>,
@@ -175,12 +161,12 @@ impl Process {
             cwd: PathBuf::new(),
             state: ProcessState::Running,
             state_has_changed: false,
-            resumption_awaiters: Vec::new(),
+            resumption_awaiters: WakerSet::new(),
             dispositions: HashMap::new(),
             blocked_signals: BTreeSet::new(),
             pending_signals: BTreeSet::new(),
             caught_signals: Vec::new(),
-            signal_wakers: Vec::new(),
+            signal_wakers: WakerSet::new(),
             resource_limits: HashMap::new(),
             selector: Weak::new(),
             last_exec: None,
@@ -366,7 +352,7 @@ impl Process {
     /// This function does nothing if the process is not stopped.
     pub fn wake_on_resumption(&mut self, waker: Weak<Cell<Option<Waker>>>) {
         if self.state.is_stopped() {
-            self.resumption_awaiters.push(waker);
+            self.resumption_awaiters.insert(waker);
         }
     }
 
@@ -394,7 +380,7 @@ impl Process {
             false
         } else {
             match state {
-                ProcessState::Running => wake_all(&mut self.resumption_awaiters),
+                ProcessState::Running => self.resumption_awaiters.wake_all(),
                 ProcessState::Halted(result) => {
                     if !result.is_stopped() {
                         self.close_fds()
@@ -485,8 +471,9 @@ impl Process {
     }
 
     /// Registers a waker that will be woken up when a signal is delivered to this process.
+    #[inline(always)]
     pub(crate) fn register_signal_waker(&mut self, waker: Weak<Cell<Option<Waker>>>) {
-        self.signal_wakers.push(waker);
+        self.signal_wakers.insert(waker);
     }
 
     /// Delivers a signal to this process.
@@ -531,7 +518,7 @@ impl Process {
             },
             Disposition::Catch => {
                 self.caught_signals.push(signal);
-                wake_all(&mut self.signal_wakers);
+                self.signal_wakers.wake_all();
                 SignalResult {
                     delivered: true,
                     caught: true,
@@ -660,8 +647,8 @@ mod tests {
                 readers: 0,
                 writers: 0,
                 pending_open_wakers: Vec::new(),
-                pending_read_wakers: Vec::new(),
-                pending_write_wakers: Vec::new(),
+                pending_read_wakers: WakerSet::new(),
+                pending_write_wakers: WakerSet::new(),
             },
             permissions: Mode::default(),
         }));

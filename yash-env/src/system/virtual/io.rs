@@ -290,6 +290,7 @@ impl Eq for FdBody {}
 #[cfg(test)]
 mod tests {
     use super::super::Mode;
+    use super::super::WakerSet;
     use super::*;
     use assert_matches::assert_matches;
     use std::collections::VecDeque;
@@ -467,8 +468,8 @@ mod tests {
                 readers: 1,
                 writers: 1,
                 pending_open_wakers: Vec::new(),
-                pending_read_wakers: Vec::new(),
-                pending_write_wakers: Vec::new(),
+                pending_read_wakers: WakerSet::new(),
+                pending_write_wakers: WakerSet::new(),
             },
             permissions: Mode::default(),
         }));
@@ -495,8 +496,8 @@ mod tests {
                 readers: 1,
                 writers: 1,
                 pending_open_wakers: Vec::new(),
-                pending_read_wakers: Vec::new(),
-                pending_write_wakers: Vec::new(),
+                pending_read_wakers: WakerSet::new(),
+                pending_write_wakers: WakerSet::new(),
             },
             permissions: Mode::default(),
         }));

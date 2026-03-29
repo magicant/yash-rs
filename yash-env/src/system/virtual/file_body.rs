@@ -18,7 +18,7 @@
 
 use super::super::FileType;
 use super::Inode;
-use super::wake_all;
+use super::WakerSet;
 use crate::path::PathBuf;
 use crate::str::UnixStr;
 use crate::system::Errno;
@@ -94,9 +94,7 @@ pub enum FileBody {
         /// reference has no strong references or the contained waker is `None`,
         /// it means the task has already been woken up (possibly by other
         /// conditions) or canceled and the item can be removed from the queue.
-        #[eq(ignore)]
-        #[partial_eq(ignore)]
-        pending_read_wakers: Vec<Weak<Cell<Option<Waker>>>>,
+        pending_read_wakers: WakerSet,
         /// Wakers of tasks waiting to write to the pipe
         ///
         /// When a task attempts to write to a full pipe, it will wait until
@@ -106,9 +104,7 @@ pub enum FileBody {
         ///
         /// See the comment on `pending_read_wakers` for the reason why the
         /// waker is wrapped in `Weak<Cell<Option<Waker>>>`.
-        #[eq(ignore)]
-        #[partial_eq(ignore)]
-        pending_write_wakers: Vec<Weak<Cell<Option<Waker>>>>,
+        pending_write_wakers: WakerSet,
     },
     /// Symbolic link
     Symlink {
@@ -205,7 +201,7 @@ impl FileBody {
                 if *readers == 0 {
                     // Let writers know that there are no readers,
                     // so they can return an error instead of blocking.
-                    wake_all(pending_write_wakers);
+                    pending_write_wakers.wake_all();
                 }
             }
             if is_writable {
@@ -213,7 +209,7 @@ impl FileBody {
                 if *writers == 0 {
                     // Let readers know that there are no writers,
                     // so they can return EOF instead of blocking.
-                    wake_all(pending_read_wakers);
+                    pending_read_wakers.wake_all();
                 }
             }
         }
@@ -266,7 +262,7 @@ impl FileBody {
             ..
         } = self
         {
-            pending_read_wakers.push(waker);
+            pending_read_wakers.insert(waker);
         }
     }
 
@@ -277,7 +273,7 @@ impl FileBody {
             ..
         } = self
         {
-            pending_write_wakers.push(waker);
+            pending_write_wakers.insert(waker);
         }
     }
 
@@ -341,7 +337,7 @@ impl FileBody {
                 let limit = content.len();
                 if limit == 0 && *writers > 0 {
                     // Block until any writer writes to the pipe or all writers are closed.
-                    pending_read_wakers.push(get_waker());
+                    pending_read_wakers.insert(get_waker());
                     return Pending;
                 }
 
@@ -354,7 +350,7 @@ impl FileBody {
                         break;
                     }
                 }
-                wake_all(pending_write_wakers);
+                pending_write_wakers.wake_all();
                 Ready(Ok(count))
             }
 
@@ -430,7 +426,7 @@ impl FileBody {
                 if room < buffer.len() {
                     if room == 0 || buffer.len() <= PIPE_BUF {
                         // Block until any reader reads from the pipe or all readers are closed.
-                        pending_write_wakers.push(get_waker());
+                        pending_write_wakers.insert(get_waker());
                         return Pending;
                     }
                     buffer = &buffer[..room];
@@ -438,7 +434,7 @@ impl FileBody {
                 content.reserve_exact(room);
                 content.extend(buffer);
                 debug_assert!(content.len() <= PIPE_SIZE);
-                wake_all(pending_read_wakers);
+                pending_read_wakers.wake_all();
                 Ready(Ok(buffer.len()))
             }
 
@@ -463,8 +459,8 @@ mod tests {
             readers: 0,
             writers: 0,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: Vec::new(),
-            pending_write_wakers: Vec::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
         };
 
         body.open(true, false);
@@ -497,8 +493,8 @@ mod tests {
             readers: 0,
             writers: 0,
             pending_open_wakers: vec![waker_1, waker_2],
-            pending_read_wakers: Vec::new(),
-            pending_write_wakers: Vec::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
         };
         body.open(true, false);
         assert!(wake_flag_1.is_woken());
@@ -516,8 +512,8 @@ mod tests {
             readers: 2,
             writers: 2,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: Vec::new(),
-            pending_write_wakers: Vec::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
         };
 
         body.close(true, false);
@@ -548,8 +544,8 @@ mod tests {
             readers: 1,
             writers: 2,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: vec![Rc::downgrade(&waker)],
-            pending_write_wakers: Vec::new(),
+            pending_read_wakers: WakerSet::from_iter([Rc::downgrade(&waker)]),
+            pending_write_wakers: WakerSet::new(),
         };
 
         // One writer is closed, but there is still another writer,
@@ -571,8 +567,8 @@ mod tests {
             readers: 2,
             writers: 1,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: Vec::new(),
-            pending_write_wakers: vec![Rc::downgrade(&waker)],
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::from_iter([Rc::downgrade(&waker)]),
         };
 
         // One reader is closed, but there is still another reader,
@@ -594,8 +590,8 @@ mod tests {
             readers: 0,
             writers: 0,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: Vec::new(),
-            pending_write_wakers: Vec::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
         };
         assert!(body.is_ready_for_reading());
 
@@ -606,8 +602,8 @@ mod tests {
             readers: 0,
             writers: 1,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: Vec::new(),
-            pending_write_wakers: Vec::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
         };
         assert!(!body.is_ready_for_reading());
         let body = FileBody::Fifo {
@@ -615,8 +611,8 @@ mod tests {
             readers: 0,
             writers: 1,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: Vec::new(),
-            pending_write_wakers: Vec::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
         };
         assert!(body.is_ready_for_reading());
     }
@@ -630,8 +626,8 @@ mod tests {
             readers: 0,
             writers: 0,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: Vec::new(),
-            pending_write_wakers: Vec::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
         };
         assert!(body.is_ready_for_writing());
 
@@ -642,8 +638,8 @@ mod tests {
             readers: 1,
             writers: 0,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: Vec::new(),
-            pending_write_wakers: Vec::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
         };
         assert!(body.is_ready_for_writing());
         let body = FileBody::Fifo {
@@ -651,8 +647,8 @@ mod tests {
             readers: 1,
             writers: 0,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: Vec::new(),
-            pending_write_wakers: Vec::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
         };
         assert!(!body.is_ready_for_writing());
     }
@@ -689,8 +685,8 @@ mod tests {
             readers: 0,
             writers: 0,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: Vec::new(),
-            pending_write_wakers: Vec::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
         };
         let mut buffer = [0; 10];
         assert_eq!(body.poll_read(&mut buffer, 0, Weak::new), Ready(Ok(0)));
@@ -705,8 +701,8 @@ mod tests {
             readers: 1,
             writers: 1,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: Vec::new(),
-            pending_write_wakers: Vec::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
         };
         let mut buffer = [0; 10];
 
@@ -735,8 +731,8 @@ mod tests {
             readers: 0,
             writers: 0,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: Vec::new(),
-            pending_write_wakers: Vec::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
         };
         let mut buffer = [0; 10];
         assert_eq!(body.poll_read(&mut buffer, 0, Weak::new), Ready(Ok(5)));
@@ -775,8 +771,8 @@ mod tests {
             readers: 0,
             writers: 0,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: Vec::new(),
-            pending_write_wakers: Vec::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
         };
         let buffer = b"hello";
         assert_eq!(
@@ -794,8 +790,8 @@ mod tests {
             readers: 1,
             writers: 0,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: Vec::new(),
-            pending_write_wakers: Vec::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
         };
         let buffer = [0; PIPE_BUF];
         assert_eq!(body.poll_write(&buffer, 0, Weak::new), Ready(Ok(PIPE_BUF)));
@@ -811,8 +807,8 @@ mod tests {
             readers: 1,
             writers: 0,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: Vec::new(),
-            pending_write_wakers: Vec::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
         };
         let buffer = [0; PIPE_BUF];
 
@@ -848,8 +844,8 @@ mod tests {
             readers: 1,
             writers: 0,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: Vec::new(),
-            pending_write_wakers: Vec::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
         };
         let buffer = [0; PIPE_BUF + 1];
         assert_eq!(body.poll_write(&buffer, 0, Weak::new), Ready(Ok(1)));
@@ -865,8 +861,8 @@ mod tests {
             readers: 1,
             writers: 0,
             pending_open_wakers: Vec::new(),
-            pending_read_wakers: Vec::new(),
-            pending_write_wakers: Vec::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
         };
         let buffer = [0; PIPE_BUF + 1];
 

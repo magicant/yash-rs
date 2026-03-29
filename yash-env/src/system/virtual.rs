@@ -64,6 +64,7 @@ mod process;
 mod select;
 mod signal;
 mod timer;
+mod waker_set;
 
 pub use self::file_body::*;
 pub use self::file_system::*;
@@ -71,6 +72,7 @@ pub use self::io::*;
 pub use self::process::*;
 pub use self::signal::*;
 pub use self::timer::*;
+pub use self::waker_set::*;
 use super::AT_FDCWD;
 use super::CaughtSignals;
 use super::Chdir;
@@ -158,7 +160,6 @@ use std::ops::DerefMut as _;
 use std::ops::RangeInclusive;
 use std::pin::Pin;
 use std::rc::Rc;
-use std::rc::Weak;
 use std::task::Context;
 use std::task::Poll;
 use std::task::Waker;
@@ -531,8 +532,8 @@ impl Pipe for VirtualSystem {
                 readers: 0,
                 writers: 0,
                 pending_open_wakers: Vec::new(),
-                pending_read_wakers: Vec::new(),
-                pending_write_wakers: Vec::new(),
+                pending_read_wakers: WakerSet::new(),
+                pending_write_wakers: WakerSet::new(),
             },
             permissions: Mode::default(),
         }));
@@ -1382,14 +1383,6 @@ fn raise_sigchld(state: &mut SystemState, target_pid: Pid) {
     }
 }
 
-fn wake_all(pending_wakers: &mut Vec<Weak<Cell<Option<Waker>>>>) {
-    for weak_ref in pending_wakers.drain(..) {
-        if let Some(waker) = weak_ref.upgrade().and_then(|cell| cell.take()) {
-            waker.wake();
-        }
-    }
-}
-
 /// State of the virtual system
 #[derive(Clone, Debug, Default)]
 pub struct SystemState {
@@ -1638,8 +1631,8 @@ mod tests {
                 readers: 0,
                 writers: 0,
                 pending_open_wakers: Vec::new(),
-                pending_read_wakers: Vec::new(),
-                pending_write_wakers: Vec::new(),
+                pending_read_wakers: WakerSet::new(),
+                pending_write_wakers: WakerSet::new(),
             },
             permissions: Mode::default(),
         }));

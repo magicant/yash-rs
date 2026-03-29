@@ -726,6 +726,7 @@ mod tests {
     use yash_env::system::resource::SetRlimit as _;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::Inode;
+    use yash_env::system::r#virtual::WakerSet;
     use yash_env::test_helper::in_virtual_system;
     use yash_syntax::syntax::Text;
 
@@ -1232,8 +1233,8 @@ mod tests {
                 readers: 1,
                 writers: 0,
                 pending_open_wakers: Vec::new(),
-                pending_read_wakers: Vec::new(),
-                pending_write_wakers: Vec::new(),
+                pending_read_wakers: WakerSet::new(),
+                pending_write_wakers: WakerSet::new(),
             },
             permissions: Default::default(),
         };
