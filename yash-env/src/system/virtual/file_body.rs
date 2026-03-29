@@ -87,13 +87,6 @@ pub enum FileBody {
         /// another task writes to the pipe. This field is used to store the
         /// wakers of such tasks, so that they can be notified when new content
         /// is written.
-        ///
-        /// The waker is wrapped in `Weak<Cell<Option<Waker>>>` to allow it to be
-        /// shared among multiple wake conditions like timeouts and signals, and
-        /// to allow it to be taken when waking up the task. When the weak
-        /// reference has no strong references or the contained waker is `None`,
-        /// it means the task has already been woken up (possibly by other
-        /// conditions) or canceled and the item can be removed from the queue.
         pending_read_wakers: WakerSet,
         /// Wakers of tasks waiting to write to the pipe
         ///
@@ -101,9 +94,6 @@ pub enum FileBody {
         /// another task reads from the pipe. This field is used to store the
         /// wakers of such tasks, so that they can be notified when content is
         /// read and space is available for writing.
-        ///
-        /// See the comment on `pending_read_wakers` for the reason why the
-        /// waker is wrapped in `Weak<Cell<Option<Waker>>>`.
         pending_write_wakers: WakerSet,
     },
     /// Symbolic link

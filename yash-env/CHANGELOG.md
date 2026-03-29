@@ -22,9 +22,11 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `impl system::Stat for system::virtual::Stat`
 - The `system::virtual::FileBody` enum now has the following methods:
     - `is_seekable`: Returns whether the file supports seeking.
-- The `pending_open_wakers: Vec<Waker>` field has been added to the
-  `system::virtual::FileBody::Fifo` variant to allow the virtual system to
-  notify tasks waiting to open the pipe.
+- The following fields have been added to the `system::virtual::FileBody::Fifo`
+  variant:
+    - `pending_open_wakers: Vec<Waker>`: Wakers of tasks waiting to open the pipe
+    - `pending_read_wakers: WakerSet`: Wakers of tasks waiting to read from the pipe
+    - `pending_write_wakers: WakerSet`: Wakers of tasks waiting to write to the pipe
 - The `system::virtual::VirtualSystem::get_open_file_description` method has
   been added to retrieve the open file description for a given file descriptor
   in the current process.
