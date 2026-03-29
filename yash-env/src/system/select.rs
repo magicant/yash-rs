@@ -71,12 +71,14 @@ pub trait Select: Signals {
     /// blocking mask while waiting and restored when the function returns.
     ///
     /// The return type is a future so that
-    /// [virtual systems](crate::system::virtual) can simulate suspension of the
-    /// process that may be caused by a signal delivered as a result of
-    /// temporarily changing the signal mask. In the
-    /// [real system](super::real), this function does not work asynchronously
-    /// and returns a ready `Future` with the result of the underlying system
-    /// call. See the [module-level documentation](super) for details.
+    /// [virtual systems](crate::system::virtual) can simulate the blocking
+    /// behavior of `select` without blocking the entire process. The future
+    /// will be ready when one of the above conditions is met. The future may
+    /// also return `Pending` if the virtual process is suspended by a signal.
+    /// In a [real system](super::real), this function does not work
+    /// asynchronously and returns a ready `Future` with the result of the
+    /// underlying system call. See the [module-level documentation](super) for
+    /// details.
     fn select<'a>(
         &self,
         readers: &'a mut Vec<Fd>,
@@ -143,8 +145,9 @@ impl<S> SelectSystem<S> {
     ///
     /// This function relies on the fact that the future returned by
     /// `S::sigmask` does not borrow from `&mut self`. This is guaranteed by the
-    /// `Sigmask` trait signature, which uses `use<Self>` (not `use<'_, Self>`),
-    /// so the future cannot capture the `'_` lifetime of `&mut self`.
+    /// `Sigmask` trait signature, which uses `use<'a, Self>` (not
+    /// `use<'_, Self>`), so the future cannot capture the `'_` lifetime of
+    /// `&mut self`.
     async fn sigmask_async(
         this: &RefCell<SelectSystem<S>>,
         op: SigmaskOp,
@@ -280,8 +283,9 @@ impl<S> SelectSystem<S> {
     ///
     /// This function relies on the fact that the future returned by
     /// `S::select` does not borrow from `&self`. This is guaranteed by the
-    /// `Select` trait signature, which uses `use<Self>` (not `use<'_, Self>`),
-    /// so the future cannot capture the `'_` lifetime of `&self`.
+    /// `Select` trait signature, which uses `use<'a, Self>` (not
+    /// `use<'_, Self>`), so the future cannot capture the `'_` lifetime of
+    /// `&self`.
     #[allow(clippy::await_holding_refcell_ref)] // false positive
     pub async fn select(this: &RefCell<SelectSystem<S>>, poll: bool) -> Result<()>
     where
