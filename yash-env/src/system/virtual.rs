@@ -459,6 +459,7 @@ impl VirtualSystem {
     /// This function does nothing if the file is not a FIFO.
     async fn wait_for_fifo_to_become_ready(open_file_description: &OpenFileDescription) {
         // If the file is a FIFO, block until the other end is opened.
+        let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
         poll_fn(|context| {
             let mut file = open_file_description.file().borrow_mut();
             let FileBody::Fifo {
@@ -475,15 +476,10 @@ impl VirtualSystem {
                 return Poll::Ready(());
             }
 
-            // Register the current task's waker to be notified when a new reader or writer
-            // is opened on the FIFO, unless it's already registered.
-            let waker = context.waker();
-            if !pending_open_wakers
-                .iter()
-                .any(|existing| existing.will_wake(waker))
-            {
-                pending_open_wakers.push(waker.clone());
-            }
+            // Register the current task's waker to be notified when a new
+            // reader or writer is opened on the FIFO.
+            waker.set(Some(context.waker().clone()));
+            pending_open_wakers.insert(Rc::downgrade(&waker));
             Poll::Pending
         })
         .await;
@@ -529,7 +525,7 @@ impl Pipe for VirtualSystem {
                 content: VecDeque::new(),
                 readers: 0,
                 writers: 0,
-                pending_open_wakers: Vec::new(),
+                pending_open_wakers: WakerSet::new(),
                 pending_read_wakers: WakerSet::new(),
                 pending_write_wakers: WakerSet::new(),
             },
@@ -1628,7 +1624,7 @@ mod tests {
                 content: [17; 42].into(),
                 readers: 0,
                 writers: 0,
-                pending_open_wakers: Vec::new(),
+                pending_open_wakers: WakerSet::new(),
                 pending_read_wakers: WakerSet::new(),
                 pending_write_wakers: WakerSet::new(),
             },

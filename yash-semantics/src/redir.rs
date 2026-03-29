@@ -1232,7 +1232,7 @@ mod tests {
                 content: Default::default(),
                 readers: 1,
                 writers: 0,
-                pending_open_wakers: Vec::new(),
+                pending_open_wakers: WakerSet::new(),
                 pending_read_wakers: WakerSet::new(),
                 pending_write_wakers: WakerSet::new(),
             },

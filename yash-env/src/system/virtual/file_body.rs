@@ -80,7 +80,7 @@ pub enum FileBody {
         /// that they can be notified when a new reader or writer is opened.
         #[eq(ignore)]
         #[partial_eq(ignore)]
-        pending_open_wakers: Vec<Waker>,
+        pending_open_wakers: WakerSet,
         /// Wakers of tasks waiting to read from the pipe
         ///
         /// When a task attempts to read from an empty pipe, it will wait until
@@ -171,7 +171,7 @@ impl FileBody {
             if is_writable {
                 *writers += 1;
             }
-            pending_open_wakers.drain(..).for_each(Waker::wake);
+            pending_open_wakers.wake_all();
         }
     }
 
@@ -453,7 +453,7 @@ mod tests {
             content: VecDeque::new(),
             readers: 0,
             writers: 0,
-            pending_open_wakers: Vec::new(),
+            pending_open_wakers: WakerSet::new(),
             pending_read_wakers: WakerSet::new(),
             pending_write_wakers: WakerSet::new(),
         };
@@ -481,13 +481,16 @@ mod tests {
     fn fifo_file_body_open_wakes_pending_open_wakers() {
         let wake_flag_1 = Arc::new(WakeFlag::new());
         let wake_flag_2 = Arc::new(WakeFlag::new());
-        let waker_1 = Waker::from(wake_flag_1.clone());
-        let waker_2 = Waker::from(wake_flag_2.clone());
+        let waker_1 = Rc::new(Cell::new(Some(Waker::from(wake_flag_1.clone()))));
+        let waker_2 = Rc::new(Cell::new(Some(Waker::from(wake_flag_2.clone()))));
         let mut body = FileBody::Fifo {
             content: VecDeque::new(),
             readers: 0,
             writers: 0,
-            pending_open_wakers: vec![waker_1, waker_2],
+            pending_open_wakers: WakerSet::from_iter([
+                Rc::downgrade(&waker_1),
+                Rc::downgrade(&waker_2),
+            ]),
             pending_read_wakers: WakerSet::new(),
             pending_write_wakers: WakerSet::new(),
         };
@@ -506,7 +509,7 @@ mod tests {
             content: VecDeque::new(),
             readers: 2,
             writers: 2,
-            pending_open_wakers: Vec::new(),
+            pending_open_wakers: WakerSet::new(),
             pending_read_wakers: WakerSet::new(),
             pending_write_wakers: WakerSet::new(),
         };
@@ -538,7 +541,7 @@ mod tests {
             content: VecDeque::new(),
             readers: 1,
             writers: 2,
-            pending_open_wakers: Vec::new(),
+            pending_open_wakers: WakerSet::new(),
             pending_read_wakers: WakerSet::from_iter([Rc::downgrade(&waker)]),
             pending_write_wakers: WakerSet::new(),
         };
@@ -561,7 +564,7 @@ mod tests {
             content: VecDeque::new(),
             readers: 2,
             writers: 1,
-            pending_open_wakers: Vec::new(),
+            pending_open_wakers: WakerSet::new(),
             pending_read_wakers: WakerSet::new(),
             pending_write_wakers: WakerSet::from_iter([Rc::downgrade(&waker)]),
         };
@@ -584,7 +587,7 @@ mod tests {
             content: VecDeque::new(),
             readers: 0,
             writers: 0,
-            pending_open_wakers: Vec::new(),
+            pending_open_wakers: WakerSet::new(),
             pending_read_wakers: WakerSet::new(),
             pending_write_wakers: WakerSet::new(),
         };
@@ -596,7 +599,7 @@ mod tests {
             content: VecDeque::new(),
             readers: 0,
             writers: 1,
-            pending_open_wakers: Vec::new(),
+            pending_open_wakers: WakerSet::new(),
             pending_read_wakers: WakerSet::new(),
             pending_write_wakers: WakerSet::new(),
         };
@@ -605,7 +608,7 @@ mod tests {
             content: VecDeque::from([0]),
             readers: 0,
             writers: 1,
-            pending_open_wakers: Vec::new(),
+            pending_open_wakers: WakerSet::new(),
             pending_read_wakers: WakerSet::new(),
             pending_write_wakers: WakerSet::new(),
         };
@@ -620,7 +623,7 @@ mod tests {
             content: VecDeque::new(),
             readers: 0,
             writers: 0,
-            pending_open_wakers: Vec::new(),
+            pending_open_wakers: WakerSet::new(),
             pending_read_wakers: WakerSet::new(),
             pending_write_wakers: WakerSet::new(),
         };
@@ -632,7 +635,7 @@ mod tests {
             content: VecDeque::from([0; PIPE_SIZE - PIPE_BUF]),
             readers: 1,
             writers: 0,
-            pending_open_wakers: Vec::new(),
+            pending_open_wakers: WakerSet::new(),
             pending_read_wakers: WakerSet::new(),
             pending_write_wakers: WakerSet::new(),
         };
@@ -641,7 +644,7 @@ mod tests {
             content: VecDeque::from([0; PIPE_SIZE - PIPE_BUF + 1]),
             readers: 1,
             writers: 0,
-            pending_open_wakers: Vec::new(),
+            pending_open_wakers: WakerSet::new(),
             pending_read_wakers: WakerSet::new(),
             pending_write_wakers: WakerSet::new(),
         };
@@ -679,7 +682,7 @@ mod tests {
             content: VecDeque::new(),
             readers: 0,
             writers: 0,
-            pending_open_wakers: Vec::new(),
+            pending_open_wakers: WakerSet::new(),
             pending_read_wakers: WakerSet::new(),
             pending_write_wakers: WakerSet::new(),
         };
@@ -695,7 +698,7 @@ mod tests {
             content: VecDeque::new(),
             readers: 1,
             writers: 1,
-            pending_open_wakers: Vec::new(),
+            pending_open_wakers: WakerSet::new(),
             pending_read_wakers: WakerSet::new(),
             pending_write_wakers: WakerSet::new(),
         };
@@ -725,7 +728,7 @@ mod tests {
             content: VecDeque::from(*b"hello"),
             readers: 0,
             writers: 0,
-            pending_open_wakers: Vec::new(),
+            pending_open_wakers: WakerSet::new(),
             pending_read_wakers: WakerSet::new(),
             pending_write_wakers: WakerSet::new(),
         };
@@ -765,7 +768,7 @@ mod tests {
             content: VecDeque::new(),
             readers: 0,
             writers: 0,
-            pending_open_wakers: Vec::new(),
+            pending_open_wakers: WakerSet::new(),
             pending_read_wakers: WakerSet::new(),
             pending_write_wakers: WakerSet::new(),
         };
@@ -784,7 +787,7 @@ mod tests {
             content: VecDeque::from([0; PIPE_SIZE - PIPE_BUF]),
             readers: 1,
             writers: 0,
-            pending_open_wakers: Vec::new(),
+            pending_open_wakers: WakerSet::new(),
             pending_read_wakers: WakerSet::new(),
             pending_write_wakers: WakerSet::new(),
         };
@@ -801,7 +804,7 @@ mod tests {
             content: VecDeque::from([0; PIPE_SIZE - PIPE_BUF + 1]),
             readers: 1,
             writers: 0,
-            pending_open_wakers: Vec::new(),
+            pending_open_wakers: WakerSet::new(),
             pending_read_wakers: WakerSet::new(),
             pending_write_wakers: WakerSet::new(),
         };
@@ -838,7 +841,7 @@ mod tests {
             content: VecDeque::from([0; PIPE_SIZE - 1]),
             readers: 1,
             writers: 0,
-            pending_open_wakers: Vec::new(),
+            pending_open_wakers: WakerSet::new(),
             pending_read_wakers: WakerSet::new(),
             pending_write_wakers: WakerSet::new(),
         };
@@ -855,7 +858,7 @@ mod tests {
             content: VecDeque::from([0; PIPE_SIZE]),
             readers: 1,
             writers: 0,
-            pending_open_wakers: Vec::new(),
+            pending_open_wakers: WakerSet::new(),
             pending_read_wakers: WakerSet::new(),
             pending_write_wakers: WakerSet::new(),
         };

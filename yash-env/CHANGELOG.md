@@ -24,7 +24,7 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `is_seekable`: Returns whether the file supports seeking.
 - The following fields have been added to the `system::virtual::FileBody::Fifo`
   variant:
-    - `pending_open_wakers: Vec<Waker>`: Wakers of tasks waiting to open the pipe
+    - `pending_open_wakers: WakerSet`: Wakers of tasks waiting to open the pipe
     - `pending_read_wakers: WakerSet`: Wakers of tasks waiting to read from the pipe
     - `pending_write_wakers: WakerSet`: Wakers of tasks waiting to write to the pipe
 - The `system::virtual::VirtualSystem::get_open_file_description` method has
