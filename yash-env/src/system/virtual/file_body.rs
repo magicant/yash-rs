@@ -239,6 +239,11 @@ impl FileBody {
             | Self::Directory { .. }
             | Self::Terminal { .. }
             | Self::Symlink { .. } => true,
+
+            // For FIFOs, we consider the file to be ready for writing if it has
+            // enough space for a write request of any size to succeed without
+            // blocking. This matches the behavior of Linux, but I don't know
+            // what about other systems.
             Self::Fifo {
                 content, readers, ..
             } => *readers == 0 || PIPE_SIZE - content.len() >= PIPE_BUF,
