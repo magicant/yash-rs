@@ -329,6 +329,10 @@ impl FileBody {
                 pending_write_wakers,
                 ..
             } => {
+                if buffer.is_empty() {
+                    return Ready(Ok(0));
+                }
+
                 let limit = content.len();
                 if limit == 0 && *writers > 0 {
                     // Block until any writer writes to the pipe or all writers are closed.
@@ -720,6 +724,27 @@ mod tests {
         let poll = body.poll_read(&mut buffer, 0, Weak::new);
         assert_eq!(poll, Ready(Ok(5)));
         assert_eq!(&buffer[..5], b"hello");
+    }
+
+    #[test]
+    fn fifo_file_body_read_empty_to_empty() {
+        // The FIFO content is empty but the read buffer is also empty,
+        // so the read operation should read 0 bytes without blocking.
+        let mut body = FileBody::Fifo {
+            content: VecDeque::new(),
+            readers: 1,
+            writers: 1,
+            pending_open_wakers: WakerSet::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
+        };
+
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Rc::new(Cell::new(Some(Waker::from(wake_flag.clone()))));
+        let get_waker = || Rc::downgrade(&waker);
+        let poll = body.poll_read(&mut [], 0, get_waker);
+        assert_eq!(poll, Ready(Ok(0)));
+        assert!(!wake_flag.is_woken());
     }
 
     #[test]
