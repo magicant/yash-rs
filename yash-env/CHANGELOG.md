@@ -30,6 +30,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `system::virtual::VirtualSystem::get_open_file_description` method has
   been added to retrieve the open file description for a given file descriptor
   in the current process.
+- The `system::virtual::SystemState` struct now has the `advance_time` method to
+  advance the current time and wake any wakers that should be notified as a
+  result.
 - The `system::virtual::OpenFileDescription` struct now has the following methods:
     - `poll_read`: Polls for the file descriptor to be ready for reading and
       performs a read operation.
@@ -95,6 +98,12 @@ A _private dependency_ is used internally and not visible to downstream users.
   `system::virtual::OpenFileDescription` now return `true` for symbolic links.
 - Private dependency versions:
     - derive_more 2.0.1 → 2.1.0
+
+### Removed
+
+- The `system::virtual::FileBody::Fifo` variant no longer has the `awaiters`
+  field, which has been replaced by the `pending_open_wakers`,
+  `pending_read_wakers`, and `pending_write_wakers` fields.
 
 ### Fixed
 
