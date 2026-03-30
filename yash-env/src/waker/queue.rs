@@ -147,7 +147,7 @@ impl ScheduledWakerQueue {
                     let old_wake_time = std::mem::replace(wake_time_entry, wake_time);
                     let waker_entry = self
                         .wakers_by_time
-                        .take(&(old_wake_time, waker_entry.clone()))
+                        .take(&(old_wake_time, waker_entry))
                         .unwrap()
                         .1;
                     self.wakers_by_time.insert((wake_time, waker_entry))
