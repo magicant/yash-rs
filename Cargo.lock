@@ -53,12 +53,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
-name = "cfg_aliases"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
-
-[[package]]
 name = "darling"
 version = "0.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -239,12 +233,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fuzed-iterator"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46c9e4e654bdc69159e3552035e0d6d702e2326e0cd4e05c6bd100027214c6b6"
-
-[[package]]
 name = "getrandom"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -346,18 +334,6 @@ name = "memchr"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
-
-[[package]]
-name = "nix"
-version = "0.31.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d6d0705320c1e6ba1d912b5e37cf18071b6c2e9b7fa8215a1e8a7651966f5d3"
-dependencies = [
- "bitflags",
- "cfg-if",
- "cfg_aliases",
- "libc",
-]
 
 [[package]]
 name = "once_cell"
@@ -544,9 +520,9 @@ dependencies = [
 
 [[package]]
 name = "tempfile"
-version = "3.26.0"
+version = "3.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82a72c767771b47409d2345987fda8628641887d5466101319899796367354a0"
+checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
  "getrandom",
@@ -788,24 +764,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "yash-cli"
-version = "3.0.5"
-dependencies = [
- "assert_matches",
- "futures-util",
- "fuzed-iterator",
- "nix",
- "tempfile",
- "thiserror",
- "yash-builtin",
- "yash-env",
- "yash-executor",
- "yash-prompt",
- "yash-semantics",
- "yash-syntax",
-]
-
-[[package]]
 name = "yash-env"
 version = "0.13.0"
 dependencies = [
@@ -831,13 +789,6 @@ dependencies = [
  "yash-prompt",
  "yash-quote",
  "yash-semantics",
-]
-
-[[package]]
-name = "yash-env-test-helper"
-version = "0.11.0"
-dependencies = [
- "yash-env",
 ]
 
 [[package]]
