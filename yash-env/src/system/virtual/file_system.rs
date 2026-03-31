@@ -17,14 +17,13 @@
 //! File system in a virtual system.
 
 use super::super::{Dir, DirEntry, Errno, FileType, Gid, Uid};
-use crate::path::{Component, Path, PathBuf};
+use super::FileBody;
+use crate::path::{Component, Path};
 use crate::str::UnixStr;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::rc::Rc;
-use std::task::Waker;
 
 const DEFAULT_DIRECTORY_MODE: Mode = Mode::USER_ALL.union(Mode::ALL_READ).union(Mode::ALL_EXEC);
 
@@ -207,108 +206,6 @@ impl Inode {
             uid: Uid(1),
             gid: Gid(1),
             size: self.body.size() as u64,
-        }
-    }
-}
-
-/// Filetype-specific content of a file
-#[derive(Clone, Debug, derive_more::Eq, derive_more::PartialEq)]
-#[non_exhaustive]
-pub enum FileBody {
-    /// Regular file
-    Regular {
-        /// File content
-        content: Vec<u8>,
-        /// Whether this file is a native binary that can be exec'ed
-        is_native_executable: bool,
-    },
-    /// Directory
-    Directory {
-        /// Files contained in this directory
-        ///
-        /// The keys of the hashmap are filenames without any parent directory
-        /// components. The hashmap does not contain "." or "..".
-        files: HashMap<Rc<UnixStr>, Rc<RefCell<Inode>>>,
-        // The hash map contents are reference-counted to allow making cheap
-        // copies of them, which is especially handy when traversing entries.
-    },
-    /// Named pipe
-    Fifo {
-        /// Content of the pipe
-        content: VecDeque<u8>,
-        /// Number of open file descriptions reading from this pipe
-        readers: usize,
-        /// Number of open file descriptions writing to this pipe
-        writers: usize,
-        /// Wakers of tasks waiting for this pipe to be updated
-        ///
-        /// This field is used to notify the following events:
-        ///
-        /// - A new reader is opened: tasks attempting to open the pipe for writing will be notified.
-        /// - A new writer is opened: tasks attempting to open the pipe for reading will be notified.
-        /// - The content is filled: tasks attempting to read from the pipe will be notified.
-        /// - The content is drained: tasks attempting to write to the pipe will be notified.
-        /// - A reader is closed: tasks attempting to write to the pipe will be notified.
-        /// - A writer is closed: tasks attempting to read from the pipe will be notified.
-        #[eq(ignore)]
-        #[partial_eq(ignore)]
-        awaiters: Vec<Waker>,
-    },
-    /// Symbolic link
-    Symlink {
-        /// Path to the file referenced by this symlink
-        target: PathBuf,
-    },
-    /// Terminal device
-    ///
-    /// This is a dummy device that works like a regular file.
-    Terminal {
-        /// Virtual file content
-        content: Vec<u8>,
-    },
-    // TODO Other filetypes
-}
-
-/// The default file body is an empty regular file.
-impl Default for FileBody {
-    fn default() -> Self {
-        FileBody::Regular {
-            content: Vec::default(),
-            is_native_executable: bool::default(),
-        }
-    }
-}
-
-impl FileBody {
-    /// Creates a regular file body with the given content.
-    pub fn new<T: Into<Vec<u8>>>(bytes: T) -> Self {
-        FileBody::Regular {
-            content: bytes.into(),
-            is_native_executable: false,
-        }
-    }
-
-    /// Returns the type of the file.
-    #[must_use]
-    pub const fn r#type(&self) -> FileType {
-        match self {
-            Self::Regular { .. } => FileType::Regular,
-            Self::Directory { .. } => FileType::Directory,
-            Self::Fifo { .. } => FileType::Fifo,
-            Self::Symlink { .. } => FileType::Symlink,
-            Self::Terminal { .. } => FileType::CharacterDevice,
-        }
-    }
-
-    /// Returns the size of the file.
-    #[must_use]
-    pub fn size(&self) -> usize {
-        match self {
-            Self::Regular { content, .. } => content.len(),
-            Self::Directory { files } => files.len(),
-            Self::Fifo { content, .. } => content.len(),
-            Self::Symlink { target } => target.as_unix_str().len(),
-            Self::Terminal { .. } => 0,
         }
     }
 }

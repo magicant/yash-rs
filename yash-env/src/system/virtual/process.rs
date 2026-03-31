@@ -21,6 +21,8 @@ use super::Gid;
 use super::Mode;
 use super::SigmaskOp;
 use super::Uid;
+use super::VirtualSystem;
+use super::WakerSet;
 use super::io::FdBody;
 use super::signal::{self, SignalEffect};
 use crate::io::Fd;
@@ -33,7 +35,6 @@ use crate::system::SelectSystem;
 use crate::system::resource::INFINITY;
 use crate::system::resource::LimitPair;
 use crate::system::resource::Resource;
-use crate::system::r#virtual::VirtualSystem;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -47,7 +48,7 @@ use std::rc::Weak;
 use std::task::Waker;
 
 /// Process in a virtual system
-#[derive(Clone, Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct Process {
     /// Process ID of the parent process
     pub(crate) ppid: Pid,
@@ -87,7 +88,7 @@ pub struct Process {
     state_has_changed: bool,
 
     /// Wakers waiting for the state of this process to change to `Running`
-    resumption_awaiters: Vec<Weak<Cell<Option<Waker>>>>,
+    resumption_awaiters: WakerSet,
 
     /// Current signal dispositions
     ///
@@ -103,6 +104,14 @@ pub struct Process {
 
     /// List of signals that have been delivered and caught
     pub(crate) caught_signals: Vec<signal::Number>,
+
+    /// Wakers of tasks waiting for signals to be delivered to this process
+    ///
+    /// When a signal is delivered to this process, all wakers in this set are
+    /// woken up and the set is cleared. When a task is waiting for multiple
+    /// signals, only one waker is added to the set and will be woken up when
+    /// any of the signals is delivered.
+    signal_wakers: WakerSet,
 
     /// Limits for system resources
     pub(crate) resource_limits: HashMap<Resource, LimitPair>,
@@ -152,11 +161,12 @@ impl Process {
             cwd: PathBuf::new(),
             state: ProcessState::Running,
             state_has_changed: false,
-            resumption_awaiters: Vec::new(),
+            resumption_awaiters: WakerSet::new(),
             dispositions: HashMap::new(),
             blocked_signals: BTreeSet::new(),
             pending_signals: BTreeSet::new(),
             caught_signals: Vec::new(),
+            signal_wakers: WakerSet::new(),
             resource_limits: HashMap::new(),
             selector: Weak::new(),
             last_exec: None,
@@ -175,7 +185,6 @@ impl Process {
         child.fds = parent.fds.clone();
         child.dispositions.clone_from(&parent.dispositions);
         child.blocked_signals.clone_from(&parent.blocked_signals);
-        child.pending_signals = BTreeSet::new();
         child
     }
 
@@ -343,7 +352,7 @@ impl Process {
     /// This function does nothing if the process is not stopped.
     pub fn wake_on_resumption(&mut self, waker: Weak<Cell<Option<Waker>>>) {
         if self.state.is_stopped() {
-            self.resumption_awaiters.push(waker);
+            self.resumption_awaiters.insert(waker);
         }
     }
 
@@ -371,15 +380,7 @@ impl Process {
             false
         } else {
             match state {
-                ProcessState::Running => {
-                    for weak in self.resumption_awaiters.drain(..) {
-                        if let Some(strong) = weak.upgrade() {
-                            if let Some(waker) = strong.take() {
-                                waker.wake();
-                            }
-                        }
-                    }
-                }
+                ProcessState::Running => self.resumption_awaiters.wake_all(),
                 ProcessState::Halted(result) => {
                     if !result.is_stopped() {
                         self.close_fds()
@@ -469,6 +470,12 @@ impl Process {
         old_disposition.unwrap_or_default()
     }
 
+    /// Registers a waker that will be woken up when a signal is delivered to this process.
+    #[inline(always)]
+    pub(crate) fn register_signal_waker(&mut self, waker: Weak<Cell<Option<Waker>>>) {
+        self.signal_wakers.insert(waker);
+    }
+
     /// Delivers a signal to this process.
     ///
     /// The action taken on the delivery depends on the current signal
@@ -511,6 +518,7 @@ impl Process {
             },
             Disposition::Catch => {
                 self.caught_signals.push(signal);
+                self.signal_wakers.wake_all();
                 SignalResult {
                     delivered: true,
                     caught: true,
@@ -593,14 +601,18 @@ impl BitOrAssign for SignalResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::system::r#virtual::file_system::{FileBody, Inode, Mode};
+    use crate::system::file_system::Mode;
+    use crate::system::r#virtual::file_body::FileBody;
+    use crate::system::r#virtual::file_system::Inode;
     use crate::system::r#virtual::io::OpenFileDescription;
+    use crate::test_helper::WakeFlag;
     use enumset::EnumSet;
     use futures_util::FutureExt;
     use futures_util::task::LocalSpawnExt;
     use std::collections::VecDeque;
     use std::future::poll_fn;
     use std::rc::Rc;
+    use std::sync::Arc;
     use std::task::Poll;
 
     #[test]
@@ -634,7 +646,9 @@ mod tests {
                 content: VecDeque::new(),
                 readers: 0,
                 writers: 0,
-                awaiters: Vec::new(),
+                pending_open_wakers: WakerSet::new(),
+                pending_read_wakers: WakerSet::new(),
+                pending_write_wakers: WakerSet::new(),
             },
             permissions: Mode::default(),
         }));
@@ -930,6 +944,10 @@ mod tests {
     fn process_raise_signal_caught() {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
         process.set_disposition(signal::SIGCHLD, Disposition::Catch);
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Rc::new(Cell::new(Some(Waker::from(wake_flag.clone()))));
+        process.register_signal_waker(Rc::downgrade(&waker));
+
         let result = process.raise_signal(signal::SIGCHLD);
         assert_eq!(
             result,
@@ -941,6 +959,7 @@ mod tests {
         );
         assert_eq!(process.state(), ProcessState::Running);
         assert_eq!(process.caught_signals, [signal::SIGCHLD]);
+        assert!(wake_flag.is_woken());
     }
 
     #[test]

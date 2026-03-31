@@ -20,9 +20,26 @@ A _private dependency_ is used internally and not visible to downstream users.
   in the real system implementation.
 - `impl system::Stat for system::real::Stat`
 - `impl system::Stat for system::virtual::Stat`
-- The `awaiters: Vec<Waker>` field has been added to the
-  `system::virtual::FileBody::Fifo` variant to allow the virtual system to
-  notify tasks waiting on the pipe when certain events occur.
+- The `system::virtual::FileBody` enum now has the following methods:
+    - `is_seekable`: Returns whether the file supports seeking.
+- The following fields have been added to the `system::virtual::FileBody::Fifo`
+  variant:
+    - `pending_open_wakers: WakerSet`: Wakers of tasks waiting to open the pipe
+    - `pending_read_wakers: WakerSet`: Wakers of tasks waiting to read from the pipe
+    - `pending_write_wakers: WakerSet`: Wakers of tasks waiting to write to the pipe
+- The `system::virtual::VirtualSystem::get_open_file_description` method has
+  been added to retrieve the open file description for a given file descriptor
+  in the current process.
+- The `system::virtual::SystemState` struct now has the `advance_time` method to
+  advance the current time and wake any wakers that should be notified as a
+  result.
+- The `system::virtual::OpenFileDescription` struct now has the following methods:
+    - `poll_read`: Polls for the file descriptor to be ready for reading and
+      performs a read operation.
+    - `poll_write`: Polls for the file descriptor to be ready for writing and
+      performs a write operation.
+- The new module `waker` has been added containing the `WakerSet` and
+  `ScheduledWakerQueue` structs for storing and activating wakers.
 - The `test_helper` module has been added with items migrated from the
   `yash-env-test-helper` crate. This module is conditionally compiled when the
   new `test-helper` feature is enabled.
@@ -65,14 +82,28 @@ A _private dependency_ is used internally and not visible to downstream users.
   implementation of this method will block until the process is running again
   if unblocking a signal causes the process to stop.
 - The `system::Select::select` method is now async. The `VirtualSystem`
-  implementation of this method will block until the process is running again
-  if temporarily changing the signal mask causes the process to stop.
+  implementation of this method will block until any of the specified events
+  occur.
 - The `Env::get_tty` method is now async.
 - The `system::SharedSystem::read_async` and `system::SharedSystem::write_all`
   methods now handle `EWOULDBLOCK` and `EINTR` by retrying the operation instead
   of returning an error.
+- The `with_open_file_description` and `with_open_file_description_mut` methods
+  of `system::virtual::VirtualSystem` internally borrow the system's state to
+  retrieve the open file description for the given file descriptor. These
+  methods previously held the borrow across the call to the provided closure,
+  but they now drop the borrow before calling the closure to allow the closure
+  to perform operations that may require borrowing the system's state again.
+- The `is_ready_for_reading` and `is_ready_for_writing` methods of
+  `system::virtual::OpenFileDescription` now return `true` for symbolic links.
 - Private dependency versions:
     - derive_more 2.0.1 → 2.1.0
+
+### Removed
+
+- The `system::virtual::FileBody::Fifo` variant no longer has the `awaiters`
+  field, which has been replaced by the `pending_open_wakers`,
+  `pending_read_wakers`, and `pending_write_wakers` fields.
 
 ### Fixed
 

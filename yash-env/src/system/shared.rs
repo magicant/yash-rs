@@ -668,13 +668,13 @@ impl<T: SendSignal> SendSignal for SharedSystem<T> {
 
 /// Delegates `Select` methods to the contained implementor.
 impl<T: Select> Select for SharedSystem<T> {
-    fn select(
+    fn select<'a>(
         &self,
-        readers: &mut Vec<Fd>,
-        writers: &mut Vec<Fd>,
+        readers: &'a mut Vec<Fd>,
+        writers: &'a mut Vec<Fd>,
         timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
-    ) -> impl Future<Output = Result<c_int>> + use<T> {
+    ) -> impl Future<Output = Result<c_int>> + use<'a, T> {
         (**self.0.borrow()).select(readers, writers, timeout, signal_mask)
     }
 }
@@ -800,8 +800,10 @@ mod tests {
     use super::super::r#virtual::VirtualSystem;
     use super::super::r#virtual::{SIGCHLD, SIGINT, SIGTERM, SIGUSR1};
     use super::*;
+    use crate::test_helper::WakeFlag;
     use assert_matches::assert_matches;
     use futures_util::FutureExt as _;
+    use std::sync::Arc;
     use std::task::Context;
     use std::task::Poll;
     use std::task::Waker;
@@ -961,14 +963,23 @@ mod tests {
         let target = start + Duration::from_millis(1_125);
 
         let mut future = Box::pin(system.wait_until(target));
-        let mut context = Context::from_waker(Waker::noop());
+
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Waker::from(wake_flag.clone());
+        let mut context = Context::from_waker(&waker);
         let poll = future.as_mut().poll(&mut context);
         assert_eq!(poll, Poll::Pending);
+        assert!(!wake_flag.is_woken());
 
+        state.borrow_mut().advance_time(target);
         system.select(false).unwrap();
+        assert!(wake_flag.is_woken());
+
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Waker::from(wake_flag.clone());
+        let mut context = Context::from_waker(&waker);
         let poll = future.as_mut().poll(&mut context);
         assert_eq!(poll, Poll::Ready(()));
-        assert_eq!(state.borrow().now, Some(target));
     }
 
     #[test]

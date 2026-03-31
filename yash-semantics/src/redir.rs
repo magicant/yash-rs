@@ -727,6 +727,7 @@ mod tests {
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::Inode;
     use yash_env::test_helper::in_virtual_system;
+    use yash_env::waker::WakerSet;
     use yash_syntax::syntax::Text;
 
     /// Returns a virtual system with a file descriptor limit.
@@ -1231,7 +1232,9 @@ mod tests {
                 content: Default::default(),
                 readers: 1,
                 writers: 0,
-                awaiters: Vec::new(),
+                pending_open_wakers: WakerSet::new(),
+                pending_read_wakers: WakerSet::new(),
+                pending_write_wakers: WakerSet::new(),
             },
             permissions: Default::default(),
         };

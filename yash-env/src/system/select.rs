@@ -71,19 +71,21 @@ pub trait Select: Signals {
     /// blocking mask while waiting and restored when the function returns.
     ///
     /// The return type is a future so that
-    /// [virtual systems](crate::system::virtual) can simulate suspension of the
-    /// process that may be caused by a signal delivered as a result of
-    /// temporarily changing the signal mask. In the
-    /// [real system](super::real), this function does not work asynchronously
-    /// and returns a ready `Future` with the result of the underlying system
-    /// call. See the [module-level documentation](super) for details.
-    fn select(
+    /// [virtual systems](crate::system::virtual) can simulate the blocking
+    /// behavior of `select` without blocking the entire process. The future
+    /// will be ready when one of the above conditions is met. The future may
+    /// also return `Pending` if the virtual process is suspended by a signal.
+    /// In a [real system](super::real), this function does not work
+    /// asynchronously and returns a ready `Future` with the result of the
+    /// underlying system call. See the [module-level documentation](super) for
+    /// details.
+    fn select<'a>(
         &self,
-        readers: &mut Vec<Fd>,
-        writers: &mut Vec<Fd>,
+        readers: &'a mut Vec<Fd>,
+        writers: &'a mut Vec<Fd>,
         timeout: Option<Duration>,
         signal_mask: Option<&[signal::Number]>,
-    ) -> impl Future<Output = Result<c_int>> + use<Self>;
+    ) -> impl Future<Output = Result<c_int>> + use<'a, Self>;
 }
 
 /// [System] extended with internal state to support asynchronous functions.
@@ -143,8 +145,9 @@ impl<S> SelectSystem<S> {
     ///
     /// This function relies on the fact that the future returned by
     /// `S::sigmask` does not borrow from `&mut self`. This is guaranteed by the
-    /// `Sigmask` trait signature, which uses `use<Self>` (not `use<'_, Self>`),
-    /// so the future cannot capture the `'_` lifetime of `&mut self`.
+    /// `Sigmask` trait signature, which uses `use<'a, Self>` (not
+    /// `use<'_, Self>`), so the future cannot capture the `'_` lifetime of
+    /// `&mut self`.
     async fn sigmask_async(
         this: &RefCell<SelectSystem<S>>,
         op: SigmaskOp,
@@ -280,29 +283,30 @@ impl<S> SelectSystem<S> {
     ///
     /// This function relies on the fact that the future returned by
     /// `S::select` does not borrow from `&self`. This is guaranteed by the
-    /// `Select` trait signature, which uses `use<Self>` (not `use<'_, Self>`),
-    /// so the future cannot capture the `'_` lifetime of `&self`.
+    /// `Select` trait signature, which uses `use<'a, Self>` (not
+    /// `use<'_, Self>`), so the future cannot capture the `'_` lifetime of
+    /// `&self`.
+    #[allow(clippy::await_holding_refcell_ref)] // false positive
     pub async fn select(this: &RefCell<SelectSystem<S>>, poll: bool) -> Result<()>
     where
         S: Select + CaughtSignals + Clock,
     {
-        let (readers, writers, future) = {
-            let me = this.borrow();
-            let mut readers = me.io.readers();
-            let mut writers = me.io.writers();
-            let timeout = if poll {
-                Some(Duration::ZERO)
-            } else {
-                me.time
-                    .first_target()
-                    .map(|instant| instant.saturating_duration_since(me.now()))
-            };
-
-            let future =
-                me.system
-                    .select(&mut readers, &mut writers, timeout, me.wait_mask.as_deref());
-            (readers, writers, future)
+        let me = this.borrow();
+        let mut readers = me.io.readers();
+        let mut writers = me.io.writers();
+        let timeout = if poll {
+            Some(Duration::ZERO)
+        } else {
+            me.time
+                .first_target()
+                .map(|instant| instant.saturating_duration_since(me.now()))
         };
+
+        let future = me
+            .system
+            .select(&mut readers, &mut writers, timeout, me.wait_mask.as_deref());
+
+        drop(me);
 
         // Await after releasing the borrow.
         let inner_result = future.await;
@@ -639,10 +643,10 @@ impl AsyncSignal {
 mod tests {
     use super::super::r#virtual::{SIGCHLD, SIGINT, SIGUSR1};
     use super::*;
+    use crate::test_helper::WakeFlag;
     use assert_matches::assert_matches;
     use std::sync::Arc;
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::task::Wake;
+    use std::sync::atomic::Ordering;
 
     #[test]
     fn async_io_has_no_default_readers_or_writers() {
@@ -751,18 +755,11 @@ mod tests {
 
     #[test]
     fn async_signal_wait_and_wake() {
-        struct WakeFlag(AtomicBool);
-        impl Wake for WakeFlag {
-            fn wake(self: Arc<Self>) {
-                self.0.store(true, Ordering::Relaxed);
-            }
-        }
-
         let mut async_signal = AsyncSignal::new();
         let status_1 = async_signal.wait_for_signals();
         let status_2 = async_signal.wait_for_signals();
-        let wake_flag_1 = Arc::new(WakeFlag(AtomicBool::new(false)));
-        let wake_flag_2 = Arc::new(WakeFlag(AtomicBool::new(false)));
+        let wake_flag_1 = Arc::new(WakeFlag::new());
+        let wake_flag_2 = Arc::new(WakeFlag::new());
         assert_matches!(&mut *status_1.borrow_mut(), SignalStatus::Expected(waker) => {
             assert!(waker.is_none());
             *waker = Some(wake_flag_1.clone().into());
@@ -811,16 +808,9 @@ mod tests {
 
     #[test]
     fn async_signal_empty_wake() {
-        struct WakeFlag(AtomicBool);
-        impl Wake for WakeFlag {
-            fn wake(self: Arc<Self>) {
-                self.0.store(true, Ordering::Relaxed);
-            }
-        }
-
         let mut async_signal = AsyncSignal::new();
         let status = async_signal.wait_for_signals();
-        let wake_flag = Arc::new(WakeFlag(AtomicBool::new(false)));
+        let wake_flag = Arc::new(WakeFlag::new());
         assert_matches!(&mut *status.borrow_mut(), SignalStatus::Expected(waker) => {
             assert!(waker.is_none());
             *waker = Some(wake_flag.clone().into());
@@ -828,12 +818,12 @@ mod tests {
 
         async_signal.wake(vec![]);
 
-        assert!(!wake_flag.0.load(Ordering::Relaxed));
+        assert!(!wake_flag.is_woken());
         // to assert that the waker is not modified, we wake the waker ourself
         assert_matches!(&*status.borrow(), SignalStatus::Expected(Some(waker)) => {
             waker.wake_by_ref();
         });
-        assert!(wake_flag.0.load(Ordering::Relaxed));
+        assert!(wake_flag.is_woken());
     }
 
     #[test]

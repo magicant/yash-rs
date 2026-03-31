@@ -85,6 +85,7 @@
 			"redirs",
 			"rlimit",
 			"rustfmt",
+			"seekable",
 			"setfd",
 			"setfl",
 			"setpgid",

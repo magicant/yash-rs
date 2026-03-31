@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Tests related to FIFO files
+//! Tests on VirtualSystem API related to FIFO files
 
 use super::tests::virtual_system_with_executor;
 use super::*;
@@ -33,7 +33,9 @@ fn create_fifo(system: &VirtualSystem) {
                     content: VecDeque::new(),
                     readers: 0,
                     writers: 0,
-                    awaiters: Vec::new(),
+                    pending_open_wakers: WakerSet::new(),
+                    pending_read_wakers: WakerSet::new(),
+                    pending_write_wakers: WakerSet::new(),
                 },
                 permissions: Mode::empty(),
             })),

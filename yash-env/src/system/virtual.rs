@@ -57,11 +57,14 @@
 //!
 //! TBD: Explain how to use `VirtualSystem` with an executor.
 
+mod file_body;
 mod file_system;
 mod io;
 mod process;
+mod select;
 mod signal;
 
+pub use self::file_body::*;
 pub use self::file_system::*;
 pub use self::io::*;
 pub use self::process::*;
@@ -130,9 +133,12 @@ use crate::semantics::ExitStatus;
 use crate::str::UnixStr;
 use crate::str::UnixString;
 use crate::system::ChildProcessStarter;
+use crate::waker::ScheduledWakerQueue;
+use crate::waker::WakerSet;
 use enumset::EnumSet;
 use std::borrow::Cow;
 use std::cell::Cell;
+use std::cell::LazyCell;
 use std::cell::Ref;
 use std::cell::RefCell;
 use std::cell::RefMut;
@@ -143,7 +149,6 @@ use std::convert::Infallible;
 use std::convert::TryInto;
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::ffi::c_int;
 use std::fmt::Debug;
 use std::future::pending;
 use std::future::poll_fn;
@@ -259,30 +264,51 @@ impl VirtualSystem {
         })
     }
 
-    /// Calls the given closure passing the open file description for the FD.
+    /// Returns the open file description for the given FD.
     ///
+    /// This is a helper function for obtaining the open file description for a
+    /// given file descriptor in the current process.
     /// Returns `Err(Errno::EBADF)` if the FD is not open.
-    pub fn with_open_file_description<F, R>(&self, fd: Fd, f: F) -> Result<R>
-    where
-        F: FnOnce(&OpenFileDescription) -> Result<R>,
-    {
+    pub fn get_open_file_description(&self, fd: Fd) -> Result<Rc<RefCell<OpenFileDescription>>> {
         let process = self.current_process();
         let body = process.get_fd(fd).ok_or(Errno::EBADF)?;
-        let ofd = body.open_file_description.borrow();
-        f(&ofd)
+        Ok(Rc::clone(&body.open_file_description))
     }
 
     /// Calls the given closure passing the open file description for the FD.
     ///
+    /// This is a helper function for performing an operation on the open file
+    /// description for a given file descriptor in the current process. The
+    /// closure is passed a reference to the open file description, and can
+    /// perform any operation on it, such as checking its state. The return
+    /// value of the closure is returned as the result of this function.
+    ///
     /// Returns `Err(Errno::EBADF)` if the FD is not open.
+    /// Panics if the open file description is already mutably borrowed.
+    pub fn with_open_file_description<F, R>(&self, fd: Fd, f: F) -> Result<R>
+    where
+        F: FnOnce(&OpenFileDescription) -> Result<R>,
+    {
+        let ofd = self.get_open_file_description(fd)?;
+        f(&ofd.borrow())
+    }
+
+    /// Calls the given closure passing the open file description for the FD.
+    ///
+    /// This is a helper function for performing a mutable operation on the open
+    /// file description for a given file descriptor in the current process. The
+    /// closure is passed a mutable reference to the open file description, and
+    /// can perform any operation on it, such as reading and writing. The return
+    /// value of the closure is returned as the result of this function.
+    ///
+    /// Returns `Err(Errno::EBADF)` if the FD is not open.
+    /// Panics if the open file description is already borrowed.
     pub fn with_open_file_description_mut<F, R>(&self, fd: Fd, f: F) -> Result<R>
     where
         F: FnOnce(&mut OpenFileDescription) -> Result<R>,
     {
-        let mut process = self.current_process_mut();
-        let body = process.get_fd_mut(fd).ok_or(Errno::EBADF)?;
-        let mut ofd = body.open_file_description.borrow_mut();
-        f(&mut ofd)
+        let ofd = self.get_open_file_description(fd)?;
+        f(&mut ofd.borrow_mut())
     }
 
     fn resolve_relative_path<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
@@ -433,12 +459,13 @@ impl VirtualSystem {
     /// This function does nothing if the file is not a FIFO.
     async fn wait_for_fifo_to_become_ready(open_file_description: &OpenFileDescription) {
         // If the file is a FIFO, block until the other end is opened.
+        let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
         poll_fn(|context| {
             let mut file = open_file_description.file().borrow_mut();
             let FileBody::Fifo {
                 readers,
                 writers,
-                ref mut awaiters,
+                ref mut pending_open_wakers,
                 ..
             } = file.body
             else {
@@ -449,11 +476,10 @@ impl VirtualSystem {
                 return Poll::Ready(());
             }
 
-            // Register the current task as an awaiter if it's not already registered.
-            let waker = context.waker();
-            if !awaiters.iter().any(|existing| existing.will_wake(waker)) {
-                awaiters.push(waker.clone());
-            }
+            // Register the current task's waker to be notified when a new
+            // reader or writer is opened on the FIFO.
+            waker.set(Some(context.waker().clone()));
+            pending_open_wakers.insert(Rc::downgrade(&waker));
             Poll::Pending
         })
         .await;
@@ -499,7 +525,9 @@ impl Pipe for VirtualSystem {
                 content: VecDeque::new(),
                 readers: 0,
                 writers: 0,
-                awaiters: Vec::new(),
+                pending_open_wakers: WakerSet::new(),
+                pending_read_wakers: WakerSet::new(),
+                pending_write_wakers: WakerSet::new(),
             },
             permissions: Mode::default(),
         }));
@@ -702,27 +730,43 @@ impl Fcntl for VirtualSystem {
 
 impl Read for VirtualSystem {
     /// Reads data from the file descriptor into the buffer.
-    ///
-    /// The current implementation of this method does not yet support blocking
-    /// behavior, and immediately returns `Err(Errno::EAGAIN)` if the file
-    /// descriptor is not ready for reading.
     fn read<'a>(
         &self,
         fd: Fd,
         buffer: &'a mut [u8],
     ) -> impl Future<Output = Result<usize>> + use<'a> {
-        ready(self.with_open_file_description_mut(fd, |ofd| ofd.read(buffer)))
+        let ofd = self.get_open_file_description(fd);
+        async move {
+            let ofd = ofd?;
+            let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
+            poll_fn(|context| {
+                let get_waker = || {
+                    waker.set(Some(context.waker().clone()));
+                    Rc::downgrade(&waker)
+                };
+                ofd.borrow_mut().poll_read(buffer, get_waker)
+            })
+            .await
+        }
     }
 }
 
 impl Write for VirtualSystem {
     /// Writes data from the buffer to the file descriptor.
-    ///
-    /// The current implementation of this method does not yet support blocking
-    /// behavior, and immediately returns `Err(Errno::EAGAIN)` if the file
-    /// descriptor is not ready for writing.
     fn write<'a>(&self, fd: Fd, buffer: &'a [u8]) -> impl Future<Output = Result<usize>> + use<'a> {
-        ready(self.with_open_file_description_mut(fd, |ofd| ofd.write(buffer)))
+        let ofd = self.get_open_file_description(fd);
+        async move {
+            let ofd = ofd?;
+            let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
+            poll_fn(|context| {
+                let get_waker = || {
+                    waker.set(Some(context.waker().clone()));
+                    Rc::downgrade(&waker)
+                };
+                ofd.borrow_mut().poll_write(buffer, get_waker)
+            })
+            .await
+        }
     }
 }
 
@@ -1016,108 +1060,6 @@ impl SendSignal for VirtualSystem {
     fn raise(&self, signal: signal::Number) -> impl Future<Output = Result<()>> + use<> {
         let target = self.process_id;
         self.kill(target, Some(signal))
-    }
-}
-
-impl Select for VirtualSystem {
-    /// Waits for a next event.
-    ///
-    /// The `VirtualSystem` implementation for this method does not actually
-    /// block the calling thread. The method returns immediately in any case,
-    /// except when temporarily changing the signal mask causes the process to
-    /// stop, in which case the returned future will be pending until the
-    /// process is running again.
-    ///
-    /// The `timeout` is ignored if this function returns because of a ready FD
-    /// or a caught signal. Otherwise, the timeout is added to
-    /// [`SystemState::now`], which must not be `None` then.
-    fn select(
-        &self,
-        readers: &mut Vec<Fd>,
-        writers: &mut Vec<Fd>,
-        timeout: Option<Duration>,
-        signal_mask: Option<&[signal::Number]>,
-    ) -> impl Future<Output = Result<c_int>> + use<> {
-        let mut state_changed = false;
-        let result;
-
-        {
-            let mut state = self.state.borrow_mut();
-            let process = state
-                .processes
-                .get_mut(&self.process_id)
-                .expect("current process not found");
-
-            // Detect invalid FDs first. POSIX requires that the arguments are
-            // not modified if an error occurs.
-            let fds = readers.iter().chain(writers.iter());
-            let bad_fd = { fds }.any(|fd| !process.fds().contains_key(fd));
-
-            if bad_fd {
-                result = Err(Errno::EBADF);
-            } else {
-                let mut caught = false;
-                let mut parent_pid_for_sigchld = None;
-
-                if let Some(signal_mask) = signal_mask {
-                    let save_mask = process
-                        .blocked_signals()
-                        .iter()
-                        .copied()
-                        .collect::<Vec<signal::Number>>();
-                    let result_1 = process.block_signals(SigmaskOp::Set, signal_mask);
-                    let result_2 = process.block_signals(SigmaskOp::Set, &save_mask);
-                    assert!(!result_2.delivered);
-                    caught = result_1.caught;
-
-                    if result_1.process_state_changed {
-                        parent_pid_for_sigchld = Some(process.ppid);
-                        state_changed = true;
-                    }
-                }
-
-                if caught {
-                    result = Err(Errno::EINTR);
-                } else {
-                    readers.retain(|fd| {
-                        // We already checked that the FD is open, so it's safe
-                        // to access by index.
-                        let ofd = process.fds()[fd].open_file_description.borrow();
-                        !ofd.is_readable() || ofd.is_ready_for_reading()
-                    });
-                    writers.retain(|fd| {
-                        let ofd = process.fds()[fd].open_file_description.borrow();
-                        !ofd.is_writable() || ofd.is_ready_for_writing()
-                    });
-
-                    let count = (readers.len() + writers.len()).try_into().unwrap();
-                    if count == 0 {
-                        if let Some(duration) = timeout {
-                            if !duration.is_zero() {
-                                let now = state.now.as_mut();
-                                let now =
-                                    now.expect("now time unspecified; cannot add timeout duration");
-                                *now += duration;
-                            }
-                        }
-                    }
-                    result = Ok(count);
-                }
-
-                // NLL: process is no longer used after this point
-                if let Some(parent_pid) = parent_pid_for_sigchld {
-                    raise_sigchld(&mut state, parent_pid);
-                }
-            }
-        }
-
-        let system = self.clone();
-        async move {
-            if state_changed {
-                system.block_until_running().await;
-            }
-            result
-        }
     }
 }
 
@@ -1435,11 +1377,18 @@ fn raise_sigchld(state: &mut SystemState, target_pid: Pid) {
     }
 }
 
-/// State of the virtual system.
+/// State of the virtual system
 #[derive(Clone, Debug, Default)]
 pub struct SystemState {
     /// Current time
+    ///
+    /// To make sure scheduled wakers are woken up at the right time, use
+    /// [`advance_time`](Self::advance_time) to update the current time instead
+    /// of directly modifying this field.
     pub now: Option<Instant>,
+
+    /// Priority queue of wakers scheduled to be woken up at specific times
+    pub scheduled_wakers: ScheduledWakerQueue,
 
     /// Consumed CPU time statistics
     pub times: CpuTimes,
@@ -1474,6 +1423,13 @@ pub struct SystemState {
 }
 
 impl SystemState {
+    /// Sets the current time to `new_current_time` and wakes up any wakers
+    /// scheduled to be woken up by that time.
+    pub fn advance_time(&mut self, new_current_time: Instant) {
+        self.now = Some(new_current_time);
+        self.scheduled_wakers.wake(new_current_time);
+    }
+
     /// Performs [`select`](crate::system::SharedSystem::select) on all
     /// processes in the system.
     ///
@@ -1668,7 +1624,9 @@ mod tests {
                 content: [17; 42].into(),
                 readers: 0,
                 writers: 0,
-                awaiters: Vec::new(),
+                pending_open_wakers: WakerSet::new(),
+                pending_read_wakers: WakerSet::new(),
+                pending_write_wakers: WakerSet::new(),
             },
             permissions: Mode::default(),
         }));
@@ -2535,187 +2493,6 @@ mod tests {
         let system = VirtualSystem::new();
         let result = system.kill(Pid(-9999), None).now_or_never().unwrap();
         assert_eq!(result, Err(Errno::ESRCH));
-    }
-
-    #[test]
-    fn select_regular_file_is_always_ready() {
-        let system = VirtualSystem::new();
-        let mut readers = vec![Fd::STDIN];
-        let mut writers = vec![Fd::STDOUT, Fd::STDERR];
-
-        let result = system
-            .select(&mut readers, &mut writers, None, None)
-            .now_or_never()
-            .unwrap();
-        assert_eq!(result, Ok(3));
-        assert_eq!(readers, [Fd::STDIN]);
-        assert_eq!(writers, [Fd::STDOUT, Fd::STDERR]);
-    }
-
-    #[test]
-    fn select_pipe_reader_is_ready_if_writer_is_closed() {
-        let system = VirtualSystem::new();
-        let (reader, writer) = system.pipe().unwrap();
-        system.close(writer).unwrap();
-        let mut readers = vec![reader];
-        let mut writers = vec![];
-
-        let result = system
-            .select(&mut readers, &mut writers, None, None)
-            .now_or_never()
-            .unwrap();
-        assert_eq!(result, Ok(1));
-        assert_eq!(readers, [reader]);
-        assert_eq!(writers, []);
-    }
-
-    #[test]
-    fn select_pipe_reader_is_ready_if_something_has_been_written() {
-        let system = VirtualSystem::new();
-        let (reader, writer) = system.pipe().unwrap();
-        system.write(writer, &[0]).now_or_never().unwrap().unwrap();
-        let mut readers = vec![reader];
-        let mut writers = vec![];
-
-        let result = system
-            .select(&mut readers, &mut writers, None, None)
-            .now_or_never()
-            .unwrap();
-        assert_eq!(result, Ok(1));
-        assert_eq!(readers, [reader]);
-        assert_eq!(writers, []);
-    }
-
-    #[test]
-    fn select_pipe_reader_is_not_ready_if_writer_has_written_nothing() {
-        let system = VirtualSystem::new();
-        let (reader, _writer) = system.pipe().unwrap();
-        let mut readers = vec![reader];
-        let mut writers = vec![];
-
-        let result = system
-            .select(&mut readers, &mut writers, None, None)
-            .now_or_never()
-            .unwrap();
-        assert_eq!(result, Ok(0));
-        assert_eq!(readers, []);
-        assert_eq!(writers, []);
-    }
-
-    #[test]
-    fn select_pipe_writer_is_ready_if_pipe_is_not_full() {
-        let system = VirtualSystem::new();
-        let (_reader, writer) = system.pipe().unwrap();
-        let mut readers = vec![];
-        let mut writers = vec![writer];
-
-        let result = system
-            .select(&mut readers, &mut writers, None, None)
-            .now_or_never()
-            .unwrap();
-        assert_eq!(result, Ok(1));
-        assert_eq!(readers, []);
-        assert_eq!(writers, [writer]);
-    }
-
-    #[test]
-    fn select_on_unreadable_fd() {
-        let system = VirtualSystem::new();
-        let (_reader, writer) = system.pipe().unwrap();
-        let mut fds = vec![writer];
-        let result = system
-            .select(&mut fds, &mut vec![], None, None)
-            .now_or_never()
-            .unwrap();
-        assert_eq!(result, Ok(1));
-        assert_eq!(fds, [writer]);
-    }
-
-    #[test]
-    fn select_on_unwritable_fd() {
-        let system = VirtualSystem::new();
-        let (reader, _writer) = system.pipe().unwrap();
-        let mut fds = vec![reader];
-        let result = system
-            .select(&mut vec![], &mut fds, None, None)
-            .now_or_never()
-            .unwrap();
-        assert_eq!(result, Ok(1));
-        assert_eq!(fds, [reader]);
-    }
-
-    #[test]
-    fn select_on_closed_fd() {
-        let system = VirtualSystem::new();
-        let result = system
-            .select(&mut vec![Fd(17)], &mut vec![], None, None)
-            .now_or_never()
-            .unwrap();
-        assert_eq!(result, Err(Errno::EBADF));
-
-        let result = system
-            .select(&mut vec![], &mut vec![Fd(17)], None, None)
-            .now_or_never()
-            .unwrap();
-        assert_eq!(result, Err(Errno::EBADF));
-    }
-
-    fn system_for_catching_sigchld() -> VirtualSystem {
-        let system = VirtualSystem::new();
-        system
-            .sigmask(Some((SigmaskOp::Add, &[SIGCHLD])), None)
-            .now_or_never()
-            .unwrap()
-            .unwrap();
-        system.sigaction(SIGCHLD, Disposition::Catch).unwrap();
-        system
-    }
-
-    #[test]
-    fn select_on_non_pending_signal() {
-        let system = system_for_catching_sigchld();
-        let result = system
-            .select(&mut vec![], &mut vec![], None, Some(&[]))
-            .now_or_never()
-            .unwrap();
-        assert_eq!(result, Ok(0));
-        assert_eq!(system.caught_signals(), []);
-    }
-
-    #[test]
-    fn select_on_pending_signal() {
-        let system = system_for_catching_sigchld();
-        let _ = system.current_process_mut().raise_signal(SIGCHLD);
-        let result = system
-            .select(&mut vec![], &mut vec![], None, Some(&[]))
-            .now_or_never()
-            .unwrap();
-        assert_eq!(result, Err(Errno::EINTR));
-        assert_eq!(system.caught_signals(), [SIGCHLD]);
-    }
-
-    #[test]
-    fn select_timeout() {
-        let system = VirtualSystem::new();
-        let now = Instant::now();
-        system.state.borrow_mut().now = Some(now);
-
-        let (reader, _writer) = system.pipe().unwrap();
-        let mut readers = vec![reader];
-        let mut writers = vec![];
-        let timeout = Duration::new(42, 195);
-
-        let result = system
-            .select(&mut readers, &mut writers, Some(timeout), None)
-            .now_or_never()
-            .unwrap();
-        assert_eq!(result, Ok(0));
-        assert_eq!(readers, []);
-        assert_eq!(writers, []);
-        assert_eq!(
-            system.state.borrow().now,
-            Some(now + Duration::new(42, 195))
-        );
     }
 
     pub(super) fn virtual_system_with_executor() -> (VirtualSystem, LocalPool) {
