@@ -17,13 +17,20 @@
 //! Items for concurrent task execution
 
 use super::{
-    Close, Dir, Dup, Fcntl, FdFlag, Fstat, IsExecutableFile, OfdAccess, Open, Pipe, Read, Result,
-    Select, Write,
+    CaughtSignals, Chdir, Clock, Close, CpuTimes, Dir, Disposition, Dup, Fcntl, FdFlag, Fstat,
+    GetCwd, GetPid, GetSigaction, IsExecutableFile, Mode, OfdAccess, Open, Pipe, Read, Result,
+    Seek, Select, SendSignal, SetPgid, Sigaction, Sigmask, SigmaskOp, Signals, Times, Umask, Write,
+    signal,
 };
 use crate::io::Fd;
+use crate::job::Pid;
+use crate::path::PathBuf;
 use enumset::EnumSet;
-use std::ffi::CStr;
+use std::ffi::{CStr, c_int};
+use std::io::SeekFrom;
+use std::ops::RangeInclusive;
 use std::rc::Rc;
+use std::time::Instant;
 
 /// Decorator for systems that makes blocking I/O operations concurrency-friendly
 ///
@@ -128,7 +135,7 @@ where
         path: &CStr,
         access: OfdAccess,
         flags: EnumSet<super::OpenFlag>,
-        mode: super::Mode,
+        mode: Mode,
     ) -> impl Future<Output = Result<Fd>> + use<S> {
         self.inner.open(path, access, flags, mode)
     }
@@ -181,5 +188,292 @@ where
     #[inline]
     fn fcntl_setfd(&self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
         self.inner.fcntl_setfd(fd, flags)
+    }
+}
+
+impl<S> Read for Rc<Concurrent<S>>
+where
+    S: Read,
+{
+    fn read<'a>(
+        &self,
+        fd: Fd,
+        buffer: &'a mut [u8],
+    ) -> impl Future<Output = Result<usize>> + use<'a, S> {
+        async move { todo!("read({:?}, {:?})", fd, buffer) }
+    }
+}
+
+impl<S> Write for Rc<Concurrent<S>>
+where
+    S: Write,
+{
+    fn write<'a>(
+        &self,
+        fd: Fd,
+        buffer: &'a [u8],
+    ) -> impl Future<Output = Result<usize>> + use<'a, S> {
+        async move { todo!("write({:?}, {:?})", fd, buffer) }
+    }
+}
+
+impl<S> Seek for Rc<Concurrent<S>>
+where
+    S: Seek,
+{
+    #[inline]
+    fn lseek(&self, fd: Fd, position: SeekFrom) -> Result<u64> {
+        self.inner.lseek(fd, position)
+    }
+}
+
+impl<S> Umask for Rc<Concurrent<S>>
+where
+    S: Umask,
+{
+    #[inline]
+    fn umask(&self, new_mask: Mode) -> Mode {
+        self.inner.umask(new_mask)
+    }
+}
+
+impl<S> GetCwd for Rc<Concurrent<S>>
+where
+    S: GetCwd,
+{
+    #[inline]
+    fn getcwd(&self) -> Result<PathBuf> {
+        self.inner.getcwd()
+    }
+}
+
+impl<S> Chdir for Rc<Concurrent<S>>
+where
+    S: Chdir,
+{
+    #[inline]
+    fn chdir(&self, path: &CStr) -> Result<()> {
+        self.inner.chdir(path)
+    }
+}
+
+impl<S> Clock for Rc<Concurrent<S>>
+where
+    S: Clock,
+{
+    #[inline]
+    fn now(&self) -> Instant {
+        self.inner.now()
+    }
+}
+
+impl<S> Times for Rc<Concurrent<S>>
+where
+    S: Times,
+{
+    #[inline]
+    fn times(&self) -> Result<CpuTimes> {
+        self.inner.times()
+    }
+}
+
+impl<S> GetPid for Rc<Concurrent<S>>
+where
+    S: GetPid,
+{
+    #[inline]
+    fn getpid(&self) -> Pid {
+        self.inner.getpid()
+    }
+    #[inline]
+    fn getppid(&self) -> Pid {
+        self.inner.getppid()
+    }
+    #[inline]
+    fn getpgrp(&self) -> Pid {
+        self.inner.getpgrp()
+    }
+    #[inline]
+    fn getsid(&self, pid: Pid) -> Result<Pid> {
+        self.inner.getsid(pid)
+    }
+}
+
+impl<S> SetPgid for Rc<Concurrent<S>>
+where
+    S: SetPgid,
+{
+    #[inline]
+    fn setpgid(&self, pid: Pid, pgid: Pid) -> Result<()> {
+        self.inner.setpgid(pid, pgid)
+    }
+}
+
+impl<S> Signals for Rc<Concurrent<S>>
+where
+    S: Signals,
+{
+    const SIGABRT: signal::Number = S::SIGABRT;
+    const SIGALRM: signal::Number = S::SIGALRM;
+    const SIGBUS: signal::Number = S::SIGBUS;
+    const SIGCHLD: signal::Number = S::SIGCHLD;
+    const SIGCLD: Option<signal::Number> = S::SIGCLD;
+    const SIGCONT: signal::Number = S::SIGCONT;
+    const SIGEMT: Option<signal::Number> = S::SIGEMT;
+    const SIGFPE: signal::Number = S::SIGFPE;
+    const SIGHUP: signal::Number = S::SIGHUP;
+    const SIGILL: signal::Number = S::SIGILL;
+    const SIGINFO: Option<signal::Number> = S::SIGINFO;
+    const SIGINT: signal::Number = S::SIGINT;
+    const SIGIO: Option<signal::Number> = S::SIGIO;
+    const SIGIOT: signal::Number = S::SIGIOT;
+    const SIGKILL: signal::Number = S::SIGKILL;
+    const SIGLOST: Option<signal::Number> = S::SIGLOST;
+    const SIGPIPE: signal::Number = S::SIGPIPE;
+    const SIGPOLL: Option<signal::Number> = S::SIGPOLL;
+    const SIGPROF: signal::Number = S::SIGPROF;
+    const SIGPWR: Option<signal::Number> = S::SIGPWR;
+    const SIGQUIT: signal::Number = S::SIGQUIT;
+    const SIGSEGV: signal::Number = S::SIGSEGV;
+    const SIGSTKFLT: Option<signal::Number> = S::SIGSTKFLT;
+    const SIGSTOP: signal::Number = S::SIGSTOP;
+    const SIGSYS: signal::Number = S::SIGSYS;
+    const SIGTERM: signal::Number = S::SIGTERM;
+    const SIGTHR: Option<signal::Number> = S::SIGTHR;
+    const SIGTRAP: signal::Number = S::SIGTRAP;
+    const SIGTSTP: signal::Number = S::SIGTSTP;
+    const SIGTTIN: signal::Number = S::SIGTTIN;
+    const SIGTTOU: signal::Number = S::SIGTTOU;
+    const SIGURG: signal::Number = S::SIGURG;
+    const SIGUSR1: signal::Number = S::SIGUSR1;
+    const SIGUSR2: signal::Number = S::SIGUSR2;
+    const SIGVTALRM: signal::Number = S::SIGVTALRM;
+    const SIGWINCH: signal::Number = S::SIGWINCH;
+    const SIGXCPU: signal::Number = S::SIGXCPU;
+    const SIGXFSZ: signal::Number = S::SIGXFSZ;
+
+    #[inline]
+    fn sigrt_range(&self) -> Option<RangeInclusive<signal::Number>> {
+        self.inner.sigrt_range()
+    }
+
+    const NAMED_SIGNALS: &'static [(&'static str, Option<signal::Number>)] = S::NAMED_SIGNALS;
+
+    #[inline]
+    fn iter_sigrt(&self) -> impl DoubleEndedIterator<Item = signal::Number> + use<S> {
+        self.inner.iter_sigrt()
+    }
+    #[inline]
+    fn to_signal_number<N: Into<signal::RawNumber>>(&self, number: N) -> Option<signal::Number> {
+        self.inner.to_signal_number(number)
+    }
+    #[inline]
+    fn sig2str<N: Into<signal::RawNumber>>(
+        &self,
+        signal: N,
+    ) -> Option<std::borrow::Cow<'static, str>> {
+        self.inner.sig2str(signal)
+    }
+    #[inline]
+    fn str2sig(&self, name: &str) -> Option<signal::Number> {
+        self.inner.str2sig(name)
+    }
+    #[inline]
+    fn validate_signal(&self, number: signal::RawNumber) -> Option<(signal::Name, signal::Number)> {
+        self.inner.validate_signal(number)
+    }
+    #[inline]
+    fn signal_name_from_number(&self, number: signal::Number) -> signal::Name {
+        self.inner.signal_name_from_number(number)
+    }
+    #[inline]
+    fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
+        self.inner.signal_number_from_name(name)
+    }
+}
+
+impl<S> Sigmask for Rc<Concurrent<S>>
+where
+    S: Sigmask,
+{
+    #[inline]
+    fn sigmask(
+        &self,
+        op: Option<(SigmaskOp, &[signal::Number])>,
+        old_mask: Option<&mut Vec<signal::Number>>,
+    ) -> impl Future<Output = Result<()>> + use<S> {
+        self.inner.sigmask(op, old_mask)
+    }
+}
+
+impl<S> GetSigaction for Rc<Concurrent<S>>
+where
+    S: GetSigaction,
+{
+    #[inline]
+    fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
+        self.inner.get_sigaction(signal)
+    }
+}
+
+impl<S> Sigaction for Rc<Concurrent<S>>
+where
+    S: Sigaction,
+{
+    #[inline]
+    fn sigaction(&self, signal: signal::Number, handling: Disposition) -> Result<Disposition> {
+        self.inner.sigaction(signal, handling)
+    }
+}
+
+impl<S> CaughtSignals for Rc<Concurrent<S>>
+where
+    S: CaughtSignals,
+{
+    #[inline]
+    fn caught_signals(&self) -> Vec<signal::Number> {
+        self.inner.caught_signals()
+    }
+}
+
+impl<S> SendSignal for Rc<Concurrent<S>>
+where
+    S: SendSignal,
+{
+    #[inline]
+    fn kill(
+        &self,
+        pid: Pid,
+        signal: Option<signal::Number>,
+    ) -> impl Future<Output = Result<()>> + use<S> {
+        self.inner.kill(pid, signal)
+    }
+    #[inline]
+    fn raise(&self, signal: signal::Number) -> impl Future<Output = Result<()>> + use<S> {
+        self.inner.raise(signal)
+    }
+}
+
+impl<S> Select for Rc<Concurrent<S>>
+where
+    S: Select,
+{
+    fn select<'a>(
+        &self,
+        readers: &'a mut Vec<Fd>,
+        writers: &'a mut Vec<Fd>,
+        timeout: Option<std::time::Duration>,
+        signal_mask: Option<&[signal::Number]>,
+    ) -> impl Future<Output = Result<c_int>> + use<'a, S> {
+        let signal_mask = signal_mask.map(|mask| mask.to_owned());
+        async move {
+            todo!(
+                "select({:?}, {:?}, {:?}, {:?})",
+                readers,
+                writers,
+                timeout,
+                signal_mask
+            )
+        }
     }
 }
