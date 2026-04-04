@@ -16,21 +16,26 @@
 
 //! Items for concurrent task execution
 
+use super::resource::{LimitPair, Resource};
 use super::{
-    CaughtSignals, Chdir, Clock, Close, CpuTimes, Dir, Disposition, Dup, Fcntl, FdFlag, Fstat,
-    GetCwd, GetPid, GetSigaction, IsExecutableFile, Mode, OfdAccess, Open, Pipe, Read, Result,
-    Seek, Select, SendSignal, SetPgid, Sigaction, Sigmask, SigmaskOp, Signals, Times, Umask, Write,
-    signal,
+    CaughtSignals, Chdir, Clock, Close, CpuTimes, Dir, Disposition, Dup, Exec, Exit, Fcntl, FdFlag,
+    Fstat, GetCwd, GetPid, GetPw, GetRlimit, GetSigaction, GetUid, Gid, IsExecutableFile, Isatty,
+    Mode, OfdAccess, Open, Pipe, Read, Result, Seek, Select, SendSignal, SetPgid, SetRlimit,
+    ShellPath, Sigaction, Sigmask, SigmaskOp, Signals, Sysconf, TcGetPgrp, TcSetPgrp, Times, Uid,
+    Umask, Wait, Write, signal,
 };
 use crate::io::Fd;
-use crate::job::Pid;
+use crate::job::{Pid, ProcessState};
 use crate::path::PathBuf;
+use crate::semantics::ExitStatus;
 use enumset::EnumSet;
-use std::ffi::{CStr, c_int};
+use std::convert::Infallible;
+use std::ffi::{CStr, CString, c_int};
 use std::io::SeekFrom;
 use std::ops::RangeInclusive;
 use std::rc::Rc;
 use std::time::Instant;
+use unix_str::UnixString;
 
 /// Decorator for systems that makes blocking I/O operations concurrency-friendly
 ///
@@ -475,5 +480,155 @@ where
                 signal_mask
             )
         }
+    }
+}
+
+impl<S> Isatty for Rc<Concurrent<S>>
+where
+    S: Isatty,
+{
+    #[inline]
+    fn isatty(&self, fd: Fd) -> bool {
+        self.inner.isatty(fd)
+    }
+}
+
+impl<S> TcGetPgrp for Rc<Concurrent<S>>
+where
+    S: TcGetPgrp,
+{
+    #[inline]
+    fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
+        self.inner.tcgetpgrp(fd)
+    }
+}
+
+impl<S> TcSetPgrp for Rc<Concurrent<S>>
+where
+    S: TcSetPgrp,
+{
+    #[inline]
+    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> + use<S> {
+        self.inner.tcsetpgrp(fd, pgid)
+    }
+}
+
+// impl<S> Fork for Rc<Concurrent<S>>
+// where
+//     S: Fork,
+// {
+//     #[inline]
+//     fn new_child_process(&self) -> Result<ChildProcessStarter<Self>>
+//     where
+//         Self: Sized,
+//     {
+//         todo!()
+//     }
+// }
+
+impl<S> Wait for Rc<Concurrent<S>>
+where
+    S: Wait,
+{
+    #[inline]
+    fn wait(&self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
+        self.inner.wait(target)
+    }
+}
+
+impl<S> Exec for Rc<Concurrent<S>>
+where
+    S: Exec,
+{
+    #[inline]
+    fn execve(
+        &self,
+        path: &CStr,
+        args: &[CString],
+        envs: &[CString],
+    ) -> impl Future<Output = Result<Infallible>> + use<S> {
+        self.inner.execve(path, args, envs)
+    }
+}
+
+impl<S> Exit for Rc<Concurrent<S>>
+where
+    S: Exit,
+{
+    #[inline]
+    fn exit(&self, exit_status: ExitStatus) -> impl Future<Output = Infallible> + use<S> {
+        self.inner.exit(exit_status)
+    }
+}
+
+impl<S> GetUid for Rc<Concurrent<S>>
+where
+    S: GetUid,
+{
+    #[inline]
+    fn getuid(&self) -> Uid {
+        self.inner.getuid()
+    }
+    #[inline]
+    fn geteuid(&self) -> Uid {
+        self.inner.geteuid()
+    }
+    #[inline]
+    fn getgid(&self) -> Gid {
+        self.inner.getgid()
+    }
+    #[inline]
+    fn getegid(&self) -> Gid {
+        self.inner.getegid()
+    }
+}
+
+impl<S> GetPw for Rc<Concurrent<S>>
+where
+    S: GetPw,
+{
+    #[inline]
+    fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
+        self.inner.getpwnam_dir(name)
+    }
+}
+
+impl<S> Sysconf for Rc<Concurrent<S>>
+where
+    S: Sysconf,
+{
+    #[inline]
+    fn confstr_path(&self) -> Result<UnixString> {
+        self.inner.confstr_path()
+    }
+}
+
+impl<S> ShellPath for Rc<Concurrent<S>>
+where
+    S: ShellPath,
+{
+    #[inline]
+    fn shell_path(&self) -> CString {
+        self.inner.shell_path()
+    }
+}
+
+impl<S> GetRlimit for Rc<Concurrent<S>>
+where
+    S: GetRlimit,
+{
+    #[inline]
+    fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
+        self.inner.getrlimit(resource)
+    }
+}
+
+impl<S> SetRlimit for Rc<Concurrent<S>>
+where
+    S: SetRlimit,
+{
+    #[inline]
+    fn setrlimit(&self, resource: Resource, limits: LimitPair) -> Result<()> {
+        self.inner.setrlimit(resource, limits)
     }
 }
