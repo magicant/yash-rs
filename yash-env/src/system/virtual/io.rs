@@ -43,7 +43,8 @@ pub struct OpenFileDescription {
     is_writable: bool,
     /// Whether this file is opened for appending
     is_appending: bool,
-    // TODO is_nonblocking
+    /// Whether this file is opened in non-blocking mode
+    is_nonblocking: bool,
 }
 
 impl Drop for OpenFileDescription {
@@ -61,6 +62,7 @@ impl OpenFileDescription {
         is_readable: bool,
         is_writable: bool,
         is_appending: bool,
+        is_nonblocking: bool,
     ) -> Self {
         file.borrow_mut().body.open(is_readable, is_writable);
 
@@ -70,6 +72,7 @@ impl OpenFileDescription {
             is_readable,
             is_writable,
             is_appending,
+            is_nonblocking,
         }
     }
 
@@ -89,6 +92,19 @@ impl OpenFileDescription {
     #[must_use]
     pub fn is_writable(&self) -> bool {
         self.is_writable
+    }
+
+    /// Returns true if this open file description is in non-blocking mode.
+    #[inline]
+    #[must_use]
+    pub fn is_nonblocking(&self) -> bool {
+        self.is_nonblocking
+    }
+
+    /// Sets whether this open file description is in non-blocking mode.
+    #[inline]
+    pub fn set_nonblocking(&mut self, is_nonblocking: bool) {
+        self.is_nonblocking = is_nonblocking
     }
 
     /// Returns true if a read operation on this open file description would not
@@ -164,7 +180,11 @@ impl OpenFileDescription {
     /// or if it failed with an error. If it is `Poll::Pending`, it means a
     /// waker has been registered and the caller should wait until it is woken
     /// up, when this method should be called again.
-    pub fn poll_read<F>(&mut self, buffer: &mut [u8], get_waker: F) -> Poll<Result<usize, Errno>>
+    pub fn poll_read<F>(
+        &mut self,
+        buffer: &mut [u8],
+        mut get_waker: F,
+    ) -> Poll<Result<usize, Errno>>
     where
         F: FnMut() -> Weak<Cell<Option<Waker>>>,
     {
@@ -173,8 +193,22 @@ impl OpenFileDescription {
         }
 
         let file = self.file.borrow_mut();
-        let poll = { file }.body.poll_read(buffer, self.offset, get_waker);
+        let is_nonblocking = self.is_nonblocking;
+        let maybe_get_waker = move || {
+            if is_nonblocking {
+                Weak::new()
+            } else {
+                get_waker()
+            }
+        };
 
+        let poll = { file }
+            .body
+            .poll_read(buffer, self.offset, maybe_get_waker);
+
+        if is_nonblocking && poll.is_pending() {
+            return Poll::Ready(Err(Errno::EAGAIN));
+        }
         if let Poll::Ready(Ok(count)) = poll {
             self.offset += count;
         }
@@ -213,7 +247,7 @@ impl OpenFileDescription {
     /// written, or if it failed with an error. If it is `Poll::Pending`, it
     /// means a waker has been registered and the caller should wait until it is
     /// woken up, when this method should be called again.
-    pub fn poll_write<F>(&mut self, buffer: &[u8], get_waker: F) -> Poll<Result<usize, Errno>>
+    pub fn poll_write<F>(&mut self, buffer: &[u8], mut get_waker: F) -> Poll<Result<usize, Errno>>
     where
         F: FnMut() -> Weak<Cell<Option<Waker>>>,
     {
@@ -227,8 +261,20 @@ impl OpenFileDescription {
         } else {
             self.offset
         };
+        let is_nonblocking = self.is_nonblocking;
+        let maybe_get_waker = move || {
+            if is_nonblocking {
+                Weak::new()
+            } else {
+                get_waker()
+            }
+        };
 
-        let poll = { file }.body.poll_write(buffer, offset, get_waker);
+        let poll = { file }.body.poll_write(buffer, offset, maybe_get_waker);
+
+        if is_nonblocking && poll.is_pending() {
+            return Poll::Ready(Err(Errno::EAGAIN));
+        }
         if let Poll::Ready(Ok(count)) = poll {
             self.offset = offset + count;
         }
@@ -289,8 +335,7 @@ impl Eq for FdBody {}
 
 #[cfg(test)]
 mod tests {
-    use super::super::Mode;
-    use super::super::WakerSet;
+    use super::super::{Mode, PIPE_SIZE, WakerSet};
     use super::*;
     use assert_matches::assert_matches;
     use std::collections::VecDeque;
@@ -303,6 +348,7 @@ mod tests {
             is_readable: false,
             is_writable: false,
             is_appending: false,
+            is_nonblocking: false,
         };
 
         let mut buffer = [0];
@@ -318,6 +364,7 @@ mod tests {
             is_readable: true,
             is_writable: false,
             is_appending: false,
+            is_nonblocking: false,
         };
 
         let mut buffer = [0; 3];
@@ -328,6 +375,53 @@ mod tests {
     }
 
     #[test]
+    fn fifo_nonblocking_read_not_ready() {
+        let fifo = Rc::new(RefCell::new(Inode {
+            body: FileBody::Fifo {
+                content: VecDeque::new(),
+                readers: 1,
+                writers: 1,
+                pending_open_wakers: WakerSet::new(),
+                pending_read_wakers: WakerSet::new(),
+                pending_write_wakers: WakerSet::new(),
+            },
+            permissions: Mode::default(),
+        }));
+        let mut open_file = OpenFileDescription::new(
+            fifo, /* offset */ 0, /* is_readable */ true, /* is_writable */ false,
+            /* is_appending */ false, /* is_nonblocking */ true,
+        );
+
+        let mut buffer = [0; 4];
+        let result = open_file.poll_read(&mut buffer, || unreachable!());
+        assert_eq!(result, Poll::Ready(Err(Errno::EAGAIN)));
+    }
+
+    #[test]
+    fn fifo_nonblocking_read_ready() {
+        let fifo = Rc::new(RefCell::new(Inode {
+            body: FileBody::Fifo {
+                content: VecDeque::from([0, 1, 2, 3]),
+                readers: 1,
+                writers: 1,
+                pending_open_wakers: WakerSet::new(),
+                pending_read_wakers: WakerSet::new(),
+                pending_write_wakers: WakerSet::new(),
+            },
+            permissions: Mode::default(),
+        }));
+        let mut open_file = OpenFileDescription::new(
+            fifo, /* offset */ 0, /* is_readable */ true, /* is_writable */ false,
+            /* is_appending */ false, /* is_nonblocking */ true,
+        );
+
+        let mut buffer = [0; 4];
+        let result = open_file.poll_read(&mut buffer, || unreachable!());
+        assert_eq!(result, Poll::Ready(Ok(4)));
+        assert_eq!(buffer, [0, 1, 2, 3]);
+    }
+
+    #[test]
     fn regular_file_write_unwritable() {
         let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(Inode::new([]))),
@@ -335,6 +429,7 @@ mod tests {
             is_readable: false,
             is_writable: false,
             is_appending: false,
+            is_nonblocking: false,
         };
 
         let result = open_file.write(&[0]);
@@ -349,6 +444,7 @@ mod tests {
             is_readable: false,
             is_writable: true,
             is_appending: false,
+            is_nonblocking: false,
         };
 
         let result = open_file.write(&[9, 8, 7, 6]);
@@ -370,6 +466,7 @@ mod tests {
             is_readable: false,
             is_writable: true,
             is_appending: true,
+            is_nonblocking: false,
         };
 
         let result = open_file.write(&[4, 5]);
@@ -384,6 +481,50 @@ mod tests {
     }
 
     #[test]
+    fn fifo_nonblocking_write_not_ready() {
+        let fifo = Rc::new(RefCell::new(Inode {
+            body: FileBody::Fifo {
+                content: VecDeque::from([0; PIPE_SIZE]),
+                readers: 1,
+                writers: 1,
+                pending_open_wakers: WakerSet::new(),
+                pending_read_wakers: WakerSet::new(),
+                pending_write_wakers: WakerSet::new(),
+            },
+            permissions: Mode::default(),
+        }));
+        let mut open_file = OpenFileDescription::new(
+            fifo, /* offset */ 0, /* is_readable */ false, /* is_writable */ true,
+            /* is_appending */ false, /* is_nonblocking */ true,
+        );
+
+        let result = open_file.poll_write(&[0; 4], || unreachable!());
+        assert_eq!(result, Poll::Ready(Err(Errno::EAGAIN)));
+    }
+
+    #[test]
+    fn fifo_nonblocking_write_ready() {
+        let fifo = Rc::new(RefCell::new(Inode {
+            body: FileBody::Fifo {
+                content: VecDeque::new(),
+                readers: 1,
+                writers: 1,
+                pending_open_wakers: WakerSet::new(),
+                pending_read_wakers: WakerSet::new(),
+                pending_write_wakers: WakerSet::new(),
+            },
+            permissions: Mode::default(),
+        }));
+        let mut open_file = OpenFileDescription::new(
+            fifo, /* offset */ 0, /* is_readable */ false, /* is_writable */ true,
+            /* is_appending */ false, /* is_nonblocking */ true,
+        );
+
+        let result = open_file.poll_write(&[9; 4], || unreachable!());
+        assert_eq!(result, Poll::Ready(Ok(4)));
+    }
+
+    #[test]
     fn regular_file_seek_from_start() {
         let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(Inode::new([]))),
@@ -391,6 +532,7 @@ mod tests {
             is_readable: true,
             is_writable: true,
             is_appending: false,
+            is_nonblocking: false,
         };
 
         let result = open_file.seek(SeekFrom::Start(10));
@@ -414,6 +556,7 @@ mod tests {
             is_readable: true,
             is_writable: true,
             is_appending: false,
+            is_nonblocking: false,
         };
 
         let result = open_file.seek(SeekFrom::Current(10));
@@ -441,6 +584,7 @@ mod tests {
             is_readable: true,
             is_writable: true,
             is_appending: false,
+            is_nonblocking: false,
         };
 
         let result = open_file.seek(SeekFrom::End(7));
@@ -479,6 +623,7 @@ mod tests {
             is_readable: true,
             is_writable: false,
             is_appending: false,
+            is_nonblocking: false,
         };
         drop(open_file);
 
@@ -507,6 +652,7 @@ mod tests {
             is_readable: false,
             is_writable: true,
             is_appending: false,
+            is_nonblocking: false,
         };
         drop(open_file);
 

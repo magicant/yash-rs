@@ -211,6 +211,7 @@ impl VirtualSystem {
                 open_file_description: Rc::new(RefCell::new(OpenFileDescription::new(
                     file, /* offset = */ 0, /* is_readable = */ true,
                     /* is_writable = */ true, /* is_appending = */ true,
+                    /* is_nonblocking = */ false,
                 ))),
                 flags: EnumSet::empty(),
             };
@@ -537,6 +538,7 @@ impl Pipe for VirtualSystem {
             /* is_readable = */ true,
             /* is_writable = */ false,
             /* is_appending = */ false,
+            /* is_nonblocking = */ false,
         );
         let writer = OpenFileDescription::new(
             Rc::clone(&file),
@@ -544,6 +546,7 @@ impl Pipe for VirtualSystem {
             /* is_readable = */ false,
             /* is_writable = */ true,
             /* is_appending = */ false,
+            /* is_nonblocking = */ false,
         );
 
         let reader = FdBody {
@@ -622,6 +625,7 @@ impl Open for VirtualSystem {
                 is_readable,
                 is_writable,
                 /* is_appending = */ flags.contains(OpenFlag::Append),
+                /* is_nonblocking = */ flags.contains(OpenFlag::NonBlock),
             );
 
             if !flags.contains(OpenFlag::NonBlock) {
@@ -637,6 +641,7 @@ impl Open for VirtualSystem {
         let open_file_description = Rc::new(RefCell::new(OpenFileDescription::new(
             file, /* offset = */ 0, /* is_readable = */ true,
             /* is_writable = */ true, /* is_appending = */ false,
+            /* is_nonblocking = */ false,
         )));
         let body = FdBody {
             open_file_description,
@@ -674,6 +679,7 @@ impl Open for VirtualSystem {
             is_readable,
             is_writable,
             /* is_appending = */ false,
+            /* is_nonblocking = */ false,
         )));
         let fd = self.create_fd(open_file_description, OpenFlag::Directory.into())?;
         self.fdopendir(fd)
@@ -707,10 +713,11 @@ impl Fcntl for VirtualSystem {
         })
     }
 
-    fn get_and_set_nonblocking(&self, fd: Fd, _nonblocking: bool) -> Result<bool> {
-        self.with_open_file_description(fd, |_ofd| {
-            // TODO Implement non-blocking I/O
-            Ok(false)
+    fn get_and_set_nonblocking(&self, fd: Fd, nonblocking: bool) -> Result<bool> {
+        self.with_open_file_description_mut(fd, |ofd| {
+            let was_nonblocking = ofd.is_nonblocking();
+            ofd.set_nonblocking(nonblocking);
+            Ok(was_nonblocking)
         })
     }
 

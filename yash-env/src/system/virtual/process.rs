@@ -658,6 +658,7 @@ mod tests {
             /* is_readable = */ true,
             /* is_writable = */ false,
             /* is_appending = */ false,
+            /* is_nonblocking = */ false,
         );
         let writer = OpenFileDescription::new(
             Rc::clone(&file),
@@ -665,6 +666,7 @@ mod tests {
             /* is_readable = */ false,
             /* is_writable = */ true,
             /* is_appending = */ false,
+            /* is_nonblocking = */ false,
         );
 
         let reader = FdBody {
