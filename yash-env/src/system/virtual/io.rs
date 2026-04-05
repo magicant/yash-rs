@@ -43,7 +43,9 @@ pub struct OpenFileDescription {
     is_writable: bool,
     /// Whether this file is opened for appending
     is_appending: bool,
-    // TODO is_nonblocking
+    /// Whether this file is opened in non-blocking mode
+    #[expect(dead_code)]
+    is_nonblocking: bool,
 }
 
 impl Drop for OpenFileDescription {
@@ -61,6 +63,7 @@ impl OpenFileDescription {
         is_readable: bool,
         is_writable: bool,
         is_appending: bool,
+        is_nonblocking: bool,
     ) -> Self {
         file.borrow_mut().body.open(is_readable, is_writable);
 
@@ -70,6 +73,7 @@ impl OpenFileDescription {
             is_readable,
             is_writable,
             is_appending,
+            is_nonblocking,
         }
     }
 
@@ -303,6 +307,7 @@ mod tests {
             is_readable: false,
             is_writable: false,
             is_appending: false,
+            is_nonblocking: false,
         };
 
         let mut buffer = [0];
@@ -318,6 +323,7 @@ mod tests {
             is_readable: true,
             is_writable: false,
             is_appending: false,
+            is_nonblocking: false,
         };
 
         let mut buffer = [0; 3];
@@ -335,6 +341,7 @@ mod tests {
             is_readable: false,
             is_writable: false,
             is_appending: false,
+            is_nonblocking: false,
         };
 
         let result = open_file.write(&[0]);
@@ -349,6 +356,7 @@ mod tests {
             is_readable: false,
             is_writable: true,
             is_appending: false,
+            is_nonblocking: false,
         };
 
         let result = open_file.write(&[9, 8, 7, 6]);
@@ -370,6 +378,7 @@ mod tests {
             is_readable: false,
             is_writable: true,
             is_appending: true,
+            is_nonblocking: false,
         };
 
         let result = open_file.write(&[4, 5]);
@@ -391,6 +400,7 @@ mod tests {
             is_readable: true,
             is_writable: true,
             is_appending: false,
+            is_nonblocking: false,
         };
 
         let result = open_file.seek(SeekFrom::Start(10));
@@ -414,6 +424,7 @@ mod tests {
             is_readable: true,
             is_writable: true,
             is_appending: false,
+            is_nonblocking: false,
         };
 
         let result = open_file.seek(SeekFrom::Current(10));
@@ -441,6 +452,7 @@ mod tests {
             is_readable: true,
             is_writable: true,
             is_appending: false,
+            is_nonblocking: false,
         };
 
         let result = open_file.seek(SeekFrom::End(7));
@@ -479,6 +491,7 @@ mod tests {
             is_readable: true,
             is_writable: false,
             is_appending: false,
+            is_nonblocking: false,
         };
         drop(open_file);
 
@@ -507,6 +520,7 @@ mod tests {
             is_readable: false,
             is_writable: true,
             is_appending: false,
+            is_nonblocking: false,
         };
         drop(open_file);
 
