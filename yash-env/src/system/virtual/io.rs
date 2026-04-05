@@ -44,7 +44,6 @@ pub struct OpenFileDescription {
     /// Whether this file is opened for appending
     is_appending: bool,
     /// Whether this file is opened in non-blocking mode
-    #[expect(dead_code)]
     is_nonblocking: bool,
 }
 
@@ -168,7 +167,11 @@ impl OpenFileDescription {
     /// or if it failed with an error. If it is `Poll::Pending`, it means a
     /// waker has been registered and the caller should wait until it is woken
     /// up, when this method should be called again.
-    pub fn poll_read<F>(&mut self, buffer: &mut [u8], get_waker: F) -> Poll<Result<usize, Errno>>
+    pub fn poll_read<F>(
+        &mut self,
+        buffer: &mut [u8],
+        mut get_waker: F,
+    ) -> Poll<Result<usize, Errno>>
     where
         F: FnMut() -> Weak<Cell<Option<Waker>>>,
     {
@@ -177,8 +180,22 @@ impl OpenFileDescription {
         }
 
         let file = self.file.borrow_mut();
-        let poll = { file }.body.poll_read(buffer, self.offset, get_waker);
+        let is_nonblocking = self.is_nonblocking;
+        let maybe_get_waker = move || {
+            if is_nonblocking {
+                Weak::new()
+            } else {
+                get_waker()
+            }
+        };
 
+        let poll = { file }
+            .body
+            .poll_read(buffer, self.offset, maybe_get_waker);
+
+        if is_nonblocking && poll.is_pending() {
+            return Poll::Ready(Err(Errno::EAGAIN));
+        }
         if let Poll::Ready(Ok(count)) = poll {
             self.offset += count;
         }
@@ -331,6 +348,53 @@ mod tests {
         assert_eq!(result, Ok(2));
         assert_eq!(open_file.offset, 3);
         assert_eq!(buffer[..2], [2, 3]);
+    }
+
+    #[test]
+    fn fifo_nonblocking_read_not_ready() {
+        let fifo = Rc::new(RefCell::new(Inode {
+            body: FileBody::Fifo {
+                content: VecDeque::new(),
+                readers: 1,
+                writers: 1,
+                pending_open_wakers: WakerSet::new(),
+                pending_read_wakers: WakerSet::new(),
+                pending_write_wakers: WakerSet::new(),
+            },
+            permissions: Mode::default(),
+        }));
+        let mut open_file = OpenFileDescription::new(
+            fifo, /* offset */ 0, /* is_readable */ true, /* is_writable */ false,
+            /* is_appending */ false, /* is_nonblocking */ true,
+        );
+
+        let mut buffer = [0; 4];
+        let result = open_file.poll_read(&mut buffer, || unreachable!());
+        assert_eq!(result, Poll::Ready(Err(Errno::EAGAIN)));
+    }
+
+    #[test]
+    fn fifo_nonblocking_read_ready() {
+        let fifo = Rc::new(RefCell::new(Inode {
+            body: FileBody::Fifo {
+                content: VecDeque::from([0, 1, 2, 3]),
+                readers: 1,
+                writers: 1,
+                pending_open_wakers: WakerSet::new(),
+                pending_read_wakers: WakerSet::new(),
+                pending_write_wakers: WakerSet::new(),
+            },
+            permissions: Mode::default(),
+        }));
+        let mut open_file = OpenFileDescription::new(
+            fifo, /* offset */ 0, /* is_readable */ true, /* is_writable */ false,
+            /* is_appending */ false, /* is_nonblocking */ true,
+        );
+
+        let mut buffer = [0; 4];
+        let result = open_file.poll_read(&mut buffer, || unreachable!());
+        assert_eq!(result, Poll::Ready(Ok(4)));
+        assert_eq!(buffer, [0, 1, 2, 3]);
     }
 
     #[test]
