@@ -34,12 +34,21 @@ A _private dependency_ is used internally and not visible to downstream users.
   advance the current time and wake any wakers that should be notified as a
   result.
 - The `system::virtual::OpenFileDescription` struct now has the following methods:
+    - `is_nonblocking`: Returns whether the file description is in non-blocking mode.
+    - `set_nonblocking`: Sets or unsets non-blocking mode for the file description.
     - `poll_read`: Polls for the file descriptor to be ready for reading and
       performs a read operation.
     - `poll_write`: Polls for the file descriptor to be ready for writing and
       performs a write operation.
 - The new module `waker` has been added containing the `WakerSet` and
   `ScheduledWakerQueue` structs for storing and activating wakers.
+- The read and write operations of the `system::virtual::VirtualSystem`
+  implementation now support both blocking and non-blocking behavior
+  based on the open file description's non-blocking mode and the state of the
+  file (e.g., whether a FIFO has data to read or space to write).
+- The `system::virtual::VirtualSystem::get_and_set_nonblocking` method (which
+  was previously unimplemented) now actually gets and sets the non-blocking mode
+  of the open file description for the given file descriptor.
 - The `test_helper` module has been added with items migrated from the
   `yash-env-test-helper` crate. This module is conditionally compiled when the
   new `test-helper` feature is enabled.

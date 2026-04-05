@@ -713,10 +713,11 @@ impl Fcntl for VirtualSystem {
         })
     }
 
-    fn get_and_set_nonblocking(&self, fd: Fd, _nonblocking: bool) -> Result<bool> {
-        self.with_open_file_description(fd, |_ofd| {
-            // TODO Implement non-blocking I/O
-            Ok(false)
+    fn get_and_set_nonblocking(&self, fd: Fd, nonblocking: bool) -> Result<bool> {
+        self.with_open_file_description_mut(fd, |ofd| {
+            let was_nonblocking = ofd.is_nonblocking();
+            ofd.set_nonblocking(nonblocking);
+            Ok(was_nonblocking)
         })
     }
 

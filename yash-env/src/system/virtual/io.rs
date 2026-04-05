@@ -94,6 +94,19 @@ impl OpenFileDescription {
         self.is_writable
     }
 
+    /// Returns true if this open file description is in non-blocking mode.
+    #[inline]
+    #[must_use]
+    pub fn is_nonblocking(&self) -> bool {
+        self.is_nonblocking
+    }
+
+    /// Sets whether this open file description is in non-blocking mode.
+    #[inline]
+    pub fn set_nonblocking(&mut self, is_nonblocking: bool) {
+        self.is_nonblocking = is_nonblocking
+    }
+
     /// Returns true if a read operation on this open file description would not
     /// block.
     #[must_use]
