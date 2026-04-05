@@ -20,6 +20,7 @@ use super::Result;
 use super::file_system::OfdAccess;
 use crate::io::Fd;
 use enumset::{EnumSet, EnumSetType};
+use std::rc::Rc;
 
 /// Attributes for file descriptors
 #[derive(Debug, EnumSetType, Hash)]
@@ -43,6 +44,14 @@ pub trait Close {
     fn close(&self, fd: Fd) -> Result<()>;
 }
 
+/// Delegates the `Close` trait to the contained instance of `S`
+impl<S: Close> Close for Rc<S> {
+    #[inline]
+    fn close(&self, fd: Fd) -> Result<()> {
+        (self as &S).close(fd)
+    }
+}
+
 /// Trait for creating pipes
 ///
 /// This trait declares the `pipe` method, which creates an unnamed pipe. This
@@ -54,6 +63,14 @@ pub trait Pipe {
     /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/pipe.html).
     /// If successful, returns the reading and writing ends of the pipe.
     fn pipe(&self) -> Result<(Fd, Fd)>;
+}
+
+/// Delegates the `Pipe` trait to the contained instance of `S`
+impl<S: Pipe> Pipe for Rc<S> {
+    #[inline]
+    fn pipe(&self) -> Result<(Fd, Fd)> {
+        (self as &S).pipe()
+    }
 }
 
 /// Trait for duplicating file descriptors
@@ -80,6 +97,18 @@ pub trait Dup {
     fn dup2(&self, from: Fd, to: Fd) -> Result<Fd>;
 }
 
+/// Delegates the `Dup` trait to the contained instance of `S`
+impl<S: Dup> Dup for Rc<S> {
+    #[inline]
+    fn dup(&self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
+        (self as &S).dup(from, to_min, flags)
+    }
+    #[inline]
+    fn dup2(&self, from: Fd, to: Fd) -> Result<Fd> {
+        (self as &S).dup2(from, to)
+    }
+}
+
 /// Trait for `fcntl`-related operations
 ///
 /// This trait declares methods related to the [`fcntl` system
@@ -100,6 +129,26 @@ pub trait Fcntl {
 
     /// Sets attributes for the file descriptor.
     fn fcntl_setfd(&self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()>;
+}
+
+/// Delegates the `Fcntl` trait to the contained instance of `S`
+impl<S: Fcntl> Fcntl for Rc<S> {
+    #[inline]
+    fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
+        (self as &S).ofd_access(fd)
+    }
+    #[inline]
+    fn get_and_set_nonblocking(&self, fd: Fd, nonblocking: bool) -> Result<bool> {
+        (self as &S).get_and_set_nonblocking(fd, nonblocking)
+    }
+    #[inline]
+    fn fcntl_getfd(&self, fd: Fd) -> Result<EnumSet<FdFlag>> {
+        (self as &S).fcntl_getfd(fd)
+    }
+    #[inline]
+    fn fcntl_setfd(&self, fd: Fd, flags: EnumSet<FdFlag>) -> Result<()> {
+        (self as &S).fcntl_setfd(fd, flags)
+    }
 }
 
 /// Trait for reading from file descriptors
@@ -125,6 +174,18 @@ pub trait Read {
     ) -> impl Future<Output = Result<usize>> + use<'a, Self>;
 }
 
+/// Delegates the `Read` trait to the contained instance of `S`
+impl<S: Read> Read for Rc<S> {
+    #[inline]
+    fn read<'a>(
+        &self,
+        fd: Fd,
+        buffer: &'a mut [u8],
+    ) -> impl Future<Output = Result<usize>> + use<'a, S> {
+        (self as &S).read(fd, buffer)
+    }
+}
+
 /// Trait for writing to file descriptors
 pub trait Write {
     /// Writes to the file descriptor.
@@ -146,4 +207,16 @@ pub trait Write {
         fd: Fd,
         buffer: &'a [u8],
     ) -> impl Future<Output = Result<usize>> + use<'a, Self>;
+}
+
+/// Delegates the `Write` trait to the contained instance of `S`
+impl<S: Write> Write for Rc<S> {
+    #[inline]
+    fn write<'a>(
+        &self,
+        fd: Fd,
+        buffer: &'a [u8],
+    ) -> impl Future<Output = Result<usize>> + use<'a, S> {
+        (self as &S).write(fd, buffer)
+    }
 }

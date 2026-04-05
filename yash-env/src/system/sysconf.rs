@@ -19,6 +19,7 @@
 use super::Result;
 use crate::str::UnixString;
 use std::ffi::CString;
+use std::rc::Rc;
 
 /// Trait for getting system configuration information
 pub trait Sysconf {
@@ -27,6 +28,14 @@ pub trait Sysconf {
     ///
     /// This is a thin wrapper around `confstr(_CS_PATH, …)`.
     fn confstr_path(&self) -> Result<UnixString>;
+}
+
+/// Delegates the `Sysconf` trait to the contained instance of `S`
+impl<S: Sysconf> Sysconf for Rc<S> {
+    #[inline]
+    fn confstr_path(&self) -> Result<UnixString> {
+        (self as &S).confstr_path()
+    }
 }
 
 /// Trait for getting the path to the shell executable
@@ -38,4 +47,12 @@ pub trait ShellPath {
     /// executable. Otherwise, it should return the path to the default POSIX
     /// shell.
     fn shell_path(&self) -> CString;
+}
+
+/// Delegates the `ShellPath` trait to the contained instance of `S`
+impl<S: ShellPath> ShellPath for Rc<S> {
+    #[inline]
+    fn shell_path(&self) -> CString {
+        (self as &S).shell_path()
+    }
 }

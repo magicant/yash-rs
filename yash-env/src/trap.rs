@@ -48,6 +48,7 @@ use crate::system::{SharedSystem, System};
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use std::pin::Pin;
+use std::rc::Rc;
 
 /// System interface for signal handling configuration
 pub trait SignalSystem: Signals {
@@ -72,6 +73,22 @@ pub trait SignalSystem: Signals {
         signal: signal::Number,
         disposition: Disposition,
     ) -> impl Future<Output = Result<Disposition, Errno>> + use<Self>;
+}
+
+/// Delegates the `SignalSystem` trait to the contained instance of `S`
+impl<S: SignalSystem> SignalSystem for Rc<S> {
+    #[inline]
+    fn get_disposition(&self, signal: signal::Number) -> Result<Disposition, Errno> {
+        (self as &S).get_disposition(signal)
+    }
+    #[inline]
+    fn set_disposition(
+        &self,
+        signal: signal::Number,
+        disposition: Disposition,
+    ) -> impl Future<Output = Result<Disposition, Errno>> + use<S> {
+        (self as &S).set_disposition(signal, disposition)
+    }
 }
 
 /// Iterator of trap actions configured in a [trap set](TrapSet).

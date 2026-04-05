@@ -88,6 +88,20 @@ pub trait Select: Signals {
     ) -> impl Future<Output = Result<c_int>> + use<'a, Self>;
 }
 
+/// Delegates the `Select` trait to the contained instance of `S`
+impl<S: Select> Select for Rc<S> {
+    #[inline]
+    fn select<'a>(
+        &self,
+        readers: &'a mut Vec<Fd>,
+        writers: &'a mut Vec<Fd>,
+        timeout: Option<Duration>,
+        signal_mask: Option<&[signal::Number]>,
+    ) -> impl Future<Output = Result<c_int>> + use<'a, S> {
+        (self as &S).select(readers, writers, timeout, signal_mask)
+    }
+}
+
 /// [System] extended with internal state to support asynchronous functions.
 ///
 /// `SelectSystem` wraps a `System` instance and manages the internal state for

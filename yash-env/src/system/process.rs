@@ -27,6 +27,7 @@ use crate::job::ProcessState;
 use std::convert::Infallible;
 use std::ffi::{CStr, CString};
 use std::pin::Pin;
+use std::rc::Rc;
 
 /// Trait for getting the current process ID and other process-related information
 pub trait GetPid {
@@ -58,6 +59,26 @@ pub trait GetPid {
     fn getsid(&self, pid: Pid) -> Result<Pid>;
 }
 
+/// Delegates the `GetPid` trait to the contained instance of `S`
+impl<S: GetPid> GetPid for Rc<S> {
+    #[inline]
+    fn getpid(&self) -> Pid {
+        (self as &S).getpid()
+    }
+    #[inline]
+    fn getppid(&self) -> Pid {
+        (self as &S).getppid()
+    }
+    #[inline]
+    fn getpgrp(&self) -> Pid {
+        (self as &S).getpgrp()
+    }
+    #[inline]
+    fn getsid(&self, pid: Pid) -> Result<Pid> {
+        (self as &S).getsid(pid)
+    }
+}
+
 /// Trait for modifying the process group ID of processes
 pub trait SetPgid {
     /// Modifies the process group ID of a process.
@@ -70,6 +91,14 @@ pub trait SetPgid {
     /// `pgid` specifies the new process group ID to be set. If `pgid` is
     /// `Pid(0)`, the process ID of the specified process is used.
     fn setpgid(&self, pid: Pid, pgid: Pid) -> Result<()>;
+}
+
+/// Delegates the `SetPgid` trait to the contained instance of `S`
+impl<S: SetPgid> SetPgid for Rc<S> {
+    #[inline]
+    fn setpgid(&self, pid: Pid, pgid: Pid) -> Result<()> {
+        (self as &S).setpgid(pid, pgid)
+    }
 }
 
 type PinFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
@@ -154,6 +183,14 @@ pub trait Wait: Signals {
     fn wait(&self, target: Pid) -> Result<Option<(Pid, ProcessState)>>;
 }
 
+/// Delegates the `Wait` trait to the contained instance of `S`
+impl<S: Wait> Wait for Rc<S> {
+    #[inline]
+    fn wait(&self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
+        (self as &S).wait(target)
+    }
+}
+
 /// Trait for executing a new program in the current process
 pub trait Exec {
     // TODO Consider passing raw pointers for optimization
@@ -168,6 +205,19 @@ pub trait Exec {
     ) -> impl Future<Output = Result<Infallible>> + use<Self>;
 }
 
+/// Delegates the `Exec` trait to the contained instance of `S`
+impl<S: Exec> Exec for Rc<S> {
+    #[inline]
+    fn execve(
+        &self,
+        path: &CStr,
+        args: &[CString],
+        envs: &[CString],
+    ) -> impl Future<Output = Result<Infallible>> + use<S> {
+        (self as &S).execve(path, args, envs)
+    }
+}
+
 /// Trait for terminating the current process
 pub trait Exit {
     /// Terminates the current process.
@@ -175,4 +225,12 @@ pub trait Exit {
     /// This function is a thin wrapper around the [`_exit` system
     /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/_exit.html).
     fn exit(&self, exit_status: ExitStatus) -> impl Future<Output = Infallible> + use<Self>;
+}
+
+/// Delegates the `Exit` trait to the contained instance of `S`
+impl<S: Exit> Exit for Rc<S> {
+    #[inline]
+    fn exit(&self, exit_status: ExitStatus) -> impl Future<Output = Infallible> + use<S> {
+        (self as &S).exit(exit_status)
+    }
 }
