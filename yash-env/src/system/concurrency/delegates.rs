@@ -34,11 +34,10 @@ use std::convert::Infallible;
 use std::ffi::{CStr, CString};
 use std::io::SeekFrom;
 use std::ops::RangeInclusive;
-use std::rc::Rc;
 use std::time::Instant;
 use unix_str::UnixString;
 
-impl<S> Fstat for Rc<Concurrent<S>>
+impl<S> Fstat for Concurrent<S>
 where
     S: Fstat,
 {
@@ -48,24 +47,21 @@ where
     fn fstat(&self, fd: Fd) -> Result<Self::Stat> {
         self.inner.fstat(fd)
     }
-
     #[inline]
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Self::Stat> {
         self.inner.fstatat(dir_fd, path, follow_symlinks)
     }
-
     #[inline]
     fn is_directory(&self, path: &CStr) -> bool {
         self.inner.is_directory(path)
     }
-
     #[inline]
     fn fd_is_pipe(&self, fd: Fd) -> bool {
         self.inner.fd_is_pipe(fd)
     }
 }
 
-impl<S> IsExecutableFile for Rc<Concurrent<S>>
+impl<S> IsExecutableFile for Concurrent<S>
 where
     S: IsExecutableFile,
 {
@@ -75,7 +71,7 @@ where
     }
 }
 
-impl<S> Pipe for Rc<Concurrent<S>>
+impl<S> Pipe for Concurrent<S>
 where
     S: Pipe,
 {
@@ -85,7 +81,7 @@ where
     }
 }
 
-impl<S> Dup for Rc<Concurrent<S>>
+impl<S> Dup for Concurrent<S>
 where
     S: Dup,
 {
@@ -101,7 +97,7 @@ where
 }
 
 /// This implementation does not (yet) support non-blocking open operations.
-impl<S> Open for Rc<Concurrent<S>>
+impl<S> Open for Concurrent<S>
 where
     S: Open,
 {
@@ -132,7 +128,7 @@ where
     }
 }
 
-impl<S> Close for Rc<Concurrent<S>>
+impl<S> Close for Concurrent<S>
 where
     S: Close,
 {
@@ -142,7 +138,7 @@ where
     }
 }
 
-impl<S> Fcntl for Rc<Concurrent<S>>
+impl<S> Fcntl for Concurrent<S>
 where
     S: Fcntl,
 {
@@ -167,7 +163,7 @@ where
     }
 }
 
-impl<S> Seek for Rc<Concurrent<S>>
+impl<S> Seek for Concurrent<S>
 where
     S: Seek,
 {
@@ -177,7 +173,7 @@ where
     }
 }
 
-impl<S> Umask for Rc<Concurrent<S>>
+impl<S> Umask for Concurrent<S>
 where
     S: Umask,
 {
@@ -187,7 +183,7 @@ where
     }
 }
 
-impl<S> GetCwd for Rc<Concurrent<S>>
+impl<S> GetCwd for Concurrent<S>
 where
     S: GetCwd,
 {
@@ -197,7 +193,7 @@ where
     }
 }
 
-impl<S> Chdir for Rc<Concurrent<S>>
+impl<S> Chdir for Concurrent<S>
 where
     S: Chdir,
 {
@@ -207,7 +203,7 @@ where
     }
 }
 
-impl<S> Clock for Rc<Concurrent<S>>
+impl<S> Clock for Concurrent<S>
 where
     S: Clock,
 {
@@ -217,7 +213,7 @@ where
     }
 }
 
-impl<S> Times for Rc<Concurrent<S>>
+impl<S> Times for Concurrent<S>
 where
     S: Times,
 {
@@ -227,7 +223,7 @@ where
     }
 }
 
-impl<S> GetPid for Rc<Concurrent<S>>
+impl<S> GetPid for Concurrent<S>
 where
     S: GetPid,
 {
@@ -249,7 +245,7 @@ where
     }
 }
 
-impl<S> SetPgid for Rc<Concurrent<S>>
+impl<S> SetPgid for Concurrent<S>
 where
     S: SetPgid,
 {
@@ -259,7 +255,7 @@ where
     }
 }
 
-impl<S> Signals for Rc<Concurrent<S>>
+impl<S> Signals for Concurrent<S>
 where
     S: Signals,
 {
@@ -342,7 +338,7 @@ where
     }
 }
 
-impl<S> Sigmask for Rc<Concurrent<S>>
+impl<S> Sigmask for Concurrent<S>
 where
     S: Sigmask,
 {
@@ -356,7 +352,7 @@ where
     }
 }
 
-impl<S> GetSigaction for Rc<Concurrent<S>>
+impl<S> GetSigaction for Concurrent<S>
 where
     S: GetSigaction,
 {
@@ -366,7 +362,7 @@ where
     }
 }
 
-impl<S> Sigaction for Rc<Concurrent<S>>
+impl<S> Sigaction for Concurrent<S>
 where
     S: Sigaction,
 {
@@ -376,7 +372,7 @@ where
     }
 }
 
-impl<S> CaughtSignals for Rc<Concurrent<S>>
+impl<S> CaughtSignals for Concurrent<S>
 where
     S: CaughtSignals,
 {
@@ -386,7 +382,7 @@ where
     }
 }
 
-impl<S> SendSignal for Rc<Concurrent<S>>
+impl<S> SendSignal for Concurrent<S>
 where
     S: SendSignal,
 {
@@ -404,7 +400,7 @@ where
     }
 }
 
-impl<S> Isatty for Rc<Concurrent<S>>
+impl<S> Isatty for Concurrent<S>
 where
     S: Isatty,
 {
@@ -414,7 +410,7 @@ where
     }
 }
 
-impl<S> TcGetPgrp for Rc<Concurrent<S>>
+impl<S> TcGetPgrp for Concurrent<S>
 where
     S: TcGetPgrp,
 {
@@ -424,7 +420,7 @@ where
     }
 }
 
-impl<S> TcSetPgrp for Rc<Concurrent<S>>
+impl<S> TcSetPgrp for Concurrent<S>
 where
     S: TcSetPgrp,
 {
@@ -434,7 +430,7 @@ where
     }
 }
 
-// impl<S> Fork for Rc<Concurrent<S>>
+// impl<S> Fork for Concurrent<S>
 // where
 //     S: Fork,
 // {
@@ -447,7 +443,7 @@ where
 //     }
 // }
 
-impl<S> Wait for Rc<Concurrent<S>>
+impl<S> Wait for Concurrent<S>
 where
     S: Wait,
 {
@@ -457,7 +453,7 @@ where
     }
 }
 
-impl<S> Exec for Rc<Concurrent<S>>
+impl<S> Exec for Concurrent<S>
 where
     S: Exec,
 {
@@ -472,7 +468,7 @@ where
     }
 }
 
-impl<S> Exit for Rc<Concurrent<S>>
+impl<S> Exit for Concurrent<S>
 where
     S: Exit,
 {
@@ -482,7 +478,7 @@ where
     }
 }
 
-impl<S> GetUid for Rc<Concurrent<S>>
+impl<S> GetUid for Concurrent<S>
 where
     S: GetUid,
 {
@@ -504,7 +500,7 @@ where
     }
 }
 
-impl<S> GetPw for Rc<Concurrent<S>>
+impl<S> GetPw for Concurrent<S>
 where
     S: GetPw,
 {
@@ -514,7 +510,7 @@ where
     }
 }
 
-impl<S> Sysconf for Rc<Concurrent<S>>
+impl<S> Sysconf for Concurrent<S>
 where
     S: Sysconf,
 {
@@ -524,7 +520,7 @@ where
     }
 }
 
-impl<S> ShellPath for Rc<Concurrent<S>>
+impl<S> ShellPath for Concurrent<S>
 where
     S: ShellPath,
 {
@@ -534,7 +530,7 @@ where
     }
 }
 
-impl<S> GetRlimit for Rc<Concurrent<S>>
+impl<S> GetRlimit for Concurrent<S>
 where
     S: GetRlimit,
 {
@@ -544,7 +540,7 @@ where
     }
 }
 
-impl<S> SetRlimit for Rc<Concurrent<S>>
+impl<S> SetRlimit for Concurrent<S>
 where
     S: SetRlimit,
 {
