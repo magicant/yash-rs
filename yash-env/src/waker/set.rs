@@ -148,7 +148,8 @@ impl WakerSet {
             self.reserve(self.wakers.len());
         }
 
-        self.wakers.insert(WakerEntry(waker_cell))
+        let entry = WakerEntry(waker_cell);
+        entry.is_alive() && self.wakers.insert(entry)
     }
 
     /// Wakes all wakers in the set and clears the set.
