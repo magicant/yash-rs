@@ -288,6 +288,7 @@ impl<'a, S: Fcntl> Deref for TemporaryNonBlockingGuard<'a, S> {
 }
 
 mod delegates;
+mod signal;
 
 #[cfg(test)]
 mod tests {
