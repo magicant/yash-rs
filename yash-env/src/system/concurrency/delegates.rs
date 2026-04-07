@@ -18,11 +18,10 @@
 
 use super::super::resource::{LimitPair, Resource};
 use super::super::{
-    CaughtSignals, Chdir, Clock, Close, CpuTimes, Dir, Disposition, Dup, Exec, Exit, Fcntl, FdFlag,
-    Fstat, GetCwd, GetPid, GetPw, GetRlimit, GetSigaction, GetUid, Gid, IsExecutableFile, Isatty,
-    Mode, OfdAccess, Open, OpenFlag, Pipe, Result, Seek, SendSignal, SetPgid, SetRlimit, ShellPath,
-    Sigaction, Sigmask, SigmaskOp, Signals, Sysconf, TcGetPgrp, TcSetPgrp, Times, Uid, Umask, Wait,
-    signal,
+    Chdir, Clock, Close, CpuTimes, Dir, Dup, Exec, Exit, Fcntl, FdFlag, Fstat, GetCwd, GetPid,
+    GetPw, GetRlimit, GetUid, Gid, IsExecutableFile, Isatty, Mode, OfdAccess, Open, OpenFlag, Pipe,
+    Result, Seek, SendSignal, SetPgid, SetRlimit, ShellPath, Signals, Sysconf, TcGetPgrp,
+    TcSetPgrp, Times, Uid, Umask, Wait, signal,
 };
 use super::Concurrent;
 use crate::io::Fd;
@@ -338,49 +337,11 @@ where
     }
 }
 
-impl<S> Sigmask for Concurrent<S>
-where
-    S: Sigmask,
-{
-    #[inline]
-    fn sigmask(
-        &self,
-        op: Option<(SigmaskOp, &[signal::Number])>,
-        old_mask: Option<&mut Vec<signal::Number>>,
-    ) -> impl Future<Output = Result<()>> + use<S> {
-        self.inner.sigmask(op, old_mask)
-    }
-}
-
-impl<S> GetSigaction for Concurrent<S>
-where
-    S: GetSigaction,
-{
-    #[inline]
-    fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
-        self.inner.get_sigaction(signal)
-    }
-}
-
-impl<S> Sigaction for Concurrent<S>
-where
-    S: Sigaction,
-{
-    #[inline]
-    fn sigaction(&self, signal: signal::Number, handling: Disposition) -> Result<Disposition> {
-        self.inner.sigaction(signal, handling)
-    }
-}
-
-impl<S> CaughtSignals for Concurrent<S>
-where
-    S: CaughtSignals,
-{
-    #[inline]
-    fn caught_signals(&self) -> Vec<signal::Number> {
-        self.inner.caught_signals()
-    }
-}
+// Sigmask, GetSigaction, Sigaction, and CaughtSignals are not implemented for Concurrent<S>
+// because Concurrent needs to control the signal dispositions and the signal mask itself to
+// ensure that the select method can respond to received signals without race conditions.
+// Instead, Concurrent<S> implements the SignalSystem trait, which provides the necessary
+// methods for configuring signal dispositions and masks in a controlled manner.
 
 impl<S> SendSignal for Concurrent<S>
 where
