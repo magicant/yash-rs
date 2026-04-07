@@ -22,14 +22,29 @@ use crate::system::{Disposition, Errno, Sigaction, Sigmask, SigmaskOp};
 use crate::trap::SignalSystem;
 use std::rc::Rc;
 
+/// Implementation of `SignalSystem` for `Concurrent`
+///
+/// `Concurrent` controls both the signal dispositions and the signal mask, so
+/// it can receive and handle signals without race conditions.
 impl<S> SignalSystem for Rc<Concurrent<S>>
 where
     S: Sigmask + Sigaction,
 {
+    /// Returns the current disposition of the specified signal.
+    ///
+    /// This implementation simply forwards the call to the inner system's
+    /// [`GetSigaction::get_sigaction`](crate::system::GetSigaction::get_sigaction)
+    /// method.
     fn get_disposition(&self, signal: Number) -> Result<Disposition, Errno> {
         self.inner.get_sigaction(signal)
     }
 
+    /// Sets the disposition of the specified signal to the given value and
+    /// returns the old disposition.
+    ///
+    /// This implementation both updates the signal disposition and the signal
+    /// mask to ensure that the [`select`](Concurrent::select) method can
+    /// respond to received signals without race conditions.
     fn set_disposition(
         &self,
         signal: Number,
@@ -37,14 +52,24 @@ where
     ) -> impl Future<Output = Result<Disposition, Errno>> + use<S> {
         let this = Rc::clone(self);
         async move {
-            // TODO When changing the disposition to Catch, we should first block the signal, then change the disposition.
+            if disposition == Disposition::Catch {
+                // Before setting the disposition to `Catch`, we need to block the signal
+                // to prevent it from being delivered before the disposition is updated.
+                this.inner
+                    .sigmask(Some((SigmaskOp::Add, &[signal])), None)
+                    .await?;
+            }
+
             let old_action = this.inner.sigaction(signal, disposition);
-            let op = match disposition {
-                Disposition::Default => SigmaskOp::Remove,
-                // TODO For Ignore, we should actually unblock
-                Disposition::Ignore | Disposition::Catch => SigmaskOp::Add,
-            };
-            this.inner.sigmask(Some((op, &[signal])), None).await?;
+
+            if disposition != Disposition::Catch {
+                // After setting the disposition to `Default` or `Ignore`, we need to unblock
+                // the signal to allow it to be delivered if it was previously blocked.
+                this.inner
+                    .sigmask(Some((SigmaskOp::Remove, &[signal])), None)
+                    .await?;
+            }
+
             old_action
         }
     }
