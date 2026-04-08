@@ -55,9 +55,7 @@ where
             if disposition == Disposition::Catch {
                 // Before setting the disposition to `Catch`, we need to block the signal
                 // to prevent it from being delivered before the disposition is updated.
-                this.inner
-                    .sigmask(Some((SigmaskOp::Add, &[signal])), None)
-                    .await?;
+                this.sigmask(SigmaskOp::Add, signal).await?;
             }
 
             let old_action = this.inner.sigaction(signal, disposition);
@@ -65,13 +63,32 @@ where
             if disposition != Disposition::Catch {
                 // After setting the disposition to `Default` or `Ignore`, we need to unblock
                 // the signal to allow it to be delivered if it was previously blocked.
-                this.inner
-                    .sigmask(Some((SigmaskOp::Remove, &[signal])), None)
-                    .await?;
+                this.sigmask(SigmaskOp::Remove, signal).await?;
             }
 
             old_action
         }
+    }
+}
+
+impl<S> Concurrent<S>
+where
+    S: Sigmask,
+{
+    /// Wrapper of the inner system's [`Sigmask::sigmask`] method that also
+    /// updates the `select_mask` field.
+    async fn sigmask(&self, op: SigmaskOp, signal: Number) -> Result<(), Errno> {
+        let mut old_mask = Vec::new();
+        self.inner
+            .sigmask(Some((op, &[signal])), Some(&mut old_mask))
+            .await?;
+
+        self.state
+            .borrow_mut()
+            .select_mask
+            .get_or_insert(old_mask)
+            .retain(|&s| s != signal);
+        Ok(())
     }
 }
 
@@ -80,8 +97,9 @@ mod tests {
     use super::*;
     use crate::job::{ProcessResult, ProcessState};
     use crate::system::SendSignal as _;
-    use crate::system::r#virtual::{SIGQUIT, SIGTERM, VirtualSystem};
+    use crate::system::r#virtual::{SIGQUIT, SIGTERM, SIGUSR1, VirtualSystem};
     use futures_util::FutureExt as _;
+    use std::num::NonZero;
 
     #[test]
     fn setting_disposition_from_default_to_catch() {
@@ -157,6 +175,84 @@ mod tests {
                 signal: SIGQUIT,
                 core_dump: true
             })
+        );
+    }
+
+    #[test]
+    fn first_sigmask_updates_blocking_mask() {
+        let inner = VirtualSystem::new();
+        _ = inner
+            .current_process_mut()
+            .block_signals(SigmaskOp::Set, &[SIGQUIT, SIGTERM, SIGUSR1]);
+        let system = Rc::new(Concurrent::new(inner.clone()));
+
+        let result = system
+            .sigmask(SigmaskOp::Add, SIGTERM)
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, Ok(()));
+        let blocked_signals = inner
+            .current_process()
+            .blocked_signals()
+            .iter()
+            .copied()
+            .collect::<Vec<_>>();
+        assert_eq!(blocked_signals, [SIGQUIT, SIGTERM, SIGUSR1]);
+    }
+
+    #[test]
+    fn first_sigmask_sets_select_mask() {
+        let inner = VirtualSystem::new();
+        _ = inner
+            .current_process_mut()
+            .block_signals(SigmaskOp::Set, &[SIGQUIT, SIGTERM, SIGUSR1]);
+        let system = Rc::new(Concurrent::new(inner.clone()));
+
+        system
+            .sigmask(SigmaskOp::Add, SIGTERM)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            system.state.borrow().select_mask.as_deref(),
+            Some([SIGQUIT, SIGUSR1].as_slice())
+        );
+    }
+
+    #[ignore = "current VirtualSystem::sigmask silently ignores invalid signals"]
+    #[test]
+    fn first_sigmask_leaves_select_mask_unchanged_on_error() {
+        let system = Rc::new(Concurrent::new(VirtualSystem::new()));
+        let invalid_signal = Number::from_raw_unchecked(NonZero::new(-1).unwrap());
+        let result = system
+            .sigmask(SigmaskOp::Add, invalid_signal)
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, Err(Errno::EINVAL));
+        assert_eq!(system.state.borrow().select_mask.as_deref(), None);
+    }
+
+    #[test]
+    fn second_sigmask_updates_select_mask() {
+        let inner = VirtualSystem::new();
+        _ = inner
+            .current_process_mut()
+            .block_signals(SigmaskOp::Set, &[SIGQUIT, SIGTERM, SIGUSR1]);
+        let system = Rc::new(Concurrent::new(inner.clone()));
+
+        system
+            .sigmask(SigmaskOp::Add, SIGTERM)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        system
+            .sigmask(SigmaskOp::Remove, SIGQUIT)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            system.state.borrow().select_mask.as_deref(),
+            Some([SIGUSR1].as_slice())
         );
     }
 }

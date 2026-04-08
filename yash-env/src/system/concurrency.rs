@@ -61,6 +61,13 @@ struct State {
     writes: HashMap<Fd, WakerSet>,
     /// Wakers for tasks waiting for a timeout to elapse
     timeouts: ScheduledWakerQueue,
+
+    /// Signal mask for the `select` method
+    ///
+    /// This is the mask the shell inherited from the parent shell minus the
+    /// signals the shell wants to catch. The value is `None` until the signal
+    /// mask is first updated by [`Concurrent::sigmask`].
+    select_mask: Option<Vec<crate::signal::Number>>,
     // TODO
 }
 
