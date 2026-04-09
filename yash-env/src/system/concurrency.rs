@@ -19,10 +19,10 @@
 use super::{Clock, Errno, Fcntl, Read, Result, Select, Write};
 use crate::io::Fd;
 use crate::waker::{ScheduledWakerQueue, WakerSet};
-use std::cell::{Cell, LazyCell, RefCell};
+use std::cell::{Cell, LazyCell, OnceCell, RefCell};
 use std::collections::HashMap;
 use std::future::poll_fn;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::task::Poll::{Pending, Ready};
 use std::time::Duration;
@@ -62,13 +62,16 @@ struct State {
     /// Wakers for tasks waiting for a timeout to elapse
     timeouts: ScheduledWakerQueue,
 
+    /// Wakers for tasks waiting for signals to be delivered
+    catches: WakerSet,
+    /// Shared placeholder for a list of next delivered signals
+    signals: Option<Rc<SignalList>>,
     /// Signal mask for the `select` method
     ///
     /// This is the mask the shell inherited from the parent shell minus the
     /// signals the shell wants to catch. The value is `None` until the signal
     /// mask is first updated by [`Concurrent::sigmask`].
     select_mask: Option<Vec<crate::signal::Number>>,
-    // TODO
 }
 
 impl<S> Concurrent<S> {
@@ -214,6 +217,49 @@ where
     }
 }
 
+impl<S> Concurrent<S> {
+    /// Waits for signals to be caught.
+    ///
+    /// The returned future will be pending until any signal is caught, at which
+    /// point it will complete with a list of caught signals. The list is shared
+    /// among all tasks waiting for signals, so that they can see the same list
+    /// of caught signals when they are woken up.
+    ///
+    /// Before calling this method, the caller needs to [`set_disposition`] for
+    /// the signals it wants to catch.
+    ///
+    /// If this `Concurrent` system is used in an `Env`, you should call
+    /// [`Env::wait_for_signals`](crate::Env::wait_for_signals) instead of this
+    /// method, so that the trap set can handle the signals properly.
+    ///
+    /// [`set_disposition`]: crate::trap::SignalSystem::set_disposition
+    pub async fn wait_for_signals(&self) -> Rc<SignalList> {
+        let signals = self
+            .state
+            .borrow_mut()
+            .signals
+            .get_or_insert_with(|| Rc::new(SignalList::new()))
+            .clone();
+
+        let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
+        poll_fn(|context| {
+            if signals.0.get().is_some() {
+                Ready(())
+            } else {
+                waker.set(Some(context.waker().clone()));
+                self.state
+                    .borrow_mut()
+                    .catches
+                    .insert(Rc::downgrade(&waker));
+                Pending
+            }
+        })
+        .await;
+
+        signals
+    }
+}
+
 impl<S> Concurrent<S>
 where
     S: Clock + Select,
@@ -291,6 +337,44 @@ impl<'a, S: Fcntl> Deref for TemporaryNonBlockingGuard<'a, S> {
 
     fn deref(&self) -> &Self::Target {
         self.system
+    }
+}
+
+/// List of received signals
+///
+/// This struct is returned by the [`Concurrent::wait_for_signals`] method to
+/// represent the list of signals that have been caught. This is a simple
+/// wrapper around `Vec<crate::signal::Number>` that is accessible through
+/// `Deref` and `DerefMut`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignalList(OnceCell<Vec<crate::signal::Number>>);
+
+impl Deref for SignalList {
+    type Target = Vec<crate::signal::Number>;
+
+    fn deref(&self) -> &Vec<crate::signal::Number> {
+        // `unwrap` is safe because the list is initialized before being shared with tasks.
+        self.0.get().unwrap()
+    }
+}
+
+impl DerefMut for SignalList {
+    fn deref_mut(&mut self) -> &mut Vec<crate::signal::Number> {
+        // `unwrap` is safe because the list is initialized before being shared with tasks.
+        self.0.get_mut().unwrap()
+    }
+}
+
+impl SignalList {
+    #[must_use]
+    fn new() -> Self {
+        Self(OnceCell::new())
+    }
+
+    /// Consumes the `SignalList` and returns the inner list of signals.
+    pub fn into_vec(self) -> Vec<crate::signal::Number> {
+        // `unwrap` is safe because the list is initialized before being shared with tasks.
+        self.0.into_inner().unwrap()
     }
 }
 
