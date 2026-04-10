@@ -315,6 +315,8 @@ where
             if !signals.is_empty() {
                 let set_result = signal_list.0.set(signals);
                 debug_assert_eq!(set_result, Ok(()), "SignalList should not be filled yet");
+                state.catches.wake_all();
+                // TODO Should clear state.signals
             }
         }
     }
@@ -676,13 +678,14 @@ mod tests {
         assert_eq!(wait.as_mut().poll(&mut context), Pending);
 
         let mut select = pin!(system.select());
-        assert_eq!(select.as_mut().poll(&mut context), Pending);
+        let mut null_context = Context::from_waker(Waker::noop());
+        assert_eq!(select.as_mut().poll(&mut null_context), Pending);
         assert!(!wake_flag.is_woken());
 
         // Send signals to make the wait ready
         system.raise(SIGINT).now_or_never().unwrap().unwrap();
         system.raise(SIGCHLD).now_or_never().unwrap().unwrap();
-        assert_eq!(select.as_mut().poll(&mut context), Ready(()));
+        assert_eq!(select.as_mut().poll(&mut null_context), Ready(()));
         assert!(wake_flag.is_woken());
 
         let wake_flag = Arc::new(WakeFlag::new());
@@ -693,6 +696,113 @@ mod tests {
         });
     }
 
-    // TODO select_completes_when_any_condition_is_ready
+    #[test]
+    fn select_completes_when_any_condition_is_ready() {
+        let system = VirtualSystem::new();
+        let state = system.state.clone();
+        let now = Instant::now();
+        state.borrow_mut().now = Some(now);
+        let system = Rc::new(Concurrent::new(system));
+        let (read_fd, write_fd) = system.pipe().unwrap();
+        let mut buffer = [0; 4];
+        system
+            .set_disposition(SIGINT, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        let mut sleep = pin!(system.sleep(Duration::from_secs(3)));
+        let mut read = pin!(system.read(read_fd, &mut buffer));
+        let mut wait = pin!(system.wait_for_signals());
+
+        let wake_sleep = Arc::new(WakeFlag::new());
+        let wake_read = Arc::new(WakeFlag::new());
+        let wake_wait = Arc::new(WakeFlag::new());
+        let sleep_waker = Waker::from(wake_sleep.clone());
+        let read_waker = Waker::from(wake_read.clone());
+        let wait_waker = Waker::from(wake_wait.clone());
+        let mut sleep_context = Context::from_waker(&sleep_waker);
+        let mut read_context = Context::from_waker(&read_waker);
+        let mut wait_context = Context::from_waker(&wait_waker);
+        assert_eq!(sleep.as_mut().poll(&mut sleep_context), Pending);
+        assert_eq!(read.as_mut().poll(&mut read_context), Pending);
+        assert_eq!(wait.as_mut().poll(&mut wait_context), Pending);
+
+        let mut select = pin!(system.select());
+
+        let wake_select = Arc::new(WakeFlag::new());
+        let select_waker = Waker::from(wake_select.clone());
+        let mut select_context = Context::from_waker(&select_waker);
+        assert_eq!(select.as_mut().poll(&mut select_context), Pending);
+        assert!(!wake_sleep.is_woken());
+        assert!(!wake_read.is_woken());
+        assert!(!wake_wait.is_woken());
+        assert!(!wake_select.is_woken());
+
+        system
+            .write(write_fd, b"foo")
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert!(wake_select.is_woken());
+
+        let wake_select = Arc::new(WakeFlag::new());
+        let select_waker = Waker::from(wake_select.clone());
+        let mut select_context = Context::from_waker(&select_waker);
+        assert_eq!(select.as_mut().poll(&mut select_context), Ready(()));
+        assert!(!wake_sleep.is_woken());
+        assert!(wake_read.is_woken());
+        assert!(!wake_wait.is_woken());
+        assert!(!wake_select.is_woken());
+
+        assert_eq!(read.now_or_never().unwrap(), Ok(3));
+
+        let mut select = pin!(system.select());
+
+        let wake_select = Arc::new(WakeFlag::new());
+        let select_waker = Waker::from(wake_select.clone());
+        let mut select_context = Context::from_waker(&select_waker);
+        assert_eq!(select.as_mut().poll(&mut select_context), Pending);
+        assert!(!wake_sleep.is_woken());
+        assert!(!wake_wait.is_woken());
+        assert!(!wake_select.is_woken());
+
+        state
+            .borrow_mut()
+            .advance_time(now + Duration::from_secs(3));
+        assert!(wake_select.is_woken());
+
+        let wake_select = Arc::new(WakeFlag::new());
+        let select_waker = Waker::from(wake_select.clone());
+        let mut select_context = Context::from_waker(&select_waker);
+        assert_eq!(select.as_mut().poll(&mut select_context), Ready(()));
+        assert!(wake_sleep.is_woken());
+        assert!(!wake_wait.is_woken());
+        assert!(!wake_select.is_woken());
+
+        sleep.now_or_never().unwrap();
+
+        let mut select = pin!(system.select());
+
+        let wake_select = Arc::new(WakeFlag::new());
+        let select_waker = Waker::from(wake_select.clone());
+        let mut select_context = Context::from_waker(&select_waker);
+        assert_eq!(select.as_mut().poll(&mut select_context), Pending);
+        assert!(!wake_wait.is_woken());
+        assert!(!wake_select.is_woken());
+
+        system.raise(SIGINT).now_or_never().unwrap().unwrap();
+        assert!(wake_select.is_woken());
+
+        let wake_select = Arc::new(WakeFlag::new());
+        let select_waker = Waker::from(wake_select.clone());
+        let mut select_context = Context::from_waker(&select_waker);
+        assert_eq!(select.as_mut().poll(&mut select_context), Ready(()));
+        assert!(wake_wait.is_woken());
+        assert!(!wake_select.is_woken());
+
+        assert_eq!(**wait.now_or_never().unwrap(), &[SIGINT]);
+    }
+
     // TODO all_tasks_for_same_fd_wake_on_same_select
 }
