@@ -16,14 +16,14 @@
 
 //! Items for concurrent task execution
 
-use super::{Clock, Errno, Fcntl, Read, Result, Select, Write};
+use super::{CaughtSignals, Clock, Errno, Fcntl, Read, Result, Select, Write};
 use crate::io::Fd;
 use crate::waker::{ScheduledWakerQueue, WakerSet};
 use std::cell::{Cell, LazyCell, OnceCell, RefCell};
 use std::collections::HashMap;
 use std::future::poll_fn;
 use std::ops::{Deref, DerefMut};
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use std::task::Poll::{Pending, Ready};
 use std::time::Duration;
 
@@ -65,7 +65,12 @@ struct State {
     /// Wakers for tasks waiting for signals to be delivered
     catches: WakerSet,
     /// Shared placeholder for a list of next delivered signals
-    signals: Option<Rc<SignalList>>,
+    ///
+    /// Tasks waiting for signals must retain a strong reference to this list to
+    /// see the delivered signals when they are woken up. The list is allocated
+    /// when the first task starts waiting for signals and is shared among all
+    /// waiting tasks. The list is filled when signals are delivered.
+    signals: Weak<SignalList>,
     /// Signal mask for the `select` method
     ///
     /// This is the mask the shell inherited from the parent shell minus the
@@ -234,12 +239,14 @@ impl<S> Concurrent<S> {
     ///
     /// [`set_disposition`]: crate::trap::SignalSystem::set_disposition
     pub async fn wait_for_signals(&self) -> Rc<SignalList> {
-        let signals = self
-            .state
-            .borrow_mut()
-            .signals
-            .get_or_insert_with(|| Rc::new(SignalList::new()))
-            .clone();
+        let signals = {
+            let mut state = self.state.borrow_mut();
+            state.signals.upgrade().unwrap_or_else(|| {
+                let signals = Rc::new(SignalList::new());
+                state.signals = Rc::downgrade(&signals);
+                signals
+            })
+        };
 
         let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
         poll_fn(|context| {
@@ -262,7 +269,7 @@ impl<S> Concurrent<S> {
 
 impl<S> Concurrent<S>
 where
-    S: Clock + Select,
+    S: CaughtSignals + Clock + Select,
 {
     /// Waits for any of pending tasks to become ready.
     ///
@@ -300,6 +307,15 @@ where
             .for_each(|(_fd, mut wakers)| wakers.wake_all());
         if timeout.is_some() {
             state.timeouts.wake(self.inner.now());
+        }
+        if let Some(signal_list) = state.signals.upgrade() {
+            // If the upgrade succeeds, it means there are tasks waiting for signals, so let's
+            // check if we have caught any signals.
+            let signals = self.inner.caught_signals();
+            if !signals.is_empty() {
+                let set_result = signal_list.0.set(signals);
+                debug_assert_eq!(set_result, Ok(()), "SignalList should not be filled yet");
+            }
         }
     }
 }
@@ -387,8 +403,11 @@ mod signal;
 mod tests {
     use super::super::{Mode, OfdAccess, Open, OpenFlag, Pipe as _};
     use super::*;
-    use crate::system::r#virtual::{PIPE_SIZE, VirtualSystem};
+    use crate::system::r#virtual::{PIPE_SIZE, SIGCHLD, SIGINT, SIGUSR2, VirtualSystem};
+    use crate::system::{Disposition, SendSignal};
     use crate::test_helper::WakeFlag;
+    use crate::trap::SignalSystem as _;
+    use assert_matches::assert_matches;
     use futures_util::FutureExt as _;
     use std::pin::pin;
     use std::sync::Arc;
@@ -630,7 +649,50 @@ mod tests {
         assert!(!wake_flag.is_woken());
     }
 
-    // TODO signal_wait_completes_on_signal
+    #[test]
+    fn signal_wait_completes_on_signal() {
+        let system = Rc::new(Concurrent::new(VirtualSystem::new()));
+        system
+            .set_disposition(SIGINT, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        system
+            .set_disposition(SIGCHLD, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        system
+            .set_disposition(SIGUSR2, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        let mut wait = pin!(system.wait_for_signals());
+
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Waker::from(wake_flag.clone());
+        let mut context = Context::from_waker(&waker);
+        assert_eq!(wait.as_mut().poll(&mut context), Pending);
+
+        let mut select = pin!(system.select());
+        assert_eq!(select.as_mut().poll(&mut context), Pending);
+        assert!(!wake_flag.is_woken());
+
+        // Send signals to make the wait ready
+        system.raise(SIGINT).now_or_never().unwrap().unwrap();
+        system.raise(SIGCHLD).now_or_never().unwrap().unwrap();
+        assert_eq!(select.as_mut().poll(&mut context), Ready(()));
+        assert!(wake_flag.is_woken());
+
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Waker::from(wake_flag.clone());
+        let mut context = Context::from_waker(&waker);
+        assert_matches!(wait.poll(&mut context), Ready(signals) => {
+            assert_matches!(***signals, [SIGINT, SIGCHLD] | [SIGCHLD, SIGINT]);
+        });
+    }
+
     // TODO select_completes_when_any_condition_is_ready
     // TODO all_tasks_for_same_fd_wake_on_same_select
 }
