@@ -437,12 +437,15 @@ mod tests {
         let (read_fd, write_fd) = system.pipe().unwrap();
 
         let mut buffer = [0; 4];
-        let mut future = pin!(system.read(read_fd, &mut buffer));
+        let mut read = pin!(system.read(read_fd, &mut buffer));
 
         let wake_flag = Arc::new(WakeFlag::new());
         let waker = Waker::from(wake_flag.clone());
         let mut context = Context::from_waker(&waker);
-        assert_eq!(future.as_mut().poll(&mut context), Pending);
+        assert_eq!(read.as_mut().poll(&mut context), Pending);
+
+        let mut select = pin!(system.select());
+        assert_eq!(select.as_mut().poll(&mut context), Pending);
         assert!(!wake_flag.is_woken());
 
         // Write data to the pipe to make the read ready
@@ -452,13 +455,13 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        system.select().now_or_never().unwrap();
+        assert_eq!(select.as_mut().poll(&mut context), Ready(()));
         assert!(wake_flag.is_woken());
 
         let wake_flag = Arc::new(WakeFlag::new());
         let waker = Waker::from(wake_flag.clone());
         let mut context = Context::from_waker(&waker);
-        assert_eq!(future.poll(&mut context), Ready(Ok(4)));
+        assert_eq!(read.poll(&mut context), Ready(Ok(4)));
         assert!(!wake_flag.is_woken());
     }
 
@@ -534,12 +537,15 @@ mod tests {
             .unwrap();
 
         let buffer = [1, 2, 3, 4];
-        let mut future = pin!(system.write(write_fd, &buffer));
+        let mut write = pin!(system.write(write_fd, &buffer));
 
         let wake_flag = Arc::new(WakeFlag::new());
         let waker = Waker::from(wake_flag.clone());
         let mut context = Context::from_waker(&waker);
-        assert_eq!(future.as_mut().poll(&mut context), Pending);
+        assert_eq!(write.as_mut().poll(&mut context), Pending);
+
+        let mut select = pin!(system.select());
+        assert_eq!(select.as_mut().poll(&mut context), Pending);
         assert!(!wake_flag.is_woken());
 
         // Make space in the pipe buffer to make the write ready
@@ -549,13 +555,13 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        system.select().now_or_never().unwrap();
+        assert_eq!(select.as_mut().poll(&mut context), Ready(()));
         assert!(wake_flag.is_woken());
 
         let wake_flag = Arc::new(WakeFlag::new());
         let waker = Waker::from(wake_flag.clone());
         let mut context = Context::from_waker(&waker);
-        assert_eq!(future.poll(&mut context), Ready(Ok(4)));
+        assert_eq!(write.poll(&mut context), Ready(Ok(4)));
         assert!(!wake_flag.is_woken());
     }
 
@@ -597,25 +603,28 @@ mod tests {
         state.borrow_mut().now = Some(now);
         let system = Rc::new(Concurrent::new(system));
 
-        let mut future = pin!(system.sleep(Duration::from_secs(1)));
+        let mut sleep = pin!(system.sleep(Duration::from_secs(1)));
 
         let wake_flag = Arc::new(WakeFlag::new());
         let waker = Waker::from(wake_flag.clone());
         let mut context = Context::from_waker(&waker);
-        assert_eq!(future.as_mut().poll(&mut context), Pending);
+        assert_eq!(sleep.as_mut().poll(&mut context), Pending);
+
+        let mut select = pin!(system.select());
+        assert_eq!(select.as_mut().poll(&mut context), Pending);
         assert!(!wake_flag.is_woken());
 
         // Advance time by 1 second to make the sleep ready
         state
             .borrow_mut()
             .advance_time(now + Duration::from_secs(1));
-        system.select().now_or_never().unwrap();
+        assert_eq!(select.as_mut().poll(&mut context), Ready(()));
         assert!(wake_flag.is_woken());
 
         let wake_flag = Arc::new(WakeFlag::new());
         let waker = Waker::from(wake_flag.clone());
         let mut context = Context::from_waker(&waker);
-        assert_eq!(future.poll(&mut context), Ready(()));
+        assert_eq!(sleep.poll(&mut context), Ready(()));
         assert!(!wake_flag.is_woken());
     }
 
