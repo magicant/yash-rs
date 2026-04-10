@@ -267,18 +267,21 @@ where
     /// Waits for any of pending tasks to become ready.
     ///
     /// TODO
+    #[allow(clippy::await_holding_refcell_ref)]
     pub async fn select(&self) {
-        let (mut readers, mut writers, timeout, signal_mask) = {
-            let state = self.state.borrow();
-            let readers = state.reads.keys().cloned().collect();
-            let writers = state.writes.keys().cloned().collect();
-            let timeout = state
-                .timeouts
-                .next_wake_time()
-                .map(|target| target.saturating_duration_since(self.inner.now()));
-            let signal_mask = None; // TODO
-            (readers, writers, timeout, signal_mask)
-        };
+        // In this method, we keep the borrow of `state` across the `await` point. This is
+        // intentional because the real `select` call blocks the entire process, so there cannot
+        // be any other task that modifies the state while we are waiting for the `select` call to
+        // return.
+        let mut state = self.state.borrow_mut();
+
+        let mut readers = state.reads.keys().cloned().collect();
+        let mut writers = state.writes.keys().cloned().collect();
+        let timeout = state
+            .timeouts
+            .next_wake_time()
+            .map(|target| target.saturating_duration_since(self.inner.now()));
+        let signal_mask = state.select_mask.as_deref();
 
         let _ = self
             .inner
@@ -286,7 +289,6 @@ where
             .await;
         // TODO Handle EBADF
 
-        let mut state = self.state.borrow_mut();
         // TODO wake tasks based on the result of select
         state
             .reads
