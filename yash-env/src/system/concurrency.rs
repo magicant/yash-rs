@@ -298,15 +298,8 @@ where
             .await;
         // TODO Handle EBADF
 
-        // TODO wake tasks based on the result of select
-        state
-            .reads
-            .drain()
-            .for_each(|(_fd, mut wakers)| wakers.wake_all());
-        state
-            .writes
-            .drain()
-            .for_each(|(_fd, mut wakers)| wakers.wake_all());
+        wake_tasks_for_ready_fds(&mut state.reads, &readers);
+        wake_tasks_for_ready_fds(&mut state.writes, &writers);
         if timeout.is_some() {
             state.timeouts.wake(self.inner.now());
         }
@@ -323,6 +316,17 @@ where
             }
         }
     }
+}
+
+fn wake_tasks_for_ready_fds(task_map: &mut HashMap<Fd, WakerSet>, ready_fds: &[Fd]) {
+    task_map.retain(|fd, wakers| {
+        if ready_fds.contains(fd) {
+            wakers.wake_all();
+            false
+        } else {
+            true
+        }
+    })
 }
 
 /// Guard for temporarily setting a file descriptor to non-blocking mode and
@@ -462,33 +466,72 @@ mod tests {
         let system = Rc::new(Concurrent::new(VirtualSystem::new()));
         let (read_fd, write_fd) = system.pipe().unwrap();
 
-        let mut buffer = [0; 4];
-        let mut read = pin!(system.read(read_fd, &mut buffer));
+        let mut buffer1 = [0; 4];
+        let mut buffer2 = [0; 4];
+        let mut read1 = pin!(system.read(read_fd, &mut buffer1));
+        let mut read2 = pin!(system.read(read_fd, &mut buffer2));
 
-        let wake_flag = Arc::new(WakeFlag::new());
-        let waker = Waker::from(wake_flag.clone());
-        let mut context = Context::from_waker(&waker);
-        assert_eq!(read.as_mut().poll(&mut context), Pending);
+        let wake_flag1 = Arc::new(WakeFlag::new());
+        let wake_flag2 = Arc::new(WakeFlag::new());
+        let waker1 = Waker::from(wake_flag1.clone());
+        let waker2 = Waker::from(wake_flag2.clone());
+        let mut context1 = Context::from_waker(&waker1);
+        let mut context2 = Context::from_waker(&waker2);
+        assert_eq!(read1.as_mut().poll(&mut context1), Pending);
+        assert_eq!(read2.as_mut().poll(&mut context2), Pending);
 
         let mut select = pin!(system.select());
-        assert_eq!(select.as_mut().poll(&mut context), Pending);
-        assert!(!wake_flag.is_woken());
+        let mut context3 = Context::from_waker(Waker::noop());
+        assert_eq!(select.as_mut().poll(&mut context3), Pending);
+        assert!(!wake_flag1.is_woken());
+        assert!(!wake_flag2.is_woken());
 
-        // Write data to the pipe to make the read ready
-        let write_buffer = [1, 2, 3, 4];
+        // Write data to the pipe to make the reads ready
         system
-            .write(write_fd, &write_buffer)
+            .write(write_fd, &[1, 2, 3, 4])
             .now_or_never()
             .unwrap()
             .unwrap();
-        assert_eq!(select.as_mut().poll(&mut context), Ready(()));
-        assert!(wake_flag.is_woken());
+        assert_eq!(select.as_mut().poll(&mut context3), Ready(()));
+        assert!(wake_flag1.is_woken());
+        assert!(wake_flag2.is_woken());
+    }
 
-        let wake_flag = Arc::new(WakeFlag::new());
-        let waker = Waker::from(wake_flag.clone());
-        let mut context = Context::from_waker(&waker);
-        assert_eq!(read.poll(&mut context), Ready(Ok(4)));
-        assert!(!wake_flag.is_woken());
+    #[test]
+    fn select_wakes_only_read_tasks_with_ready_fd() {
+        let system = Rc::new(Concurrent::new(VirtualSystem::new()));
+        let (read_fd1, write_fd1) = system.pipe().unwrap();
+        let (read_fd2, _write_fd2) = system.pipe().unwrap();
+
+        let mut buffer1 = [0; 4];
+        let mut buffer2 = [0; 4];
+        let mut read1 = pin!(system.read(read_fd1, &mut buffer1));
+        let mut read2 = pin!(system.read(read_fd2, &mut buffer2));
+
+        let wake_flag1 = Arc::new(WakeFlag::new());
+        let wake_flag2 = Arc::new(WakeFlag::new());
+        let waker1 = Waker::from(wake_flag1.clone());
+        let waker2 = Waker::from(wake_flag2.clone());
+        let mut context1 = Context::from_waker(&waker1);
+        let mut context2 = Context::from_waker(&waker2);
+        assert_eq!(read1.as_mut().poll(&mut context1), Pending);
+        assert_eq!(read2.as_mut().poll(&mut context2), Pending);
+
+        let mut select = pin!(system.select());
+        let mut context3 = Context::from_waker(Waker::noop());
+        assert_eq!(select.as_mut().poll(&mut context3), Pending);
+        assert!(!wake_flag1.is_woken());
+        assert!(!wake_flag2.is_woken());
+
+        // Write data to the first pipe to make the first read ready
+        system
+            .write(write_fd1, &[1, 2, 3, 4])
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_eq!(select.as_mut().poll(&mut context3), Ready(()));
+        assert!(wake_flag1.is_woken());
+        assert!(!wake_flag2.is_woken());
     }
 
     #[test]
@@ -562,33 +605,85 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        let buffer = [1, 2, 3, 4];
-        let mut write = pin!(system.write(write_fd, &buffer));
+        let buffer1 = [1, 2, 3, 4];
+        let buffer2 = [5, 6, 7, 8];
+        let mut write1 = pin!(system.write(write_fd, &buffer1));
+        let mut write2 = pin!(system.write(write_fd, &buffer2));
 
-        let wake_flag = Arc::new(WakeFlag::new());
-        let waker = Waker::from(wake_flag.clone());
-        let mut context = Context::from_waker(&waker);
-        assert_eq!(write.as_mut().poll(&mut context), Pending);
+        let wake_flag1 = Arc::new(WakeFlag::new());
+        let wake_flag2 = Arc::new(WakeFlag::new());
+        let waker1 = Waker::from(wake_flag1.clone());
+        let waker2 = Waker::from(wake_flag2.clone());
+        let mut context1 = Context::from_waker(&waker1);
+        let mut context2 = Context::from_waker(&waker2);
+        assert_eq!(write1.as_mut().poll(&mut context1), Pending);
+        assert_eq!(write2.as_mut().poll(&mut context2), Pending);
 
         let mut select = pin!(system.select());
-        assert_eq!(select.as_mut().poll(&mut context), Pending);
-        assert!(!wake_flag.is_woken());
+        let mut context3 = Context::from_waker(Waker::noop());
+        assert_eq!(select.as_mut().poll(&mut context3), Pending);
+        assert!(!wake_flag1.is_woken());
+        assert!(!wake_flag2.is_woken());
 
-        // Make space in the pipe buffer to make the write ready
+        // Make space in the pipe buffer to make the writes ready
         let mut read_buffer = [0; PIPE_SIZE];
         system
             .read(read_fd, &mut read_buffer)
             .now_or_never()
             .unwrap()
             .unwrap();
-        assert_eq!(select.as_mut().poll(&mut context), Ready(()));
-        assert!(wake_flag.is_woken());
+        assert_eq!(select.as_mut().poll(&mut context3), Ready(()));
+        assert!(wake_flag1.is_woken());
+        assert!(wake_flag2.is_woken());
+    }
 
-        let wake_flag = Arc::new(WakeFlag::new());
-        let waker = Waker::from(wake_flag.clone());
-        let mut context = Context::from_waker(&waker);
-        assert_eq!(write.poll(&mut context), Ready(Ok(4)));
-        assert!(!wake_flag.is_woken());
+    #[test]
+    fn select_wakes_only_write_tasks_with_ready_fd() {
+        let system = Rc::new(Concurrent::new(VirtualSystem::new()));
+        let (read_fd1, write_fd1) = system.pipe().unwrap();
+        let (_read_fd2, write_fd2) = system.pipe().unwrap();
+        // Fill the pipe buffers to make the next writes pending
+        system
+            .write(write_fd1, &[0; PIPE_SIZE])
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        system
+            .write(write_fd2, &[0; PIPE_SIZE])
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        let buffer1 = [1, 2, 3, 4];
+        let buffer2 = [5, 6, 7, 8];
+        let mut write1 = pin!(system.write(write_fd1, &buffer1));
+        let mut write2 = pin!(system.write(write_fd2, &buffer2));
+
+        let wake_flag1 = Arc::new(WakeFlag::new());
+        let wake_flag2 = Arc::new(WakeFlag::new());
+        let waker1 = Waker::from(wake_flag1.clone());
+        let waker2 = Waker::from(wake_flag2.clone());
+        let mut context1 = Context::from_waker(&waker1);
+        let mut context2 = Context::from_waker(&waker2);
+        assert_eq!(write1.as_mut().poll(&mut context1), Pending);
+        assert_eq!(write2.as_mut().poll(&mut context2), Pending);
+
+        let mut select = pin!(system.select());
+        let mut context3 = Context::from_waker(Waker::noop());
+        assert_eq!(select.as_mut().poll(&mut context3), Pending);
+        assert!(!wake_flag1.is_woken());
+        assert!(!wake_flag2.is_woken());
+
+        // Make space in the pipe buffer to make the write ready
+        let mut read_buffer = [0; PIPE_SIZE];
+        system
+            .read(read_fd1, &mut read_buffer)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_eq!(select.as_mut().poll(&mut context3), Ready(()));
+        assert!(wake_flag1.is_woken());
+        assert!(!wake_flag2.is_woken());
     }
 
     #[test]
@@ -874,6 +969,4 @@ mod tests {
 
         assert_eq!(**wait.now_or_never().unwrap(), &[SIGINT]);
     }
-
-    // TODO all_tasks_for_same_fd_wake_on_same_select
 }
