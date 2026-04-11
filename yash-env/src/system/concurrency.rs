@@ -296,7 +296,6 @@ where
             .inner
             .select(&mut readers, &mut writers, timeout, signal_mask)
             .await;
-        // TODO Handle EBADF
 
         wake_tasks_for_ready_fds(&mut state.reads, &readers);
         wake_tasks_for_ready_fds(&mut state.writes, &writers);
@@ -410,10 +409,11 @@ mod signal;
 
 #[cfg(test)]
 mod tests {
-    use super::super::{Mode, OfdAccess, Open, OpenFlag, Pipe as _};
+    use super::super::{
+        Close as _, Disposition, Mode, OfdAccess, Open as _, OpenFlag, Pipe as _, SendSignal,
+    };
     use super::*;
     use crate::system::r#virtual::{PIPE_SIZE, SIGCHLD, SIGINT, SIGUSR2, VirtualSystem};
-    use crate::system::{Disposition, SendSignal};
     use crate::test_helper::WakeFlag;
     use crate::trap::SignalSystem as _;
     use assert_matches::assert_matches;
@@ -968,5 +968,53 @@ mod tests {
         assert!(!wake_select.is_woken());
 
         assert_eq!(**wait.now_or_never().unwrap(), &[SIGINT]);
+    }
+
+    #[test]
+    fn select_wakes_all_reads_and_writes_on_ebadf() {
+        let system = Rc::new(Concurrent::new(VirtualSystem::new()));
+        let (read_fd1, _write_fd1) = system.pipe().unwrap();
+        let (_read_fd2, write_fd2) = system.pipe().unwrap();
+        // Fill the pipe buffer to make the next write pending
+        system
+            .write(write_fd2, &[0; PIPE_SIZE])
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        let mut read_buffer = [0; 4];
+        let mut read = pin!(system.read(read_fd1, &mut read_buffer));
+        let mut write = pin!(system.write(write_fd2, &[1, 2, 3, 4]));
+
+        let wake_flag1 = Arc::new(WakeFlag::new());
+        let wake_flag2 = Arc::new(WakeFlag::new());
+        let waker1 = Waker::from(wake_flag1.clone());
+        let waker2 = Waker::from(wake_flag2.clone());
+        let mut context1 = Context::from_waker(&waker1);
+        let mut context2 = Context::from_waker(&waker2);
+        assert_eq!(read.as_mut().poll(&mut context1), Pending);
+        assert_eq!(write.as_mut().poll(&mut context2), Pending);
+
+        let mut select = pin!(system.select());
+
+        let wake_select = Arc::new(WakeFlag::new());
+        let select_waker = Waker::from(wake_select.clone());
+        let mut select_context = Context::from_waker(&select_waker);
+        assert_eq!(select.as_mut().poll(&mut select_context), Pending);
+        assert!(!wake_flag1.is_woken());
+        assert!(!wake_flag2.is_woken());
+        assert!(!wake_select.is_woken());
+
+        // Close the file descriptor to make the select call return EBADF
+        system.close(read_fd1).unwrap();
+        assert!(wake_select.is_woken());
+
+        let wake_select = Arc::new(WakeFlag::new());
+        let select_waker = Waker::from(wake_select.clone());
+        let mut select_context = Context::from_waker(&select_waker);
+        assert_eq!(select.as_mut().poll(&mut select_context), Ready(()));
+        assert!(wake_flag1.is_woken());
+        assert!(wake_flag2.is_woken());
+        assert!(!wake_select.is_woken());
     }
 }
