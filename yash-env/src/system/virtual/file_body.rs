@@ -188,19 +188,16 @@ impl FileBody {
         {
             if is_readable {
                 *readers -= 1;
-                if *readers == 0 {
-                    // Let writers know that there are no readers,
-                    // so they can return an error instead of blocking.
-                    pending_write_wakers.wake_all();
-                }
             }
             if is_writable {
                 *writers -= 1;
-                if *writers == 0 {
-                    // Let readers know that there are no writers,
-                    // so they can return EOF instead of blocking.
-                    pending_read_wakers.wake_all();
-                }
+            }
+            if *readers == 0 || *writers == 0 {
+                // If there are no readers or no writers, all pending read and
+                // write wakers should be woken up, since the read and write
+                // operations no longer block (either EOF or error).
+                pending_read_wakers.wake_all();
+                pending_write_wakers.wake_all();
             }
         }
     }
@@ -538,49 +535,57 @@ mod tests {
     }
 
     #[test]
-    fn fifo_file_body_wakes_pending_read_wakers_if_no_writers_remain() {
-        let wake_flag = Arc::new(WakeFlag::new());
-        let waker = Rc::new(Cell::new(Some(Waker::from(wake_flag.clone()))));
+    fn fifo_file_body_wakes_pending_wakers_if_no_writers_remain() {
+        let wake_flag_1 = Arc::new(WakeFlag::new());
+        let wake_flag_2 = Arc::new(WakeFlag::new());
+        let waker_1 = Rc::new(Cell::new(Some(Waker::from(wake_flag_1.clone()))));
+        let waker_2 = Rc::new(Cell::new(Some(Waker::from(wake_flag_2.clone()))));
         let mut body = FileBody::Fifo {
             content: VecDeque::new(),
             readers: 1,
             writers: 2,
             pending_open_wakers: WakerSet::new(),
-            pending_read_wakers: WakerSet::from_iter([Rc::downgrade(&waker)]),
-            pending_write_wakers: WakerSet::new(),
+            pending_read_wakers: WakerSet::from_iter([Rc::downgrade(&waker_1)]),
+            pending_write_wakers: WakerSet::from_iter([Rc::downgrade(&waker_2)]),
         };
 
         // One writer is closed, but there is still another writer,
-        // so the pending read waker should not be woken up.
+        // so the pending wakers should not be woken up.
         body.close(false, true);
-        assert!(!wake_flag.is_woken());
+        assert!(!wake_flag_1.is_woken());
+        assert!(!wake_flag_2.is_woken());
 
-        // The other writer is closed, so the pending read waker should be woken up.
+        // The other writer is closed, so the pending wakers should be woken up.
         body.close(false, true);
-        assert!(wake_flag.is_woken());
+        assert!(wake_flag_1.is_woken());
+        assert!(wake_flag_2.is_woken());
     }
 
     #[test]
-    fn fifo_file_body_wakes_pending_write_wakers_if_no_readers_remain() {
-        let wake_flag = Arc::new(WakeFlag::new());
-        let waker = Rc::new(Cell::new(Some(Waker::from(wake_flag.clone()))));
+    fn fifo_file_body_wakes_pending_wakers_if_no_readers_remain() {
+        let wake_flag_1 = Arc::new(WakeFlag::new());
+        let wake_flag_2 = Arc::new(WakeFlag::new());
+        let waker_1 = Rc::new(Cell::new(Some(Waker::from(wake_flag_1.clone()))));
+        let waker_2 = Rc::new(Cell::new(Some(Waker::from(wake_flag_2.clone()))));
         let mut body = FileBody::Fifo {
             content: VecDeque::new(),
             readers: 2,
             writers: 1,
             pending_open_wakers: WakerSet::new(),
-            pending_read_wakers: WakerSet::new(),
-            pending_write_wakers: WakerSet::from_iter([Rc::downgrade(&waker)]),
+            pending_read_wakers: WakerSet::from_iter([Rc::downgrade(&waker_1)]),
+            pending_write_wakers: WakerSet::from_iter([Rc::downgrade(&waker_2)]),
         };
 
         // One reader is closed, but there is still another reader,
-        // so the pending write waker should not be woken up.
+        // so the pending wakers should not be woken up.
         body.close(true, false);
-        assert!(!wake_flag.is_woken());
+        assert!(!wake_flag_1.is_woken());
+        assert!(!wake_flag_2.is_woken());
 
-        // The other reader is closed, so the pending write waker should be woken up.
+        // The other reader is closed, so the pending wakers should be woken up.
         body.close(true, false);
-        assert!(wake_flag.is_woken());
+        assert!(wake_flag_1.is_woken());
+        assert!(wake_flag_2.is_woken());
     }
 
     #[test]
