@@ -288,7 +288,9 @@ where
             .timeouts
             .next_wake_time()
             .map(|target| target.saturating_duration_since(self.inner.now()));
-        let signal_mask = state.select_mask.as_deref();
+        let signal_mask = (state.signals.strong_count() > 0)
+            .then(|| state.select_mask.as_deref())
+            .flatten();
 
         let _ = self
             .inner
@@ -693,6 +695,39 @@ mod tests {
         let mut context = Context::from_waker(&waker);
         assert_matches!(wait.poll(&mut context), Ready(signals) => {
             assert_matches!(***signals, [SIGINT, SIGCHLD] | [SIGCHLD, SIGINT]);
+        });
+    }
+
+    #[test]
+    fn select_does_not_consume_caught_signals_until_tasks_are_waiting_for_signals() {
+        let system = Rc::new(Concurrent::new(VirtualSystem::new()));
+        let (read_fd, write_fd) = system.pipe().unwrap();
+        system
+            .set_disposition(SIGCHLD, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        system.raise(SIGCHLD).now_or_never().unwrap().unwrap();
+
+        let mut buffer = [0; 4];
+        let mut read = pin!(system.read(read_fd, &mut buffer));
+
+        let mut null_context = Context::from_waker(Waker::noop());
+        assert_eq!(read.as_mut().poll(&mut null_context), Pending);
+
+        system
+            .write(write_fd, b"foo")
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        system.select().now_or_never().unwrap();
+
+        let mut wait = pin!(system.wait_for_signals());
+        assert_eq!(wait.as_mut().poll(&mut null_context), Pending);
+
+        system.select().now_or_never().unwrap();
+        assert_matches!(wait.poll(&mut null_context), Ready(signals) => {
+            assert_eq!(**signals, &[SIGCHLD]);
         });
     }
 
