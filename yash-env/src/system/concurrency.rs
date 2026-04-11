@@ -318,7 +318,8 @@ where
                 let set_result = signal_list.0.set(signals);
                 debug_assert_eq!(set_result, Ok(()), "SignalList should not be filled yet");
                 state.catches.wake_all();
-                // TODO Should clear state.signals
+                // Drop the list so that the next wait_for_signals call can create a new one.
+                state.signals = Weak::new();
             }
         }
     }
@@ -728,6 +729,41 @@ mod tests {
         system.select().now_or_never().unwrap();
         assert_matches!(wait.poll(&mut null_context), Ready(signals) => {
             assert_eq!(**signals, &[SIGCHLD]);
+        });
+    }
+
+    #[test]
+    fn wait_for_signals_can_be_used_many_times() {
+        let system = Rc::new(Concurrent::new(VirtualSystem::new()));
+        system
+            .set_disposition(SIGINT, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        system
+            .set_disposition(SIGCHLD, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        let mut wait1 = pin!(system.wait_for_signals());
+        let mut null_context = Context::from_waker(Waker::noop());
+        assert_eq!(wait1.as_mut().poll(&mut null_context), Pending);
+
+        system.raise(SIGCHLD).now_or_never().unwrap().unwrap();
+        system.select().now_or_never().unwrap();
+
+        let mut wait2 = pin!(system.wait_for_signals());
+        assert_eq!(wait2.as_mut().poll(&mut null_context), Pending);
+
+        system.raise(SIGINT).now_or_never().unwrap().unwrap();
+        system.select().now_or_never().unwrap();
+
+        assert_matches!(wait1.poll(&mut null_context), Ready(signals) => {
+            assert_eq!(**signals, &[SIGCHLD]);
+        });
+        assert_matches!(wait2.poll(&mut null_context), Ready(signals) => {
+            assert_eq!(**signals, &[SIGINT]);
         });
     }
 
