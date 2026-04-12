@@ -273,7 +273,20 @@ where
 {
     /// Waits for any of pending tasks to become ready.
     ///
-    /// TODO
+    /// This method performs a `select` system call with the file descriptors
+    /// and timeout of pending tasks, and wakes the tasks whose events are
+    /// ready. This method should be called in the main loop of the process to
+    /// ensure that tasks can make progress. In a typical use case, the main
+    /// loop would look like this:
+    ///
+    /// ```ignore
+    /// loop {
+    ///     // Run ready tasks until they yield again
+    ///     run_ready_tasks();
+    ///     // Wait for any pending task to become ready
+    ///     concurrent.select().await;
+    /// }
+    /// ```
     #[allow(clippy::await_holding_refcell_ref)]
     pub async fn select(&self) {
         // In this method, we keep the borrow of `state` across the `await` point. This is
