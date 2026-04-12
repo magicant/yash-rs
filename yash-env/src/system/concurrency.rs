@@ -110,7 +110,7 @@ where
         let this = Rc::clone(self);
         async move {
             let this = TemporaryNonBlockingGuard::new(&this, fd);
-            let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
+            let waker = LazyCell::default();
             loop {
                 match this.inner.read(fd, buffer).await {
                     // EWOULDBLOCK is unreachable if it has the same value as EAGAIN.
@@ -216,7 +216,7 @@ where
     /// The returned future will be pending until the specified deadline is
     /// reached, at which point it will complete.
     pub async fn sleep_until(&self, deadline: Instant) {
-        let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
+        let waker: LazyCell<Rc<Cell<Option<Waker>>>> = LazyCell::default();
         poll_fn(|context| {
             if self.inner.now() >= deadline {
                 Ready(())
@@ -269,7 +269,7 @@ impl<S> Concurrent<S> {
             })
         };
 
-        let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
+        let waker: LazyCell<Rc<Cell<Option<Waker>>>> = LazyCell::default();
         poll_fn(|context| {
             if signals.0.get().is_some() {
                 Ready(())

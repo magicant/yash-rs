@@ -19,9 +19,8 @@
 use super::{Concurrent, TemporaryNonBlockingGuard};
 use crate::io::Fd;
 use crate::system::{Errno, Fcntl, Read, Write};
-use std::cell::{Cell, LazyCell};
+use std::cell::LazyCell;
 use std::iter::repeat_n;
-use std::rc::Rc;
 
 impl<S> Concurrent<S>
 where
@@ -37,7 +36,7 @@ where
     /// append to.
     pub async fn read_all_to(&self, fd: Fd, buffer: &mut Vec<u8>) -> Result<(), Errno> {
         let this = TemporaryNonBlockingGuard::new(self, fd);
-        let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
+        let waker = LazyCell::default();
         let mut effective_length = buffer.len();
         loop {
             // The `read` method requires an initialized buffer, so we reserve
@@ -96,7 +95,7 @@ where
         }
 
         let this = TemporaryNonBlockingGuard::new(self, fd);
-        let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
+        let waker = LazyCell::default();
         loop {
             match this.inner.write(fd, data).await {
                 // EWOULDBLOCK is unreachable if it has the same value as EAGAIN.
