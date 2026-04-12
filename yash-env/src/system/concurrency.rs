@@ -26,7 +26,7 @@ use std::ops::{Deref, DerefMut};
 use std::rc::{Rc, Weak};
 use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Decorator for systems that makes blocking I/O operations concurrency-friendly
 ///
@@ -211,13 +211,11 @@ impl<S> Concurrent<S>
 where
     S: Clock,
 {
-    /// Waits for the specified duration to elapse.
+    /// Waits until the specified deadline.
     ///
-    /// The returned future will be pending until the specified duration has
-    /// elapsed, at which point it will complete.
-    pub async fn sleep(&self, duration: Duration) {
-        let now = self.inner.now();
-        let deadline = now + duration;
+    /// The returned future will be pending until the specified deadline is
+    /// reached, at which point it will complete.
+    pub async fn sleep_until(&self, deadline: Instant) {
         let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
         poll_fn(|context| {
             if self.inner.now() >= deadline {
@@ -232,6 +230,16 @@ where
             }
         })
         .await
+    }
+
+    /// Waits for the specified duration to elapse.
+    ///
+    /// The returned future will be pending until the specified duration has
+    /// elapsed, at which point it will complete.
+    pub async fn sleep(&self, duration: Duration) {
+        let now = self.inner.now();
+        let deadline = now + duration;
+        self.sleep_until(deadline).await;
     }
 }
 
@@ -458,7 +466,6 @@ mod tests {
     use std::sync::Arc;
     use std::task::Poll::{Pending, Ready};
     use std::task::{Context, Waker};
-    use std::time::Instant;
 
     #[test]
     fn select_with_no_conditions_never_completes() {
