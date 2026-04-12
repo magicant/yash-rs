@@ -282,6 +282,7 @@ where
         // return.
         let mut state = self.state.borrow_mut();
 
+        // Prepare parameters for the `select` call based on the current state
         let mut readers = state.reads.keys().cloned().collect();
         let mut writers = state.writes.keys().cloned().collect();
         let timeout = state
@@ -292,13 +293,21 @@ where
             .then(|| state.select_mask.as_deref())
             .flatten();
 
-        let _ = self
+        // Perform the `select` call
+        let result = self
             .inner
             .select(&mut readers, &mut writers, timeout, signal_mask)
             .await;
 
-        wake_tasks_for_ready_fds(&mut state.reads, &readers);
-        wake_tasks_for_ready_fds(&mut state.writes, &writers);
+        // Wake eligible tasks
+        if result != Err(Errno::EINTR) {
+            // If `select` succeeded, `readers` and `writers` contain the lists of ready FDs. In
+            // case of error, `select` leaves the input lists unmodified (which is required by
+            // POSIX), but we don't know which FD caused the error, so we conservatively wake all
+            // tasks waiting for any FD.
+            wake_tasks_for_ready_fds(&mut state.reads, &readers);
+            wake_tasks_for_ready_fds(&mut state.writes, &writers);
+        }
         if timeout.is_some() {
             state.timeouts.wake(self.inner.now());
         }
@@ -1016,5 +1025,53 @@ mod tests {
         assert!(wake_flag1.is_woken());
         assert!(wake_flag2.is_woken());
         assert!(!wake_select.is_woken());
+    }
+
+    #[test]
+    fn select_does_not_wake_reads_or_writes_on_eintr() {
+        // Prepare a system and a pipe
+        let system = Rc::new(Concurrent::new(VirtualSystem::new()));
+        let (read_fd1, _write_fd1) = system.pipe().unwrap();
+        let (_read_fd2, write_fd2) = system.pipe().unwrap();
+        // Fill the pipe buffer to make the next write pending
+        system
+            .write(write_fd2, &[0; PIPE_SIZE])
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        system
+            .set_disposition(SIGUSR2, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        let mut read_buffer = [0; 4];
+        let mut read = pin!(system.read(read_fd1, &mut read_buffer));
+        let mut write = pin!(system.write(write_fd2, &[1]));
+        let mut wait = pin!(system.wait_for_signals());
+
+        let wake_flag1 = Arc::new(WakeFlag::new());
+        let wake_flag2 = Arc::new(WakeFlag::new());
+        let wake_flag3 = Arc::new(WakeFlag::new());
+        let waker1 = Waker::from(wake_flag1.clone());
+        let waker2 = Waker::from(wake_flag2.clone());
+        let waker3 = Waker::from(wake_flag3.clone());
+        let mut context1 = Context::from_waker(&waker1);
+        let mut context2 = Context::from_waker(&waker2);
+        let mut context3 = Context::from_waker(&waker3);
+        assert_eq!(read.as_mut().poll(&mut context1), Pending);
+        assert_eq!(write.as_mut().poll(&mut context2), Pending);
+        assert_eq!(wait.as_mut().poll(&mut context3), Pending);
+        assert!(!wake_flag1.is_woken());
+        assert!(!wake_flag2.is_woken());
+        assert!(!wake_flag3.is_woken());
+
+        system.raise(SIGUSR2).now_or_never().unwrap().unwrap();
+
+        let mut select_fut = pin!(system.select());
+        let mut context4 = Context::from_waker(Waker::noop());
+        assert_eq!(select_fut.as_mut().poll(&mut context4), Ready(()));
+        assert!(!wake_flag1.is_woken());
+        assert!(!wake_flag2.is_woken());
     }
 }
