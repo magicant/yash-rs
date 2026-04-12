@@ -25,6 +25,7 @@ use std::future::poll_fn;
 use std::ops::{Deref, DerefMut};
 use std::rc::{Rc, Weak};
 use std::task::Poll::{Pending, Ready};
+use std::task::Waker;
 use std::time::Duration;
 
 /// Decorator for systems that makes blocking I/O operations concurrency-friendly
@@ -115,23 +116,7 @@ where
                     // EWOULDBLOCK is unreachable if it has the same value as EAGAIN.
                     #[allow(unreachable_patterns)]
                     Err(Errno::EAGAIN | Errno::EWOULDBLOCK) => {
-                        let mut first_time = true;
-                        poll_fn(|context| {
-                            if first_time {
-                                first_time = false;
-                                waker.set(Some(context.waker().clone()));
-                                this.state
-                                    .borrow_mut()
-                                    .reads
-                                    .entry(fd)
-                                    .or_default()
-                                    .insert(Rc::downgrade(&waker));
-                                Pending
-                            } else {
-                                Ready(())
-                            }
-                        })
-                        .await
+                        this.yield_for_read(fd, &waker).await
                     }
 
                     result => return result,
@@ -162,35 +147,63 @@ where
         let this = Rc::clone(self);
         async move {
             let this = TemporaryNonBlockingGuard::new(&this, fd);
-            let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
+            let waker = LazyCell::default();
             loop {
                 match this.inner.write(fd, buffer).await {
                     // EWOULDBLOCK is unreachable if it has the same value as EAGAIN.
                     #[allow(unreachable_patterns)]
                     Err(Errno::EAGAIN | Errno::EWOULDBLOCK) => {
-                        let mut first_time = true;
-                        poll_fn(|context| {
-                            if first_time {
-                                first_time = false;
-                                waker.set(Some(context.waker().clone()));
-                                this.state
-                                    .borrow_mut()
-                                    .writes
-                                    .entry(fd)
-                                    .or_default()
-                                    .insert(Rc::downgrade(&waker));
-                                Pending
-                            } else {
-                                Ready(())
-                            }
-                        })
-                        .await
+                        this.yield_for_write(fd, &waker).await
                     }
 
                     result => return result,
                 }
             }
         }
+    }
+}
+
+impl<S> Concurrent<S> {
+    async fn yield_for_read<F>(&self, fd: Fd, waker: &LazyCell<Rc<Cell<Option<Waker>>>, F>)
+    where
+        F: FnOnce() -> Rc<Cell<Option<Waker>>>,
+    {
+        self.yield_once(fd, waker, |state| &mut state.reads).await
+    }
+
+    async fn yield_for_write<F>(&self, fd: Fd, waker: &LazyCell<Rc<Cell<Option<Waker>>>, F>)
+    where
+        F: FnOnce() -> Rc<Cell<Option<Waker>>>,
+    {
+        self.yield_once(fd, waker, |state| &mut state.writes).await
+    }
+
+    /// Helper method for yielding the current task and registering its waker
+    /// for the specified file descriptor and event type (read or write)
+    async fn yield_once<F, G>(
+        &self,
+        fd: Fd,
+        waker: &LazyCell<Rc<Cell<Option<Waker>>>, F>,
+        target: G,
+    ) where
+        F: FnOnce() -> Rc<Cell<Option<Waker>>>,
+        G: Fn(&mut State) -> &mut HashMap<Fd, WakerSet>,
+    {
+        let mut first_time = true;
+        poll_fn(|context| {
+            if first_time {
+                first_time = false;
+                waker.set(Some(context.waker().clone()));
+                target(&mut self.state.borrow_mut())
+                    .entry(fd)
+                    .or_default()
+                    .insert(Rc::downgrade(waker));
+                Pending
+            } else {
+                Ready(())
+            }
+        })
+        .await
     }
 }
 
@@ -427,6 +440,7 @@ impl SignalList {
 }
 
 mod delegates;
+mod rw_all;
 mod signal;
 
 #[cfg(test)]
@@ -735,8 +749,6 @@ mod tests {
         // (which was set to non-blocking before the write)
         assert_eq!(system.inner.get_and_set_nonblocking(fd, true), Ok(true));
     }
-
-    // TODO write_all_completes_after_writing_all_data
 
     #[test]
     fn sleep_completes_after_duration() {
