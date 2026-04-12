@@ -18,10 +18,10 @@
 
 use super::super::resource::{LimitPair, Resource};
 use super::super::{
-    Chdir, Clock, Close, CpuTimes, Dir, Dup, Exec, Exit, Fcntl, FdFlag, Fstat, GetCwd, GetPid,
-    GetPw, GetRlimit, GetUid, Gid, IsExecutableFile, Isatty, Mode, OfdAccess, Open, OpenFlag, Pipe,
-    Result, Seek, SendSignal, SetPgid, SetRlimit, ShellPath, Signals, Sysconf, TcGetPgrp,
-    TcSetPgrp, Times, Uid, Umask, Wait, signal,
+    Chdir, ChildProcessStarter, Clock, Close, CpuTimes, Dir, Dup, Exec, Exit, Fcntl, FdFlag, Fork,
+    Fstat, GetCwd, GetPid, GetPw, GetRlimit, GetUid, Gid, IsExecutableFile, Isatty, Mode,
+    OfdAccess, Open, OpenFlag, Pipe, Result, Seek, SendSignal, SetPgid, SetRlimit, ShellPath,
+    Signals, Sysconf, TcGetPgrp, TcSetPgrp, Times, Uid, Umask, Wait, signal,
 };
 use super::Concurrent;
 use crate::io::Fd;
@@ -391,6 +391,10 @@ where
     }
 }
 
+// Concurrent<S> cannot implement Fork because the return type of the fork
+// method does not match with that of the inner system S. Instead, Concurrent<S>
+// provides an inherent method `new_child_process` that returns a
+// `ChildProcessStarter<S>` as returned by the inner method.
 // impl<S> Fork for Concurrent<S>
 // where
 //     S: Fork,
@@ -403,6 +407,22 @@ where
 //         todo!()
 //     }
 // }
+
+impl<S> Concurrent<S>
+where
+    S: Fork,
+{
+    /// Creates a new child process.
+    ///
+    /// Returns the `ChildProcessStarter<S>` returned by the inner system's
+    /// [`Fork::new_child_process`] method. This method is an inherent method of
+    /// `Concurrent<S>` instead of an implementation of the `Fork` trait because
+    /// the return type does not match with that of the inner system `S`.
+    #[inline]
+    pub fn new_child_process(&self) -> Result<ChildProcessStarter<S>> {
+        self.inner.new_child_process()
+    }
+}
 
 impl<S> Wait for Concurrent<S>
 where
