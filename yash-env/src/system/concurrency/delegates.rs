@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Trait implementations for `Rc<Concurrent<S>>` that delegate to the inner system `S`
+//! Trait implementations for `Concurrent<S>` that delegate to the inner system `S`
 
 use super::super::resource::{LimitPair, Resource};
 use super::super::{

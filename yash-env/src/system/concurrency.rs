@@ -39,9 +39,9 @@ use std::time::{Duration, Instant};
 /// tasks and wait for them to complete concurrently on a single thread. This
 /// struct also provides methods for waiting for signals and waiting for a
 /// specified duration, which are represented as [`Future`]s as well. The
-/// `select` method of this struct consolidates blocking behavior into a single
-/// system call so that the process can resume execution as soon as any of the
-/// specified events occurs.
+/// [`select`](Self::select) method of this struct consolidates blocking
+/// behavior into a single system call so that the process can resume execution
+/// as soon as any of the specified events occurs.
 ///
 /// For system calls that do not block, such as [`Pipe`], the wrapper directly
 /// forwards the call to the inner system without any modification.
