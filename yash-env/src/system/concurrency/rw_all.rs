@@ -116,6 +116,15 @@ where
             }
         }
     }
+
+    /// Writes the given message to standard error.
+    ///
+    /// This is a convenience method that calls [`write_all`](Self::write_all)
+    /// with [`Fd::STDERR`].
+    #[inline]
+    pub async fn print_error<T: AsRef<[u8]>>(&self, message: T) {
+        _ = self.write_all(Fd::STDERR, message.as_ref()).await
+    }
 }
 
 #[cfg(test)]
