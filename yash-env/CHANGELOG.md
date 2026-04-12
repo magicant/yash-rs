@@ -20,6 +20,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   in the real system implementation.
 - `impl system::Stat for system::real::Stat`
 - `impl system::Stat for system::virtual::Stat`
+- The `system::Concurrent` struct has been added as a wrapper around a `System`
+  implementation to provide concurrent execution of blocking operations. This
+  struct replaces the existing `system::SharedSystem` struct.
 - The `system::virtual::FileBody` enum now has the following methods:
     - `is_seekable`: Returns whether the file supports seeking.
 - The following fields have been added to the `system::virtual::FileBody::Fifo`
