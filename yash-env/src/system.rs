@@ -121,7 +121,7 @@ mod time;
 mod user;
 pub mod r#virtual;
 
-pub use self::concurrency::Concurrent;
+pub use self::concurrency::{Concurrent, SignalList};
 pub use self::errno::Errno;
 pub use self::errno::RawErrno;
 pub use self::errno::Result;
