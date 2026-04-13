@@ -58,7 +58,7 @@ where
                 this.sigmask(SigmaskOp::Add, signal).await?;
             }
 
-            let old_action = this.inner.sigaction(signal, disposition);
+            let old_action = this.inner.sigaction(signal, disposition)?;
 
             if disposition != Disposition::Catch {
                 // After setting the disposition to `Default` or `Ignore`, we need to unblock
@@ -66,7 +66,7 @@ where
                 this.sigmask(SigmaskOp::Remove, signal).await?;
             }
 
-            old_action
+            Ok(old_action)
         }
     }
 }
