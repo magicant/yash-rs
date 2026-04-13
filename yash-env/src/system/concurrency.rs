@@ -424,14 +424,14 @@ impl Deref for SignalList {
     type Target = Vec<crate::signal::Number>;
 
     fn deref(&self) -> &Vec<crate::signal::Number> {
-        // `unwrap` is safe because the list is initialized before being shared with tasks.
+        // `unwrap` is safe because the list is initialized before being made available to the user.
         self.0.get().unwrap()
     }
 }
 
 impl DerefMut for SignalList {
     fn deref_mut(&mut self) -> &mut Vec<crate::signal::Number> {
-        // `unwrap` is safe because the list is initialized before being shared with tasks.
+        // `unwrap` is safe because the list is initialized before being made available to the user.
         self.0.get_mut().unwrap()
     }
 }
@@ -444,7 +444,7 @@ impl SignalList {
 
     /// Consumes the `SignalList` and returns the inner list of signals.
     pub fn into_vec(self) -> Vec<crate::signal::Number> {
-        // `unwrap` is safe because the list is initialized before being shared with tasks.
+        // `unwrap` is safe because the list is initialized before being made available to the user.
         self.0.into_inner().unwrap()
     }
 }
