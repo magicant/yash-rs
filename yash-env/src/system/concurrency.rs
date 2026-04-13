@@ -74,9 +74,11 @@ struct State {
     signals: Weak<SignalList>,
     /// Signal mask for the `select` method
     ///
-    /// This is the mask the shell inherited from the parent shell minus the
-    /// signals the shell wants to catch. The value is `None` until the signal
-    /// mask is first updated by [`Concurrent::sigmask`].
+    /// This cache is initialized from the signal mask the shell inherited from
+    /// the parent shell and then updated by [`Concurrent::sigmask`] for use by
+    /// `select`. In particular, signals the shell wants to catch are removed
+    /// from this mask so they can interrupt `select`. The value is `None` until
+    /// the signal mask is first updated by [`Concurrent::sigmask`].
     select_mask: Option<Vec<crate::signal::Number>>,
 }
 
