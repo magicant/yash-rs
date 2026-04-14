@@ -17,6 +17,7 @@
 //! Items about time
 
 use super::Result;
+use std::rc::Rc;
 use std::time::Instant;
 
 /// Trait for getting the current time
@@ -24,6 +25,14 @@ pub trait Clock {
     /// Returns the current time.
     #[must_use]
     fn now(&self) -> Instant;
+}
+
+/// Delegates the `Clock` trait to the contained instance of `S`
+impl<S: Clock> Clock for Rc<S> {
+    #[inline]
+    fn now(&self) -> Instant {
+        (self as &S).now()
+    }
 }
 
 /// Set of consumed CPU time statistics
@@ -50,4 +59,12 @@ pub trait Times {
     /// This function abstracts the behavior of the
     /// [`times` system call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/times.html).
     fn times(&self) -> Result<CpuTimes>;
+}
+
+/// Delegates the `Times` trait to the contained instance of `S`
+impl<S: Times> Times for Rc<S> {
+    #[inline]
+    fn times(&self) -> Result<CpuTimes> {
+        (self as &S).times()
+    }
 }

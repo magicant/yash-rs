@@ -24,7 +24,7 @@ use std::cell::{Cell, LazyCell};
 use std::ffi::c_int;
 use std::future::poll_fn;
 use std::rc::Rc;
-use std::task::Poll;
+use std::task::{Poll, Waker};
 
 impl Select for VirtualSystem {
     /// Waits for a next event.
@@ -89,7 +89,7 @@ impl Select for VirtualSystem {
                 (old_mask, old_caught_signals, deadline)
             };
 
-            let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
+            let waker: LazyCell<Rc<Cell<Option<Waker>>>> = LazyCell::default();
 
             let result = poll_fn(|context| {
                 let state = &mut *this.state.borrow_mut();
@@ -101,7 +101,6 @@ impl Select for VirtualSystem {
                 // If the process is currently suspended, do nothing until resumed
                 if let ProcessState::Halted(reason) = proc.state() {
                     if reason.is_stopped() {
-                        // let waker = Rc::new(Cell::new(Some(context.waker().clone())));
                         waker.set(Some(context.waker().clone()));
                         proc.wake_on_resumption(Rc::downgrade(&waker));
                         return Poll::Pending;

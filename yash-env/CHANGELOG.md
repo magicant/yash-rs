@@ -20,6 +20,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   in the real system implementation.
 - `impl system::Stat for system::real::Stat`
 - `impl system::Stat for system::virtual::Stat`
+- The `system::Concurrent` struct has been added as a wrapper around a `System`
+  implementation to provide concurrent execution of blocking operations. This
+  struct will replace the existing `system::SharedSystem` struct.
 - The `system::virtual::FileBody` enum now has the following methods:
     - `is_seekable`: Returns whether the file supports seeking.
 - The following fields have been added to the `system::virtual::FileBody::Fifo`
@@ -49,6 +52,41 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `system::virtual::VirtualSystem::get_and_set_nonblocking` method (which
   was previously unimplemented) now actually gets and sets the non-blocking mode
   of the open file description for the given file descriptor.
+- The following trait implementations have been added for `Rc<S>` where `S`
+  implements the corresponding trait:
+    - `CaughtSignals`
+    - `Chdir`
+    - `Clock`
+    - `Close`
+    - `Dup`
+    - `Exec`
+    - `Exit`
+    - `Fcntl`
+    - `Fstat`
+    - `GetCwd`
+    - `GetPid`
+    - `GetPw`
+    - `GetSigaction`
+    - `GetUid`
+    - `IsExecutableFile`
+    - `Isatty`
+    - `Pipe`
+    - `Read`
+    - `Seek`
+    - `Select`
+    - `SetPgid`
+    - `ShellPath`
+    - `Sigaction`
+    - `Sigmask`
+    - `SignalSystem`
+    - `Signals`
+    - `Sysconf`
+    - `TcGetPgrp`
+    - `TcSetPgrp`
+    - `Times`
+    - `Umask`
+    - `Wait`
+    - `Write`
 - The `test_helper` module has been added with items migrated from the
   `yash-env-test-helper` crate. This module is conditionally compiled when the
   new `test-helper` feature is enabled.

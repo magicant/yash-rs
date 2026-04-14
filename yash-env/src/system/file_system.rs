@@ -25,6 +25,7 @@ use enumset::{EnumSet, EnumSetType};
 use std::ffi::CStr;
 use std::fmt::Debug;
 use std::io::SeekFrom;
+use std::rc::Rc;
 
 #[cfg(unix)]
 const RAW_AT_FDCWD: i32 = libc::AT_FDCWD;
@@ -298,6 +299,28 @@ pub trait Fstat {
     }
 }
 
+/// Delegates the `Fstat` trait to the contained instance of `S`
+impl<S: Fstat> Fstat for Rc<S> {
+    type Stat = S::Stat;
+
+    #[inline]
+    fn fstat(&self, fd: Fd) -> Result<S::Stat> {
+        (self as &S).fstat(fd)
+    }
+    #[inline]
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<S::Stat> {
+        (self as &S).fstatat(dir_fd, path, follow_symlinks)
+    }
+    #[inline]
+    fn is_directory(&self, path: &CStr) -> bool {
+        (self as &S).is_directory(path)
+    }
+    #[inline]
+    fn fd_is_pipe(&self, fd: Fd) -> bool {
+        (self as &S).fd_is_pipe(fd)
+    }
+}
+
 /// Trait for checking if a file is executable
 ///
 /// This trait declares the `is_executable_file` method, which checks whether a
@@ -308,6 +331,14 @@ pub trait IsExecutableFile {
     /// Whether there is an executable regular file at the specified path.
     #[must_use]
     fn is_executable_file(&self, path: &CStr) -> bool;
+}
+
+/// Delegates the `IsExecutableFile` trait to the contained instance of `S`
+impl<S: IsExecutableFile> IsExecutableFile for Rc<S> {
+    #[inline]
+    fn is_executable_file(&self, path: &CStr) -> bool {
+        (self as &S).is_executable_file(path)
+    }
 }
 
 /// File access mode of open file descriptions
@@ -397,6 +428,32 @@ pub trait Open {
     fn opendir(&self, path: &CStr) -> Result<impl Dir + use<Self>>;
 }
 
+/// Delegates the `Open` trait to the contained instance of `S`
+impl<S: Open> Open for Rc<S> {
+    #[inline]
+    fn open(
+        &self,
+        path: &CStr,
+        access: OfdAccess,
+        flags: EnumSet<OpenFlag>,
+        mode: Mode,
+    ) -> impl Future<Output = Result<Fd>> + use<S> {
+        (self as &S).open(path, access, flags, mode)
+    }
+    #[inline]
+    fn open_tmpfile(&self, parent_dir: &Path) -> Result<Fd> {
+        (self as &S).open_tmpfile(parent_dir)
+    }
+    #[inline]
+    fn fdopendir(&self, fd: Fd) -> Result<impl Dir + use<S>> {
+        (self as &S).fdopendir(fd)
+    }
+    #[inline]
+    fn opendir(&self, path: &CStr) -> Result<impl Dir + use<S>> {
+        (self as &S).opendir(path)
+    }
+}
+
 /// Trait for seeking within file descriptors
 pub trait Seek {
     /// Moves the position of the open file description.
@@ -405,6 +462,14 @@ pub trait Seek {
     /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/lseek.html).
     /// If successful, returns the new position from the beginning of the file.
     fn lseek(&self, fd: Fd, position: SeekFrom) -> Result<u64>;
+}
+
+/// Delegates the `Seek` trait to the contained instance of `S`
+impl<S: Seek> Seek for Rc<S> {
+    #[inline]
+    fn lseek(&self, fd: Fd, position: SeekFrom) -> Result<u64> {
+        (self as &S).lseek(fd, position)
+    }
 }
 
 /// Trait for getting and setting the file creation mask
@@ -421,6 +486,14 @@ pub trait Umask {
     fn umask(&self, new_mask: Mode) -> Mode;
 }
 
+/// Delegates the `Umask` trait to the contained instance of `S`
+impl<S: Umask> Umask for Rc<S> {
+    #[inline]
+    fn umask(&self, new_mask: Mode) -> Mode {
+        (self as &S).umask(new_mask)
+    }
+}
+
 /// Trait for getting the current working directory
 ///
 /// See also [`Chdir`].
@@ -429,10 +502,26 @@ pub trait GetCwd {
     fn getcwd(&self) -> Result<PathBuf>;
 }
 
+/// Delegates the `GetCwd` trait to the contained instance of `S`
+impl<S: GetCwd> GetCwd for Rc<S> {
+    #[inline]
+    fn getcwd(&self) -> Result<PathBuf> {
+        (self as &S).getcwd()
+    }
+}
+
 /// Trait for changing the current working directory
 ///
 /// See also [`GetCwd`].
 pub trait Chdir {
     /// Changes the working directory.
     fn chdir(&self, path: &CStr) -> Result<()>;
+}
+
+/// Delegates the `Chdir` trait to the contained instance of `S`
+impl<S: Chdir> Chdir for Rc<S> {
+    #[inline]
+    fn chdir(&self, path: &CStr) -> Result<()> {
+        (self as &S).chdir(path)
+    }
 }

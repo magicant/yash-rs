@@ -19,6 +19,7 @@
 use super::Result;
 use crate::path::PathBuf;
 use std::ffi::CStr;
+use std::rc::Rc;
 
 #[cfg(unix)]
 type RawUidDef = libc::uid_t;
@@ -85,6 +86,26 @@ pub trait GetUid {
     fn getegid(&self) -> Gid;
 }
 
+/// Delegates the `GetUid` trait to the contained instance of `S`
+impl<S: GetUid> GetUid for Rc<S> {
+    #[inline]
+    fn getuid(&self) -> Uid {
+        (self as &S).getuid()
+    }
+    #[inline]
+    fn geteuid(&self) -> Uid {
+        (self as &S).geteuid()
+    }
+    #[inline]
+    fn getgid(&self) -> Gid {
+        (self as &S).getgid()
+    }
+    #[inline]
+    fn getegid(&self) -> Gid {
+        (self as &S).getegid()
+    }
+}
+
 /// Trait for getting user information
 ///
 /// This trait declares methods for getting user information. `Pw` in the trait
@@ -95,4 +116,12 @@ pub trait GetPw {
     ///
     /// Returns `Ok(None)` if the user is not found.
     fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>>;
+}
+
+/// Delegates the `GetPw` trait to the contained instance of `S`
+impl<S: GetPw> GetPw for Rc<S> {
+    #[inline]
+    fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
+        (self as &S).getpwnam_dir(name)
+    }
 }

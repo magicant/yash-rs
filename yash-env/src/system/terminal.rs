@@ -17,6 +17,7 @@
 //! Items for controlling terminal devices
 
 use super::{Fd, Pid, Result};
+use std::rc::Rc;
 
 // TODO: Isatty should be a subtrait of TcGetAttr
 /// Trait for testing if a file descriptor is associated with a terminal device
@@ -33,6 +34,14 @@ pub trait Isatty {
     fn isatty(&self, fd: Fd) -> bool;
 }
 
+/// Delegates the `Isatty` trait to the contained instance of `S`
+impl<S: Isatty> Isatty for Rc<S> {
+    #[inline]
+    fn isatty(&self, fd: Fd) -> bool {
+        (self as &S).isatty(fd)
+    }
+}
+
 /// Trait for getting the foreground process group ID of a terminal
 pub trait TcGetPgrp {
     /// Returns the current foreground process group ID.
@@ -46,6 +55,14 @@ pub trait TcGetPgrp {
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid>;
 }
 
+/// Delegates the `TcGetPgrp` trait to the contained instance of `S`
+impl<S: TcGetPgrp> TcGetPgrp for Rc<S> {
+    #[inline]
+    fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
+        (self as &S).tcgetpgrp(fd)
+    }
+}
+
 /// Trait for setting the foreground process group ID of a terminal
 pub trait TcSetPgrp {
     /// Switches the foreground process group.
@@ -56,4 +73,12 @@ pub trait TcSetPgrp {
     /// The virtual system version of this function may block the calling thread
     /// if called in a background process group, hence returning a future.
     fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> + use<Self>;
+}
+
+/// Delegates the `TcSetPgrp` trait to the contained instance of `S`
+impl<S: TcSetPgrp> TcSetPgrp for Rc<S> {
+    #[inline]
+    fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> + use<S> {
+        (self as &S).tcsetpgrp(fd, pgid)
+    }
 }

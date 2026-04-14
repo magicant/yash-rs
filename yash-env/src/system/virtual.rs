@@ -460,7 +460,7 @@ impl VirtualSystem {
     /// This function does nothing if the file is not a FIFO.
     async fn wait_for_fifo_to_become_ready(open_file_description: &OpenFileDescription) {
         // If the file is a FIFO, block until the other end is opened.
-        let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
+        let waker: LazyCell<Rc<Cell<Option<Waker>>>> = LazyCell::default();
         poll_fn(|context| {
             let mut file = open_file_description.file().borrow_mut();
             let FileBody::Fifo {
@@ -745,7 +745,7 @@ impl Read for VirtualSystem {
         let ofd = self.get_open_file_description(fd);
         async move {
             let ofd = ofd?;
-            let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
+            let waker: LazyCell<Rc<Cell<Option<Waker>>>> = LazyCell::default();
             poll_fn(|context| {
                 let get_waker = || {
                     waker.set(Some(context.waker().clone()));
@@ -764,7 +764,7 @@ impl Write for VirtualSystem {
         let ofd = self.get_open_file_description(fd);
         async move {
             let ofd = ofd?;
-            let waker = LazyCell::new(|| Rc::new(Cell::new(None)));
+            let waker: LazyCell<Rc<Cell<Option<Waker>>>> = LazyCell::default();
             poll_fn(|context| {
                 let get_waker = || {
                     waker.set(Some(context.waker().clone()));

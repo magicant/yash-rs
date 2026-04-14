@@ -23,6 +23,7 @@ pub use crate::signal::{Name, Number, RawNumber};
 use std::borrow::Cow;
 use std::num::NonZero;
 use std::ops::RangeInclusive;
+use std::rc::Rc;
 
 /// Trait for managing available signals
 pub trait Signals {
@@ -362,6 +363,84 @@ pub trait Signals {
     }
 }
 
+/// Delegates the `Signals` trait to the contained instance of `S`
+impl<S: Signals> Signals for Rc<S> {
+    const SIGABRT: Number = S::SIGABRT;
+    const SIGALRM: Number = S::SIGALRM;
+    const SIGBUS: Number = S::SIGBUS;
+    const SIGCHLD: Number = S::SIGCHLD;
+    const SIGCLD: Option<Number> = S::SIGCLD;
+    const SIGCONT: Number = S::SIGCONT;
+    const SIGEMT: Option<Number> = S::SIGEMT;
+    const SIGFPE: Number = S::SIGFPE;
+    const SIGHUP: Number = S::SIGHUP;
+    const SIGILL: Number = S::SIGILL;
+    const SIGINFO: Option<Number> = S::SIGINFO;
+    const SIGINT: Number = S::SIGINT;
+    const SIGIO: Option<Number> = S::SIGIO;
+    const SIGIOT: Number = S::SIGIOT;
+    const SIGKILL: Number = S::SIGKILL;
+    const SIGLOST: Option<Number> = S::SIGLOST;
+    const SIGPIPE: Number = S::SIGPIPE;
+    const SIGPOLL: Option<Number> = S::SIGPOLL;
+    const SIGPROF: Number = S::SIGPROF;
+    const SIGPWR: Option<Number> = S::SIGPWR;
+    const SIGQUIT: Number = S::SIGQUIT;
+    const SIGSEGV: Number = S::SIGSEGV;
+    const SIGSTKFLT: Option<Number> = S::SIGSTKFLT;
+    const SIGSTOP: Number = S::SIGSTOP;
+    const SIGSYS: Number = S::SIGSYS;
+    const SIGTERM: Number = S::SIGTERM;
+    const SIGTHR: Option<Number> = S::SIGTHR;
+    const SIGTRAP: Number = S::SIGTRAP;
+    const SIGTSTP: Number = S::SIGTSTP;
+    const SIGTTIN: Number = S::SIGTTIN;
+    const SIGTTOU: Number = S::SIGTTOU;
+    const SIGURG: Number = S::SIGURG;
+    const SIGUSR1: Number = S::SIGUSR1;
+    const SIGUSR2: Number = S::SIGUSR2;
+    const SIGVTALRM: Number = S::SIGVTALRM;
+    const SIGWINCH: Number = S::SIGWINCH;
+    const SIGXCPU: Number = S::SIGXCPU;
+    const SIGXFSZ: Number = S::SIGXFSZ;
+
+    #[inline]
+    fn sigrt_range(&self) -> Option<RangeInclusive<Number>> {
+        (self as &S).sigrt_range()
+    }
+
+    const NAMED_SIGNALS: &'static [(&'static str, Option<Number>)] = S::NAMED_SIGNALS;
+
+    #[inline]
+    fn iter_sigrt(&self) -> impl DoubleEndedIterator<Item = Number> + use<S> {
+        (self as &S).iter_sigrt()
+    }
+    #[inline]
+    fn to_signal_number<N: Into<RawNumber>>(&self, number: N) -> Option<Number> {
+        (self as &S).to_signal_number(number)
+    }
+    #[inline]
+    fn sig2str<N: Into<RawNumber>>(&self, signal: N) -> Option<Cow<'static, str>> {
+        (self as &S).sig2str(signal)
+    }
+    #[inline]
+    fn str2sig(&self, name: &str) -> Option<Number> {
+        (self as &S).str2sig(name)
+    }
+    #[inline]
+    fn validate_signal(&self, number: RawNumber) -> Option<(Name, Number)> {
+        (self as &S).validate_signal(number)
+    }
+    #[inline]
+    fn signal_name_from_number(&self, number: Number) -> Name {
+        (self as &S).signal_name_from_number(number)
+    }
+    #[inline]
+    fn signal_number_from_name(&self, name: Name) -> Option<Number> {
+        (self as &S).signal_number_from_name(name)
+    }
+}
+
 /// Operation applied to the signal blocking mask
 ///
 /// This enum corresponds to the operations of the `sigprocmask` system call and
@@ -407,6 +486,18 @@ pub trait Sigmask: Signals {
     ) -> impl Future<Output = Result<()>> + use<Self>;
 }
 
+/// Delegates the `Sigmask` trait to the contained instance of `S`
+impl<S: Sigmask> Sigmask for Rc<S> {
+    #[inline]
+    fn sigmask(
+        &self,
+        op: Option<(SigmaskOp, &[Number])>,
+        old_mask: Option<&mut Vec<Number>>,
+    ) -> impl Future<Output = Result<()>> + use<S> {
+        (self as &S).sigmask(op, old_mask)
+    }
+}
+
 /// How the shell process responds to a signal
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Disposition {
@@ -440,6 +531,14 @@ pub trait GetSigaction: Signals {
     fn get_sigaction(&self, signal: Number) -> Result<Disposition>;
 }
 
+/// Delegates the `GetSigaction` trait to the contained instance of `S`
+impl<S: GetSigaction> GetSigaction for Rc<S> {
+    #[inline]
+    fn get_sigaction(&self, signal: Number) -> Result<Disposition> {
+        (self as &S).get_sigaction(signal)
+    }
+}
+
 /// Trait for managing signal dispositions
 pub trait Sigaction: GetSigaction {
     /// Gets and sets the disposition for a signal.
@@ -461,6 +560,14 @@ pub trait Sigaction: GetSigaction {
     /// To get the current disposition without changing it, use
     /// [`GetSigaction::get_sigaction`].
     fn sigaction(&self, signal: Number, action: Disposition) -> Result<Disposition>;
+}
+
+/// Delegates the `Sigaction` trait to the contained instance of `S`
+impl<S: Sigaction> Sigaction for Rc<S> {
+    #[inline]
+    fn sigaction(&self, signal: Number, action: Disposition) -> Result<Disposition> {
+        (self as &S).sigaction(signal, action)
+    }
 }
 
 /// Trait for examining signals caught by the process
@@ -495,6 +602,14 @@ pub trait CaughtSignals: Signals {
     fn caught_signals(&self) -> Vec<Number>;
 }
 
+/// Delegates the `CaughtSignals` trait to the contained instance of `S`
+impl<S: CaughtSignals> CaughtSignals for Rc<S> {
+    #[inline]
+    fn caught_signals(&self) -> Vec<Number> {
+        (self as &S).caught_signals()
+    }
+}
+
 /// Trait for sending signals to processes
 pub trait SendSignal: Signals {
     /// Sends a signal.
@@ -525,4 +640,20 @@ pub trait SendSignal: Signals {
     ///
     /// [`VirtualSystem::kill`]: crate::system::virtual::VirtualSystem::kill
     fn raise(&self, signal: Number) -> impl Future<Output = Result<()>> + use<Self>;
+}
+
+/// Delegates the `SendSignal` trait to the contained instance of `S`
+impl<S: SendSignal> SendSignal for Rc<S> {
+    #[inline]
+    fn kill(
+        &self,
+        target: Pid,
+        signal: Option<Number>,
+    ) -> impl Future<Output = Result<()>> + use<S> {
+        (self as &S).kill(target, signal)
+    }
+    #[inline]
+    fn raise(&self, signal: Number) -> impl Future<Output = Result<()>> + use<S> {
+        (self as &S).raise(signal)
+    }
 }

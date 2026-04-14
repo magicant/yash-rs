@@ -103,6 +103,7 @@
 //! concurrently. `RealSystem` implementations return ready futures after the
 //! underlying system calls complete (which may block the current thread).
 
+mod concurrency;
 mod errno;
 mod file_system;
 mod future;
@@ -120,6 +121,7 @@ mod time;
 mod user;
 pub mod r#virtual;
 
+pub use self::concurrency::{Concurrent, SignalList};
 pub use self::errno::Errno;
 pub use self::errno::RawErrno;
 pub use self::errno::Result;
