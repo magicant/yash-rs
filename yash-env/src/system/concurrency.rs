@@ -46,6 +46,15 @@ use std::time::{Duration, Instant};
 /// For system calls that do not block, such as [`Pipe`], the wrapper directly
 /// forwards the call to the inner system without any modification.
 ///
+/// This struct is designed to be used in an `Rc` to allow multiple tasks to
+/// share the same concurrent system. Some traits, such as [`Read`] and
+/// [`Write`], are implemented for `Rc<Concurrent<S>>` instead of
+/// `Concurrent<S>` to allow the methods to return futures that capture a clone
+/// of the `Rc` and keep it alive until the operation is finished. This is
+/// necessary because the futures need to access the internal state of the
+/// `Concurrent` system without capturing a reference to the original
+/// `Concurrent` struct, which may not live long enough.
+///
 /// [`Pipe`]: super::Pipe
 #[derive(Clone, Debug, Default)]
 pub struct Concurrent<S> {
