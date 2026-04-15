@@ -19,9 +19,10 @@
 use super::super::resource::{LimitPair, Resource};
 use super::super::{
     Chdir, ChildProcessStarter, Clock, Close, CpuTimes, Dir, Dup, Exec, Exit, Fcntl, FdFlag, Fork,
-    Fstat, GetCwd, GetPid, GetPw, GetRlimit, GetUid, Gid, IsExecutableFile, Isatty, Mode,
-    OfdAccess, Open, OpenFlag, Pipe, Result, Seek, SendSignal, SetPgid, SetRlimit, ShellPath,
-    Signals, Sysconf, TcGetPgrp, TcSetPgrp, Times, Uid, Umask, Wait, signal,
+    Fstat, GetCwd, GetPid, GetPw, GetRlimit, GetSigaction, GetUid, Gid, IsExecutableFile, Isatty,
+    Mode, OfdAccess, Open, OpenFlag, Pipe, Result, Seek, SendSignal, SetPgid, SetRlimit, ShellPath,
+    Sigaction, Sigmask, SigmaskOp, Signals, Sysconf, TcGetPgrp, TcSetPgrp, Times, Uid, Umask, Wait,
+    signal,
 };
 use super::Concurrent;
 use crate::io::Fd;
@@ -334,6 +335,74 @@ where
     #[inline]
     fn signal_number_from_name(&self, name: signal::Name) -> Option<signal::Number> {
         self.inner.signal_number_from_name(name)
+    }
+}
+
+/// Exposes the inner system's `sigmask` method.
+///
+/// This implementation of `Sigmask` simply delegates to the inner system's
+/// `sigmask` method, which bypasses the internal state of `Concurrent` and may
+/// prevent the [`peek`](Concurrent::peek) and [`select`](Concurrent::select)
+/// methods from responding to received signals without race conditions. To
+/// ensure that the signal mask is configured in a way that allows `Concurrent`
+/// to respond to signals correctly, direct calls to `sigmask` should be
+/// avoided, and, if necessary, only used to temporarily change the signal mask
+/// for specific operations while ensuring that the original mask is restored
+/// afterward before a next call to `peek`, `select`, or `set_disposition`.
+impl<S> Sigmask for Concurrent<S>
+where
+    S: Sigmask,
+{
+    #[inline]
+    fn sigmask(
+        &self,
+        op_and_signals: Option<(SigmaskOp, &[signal::Number])>,
+        old_mask: Option<&mut Vec<signal::Number>>,
+    ) -> impl Future<Output = Result<()>> + use<S> {
+        self.inner.sigmask(op_and_signals, old_mask)
+    }
+}
+
+impl<S> GetSigaction for Concurrent<S>
+where
+    S: GetSigaction,
+{
+    #[inline]
+    fn get_sigaction(&self, signal: signal::Number) -> Result<signal::Disposition> {
+        self.inner.get_sigaction(signal)
+    }
+}
+
+/// Exposes the inner system's `sigaction` method.
+///
+/// This implementation of `Sigaction` simply delegates to the inner system's
+/// `sigaction` method, which bypasses the internal state of `Concurrent` and
+/// may prevent the [`peek`](Concurrent::peek) and
+/// [`select`](Concurrent::select) methods from responding to received signals
+/// without race conditions. To ensure that signal dispositions are configured
+/// in a way that allows `Concurrent` to respond to signals correctly, direct
+/// calls to `sigaction` should be avoided, and, if necessary, only used to
+/// temporarily change the signal disposition for specific operations while
+/// ensuring that the original disposition is restored afterward before a next
+/// call to `peek`, `select`, or `set_disposition`.
+///
+/// The standard way to set a signal disposition to `Concurrent` is to use the
+/// `set_disposition` method provided by the [`SignalSystem`] trait, which
+/// ensures that the signal disposition and the signal mask are updated
+/// consistently.
+///
+/// [`SignalSystem`]: crate::trap::SignalSystem
+impl<S> Sigaction for Concurrent<S>
+where
+    S: Sigaction,
+{
+    #[inline]
+    fn sigaction(
+        &self,
+        signal: signal::Number,
+        disposition: signal::Disposition,
+    ) -> Result<signal::Disposition> {
+        self.inner.sigaction(signal, disposition)
     }
 }
 
