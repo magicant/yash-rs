@@ -496,7 +496,7 @@ mod tests {
 
     #[test]
     fn select_with_no_conditions_never_completes() {
-        let system = Rc::new(Concurrent::new(VirtualSystem::new()));
+        let system = Concurrent::new(VirtualSystem::new());
 
         let future = pin!(system.select());
 
@@ -790,7 +790,7 @@ mod tests {
         let state = system.state.clone();
         let now = Instant::now();
         state.borrow_mut().now = Some(now);
-        let system = Rc::new(Concurrent::new(system));
+        let system = Concurrent::new(system);
 
         let mut sleep = pin!(system.sleep(Duration::from_secs(1)));
 
