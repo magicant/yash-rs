@@ -146,6 +146,12 @@ A _private dependency_ is used internally and not visible to downstream users.
 - Private dependency versions:
     - derive_more 2.0.1 → 2.1.0
 
+### Deprecated
+
+- `system::virtual::SystemState::select_all`: This method is no longer necessary
+  because virtual processes are now automatically woken up when they are ready
+  to make progress.
+
 ### Removed
 
 - The `system::virtual::FileBody::Fifo` variant no longer has the `awaiters`

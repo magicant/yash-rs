@@ -82,7 +82,6 @@ where
             }
         }
         shared_system.select(false).unwrap();
-        SystemState::select_all(&state);
     }
 }
 

@@ -1444,6 +1444,16 @@ impl SystemState {
     ///
     /// The `RefCell` must not have been borrowed, or this function will panic
     /// with a double borrow.
+    ///
+    /// # Deprecation
+    ///
+    /// This function is deprecated because it is no longer necessary. Virtual
+    /// processes are now automatically woken up when they are ready to make
+    /// progress, so there is no need to manually call `select` on them.
+    #[deprecated(
+        note = "you no longer need to call this function manually",
+        since = "0.13.0"
+    )]
     pub fn select_all(this: &RefCell<Self>) {
         use std::task::{Context, Poll, Waker};
         let mut selectors = Vec::new();
@@ -1456,7 +1466,6 @@ impl SystemState {
         // dropping the borrow for `this`
         let mut context = Context::from_waker(Waker::noop());
         for selector in selectors {
-            // TODO merge advances of `now` performed by each select
             let mut future = std::pin::pin!(SelectSystem::select(&selector, false));
             if let Poll::Ready(result) = future.as_mut().poll(&mut context) {
                 result.ok();
