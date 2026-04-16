@@ -406,11 +406,19 @@ where
     }
 }
 
-// Sigmask, GetSigaction, Sigaction, and CaughtSignals are not implemented for Concurrent<S>
-// because Concurrent needs to control the signal dispositions and the signal mask itself to
-// ensure that the select method can respond to received signals without race conditions.
-// Instead, Concurrent<S> implements the SignalSystem trait, which provides the necessary
+// CaughtSignals is not implemented for Concurrent<S> because Concurrent needs to
+// control the signal dispositions and the signal mask itself to ensure that the
+// select method can respond to received signals without race conditions. Instead,
+// Concurrent<S> implements the SignalSystem trait, which provides the necessary
 // methods for configuring signal dispositions and masks in a controlled manner.
+//
+// Note: Sigmask, GetSigaction, and Sigaction are implemented above as delegating
+// implementations. However, direct calls to sigmask() and sigaction() bypass
+// Concurrent's internal state and may prevent peek() and select() from responding
+// to received signals without race conditions. To ensure correct behavior, use the
+// set_disposition method from the SignalSystem trait instead. If direct sigmask or
+// sigaction calls are necessary, temporarily change the mask/disposition and restore
+// it afterward before calling peek(), select(), or set_disposition().
 
 impl<S> SendSignal for Concurrent<S>
 where
