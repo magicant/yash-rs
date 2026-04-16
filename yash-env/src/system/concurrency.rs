@@ -25,7 +25,7 @@ use std::future::poll_fn;
 use std::ops::{Deref, DerefMut};
 use std::rc::{Rc, Weak};
 use std::task::Poll::{Pending, Ready};
-use std::task::Waker;
+use std::task::{Context, Waker};
 use std::time::{Duration, Instant};
 
 /// Decorator for systems that makes blocking I/O operations concurrency-friendly
@@ -45,6 +45,15 @@ use std::time::{Duration, Instant};
 ///
 /// For system calls that do not block, such as [`Pipe`], the wrapper directly
 /// forwards the call to the inner system without any modification.
+///
+/// This struct is designed to be used in an `Rc` to allow multiple tasks to
+/// share the same concurrent system. Some traits, such as [`Read`] and
+/// [`Write`], are implemented for `Rc<Concurrent<S>>` instead of
+/// `Concurrent<S>` to allow the methods to return futures that capture a clone
+/// of the `Rc` and keep it alive until the operation is finished. This is
+/// necessary because the futures need to access the internal state of the
+/// `Concurrent` system without capturing a reference to the original
+/// `Concurrent` struct, which may not live long enough.
 ///
 /// [`Pipe`]: super::Pipe
 #[derive(Clone, Debug, Default)]
@@ -294,6 +303,18 @@ impl<S> Concurrent<S>
 where
     S: CaughtSignals + Clock + Select,
 {
+    /// Peeks for any ready events without blocking.
+    ///
+    /// This method performs a `select` system call with the file descriptors
+    /// and timeout of pending tasks, and wakes the tasks whose events are
+    /// ready. This method is similar to [`select`](Concurrent::select), but it
+    /// does not block and returns immediately.
+    pub fn peek(&self) {
+        let select = std::pin::pin!(self.select_impl(true));
+        let poll = select.poll(&mut Context::from_waker(Waker::noop()));
+        debug_assert_eq!(poll, Ready(()), "peek should not block");
+    }
+
     /// Waits for any of pending tasks to become ready.
     ///
     /// This method performs a `select` system call with the file descriptors
@@ -310,8 +331,12 @@ where
     ///     concurrent.select().await;
     /// }
     /// ```
-    #[allow(clippy::await_holding_refcell_ref)]
     pub async fn select(&self) {
+        self.select_impl(false).await;
+    }
+
+    #[allow(clippy::await_holding_refcell_ref)]
+    async fn select_impl(&self, peek: bool) {
         // In this method, we keep the borrow of `state` across the `await` point. This is
         // intentional because the real `select` call blocks the entire process, so there cannot
         // be any other task that modifies the state while we are waiting for the `select` call to
@@ -321,10 +346,14 @@ where
         // Prepare parameters for the `select` call based on the current state
         let mut readers = state.reads.keys().cloned().collect();
         let mut writers = state.writes.keys().cloned().collect();
-        let timeout = state
-            .timeouts
-            .next_wake_time()
-            .map(|target| target.saturating_duration_since(self.inner.now()));
+        let timeout = if peek {
+            Some(Duration::ZERO)
+        } else {
+            state
+                .timeouts
+                .next_wake_time()
+                .map(|target| target.saturating_duration_since(self.inner.now()))
+        };
         let signal_mask = (state.signals.strong_count() > 0)
             .then(|| state.select_mask.as_deref())
             .flatten();
@@ -344,7 +373,7 @@ where
             wake_tasks_for_ready_fds(&mut state.reads, &readers);
             wake_tasks_for_ready_fds(&mut state.writes, &writers);
         }
-        if timeout.is_some() {
+        if !state.timeouts.is_empty() {
             state.timeouts.wake(self.inner.now());
         }
         if let Some(signal_list) = state.signals.upgrade() {
@@ -467,11 +496,16 @@ mod tests {
     use std::pin::pin;
     use std::sync::Arc;
     use std::task::Poll::{Pending, Ready};
-    use std::task::{Context, Waker};
+
+    #[test]
+    fn peek_with_no_conditions_returns_immediately() {
+        let system = Concurrent::new(VirtualSystem::new());
+        system.peek();
+    }
 
     #[test]
     fn select_with_no_conditions_never_completes() {
-        let system = Rc::new(Concurrent::new(VirtualSystem::new()));
+        let system = Concurrent::new(VirtualSystem::new());
 
         let future = pin!(system.select());
 
@@ -765,7 +799,7 @@ mod tests {
         let state = system.state.clone();
         let now = Instant::now();
         state.borrow_mut().now = Some(now);
-        let system = Rc::new(Concurrent::new(system));
+        let system = Concurrent::new(system);
 
         let mut sleep = pin!(system.sleep(Duration::from_secs(1)));
 
@@ -1107,5 +1141,48 @@ mod tests {
         assert_eq!(select_fut.as_mut().poll(&mut context4), Ready(()));
         assert!(!wake_flag1.is_woken());
         assert!(!wake_flag2.is_woken());
+    }
+
+    #[test]
+    fn signal_wait_is_made_ready_by_peek_after_caught() {
+        let system = Rc::new(Concurrent::new(VirtualSystem::new()));
+        system
+            .set_disposition(SIGINT, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        system
+            .set_disposition(SIGCHLD, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        system
+            .set_disposition(SIGUSR2, Disposition::Catch)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        let mut wait = pin!(system.wait_for_signals());
+
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Waker::from(wake_flag.clone());
+        let mut context = Context::from_waker(&waker);
+        assert_eq!(wait.as_mut().poll(&mut context), Pending);
+
+        system.peek();
+        assert!(!wake_flag.is_woken());
+
+        // Send signals to make the wait ready
+        system.raise(SIGINT).now_or_never().unwrap().unwrap();
+        system.raise(SIGCHLD).now_or_never().unwrap().unwrap();
+        system.peek();
+        assert!(wake_flag.is_woken());
+
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Waker::from(wake_flag.clone());
+        let mut context = Context::from_waker(&waker);
+        assert_matches!(wait.poll(&mut context), Ready(signals) => {
+            assert_matches!(***signals, [SIGINT, SIGCHLD] | [SIGCHLD, SIGINT]);
+        });
     }
 }

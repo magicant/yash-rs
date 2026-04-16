@@ -20,6 +20,7 @@
 //! getting and setting resource limits.
 
 use super::Result;
+use std::rc::Rc;
 
 #[cfg(unix)]
 type RawLimit = libc::rlim_t;
@@ -154,6 +155,13 @@ pub trait GetRlimit {
     fn getrlimit(&self, resource: Resource) -> Result<LimitPair>;
 }
 
+impl<S: GetRlimit> GetRlimit for Rc<S> {
+    #[inline]
+    fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
+        (self as &S).getrlimit(resource)
+    }
+}
+
 pub trait SetRlimit {
     /// Sets the limits for the specified resource.
     ///
@@ -161,4 +169,11 @@ pub trait SetRlimit {
     ///
     /// This is a thin wrapper around the `setrlimit` system call.
     fn setrlimit(&self, resource: Resource, limits: LimitPair) -> Result<()>;
+}
+
+impl<S: SetRlimit> SetRlimit for Rc<S> {
+    #[inline]
+    fn setrlimit(&self, resource: Resource, limits: LimitPair) -> Result<()> {
+        (self as &S).setrlimit(resource, limits)
+    }
 }

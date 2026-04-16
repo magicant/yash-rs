@@ -44,7 +44,12 @@ where
     ///
     /// This implementation both updates the signal disposition and the signal
     /// mask to ensure that the [`select`](Concurrent::select) method can
-    /// respond to received signals without race conditions.
+    /// respond to received signals without race conditions. Specifically:
+    ///
+    /// - When setting the disposition to `Default` or `Ignore`, the signal is
+    ///   unblocked to allow it to be delivered as soon as possible.
+    /// - When setting the disposition to `Catch`, the signal is blocked so that
+    ///   it is only delivered inside the `select` method.
     fn set_disposition(
         &self,
         signal: Number,
@@ -55,7 +60,8 @@ where
             if disposition == Disposition::Catch {
                 // Before setting the disposition to `Catch`, we need to block the signal
                 // to prevent it from being delivered before the disposition is updated.
-                this.sigmask(SigmaskOp::Add, signal).await?;
+                this.update_sigmask_and_select_mask(SigmaskOp::Add, signal)
+                    .await?;
             }
 
             let old_action = this.inner.sigaction(signal, disposition)?;
@@ -63,7 +69,8 @@ where
             if disposition != Disposition::Catch {
                 // After setting the disposition to `Default` or `Ignore`, we need to unblock
                 // the signal to allow it to be delivered if it was previously blocked.
-                this.sigmask(SigmaskOp::Remove, signal).await?;
+                this.update_sigmask_and_select_mask(SigmaskOp::Remove, signal)
+                    .await?;
             }
 
             Ok(old_action)
@@ -77,7 +84,11 @@ where
 {
     /// Wrapper of the inner system's [`Sigmask::sigmask`] method that also
     /// updates the `select_mask` field.
-    async fn sigmask(&self, op: SigmaskOp, signal: Number) -> Result<(), Errno> {
+    async fn update_sigmask_and_select_mask(
+        &self,
+        op: SigmaskOp,
+        signal: Number,
+    ) -> Result<(), Errno> {
         let mut old_mask = Vec::new();
         self.inner
             .sigmask(Some((op, &[signal])), Some(&mut old_mask))
@@ -179,7 +190,7 @@ mod tests {
     }
 
     #[test]
-    fn first_sigmask_updates_blocking_mask() {
+    fn first_update_sigmask_and_select_mask_updates_blocking_mask() {
         let inner = VirtualSystem::new();
         _ = inner
             .current_process_mut()
@@ -187,7 +198,7 @@ mod tests {
         let system = Rc::new(Concurrent::new(inner.clone()));
 
         let result = system
-            .sigmask(SigmaskOp::Add, SIGTERM)
+            .update_sigmask_and_select_mask(SigmaskOp::Add, SIGTERM)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Ok(()));
@@ -201,7 +212,7 @@ mod tests {
     }
 
     #[test]
-    fn first_sigmask_sets_select_mask() {
+    fn first_update_sigmask_and_select_mask_sets_select_mask() {
         let inner = VirtualSystem::new();
         _ = inner
             .current_process_mut()
@@ -209,7 +220,7 @@ mod tests {
         let system = Rc::new(Concurrent::new(inner.clone()));
 
         system
-            .sigmask(SigmaskOp::Add, SIGTERM)
+            .update_sigmask_and_select_mask(SigmaskOp::Add, SIGTERM)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -221,11 +232,11 @@ mod tests {
 
     #[ignore = "current VirtualSystem::sigmask silently ignores invalid signals"]
     #[test]
-    fn first_sigmask_leaves_select_mask_unchanged_on_error() {
+    fn first_update_sigmask_and_select_mask_leaves_select_mask_unchanged_on_error() {
         let system = Rc::new(Concurrent::new(VirtualSystem::new()));
         let invalid_signal = Number::from_raw_unchecked(NonZero::new(-1).unwrap());
         let result = system
-            .sigmask(SigmaskOp::Add, invalid_signal)
+            .update_sigmask_and_select_mask(SigmaskOp::Add, invalid_signal)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Err(Errno::EINVAL));
@@ -233,7 +244,7 @@ mod tests {
     }
 
     #[test]
-    fn second_sigmask_updates_select_mask() {
+    fn second_update_sigmask_and_select_mask_updates_select_mask() {
         let inner = VirtualSystem::new();
         _ = inner
             .current_process_mut()
@@ -241,12 +252,12 @@ mod tests {
         let system = Rc::new(Concurrent::new(inner.clone()));
 
         system
-            .sigmask(SigmaskOp::Add, SIGTERM)
+            .update_sigmask_and_select_mask(SigmaskOp::Add, SIGTERM)
             .now_or_never()
             .unwrap()
             .unwrap();
         system
-            .sigmask(SigmaskOp::Remove, SIGQUIT)
+            .update_sigmask_and_select_mask(SigmaskOp::Remove, SIGQUIT)
             .now_or_never()
             .unwrap()
             .unwrap();
