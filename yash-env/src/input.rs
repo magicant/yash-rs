@@ -121,6 +121,9 @@ pub use memory::Memory;
 mod fd_reader;
 pub use fd_reader::FdReader;
 
+mod fd_reader_2;
+pub use fd_reader_2::FdReader2;
+
 mod echo;
 pub use echo::Echo;
 
