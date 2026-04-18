@@ -31,6 +31,14 @@
 //! [`RealSystem`] provides an implementation for them that interacts with
 //! the underlying system. [`VirtualSystem`] simulates a system for testing
 //! purposes.
+//!
+//! We assume that the shell process is single-threaded. This means that the
+//! shell process itself must not create threads, and all interactions with the
+//! system must be performed in the main thread. Using any items in this crate
+//! in a multi-threaded context is not supported and may cause undefined
+//! behavior. This prerequisite still applies even when a [`VirtualSystem`]
+//! simulates concurrent execution of multiple processes, which run as
+//! asynchronous tasks.
 
 use self::alias::AliasSet;
 use self::any::DataSet;

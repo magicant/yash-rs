@@ -23,6 +23,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `system::Concurrent` struct has been added as a wrapper around a `System`
   implementation to provide concurrent execution of blocking operations. This
   struct will replace the existing `system::SharedSystem` struct.
+- The `select_async` method has been added to the `system::SharedSystem` struct.
 - The `system::virtual::FileBody` enum now has the following methods:
     - `is_seekable`: Returns whether the file supports seeking.
 - The following fields have been added to the `system::virtual::FileBody::Fifo`
@@ -90,6 +91,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `test_helper` module has been added with items migrated from the
   `yash-env-test-helper` crate. This module is conditionally compiled when the
   new `test-helper` feature is enabled.
+- The `system::virtual::Executor` trait is now implemented for
+  the `yash_executor::Spawner` type, allowing it to be used as an executor for
+  the virtual system.
 - Private dependencies:
     - assert_matches (optional) 1.5.0
     - futures-executor (optional) 0.3.31
@@ -143,6 +147,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   to perform operations that may require borrowing the system's state again.
 - The `is_ready_for_reading` and `is_ready_for_writing` methods of
   `system::virtual::OpenFileDescription` now return `true` for symbolic links.
+- The `test_helper::in_virtual_system` function now internally uses nested loops
+  with two executors to better simulate the concurrent execution of the shell
+  processes.
 - Private dependency versions:
     - derive_more 2.0.1 → 2.1.0
 

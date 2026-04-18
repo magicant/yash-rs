@@ -380,6 +380,26 @@ impl<S> SharedSystem<S> {
         }
     }
 
+    /// Waits for a next event to occur.
+    ///
+    /// This function calls [`Select::select`] with arguments computed from the
+    /// current internal state of the `SharedSystem`. It will wake up tasks
+    /// waiting for the file descriptor to be ready in
+    /// [`read_async`](Self::read_async) and [`write_all`](Self::write_all) or
+    /// for a signal to be caught in [`wait_for_signal`](Self::wait_for_signal).
+    /// If no tasks are woken for FDs or signals and `poll` is false, this
+    /// function simulates blocking by returning `Pending` from the returned
+    /// future until the first task waiting for a specific time point is woken.
+    ///
+    /// This function may wake up a task even if the condition it is expecting
+    /// has not yet been met.
+    pub async fn select_async(&self) -> Result<()>
+    where
+        S: Select + CaughtSignals + Clock,
+    {
+        SelectSystem::select(&self.0, false).await
+    }
+
     /// Creates a new child process.
     ///
     /// See [`Fork::new_child_process`] for details.

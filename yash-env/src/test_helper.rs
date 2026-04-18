@@ -42,6 +42,26 @@ impl Executor for LocalExecutor {
     }
 }
 
+/// Allows `Spawner` to be used as an `Executor` in the virtual system.
+///
+/// Remember that `yash_executor::Spawner` is for single-threaded processes.
+/// It is not safe to use it in a multi-threaded context, e.g. by spawning a
+/// task that creates threads and uses wakers from the executor in those
+/// threads.
+impl<'a> Executor for yash_executor::Spawner<'a> {
+    fn spawn(
+        &self,
+        task: Pin<Box<dyn Future<Output = ()>>>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // SAFETY: Actually this is not safe if the task creates a thread and
+        // a waker from the executor is used in the thread. However, the shell
+        // process must be single-threaded to work correctly, so we assume the
+        // task does not create threads.
+        (unsafe { self.spawn_pinned(task) })
+            .map_err(|_| "failed to spawn task: the executor has been dropped".into())
+    }
+}
+
 /// Runs an asynchronous function in a virtual system with a local executor.
 ///
 /// This function creates a [`VirtualSystem`] and installs a [`LocalExecutor`]
@@ -63,25 +83,47 @@ where
 {
     let system = VirtualSystem::new();
     let state = Rc::clone(&system.state);
-    let mut executor = futures_executor::LocalPool::new();
-    state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
+    let global_executor = yash_executor::Executor::new();
+    state.borrow_mut().executor = Some(Rc::new(global_executor.spawner()));
 
     let env = Env::with_system(system);
-    let shared_system = env.system.clone();
+    let selector = env.system.clone();
     let task = f(env, Rc::clone(&state));
-    let mut task = executor.spawner().spawn_local_with_handle(task).unwrap();
+
+    // Wrap the task in a loop that performs `select` to drive the executor
+    // until the task completes. This simulates the main loop of the shell
+    // process.
+    let task = async move {
+        let local_executor = yash_executor::Executor::new();
+        // SAFETY: Actually this is not safe if the task creates a thread and
+        // a waker from the executor is used in the thread. However, the shell
+        // process must be single-threaded to work correctly, so we assume the
+        // task does not create threads.
+        let mut result_future = unsafe { local_executor.spawn(task) };
+        loop {
+            local_executor.run_until_stalled();
+            if let Some(result) = (&mut result_future).now_or_never() {
+                return result;
+            }
+            selector.select_async().await.ok();
+        }
+    };
+
+    // SAFETY: The same as above.
+    let mut task = unsafe { global_executor.spawn(task) };
+
+    // The outer, global executor allows the task to spawn child processes that
+    // are run concurrently with the main task.
     loop {
+        global_executor.run_until_stalled();
         if let Some(result) = (&mut task).now_or_never() {
             return result;
         }
-        executor.run_until_stalled();
-        {
-            let mut state = state.borrow_mut();
-            if let Some(next_wake_time) = state.scheduled_wakers.next_wake_time() {
-                state.advance_time(next_wake_time);
-            }
+
+        let mut state = state.borrow_mut();
+        if let Some(next_wake_time) = state.scheduled_wakers.next_wake_time() {
+            state.advance_time(next_wake_time);
         }
-        shared_system.select(false).unwrap();
     }
 }
 
