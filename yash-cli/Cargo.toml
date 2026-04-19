@@ -28,7 +28,6 @@ path = "src/main.rs"
 thiserror = { workspace = true }
 yash-builtin = { workspace = true }
 yash-env = { workspace = true }
-yash-executor = { workspace = true }
 yash-prompt = { workspace = true }
 yash-semantics = { workspace = true }
 yash-syntax = { workspace = true }
