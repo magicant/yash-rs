@@ -109,6 +109,7 @@ use std::num::NonZero;
 use std::ops::RangeInclusive;
 use std::os::unix::ffi::OsStrExt as _;
 use std::os::unix::io::IntoRawFd;
+use std::pin::{Pin, pin};
 use std::ptr::NonNull;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering;
@@ -999,23 +1000,41 @@ impl Fork for RealSystem {
         // Child process
         Ok(Box::new(|env, task| {
             let system = env.system.clone();
-            // Here we create a new executor to run the task. This makes sure that any
-            // other concurrent tasks in the parent process do not interfere with the
-            // child process.
-            let executor = Executor::new();
-            let task = Box::pin(async move { match task(env).await {} });
-            // SAFETY: We never create new threads in the whole process, so wakers are
-            // never shared between threads.
-            unsafe { executor.spawn_pinned(task) }
-            loop {
-                executor.run_until_stalled();
-
-                let select_future = std::pin::pin!(system.select());
-                let poll = select_future.poll(&mut Context::from_waker(Waker::noop()));
-                debug_assert_eq!(poll, Poll::Ready(()));
-            }
+            run_loop(&system, task(env))
         }))
     }
+}
+
+/// Runs the task in the current process using [`Executor`].
+///
+/// This function implements the main loop of the shell process. It runs the
+/// given task while also calling [`select`](super::Concurrent::select) to
+/// handle signals and other events. The task is expected to call `exit` when it
+/// finishes, so this function never returns.
+///
+/// The task must not spawn any thread because the executor is not thread-safe.
+pub fn run_loop<F>(system: &super::Concurrent<RealSystem>, task: F) -> !
+where
+    F: Future<Output = Infallible>,
+{
+    fn inner(
+        system: &super::Concurrent<RealSystem>,
+        task: Pin<Box<dyn Future<Output = ()> + '_>>,
+    ) -> ! {
+        let executor = Executor::new();
+        // SAFETY: We never create new threads in the whole process, so wakers are
+        // never shared between threads.
+        unsafe { executor.spawn_pinned(task) }
+        loop {
+            executor.run_until_stalled();
+
+            let select_future = pin!(system.select());
+            let poll = select_future.poll(&mut Context::from_waker(Waker::noop()));
+            debug_assert_eq!(poll, Poll::Ready(()));
+        }
+    }
+
+    inner(system, Box::pin(async move { match task.await {} }))
 }
 
 impl Wait for RealSystem {
