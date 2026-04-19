@@ -436,7 +436,7 @@ impl<S> Env<S> {
         // We need to set the internal disposition before calling `wait` so we don't
         // miss any `SIGCHLD` that may arrive between `wait` and `wait_for_signal`.
         self.traps
-            .enable_internal_disposition_for_sigchld(&mut self.system)
+            .enable_internal_disposition_for_sigchld(&self.system)
             .await?;
 
         loop {
@@ -638,7 +638,7 @@ mod tests {
         in_virtual_system(|mut env, state| async move {
             env.traps
                 .set_action(
-                    &mut env.system,
+                    &env.system,
                     SIGCHLD,
                     Action::Command("".into()),
                     Location::dummy(""),
@@ -664,7 +664,7 @@ mod tests {
         let mut env = Env::with_system(system.clone());
         env.traps
             .set_action(
-                &mut env.system,
+                &env.system,
                 SIGCHLD,
                 Action::Command("".into()),
                 Location::dummy(""),

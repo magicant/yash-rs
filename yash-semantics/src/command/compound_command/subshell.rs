@@ -213,7 +213,7 @@ mod tests {
             Box::pin(async move {
                 env.traps
                     .set_action(
-                        &mut env.system,
+                        &env.system,
                         yash_env::trap::Condition::Exit,
                         yash_env::trap::Action::Command("echo exiting".into()),
                         Location::dummy(""),

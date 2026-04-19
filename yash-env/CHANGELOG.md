@@ -106,6 +106,16 @@ A _private dependency_ is used internally and not visible to downstream users.
     - The return type is now
       `impl Future<Output = Result<Disposition, Errno>> + use<Self>` instead of
       `Result<Disposition, Errno>`, making the method async.
+- The following methods of `trap::TrapSet` now take `&S` instead of `&mut S` for
+  the system parameter:
+    - `disable_internal_dispositions`
+    - `disable_internal_dispositions_for_stoppers`
+    - `disable_internal_dispositions_for_terminators`
+    - `enable_internal_disposition_for_sigchld`
+    - `enable_internal_dispositions_for_terminators`
+    - `enable_internal_dispositions_for_stoppers`
+    - `enter_subshell`
+    - `set_action`
 - The following `trap::TrapSet` methods are now async:
     - `set_action`
     - `enter_subshell`

@@ -268,7 +268,7 @@ impl FdSpec {
         }
     }
 
-    fn close<S: Close>(self, system: &mut S) {
+    fn close<S: Close>(self, system: &S) {
         match self {
             FdSpec::Owned(fd) => {
                 let _ = system.close(fd);
@@ -560,7 +560,7 @@ where
     if let Some(fd) = fd_spec.as_fd() {
         if fd != target_fd {
             let dup_result = env.system.dup2(fd, target_fd);
-            fd_spec.close(&mut env.system);
+            fd_spec.close(&env.system);
             match dup_result {
                 Ok(new_fd) => assert_eq!(new_fd, target_fd),
                 Err(errno) => {

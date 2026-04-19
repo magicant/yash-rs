@@ -144,7 +144,7 @@ pub async fn replace_current_process<S: Exec + ShellPath + Signals + Sigmask + S
     args: Vec<Field>,
 ) -> std::result::Result<Infallible, ReplaceCurrentProcessError> {
     env.traps
-        .disable_internal_dispositions(&mut env.system)
+        .disable_internal_dispositions(&env.system)
         .await
         .ok();
 
@@ -153,7 +153,7 @@ pub async fn replace_current_process<S: Exec + ShellPath + Signals + Sigmask + S
     let Err(errno) = env.system.execve(path.as_c_str(), &args, &envs).await;
     env.exit_status = match errno {
         Errno::ENOEXEC => {
-            fall_back_on_sh(&mut env.system, path.clone(), args, envs).await;
+            fall_back_on_sh(&env.system, path.clone(), args, envs).await;
             ExitStatus::NOEXEC
         }
         Errno::ENOENT | Errno::ENOTDIR => ExitStatus::NOT_FOUND,
@@ -175,7 +175,7 @@ fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
 
 /// Invokes the shell with the given arguments.
 async fn fall_back_on_sh<S: ShellPath + Exec>(
-    system: &mut S,
+    system: &S,
     mut script_path: CString,
     mut args: Vec<CString>,
     envs: Vec<CString>,

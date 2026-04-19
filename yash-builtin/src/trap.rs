@@ -580,7 +580,7 @@ mod tests {
         let args = Field::dummies(["", "TERM"]);
         let _ = main(&mut env, args).now_or_never().unwrap();
         env.traps
-            .enter_subshell(&mut env.system, false, false)
+            .enter_subshell(&env.system, false, false)
             .now_or_never()
             .unwrap();
 
@@ -601,7 +601,7 @@ mod tests {
         let args = Field::dummies(["", "TERM"]);
         let _ = main(&mut env, args).now_or_never().unwrap();
         env.traps
-            .enter_subshell(&mut env.system, false, false)
+            .enter_subshell(&env.system, false, false)
             .now_or_never()
             .unwrap();
         let args = Field::dummies(["ls", "QUIT"]);

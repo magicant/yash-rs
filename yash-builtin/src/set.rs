@@ -81,11 +81,11 @@ where
 {
     if env.options.get(Interactive) == State::On && env.options.get(Monitor) == State::On {
         env.traps
-            .enable_internal_dispositions_for_stoppers(&mut env.system)
+            .enable_internal_dispositions_for_stoppers(&env.system)
             .await
     } else {
         env.traps
-            .disable_internal_dispositions_for_stoppers(&mut env.system)
+            .disable_internal_dispositions_for_stoppers(&env.system)
             .await
     }
     .ok();
