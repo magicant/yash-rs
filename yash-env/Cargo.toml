@@ -21,10 +21,10 @@ targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
 [features]
 default = []
 test-helper = [
-    "assert_matches",
-    "dep:yash-executor",
-    "futures-executor",
-    "futures-util",
+  "assert_matches",
+  "dep:yash-executor",
+  "futures-executor",
+  "futures-util",
 ]
 
 [dependencies]
