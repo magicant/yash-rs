@@ -59,6 +59,7 @@ use self::stack::Stack;
 use self::system::CaughtSignals;
 use self::system::Clock;
 use self::system::Close;
+use self::system::Concurrent;
 use self::system::Dup;
 use self::system::Errno;
 use self::system::Fstat;
@@ -73,6 +74,7 @@ use self::system::Select;
 pub use self::system::SharedSystem;
 use self::system::Sigaction;
 use self::system::Sigmask;
+use self::system::SignalList;
 use self::system::Signals;
 #[allow(deprecated)]
 pub use self::system::System;
@@ -162,7 +164,7 @@ pub struct Env<S> {
     pub any: DataSet,
 
     /// Interface to the system-managed parts of the environment
-    pub system: SharedSystem<S>,
+    pub system: Rc<Concurrent<S>>,
 }
 
 impl<S> Env<S> {
@@ -191,7 +193,7 @@ impl<S> Env<S> {
             tty: Default::default(),
             variables: Default::default(),
             any: Default::default(),
-            system: SharedSystem::new(system),
+            system: Rc::new(Concurrent::new(system)),
         }
     }
 
@@ -217,7 +219,7 @@ impl<S> Env<S> {
             tty: self.tty,
             variables: self.variables.clone(),
             any: self.any.clone(),
-            system: SharedSystem::new(system),
+            system: Rc::new(Concurrent::new(system)),
         }
     }
 }
@@ -268,7 +270,7 @@ impl<S> Env<S> {
     /// Before the function returns, it passes the results to
     /// [`TrapSet::catch_signal`] so the trap set can remember the signals
     /// caught to be handled later.
-    pub async fn wait_for_signals(&mut self) -> Rc<[signal::Number]> {
+    pub async fn wait_for_signals(&mut self) -> Rc<SignalList> {
         let result = self.system.wait_for_signals().await;
         for signal in result.iter().copied() {
             self.traps.catch_signal(signal);
@@ -289,24 +291,30 @@ impl<S> Env<S> {
     /// This function is similar to
     /// [`wait_for_signals`](Self::wait_for_signals) but does not wait for
     /// signals to be caught. Instead, it only checks if any signals have been
-    /// caught but not yet consumed in the [`SharedSystem`].
-    pub fn poll_signals(&mut self) -> Option<Rc<[signal::Number]>>
+    /// caught but not yet consumed in the [`SharedSystem`]. If no signals
+    /// have been caught, it returns `None`.
+    pub fn poll_signals(&mut self) -> Option<Rc<SignalList>>
     where
         S: Select + CaughtSignals + Clock,
     {
-        let system = self.system.clone();
+        let system = Rc::clone(&self.system);
 
         let mut future = std::pin::pin!(self.wait_for_signals());
-
         let mut context = Context::from_waker(Waker::noop());
+
+        // Check if the result is ready before peeking the system
         if let Poll::Ready(signals) = future.as_mut().poll(&mut context) {
             return Some(signals);
         }
 
-        system.select(true).ok();
+        // Peek to handle any pending signals
+        system.peek();
+
+        // Check again if the result is ready after peeking
         if let Poll::Ready(signals) = future.poll(&mut context) {
             return Some(signals);
         }
+
         None
     }
 
@@ -694,7 +702,7 @@ mod tests {
         }
 
         let result = env.poll_signals().unwrap();
-        assert_eq!(*result, [SIGCHLD]);
+        assert_eq!(result.as_slice(), [SIGCHLD]);
     }
 
     #[test]

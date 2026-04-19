@@ -156,7 +156,7 @@ where
         // Read from the standard input byte by byte so that we don't consume
         // more than one character.
         let byte = std::slice::from_mut(&mut buffer[len]);
-        let count = env.system.read_async(Fd::STDIN, byte).await?;
+        let count = env.system.read(Fd::STDIN, byte).await?;
         if count == 0 {
             // End of input
             return if len == 0 {

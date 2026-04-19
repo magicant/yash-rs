@@ -30,6 +30,7 @@ use self::startup::init_file::run_rcfile;
 use self::startup::input::prepare_input;
 use std::cell::RefCell;
 use std::ops::ControlFlow::{Break, Continue};
+use std::task::{Context, Poll, Waker};
 use yash_env::Env;
 use yash_env::RealSystem;
 use yash_env::option::{Interactive, On};
@@ -157,6 +158,9 @@ pub fn main() -> ! {
     unsafe { executor.spawn_pinned(task) }
     loop {
         executor.run_until_stalled();
-        system.select(false).ok();
+
+        let select_future = std::pin::pin!(system.select());
+        let poll = select_future.poll(&mut Context::from_waker(Waker::noop()));
+        debug_assert_eq!(poll, Poll::Ready(()));
     }
 }

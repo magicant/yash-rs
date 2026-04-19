@@ -113,6 +113,9 @@ use std::ptr::NonNull;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering;
 use std::sync::atomic::compiler_fence;
+use std::task::Context;
+use std::task::Poll;
+use std::task::Waker;
 use std::time::Duration;
 use std::time::Instant;
 use yash_executor::Executor;
@@ -1006,7 +1009,10 @@ impl Fork for RealSystem {
             unsafe { executor.spawn_pinned(task) }
             loop {
                 executor.run_until_stalled();
-                system.select(false).ok();
+
+                let select_future = std::pin::pin!(system.select());
+                let poll = select_future.poll(&mut Context::from_waker(Waker::noop()));
+                debug_assert_eq!(poll, Poll::Ready(()));
             }
         }))
     }

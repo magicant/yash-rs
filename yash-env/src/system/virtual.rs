@@ -1153,11 +1153,6 @@ impl Fork for VirtualSystem {
             let system = VirtualSystem { state, process_id };
             let mut child_env = parent_env.clone_with_system(system.clone());
 
-            {
-                let mut process = system.current_process_mut();
-                process.selector = Rc::downgrade(&child_env.system.0);
-            }
-
             let run_task_and_set_exit_status = Box::pin(async move {
                 let runner = ProcessRunner {
                     task: task(&mut child_env),
@@ -2888,7 +2883,7 @@ mod tests {
         system.sigaction(SIGCHLD, Disposition::Catch).unwrap();
 
         let child_process = system.new_child_process().unwrap();
-
+        let system2 = system.clone();
         let mut env = Env::with_system(system);
         let _pid = child_process(
             &mut env,
@@ -2896,7 +2891,7 @@ mod tests {
         );
         executor.run_until_stalled();
 
-        assert_eq!(env.system.caught_signals(), [SIGCHLD]);
+        assert_eq!(system2.current_process().caught_signals, [SIGCHLD]);
     }
 
     #[test]
@@ -2987,7 +2982,7 @@ mod tests {
         system.sigaction(SIGCHLD, Disposition::Catch).unwrap();
 
         let child_process = system.new_child_process().unwrap();
-
+        let system2 = system.clone();
         let mut env = Env::with_system(system);
         let _pid = child_process(
             &mut env,
@@ -2995,7 +2990,7 @@ mod tests {
         );
         executor.run_until_stalled();
 
-        assert_eq!(env.system.caught_signals(), [SIGCHLD]);
+        assert_eq!(system2.current_process().caught_signals, [SIGCHLD]);
     }
 
     #[test]

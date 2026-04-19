@@ -39,7 +39,7 @@ use yash_env::option::State::On;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
-use yash_env::system::{Fcntl, Isatty, SharedSystem, Sigaction, Sigmask, Signals, Write};
+use yash_env::system::{Fcntl, Isatty, Sigaction, Sigmask, Signals, Write};
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
 use yash_env::trap::SetActionError;
@@ -195,17 +195,14 @@ impl<'a> From<&'a Error> for Report<'a> {
 /// Updates an action for a condition in the trap set.
 ///
 /// This is a utility function for implementing [`Command::execute`].
-async fn set_action<S>(
+async fn set_action<S: SignalSystem>(
     traps: &mut TrapSet,
-    system: &mut SharedSystem<S>,
+    system: &S,
     cond: Condition,
     field: Field,
     action: Action,
     override_ignore: bool,
-) -> Result<(), Error>
-where
-    S: Signals + Sigmask + Sigaction,
-{
+) -> Result<(), Error> {
     traps
         .set_action(
             system,
@@ -252,7 +249,7 @@ impl Command {
                 for (cond, field) in conditions {
                     if let Err(error) = set_action(
                         &mut env.traps,
-                        &mut env.system,
+                        &env.system,
                         cond,
                         field,
                         action.clone(),

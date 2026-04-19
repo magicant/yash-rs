@@ -33,7 +33,7 @@ use std::ffi::CString;
 use std::rc::Rc;
 use thiserror::Error;
 use yash_env::Env;
-use yash_env::input::{Echo, FdReader};
+use yash_env::input::{Echo, FdReader2};
 use yash_env::io::Fd;
 use yash_env::io::move_fd_internal;
 use yash_env::option::Option::Interactive;
@@ -190,7 +190,7 @@ where
     let env = &mut *env.push_frame(Frame::InitFile);
     let system = env.system.clone();
     let ref_env = RefCell::new(&mut *env);
-    let input = Box::new(Echo::new(FdReader::new(fd, system), &ref_env));
+    let input = Box::new(Echo::new(FdReader2::new(fd, system), &ref_env));
     let mut config = Config::with_input(input);
     config.source = Some(Rc::new(Source::InitFile {
         path: path.to_owned(),

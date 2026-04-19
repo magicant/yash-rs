@@ -105,7 +105,7 @@ where
             if let Some(result) = (&mut result_future).now_or_never() {
                 return result;
             }
-            selector.select_async().await.ok();
+            selector.select().await;
         }
     };
 

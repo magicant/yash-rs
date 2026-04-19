@@ -24,8 +24,7 @@ use std::ffi::CString;
 use std::ops::ControlFlow;
 use std::rc::Rc;
 use yash_env::Env;
-use yash_env::input::Echo;
-use yash_env::input::FdReader;
+use yash_env::input::{Echo, FdReader2};
 use yash_env::io::Fd;
 use yash_env::io::move_fd_internal;
 use yash_env::parser::Config;
@@ -65,7 +64,7 @@ impl Command {
             .expect("`source` built-in requires `RunReadEvalLoop` in `Env::any`");
         let system = env.system.clone();
         let ref_env = RefCell::new(&mut *env);
-        let input = Box::new(Echo::new(FdReader::new(fd, system), &ref_env));
+        let input = Box::new(Echo::new(FdReader2::new(fd, system), &ref_env));
         let mut config = Config::with_input(input);
         config.source = Some(Rc::new(Source::DotScript {
             name: self.file.value,

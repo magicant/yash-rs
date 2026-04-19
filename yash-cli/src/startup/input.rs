@@ -30,7 +30,7 @@ use std::ffi::CString;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::input::Echo;
-use yash_env::input::FdReader;
+use yash_env::input::FdReader2;
 use yash_env::input::IgnoreEof;
 use yash_env::input::Reporter;
 use yash_env::io::Fd;
@@ -153,7 +153,7 @@ where
 
 /// Creates an input object from a file descriptor.
 ///
-/// This function creates an [`FdReader`] object from the given file descriptor
+/// This function creates an [`FdReader2`] object from the given file descriptor
 /// and wraps it with the [`Echo`] decorator. If the [`Interactive`] option is
 /// enabled, the [`Prompter`], [`Reporter`], and [`IgnoreEof`] decorators are
 /// applied to the input object.
@@ -164,7 +164,7 @@ where
     let env = ref_env.borrow();
     let system = env.system.clone();
 
-    let basic_input = Echo::new(FdReader::new(fd, system), ref_env);
+    let basic_input = Echo::new(FdReader2::new(fd, system), ref_env);
 
     if env.options.get(Interactive) == Off {
         Box::new(basic_input)

@@ -22,7 +22,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `impl system::Stat for system::virtual::Stat`
 - The `system::Concurrent` struct has been added as a wrapper around a `System`
   implementation to provide concurrent execution of blocking operations. This
-  struct will replace the existing `system::SharedSystem` struct.
+  struct replaces the existing `system::SharedSystem` struct.
 - The `select_async` method has been added to the `system::SharedSystem` struct.
 - The `system::virtual::FileBody` enum now has the following methods:
     - `is_seekable`: Returns whether the file supports seeking.
@@ -101,6 +101,12 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- The `Env::system` field now holds an `Rc<Concurrent<S>>` instead of a
+  `SharedSystem<S>`.
+- The `Env::wait_for_signals` method now returns `Rc<system::SignalList>`
+  instead of `Rc<[signal::Number]>`.
+- The `Env::poll_signals` method now returns `Option<Rc<system::SignalList>>`
+  instead of `Option<Rc<[signal::Number]>>`.
 - The `trap::SignalSystem::set_disposition` method signature has changed:
     - The receiver is now `&self` instead of `&mut self`.
     - The return type is now
