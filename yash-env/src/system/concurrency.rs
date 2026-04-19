@@ -46,7 +46,7 @@ use std::time::{Duration, Instant};
 /// For system calls that do not block, such as [`Pipe`], the wrapper directly
 /// forwards the call to the inner system without any modification.
 ///
-/// This struct is designed to be used in an `Rc` to allow multiple tasks to
+/// This struct is designed to be used in an [`Rc`] to allow multiple tasks to
 /// share the same concurrent system. Some traits, such as [`Read`] and
 /// [`Write`], are implemented for `Rc<Concurrent<S>>` instead of
 /// `Concurrent<S>` to allow the methods to return futures that capture a clone
@@ -54,6 +54,44 @@ use std::time::{Duration, Instant};
 /// necessary because the futures need to access the internal state of the
 /// `Concurrent` system without capturing a reference to the original
 /// `Concurrent` struct, which may not live long enough.
+///
+/// The following example illustrates how multiple concurrent tasks are run in a
+/// single-threaded pool:
+///
+/// ```
+/// # use std::rc::Rc;
+/// # use yash_env::system::{Concurrent, Pipe as _, Read as _, Write as _};
+/// # use yash_env::VirtualSystem;
+/// # use futures_util::task::LocalSpawnExt as _;
+/// let system = Rc::new(Concurrent::new(VirtualSystem::new()));
+/// let system2 = system.clone();
+/// let system3 = system.clone();
+/// let (reader, writer) = system.pipe().unwrap();
+/// let mut executor = futures_executor::LocalPool::new();
+///
+/// // We add a task that tries to read from the pipe, but nothing has been
+/// // written to it, so the task is stalled.
+/// let read_task = executor.spawner().spawn_local_with_handle(async move {
+///     let mut buffer = [0; 1];
+///     system.read(reader, &mut buffer).await.unwrap();
+///     buffer[0]
+/// });
+/// executor.run_until_stalled();
+///
+/// // Let's add a task that writes to the pipe.
+/// executor.spawner().spawn_local(async move {
+///     system2.write_all(writer, &[123]).await.unwrap();
+/// });
+/// executor.run_until_stalled();
+///
+/// // The write task has written a byte to the pipe, but the read task is still
+/// // stalled. We need to wake it up by calling `select` or `peek`.
+/// system3.peek();
+///
+/// // Now the read task can proceed to the end.
+/// let number = executor.run_until(read_task.unwrap());
+/// assert_eq!(number, 123);
+/// ```
 ///
 /// [`Pipe`]: super::Pipe
 #[derive(Clone, Debug, Default)]

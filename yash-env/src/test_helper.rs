@@ -62,12 +62,12 @@ impl<'a> Executor for yash_executor::Spawner<'a> {
     }
 }
 
-/// Runs an asynchronous function in a virtual system with a local executor.
+/// Runs an asynchronous function in a virtual system with an executor.
 ///
-/// This function creates a [`VirtualSystem`] and installs a [`LocalExecutor`]
-/// in it. The argument function `f` is called with an [`Env`] with the virtual
-/// system. The executor is run until the task returned by `f` completes, and
-/// the result is returned.
+/// This function creates a [`VirtualSystem`] and installs a
+/// [`yash_executor::Spawner`] in it as an [`Executor`]. The argument function
+/// `f` is called with an [`Env`] with the virtual system. The executor loop is
+/// run until the task returned by `f` completes, and the result is returned.
 ///
 /// Function `f` is called with two arguments: the [`Env`] and a shared
 /// reference to the system state. The system state can be used to interact

@@ -16,11 +16,9 @@
 
 //! API declarations and implementations for system-managed parts of the environment
 //!
-//! This module defines the [`System`] trait, which provides an interface to
-//! interact with the underlying system. It is a subtrait of various other traits
-//! that define specific functionalities, such as file system operations, process
-//! management, signal handling, and resource limit management. The following
-//! traits are included as subtraits of `System`:
+//! This module defines many traits that declare methods to interact with the
+//! underlying system, such as file system operations, process management,
+//! signal handling, and resource limit management:
 //!
 //! - [`CaughtSignals`]: Declares the `caught_signals` method for retrieving
 //!   caught signals.
@@ -82,20 +80,23 @@
 //! - [`resource::SetRlimit`]: Declares the `setrlimit` method for
 //!   setting resource limits.
 //!
-//! There are two main implementors of the `System` trait:
+//! There are two main implementors of these traits:
 //!
-//! - `RealSystem`: An implementation that interacts with the actual
+//! - [`RealSystem`]: An implementation that interacts with the actual
 //!   underlying system (see the [`real`] module).
-//! - `VirtualSystem`: An implementation that simulates system behavior
-//!   for testing purposes (see the [`virtual`] module).
+//! - [`VirtualSystem`]: An implementation that simulates system behavior for
+//!   testing purposes (see the [`virtual`] module).
 //!
-//! Additionally, there is the [`SharedSystem`] implementor that wraps
-//! another `System` instance to provide asynchronous methods.
+//! Additionally, [`Concurrent`] is a wrapper that extends the interface with
+//! asynchronous methods for concurrency.
+//! ([`SharedSystem`] is a former wrapper that provided similar functionality
+//! but is now deprecated in favor of `Concurrent`.)
 //!
-//! User code should generally depend only on specific subtraits of `System`
-//! rather than `System` itself. This allows for more modular and testable code.
-//! For example, code that only needs to write to file descriptors can depend
-//! on the `Write` trait alone.
+//! This module has a deprecated trait, [`System`], that combines all the traits
+//! above. To promote interface segregation, user code should generally depend
+//! only on specific traits that declare the methods it needs, rather than
+//! working with `System` directly. For example, code that only needs to write
+//! to file descriptors can depend on the `Write` trait alone.
 //!
 //! Some methods of these traits return [futures](std::future::Future), not
 //! because the underlying system calls are asynchronous, but to allow
@@ -165,13 +166,15 @@ use crate::trap::SignalSystem;
 use std::convert::Infallible;
 use std::fmt::Debug;
 
-/// API to the system-managed parts of the environment.
+/// Utility trait that aggregates all the traits in this module
 ///
 /// The `System` trait defines a collection of methods to access the underlying
-/// operating system from the shell as an application program. There are two
-/// substantial implementors for this trait: [`RealSystem`] and
-/// [`VirtualSystem`]. Another implementor is [`SharedSystem`], which wraps a
-/// `System` instance to extend the interface with asynchronous methods.
+/// operating system from the shell as an application program. See the
+/// [module-level documentation](self) for more details.
+///
+/// This trait is now deprecated in favor of depending on specific traits that
+/// declare the methods needed by the user code, which promotes interface
+/// segregation.
 #[deprecated(
     note = "use smaller, more specialized traits declared in the `system` module instead",
     since = "0.11.0"

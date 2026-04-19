@@ -23,10 +23,10 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Span, SpanRole, add_span};
+#[cfg(doc)]
+use yash_env::system::Concurrent;
 use yash_env::system::Fcntl;
 use yash_env::system::Isatty;
-#[cfg(doc)]
-use yash_env::system::SharedSystem;
 use yash_env::system::Write;
 use yash_env::variable::Scope::Global;
 
@@ -157,7 +157,7 @@ where
 /// Prints an error message to the standard error.
 ///
 /// This function constructs a message with [`unset_variables_error_message`]
-/// and prints it with [`SharedSystem::print_error`].
+/// and prints it with [`Concurrent::print_error`].
 #[deprecated(
     note = "use `merge_reports` and `report_failure` directly",
     since = "0.11.0"
@@ -292,7 +292,7 @@ where
 /// Prints an error message to the standard error.
 ///
 /// This function constructs a message with [`unset_functions_error_message`]
-/// and prints it with [`SharedSystem::print_error`].
+/// and prints it with [`Concurrent::print_error`].
 #[deprecated(
     note = "use `merge_reports` and `report_failure` directly",
     since = "0.11.0"

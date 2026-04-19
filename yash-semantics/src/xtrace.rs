@@ -287,7 +287,7 @@ pub async fn finish<S: Runtime + 'static>(env: &mut Env<S>, xtrace: Option<XTrac
 }
 
 /// Convenience function for [finish]ing and
-/// [print](yash_env::SharedSystem::print_error)ing an (optional) `XTrace`.
+/// [print](yash_env::system::Concurrent::print_error)ing an (optional) `XTrace`.
 pub async fn print<S, X>(env: &mut Env<S>, xtrace: X)
 where
     S: Runtime + 'static,

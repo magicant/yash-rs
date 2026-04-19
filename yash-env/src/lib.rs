@@ -102,13 +102,13 @@ pub use unix_str as str;
 ///
 /// The shell execution environment consists of application-managed parts and
 /// system-managed parts. Application-managed parts are directly implemented in
-/// the `Env` instance. System-managed parts are managed by a [`SharedSystem`]
-/// that contains an instance of `S` that implements [`System`].
+/// the `Env` instance. System-managed parts are managed by a [`Concurrent`]
+/// wrapping a `System` instance.
 ///
 /// # Cloning
 ///
 /// `Env::clone` effectively clones the application-managed parts of the
-/// environment. Since [`SharedSystem`] is reference-counted, you will not get a
+/// environment. Since [`Concurrent`] is reference-counted, you will not get a
 /// deep copy of the system-managed parts. See also
 /// [`clone_with_system`](Self::clone_with_system).
 #[derive(Clone, Debug)]
@@ -171,8 +171,9 @@ impl<S> Env<S> {
     /// Creates a new environment with the given system.
     ///
     /// Members of the new environments are default-constructed except that:
+    /// - `main_pgid` is initialized as `system.getpgrp()`
     /// - `main_pid` is initialized as `system.getpid()`
-    /// - `system` is initialized as `SharedSystem::new(system)`
+    /// - `system` is initialized as `Rc::new(Concurrent::new(system))`
     #[must_use]
     pub fn with_system(system: S) -> Self
     where
@@ -266,7 +267,7 @@ impl<S> Env<S> {
     ///
     /// Returns an array of signals caught.
     ///
-    /// This function is a wrapper for [`SharedSystem::wait_for_signals`].
+    /// This function is a wrapper for [`Concurrent::wait_for_signals`].
     /// Before the function returns, it passes the results to
     /// [`TrapSet::catch_signal`] so the trap set can remember the signals
     /// caught to be handled later.
@@ -291,8 +292,8 @@ impl<S> Env<S> {
     /// This function is similar to
     /// [`wait_for_signals`](Self::wait_for_signals) but does not wait for
     /// signals to be caught. Instead, it only checks if any signals have been
-    /// caught but not yet consumed in the [`SharedSystem`]. If no signals
-    /// have been caught, it returns `None`.
+    /// caught but not yet consumed in the [`Concurrent`] instance. If no
+    /// signals have been caught, it returns `None`.
     pub fn poll_signals(&mut self) -> Option<Rc<SignalList>>
     where
         S: Select + CaughtSignals + Clock,

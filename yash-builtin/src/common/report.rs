@@ -21,8 +21,6 @@
 
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
-#[cfg(doc)]
-use yash_env::SharedSystem;
 use yash_env::semantics::{Divert, ExitStatus};
 use yash_env::source::Location;
 use yash_env::source::pretty::{
@@ -49,9 +47,11 @@ use yash_env::system::{Fcntl, Isatty, Write};
 /// in a built-in. This ensures that the message contains the built-in name
 /// in a unified format.
 ///
-/// Use [`SharedSystem::print_error`] to print the returned message and
+/// Use [`Concurrent::print_error`] to print the returned message and
 /// [`crate::Result::with_exit_status_and_divert`] to return the divert value
 /// along with an exit status.
+///
+/// [`Concurrent::print_error`]: yash_env::system::Concurrent::print_error
 #[must_use = "returned message should be printed"]
 pub fn prepare_report_message_and_divert<'e, 'r, S>(
     env: &'e Env<S>,

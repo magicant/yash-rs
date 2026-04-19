@@ -19,10 +19,10 @@
 use super::Disposition;
 use super::Errno;
 use super::Result;
-#[cfg(doc)]
-use super::SharedSystem;
 use super::SigmaskOp;
 use super::signal;
+#[cfg(doc)]
+use super::{Concurrent, SharedSystem};
 use crate::io::Fd;
 use crate::system::{CaughtSignals, Clock, Sigaction, Sigmask, Signals};
 use std::cell::RefCell;
@@ -44,11 +44,9 @@ use std::time::Instant;
 pub trait Select: Signals {
     /// Waits for a next event.
     ///
-    /// This is a low-level function used internally by
-    /// [`SharedSystem::select`]. You should not call this function directly, or
-    /// you will disrupt the behavior of `SharedSystem`. The description below
-    /// applies if you want to do everything yourself without depending on
-    /// `SharedSystem`.
+    /// In a typical configuration, this trait is not used directly. Instead,
+    /// it is used by [`Concurrent`] and [`SharedSystem`] to implement
+    /// asynchronous I/O, signal handling, and timer functions.
     ///
     /// This function blocks the calling thread until one of the following
     /// condition is met:
