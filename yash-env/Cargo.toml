@@ -56,6 +56,7 @@ yash-executor = { workspace = true }
 assert_matches = { workspace = true }
 futures-executor = { workspace = true }
 futures-util = { workspace = true, features = ["channel"] }
+yash-executor = { path = "../yash-executor" }
 yash-prompt = { path = "../yash-prompt" }
 yash-semantics = { path = "../yash-semantics" }
 
