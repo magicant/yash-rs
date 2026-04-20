@@ -1109,7 +1109,7 @@ mod tests {
             .unwrap()
             .unwrap();
         trap_set
-            .enable_internal_dispositions_for_terminators(&system)
+            .enable_internal_dispositions_for_stoppers(&system)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -1148,7 +1148,7 @@ mod tests {
             .unwrap()
             .unwrap();
         trap_set
-            .enable_internal_dispositions_for_terminators(&system)
+            .enable_internal_dispositions_for_stoppers(&system)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -1187,7 +1187,7 @@ mod tests {
             .unwrap()
             .unwrap();
         trap_set
-            .enable_internal_dispositions_for_terminators(&system)
+            .enable_internal_dispositions_for_stoppers(&system)
             .now_or_never()
             .unwrap()
             .unwrap();
