@@ -30,11 +30,11 @@ use self::startup::init_file::run_rcfile;
 use self::startup::input::prepare_input;
 use std::cell::RefCell;
 use std::ops::ControlFlow::{Break, Continue};
+use std::rc::Rc;
 use yash_env::Env;
 use yash_env::RealSystem;
 use yash_env::option::{Interactive, On};
 use yash_env::semantics::{Divert, ExitStatus, exit_or_raise};
-use yash_env::system::real::run_loop;
 use yash_env::system::resource::GetRlimit;
 use yash_env::system::{
     Chdir, Disposition, Errno, Fcntl, GetCwd, GetUid, Isatty, Sigaction, Signals, Sysconf,
@@ -146,10 +146,10 @@ pub fn main() -> ! {
         .sigaction(RealSystem::SIGPIPE, Disposition::Default)
         .ok();
 
-    let system = env.system.clone();
+    let system = Rc::clone(&env.system);
     let task = async {
         run_as_shell_process(&mut env).await;
         exit_or_raise(&env.system, env.exit_status).await
     };
-    run_loop(&system, task)
+    system.run_sync(task)
 }

@@ -31,9 +31,6 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `pending_open_wakers: WakerSet`: Wakers of tasks waiting to open the pipe
     - `pending_read_wakers: WakerSet`: Wakers of tasks waiting to read from the pipe
     - `pending_write_wakers: WakerSet`: Wakers of tasks waiting to write to the pipe
-- The `system::real::run_loop` function has been added to run a task in the
-  current process using the real system implementation. This function serves as
-  the main loop of the shell process when running on a real system.
 - The `system::virtual::VirtualSystem::get_open_file_description` method has
   been added to retrieve the open file description for a given file descriptor
   in the current process.

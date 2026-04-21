@@ -16,6 +16,8 @@
 
 //! Items for concurrent task execution
 
+#[cfg(unix)]
+use super::real::RealSystem;
 use super::{CaughtSignals, Clock, Errno, Fcntl, Read, Result, Select, Write};
 use crate::io::Fd;
 use crate::waker::{ScheduledWakerQueue, WakerSet};
@@ -23,6 +25,7 @@ use std::cell::{Cell, LazyCell, OnceCell, RefCell};
 use std::collections::HashMap;
 use std::future::poll_fn;
 use std::ops::{Deref, DerefMut};
+use std::pin::pin;
 use std::rc::{Rc, Weak};
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Waker};
@@ -348,7 +351,7 @@ where
     /// ready. This method is similar to [`select`](Concurrent::select), but it
     /// does not block and returns immediately.
     pub fn peek(&self) {
-        let select = std::pin::pin!(self.select_impl(true));
+        let select = pin!(self.select_impl(true));
         let poll = select.poll(&mut Context::from_waker(Waker::noop()));
         debug_assert_eq!(poll, Ready(()), "peek should not block");
     }
@@ -369,6 +372,13 @@ where
     ///     concurrent.select().await;
     /// }
     /// ```
+    ///
+    /// The [`run`](Self::run) method provides a convenient way to implement
+    /// such a main loop.
+    ///
+    /// The future returned by this method will be pending if and only if the
+    /// future returned by the inner system's [`select`](Select::select) method
+    /// is pending.
     pub async fn select(&self) {
         self.select_impl(false).await;
     }
@@ -425,6 +435,49 @@ where
                 // Drop the list so that the next wait_for_signals call can create a new one.
                 state.signals = Weak::new();
             }
+        }
+    }
+
+    /// Runs the given task in the current process using an internal executor.
+    ///
+    /// This function implements the main loop of the shell process. It runs the
+    /// given task while also calling [`select`](Self::select) to handle signals
+    /// and other events. The task is expected to perform I/O operations using
+    /// the methods of this `Concurrent` instance, so that it can yield when the
+    /// operations would block. The function returns the output of the task when
+    /// it completes.
+    ///
+    /// The task is run on an internal executor ([`yash_executor::Executor`])
+    /// created for this method, which is separate from any executor that may be
+    /// used by the caller. This executor is not thread-safe, so the task must
+    /// not pass any [`Waker`]s provided by the task context to other threads.
+    ///
+    /// The future returned by this method will be pending if and only if the
+    /// future returned by the internal system's [`select`](Select::select)
+    /// method is pending. For use with [`RealSystem`], the
+    /// [`run_sync`](Self::run_sync) method may be more convenient, which works
+    /// synchronously.
+    pub async fn run<F, T>(&self, task: F) -> T
+    where
+        F: Future<Output = T>,
+    {
+        let executor = yash_executor::Executor::new();
+
+        // SAFETY: We never create new threads in the whole process, so wakers
+        // are never shared between threads.
+        let mut receiver = pin!(unsafe { executor.spawn(task) });
+
+        loop {
+            executor.run_until_stalled();
+
+            if let Ready(result) = receiver
+                .as_mut()
+                .poll(&mut Context::from_waker(Waker::noop()))
+            {
+                return result;
+            }
+
+            self.select().await;
         }
     }
 }
@@ -516,6 +569,39 @@ impl SignalList {
     }
 }
 
+#[cfg(unix)]
+impl Concurrent<RealSystem> {
+    /// Runs the given task in the current process using an internal executor.
+    ///
+    /// This function implements the main loop of the shell process. It runs the
+    /// given task while also calling [`select`](Self::select) to handle signals
+    /// and other events. The task is expected to perform I/O operations using
+    /// the methods of this `Concurrent` instance, so that it can yield when the
+    /// operations would block. The function returns the output of the task when
+    /// it completes.
+    ///
+    /// The task is run on an internal executor ([`yash_executor::Executor`])
+    /// created for this method, which is separate from any executor that may be
+    /// used by the caller. This executor is not thread-safe, so the task must
+    /// not pass any [`Waker`]s provided by the task context to other threads.
+    ///
+    /// This method is a specialization of the more general [`run`](Self::run)
+    /// method for the case where the inner system is `RealSystem`. Since
+    /// [`RealSystem::select`] performs a real `select` system call that blocks
+    /// the entire process, this method synchronously returns the output of the
+    /// task.
+    pub fn run_sync<F, T>(&self, task: F) -> T
+    where
+        F: Future<Output = T>,
+    {
+        let future = pin!(self.run(task));
+        match future.poll(&mut Context::from_waker(Waker::noop())) {
+            Ready(result) => result,
+            Pending => unreachable!("`RealSystem::select` should never return `Pending`"),
+        }
+    }
+}
+
 mod delegates;
 mod rw_all;
 mod signal;
@@ -531,7 +617,6 @@ mod tests {
     use crate::trap::SignalSystem as _;
     use assert_matches::assert_matches;
     use futures_util::FutureExt as _;
-    use std::pin::pin;
     use std::sync::Arc;
     use std::task::Poll::{Pending, Ready};
 
