@@ -93,7 +93,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   new `test-helper` feature is enabled.
 - The `system::virtual::Executor` trait is now implemented for
   the `yash_executor::Spawner` type, allowing it to be used as an executor for
-  the virtual system.
+  the virtual system. This implementation is conditionally compiled when the new
+  `yash-executor` feature is enabled, which is transitively enabled by the
+  `test-helper` feature.
 - Private dependencies:
     - assert_matches (optional) 1.5.0
     - futures-executor (optional) 0.3.31

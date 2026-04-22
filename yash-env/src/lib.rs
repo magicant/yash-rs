@@ -624,6 +624,8 @@ pub mod trap;
 pub mod variable;
 pub mod waker;
 
+#[cfg(any(test, feature = "yash-executor"))]
+mod executor_helper;
 #[cfg(any(test, feature = "test-helper"))]
 pub mod test_helper;
 
