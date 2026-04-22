@@ -21,6 +21,7 @@ use super::real::RealSystem;
 use super::{CaughtSignals, Clock, Errno, Fcntl, Read, Result, Select, Write};
 use crate::io::Fd;
 use crate::waker::{ScheduledWakerQueue, WakerSet};
+use futures_util::poll;
 use std::cell::{Cell, LazyCell, OnceCell, RefCell};
 use std::collections::HashMap;
 use std::future::poll_fn;
@@ -438,7 +439,7 @@ where
         }
     }
 
-    /// Runs the given task in the current process using an internal executor.
+    /// Runs the given task with concurrency support.
     ///
     /// This function implements the main loop of the shell process. It runs the
     /// given task while also calling [`select`](Self::select) to handle signals
@@ -446,11 +447,6 @@ where
     /// the methods of this `Concurrent` instance, so that it can yield when the
     /// operations would block. The function returns the output of the task when
     /// it completes.
-    ///
-    /// The task is run on an internal executor ([`yash_executor::Executor`])
-    /// created for this method, which is separate from any executor that may be
-    /// used by the caller. This executor is not thread-safe, so the task must
-    /// not pass any [`Waker`]s provided by the task context to other threads.
     ///
     /// The future returned by this method will be pending if and only if the
     /// future returned by the internal system's [`select`](Select::select)
@@ -461,22 +457,11 @@ where
     where
         F: Future<Output = T>,
     {
-        let executor = yash_executor::Executor::new();
-
-        // SAFETY: We never create new threads in the whole process, so wakers
-        // are never shared between threads.
-        let mut receiver = pin!(unsafe { executor.spawn(task) });
-
+        let mut task = pin!(task);
         loop {
-            executor.run_until_stalled();
-
-            if let Ready(result) = receiver
-                .as_mut()
-                .poll(&mut Context::from_waker(Waker::noop()))
-            {
+            if let Ready(result) = poll!(&mut task) {
                 return result;
             }
-
             self.select().await;
         }
     }
@@ -571,7 +556,7 @@ impl SignalList {
 
 #[cfg(unix)]
 impl Concurrent<RealSystem> {
-    /// Runs the given task in the current process using an internal executor.
+    /// Runs the given task with concurrency support.
     ///
     /// This function implements the main loop of the shell process. It runs the
     /// given task while also calling [`select`](Self::select) to handle signals
@@ -579,11 +564,6 @@ impl Concurrent<RealSystem> {
     /// the methods of this `Concurrent` instance, so that it can yield when the
     /// operations would block. The function returns the output of the task when
     /// it completes.
-    ///
-    /// The task is run on an internal executor ([`yash_executor::Executor`])
-    /// created for this method, which is separate from any executor that may be
-    /// used by the caller. This executor is not thread-safe, so the task must
-    /// not pass any [`Waker`]s provided by the task context to other threads.
     ///
     /// This method is a specialization of the more general [`run`](Self::run)
     /// method for the case where the inner system is `RealSystem`. Since
