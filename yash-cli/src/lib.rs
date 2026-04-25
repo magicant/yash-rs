@@ -151,5 +151,5 @@ pub fn main() -> ! {
         run_as_shell_process(&mut env).await;
         exit_or_raise(&env.system, env.exit_status).await
     };
-    system.run_sync(task)
+    system.run_real(task)
 }

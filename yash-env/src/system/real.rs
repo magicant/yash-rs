@@ -996,7 +996,7 @@ impl Fork for RealSystem {
         // Child process
         Ok(Box::new(|env, task| {
             let system = Rc::clone(&env.system);
-            match system.run_sync(task(env)) {}
+            match system.run_real(task(env)) {}
         }))
     }
 }

@@ -376,8 +376,8 @@ where
     /// }
     /// ```
     ///
-    /// The [`run`](Self::run) method provides a convenient way to implement
-    /// such a main loop.
+    /// The [`run_real`](Self::run_real) and [`run_virtual`](Self::run_virtual)
+    /// methods provide a convenient way to implement such a main loop.
     ///
     /// The future returned by this method will be pending if and only if the
     /// future returned by the inner system's [`select`](Select::select) method
@@ -438,33 +438,6 @@ where
                 // Drop the list so that the next wait_for_signals call can create a new one.
                 state.signals = Weak::new();
             }
-        }
-    }
-
-    /// Runs the given task with concurrency support.
-    ///
-    /// This function implements the main loop of the shell process. It runs the
-    /// given task while also calling [`select`](Self::select) to handle signals
-    /// and other events. The task is expected to perform I/O operations using
-    /// the methods of this `Concurrent` instance, so that it can yield when the
-    /// operations would block. The function returns the output of the task when
-    /// it completes.
-    ///
-    /// The future returned by this method will be pending if and only if the
-    /// future returned by the internal system's [`select`](Select::select)
-    /// method is pending. For use with [`RealSystem`], the
-    /// [`run_sync`](Self::run_sync) method may be more convenient, which works
-    /// synchronously.
-    pub async fn run<F, T>(&self, task: F) -> T
-    where
-        F: Future<Output = T>,
-    {
-        let mut task = pin!(task);
-        loop {
-            if let Ready(result) = poll!(&mut task) {
-                return result;
-            }
-            self.select().await;
         }
     }
 }
@@ -567,17 +540,26 @@ impl Concurrent<RealSystem> {
     /// operations would block. The function returns the output of the task when
     /// it completes.
     ///
-    /// This method is a specialization of the more general [`run`](Self::run)
-    /// method for the case where the inner system is `RealSystem`. Since
-    /// [`RealSystem::select`] performs a real `select` system call that blocks
-    /// the entire process, this method synchronously returns the output of the
-    /// task.
-    pub fn run_sync<F, T>(&self, task: F) -> T
+    /// This method supports concurrency only inside the task. Other tasks
+    /// created outside the task will not be run concurrently.
+    /// This method blocks the current thread until the task completes, so it
+    /// should only be called in the main function of the shell process.
+    /// See the [`run_virtual`](Self::run_virtual) method for the
+    /// `VirtualSystem` counterpart.
+    pub fn run_real<F, T>(&self, task: F) -> T
     where
         F: Future<Output = T>,
     {
-        let future = pin!(self.run(task));
-        match future.poll(&mut Context::from_waker(Waker::noop())) {
+        let runner = pin!(async move {
+            let mut task = pin!(task);
+            loop {
+                if let Ready(result) = poll!(&mut task) {
+                    return result;
+                }
+                self.select().await;
+            }
+        });
+        match runner.poll(&mut Context::from_waker(Waker::noop())) {
             Ready(result) => result,
             Pending => unreachable!("`RealSystem::select` should never return `Pending`"),
         }
@@ -595,7 +577,7 @@ impl Concurrent<VirtualSystem> {
     /// it completes.
     ///
     /// This is the `VirtualSystem` counterpart for the
-    /// [`run_sync`](Self::run_sync) method. To allow `VirtualSystem` to run
+    /// [`run_real`](Self::run_real) method. To allow `VirtualSystem` to run
     /// multiple tasks concurrently, this method is asynchronous and returns a
     /// future that completes when the task finishes or the process is
     /// terminated.
