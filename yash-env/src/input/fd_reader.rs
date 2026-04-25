@@ -19,6 +19,7 @@
 use super::{Context, Input, Result};
 use crate::io::Fd;
 use crate::option::State;
+#[allow(deprecated)]
 use crate::system::{Fcntl, Read, SharedSystem, Write};
 use std::cell::Cell;
 use std::rc::Rc;
@@ -42,6 +43,7 @@ pub struct FdReader<S> {
     /// File descriptor to read from
     fd: Fd,
     /// System to interact with the FD
+    #[allow(deprecated)]
     system: SharedSystem<S>,
     /// Whether lines read are echoed to stderr
     echo: Option<Rc<Cell<State>>>,
@@ -53,6 +55,7 @@ impl<S> FdReader<S> {
     /// The `fd` argument is the file descriptor to read from. It should be
     /// readable, have the close-on-exec flag set, and remain open for the
     /// lifetime of the `FdReader` instance.
+    #[allow(deprecated)]
     pub fn new(fd: Fd, system: SharedSystem<S>) -> Self {
         let echo = None;
         FdReader { fd, system, echo }
@@ -147,6 +150,7 @@ mod tests {
     #[test]
     fn empty_reader() {
         let system = VirtualSystem::new();
+        #[allow(deprecated)]
         let system = SharedSystem::new(system);
         let mut reader = FdReader::new(Fd::STDIN, system);
 
@@ -166,6 +170,7 @@ mod tests {
             let file = state.file_system.get("/dev/stdin").unwrap();
             file.borrow_mut().body = FileBody::new(*b"echo ok\n");
         }
+        #[allow(deprecated)]
         let system = SharedSystem::new(system);
         let mut reader = FdReader::new(Fd::STDIN, system);
 
@@ -191,6 +196,7 @@ mod tests {
             let file = state.file_system.get("/dev/stdin").unwrap();
             file.borrow_mut().body = FileBody::new(*b"#!/bin/sh\necho ok\nexit");
         }
+        #[allow(deprecated)]
         let system = SharedSystem::new(system);
         let mut reader = FdReader::new(Fd::STDIN, system);
 
@@ -228,6 +234,7 @@ mod tests {
             let file = Rc::new(Inode::new("echo file\n").into());
             state.file_system.save("/foo", file).unwrap();
         }
+        #[allow(deprecated)]
         let system = SharedSystem::new(system);
         let path = c"/foo";
         let fd = system
@@ -260,6 +267,7 @@ mod tests {
     fn reader_error() {
         let system = VirtualSystem::new();
         system.current_process_mut().close_fd(Fd::STDIN);
+        #[allow(deprecated)]
         let system = SharedSystem::new(system);
         let mut reader = FdReader::new(Fd::STDIN, system);
 
@@ -280,6 +288,7 @@ mod tests {
             let file = state.file_system.get("/dev/stdin").unwrap();
             file.borrow_mut().body = FileBody::new(*b"one\ntwo");
         }
+        #[allow(deprecated)]
         let system = SharedSystem::new(system);
         let mut reader = FdReader::new(Fd::STDIN, system);
         #[allow(deprecated)]
@@ -305,6 +314,7 @@ mod tests {
             let file = state.file_system.get("/dev/stdin").unwrap();
             file.borrow_mut().body = FileBody::new(*b"one\ntwo");
         }
+        #[allow(deprecated)]
         let system = SharedSystem::new(system);
         let mut reader = FdReader::new(Fd::STDIN, system);
         #[allow(deprecated)]

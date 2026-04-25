@@ -71,6 +71,7 @@ use self::system::OfdAccess;
 use self::system::Open;
 use self::system::OpenFlag;
 use self::system::Select;
+#[allow(deprecated)]
 pub use self::system::SharedSystem;
 use self::system::Sigaction;
 use self::system::Sigmask;

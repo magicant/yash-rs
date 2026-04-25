@@ -180,6 +180,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Deprecated
 
+- `system::SharedSystem`: This struct is now deprecated in favor of the new
+  `system::Concurrent` struct, which provides better support for concurrent
+  execution of blocking operations in virtual systems.
 - `system::virtual::SystemState::select_all`: This method is no longer necessary
   because virtual processes are now automatically woken up when they are ready
   to make progress.

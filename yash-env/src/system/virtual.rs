@@ -102,7 +102,6 @@ use super::Read;
 use super::Result;
 use super::Seek;
 use super::Select;
-use super::SelectSystem;
 use super::SendSignal;
 use super::SetPgid;
 use super::SetRlimit;
@@ -1448,41 +1447,22 @@ impl SystemState {
         self.scheduled_wakers.wake(new_current_time);
     }
 
-    /// Performs [`select`](crate::system::SharedSystem::select) on all
-    /// processes in the system.
+    /// Does nothing.
     ///
-    /// Any errors are ignored.
+    /// This function is a no-op and is only provided for backward
+    /// compatibility. It is not necessary to call this function manually, as
+    /// virtual processes are now automatically woken up when they are ready to
+    /// make progress. If you have existing code that calls this function, you
+    /// can safely remove those calls.
     ///
-    /// The `RefCell` must not have been borrowed, or this function will panic
-    /// with a double borrow.
-    ///
-    /// # Deprecation
-    ///
-    /// This function is deprecated because it is no longer necessary. Virtual
-    /// processes are now automatically woken up when they are ready to make
-    /// progress, so there is no need to manually call `select` on them.
+    /// This function used to perform
+    /// [`select`](crate::system::SharedSystem::select) on all processes in the
+    /// system.
     #[deprecated(
         note = "you no longer need to call this function manually",
         since = "0.13.0"
     )]
-    pub fn select_all(this: &RefCell<Self>) {
-        use std::task::{Context, Poll, Waker};
-        let mut selectors = Vec::new();
-        for process in this.borrow().processes.values() {
-            if let Some(selector) = process.selector.upgrade() {
-                selectors.push(selector);
-            }
-        }
-        // To avoid double borrowing, SelectSystem::select must be called after
-        // dropping the borrow for `this`
-        let mut context = Context::from_waker(Waker::noop());
-        for selector in selectors {
-            let mut future = std::pin::pin!(SelectSystem::select(&selector, false));
-            if let Poll::Ready(result) = future.as_mut().poll(&mut context) {
-                result.ok();
-            }
-        }
-    }
+    pub fn select_all(_: &RefCell<Self>) {}
 
     /// Finds a child process to wait for.
     ///
