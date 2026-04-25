@@ -21,7 +21,6 @@ use super::Gid;
 use super::Mode;
 use super::SigmaskOp;
 use super::Uid;
-use super::VirtualSystem;
 use super::WakerSet;
 use super::io::FdBody;
 use super::signal::{self, SignalEffect};
@@ -31,12 +30,10 @@ use crate::job::ProcessResult;
 use crate::job::ProcessState;
 use crate::path::Path;
 use crate::path::PathBuf;
-use crate::system::SelectSystem;
 use crate::system::resource::INFINITY;
 use crate::system::resource::LimitPair;
 use crate::system::resource::Resource;
 use std::cell::Cell;
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
@@ -116,13 +113,6 @@ pub struct Process {
     /// Limits for system resources
     pub(crate) resource_limits: HashMap<Resource, LimitPair>,
 
-    /// Weak reference to the `SelectSystem` for this process
-    ///
-    /// This weak reference is empty for the initial process of a
-    /// `VirtualSystem`.  When a new child process is created, a weak reference
-    /// to the `SelectSystem` for the child is set.
-    pub(crate) selector: Weak<RefCell<SelectSystem<VirtualSystem>>>,
-
     /// Copy of arguments passed to [`execve`](crate::System::execve)
     pub(crate) last_exec: Option<(CString, Vec<CString>, Vec<CString>)>,
 }
@@ -168,7 +158,6 @@ impl Process {
             caught_signals: Vec::new(),
             signal_wakers: WakerSet::new(),
             resource_limits: HashMap::new(),
-            selector: Weak::new(),
             last_exec: None,
         }
     }
@@ -609,6 +598,7 @@ mod tests {
     use enumset::EnumSet;
     use futures_util::FutureExt;
     use futures_util::task::LocalSpawnExt;
+    use std::cell::RefCell;
     use std::collections::VecDeque;
     use std::future::poll_fn;
     use std::rc::Rc;
