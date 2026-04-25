@@ -22,9 +22,8 @@ use crate::Env;
 use crate::system::r#virtual::{Executor, FileBody, Inode, SystemState, VirtualSystem};
 use assert_matches::assert_matches;
 use futures_executor::LocalSpawner;
-use futures_util::FutureExt as _;
 use futures_util::task::LocalSpawnExt as _;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::pin::Pin;
 use std::rc::Rc;
 use std::str::from_utf8;
@@ -46,16 +45,17 @@ impl Executor for LocalExecutor {
 ///
 /// This function creates a [`VirtualSystem`] and installs a
 /// [`yash_executor::Spawner`] in it as an [`Executor`]. The argument function
-/// `f` is called with an [`Env`] with the virtual system. The executor loop is
-/// run until the task returned by `f` completes, and the result is returned.
+/// `task` is called with an [`Env`] with the virtual system. The executor loop
+/// is run until the future returned by `task` completes, and the result is
+/// returned.
 ///
-/// Function `f` is called with two arguments: the [`Env`] and a shared
+/// Function `task` is called with two arguments: the [`Env`] and a shared
 /// reference to the system state. The system state can be used to interact
-/// with the virtual system, e.g. to create files or concurrent tasks.
+/// with the virtual system, e.g. to create files or inspect the process state.
 ///
 /// This function is useful for testing asynchronous code that spawns tasks
 /// that need to be run concurrently with the main task.
-pub fn in_virtual_system<F, Fut, T>(f: F) -> T
+pub fn in_virtual_system<F, Fut, T>(task: F) -> T
 where
     F: FnOnce(Env<VirtualSystem>, Rc<RefCell<SystemState>>) -> Fut,
     Fut: Future<Output = T> + 'static,
@@ -67,36 +67,24 @@ where
     state.borrow_mut().executor = Some(Rc::new(global_executor.spawner()));
 
     let env = Env::with_system(system);
-    let selector = env.system.clone();
-    let task = f(env, Rc::clone(&state));
+    let concurrent = env.system.clone();
+    let task = task(env, Rc::clone(&state));
 
-    // Wrap the task in a loop that performs `select` to drive the executor
-    // until the task completes. This simulates the main loop of the shell
-    // process.
-    let task = async move {
-        let local_executor = yash_executor::Executor::new();
-        // SAFETY: Actually this is not safe if the task creates a thread and
-        // a waker from the executor is used in the thread. However, the shell
-        // process must be single-threaded to work correctly, so we assume the
-        // task does not create threads.
-        let mut result_future = unsafe { local_executor.spawn(task) };
-        loop {
-            local_executor.run_until_stalled();
-            if let Some(result) = (&mut result_future).now_or_never() {
-                return result;
-            }
-            selector.select().await;
-        }
+    let result = Rc::new(Cell::new(None));
+    let result_passer = Rc::clone(&result);
+    let runner = async move {
+        let run_task_and_set_result = async move { result_passer.set(Some(task.await)) };
+        concurrent.run_virtual(run_task_and_set_result).await
     };
 
-    // SAFETY: The same as above.
-    let mut task = unsafe { global_executor.spawn(task) };
+    // SAFETY: Actually this is not safe if the task creates a thread and a waker from the executor
+    // is used in the thread. However, the shell process must be single-threaded to work correctly,
+    // so we assume the task does not create threads.
+    unsafe { global_executor.spawn_pinned(Box::pin(runner)) };
 
-    // The outer, global executor allows the task to spawn child processes that
-    // are run concurrently with the main task.
     loop {
         global_executor.run_until_stalled();
-        if let Some(result) = (&mut task).now_or_never() {
+        if let Some(result) = result.take() {
             return result;
         }
 

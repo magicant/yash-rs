@@ -170,9 +170,11 @@ A _private dependency_ is used internally and not visible to downstream users.
   `system::Concurrent::run_virtual`, which calls `system::Concurrent::select`
   while the task is pending so that the task can be woken up by events in the
   virtual system.
-- The `test_helper::in_virtual_system` function now internally uses nested loops
-  with two executors to better simulate the concurrent execution of the shell
-  processes.
+- The `test_helper::in_virtual_system` function now internally uses
+  `system::Concurrent::run_virtual` to run the provided task, which better
+  simulates the execution of shell processes driven by
+  `system::Concurrent::run_real`. It now also uses `yash_executor::Executor`
+  as the executor instead of `futures_executor::LocalPool`.
 - Private dependency versions:
     - derive_more 2.0.1 → 2.1.0
 
