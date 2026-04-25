@@ -16,14 +16,9 @@
 
 //! Items for concurrent task execution
 
-#[cfg(unix)]
-use super::real::RealSystem;
-use super::r#virtual::VirtualSystem;
 use super::{CaughtSignals, Clock, Errno, Fcntl, Read, Result, Select, Write};
 use crate::io::Fd;
-use crate::job::ProcessState;
 use crate::waker::{ScheduledWakerQueue, WakerSet};
-use futures_util::{pending, poll};
 use std::cell::{Cell, LazyCell, OnceCell, RefCell};
 use std::collections::HashMap;
 use std::future::poll_fn;
@@ -529,114 +524,8 @@ impl SignalList {
     }
 }
 
-#[cfg(unix)]
-impl Concurrent<RealSystem> {
-    /// Runs the given task with concurrency support.
-    ///
-    /// This function implements the main loop of the shell process. It runs the
-    /// given task while also calling [`select`](Self::select) to handle signals
-    /// and other events. The task is expected to perform I/O operations using
-    /// the methods of this `Concurrent` instance, so that it can yield when the
-    /// operations would block. The function returns the output of the task when
-    /// it completes.
-    ///
-    /// This method supports concurrency only inside the task. Other tasks
-    /// created outside the task will not be run concurrently.
-    /// This method blocks the current thread until the task completes, so it
-    /// should only be called in the main function of the shell process.
-    /// See the [`run_virtual`](Self::run_virtual) method for the
-    /// `VirtualSystem` counterpart.
-    pub fn run_real<F, T>(&self, task: F) -> T
-    where
-        F: Future<Output = T>,
-    {
-        let runner = pin!(async move {
-            let mut task = pin!(task);
-            loop {
-                if let Ready(result) = poll!(&mut task) {
-                    return result;
-                }
-                self.select().await;
-            }
-        });
-        match runner.poll(&mut Context::from_waker(Waker::noop())) {
-            Ready(result) => result,
-            Pending => unreachable!("`RealSystem::select` should never return `Pending`"),
-        }
-    }
-}
-
-impl Concurrent<VirtualSystem> {
-    /// Runs the given task with concurrency support.
-    ///
-    /// This function implements the main loop of the shell process. It runs the
-    /// given task while also calling [`select`](Self::select) to handle signals
-    /// and other events. The task is expected to perform I/O operations using
-    /// the methods of this `Concurrent` instance, so that it can yield when the
-    /// operations would block. The function returns the output of the task when
-    /// it completes.
-    ///
-    /// This is the `VirtualSystem` counterpart for the
-    /// [`run_real`](Self::run_real) method. To allow `VirtualSystem` to run
-    /// multiple tasks concurrently, this method is asynchronous and returns a
-    /// future that completes when the task finishes or the process is
-    /// terminated.
-    pub async fn run_virtual<F>(&self, task: F)
-    where
-        F: Future<Output = ()>,
-    {
-        let mut task = pin!(task);
-        while poll!(&mut task).is_pending() {
-            let state = self.inner.current_process().state();
-            match state {
-                ProcessState::Running => {
-                    // The process is running, but the task is not ready yet, so we need to wait
-                    // for it to become ready. Proceed to the `select` call below.
-                }
-                ProcessState::Halted(result) => {
-                    if result.is_stopped() {
-                        // The process is stopped while the task is still working.
-                        let terminated = self.inner.block_while_stopped().await;
-                        if !terminated {
-                            // The process has been resumed, so we can continue running the task.
-                            continue;
-                        }
-                    }
-                    // The process has been terminated, so we simply abort the task.
-                    return;
-                }
-            }
-
-            let mut select = pin!(self.select());
-            while poll!(&mut select).is_pending() {
-                let state = self.inner.current_process().state();
-                match state {
-                    ProcessState::Running => {
-                        // The process is running, but the select call is not ready yet, so we need
-                        // to wait for it to become ready. Here we propagate the pending state to
-                        // the caller to yield to other processes.
-                        pending!()
-                    }
-                    ProcessState::Halted(result) => {
-                        if result.is_stopped() {
-                            // The process is stopped while we are waiting for the select call.
-                            let terminated = self.inner.block_while_stopped().await;
-                            if !terminated {
-                                // The process has been resumed, so we can continue waiting
-                                // for the select call.
-                                continue;
-                            }
-                        }
-                        // The process has been terminated, so we simply abort the task.
-                        return;
-                    }
-                }
-            }
-        }
-    }
-}
-
 mod delegates;
+mod run;
 mod rw_all;
 mod signal;
 
@@ -646,7 +535,7 @@ mod tests {
         Close as _, Disposition, Mode, OfdAccess, Open as _, OpenFlag, Pipe as _, SendSignal,
     };
     use super::*;
-    use crate::system::r#virtual::{PIPE_SIZE, SIGCHLD, SIGINT, SIGUSR2};
+    use crate::system::r#virtual::{PIPE_SIZE, SIGCHLD, SIGINT, SIGUSR2, VirtualSystem};
     use crate::test_helper::WakeFlag;
     use crate::trap::SignalSystem as _;
     use assert_matches::assert_matches;
