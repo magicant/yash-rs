@@ -92,6 +92,11 @@ where
         if let Some(next_wake_time) = state.scheduled_wakers.next_wake_time() {
             state.advance_time(next_wake_time);
         }
+        assert_ne!(
+            global_executor.wake_count(),
+            0,
+            "deadlock detected: at least one task should be woken up to make progress"
+        );
     }
 }
 
