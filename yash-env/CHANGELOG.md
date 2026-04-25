@@ -165,6 +165,11 @@ A _private dependency_ is used internally and not visible to downstream users.
   to perform operations that may require borrowing the system's state again.
 - The `is_ready_for_reading` and `is_ready_for_writing` methods of
   `system::virtual::OpenFileDescription` now return `true` for symbolic links.
+- Virtual processes created by
+  `system::virtual::VirtualSystem::new_child_process` now run tasks using
+  `system::Concurrent::run_virtual`, which calls `system::Concurrent::select`
+  while the task is pending so that the task can be woken up by events in the
+  virtual system.
 - The `test_helper::in_virtual_system` function now internally uses nested loops
   with two executors to better simulate the concurrent execution of the shell
   processes.

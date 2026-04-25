@@ -154,11 +154,9 @@ use std::future::pending;
 use std::future::poll_fn;
 use std::future::ready;
 use std::io::SeekFrom;
-use std::ops::DerefMut as _;
 use std::ops::RangeInclusive;
 use std::pin::Pin;
 use std::rc::Rc;
-use std::task::Context;
 use std::task::Poll;
 use std::task::Waker;
 use std::time::Duration;
@@ -372,6 +370,28 @@ impl VirtualSystem {
                     }
                     Poll::Pending
                 }
+            }
+        })
+        .await
+    }
+
+    /// Blocks the calling thread while the current process is stopped.
+    ///
+    /// Returns `true` if the process has terminated, or `false` if it has resumed.
+    /// **Panics** if the process is not found in the system state.
+    pub(crate) async fn block_while_stopped(&self) -> bool {
+        let waker = Rc::new(Cell::new(None));
+
+        poll_fn(|cx| {
+            let mut process = self.current_process_mut();
+            match process.state() {
+                ProcessState::Running => Poll::Ready(false),
+                ProcessState::Halted(process_result) if process_result.is_stopped() => {
+                    waker.set(Some(cx.waker().clone()));
+                    process.wake_on_resumption(Rc::downgrade(&waker));
+                    Poll::Pending
+                }
+                ProcessState::Halted(_) => Poll::Ready(true),
             }
         })
         .await
@@ -1152,18 +1172,14 @@ impl Fork for VirtualSystem {
         Ok(Box::new(move |parent_env, task| {
             let system = VirtualSystem { state, process_id };
             let mut child_env = parent_env.clone_with_system(system.clone());
+            let concurrent = Rc::clone(&child_env.system);
 
-            let run_task_and_set_exit_status = Box::pin(async move {
-                let runner = ProcessRunner {
-                    task: task(&mut child_env),
-                    system,
-                    waker: Rc::new(Cell::new(None)),
-                };
-                runner.await;
-            });
-
+            let task_runner = async move {
+                let task = async move { match task(&mut child_env).await {} };
+                concurrent.run_virtual(task).await
+            };
             executor
-                .spawn(run_task_and_set_exit_status)
+                .spawn(Box::pin(task_runner))
                 .expect("the executor failed to start the child process task");
 
             process_id
@@ -1517,51 +1533,6 @@ pub trait Executor: Debug {
         &self,
         task: Pin<Box<dyn Future<Output = ()>>>,
     ) -> std::result::Result<(), Box<dyn std::error::Error>>;
-}
-
-/// Concurrent task that manages the execution of a process.
-///
-/// This struct is a helper for [`VirtualSystem::new_child_process`].
-/// It basically runs the given task, but pauses or cancels it depending on
-/// the state of the process.
-struct ProcessRunner<'a> {
-    task: Pin<Box<dyn Future<Output = Infallible> + 'a>>,
-    system: VirtualSystem,
-
-    /// Waker that is woken up when the process is resumed.
-    waker: Rc<Cell<Option<Waker>>>,
-}
-
-impl Future for ProcessRunner<'_> {
-    type Output = ();
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        let this = self.deref_mut();
-
-        let process_state = this.system.current_process().state;
-        if process_state == ProcessState::Running {
-            // Let the task make progress
-            let poll = this.task.as_mut().poll(cx);
-            match poll {
-                // unreachable: Poll::Ready(_) => todo!(),
-                Poll::Pending => (),
-            }
-        }
-
-        let mut process = this.system.current_process_mut();
-        match process.state {
-            ProcessState::Running => Poll::Pending,
-            ProcessState::Halted(result) => {
-                if result.is_stopped() {
-                    this.waker.set(Some(cx.waker().clone()));
-                    process.wake_on_resumption(Rc::downgrade(&this.waker));
-                    Poll::Pending
-                } else {
-                    Poll::Ready(())
-                }
-            }
-        }
-    }
 }
 
 #[cfg(test)]
