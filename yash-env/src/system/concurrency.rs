@@ -23,6 +23,7 @@ use std::cell::{Cell, LazyCell, OnceCell, RefCell};
 use std::collections::HashMap;
 use std::future::poll_fn;
 use std::ops::{Deref, DerefMut};
+use std::pin::pin;
 use std::rc::{Rc, Weak};
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Waker};
@@ -46,7 +47,7 @@ use std::time::{Duration, Instant};
 /// For system calls that do not block, such as [`Pipe`], the wrapper directly
 /// forwards the call to the inner system without any modification.
 ///
-/// This struct is designed to be used in an `Rc` to allow multiple tasks to
+/// This struct is designed to be used in an [`Rc`] to allow multiple tasks to
 /// share the same concurrent system. Some traits, such as [`Read`] and
 /// [`Write`], are implemented for `Rc<Concurrent<S>>` instead of
 /// `Concurrent<S>` to allow the methods to return futures that capture a clone
@@ -54,6 +55,44 @@ use std::time::{Duration, Instant};
 /// necessary because the futures need to access the internal state of the
 /// `Concurrent` system without capturing a reference to the original
 /// `Concurrent` struct, which may not live long enough.
+///
+/// The following example illustrates how multiple concurrent tasks are run in a
+/// single-threaded pool:
+///
+/// ```
+/// # use std::rc::Rc;
+/// # use yash_env::system::{Concurrent, Pipe as _, Read as _, Write as _};
+/// # use yash_env::VirtualSystem;
+/// # use futures_util::task::LocalSpawnExt as _;
+/// let system = Rc::new(Concurrent::new(VirtualSystem::new()));
+/// let system2 = system.clone();
+/// let system3 = system.clone();
+/// let (reader, writer) = system.pipe().unwrap();
+/// let mut executor = futures_executor::LocalPool::new();
+///
+/// // We add a task that tries to read from the pipe, but nothing has been
+/// // written to it, so the task is stalled.
+/// let read_task = executor.spawner().spawn_local_with_handle(async move {
+///     let mut buffer = [0; 1];
+///     system.read(reader, &mut buffer).await.unwrap();
+///     buffer[0]
+/// });
+/// executor.run_until_stalled();
+///
+/// // Let's add a task that writes to the pipe.
+/// executor.spawner().spawn_local(async move {
+///     system2.write_all(writer, &[123]).await.unwrap();
+/// });
+/// executor.run_until_stalled();
+///
+/// // The write task has written a byte to the pipe, but the read task is still
+/// // stalled. We need to wake it up by calling `select` or `peek`.
+/// system3.peek();
+///
+/// // Now the read task can proceed to the end.
+/// let number = executor.run_until(read_task.unwrap());
+/// assert_eq!(number, 123);
+/// ```
 ///
 /// [`Pipe`]: super::Pipe
 #[derive(Clone, Debug, Default)]
@@ -310,7 +349,7 @@ where
     /// ready. This method is similar to [`select`](Concurrent::select), but it
     /// does not block and returns immediately.
     pub fn peek(&self) {
-        let select = std::pin::pin!(self.select_impl(true));
+        let select = pin!(self.select_impl(true));
         let poll = select.poll(&mut Context::from_waker(Waker::noop()));
         debug_assert_eq!(poll, Ready(()), "peek should not block");
     }
@@ -331,6 +370,13 @@ where
     ///     concurrent.select().await;
     /// }
     /// ```
+    ///
+    /// The [`run_real`](Self::run_real) and [`run_virtual`](Self::run_virtual)
+    /// methods provide a convenient way to implement such a main loop.
+    ///
+    /// The future returned by this method will be pending if and only if the
+    /// future returned by the inner system's [`select`](Select::select) method
+    /// is pending.
     pub async fn select(&self) {
         self.select_impl(false).await;
     }
@@ -479,6 +525,7 @@ impl SignalList {
 }
 
 mod delegates;
+mod run;
 mod rw_all;
 mod signal;
 
@@ -493,7 +540,6 @@ mod tests {
     use crate::trap::SignalSystem as _;
     use assert_matches::assert_matches;
     use futures_util::FutureExt as _;
-    use std::pin::pin;
     use std::sync::Arc;
     use std::task::Poll::{Pending, Ready};
 

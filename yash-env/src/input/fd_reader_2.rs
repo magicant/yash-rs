@@ -14,93 +14,64 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// `FdReader` definition
+// `FdReader2` definition
 
 use super::{Context, Input, Result};
 use crate::io::Fd;
-use crate::option::State;
-use crate::system::{Fcntl, Read, SharedSystem, Write};
-use std::cell::Cell;
+use crate::system::{Concurrent, Fcntl, Read};
 use std::rc::Rc;
 use std::slice::from_mut;
 
-/// Input function that reads from a file descriptor.
+/// [Input function](Input) that reads from a file descriptor
 ///
-/// An instance of `FdReader` contains a [`SharedSystem`] to interact with the
-/// file descriptor.
+/// An instance of `FdReader2<S>` contains a `Rc<Concurrent<S>>` to read input
+/// from a file descriptor.
 ///
-/// Although `FdReader` implements `Clone`, it does not mean you can create and
-/// keep a copy of a `FdReader` instance to replay the input later. Since both
-/// the original and clone share the same `SharedSystem`, reading a line from
+/// Although `FdReader2` implements `Clone`, it does not mean you can create and
+/// keep a copy of a `FdReader2` instance to replay the input later. Since both
+/// the original and clone share the same `Concurrent<S>`, reading a line from
 /// one instance will affect the next read from the other.
 ///
-/// Use [`FdReader2`](super::FdReader2) if you want an `Input` that depends on
-/// [`Concurrent`](crate::system::Concurrent) instead of `SharedSystem`.
+/// `FdReader2` is a variant of [`FdReader`](super::FdReader) that depends on
+/// `Concurrent<S>` instead of [`SharedSystem`](crate::system::SharedSystem).
 #[derive(Debug)]
-#[must_use = "FdReader does nothing unless used by a parser"]
-pub struct FdReader<S> {
+#[must_use = "FdReader2 does nothing unless used by a parser"]
+pub struct FdReader2<S> {
     /// File descriptor to read from
     fd: Fd,
     /// System to interact with the FD
-    system: SharedSystem<S>,
-    /// Whether lines read are echoed to stderr
-    echo: Option<Rc<Cell<State>>>,
+    system: Rc<Concurrent<S>>,
 }
 
-impl<S> FdReader<S> {
-    /// Creates a new `FdReader` instance.
+impl<S> FdReader2<S> {
+    /// Creates a new `FdReader2` instance.
     ///
     /// The `fd` argument is the file descriptor to read from. It should be
     /// readable, have the close-on-exec flag set, and remain open for the
-    /// lifetime of the `FdReader` instance.
-    pub fn new(fd: Fd, system: SharedSystem<S>) -> Self {
-        let echo = None;
-        FdReader { fd, system, echo }
-    }
-
-    /// Sets the "echo" flag.
-    ///
-    /// You can use this setter function to set a shared option state that
-    /// controls whether the input function echoes lines it reads to the
-    /// standard error. If `echo` is `None` or some shared cell containing
-    /// `Off`, the function does not echo. If a cell has `On`, the function
-    /// prints every line it reads to the standard error.
-    ///
-    /// This option implements the behavior of the `verbose` shell option. You
-    /// can change the state of the shared cell through the lifetime of the
-    /// input function to reflect the option dynamically changed, which will
-    /// affect the next `next_line` call.
-    ///
-    /// # Deprecation
-    ///
-    /// This function is deprecated in favor of the [`Echo`] struct.
-    ///
-    /// [`Echo`]: super::Echo
-    #[deprecated = "use Echo instead"]
-    pub fn set_echo(&mut self, echo: Option<Rc<Cell<State>>>) {
-        self.echo = echo;
+    /// lifetime of the `FdReader2` instance.
+    pub fn new(fd: Fd, system: Rc<Concurrent<S>>) -> Self {
+        FdReader2 { fd, system }
     }
 }
 
 // Not derived automatically because S may not implement Clone
-impl<S> Clone for FdReader<S> {
+impl<S> Clone for FdReader2<S> {
     fn clone(&self) -> Self {
         Self {
             fd: self.fd,
             system: self.system.clone(),
-            echo: self.echo.clone(),
         }
     }
 }
 
-impl<S: Fcntl + Read + Write> Input for FdReader<S> {
+impl<S: Fcntl + Read> Input for FdReader2<S> {
     async fn next_line(&mut self, _context: &Context) -> Result {
         // TODO Read many bytes at once if seekable
 
         let mut bytes = Vec::new();
         loop {
             let mut byte = 0;
-            match self.system.read_async(self.fd, from_mut(&mut byte)).await {
+            match self.system.read(self.fd, from_mut(&mut byte)).await {
                 // End of input
                 Ok(0) => break,
 
@@ -120,12 +91,6 @@ impl<S: Fcntl + Read + Write> Input for FdReader<S> {
         let line = String::from_utf8(bytes)
             .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).into());
 
-        if let Some(echo) = &self.echo {
-            if echo.get() == State::On {
-                let _ = self.system.write_all(Fd::STDERR, line.as_bytes()).await;
-            }
-        }
-
         Ok(line)
     }
 }
@@ -141,14 +106,13 @@ mod tests {
     use crate::system::r#virtual::FileBody;
     use crate::system::r#virtual::Inode;
     use crate::system::r#virtual::VirtualSystem;
-    use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn empty_reader() {
         let system = VirtualSystem::new();
-        let system = SharedSystem::new(system);
-        let mut reader = FdReader::new(Fd::STDIN, system);
+        let system = Rc::new(Concurrent::new(system));
+        let mut reader = FdReader2::new(Fd::STDIN, system);
 
         let line = reader
             .next_line(&Context::default())
@@ -166,8 +130,8 @@ mod tests {
             let file = state.file_system.get("/dev/stdin").unwrap();
             file.borrow_mut().body = FileBody::new(*b"echo ok\n");
         }
-        let system = SharedSystem::new(system);
-        let mut reader = FdReader::new(Fd::STDIN, system);
+        let system = Rc::new(Concurrent::new(system));
+        let mut reader = FdReader2::new(Fd::STDIN, system);
 
         let line = reader
             .next_line(&Context::default())
@@ -191,8 +155,8 @@ mod tests {
             let file = state.file_system.get("/dev/stdin").unwrap();
             file.borrow_mut().body = FileBody::new(*b"#!/bin/sh\necho ok\nexit");
         }
-        let system = SharedSystem::new(system);
-        let mut reader = FdReader::new(Fd::STDIN, system);
+        let system = Rc::new(Concurrent::new(system));
+        let mut reader = FdReader2::new(Fd::STDIN, system);
 
         let line = reader
             .next_line(&Context::default())
@@ -228,7 +192,7 @@ mod tests {
             let file = Rc::new(Inode::new("echo file\n").into());
             state.file_system.save("/foo", file).unwrap();
         }
-        let system = SharedSystem::new(system);
+        let system = Rc::new(Concurrent::new(system));
         let path = c"/foo";
         let fd = system
             .open(
@@ -240,7 +204,7 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        let mut reader = FdReader::new(fd, system);
+        let mut reader = FdReader2::new(fd, system);
 
         let line = reader
             .next_line(&Context::default())
@@ -260,8 +224,8 @@ mod tests {
     fn reader_error() {
         let system = VirtualSystem::new();
         system.current_process_mut().close_fd(Fd::STDIN);
-        let system = SharedSystem::new(system);
-        let mut reader = FdReader::new(Fd::STDIN, system);
+        let system = Rc::new(Concurrent::new(system));
+        let mut reader = FdReader2::new(Fd::STDIN, system);
 
         let error = reader
             .next_line(&Context::default())
@@ -269,68 +233,5 @@ mod tests {
             .unwrap()
             .unwrap_err();
         assert_eq!(error.raw_os_error(), Some(Errno::EBADF.0));
-    }
-
-    #[test]
-    fn echo_off() {
-        let system = VirtualSystem::new();
-        let state = Rc::clone(&system.state);
-        {
-            let state = state.borrow();
-            let file = state.file_system.get("/dev/stdin").unwrap();
-            file.borrow_mut().body = FileBody::new(*b"one\ntwo");
-        }
-        let system = SharedSystem::new(system);
-        let mut reader = FdReader::new(Fd::STDIN, system);
-        #[allow(deprecated)]
-        reader.set_echo(Some(Rc::new(Cell::new(State::Off))));
-
-        let _ = reader
-            .next_line(&Context::default())
-            .now_or_never()
-            .unwrap();
-        let state = state.borrow();
-        let file = state.file_system.get("/dev/stderr").unwrap();
-        assert_matches!(&file.borrow().body, FileBody::Regular { content, .. } => {
-            assert_eq!(content, &[]);
-        });
-    }
-
-    #[test]
-    fn echo_on() {
-        let system = VirtualSystem::new();
-        let state = Rc::clone(&system.state);
-        {
-            let state = state.borrow();
-            let file = state.file_system.get("/dev/stdin").unwrap();
-            file.borrow_mut().body = FileBody::new(*b"one\ntwo");
-        }
-        let system = SharedSystem::new(system);
-        let mut reader = FdReader::new(Fd::STDIN, system);
-        #[allow(deprecated)]
-        reader.set_echo(Some(Rc::new(Cell::new(State::On))));
-
-        let _ = reader
-            .next_line(&Context::default())
-            .now_or_never()
-            .unwrap();
-        {
-            let state = state.borrow();
-            let file = state.file_system.get("/dev/stderr").unwrap();
-            assert_matches!(&file.borrow().body, FileBody::Regular { content, .. } => {
-                assert_eq!(content, b"one\n");
-            });
-        }
-        let _ = reader
-            .next_line(&Context::default())
-            .now_or_never()
-            .unwrap();
-        {
-            let state = state.borrow();
-            let file = state.file_system.get("/dev/stderr").unwrap();
-            assert_matches!(&file.borrow().body, FileBody::Regular { content, .. } => {
-                assert_eq!(content, b"one\ntwo");
-            });
-        }
     }
 }

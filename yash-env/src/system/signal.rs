@@ -17,7 +17,7 @@
 //! Signal-related functionality for the system module
 
 #[cfg(doc)]
-use super::SharedSystem;
+use super::{Concurrent, SharedSystem};
 use super::{Pid, Result};
 pub use crate::signal::{Name, Number, RawNumber};
 use std::borrow::Cow;
@@ -460,10 +460,9 @@ pub enum SigmaskOp {
 pub trait Sigmask: Signals {
     /// Gets and/or sets the signal blocking mask.
     ///
-    /// This is a low-level function used internally by [`SharedSystem`]. You
-    /// should not call this function directly, or you will disrupt the behavior
-    /// of `SharedSystem`. The description below applies if you want to do
-    /// everything yourself without depending on `SharedSystem`.
+    /// This trait is usually not used directly. Instead, it is used by
+    /// [`Concurrent`] and [`SharedSystem`] to configure signal handling
+    /// behavior of the process.
     ///
     /// This is a thin wrapper around the [`sigprocmask` system
     /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_sigmask.html).
@@ -517,12 +516,6 @@ pub enum Disposition {
 pub trait GetSigaction: Signals {
     /// Gets the disposition for a signal.
     ///
-    /// This is a low-level function used internally by
-    /// [`SharedSystem`]. You should not call this function directly, or you
-    /// will leave the `SharedSystem` instance in an inconsistent state. The
-    /// description below applies if you want to do everything yourself without
-    /// depending on `SharedSystem`.
-    ///
     /// This is an abstract wrapper around the [`sigaction` system
     /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigaction.html).
     /// This function returns the current disposition if successful.
@@ -543,11 +536,9 @@ impl<S: GetSigaction> GetSigaction for Rc<S> {
 pub trait Sigaction: GetSigaction {
     /// Gets and sets the disposition for a signal.
     ///
-    /// This is a low-level function used internally by [`SharedSystem`]. You
-    /// should not call this function directly, or you will leave the
-    /// `SharedSystem` instance in an inconsistent state. The description below
-    /// applies if you want to do everything yourself without depending on
-    /// `SharedSystem`.
+    /// This trait is usually not used directly. Instead, it is used by
+    /// [`Concurrent`] and [`SharedSystem`] to configure signal handling
+    /// behavior of the process.
     ///
     /// This is an abstract wrapper around the [`sigaction` system
     /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigaction.html).
@@ -577,11 +568,9 @@ impl<S: Sigaction> Sigaction for Rc<S> {
 pub trait CaughtSignals: Signals {
     /// Returns signals this process has caught, if any.
     ///
-    /// This is a low-level function used internally by
-    /// [`SharedSystem::select`]. You should not call this function directly, or
-    /// you will disrupt the behavior of `SharedSystem`. The description below
-    /// applies if you want to do everything yourself without depending on
-    /// `SharedSystem`.
+    /// This trait is usually not used directly. Instead, it is used by
+    /// [`Concurrent`] and [`SharedSystem`] to collect signals caught by the
+    /// process.
     ///
     /// Implementors of this trait usually also implement [`Sigaction`] to allow
     /// setting which signals are caught.

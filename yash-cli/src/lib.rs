@@ -30,6 +30,7 @@ use self::startup::init_file::run_rcfile;
 use self::startup::input::prepare_input;
 use std::cell::RefCell;
 use std::ops::ControlFlow::{Break, Continue};
+use std::rc::Rc;
 use yash_env::Env;
 use yash_env::RealSystem;
 use yash_env::option::{Interactive, On};
@@ -39,7 +40,6 @@ use yash_env::system::{
     Chdir, Disposition, Errno, Fcntl, GetCwd, GetUid, Isatty, Sigaction, Signals, Sysconf,
     TcGetPgrp, Times, Umask, Write,
 };
-use yash_executor::Executor;
 use yash_semantics::trap::run_exit_trap;
 use yash_semantics::{Runtime, interactive_read_eval_loop, read_eval_loop};
 
@@ -146,17 +146,10 @@ pub fn main() -> ! {
         .sigaction(RealSystem::SIGPIPE, Disposition::Default)
         .ok();
 
-    let system = env.system.clone();
-    let executor = Executor::new();
-    let task = Box::pin(async {
+    let system = Rc::clone(&env.system);
+    let task = async {
         run_as_shell_process(&mut env).await;
         exit_or_raise(&env.system, env.exit_status).await
-    });
-    // SAFETY: We never create new threads in the whole process, so wakers are
-    // never shared between threads.
-    unsafe { executor.spawn_pinned(task) }
-    loop {
-        executor.run_until_stalled();
-        system.select(false).ok();
-    }
+    };
+    system.run_real(task)
 }

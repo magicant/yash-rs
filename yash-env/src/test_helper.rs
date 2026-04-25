@@ -22,9 +22,8 @@ use crate::Env;
 use crate::system::r#virtual::{Executor, FileBody, Inode, SystemState, VirtualSystem};
 use assert_matches::assert_matches;
 use futures_executor::LocalSpawner;
-use futures_util::FutureExt as _;
 use futures_util::task::LocalSpawnExt as _;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::pin::Pin;
 use std::rc::Rc;
 use std::str::from_utf8;
@@ -42,20 +41,21 @@ impl Executor for LocalExecutor {
     }
 }
 
-/// Runs an asynchronous function in a virtual system with a local executor.
+/// Runs an asynchronous function in a virtual system with an executor.
 ///
-/// This function creates a [`VirtualSystem`] and installs a [`LocalExecutor`]
-/// in it. The argument function `f` is called with an [`Env`] with the virtual
-/// system. The executor is run until the task returned by `f` completes, and
-/// the result is returned.
+/// This function creates a [`VirtualSystem`] and installs a
+/// [`yash_executor::Spawner`] in it as an [`Executor`]. The argument function
+/// `task` is called with an [`Env`] with the virtual system. The executor loop
+/// is run until the future returned by `task` completes, and the result is
+/// returned.
 ///
-/// Function `f` is called with two arguments: the [`Env`] and a shared
+/// Function `task` is called with two arguments: the [`Env`] and a shared
 /// reference to the system state. The system state can be used to interact
-/// with the virtual system, e.g. to create files or concurrent tasks.
+/// with the virtual system, e.g. to create files or inspect the process state.
 ///
 /// This function is useful for testing asynchronous code that spawns tasks
 /// that need to be run concurrently with the main task.
-pub fn in_virtual_system<F, Fut, T>(f: F) -> T
+pub fn in_virtual_system<F, Fut, T>(task: F) -> T
 where
     F: FnOnce(Env<VirtualSystem>, Rc<RefCell<SystemState>>) -> Fut,
     Fut: Future<Output = T> + 'static,
@@ -63,26 +63,40 @@ where
 {
     let system = VirtualSystem::new();
     let state = Rc::clone(&system.state);
-    let mut executor = futures_executor::LocalPool::new();
-    state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
+    let global_executor = yash_executor::Executor::new();
+    state.borrow_mut().executor = Some(Rc::new(global_executor.spawner()));
 
     let env = Env::with_system(system);
-    let shared_system = env.system.clone();
-    let task = f(env, Rc::clone(&state));
-    let mut task = executor.spawner().spawn_local_with_handle(task).unwrap();
+    let concurrent = env.system.clone();
+    let task = task(env, Rc::clone(&state));
+
+    let result = Rc::new(Cell::new(None));
+    let result_passer = Rc::clone(&result);
+    let runner = async move {
+        let run_task_and_set_result = async move { result_passer.set(Some(task.await)) };
+        concurrent.run_virtual(run_task_and_set_result).await
+    };
+
+    // SAFETY: Actually this is not safe if the task creates a thread and a waker from the executor
+    // is used in the thread. However, the shell process must be single-threaded to work correctly,
+    // so we assume the task does not create threads.
+    unsafe { global_executor.spawn_pinned(Box::pin(runner)) };
+
     loop {
-        if let Some(result) = (&mut task).now_or_never() {
+        global_executor.run_until_stalled();
+        if let Some(result) = result.take() {
             return result;
         }
-        executor.run_until_stalled();
-        {
-            let mut state = state.borrow_mut();
-            if let Some(next_wake_time) = state.scheduled_wakers.next_wake_time() {
-                state.advance_time(next_wake_time);
-            }
+
+        let mut state = state.borrow_mut();
+        if let Some(next_wake_time) = state.scheduled_wakers.next_wake_time() {
+            state.advance_time(next_wake_time);
         }
-        shared_system.select(false).unwrap();
-        SystemState::select_all(&state);
+        assert_ne!(
+            global_executor.wake_count(),
+            0,
+            "deadlock detected: at least one task should be woken up to make progress"
+        );
     }
 }
 

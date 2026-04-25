@@ -22,7 +22,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `impl system::Stat for system::virtual::Stat`
 - The `system::Concurrent` struct has been added as a wrapper around a `System`
   implementation to provide concurrent execution of blocking operations. This
-  struct will replace the existing `system::SharedSystem` struct.
+  struct replaces the existing `system::SharedSystem` struct.
+- The `select_async` method has been added to the `system::SharedSystem` struct.
 - The `system::virtual::FileBody` enum now has the following methods:
     - `is_seekable`: Returns whether the file supports seeking.
 - The following fields have been added to the `system::virtual::FileBody::Fifo`
@@ -90,6 +91,11 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `test_helper` module has been added with items migrated from the
   `yash-env-test-helper` crate. This module is conditionally compiled when the
   new `test-helper` feature is enabled.
+- The `system::virtual::Executor` trait is now implemented for
+  the `yash_executor::Spawner` type, allowing it to be used as an executor for
+  the virtual system. This implementation is conditionally compiled when the new
+  `yash-executor` feature is enabled, which is transitively enabled by the
+  `test-helper` feature.
 - Private dependencies:
     - assert_matches (optional) 1.5.0
     - futures-executor (optional) 0.3.31
@@ -97,11 +103,27 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- The `Env::system` field now holds an `Rc<Concurrent<S>>` instead of a
+  `SharedSystem<S>`.
+- The `Env::wait_for_signals` method now returns `Rc<system::SignalList>`
+  instead of `Rc<[signal::Number]>`.
+- The `Env::poll_signals` method now returns `Option<Rc<system::SignalList>>`
+  instead of `Option<Rc<[signal::Number]>>`.
 - The `trap::SignalSystem::set_disposition` method signature has changed:
     - The receiver is now `&self` instead of `&mut self`.
     - The return type is now
       `impl Future<Output = Result<Disposition, Errno>> + use<Self>` instead of
       `Result<Disposition, Errno>`, making the method async.
+- The following methods of `trap::TrapSet` now take `&S` instead of `&mut S` for
+  the system parameter:
+    - `disable_internal_dispositions`
+    - `disable_internal_dispositions_for_stoppers`
+    - `disable_internal_dispositions_for_terminators`
+    - `enable_internal_disposition_for_sigchld`
+    - `enable_internal_dispositions_for_terminators`
+    - `enable_internal_dispositions_for_stoppers`
+    - `enter_subshell`
+    - `set_action`
 - The following `trap::TrapSet` methods are now async:
     - `set_action`
     - `enter_subshell`
@@ -143,8 +165,24 @@ A _private dependency_ is used internally and not visible to downstream users.
   to perform operations that may require borrowing the system's state again.
 - The `is_ready_for_reading` and `is_ready_for_writing` methods of
   `system::virtual::OpenFileDescription` now return `true` for symbolic links.
+- Virtual processes created by
+  `system::virtual::VirtualSystem::new_child_process` now run tasks using
+  `system::Concurrent::run_virtual`, which calls `system::Concurrent::select`
+  while the task is pending so that the task can be woken up by events in the
+  virtual system.
+- The `test_helper::in_virtual_system` function now internally uses
+  `system::Concurrent::run_virtual` to run the provided task, which better
+  simulates the execution of shell processes driven by
+  `system::Concurrent::run_real`. It now also uses `yash_executor::Executor`
+  as the executor instead of `futures_executor::LocalPool`.
 - Private dependency versions:
     - derive_more 2.0.1 → 2.1.0
+
+### Deprecated
+
+- `system::virtual::SystemState::select_all`: This method is no longer necessary
+  because virtual processes are now automatically woken up when they are ready
+  to make progress.
 
 ### Removed
 

@@ -82,7 +82,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         env.traps
             .set_action(
-                &mut env.system,
+                &env.system,
                 Condition::Exit,
                 Action::Command("echo exit trap executed".into()),
                 Location::dummy(""),
@@ -114,7 +114,7 @@ mod tests {
         );
         env.traps
             .set_action(
-                &mut env.system,
+                &env.system,
                 Condition::Exit,
                 Action::Command("check".into()),
                 Location::dummy(""),
@@ -132,7 +132,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         env.traps
             .set_action(
-                &mut env.system,
+                &env.system,
                 Condition::Exit,
                 Action::Command("return -n 123".into()),
                 Location::dummy(""),
@@ -155,7 +155,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         env.traps
             .set_action(
-                &mut env.system,
+                &env.system,
                 Condition::Exit,
                 Action::Command("echo $?; echo $?".into()),
                 Location::dummy(""),
@@ -176,7 +176,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         env.traps
             .set_action(
-                &mut env.system,
+                &env.system,
                 Condition::Exit,
                 Action::Command("return -n 53; return".into()),
                 Location::dummy(""),
@@ -197,7 +197,7 @@ mod tests {
         env.builtins.insert("exit", exit_builtin());
         env.traps
             .set_action(
-                &mut env.system,
+                &env.system,
                 Condition::Exit,
                 Action::Command("exit 31".into()),
                 Location::dummy(""),
@@ -218,7 +218,7 @@ mod tests {
         env.builtins.insert("exit", exit_builtin());
         env.traps
             .set_action(
-                &mut env.system,
+                &env.system,
                 Condition::Exit,
                 Action::Command("echo; exit".into()),
                 Location::dummy(""),

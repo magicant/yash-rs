@@ -222,7 +222,7 @@ where
 
                 env.traps
                     .enter_subshell(
-                        &mut env.system,
+                        &env.system,
                         ignore_sigint_sigquit,
                         keep_internal_dispositions_for_stoppers,
                     )
@@ -405,7 +405,7 @@ mod tests {
         in_virtual_system(|mut env, _state| async move {
             env.traps
                 .set_action(
-                    &mut env.system,
+                    &env.system,
                     SIGCHLD,
                     Action::Command("echo foo".into()),
                     Location::dummy(""),
@@ -732,7 +732,7 @@ mod tests {
             parent_env.options.set(Monitor, On);
             parent_env
                 .traps
-                .enable_internal_dispositions_for_stoppers(&mut parent_env.system)
+                .enable_internal_dispositions_for_stoppers(&parent_env.system)
                 .await
                 .unwrap();
             stub_tty(&state);
@@ -762,7 +762,7 @@ mod tests {
             parent_env.options.set(Monitor, On);
             parent_env
                 .traps
-                .enable_internal_dispositions_for_stoppers(&mut parent_env.system)
+                .enable_internal_dispositions_for_stoppers(&parent_env.system)
                 .await
                 .unwrap();
             stub_tty(&state);

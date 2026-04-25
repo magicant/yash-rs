@@ -337,7 +337,7 @@ mod tests {
     fn ignore_sigttin(env: &mut Env<VirtualSystem>) {
         env.traps
             .set_action(
-                &mut env.system,
+                &env.system,
                 VirtualSystem::SIGTTIN,
                 yash_env::trap::Action::Ignore,
                 Location::dummy(""),

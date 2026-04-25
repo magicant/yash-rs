@@ -24,8 +24,7 @@ use std::ffi::CString;
 use std::ops::ControlFlow;
 use std::rc::Rc;
 use yash_env::Env;
-use yash_env::input::Echo;
-use yash_env::input::FdReader;
+use yash_env::input::{Echo, FdReader2};
 use yash_env::io::Fd;
 use yash_env::io::move_fd_internal;
 use yash_env::parser::Config;
@@ -65,7 +64,7 @@ impl Command {
             .expect("`source` built-in requires `RunReadEvalLoop` in `Env::any`");
         let system = env.system.clone();
         let ref_env = RefCell::new(&mut *env);
-        let input = Box::new(Echo::new(FdReader::new(fd, system), &ref_env));
+        let input = Box::new(Echo::new(FdReader2::new(fd, system), &ref_env));
         let mut config = Config::with_input(input);
         config.source = Some(Rc::new(Source::DotScript {
             name: self.file.value,
@@ -106,7 +105,7 @@ where
             .into_unix_string()
             .into_vec();
         if let Ok(c_path) = CString::new(path) {
-            if let Ok(fd) = open_file(&mut env.system, &c_path).await {
+            if let Ok(fd) = open_file(&env.system, &c_path).await {
                 return Ok(fd);
             }
         }
@@ -118,7 +117,7 @@ where
 ///
 /// The returned file descriptor is opened with the `O_CLOEXEC` flag and is at
 /// least [`MIN_INTERNAL_FD`](yash_env::io::MIN_INTERNAL_FD).
-async fn open_file<S>(system: &mut S, path: &CStr) -> Result<Fd, Errno>
+async fn open_file<S>(system: &S, path: &CStr) -> Result<Fd, Errno>
 where
     S: Open + Close + Dup + ?Sized,
 {
@@ -254,15 +253,15 @@ mod tests {
 
     #[test]
     fn open_file_result_lower_bound() {
-        let mut system = system_with_file("/foo/file", "");
-        let result = open_file(&mut system, c"/foo/file").now_or_never().unwrap();
+        let system = system_with_file("/foo/file", "");
+        let result = open_file(&system, c"/foo/file").now_or_never().unwrap();
         assert_matches!(result, Ok(fd) if fd >= MIN_INTERNAL_FD);
     }
 
     #[test]
     fn open_file_result_cloexec() {
-        let mut system = system_with_file("/foo/file", "");
-        let fd = open_file(&mut system, c"/foo/file")
+        let system = system_with_file("/foo/file", "");
+        let fd = open_file(&system, c"/foo/file")
             .now_or_never()
             .unwrap()
             .unwrap();

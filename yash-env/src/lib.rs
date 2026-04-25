@@ -31,6 +31,14 @@
 //! [`RealSystem`] provides an implementation for them that interacts with
 //! the underlying system. [`VirtualSystem`] simulates a system for testing
 //! purposes.
+//!
+//! We assume that the shell process is single-threaded. This means that the
+//! shell process itself must not create threads, and all interactions with the
+//! system must be performed in the main thread. Using any items in this crate
+//! in a multi-threaded context is not supported and may cause undefined
+//! behavior. This prerequisite still applies even when a [`VirtualSystem`]
+//! simulates concurrent execution of multiple processes, which run as
+//! asynchronous tasks.
 
 use self::alias::AliasSet;
 use self::any::DataSet;
@@ -51,6 +59,7 @@ use self::stack::Stack;
 use self::system::CaughtSignals;
 use self::system::Clock;
 use self::system::Close;
+use self::system::Concurrent;
 use self::system::Dup;
 use self::system::Errno;
 use self::system::Fstat;
@@ -65,6 +74,7 @@ use self::system::Select;
 pub use self::system::SharedSystem;
 use self::system::Sigaction;
 use self::system::Sigmask;
+use self::system::SignalList;
 use self::system::Signals;
 #[allow(deprecated)]
 pub use self::system::System;
@@ -92,13 +102,13 @@ pub use unix_str as str;
 ///
 /// The shell execution environment consists of application-managed parts and
 /// system-managed parts. Application-managed parts are directly implemented in
-/// the `Env` instance. System-managed parts are managed by a [`SharedSystem`]
-/// that contains an instance of `S` that implements [`System`].
+/// the `Env` instance. System-managed parts are managed by a [`Concurrent`]
+/// wrapping a `System` instance.
 ///
 /// # Cloning
 ///
 /// `Env::clone` effectively clones the application-managed parts of the
-/// environment. Since [`SharedSystem`] is reference-counted, you will not get a
+/// environment. Since [`Concurrent`] is reference-counted, you will not get a
 /// deep copy of the system-managed parts. See also
 /// [`clone_with_system`](Self::clone_with_system).
 #[derive(Clone, Debug)]
@@ -154,15 +164,16 @@ pub struct Env<S> {
     pub any: DataSet,
 
     /// Interface to the system-managed parts of the environment
-    pub system: SharedSystem<S>,
+    pub system: Rc<Concurrent<S>>,
 }
 
 impl<S> Env<S> {
     /// Creates a new environment with the given system.
     ///
     /// Members of the new environments are default-constructed except that:
+    /// - `main_pgid` is initialized as `system.getpgrp()`
     /// - `main_pid` is initialized as `system.getpid()`
-    /// - `system` is initialized as `SharedSystem::new(system)`
+    /// - `system` is initialized as `Rc::new(Concurrent::new(system))`
     #[must_use]
     pub fn with_system(system: S) -> Self
     where
@@ -183,7 +194,7 @@ impl<S> Env<S> {
             tty: Default::default(),
             variables: Default::default(),
             any: Default::default(),
-            system: SharedSystem::new(system),
+            system: Rc::new(Concurrent::new(system)),
         }
     }
 
@@ -209,7 +220,7 @@ impl<S> Env<S> {
             tty: self.tty,
             variables: self.variables.clone(),
             any: self.any.clone(),
-            system: SharedSystem::new(system),
+            system: Rc::new(Concurrent::new(system)),
         }
     }
 }
@@ -256,11 +267,11 @@ impl<S> Env<S> {
     ///
     /// Returns an array of signals caught.
     ///
-    /// This function is a wrapper for [`SharedSystem::wait_for_signals`].
+    /// This function is a wrapper for [`Concurrent::wait_for_signals`].
     /// Before the function returns, it passes the results to
     /// [`TrapSet::catch_signal`] so the trap set can remember the signals
     /// caught to be handled later.
-    pub async fn wait_for_signals(&mut self) -> Rc<[signal::Number]> {
+    pub async fn wait_for_signals(&mut self) -> Rc<SignalList> {
         let result = self.system.wait_for_signals().await;
         for signal in result.iter().copied() {
             self.traps.catch_signal(signal);
@@ -281,24 +292,30 @@ impl<S> Env<S> {
     /// This function is similar to
     /// [`wait_for_signals`](Self::wait_for_signals) but does not wait for
     /// signals to be caught. Instead, it only checks if any signals have been
-    /// caught but not yet consumed in the [`SharedSystem`].
-    pub fn poll_signals(&mut self) -> Option<Rc<[signal::Number]>>
+    /// caught but not yet consumed in the [`Concurrent`] instance. If no
+    /// signals have been caught, it returns `None`.
+    pub fn poll_signals(&mut self) -> Option<Rc<SignalList>>
     where
         S: Select + CaughtSignals + Clock,
     {
-        let system = self.system.clone();
+        let system = Rc::clone(&self.system);
 
         let mut future = std::pin::pin!(self.wait_for_signals());
-
         let mut context = Context::from_waker(Waker::noop());
+
+        // Check if the result is ready before peeking the system
         if let Poll::Ready(signals) = future.as_mut().poll(&mut context) {
             return Some(signals);
         }
 
-        system.select(true).ok();
+        // Peek to handle any pending signals
+        system.peek();
+
+        // Check again if the result is ready after peeking
         if let Poll::Ready(signals) = future.poll(&mut context) {
             return Some(signals);
         }
+
         None
     }
 
@@ -428,7 +445,7 @@ impl<S> Env<S> {
         // We need to set the internal disposition before calling `wait` so we don't
         // miss any `SIGCHLD` that may arrive between `wait` and `wait_for_signal`.
         self.traps
-            .enable_internal_disposition_for_sigchld(&mut self.system)
+            .enable_internal_disposition_for_sigchld(&self.system)
             .await?;
 
         loop {
@@ -607,6 +624,8 @@ pub mod trap;
 pub mod variable;
 pub mod waker;
 
+#[cfg(any(test, feature = "yash-executor"))]
+mod executor_helper;
 #[cfg(any(test, feature = "test-helper"))]
 pub mod test_helper;
 
@@ -630,7 +649,7 @@ mod tests {
         in_virtual_system(|mut env, state| async move {
             env.traps
                 .set_action(
-                    &mut env.system,
+                    &env.system,
                     SIGCHLD,
                     Action::Command("".into()),
                     Location::dummy(""),
@@ -656,7 +675,7 @@ mod tests {
         let mut env = Env::with_system(system.clone());
         env.traps
             .set_action(
-                &mut env.system,
+                &env.system,
                 SIGCHLD,
                 Action::Command("".into()),
                 Location::dummy(""),
@@ -686,7 +705,7 @@ mod tests {
         }
 
         let result = env.poll_signals().unwrap();
-        assert_eq!(*result, [SIGCHLD]);
+        assert_eq!(result.as_slice(), [SIGCHLD]);
     }
 
     #[test]

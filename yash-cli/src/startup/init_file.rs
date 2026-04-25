@@ -33,7 +33,7 @@ use std::ffi::CString;
 use std::rc::Rc;
 use thiserror::Error;
 use yash_env::Env;
-use yash_env::input::{Echo, FdReader};
+use yash_env::input::{Echo, FdReader2};
 use yash_env::io::Fd;
 use yash_env::io::move_fd_internal;
 use yash_env::option::Option::Interactive;
@@ -158,7 +158,7 @@ where
         return;
     }
 
-    async fn open_fd<S>(system: &mut S, path: String) -> Result<Fd, Errno>
+    async fn open_fd<S>(system: &S, path: String) -> Result<Fd, Errno>
     where
         S: Close + Dup + Open,
     {
@@ -174,7 +174,7 @@ where
         move_fd_internal(system, fd)
     }
 
-    let fd = match open_fd(&mut env.system, path.to_owned()).await {
+    let fd = match open_fd(&env.system, path.to_owned()).await {
         Ok(fd) => fd,
         Err(errno) => {
             env.system
@@ -190,7 +190,7 @@ where
     let env = &mut *env.push_frame(Frame::InitFile);
     let system = env.system.clone();
     let ref_env = RefCell::new(&mut *env);
-    let input = Box::new(Echo::new(FdReader::new(fd, system), &ref_env));
+    let input = Box::new(Echo::new(FdReader2::new(fd, system), &ref_env));
     let mut config = Config::with_input(input);
     config.source = Some(Rc::new(Source::InitFile {
         path: path.to_owned(),

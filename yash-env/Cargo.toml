@@ -20,7 +20,13 @@ targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
 
 [features]
 default = []
-test-helper = ["assert_matches", "futures-executor", "futures-util"]
+yash-executor = ["dep:yash-executor"]
+test-helper = [
+  "dep:assert_matches",
+  "yash-executor",
+  "dep:futures-executor",
+  "futures-util/channel",
+]
 
 [dependencies]
 annotate-snippets = { workspace = true }
@@ -32,7 +38,7 @@ either = { workspace = true }
 enumset = { workspace = true }
 errno = { workspace = true, default-features = false }
 futures-executor = { workspace = true, optional = true }
-futures-util = { workspace = true, features = ["channel"], optional = true }
+futures-util = { workspace = true }
 itertools = { workspace = true }
 slab = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
@@ -40,11 +46,11 @@ tempfile = { workspace = true }
 thiserror = { workspace = true }
 unix_path = { workspace = true }
 unix_str = { workspace = true }
+yash-executor = { workspace = true, optional = true }
 yash-quote = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true, default-features = false }
-yash-executor = { workspace = true }
 
 [dev-dependencies]
 assert_matches = { workspace = true }

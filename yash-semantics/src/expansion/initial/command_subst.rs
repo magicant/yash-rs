@@ -133,14 +133,10 @@ where
     env.inner.system.close(writer).ok();
 
     // Read the output from the subshell
+    // (In case of an error, we will use whatever we have read so far and ignore the error,
+    // just like bash does.)
     let mut result = Vec::new();
-    let mut buffer = [0; 4096];
-    while let Ok(count) = env.inner.system.read_async(reader, &mut buffer).await {
-        if count == 0 {
-            break;
-        }
-        result.extend(&buffer[..count]);
-    }
+    env.inner.system.read_all_to(reader, &mut result).await.ok();
     env.inner.system.close(reader).ok();
 
     // Wait for the subshell

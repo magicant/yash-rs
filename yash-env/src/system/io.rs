@@ -164,9 +164,11 @@ pub trait Read {
     /// simulating blocking I/O in [virtual systems](super::virtual). In the
     /// [real system](super::real), this function does not work asynchronously
     /// and returns a ready `Future` with the result of the underlying system
-    /// call. See the [module-level documentation](super) for details. Use
-    /// [`SharedSystem::read_async`](super::SharedSystem::read_async) for
-    /// concurrent read operations in an `async` function context.
+    /// call. See the [module-level documentation](super) for details.
+    ///
+    /// The implementation for [`Rc<Concurrent<_>>`](super::Concurrent) provides
+    /// asynchronous reading by using non-blocking I/O, which allows concurrent
+    /// multitasking in `async` function contexts.
     fn read<'a>(
         &self,
         fd: Fd,
@@ -200,8 +202,13 @@ pub trait Write {
     /// In the [real system](super::real), this function does not work
     /// asynchronously and returns a ready `Future` with the result of the
     /// underlying system call. See the [module-level documentation](super) for
-    /// details. Use [`SharedSystem::write_all`](super::SharedSystem::write_all)
-    /// for concurrent write operations in an `async` function context.
+    /// details.
+    ///
+    /// The implementation for [`Rc<Concurrent<_>>`](super::Concurrent) provides
+    /// asynchronous writing by using non-blocking I/O, which allows concurrent
+    /// multitasking in `async` function contexts. Use
+    /// [`Concurrent::write_all`](super::Concurrent::write_all) to write the
+    /// entire buffer.
     fn write<'a>(
         &self,
         fd: Fd,

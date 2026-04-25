@@ -19,8 +19,6 @@
 use crate::Env;
 use crate::source::Location;
 use crate::source::pretty::{Report, ReportType, Snippet};
-#[cfg(doc)]
-use crate::system::SharedSystem;
 use crate::system::{Close, Dup, Fcntl, FdFlag, Isatty, Write};
 use annotate_snippets::Renderer;
 use std::borrow::Cow;
@@ -103,7 +101,7 @@ where
 /// `env` allows it. The string will end with a newline.
 ///
 /// To print the returned string to the standard error, you can use
-/// [`SharedSystem::print_error`].
+/// [`Concurrent::print_error`](crate::system::Concurrent::print_error).
 #[must_use]
 pub fn report_to_string<S: Isatty>(env: &Env<S>, report: &Report<'_>) -> String {
     let renderer = if env.should_print_error_in_color() {

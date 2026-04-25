@@ -430,7 +430,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         env.traps
             .set_action(
-                &mut env.system,
+                &env.system,
                 SIGUSR1,
                 Action::Command("echo USR1".into()),
                 Location::dummy(""),

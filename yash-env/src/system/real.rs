@@ -110,12 +110,12 @@ use std::ops::RangeInclusive;
 use std::os::unix::ffi::OsStrExt as _;
 use std::os::unix::io::IntoRawFd;
 use std::ptr::NonNull;
+use std::rc::Rc;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering;
 use std::sync::atomic::compiler_fence;
 use std::time::Duration;
 use std::time::Instant;
-use yash_executor::Executor;
 
 trait ErrnoIfM1: PartialEq + Sized {
     const MINUS_1: Self;
@@ -995,19 +995,8 @@ impl Fork for RealSystem {
 
         // Child process
         Ok(Box::new(|env, task| {
-            let system = env.system.clone();
-            // Here we create a new executor to run the task. This makes sure that any
-            // other concurrent tasks in the parent process do not interfere with the
-            // child process.
-            let executor = Executor::new();
-            let task = Box::pin(async move { match task(env).await {} });
-            // SAFETY: We never create new threads in the whole process, so wakers are
-            // never shared between threads.
-            unsafe { executor.spawn_pinned(task) }
-            loop {
-                executor.run_until_stalled();
-                system.select(false).ok();
-            }
+            let system = Rc::clone(&env.system);
+            match system.run_real(task(env)) {}
         }))
     }
 }

@@ -73,7 +73,7 @@ where
     // don't miss any `SIGCHLD` that may arrive between `wait` and
     // `wait_for_signals`.  See also Env::wait_for_subshell.
     env.traps
-        .enable_internal_disposition_for_sigchld(&mut env.system)
+        .enable_internal_disposition_for_sigchld(&env.system)
         .await?;
 
     loop {
@@ -208,7 +208,7 @@ mod tests {
             // Set a trap for SIGTERM.
             env.traps
                 .set_action(
-                    &mut env.system,
+                    &env.system,
                     SIGTERM,
                     Action::Command("foo=bar".into()),
                     Location::dummy("somewhere"),

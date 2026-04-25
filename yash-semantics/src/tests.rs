@@ -210,7 +210,7 @@ where
     {
         let mut buffer = [0; 1024];
         loop {
-            let count = env.system.read_async(Fd::STDIN, &mut buffer).await?;
+            let count = env.system.read(Fd::STDIN, &mut buffer).await?;
             if count == 0 {
                 break Ok(());
             }

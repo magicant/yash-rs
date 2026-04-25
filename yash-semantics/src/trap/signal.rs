@@ -130,7 +130,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         env.traps
             .set_action(
-                &mut env.system,
+                &env.system,
                 SIGINT,
                 Action::Command("echo trapped".into()),
                 Location::dummy(""),
@@ -229,7 +229,7 @@ mod tests {
         );
         env.traps
             .set_action(
-                &mut env.system,
+                &env.system,
                 SIGINT,
                 Action::Command("check".into()),
                 Location::dummy(""),
@@ -261,7 +261,7 @@ mod tests {
         for signal in [SIGUSR1, SIGUSR2] {
             env.traps
                 .set_action(
-                    &mut env.system,
+                    &env.system,
                     signal,
                     Action::Command("echo $?; echo $?".into()),
                     Location::dummy(""),
@@ -288,7 +288,7 @@ mod tests {
         env.builtins.insert("exit", exit_builtin());
         env.traps
             .set_action(
-                &mut env.system,
+                &env.system,
                 SIGUSR1,
                 Action::Command("echo; exit 56".into()),
                 Location::dummy(""),
@@ -312,7 +312,7 @@ mod tests {
         env.builtins.insert("exit", exit_builtin());
         env.traps
             .set_action(
-                &mut env.system,
+                &env.system,
                 SIGUSR1,
                 Action::Command("echo; exit".into()),
                 Location::dummy(""),

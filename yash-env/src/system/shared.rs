@@ -148,14 +148,7 @@ use std::time::Instant;
 /// assert_eq!(number, 123);
 /// ```
 ///
-/// If there is a child process in the [`VirtualSystem`], you should call
-/// [`SystemState::select_all`](super::virtual::SystemState::select_all) in
-/// addition to [`SharedSystem::select`] so that the child process task is woken
-/// up when needed.
-/// (TBD code example)
-///
 /// [`System`]: crate::system::System
-/// [`VirtualSystem`]: crate::system::virtual::VirtualSystem
 #[derive(Debug)]
 pub struct SharedSystem<S>(pub(super) Rc<RefCell<SelectSystem<S>>>);
 
@@ -378,6 +371,26 @@ impl<S> SharedSystem<S> {
             Poll::Ready(result) => result,
             Poll::Pending => Ok(()),
         }
+    }
+
+    /// Waits for a next event to occur.
+    ///
+    /// This function calls [`Select::select`] with arguments computed from the
+    /// current internal state of the `SharedSystem`. It will wake up tasks
+    /// waiting for the file descriptor to be ready in
+    /// [`read_async`](Self::read_async) and [`write_all`](Self::write_all) or
+    /// for a signal to be caught in [`wait_for_signal`](Self::wait_for_signal).
+    /// If no tasks are woken for FDs or signals, this function simulates
+    /// blocking by returning `Pending` from the returned future until the first
+    /// task waiting for a specific time point is woken.
+    ///
+    /// This function may wake up a task even if the condition it is expecting
+    /// has not yet been met.
+    pub async fn select_async(&self) -> Result<()>
+    where
+        S: Select + CaughtSignals + Clock,
+    {
+        SelectSystem::select(&self.0, false).await
     }
 
     /// Creates a new child process.

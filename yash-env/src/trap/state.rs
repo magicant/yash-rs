@@ -212,7 +212,7 @@ impl GrandState {
 
     /// Updates the entry with the new action.
     pub async fn set_action<S: SignalSystem>(
-        system: &mut S,
+        system: &S,
         entry: Entry<'_, Condition, GrandState>,
         action: Action,
         origin: Location,
@@ -292,7 +292,7 @@ impl GrandState {
     /// The condition of the given entry must be a signal, or this function
     /// panics.
     pub async fn set_internal_disposition<S: SignalSystem>(
-        system: &mut S,
+        system: &S,
         entry: Entry<'_, Condition, GrandState>,
         disposition: Disposition,
     ) -> Result<(), Errno> {
@@ -337,7 +337,7 @@ impl GrandState {
     /// `option`.
     pub async fn enter_subshell<S: SignalSystem>(
         &mut self,
-        system: &mut S,
+        system: &S,
         cond: Condition,
         option: EnterSubshellOption,
     ) -> Result<(), Errno> {
@@ -393,7 +393,7 @@ impl GrandState {
     ///
     /// This function panics if the condition is not a signal.
     pub async fn ignore<S: SignalSystem>(
-        system: &mut S,
+        system: &S,
         vacant: VacantEntry<'_, Condition, GrandState>,
     ) -> Result<(), Errno> {
         let signal = match *vacant.key() {
@@ -580,12 +580,12 @@ mod tests {
 
     #[test]
     fn insertion_with_occupied_entry() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("origin");
         let action = Action::Command("echo".into());
-        GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false)
+        GrandState::set_action(&system, entry, action.clone(), origin.clone(), false)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -625,15 +625,14 @@ mod tests {
 
     #[test]
     fn setting_trap_to_ignore_without_override_ignore() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("origin");
 
-        let result =
-            GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), false)
-                .now_or_never()
-                .unwrap();
+        let result = GrandState::set_action(&system, entry, Action::Ignore, origin.clone(), false)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(()));
         assert_eq!(
             map[&SIGCHLD.into()].current_state(),
@@ -649,15 +648,14 @@ mod tests {
 
     #[test]
     fn setting_trap_to_ignore_with_override_ignore() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("origin");
 
-        let result =
-            GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), true)
-                .now_or_never()
-                .unwrap();
+        let result = GrandState::set_action(&system, entry, Action::Ignore, origin.clone(), true)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(()));
         assert_eq!(
             map[&SIGCHLD.into()].current_state(),
@@ -673,16 +671,15 @@ mod tests {
 
     #[test]
     fn setting_trap_to_command() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let entry = map.entry(SIGCHLD.into());
         let action = Action::Command("echo".into());
         let origin = Location::dummy("origin");
 
-        let result =
-            GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false)
-                .now_or_never()
-                .unwrap();
+        let result = GrandState::set_action(&system, entry, action.clone(), origin.clone(), false)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(()));
         assert_eq!(
             map[&SIGCHLD.into()].current_state(),
@@ -698,21 +695,20 @@ mod tests {
 
     #[test]
     fn setting_trap_to_default() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("foo");
-        GrandState::set_action(&mut system, entry, Action::Ignore, origin, false)
+        GrandState::set_action(&system, entry, Action::Ignore, origin, false)
             .now_or_never()
             .unwrap()
             .unwrap();
 
         let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("bar");
-        let result =
-            GrandState::set_action(&mut system, entry, Action::Default, origin.clone(), false)
-                .now_or_never()
-                .unwrap();
+        let result = GrandState::set_action(&system, entry, Action::Default, origin.clone(), false)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(()));
         assert_eq!(
             map[&SIGCHLD.into()].current_state(),
@@ -728,12 +724,12 @@ mod tests {
 
     #[test]
     fn resetting_trap_from_ignore_no_override() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         system.0.borrow_mut().insert(SIGCHLD, Disposition::Ignore);
         let mut map = BTreeMap::new();
         let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("foo");
-        let result = GrandState::set_action(&mut system, entry, Action::Ignore, origin, false)
+        let result = GrandState::set_action(&system, entry, Action::Ignore, origin, false)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Err(SetActionError::InitiallyIgnored));
@@ -741,7 +737,7 @@ mod tests {
         // Idempotence
         let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("bar");
-        let result = GrandState::set_action(&mut system, entry, Action::Ignore, origin, false)
+        let result = GrandState::set_action(&system, entry, Action::Ignore, origin, false)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Err(SetActionError::InitiallyIgnored));
@@ -760,15 +756,14 @@ mod tests {
 
     #[test]
     fn resetting_trap_from_ignore_override() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         system.0.borrow_mut().insert(SIGCHLD, Disposition::Ignore);
         let mut map = BTreeMap::new();
         let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("origin");
-        let result =
-            GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), true)
-                .now_or_never()
-                .unwrap();
+        let result = GrandState::set_action(&system, entry, Action::Ignore, origin.clone(), true)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(()));
         assert_eq!(
             map[&SIGCHLD.into()].current_state(),
@@ -784,11 +779,11 @@ mod tests {
 
     #[test]
     fn internal_disposition_ignore() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let entry = map.entry(SIGCHLD.into());
 
-        let result = GrandState::set_internal_disposition(&mut system, entry, Disposition::Ignore)
+        let result = GrandState::set_internal_disposition(&system, entry, Disposition::Ignore)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Ok(()));
@@ -810,11 +805,11 @@ mod tests {
 
     #[test]
     fn internal_disposition_catch() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let entry = map.entry(SIGCHLD.into());
 
-        let result = GrandState::set_internal_disposition(&mut system, entry, Disposition::Catch)
+        let result = GrandState::set_internal_disposition(&system, entry, Disposition::Catch)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Ok(()));
@@ -836,17 +831,17 @@ mod tests {
 
     #[test]
     fn action_ignore_and_internal_disposition_catch() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("origin");
-        GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), false)
+        GrandState::set_action(&system, entry, Action::Ignore, origin.clone(), false)
             .now_or_never()
             .unwrap()
             .unwrap();
         let entry = map.entry(SIGCHLD.into());
 
-        let result = GrandState::set_internal_disposition(&mut system, entry, Disposition::Catch)
+        let result = GrandState::set_internal_disposition(&system, entry, Disposition::Catch)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Ok(()));
@@ -868,18 +863,18 @@ mod tests {
 
     #[test]
     fn action_catch_and_internal_disposition_ignore() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let entry = map.entry(SIGCHLD.into());
         let origin = Location::dummy("origin");
         let action = Action::Command("echo".into());
-        GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false)
+        GrandState::set_action(&system, entry, action.clone(), origin.clone(), false)
             .now_or_never()
             .unwrap()
             .unwrap();
         let entry = map.entry(SIGCHLD.into());
 
-        let result = GrandState::set_internal_disposition(&mut system, entry, Disposition::Ignore)
+        let result = GrandState::set_internal_disposition(&system, entry, Disposition::Ignore)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Ok(()));
@@ -901,10 +896,10 @@ mod tests {
 
     #[test]
     fn set_internal_disposition_for_initially_defaulted_signal_then_allow_override() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let entry = map.entry(SIGTTOU.into());
-        GrandState::set_internal_disposition(&mut system, entry, Disposition::Ignore)
+        GrandState::set_internal_disposition(&system, entry, Disposition::Ignore)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -912,10 +907,9 @@ mod tests {
         let origin = Location::dummy("origin");
         let action = Action::Command("echo".into());
 
-        let result =
-            GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false)
-                .now_or_never()
-                .unwrap();
+        let result = GrandState::set_action(&system, entry, action.clone(), origin.clone(), false)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Ok(()));
         assert_eq!(
             map[&SIGTTOU.into()].internal_disposition(),
@@ -935,12 +929,12 @@ mod tests {
 
     #[test]
     fn set_internal_disposition_for_initially_ignored_signal_then_reject_override() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         system.0.borrow_mut().insert(SIGTTOU, Disposition::Ignore);
         let mut map = BTreeMap::new();
         let cond = SIGTTOU.into();
         let entry = map.entry(cond);
-        GrandState::set_internal_disposition(&mut system, entry, Disposition::Ignore)
+        GrandState::set_internal_disposition(&system, entry, Disposition::Ignore)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -948,7 +942,7 @@ mod tests {
         let origin = Location::dummy("origin");
         let action = Action::Command("echo".into());
 
-        let result = GrandState::set_action(&mut system, entry, action, origin, false)
+        let result = GrandState::set_action(&system, entry, action, origin, false)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Err(SetActionError::InitiallyIgnored));
@@ -967,10 +961,10 @@ mod tests {
 
     #[test]
     fn enter_subshell_with_internal_disposition_keeping_internal_disposition() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let cond = SIGCHLD.into();
-        GrandState::set_internal_disposition(&mut system, map.entry(cond), Disposition::Catch)
+        GrandState::set_internal_disposition(&system, map.entry(cond), Disposition::Catch)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -978,11 +972,7 @@ mod tests {
         let result = map
             .get_mut(&cond)
             .unwrap()
-            .enter_subshell(
-                &mut system,
-                cond,
-                EnterSubshellOption::KeepInternalDisposition,
-            )
+            .enter_subshell(&system, cond, EnterSubshellOption::KeepInternalDisposition)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Ok(()));
@@ -1001,11 +991,11 @@ mod tests {
 
     #[test]
     fn enter_subshell_with_internal_disposition_clearing_internal_disposition() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let cond = SIGCHLD.into();
         let entry = map.entry(cond);
-        GrandState::set_internal_disposition(&mut system, entry, Disposition::Catch)
+        GrandState::set_internal_disposition(&system, entry, Disposition::Catch)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -1013,11 +1003,7 @@ mod tests {
         let result = map
             .get_mut(&cond)
             .unwrap()
-            .enter_subshell(
-                &mut system,
-                cond,
-                EnterSubshellOption::ClearInternalDisposition,
-            )
+            .enter_subshell(&system, cond, EnterSubshellOption::ClearInternalDisposition)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Ok(()));
@@ -1036,12 +1022,12 @@ mod tests {
 
     #[test]
     fn enter_subshell_with_ignore_and_no_internal_disposition() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let cond = SIGCHLD.into();
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
-        GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), false)
+        GrandState::set_action(&system, entry, Action::Ignore, origin.clone(), false)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -1049,11 +1035,7 @@ mod tests {
         let result = map
             .get_mut(&cond)
             .unwrap()
-            .enter_subshell(
-                &mut system,
-                cond,
-                EnterSubshellOption::KeepInternalDisposition,
-            )
+            .enter_subshell(&system, cond, EnterSubshellOption::KeepInternalDisposition)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Ok(()));
@@ -1072,17 +1054,17 @@ mod tests {
 
     #[test]
     fn enter_subshell_with_ignore_clearing_internal_disposition() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let cond = SIGCHLD.into();
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
-        GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), false)
+        GrandState::set_action(&system, entry, Action::Ignore, origin.clone(), false)
             .now_or_never()
             .unwrap()
             .unwrap();
         let entry = map.entry(cond);
-        GrandState::set_internal_disposition(&mut system, entry, Disposition::Catch)
+        GrandState::set_internal_disposition(&system, entry, Disposition::Catch)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -1090,11 +1072,7 @@ mod tests {
         let result = map
             .get_mut(&cond)
             .unwrap()
-            .enter_subshell(
-                &mut system,
-                cond,
-                EnterSubshellOption::ClearInternalDisposition,
-            )
+            .enter_subshell(&system, cond, EnterSubshellOption::ClearInternalDisposition)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Ok(()));
@@ -1113,13 +1091,13 @@ mod tests {
 
     #[test]
     fn enter_subshell_with_command_and_no_internal_disposition() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let cond = SIGCHLD.into();
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
         let action = Action::Command("echo".into());
-        GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false)
+        GrandState::set_action(&system, entry, action.clone(), origin.clone(), false)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -1127,11 +1105,7 @@ mod tests {
         let result = map
             .get_mut(&cond)
             .unwrap()
-            .enter_subshell(
-                &mut system,
-                cond,
-                EnterSubshellOption::ClearInternalDisposition,
-            )
+            .enter_subshell(&system, cond, EnterSubshellOption::ClearInternalDisposition)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Ok(()));
@@ -1157,18 +1131,18 @@ mod tests {
 
     #[test]
     fn enter_subshell_with_command_keeping_internal_disposition() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let cond = SIGTSTP.into();
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
         let action = Action::Command("echo".into());
-        GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false)
+        GrandState::set_action(&system, entry, action.clone(), origin.clone(), false)
             .now_or_never()
             .unwrap()
             .unwrap();
         let entry = map.entry(cond);
-        GrandState::set_internal_disposition(&mut system, entry, Disposition::Ignore)
+        GrandState::set_internal_disposition(&system, entry, Disposition::Ignore)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -1176,11 +1150,7 @@ mod tests {
         let result = map
             .get_mut(&cond)
             .unwrap()
-            .enter_subshell(
-                &mut system,
-                cond,
-                EnterSubshellOption::KeepInternalDisposition,
-            )
+            .enter_subshell(&system, cond, EnterSubshellOption::KeepInternalDisposition)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Ok(()));
@@ -1206,18 +1176,18 @@ mod tests {
 
     #[test]
     fn enter_subshell_with_command_clearing_internal_disposition() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let cond = SIGTSTP.into();
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
         let action = Action::Command("echo".into());
-        GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false)
+        GrandState::set_action(&system, entry, action.clone(), origin.clone(), false)
             .now_or_never()
             .unwrap()
             .unwrap();
         let entry = map.entry(cond);
-        GrandState::set_internal_disposition(&mut system, entry, Disposition::Ignore)
+        GrandState::set_internal_disposition(&system, entry, Disposition::Ignore)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -1225,11 +1195,7 @@ mod tests {
         let result = map
             .get_mut(&cond)
             .unwrap()
-            .enter_subshell(
-                &mut system,
-                cond,
-                EnterSubshellOption::ClearInternalDisposition,
-            )
+            .enter_subshell(&system, cond, EnterSubshellOption::ClearInternalDisposition)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Ok(()));
@@ -1255,13 +1221,13 @@ mod tests {
 
     #[test]
     fn enter_subshell_with_command_ignoring() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let cond = SIGQUIT.into();
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
         let action = Action::Command("echo".into());
-        GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false)
+        GrandState::set_action(&system, entry, action.clone(), origin.clone(), false)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -1269,7 +1235,7 @@ mod tests {
         let result = map
             .get_mut(&cond)
             .unwrap()
-            .enter_subshell(&mut system, cond, EnterSubshellOption::Ignore)
+            .enter_subshell(&system, cond, EnterSubshellOption::Ignore)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Ok(()));
@@ -1295,15 +1261,13 @@ mod tests {
 
     #[test]
     fn ignoring_initially_defaulted_signal() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let cond = SIGQUIT.into();
         let entry = map.entry(cond);
         let vacant = assert_matches!(entry, Entry::Vacant(vacant) => vacant);
 
-        let result = GrandState::ignore(&mut system, vacant)
-            .now_or_never()
-            .unwrap();
+        let result = GrandState::ignore(&system, vacant).now_or_never().unwrap();
         assert_eq!(result, Ok(()));
         assert_eq!(
             map[&cond].current_state(),
@@ -1319,7 +1283,7 @@ mod tests {
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
         let action = Action::Command("echo".into());
-        let result = GrandState::set_action(&mut system, entry, action, origin, false)
+        let result = GrandState::set_action(&system, entry, action, origin, false)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Ok(()));
@@ -1327,16 +1291,14 @@ mod tests {
 
     #[test]
     fn ignoring_initially_ignored_signal() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         system.0.borrow_mut().insert(SIGQUIT, Disposition::Ignore);
         let mut map = BTreeMap::new();
         let cond = SIGQUIT.into();
         let entry = map.entry(cond);
         let vacant = assert_matches!(entry, Entry::Vacant(vacant) => vacant);
 
-        let result = GrandState::ignore(&mut system, vacant)
-            .now_or_never()
-            .unwrap();
+        let result = GrandState::ignore(&system, vacant).now_or_never().unwrap();
         assert_eq!(result, Ok(()));
         assert_eq!(
             map[&cond].current_state(),
@@ -1352,7 +1314,7 @@ mod tests {
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
         let action = Action::Command("echo".into());
-        let result = GrandState::set_action(&mut system, entry, action, origin, false)
+        let result = GrandState::set_action(&system, entry, action, origin, false)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Err(SetActionError::InitiallyIgnored));
@@ -1360,23 +1322,19 @@ mod tests {
 
     #[test]
     fn clearing_parent_setting() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let cond = SIGCHLD.into();
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
         let action = Action::Command("echo".into());
-        GrandState::set_action(&mut system, entry, action, origin, false)
+        GrandState::set_action(&system, entry, action, origin, false)
             .now_or_never()
             .unwrap()
             .unwrap();
         let state = map.get_mut(&cond).unwrap();
         state
-            .enter_subshell(
-                &mut system,
-                cond,
-                EnterSubshellOption::ClearInternalDisposition,
-            )
+            .enter_subshell(&system, cond, EnterSubshellOption::ClearInternalDisposition)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -1395,13 +1353,13 @@ mod tests {
 
     #[test]
     fn marking_as_caught_and_handling() {
-        let mut system = DummySystem::default();
+        let system = DummySystem::default();
         let mut map = BTreeMap::new();
         let cond = SIGUSR1.into();
         let entry = map.entry(cond);
         let origin = Location::dummy("foo");
         let action = Action::Command("echo".into());
-        GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false)
+        GrandState::set_action(&system, entry, action.clone(), origin.clone(), false)
             .now_or_never()
             .unwrap()
             .unwrap();

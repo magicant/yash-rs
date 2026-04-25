@@ -45,7 +45,7 @@
 //! use std::cell::RefCell;
 //! use std::ops::ControlFlow::Continue;
 //! use yash_env::Env;
-//! use yash_env::input::FdReader;
+//! use yash_env::input::FdReader2;
 //! use yash_env::io::Fd;
 //! use yash_env::parser::Config;
 //! use yash_env::semantics::ExitStatus;
@@ -61,7 +61,7 @@
 //!     Box::pin(async move { expand_text(env, text).await.ok() })
 //! })));
 //!
-//! let reader = FdReader::new(Fd::STDIN, env.system.clone());
+//! let reader = FdReader2::new(Fd::STDIN, env.system.clone());
 //! let mut ref_env = RefCell::new(&mut env);
 //! let input = Box::new(Prompter::new(reader, &ref_env));
 //! let mut config = Config::with_input(input);
