@@ -149,9 +149,11 @@ use std::time::Instant;
 /// ```
 ///
 /// [`System`]: crate::system::System
+#[deprecated(since = "0.13.0", note = "use `Concurrent` instead")]
 #[derive(Debug)]
 pub struct SharedSystem<S>(pub(super) Rc<RefCell<SelectSystem<S>>>);
 
+#[allow(deprecated)]
 impl<S> SharedSystem<S> {
     /// Creates a new shared system.
     pub fn new(system: S) -> Self {
@@ -404,6 +406,7 @@ impl<S> SharedSystem<S> {
     }
 }
 
+#[allow(deprecated)]
 impl<S> Clone for SharedSystem<S> {
     fn clone(&self) -> Self {
         SharedSystem(self.0.clone())
@@ -411,6 +414,7 @@ impl<S> Clone for SharedSystem<S> {
 }
 
 /// Delegates `Fstat` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Fstat> Fstat for SharedSystem<T> {
     type Stat = T::Stat;
 
@@ -423,6 +427,7 @@ impl<T: Fstat> Fstat for SharedSystem<T> {
 }
 
 /// Delegates `IsExecutableFile` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: IsExecutableFile> IsExecutableFile for SharedSystem<T> {
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.0.borrow().is_executable_file(path)
@@ -430,6 +435,7 @@ impl<T: IsExecutableFile> IsExecutableFile for SharedSystem<T> {
 }
 
 /// Delegates `Pipe` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Pipe> Pipe for SharedSystem<T> {
     fn pipe(&self) -> Result<(Fd, Fd)> {
         self.0.borrow().pipe()
@@ -437,6 +443,7 @@ impl<T: Pipe> Pipe for SharedSystem<T> {
 }
 
 /// Delegates `Dup` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Dup> Dup for SharedSystem<T> {
     fn dup(&self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
         self.0.borrow().dup(from, to_min, flags)
@@ -446,6 +453,7 @@ impl<T: Dup> Dup for SharedSystem<T> {
     }
 }
 
+#[allow(deprecated)]
 impl<T: Open> Open for SharedSystem<T> {
     fn open(
         &self,
@@ -467,6 +475,7 @@ impl<T: Open> Open for SharedSystem<T> {
     }
 }
 
+#[allow(deprecated)]
 impl<T: Close> Close for SharedSystem<T> {
     fn close(&self, fd: Fd) -> Result<()> {
         self.0.borrow().close(fd)
@@ -474,6 +483,7 @@ impl<T: Close> Close for SharedSystem<T> {
 }
 
 /// Delegates `Fcntl` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Fcntl> Fcntl for SharedSystem<T> {
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
         self.0.borrow().ofd_access(fd)
@@ -490,6 +500,7 @@ impl<T: Fcntl> Fcntl for SharedSystem<T> {
 }
 
 /// Delegates `Read` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Read> Read for SharedSystem<T> {
     fn read<'a>(
         &self,
@@ -501,6 +512,7 @@ impl<T: Read> Read for SharedSystem<T> {
 }
 
 /// Delegates `Write` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Write> Write for SharedSystem<T> {
     fn write<'a>(
         &self,
@@ -512,6 +524,7 @@ impl<T: Write> Write for SharedSystem<T> {
 }
 
 /// Delegates `Seek` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Seek> Seek for SharedSystem<T> {
     fn lseek(&self, fd: Fd, position: SeekFrom) -> Result<u64> {
         self.0.borrow().lseek(fd, position)
@@ -519,6 +532,7 @@ impl<T: Seek> Seek for SharedSystem<T> {
 }
 
 /// Delegates `Umask` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Umask> Umask for SharedSystem<T> {
     fn umask(&self, new_mask: Mode) -> Mode {
         self.0.borrow().umask(new_mask)
@@ -526,6 +540,7 @@ impl<T: Umask> Umask for SharedSystem<T> {
 }
 
 /// Delegates `GetCwd` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: GetCwd> GetCwd for SharedSystem<T> {
     fn getcwd(&self) -> Result<PathBuf> {
         self.0.borrow().getcwd()
@@ -533,6 +548,7 @@ impl<T: GetCwd> GetCwd for SharedSystem<T> {
 }
 
 /// Delegates `Chdir` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Chdir> Chdir for SharedSystem<T> {
     fn chdir(&self, path: &CStr) -> Result<()> {
         self.0.borrow().chdir(path)
@@ -540,6 +556,7 @@ impl<T: Chdir> Chdir for SharedSystem<T> {
 }
 
 /// Delegates `Time` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Clock> Clock for SharedSystem<T> {
     fn now(&self) -> Instant {
         self.0.borrow().now()
@@ -547,6 +564,7 @@ impl<T: Clock> Clock for SharedSystem<T> {
 }
 
 /// Delegates `Times` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Times> Times for SharedSystem<T> {
     fn times(&self) -> Result<CpuTimes> {
         self.0.borrow().times()
@@ -554,6 +572,7 @@ impl<T: Times> Times for SharedSystem<T> {
 }
 
 /// Delegates `GetPid` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: GetPid> GetPid for SharedSystem<T> {
     fn getsid(&self, pid: Pid) -> Result<Pid> {
         self.0.borrow().getsid(pid)
@@ -573,6 +592,7 @@ impl<T: GetPid> GetPid for SharedSystem<T> {
 }
 
 /// Delegates `SetPgid` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: SetPgid> SetPgid for SharedSystem<T> {
     fn setpgid(&self, pid: Pid, pgid: Pid) -> Result<()> {
         self.0.borrow().setpgid(pid, pgid)
@@ -580,6 +600,7 @@ impl<T: SetPgid> SetPgid for SharedSystem<T> {
 }
 
 /// Delegates `Signals` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Signals> Signals for SharedSystem<T> {
     const SIGABRT: signal::Number = T::SIGABRT;
     const SIGALRM: signal::Number = T::SIGALRM;
@@ -634,6 +655,7 @@ impl<T: Signals> Signals for SharedSystem<T> {
 }
 
 /// Delegates `Sigmask` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Sigmask> Sigmask for SharedSystem<T> {
     fn sigmask(
         &self,
@@ -645,6 +667,7 @@ impl<T: Sigmask> Sigmask for SharedSystem<T> {
 }
 
 /// Delegates `GetSigaction` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Sigaction> GetSigaction for SharedSystem<T> {
     fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
         self.0.borrow().get_sigaction(signal)
@@ -652,6 +675,7 @@ impl<T: Sigaction> GetSigaction for SharedSystem<T> {
 }
 
 /// Delegates `Sigaction` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Sigaction> Sigaction for SharedSystem<T> {
     fn sigaction(&self, signal: signal::Number, action: Disposition) -> Result<Disposition> {
         self.0.borrow().sigaction(signal, action)
@@ -659,6 +683,7 @@ impl<T: Sigaction> Sigaction for SharedSystem<T> {
 }
 
 /// Delegates `CaughtSignals` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: CaughtSignals> CaughtSignals for SharedSystem<T> {
     fn caught_signals(&self) -> Vec<signal::Number> {
         self.0.borrow().caught_signals()
@@ -666,6 +691,7 @@ impl<T: CaughtSignals> CaughtSignals for SharedSystem<T> {
 }
 
 /// Delegates `SendSignal` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: SendSignal> SendSignal for SharedSystem<T> {
     fn kill(
         &self,
@@ -680,6 +706,7 @@ impl<T: SendSignal> SendSignal for SharedSystem<T> {
 }
 
 /// Delegates `Select` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Select> Select for SharedSystem<T> {
     fn select<'a>(
         &self,
@@ -693,6 +720,7 @@ impl<T: Select> Select for SharedSystem<T> {
 }
 
 /// Delegates `Isatty` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Isatty> Isatty for SharedSystem<T> {
     fn isatty(&self, fd: Fd) -> bool {
         self.0.borrow().isatty(fd)
@@ -700,6 +728,7 @@ impl<T: Isatty> Isatty for SharedSystem<T> {
 }
 
 /// Delegates `TcGetPgrp` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: TcGetPgrp> TcGetPgrp for SharedSystem<T> {
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
         self.0.borrow().tcgetpgrp(fd)
@@ -707,6 +736,7 @@ impl<T: TcGetPgrp> TcGetPgrp for SharedSystem<T> {
 }
 
 /// Delegates `TcSetPgrp` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: TcSetPgrp> TcSetPgrp for SharedSystem<T> {
     fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> + use<T> {
         self.0.borrow().tcsetpgrp(fd, pgid)
@@ -714,6 +744,7 @@ impl<T: TcSetPgrp> TcSetPgrp for SharedSystem<T> {
 }
 
 /// Delegates `Wait` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Wait> Wait for SharedSystem<T> {
     fn wait(&self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
         self.0.borrow().wait(target)
@@ -721,6 +752,7 @@ impl<T: Wait> Wait for SharedSystem<T> {
 }
 
 /// Delegates `Exec` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Exec> Exec for SharedSystem<T> {
     fn execve(
         &self,
@@ -733,6 +765,7 @@ impl<T: Exec> Exec for SharedSystem<T> {
 }
 
 /// Delegates `Exit` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Exit> Exit for SharedSystem<T> {
     fn exit(&self, exit_status: ExitStatus) -> impl Future<Output = Infallible> + use<T> {
         self.0.borrow().exit(exit_status)
@@ -740,6 +773,7 @@ impl<T: Exit> Exit for SharedSystem<T> {
 }
 
 /// Delegates `GetUid` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: GetUid> GetUid for SharedSystem<T> {
     fn getuid(&self) -> Uid {
         self.0.borrow().getuid()
@@ -756,6 +790,7 @@ impl<T: GetUid> GetUid for SharedSystem<T> {
 }
 
 /// Delegates `GetPw` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: GetPw> GetPw for SharedSystem<T> {
     fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
         self.0.borrow().getpwnam_dir(name)
@@ -763,6 +798,7 @@ impl<T: GetPw> GetPw for SharedSystem<T> {
 }
 
 /// Delegates `Sysconf` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: Sysconf> Sysconf for SharedSystem<T> {
     fn confstr_path(&self) -> Result<UnixString> {
         self.0.borrow().confstr_path()
@@ -770,6 +806,7 @@ impl<T: Sysconf> Sysconf for SharedSystem<T> {
 }
 
 /// Delegates `ShellPath` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: ShellPath> ShellPath for SharedSystem<T> {
     fn shell_path(&self) -> CString {
         self.0.borrow().shell_path()
@@ -777,6 +814,7 @@ impl<T: ShellPath> ShellPath for SharedSystem<T> {
 }
 
 /// Delegates `GetRlimit` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: GetRlimit> GetRlimit for SharedSystem<T> {
     fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
         self.0.borrow().getrlimit(resource)
@@ -784,12 +822,14 @@ impl<T: GetRlimit> GetRlimit for SharedSystem<T> {
 }
 
 /// Delegates `SetRlimit` methods to the contained implementor.
+#[allow(deprecated)]
 impl<T: SetRlimit> SetRlimit for SharedSystem<T> {
     fn setrlimit(&self, resource: Resource, limits: LimitPair) -> Result<()> {
         self.0.borrow().setrlimit(resource, limits)
     }
 }
 
+#[allow(deprecated)]
 impl<S: Signals + Sigmask + Sigaction> SignalSystem for SharedSystem<S> {
     #[inline]
     fn get_disposition(&self, signal: signal::Number) -> Result<Disposition> {
@@ -808,6 +848,7 @@ impl<S: Signals + Sigmask + Sigaction> SignalSystem for SharedSystem<S> {
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::super::r#virtual::PIPE_SIZE;
     use super::super::r#virtual::VirtualSystem;

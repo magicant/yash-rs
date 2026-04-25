@@ -142,6 +142,7 @@ use self::resource::{GetRlimit, LimitPair, Resource, SetRlimit};
 pub use self::select::Select;
 use self::select::SelectSystem;
 use self::select::SignalStatus;
+#[allow(deprecated)]
 pub use self::shared::SharedSystem;
 pub use self::signal::{
     CaughtSignals, Disposition, GetSigaction, SendSignal, Sigaction, Sigmask, SigmaskOp, Signals,
