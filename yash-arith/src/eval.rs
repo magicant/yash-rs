@@ -339,7 +339,9 @@ pub fn eval<'a, E: Env>(
     ast: &[Ast<'a>],
     env: &mut E,
 ) -> Result<Term<'a>, Error<E::GetVariableError, E::AssignVariableError>> {
-    let (root, children) = ast.split_last().expect("evaluating an empty expression");
+    let (root, children) = ast
+        .split_last()
+        .expect("the expression should not be empty");
     match root {
         Ast::Term(term) => Ok(term.clone()),
 

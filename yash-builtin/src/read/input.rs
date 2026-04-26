@@ -208,10 +208,7 @@ where
     }
 
     // Obtain the prompt string
-    let GetPrompt(get_prompt) = *env
-        .any
-        .get()
-        .expect("reading input requires `GetPrompt` in `Env::any`");
+    let GetPrompt(get_prompt) = *env.any.get().expect("`GetPrompt` should be in `env.any`");
     let mut context = yash_env::input::Context::default();
     context.set_is_first_line(false);
     let prompt = get_prompt(env, &context).await;

@@ -106,7 +106,7 @@ impl Lexer<'_> {
         here_doc
             .content
             .set(Text(content))
-            .expect("here-doc content must be read just once");
+            .expect("here-doc content should not be read more than once");
         Ok(())
     }
 }

@@ -34,12 +34,16 @@ impl Task<'_> {
     /// If `self.executor` has been dropped or the task is polled recursively,
     /// this method panics.
     pub fn poll(self: &Rc<Self>) -> bool {
-        assert_ne!(self.executor.strong_count(), 0, "executor has been dropped");
+        assert_ne!(
+            self.executor.strong_count(),
+            0,
+            "the executor should not be dropped"
+        );
 
         let mut future_or_none = self
             .future
             .try_borrow_mut()
-            .expect("future polled recursively");
+            .expect("`Future` should not be polled recursively");
         let Some(future) = future_or_none.as_mut() else {
             return true;
         };
@@ -117,7 +121,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic = "executor has been dropped"]
+    #[should_panic = "the executor should not be dropped"]
     fn polling_without_executor_panics() {
         let task = Rc::new(Task {
             executor: Weak::new(),
@@ -165,7 +169,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic = "future polled recursively"]
+    #[should_panic = "`Future` should not be polled recursively"]
     fn recursive_poll_panics() {
         let executor = Rc::default();
         let task = Rc::new(Task {

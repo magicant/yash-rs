@@ -126,7 +126,7 @@ where
 
         Target::Function(function) => {
             let RunFunction(run_function) =
-                env.any.get().expect("RunFunction not found in env.any");
+                env.any.get().expect("`RunFunction` should be in `env.any`");
             let divert = run_function(env, function, fields, None).await;
             crate::Result::with_exit_status_and_divert(env.exit_status, divert)
         }

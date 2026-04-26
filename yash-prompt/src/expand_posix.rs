@@ -115,10 +115,7 @@ where
         replace_exclamation_marks(&mut text.0);
     }
 
-    let ExpandText(expand_text) = *env
-        .any
-        .get()
-        .expect("`yash-prompt::expand_posix` requires `ExpandText` in `Env::any`");
+    let ExpandText(expand_text) = *env.any.get().expect("`ExpandText` should be in `env.any`");
     match expand_text(env, &text).await {
         Some((expansion, _exit_status)) => expansion,
         None => text.to_string(),

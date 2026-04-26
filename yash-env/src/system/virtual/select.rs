@@ -53,7 +53,7 @@ impl Select for VirtualSystem {
                 let proc = state
                     .processes
                     .get_mut(&this.process_id)
-                    .expect("current process not found");
+                    .expect("the current process should be in the system state");
 
                 let old_caught_signals = proc.caught_signals.len();
 
@@ -81,7 +81,7 @@ impl Select for VirtualSystem {
                     None | Some(Duration::ZERO) => None,
                     Some(timeout) => {
                         let now = state.now;
-                        let now = now.expect("current time unspecified; cannot compute deadline");
+                        let now = now.expect("the current time should be set in the system state");
                         Some(now + timeout)
                     }
                 };
@@ -96,7 +96,7 @@ impl Select for VirtualSystem {
                 let proc = state
                     .processes
                     .get_mut(&this.process_id)
-                    .expect("current process not found");
+                    .expect("the current process should be in the system state");
 
                 // If the process is currently suspended, do nothing until resumed
                 if let ProcessState::Halted(reason) = proc.state() {
@@ -147,7 +147,7 @@ impl Select for VirtualSystem {
                     None => timeout == Some(Duration::ZERO),
                     Some(deadline) => {
                         let now = state.now;
-                        let now = now.expect("current time unspecified; cannot check timeout");
+                        let now = now.expect("the current time should be set in the system state");
                         now >= deadline
                     }
                 };
@@ -183,7 +183,7 @@ impl Select for VirtualSystem {
                 let proc = state
                     .processes
                     .get_mut(&this.process_id)
-                    .expect("current process not found");
+                    .expect("the current process should be in the system state");
                 let result = proc.block_signals(SigmaskOp::Set, &old_mask);
                 if result.process_state_changed {
                     let ppid = proc.ppid;
