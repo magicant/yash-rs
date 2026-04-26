@@ -783,13 +783,13 @@ impl Read for VirtualSystem {
                         .processes
                         .get_mut(&process_id)
                         .expect("the current process should be in the system state");
-                    let curr_signal_count = proc.caught_signals.len();
+                    let current_signal_count = proc.caught_signals.len();
                     match blocked_at_signal_count.get() {
                         None => {
                             // First time blocking: record signal count
-                            blocked_at_signal_count.set(Some(curr_signal_count));
+                            blocked_at_signal_count.set(Some(current_signal_count));
                         }
-                        Some(count) if curr_signal_count != count => {
+                        Some(count) if current_signal_count != count => {
                             // A signal was caught while we were blocking
                             return Poll::Ready(Err(Errno::EINTR));
                         }
@@ -831,13 +831,13 @@ impl Write for VirtualSystem {
                         .processes
                         .get_mut(&process_id)
                         .expect("the current process should be in the system state");
-                    let curr_signal_count = proc.caught_signals.len();
+                    let current_signal_count = proc.caught_signals.len();
                     match blocked_at_signal_count.get() {
                         None => {
                             // First time blocking: record signal count
-                            blocked_at_signal_count.set(Some(curr_signal_count));
+                            blocked_at_signal_count.set(Some(current_signal_count));
                         }
-                        Some(count) if curr_signal_count != count => {
+                        Some(count) if current_signal_count != count => {
                             // A signal was caught while we were blocking
                             return Poll::Ready(Err(Errno::EINTR));
                         }
