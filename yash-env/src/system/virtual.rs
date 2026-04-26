@@ -1824,8 +1824,9 @@ mod tests {
         let system = VirtualSystem::new();
         system.sigaction(SIGINT, Disposition::Catch).unwrap();
         let (_reader, writer) = system.pipe().unwrap();
+        // Fill the pipe to make the next write block
         system
-            .write(writer, &vec![0u8; PIPE_SIZE])
+            .write(writer, &[0u8; PIPE_SIZE])
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -1888,7 +1889,7 @@ mod tests {
         );
 
         // The bytes already written should be available for reading.
-        let mut read_buf = vec![0u8; PIPE_SIZE];
+        let mut read_buf = [0u8; PIPE_SIZE];
         assert_eq!(
             system.read(reader, &mut read_buf).now_or_never().unwrap(),
             Ok(PIPE_SIZE)
@@ -1922,7 +1923,7 @@ mod tests {
         assert_eq!(write_fut.as_mut().poll(&mut context), Pending);
 
         // Drain the pipe so the write can continue.
-        let mut read_buf = vec![0u8; PIPE_SIZE];
+        let mut read_buf = [0u8; PIPE_SIZE];
         assert_eq!(
             system.read(reader, &mut read_buf).now_or_never().unwrap(),
             Ok(PIPE_SIZE)
@@ -1944,7 +1945,7 @@ mod tests {
         );
 
         // The second half of the buffer must also be readable from the pipe.
-        let mut read_buf2 = vec![0u8; PIPE_SIZE];
+        let mut read_buf2 = [0u8; PIPE_SIZE];
         assert_eq!(
             system.read(reader, &mut read_buf2).now_or_never().unwrap(),
             Ok(PIPE_SIZE)
