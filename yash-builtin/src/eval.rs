@@ -70,7 +70,7 @@ where
     let RunReadEvalLoop(run_read_eval_loop) = *env
         .any
         .get()
-        .expect("`eval` built-in requires `RunReadEvalLoop` in `Env::any`");
+        .expect("`RunReadEvalLoop` should be in `env.any`");
     let mut config = Config::with_input(Box::new(Memory::new(&command.value)));
     config.source = Some(Rc::new(Source::Eval {
         original: command.origin,

@@ -42,7 +42,7 @@ pub trait Unquote {
         let mut unquoted = String::new();
         let is_quoted = self
             .write_unquoted(&mut unquoted)
-            .expect("`write_unquoted` should not fail");
+            .expect("`write_unquoted` should not fail when writing to a `String`");
         (unquoted, is_quoted)
     }
 }

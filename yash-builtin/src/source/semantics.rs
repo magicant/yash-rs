@@ -61,7 +61,7 @@ impl Command {
             .any
             .get::<RunReadEvalLoop<S>>()
             .cloned()
-            .expect("`source` built-in requires `RunReadEvalLoop` in `Env::any`");
+            .expect("`RunReadEvalLoop` should be in `env.any`");
         let system = env.system.clone();
         let ref_env = RefCell::new(&mut *env);
         let input = Box::new(Echo::new(FdReader2::new(fd, system), &ref_env));

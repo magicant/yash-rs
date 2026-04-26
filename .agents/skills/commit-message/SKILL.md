@@ -64,7 +64,9 @@ Produce:
 
 ## Output Format
 
-Unless the user asks for a different convention, provide:
+Unless the user asks for a different convention, always present the primary suggested commit message in a fenced `text` code block so it can be pasted directly into a commit editor.
+
+Use this structure:
 
 ```text
 <subject>
@@ -74,7 +76,7 @@ Unless the user asks for a different convention, provide:
 
 Keep the subject at 72 characters or fewer, preferably 50 or fewer, and wrap each body line at 72 characters.
 
-If useful, also provide 2 to 3 alternative subject lines with different emphasis, such as user-visible behavior, subsystem, or bug fix framing.
+If useful, also provide 2 to 3 alternative subject lines with different emphasis, such as user-visible behavior, subsystem, or bug fix framing. The alternatives can be outside the code block.
 
 ## Heuristics
 

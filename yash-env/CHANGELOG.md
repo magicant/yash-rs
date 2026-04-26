@@ -175,6 +175,7 @@ A _private dependency_ is used internally and not visible to downstream users.
   simulates the execution of shell processes driven by
   `system::Concurrent::run_real`. It now also uses `yash_executor::Executor`
   as the executor instead of `futures_executor::LocalPool`.
+- Revised some panic messages to be more informative.
 - Private dependency versions:
     - derive_more 2.0.1 → 2.1.0
 

@@ -32,7 +32,7 @@ use std::str::FromStr;
 fn unwrap_ready<F: Future>(f: F) -> <F as Future>::Output {
     use futures_util::future::FutureExt;
     f.now_or_never()
-        .expect("Expected Ready but received Pending")
+        .expect("the lexer should not block when reading from a string")
 }
 
 /// Returns an error if the parser has a remaining token.

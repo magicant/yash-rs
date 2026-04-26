@@ -838,7 +838,7 @@ impl Clock for VirtualSystem {
         self.state
             .borrow()
             .now
-            .expect("SystemState::now not assigned")
+            .expect("`SystemState::now` should be assigned")
     }
 }
 
@@ -961,7 +961,7 @@ impl Sigmask for VirtualSystem {
             let process = state
                 .processes
                 .get_mut(&self.process_id)
-                .expect("current process not found");
+                .expect("the current process should be in the system state");
 
             if let Some(old_mask) = old_mask {
                 old_mask.clear();

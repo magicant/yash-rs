@@ -157,7 +157,7 @@ where
 
     match syntax::parse(args) {
         Ok(Command::PrintVariables) => {
-            let IsName(is_name) = env.any.get().expect("IsName not found in env.any");
+            let IsName(is_name) = env.any.get().expect("`IsName` should be in `env.any`");
             let mut vars: Vec<_> = env
                 .variables
                 .iter(Global)

@@ -67,7 +67,7 @@ where
     let RunSignalTrapIfCaught(run_trap_if_caught) = *env
         .any
         .get()
-        .expect("`wait` built-in requires `RunSignalTrapIfCaught` in `Env::any`");
+        .expect("`RunSignalTrapIfCaught` should be in `env.any`");
 
     // We need to install the internal disposition before calling `wait` so we
     // don't miss any `SIGCHLD` that may arrive between `wait` and

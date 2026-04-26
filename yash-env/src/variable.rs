@@ -288,7 +288,7 @@ impl VariableSet {
         contexts
             .iter()
             .rposition(|context| matches!(context, Context::Regular { .. }))
-            .expect("base context has gone")
+            .expect("the stack should have at least one regular context")
     }
 
     /// Computes the index of the context that matches the specified scope.
@@ -685,7 +685,7 @@ impl VariableSet {
                 Context::Regular { positional_params } => Some(positional_params),
                 Context::Volatile => None,
             })
-            .expect("base context has gone")
+            .expect("the stack should have at least one regular context")
     }
 
     /// Returns a mutable reference to the positional parameters.
@@ -703,7 +703,7 @@ impl VariableSet {
                 Context::Regular { positional_params } => Some(positional_params),
                 Context::Volatile => None,
             })
-            .expect("base context has gone")
+            .expect("the stack should have at least one regular context")
     }
 
     fn push_context_impl(&mut self, context: Context) {
@@ -712,7 +712,11 @@ impl VariableSet {
 
     fn pop_context_impl(&mut self) {
         debug_assert!(!self.contexts.is_empty());
-        assert_ne!(self.contexts.len(), 1, "cannot pop the base context");
+        assert_ne!(
+            self.contexts.len(),
+            1,
+            "the base context should not be popped"
+        );
         self.contexts.pop();
         self.all_variables.retain(|_, stack| {
             stack.pop_if(|vic| {
@@ -1256,7 +1260,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "cannot pop the base context")]
+    #[should_panic(expected = "the base context should not be popped")]
     fn cannot_pop_base_context() {
         let mut variables = VariableSet::new();
         variables.pop_context_impl();

@@ -208,7 +208,11 @@ where
     S: Fstat + GetCwd + IsExecutableFile + Sysconf + 'static,
 {
     if env.params.categories.contains(Category::Keyword) {
-        let IsKeyword(is_keyword) = env.env.any.get().expect("IsKeyword not found in env.any");
+        let IsKeyword(is_keyword) = env
+            .env
+            .any
+            .get()
+            .expect("`IsKeyword` should be in `env.any`");
         if is_keyword(env.env, &name.value) {
             return Ok(Categorization::Keyword);
         }

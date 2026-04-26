@@ -37,12 +37,14 @@ impl SetFunctions {
                             Ok(Some(mut function)) => {
                                 Rc::make_mut(&mut function).read_only_location =
                                     Some(name.origin.clone());
-                                functions
-                                    .define(function)
-                                    // The define function fails only when the set has a read-only
-                                    // function with the same name. This is impossible because we
-                                    // have just unset the function.
-                                    .expect("unreachable error case");
+                                let define_result = functions.define(function);
+                                // The define function fails only when the set has a read-only
+                                // function with the same name. This is impossible because we have
+                                // just unset the function.
+                                debug_assert!(
+                                    define_result.is_ok(),
+                                    "the function should be defined successfully: {define_result:?}"
+                                );
                             }
                         }
                     }
