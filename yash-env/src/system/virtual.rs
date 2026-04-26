@@ -767,7 +767,7 @@ impl VirtualSystem {
         context: &mut std::task::Context<'_>,
     ) -> bool {
         let mut proc = self.current_process_mut();
-        if proc.caught_signals.len() != initial_signal_count {
+        if proc.caught_signals_count != initial_signal_count {
             return true;
         }
         waker.set(Some(context.waker().clone()));
@@ -790,7 +790,7 @@ impl Read for VirtualSystem {
         let system = self.clone();
         async move {
             let ofd = ofd?;
-            let initial_signal_count = system.current_process().caught_signals.len();
+            let initial_signal_count = system.current_process().caught_signals_count;
             let waker: LazyCell<Rc<Cell<Option<Waker>>>> = LazyCell::default();
             poll_fn(|context| {
                 let get_waker = || {
@@ -826,7 +826,7 @@ impl Write for VirtualSystem {
         let system = self.clone();
         async move {
             let ofd = ofd?;
-            let initial_signal_count = system.current_process().caught_signals.len();
+            let initial_signal_count = system.current_process().caught_signals_count;
             let mut bytes_written = 0usize;
             let waker: LazyCell<Rc<Cell<Option<Waker>>>> = LazyCell::default();
             poll_fn(|context| {
