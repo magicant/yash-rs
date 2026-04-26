@@ -205,6 +205,11 @@ A _private dependency_ is used internally and not visible to downstream users.
   operation now blocks until the entire buffer can be written in one call.
   Previously, it would write as many bytes as fit immediately, resulting in a
   partial write even in blocking mode.
+- `system::real::RealSystem::read` and `system::real::RealSystem::write` no
+  longer silently retry on [`Errno::EINTR`]. When the underlying system call
+  is interrupted by a signal, the error is now returned to the caller directly.
+  Callers are responsible for handling `EINTR` (e.g., by retrying the operation
+  or propagating the error).
 - `system::virtual::VirtualSystem::select` now correctly sends SIGCHLD to the
   parent process when temporarily changing the signal mask causes the process
   state to change.
