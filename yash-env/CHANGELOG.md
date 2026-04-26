@@ -200,6 +200,11 @@ A _private dependency_ is used internally and not visible to downstream users.
   now return [`Errno::EINTR`] when a signal is caught while the operation is
   blocking. Previously, these methods would block indefinitely, ignoring any
   signals that were caught.
+- When writing to a FIFO or pipe in blocking mode with a buffer larger than
+  [`PIPE_BUF`](system::virtual::PIPE_BUF), the virtual system's write
+  operation now blocks until the entire buffer can be written in one call.
+  Previously, it would write as many bytes as fit immediately, resulting in a
+  partial write even in blocking mode.
 - `system::virtual::VirtualSystem::select` now correctly sends SIGCHLD to the
   parent process when temporarily changing the signal mask causes the process
   state to change.

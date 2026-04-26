@@ -375,6 +375,18 @@ impl FileBody {
     /// wake conditions and to allow it to be taken by the first condition that
     /// wakes the task.
     ///
+    /// For FIFO writes, blocking vs non-blocking mode is inferred from the
+    /// waker returned by `get_waker`: if the returned [`Weak`] can be upgraded
+    /// (i.e., `strong_count() > 0`), the operation is considered blocking.
+    /// This matters for writes larger than [`PIPE_BUF`]:
+    ///
+    /// - In **blocking** mode the whole buffer must be written in one call, so
+    ///   the method returns [`Poll::Pending`] (and registers the waker) until
+    ///   the pipe has room for the entire buffer.
+    /// - In **non-blocking** mode a partial write is allowed: if at least one
+    ///   byte fits, it writes as many bytes as the current free space allows
+    ///   and returns [`Poll::Ready`] with that count.
+    ///
     /// The returned `Poll` indicates whether the write operation has completed
     /// or is still pending. If it is `Poll::Ready`, the contained `Result`
     /// indicates whether the write was successful and how many bytes were
@@ -425,6 +437,17 @@ impl FileBody {
                         pending_write_wakers.insert(get_waker());
                         return Pending;
                     }
+                    // Non-atomic write (buffer > PIPE_BUF) with some room available.
+                    // In blocking mode, all bytes must be written in a single call, so
+                    // we block until there is room for the entire buffer.
+                    // In non-blocking mode, we write as many bytes as fit.
+                    let waker = get_waker();
+                    if waker.strong_count() > 0 {
+                        // Blocking mode: block until there is room for the whole buffer
+                        pending_write_wakers.insert(waker);
+                        return Pending;
+                    }
+                    // Non-blocking mode: partial write
                     buffer = &buffer[..room];
                 }
                 content.reserve_exact(room);
@@ -866,7 +889,8 @@ mod tests {
     fn fifo_file_body_write_non_atomic_empty() {
         // When the write size exceeds PIPE_BUF, the FIFO has space for at least
         // one byte, but there are readers that may read from the FIFO, the
-        // write operation should succeed and write as much as possible.
+        // write operation (in non-blocking mode) should succeed and write as
+        // much as possible.
         let mut body = FileBody::Fifo {
             content: VecDeque::from([0; PIPE_SIZE - 1]),
             readers: 1,
@@ -880,10 +904,34 @@ mod tests {
     }
 
     #[test]
+    fn fifo_file_body_write_non_atomic_blocking_with_partial_space() {
+        // When the write size exceeds PIPE_BUF and the FIFO has some space but
+        // not enough for all bytes, in blocking mode the write should block
+        // until there is room for the entire buffer.
+        let mut body = FileBody::Fifo {
+            content: VecDeque::from([0; PIPE_SIZE - 1]),
+            readers: 1,
+            writers: 0,
+            pending_open_wakers: WakerSet::new(),
+            pending_read_wakers: WakerSet::new(),
+            pending_write_wakers: WakerSet::new(),
+        };
+        let buffer = [0; PIPE_BUF + 1];
+
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Rc::new(Cell::new(Some(Waker::from(wake_flag.clone()))));
+        let get_waker = || Rc::downgrade(&waker);
+        // Only 1 byte of room, but buffer.len() = PIPE_BUF + 1: must block in blocking mode
+        let poll = body.poll_write(&buffer, 0, get_waker);
+        assert_eq!(poll, Pending);
+        assert!(!wake_flag.is_woken());
+    }
+
+    #[test]
     fn fifo_file_body_write_non_atomic_full() {
         // When the write size exceeds PIPE_BUF, the FIFO is full, and there are
         // readers that may read from it, the write operation should block until
-        // there is space for at least one byte to be written.
+        // there is space for all bytes to be written.
         let mut body = FileBody::Fifo {
             content: VecDeque::from([0; PIPE_SIZE]),
             readers: 1,
@@ -901,18 +949,33 @@ mod tests {
         assert_eq!(poll, Pending);
         assert!(!wake_flag.is_woken());
 
-        // When another task reads from the FIFO, the write operation should be woken up.
+        // When another task reads 1 byte from the FIFO, the write operation
+        // is woken up, but still does not have enough room.
         let mut read_buffer = [0; 1];
         let poll = body.poll_read(&mut read_buffer, 0, Weak::new);
         assert_eq!(poll, Ready(Ok(1)));
         assert!(wake_flag.is_woken());
 
-        // After being woken up, the write operation successfully writes one byte to the FIFO.
+        // Without enough room, the write operation blocks again.
         let wake_flag = Arc::new(WakeFlag::new());
         let waker = Rc::new(Cell::new(Some(Waker::from(wake_flag.clone()))));
         let get_waker = || Rc::downgrade(&waker);
         let poll = body.poll_write(&buffer, 0, get_waker);
-        assert_eq!(poll, Ready(Ok(1)));
+        assert_eq!(poll, Pending);
+        assert!(!wake_flag.is_woken());
+
+        // When a reader frees enough space (PIPE_BUF bytes = 512 more bytes),
+        // the write operation is woken and writes all PIPE_BUF + 1 bytes.
+        let mut read_buffer = [0; PIPE_BUF];
+        let poll = body.poll_read(&mut read_buffer, 0, Weak::new);
+        assert_eq!(poll, Ready(Ok(PIPE_BUF)));
+        assert!(wake_flag.is_woken());
+
+        let wake_flag = Arc::new(WakeFlag::new());
+        let waker = Rc::new(Cell::new(Some(Waker::from(wake_flag.clone()))));
+        let get_waker = || Rc::downgrade(&waker);
+        let poll = body.poll_write(&buffer, 0, get_waker);
+        assert_eq!(poll, Ready(Ok(PIPE_BUF + 1)));
         assert!(!wake_flag.is_woken());
     }
 }
