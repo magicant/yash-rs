@@ -20,6 +20,7 @@ Use this skill when the goal is to produce a commit message that explains both w
 Produce:
 
 - A one-line subject that states the main change precisely
+- A subject written as a plain imperative phrase, not a marker prefix
 - An optional body that captures motivation, important details, and user-visible effects
 - Wording that matches the actual diff instead of inventing intent
 
@@ -38,13 +39,15 @@ Produce:
    Use a subject only for small self-explanatory changes. Add a body when the change affects behavior, touches multiple areas, has follow-up constraints, or needs context for reviewers.
 
 5. Write the subject line.
-   Prefer the imperative mood. Keep it specific and compact. Target 50 characters or fewer when possible, and keep the subject at 72 characters or fewer. Lead with the most important noun or subsystem when that improves clarity.
+   Prefer the imperative mood. Keep it specific and compact. Target 50 characters or fewer when possible, and keep the subject at 72 characters or fewer.
+   Do not start the subject with a marker prefix such as `fix:`, `feat:`, or `fix(scope):`. Unless the user explicitly requests that convention, write a plain sentence-style subject (for example, `Preserve redirection order in subshell execution`).
 
 6. Write the body if needed.
    Explain the motivation, notable implementation detail, and observable impact in short paragraphs or flat bullets. Wrap every body line at 72 characters. Mention tests only when they add meaning.
 
 7. Validate against the diff.
-   Check that every claim is supported by the changes. Remove filler words, avoid generic verbs like "update" or "improve" when a more exact verb exists, and make sure unrelated edits are not bundled into the description.
+   Check that every claim is supported by the changes. Remove filler words, avoid generic verbs like "add", "fix", "update" or "improve", and make sure unrelated edits are not bundled into the description.
+   Confirm the subject does not match marker patterns like `^[a-z]+(\([^\)]*\))?!?:`.
 
 ## Decision Points
 
@@ -58,6 +61,7 @@ Produce:
 
 - The subject is understandable without opening the diff.
 - The subject names the real change, not a vague activity.
+- The subject does not begin with marker prefixes such as `type:` or `type(scope):`.
 - The body explains why the change exists when that is not obvious.
 - The message does not claim behavior or intent that the diff does not support.
 - The wording is short enough to scan quickly but detailed enough to be useful in history.

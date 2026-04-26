@@ -197,6 +197,10 @@ For yash-cli CHANGELOG: Include changes in observable behavior even if yash-cli 
 - All public APIs must have documentation comments, except for trivial trait implementations
     - If the documentation comment for an item starts with a paragraph composed only of a noun phrase, do not end that paragraph with a period. Other paragraphs should end with periods.
 
+### Commit Message Guidelines
+
+Follow the commit message guidelines in `.agents/skills/commit-message/SKILL.md` for all commits. Use the imperative mood in the subject line and provide a detailed body when necessary to explain the motivation and impact of the change.
+
 ## Key Configuration Files
 
 - **Cargo.toml** (root): Workspace configuration, shared dependencies
