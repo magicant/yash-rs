@@ -1823,8 +1823,7 @@ mod tests {
     fn write_returns_eintr_when_interrupted_by_signal() {
         let system = VirtualSystem::new();
         system.sigaction(SIGINT, Disposition::Catch).unwrap();
-        let (reader, writer) = system.pipe().unwrap();
-        // Fill the pipe to make the next write block
+        let (_reader, writer) = system.pipe().unwrap();
         system
             .write(writer, &vec![0u8; PIPE_SIZE])
             .now_or_never()
@@ -1848,7 +1847,6 @@ mod tests {
         let woken = Arc::new(WakeFlag::new());
         let waker = std::task::Waker::from(woken.clone());
         let mut context = Context::from_waker(&waker);
-        let _ = reader; // keep reader alive so pipe is open
         assert_eq!(write_fut.poll(&mut context), Ready(Err(Errno::EINTR)));
     }
 
@@ -1944,6 +1942,14 @@ mod tests {
             Ready(Ok(2 * PIPE_SIZE)),
             "large write without signal must complete the full buffer"
         );
+
+        // The second half of the buffer must also be readable from the pipe.
+        let mut read_buf2 = vec![0u8; PIPE_SIZE];
+        assert_eq!(
+            system.read(reader, &mut read_buf2).now_or_never().unwrap(),
+            Ok(PIPE_SIZE)
+        );
+        assert_eq!(read_buf2, big_buf[PIPE_SIZE..]);
     }
 
     #[test]
