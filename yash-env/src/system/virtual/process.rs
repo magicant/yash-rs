@@ -102,6 +102,13 @@ pub struct Process {
     /// List of signals that have been delivered and caught
     pub(crate) caught_signals: Vec<signal::Number>,
 
+    /// Monotonically increasing count of signals that have been caught
+    ///
+    /// Unlike [`caught_signals`](Self::caught_signals), this counter is never
+    /// reset. It is incremented each time a signal is caught, regardless of
+    /// whether the signal has been consumed from `caught_signals`.
+    pub(crate) caught_signals_count: usize,
+
     /// Wakers of tasks waiting for signals to be delivered to this process
     ///
     /// When a signal is delivered to this process, all wakers in this set are
@@ -156,6 +163,7 @@ impl Process {
             blocked_signals: BTreeSet::new(),
             pending_signals: BTreeSet::new(),
             caught_signals: Vec::new(),
+            caught_signals_count: 0,
             signal_wakers: WakerSet::new(),
             resource_limits: HashMap::new(),
             last_exec: None,
@@ -507,6 +515,7 @@ impl Process {
             },
             Disposition::Catch => {
                 self.caught_signals.push(signal);
+                self.caught_signals_count += 1;
                 self.signal_wakers.wake_all();
                 SignalResult {
                     delivered: true,
