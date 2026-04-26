@@ -431,10 +431,6 @@ impl Fcntl for RealSystem {
 
 impl Read for RealSystem {
     /// Reads data from the file descriptor into the buffer.
-    ///
-    /// This method does not retry on [`Errno::EINTR`]; if the underlying
-    /// `read` system call is interrupted by a signal, the error is returned
-    /// to the caller directly.
     fn read<'a>(
         &self,
         fd: Fd,
@@ -448,10 +444,6 @@ impl Read for RealSystem {
 
 impl Write for RealSystem {
     /// Writes data from the buffer to the file descriptor.
-    ///
-    /// This method does not retry on [`Errno::EINTR`]; if the underlying
-    /// `write` system call is interrupted by a signal, the error is returned
-    /// to the caller directly.
     fn write<'a>(&self, fd: Fd, buffer: &'a [u8]) -> impl Future<Output = Result<usize>> + use<'a> {
         let result =
             unsafe { libc::write(fd.0, buffer.as_ptr().cast(), buffer.len()) }.errno_if_m1();

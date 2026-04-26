@@ -1604,7 +1604,7 @@ mod tests {
     use std::pin::pin;
     use std::sync::Arc;
     use std::task::Context;
-    use std::task::Poll::{Pending as PollPending, Ready};
+    use std::task::Poll::{Pending, Ready};
 
     impl Executor for futures_executor::LocalSpawner {
         fn spawn(
@@ -1782,7 +1782,7 @@ mod tests {
         let mut read_fut = pin!(system.read(reader, &mut buffer));
 
         // First poll: no data, should be pending
-        assert_eq!(read_fut.as_mut().poll(&mut context), PollPending);
+        assert_eq!(read_fut.as_mut().poll(&mut context), Pending);
 
         // Deliver a signal
         let _ = system.current_process_mut().raise_signal(SIGINT);
@@ -1838,7 +1838,7 @@ mod tests {
         let mut write_fut = pin!(system.write(writer, &[1]));
 
         // First poll: no space, should be pending
-        assert_eq!(write_fut.as_mut().poll(&mut context), PollPending);
+        assert_eq!(write_fut.as_mut().poll(&mut context), Pending);
 
         // Deliver a signal
         let _ = system.current_process_mut().raise_signal(SIGINT);
@@ -1873,7 +1873,7 @@ mod tests {
         let mut write_fut = pin!(system.write(writer, &big_buf));
 
         // First poll: writes PIPE_SIZE bytes (filling the pipe), then blocks.
-        assert_eq!(write_fut.as_mut().poll(&mut context), PollPending);
+        assert_eq!(write_fut.as_mut().poll(&mut context), Pending);
 
         // A signal arrives while the write is blocking.
         let _ = system.current_process_mut().raise_signal(SIGINT);
@@ -1902,6 +1902,47 @@ mod tests {
             system.current_process().caught_signals,
             [SIGINT],
             "SIGINT should be in the caught signals list"
+        );
+    }
+
+    #[test]
+    fn write_large_buffer_completes_fully_without_signal() {
+        // A large write in blocking mode (without a signal) must eventually
+        // transfer the entire buffer.  The pipe can hold PIPE_SIZE bytes at a
+        // time; the write fills it and blocks, a reader drains it, and the
+        // pattern repeats until all bytes are written.
+        let big_buf: Vec<u8> = (0..2 * PIPE_SIZE).map(|i| i as u8).collect();
+        let system = VirtualSystem::new();
+        let (reader, writer) = system.pipe().unwrap();
+
+        let woken = Arc::new(WakeFlag::new());
+        let waker = std::task::Waker::from(woken.clone());
+        let mut context = Context::from_waker(&waker);
+        let mut write_fut = pin!(system.write(writer, &big_buf));
+
+        // First poll: fills the pipe (PIPE_SIZE bytes), then blocks.
+        assert_eq!(write_fut.as_mut().poll(&mut context), Pending);
+
+        // Drain the pipe so the write can continue.
+        let mut read_buf = vec![0u8; PIPE_SIZE];
+        assert_eq!(
+            system.read(reader, &mut read_buf).now_or_never().unwrap(),
+            Ok(PIPE_SIZE)
+        );
+        assert_eq!(read_buf, big_buf[..PIPE_SIZE]);
+        assert!(
+            woken.is_woken(),
+            "draining the pipe should wake the write task"
+        );
+
+        // Second poll: writes the remaining bytes.
+        let woken = Arc::new(WakeFlag::new());
+        let waker = std::task::Waker::from(woken.clone());
+        let mut context = Context::from_waker(&waker);
+        assert_eq!(
+            write_fut.poll(&mut context),
+            Ready(Ok(2 * PIPE_SIZE)),
+            "large write without signal must complete the full buffer"
         );
     }
 
