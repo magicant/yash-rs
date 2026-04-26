@@ -1749,9 +1749,9 @@ mod tests {
     #[test]
     fn read_returns_eintr_when_interrupted_by_signal() {
         use crate::test_helper::WakeFlag;
+        use std::pin::pin;
         use std::sync::Arc;
         use std::task::Context;
-        use std::pin::pin;
         use std::task::Poll::{Pending, Ready};
 
         let system = VirtualSystem::new();
@@ -1783,9 +1783,9 @@ mod tests {
     fn write_returns_eintr_when_interrupted_by_signal() {
         use crate::system::r#virtual::PIPE_SIZE;
         use crate::test_helper::WakeFlag;
+        use std::pin::pin;
         use std::sync::Arc;
         use std::task::Context;
-        use std::pin::pin;
         use std::task::Poll::{Pending, Ready};
 
         let system = VirtualSystem::new();
@@ -1822,9 +1822,9 @@ mod tests {
     #[test]
     fn read_does_not_return_eintr_if_data_available_despite_pending_signal() {
         use crate::test_helper::WakeFlag;
+        use std::pin::pin;
         use std::sync::Arc;
         use std::task::Context;
-        use std::pin::pin;
         use std::task::Poll::Ready;
 
         let system = VirtualSystem::new();
