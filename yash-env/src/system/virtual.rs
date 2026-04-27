@@ -755,7 +755,7 @@ impl Fcntl for VirtualSystem {
 }
 
 impl VirtualSystem {
-    /// Checks for newly caught signals and registers a signal waker if none found
+    /// Checks for newly caught signals and registers a signal waker if none found.
     ///
     /// Returns `true` if new signals have been caught since `initial_signal_count`,
     /// leaving the waker unregistered. Returns `false` and registers the waker for
@@ -817,80 +817,63 @@ impl Write for VirtualSystem {
     /// [`PIPE_BUF`] bytes, this method blocks until enough room is available
     /// to write all bytes atomically. For larger writes, this method writes as
     /// many bytes as fit on each pass and loops, blocking only when the pipe is
-    /// completely full, until the entire buffer has been written.
+    /// completely full, until the entire buffer has been written. The decision
+    /// to loop is encapsulated in
+    /// [`OpenFileDescription::poll_write_full`](OpenFileDescription::poll_write_full);
+    /// this method itself contains no file-type branching.
     ///
     /// For non-pipe file types or non-blocking mode, this method returns after
     /// the first successful (possibly partial) write without looping.
     ///
     /// If a signal is caught while this method is blocking, it returns
     /// [`Errno::EINTR`] if no bytes have been written yet, or the count of
-    /// bytes written so far otherwise.
+    /// bytes written so far otherwise. The signal-precedence check runs at the
+    /// top of each poll iteration *before* any further write is attempted, so
+    /// when `Err(Errno::EINTR)` is returned no bytes have been transferred in
+    /// this call.
     fn write<'a>(&self, fd: Fd, buffer: &'a [u8]) -> impl Future<Output = Result<usize>> + use<'a> {
         let ofd = self.get_open_file_description(fd);
         let system = self.clone();
         async move {
             let ofd = ofd?;
-            let (is_pipe, is_nonblocking) = {
-                let ofd = ofd.borrow();
-                (ofd.is_fifo(), ofd.is_nonblocking())
-            };
             let initial_signal_count = system.current_process().caught_signals_count;
             let mut bytes_written = 0usize;
             let mut has_blocked = false;
             let waker: LazyCell<Rc<Cell<Option<Waker>>>> = LazyCell::default();
+            // Helper that maps the running byte count into the result returned
+            // when a signal interrupts the operation.
+            let interrupted = |bytes_written: usize| -> Poll<Result<usize>> {
+                Poll::Ready(if bytes_written > 0 {
+                    Ok(bytes_written)
+                } else {
+                    Err(Errno::EINTR)
+                })
+            };
             poll_fn(|context| {
                 // After having blocked at least once, check for signals before
-                // attempting to write. This ensures EINTR is returned even when
-                // space becomes available at the same moment a signal is caught.
+                // attempting any further write. This guarantees that when
+                // EINTR is returned, no bytes have been transferred in this
+                // call (the precedence policy POSIX leaves to the
+                // implementation).
                 if has_blocked
                     && system.current_process().caught_signals_count != initial_signal_count
                 {
-                    return Poll::Ready(if bytes_written > 0 {
-                        Ok(bytes_written)
-                    } else {
-                        Err(Errno::EINTR)
-                    });
+                    return interrupted(bytes_written);
                 }
-                loop {
-                    let remaining = &buffer[bytes_written..];
-                    if remaining.is_empty() {
-                        return Poll::Ready(Ok(bytes_written));
-                    }
-                    let get_waker = || {
-                        waker.set(Some(context.waker().clone()));
-                        Rc::downgrade(&waker)
-                    };
-                    match ofd.borrow_mut().poll_write(remaining, get_waker) {
-                        Poll::Ready(Ok(n)) => {
-                            bytes_written += n;
-                            if !is_pipe || is_nonblocking {
-                                // For non-pipe files or non-blocking mode, return
-                                // after the first successful write.
-                                return Poll::Ready(Ok(bytes_written));
-                            }
-                            // For blocking pipes, keep looping to write the rest.
-                        }
-                        Poll::Ready(Err(e)) => {
-                            // Return bytes written so far if any, else propagate the error
-                            return Poll::Ready(if bytes_written > 0 {
-                                Ok(bytes_written)
-                            } else {
-                                Err(e)
-                            });
-                        }
-                        Poll::Pending => {
-                            has_blocked = true;
-                            if system.signal_interrupted(initial_signal_count, &waker, context) {
-                                return Poll::Ready(if bytes_written > 0 {
-                                    Ok(bytes_written)
-                                } else {
-                                    Err(Errno::EINTR)
-                                });
-                            }
-                            return Poll::Pending;
-                        }
+                let get_waker = || {
+                    waker.set(Some(context.waker().clone()));
+                    Rc::downgrade(&waker)
+                };
+                let result =
+                    ofd.borrow_mut()
+                        .poll_write_full(buffer, &mut bytes_written, get_waker);
+                if result.is_pending() {
+                    has_blocked = true;
+                    if system.signal_interrupted(initial_signal_count, &waker, context) {
+                        return interrupted(bytes_written);
                     }
                 }
+                result
             })
             .await
         }
@@ -2019,9 +2002,38 @@ mod tests {
         let waker = std::task::Waker::from(woken.clone());
         let mut context = Context::from_waker(&waker);
         assert_eq!(
-            write_fut.poll(&mut context),
+            write_fut.as_mut().poll(&mut context),
             Ready(Err(Errno::EINTR)),
             "signal should interrupt write even when space is available"
+        );
+
+        // A fresh read on the now-drained pipe must block (return Pending)
+        // because the interrupted write left it empty: no bytes were
+        // transferred when EINTR was returned.
+        let mut probe_buf = [0u8; 1];
+        assert_eq!(
+            system.read(reader, &mut probe_buf).now_or_never(),
+            None,
+            "no bytes must be transferred when EINTR is returned"
+        );
+    }
+
+    #[test]
+    fn write_does_not_check_signals_before_first_block() {
+        // A signal caught *before* write is called must not cause the write to
+        // return EINTR if the operation never had to block. The signal-
+        // precedence policy only applies once the write has blocked at least
+        // once.
+        let system = VirtualSystem::new();
+        system.sigaction(SIGINT, Disposition::Catch).unwrap();
+        let (_reader, writer) = system.pipe().unwrap();
+        let _ = system.current_process_mut().raise_signal(SIGINT);
+
+        let result = system.write(writer, &[42]).now_or_never().unwrap();
+        assert_eq!(
+            result,
+            Ok(1),
+            "write that does not block must succeed even with a pending signal"
         );
     }
 
@@ -2092,7 +2104,7 @@ mod tests {
             Some(Err(Errno::EAGAIN)),
             "non-blocking write to full pipe should return EAGAIN"
         );
-        drop(reader);
+        let _reader = reader;
     }
 
     #[test]
