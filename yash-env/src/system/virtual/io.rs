@@ -101,6 +101,12 @@ impl OpenFileDescription {
         self.is_nonblocking
     }
 
+    /// Returns true if this open file description operates on a FIFO (pipe).
+    #[must_use]
+    pub fn is_fifo(&self) -> bool {
+        self.file.borrow().body.is_fifo()
+    }
+
     /// Sets whether this open file description is in non-blocking mode.
     #[inline]
     pub fn set_nonblocking(&mut self, is_nonblocking: bool) {

@@ -430,30 +430,24 @@ impl Fcntl for RealSystem {
 }
 
 impl Read for RealSystem {
+    /// Reads data from the file descriptor into the buffer.
     fn read<'a>(
         &self,
         fd: Fd,
         buffer: &'a mut [u8],
     ) -> impl Future<Output = Result<usize>> + use<'a> {
-        ready(loop {
-            let result =
-                unsafe { libc::read(fd.0, buffer.as_mut_ptr().cast(), buffer.len()) }.errno_if_m1();
-            if result != Err(Errno::EINTR) {
-                break result.map(|len| len.try_into().unwrap());
-            }
-        })
+        let result =
+            unsafe { libc::read(fd.0, buffer.as_mut_ptr().cast(), buffer.len()) }.errno_if_m1();
+        ready(result.map(|len| len.try_into().unwrap()))
     }
 }
 
 impl Write for RealSystem {
+    /// Writes data from the buffer to the file descriptor.
     fn write<'a>(&self, fd: Fd, buffer: &'a [u8]) -> impl Future<Output = Result<usize>> + use<'a> {
-        ready(loop {
-            let result =
-                unsafe { libc::write(fd.0, buffer.as_ptr().cast(), buffer.len()) }.errno_if_m1();
-            if result != Err(Errno::EINTR) {
-                break result.map(|len| len.try_into().unwrap());
-            }
-        })
+        let result =
+            unsafe { libc::write(fd.0, buffer.as_ptr().cast(), buffer.len()) }.errno_if_m1();
+        ready(result.map(|len| len.try_into().unwrap()))
     }
 }
 
