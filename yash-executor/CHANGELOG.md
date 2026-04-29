@@ -9,7 +9,7 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
-## [1.0.1] - Unreleased
+## [1.0.1] - 2026-04-29
 
 ### Changed
 

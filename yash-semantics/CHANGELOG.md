@@ -9,11 +9,12 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
-## [0.15.0] - Unreleased
+## [0.15.0] - 2026-04-29
 
 ### Changed
 
 - Public dependency versions:
+    - yash-arith 0.2.1 → 0.2.3
     - yash-env 0.12.0 → 0.13.0
     - yash-syntax 0.19.0 → 0.20.0
 

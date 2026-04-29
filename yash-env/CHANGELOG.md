@@ -9,7 +9,7 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
-## [0.13.0] - Unreleased
+## [0.13.0] - 2026-04-29
 
 ### Added
 
@@ -178,6 +178,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   `system::Concurrent::run_real`. It now also uses `yash_executor::Executor`
   as the executor instead of `futures_executor::LocalPool`.
 - Revised some panic messages to be more informative.
+- Public dependency versions:
+    - yash-executor 1.0.0 → 1.0.1
+        - This dependency is now public.
 - Private dependency versions:
     - derive_more 2.0.1 → 2.1.0
 

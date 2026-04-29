@@ -765,7 +765,7 @@ dependencies = [
 
 [[package]]
 name = "yash-arith"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "thiserror",
 ]
@@ -789,7 +789,7 @@ dependencies = [
 
 [[package]]
 name = "yash-cli"
-version = "3.0.5"
+version = "3.0.6"
 dependencies = [
  "assert_matches",
  "futures-util",
@@ -841,7 +841,7 @@ dependencies = [
 
 [[package]]
 name = "yash-executor"
-version = "1.0.0"
+version = "1.0.1"
 
 [[package]]
 name = "yash-fnmatch"
