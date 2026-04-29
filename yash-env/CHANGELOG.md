@@ -13,8 +13,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Fixed
 
-- Fixed the misconfiguration that prevented the crate from building in the
-  release profile. This bug was introduced in 0.13.0.
+- Fixed a bug where debug-only validation code was called in non-debug builds,
+  preventing the crate from building in the release profile. This bug was
+  introduced in 0.13.0.
 
 ## [0.13.0] - 2026-04-29
 
