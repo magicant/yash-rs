@@ -778,7 +778,7 @@ dependencies = [
 
 [[package]]
 name = "yash-builtin"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "assert_matches",
  "either",
@@ -812,7 +812,7 @@ dependencies = [
 
 [[package]]
 name = "yash-env"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "annotate-snippets",
  "assert_matches",
@@ -861,7 +861,7 @@ dependencies = [
 
 [[package]]
 name = "yash-prompt"
-version = "0.11.0"
+version = "0.11.1"
 dependencies = [
  "futures-util",
  "yash-env",
@@ -875,7 +875,7 @@ version = "1.1.1"
 
 [[package]]
 name = "yash-semantics"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "assert_matches",
  "either",
@@ -893,7 +893,7 @@ dependencies = [
 
 [[package]]
 name = "yash-syntax"
-version = "0.20.0"
+version = "0.20.1"
 dependencies = [
  "assert_matches",
  "futures-executor",
