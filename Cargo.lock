@@ -806,7 +806,7 @@ dependencies = [
 
 [[package]]
 name = "yash-env"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "annotate-snippets",
  "assert_matches",

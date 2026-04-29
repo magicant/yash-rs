@@ -80,6 +80,8 @@ impl ScheduledWakerQueue {
     pub fn clear(&mut self) {
         self.wakers_by_time.clear();
         self.waker_to_time.clear();
+
+        #[cfg(debug_assertions)]
         self.validate();
     }
 
@@ -155,7 +157,9 @@ impl ScheduledWakerQueue {
             }
         };
 
+        #[cfg(debug_assertions)]
         self.validate();
+
         pushed
     }
 
@@ -202,7 +206,10 @@ impl ScheduledWakerQueue {
             self.waker_to_time.remove(waker_entry);
             self.wakers_by_time.pop_first();
         }
+
+        #[cfg(debug_assertions)]
         self.validate();
+
         next_wake_time
     }
 
@@ -224,6 +231,8 @@ impl ScheduledWakerQueue {
                 waker.wake();
             }
         }
+
+        #[cfg(debug_assertions)]
         self.validate();
     }
 
