@@ -375,6 +375,12 @@ impl FileBody {
     /// wake conditions and to allow it to be taken by the first condition that
     /// wakes the task.
     ///
+    /// For FIFO writes of at most [`PIPE_BUF`] bytes, the write is atomic:
+    /// either all bytes are written at once or the method blocks until enough
+    /// room is available. For larger writes, the method writes as many bytes as
+    /// fit in the pipe buffer and returns immediately; if no bytes fit (the
+    /// pipe is full), it blocks until at least one byte can be written.
+    ///
     /// The returned `Poll` indicates whether the write operation has completed
     /// or is still pending. If it is `Poll::Ready`, the contained `Result`
     /// indicates whether the write was successful and how many bytes were
@@ -865,7 +871,7 @@ mod tests {
     #[test]
     fn fifo_file_body_write_non_atomic_empty() {
         // When the write size exceeds PIPE_BUF, the FIFO has space for at least
-        // one byte, but there are readers that may read from the FIFO, the
+        // one byte, and there are readers that may read from the FIFO, the
         // write operation should succeed and write as much as possible.
         let mut body = FileBody::Fifo {
             content: VecDeque::from([0; PIPE_SIZE - 1]),

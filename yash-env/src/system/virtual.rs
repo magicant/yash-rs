@@ -754,23 +754,56 @@ impl Fcntl for VirtualSystem {
     }
 }
 
+impl VirtualSystem {
+    /// Checks for newly caught signals and registers a signal waker if none found.
+    ///
+    /// Returns `true` if new signals have been caught since `initial_signal_count`,
+    /// leaving the waker unregistered. Returns `false` and registers the waker for
+    /// future signal notifications otherwise.
+    fn signal_interrupted(
+        &self,
+        initial_signal_count: usize,
+        waker: &Rc<Cell<Option<Waker>>>,
+        context: &mut std::task::Context<'_>,
+    ) -> bool {
+        let mut proc = self.current_process_mut();
+        if proc.caught_signals_count != initial_signal_count {
+            return true;
+        }
+        waker.set(Some(context.waker().clone()));
+        proc.register_signal_waker(Rc::downgrade(waker));
+        false
+    }
+}
+
 impl Read for VirtualSystem {
     /// Reads data from the file descriptor into the buffer.
+    ///
+    /// If a signal is caught while this method is blocking for data, it returns
+    /// [`Errno::EINTR`].
     fn read<'a>(
         &self,
         fd: Fd,
         buffer: &'a mut [u8],
     ) -> impl Future<Output = Result<usize>> + use<'a> {
         let ofd = self.get_open_file_description(fd);
+        let system = self.clone();
         async move {
             let ofd = ofd?;
+            let initial_signal_count = system.current_process().caught_signals_count;
             let waker: LazyCell<Rc<Cell<Option<Waker>>>> = LazyCell::default();
             poll_fn(|context| {
                 let get_waker = || {
                     waker.set(Some(context.waker().clone()));
                     Rc::downgrade(&waker)
                 };
-                ofd.borrow_mut().poll_read(buffer, get_waker)
+                let result = ofd.borrow_mut().poll_read(buffer, get_waker);
+                if result.is_pending()
+                    && system.signal_interrupted(initial_signal_count, &waker, context)
+                {
+                    return Poll::Ready(Err(Errno::EINTR));
+                }
+                result
             })
             .await
         }
@@ -779,17 +812,59 @@ impl Read for VirtualSystem {
 
 impl Write for VirtualSystem {
     /// Writes data from the buffer to the file descriptor.
+    ///
+    /// For pipes (FIFOs) opened in blocking mode, if the write is at most
+    /// [`PIPE_BUF`] bytes, this method blocks until enough room is available
+    /// to write all bytes atomically. For larger writes, this method writes as
+    /// many bytes as fit on each pass and loops, blocking only when the pipe is
+    /// completely full, until the entire buffer has been written. The decision
+    /// to loop is encapsulated in
+    /// [`OpenFileDescription::poll_write_full`](OpenFileDescription::poll_write_full);
+    /// this method itself contains no file-type branching.
+    ///
+    /// For non-pipe file types or non-blocking mode, this method returns after
+    /// the first successful (possibly partial) write without looping.
+    ///
+    /// If a signal is caught while this method is blocking, it returns
+    /// [`Errno::EINTR`] if no bytes have been written yet, or the count of
+    /// bytes written so far otherwise. The signal-precedence check runs at the
+    /// top of each poll iteration *before* any further write is attempted, so
+    /// when `Err(Errno::EINTR)` is returned no bytes have been transferred in
+    /// this call.
     fn write<'a>(&self, fd: Fd, buffer: &'a [u8]) -> impl Future<Output = Result<usize>> + use<'a> {
         let ofd = self.get_open_file_description(fd);
+        let system = self.clone();
         async move {
             let ofd = ofd?;
+            let initial_signal_count = system.current_process().caught_signals_count;
+            let mut bytes_written = 0usize;
             let waker: LazyCell<Rc<Cell<Option<Waker>>>> = LazyCell::default();
+            // Helper that maps the running byte count into the result returned
+            // when a signal interrupts the operation.
+            let interrupted = |bytes_written: usize| -> Poll<Result<usize>> {
+                Poll::Ready(if bytes_written > 0 {
+                    Ok(bytes_written)
+                } else {
+                    Err(Errno::EINTR)
+                })
+            };
             poll_fn(|context| {
+                if system.current_process().caught_signals_count != initial_signal_count {
+                    return interrupted(bytes_written);
+                }
                 let get_waker = || {
                     waker.set(Some(context.waker().clone()));
                     Rc::downgrade(&waker)
                 };
-                ofd.borrow_mut().poll_write(buffer, get_waker)
+                let result =
+                    ofd.borrow_mut()
+                        .poll_write_full(buffer, &mut bytes_written, get_waker);
+                if result.is_pending()
+                    && system.signal_interrupted(initial_signal_count, &waker, context)
+                {
+                    return interrupted(bytes_written);
+                }
+                result
             })
             .await
         }
@@ -1521,10 +1596,16 @@ mod tests {
     use crate::Env;
     use crate::job::ProcessResult;
     use crate::system::FileType;
+    use crate::system::r#virtual::PIPE_SIZE;
+    use crate::test_helper::WakeFlag;
     use assert_matches::assert_matches;
     use futures_executor::LocalPool;
     use futures_util::FutureExt as _;
     use std::future::pending;
+    use std::pin::pin;
+    use std::sync::Arc;
+    use std::task::Context;
+    use std::task::Poll::{Pending, Ready};
 
     impl Executor for futures_executor::LocalSpawner {
         fn spawn(
@@ -1686,6 +1767,336 @@ mod tests {
 
         let result = system.read(reader, &mut buffer).now_or_never().unwrap();
         assert_eq!(result, Ok(0));
+    }
+
+    #[test]
+    fn read_returns_eintr_when_interrupted_by_signal() {
+        let system = VirtualSystem::new();
+        system.sigaction(SIGINT, Disposition::Catch).unwrap();
+        let (reader, _writer) = system.pipe().unwrap();
+
+        let woken = Arc::new(WakeFlag::new());
+        let waker = std::task::Waker::from(woken.clone());
+        let mut context = Context::from_waker(&waker);
+
+        let mut buffer = [0; 4];
+        let mut read_fut = pin!(system.read(reader, &mut buffer));
+
+        // First poll: no data, should be pending
+        assert_eq!(read_fut.as_mut().poll(&mut context), Pending);
+
+        // Deliver a signal
+        let _ = system.current_process_mut().raise_signal(SIGINT);
+        assert!(woken.is_woken(), "signal should have woken the read task");
+
+        // Second poll: signal delivered, should return EINTR
+        let woken = Arc::new(WakeFlag::new());
+        let waker = std::task::Waker::from(woken.clone());
+        let mut context = Context::from_waker(&waker);
+        assert_eq!(read_fut.poll(&mut context), Ready(Err(Errno::EINTR)));
+    }
+
+    #[test]
+    fn read_does_not_return_eintr_if_data_available_despite_pending_signal() {
+        let system = VirtualSystem::new();
+        system.sigaction(SIGINT, Disposition::Catch).unwrap();
+        let (reader, writer) = system.pipe().unwrap();
+        // Write data before the signal
+        system
+            .write(writer, &[1, 2, 3])
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        // Also deliver a signal
+        let _ = system.current_process_mut().raise_signal(SIGINT);
+
+        let woken = Arc::new(WakeFlag::new());
+        let waker = std::task::Waker::from(woken.clone());
+        let mut context = Context::from_waker(&waker);
+
+        let mut buffer = [0; 4];
+        let read_fut = pin!(system.read(reader, &mut buffer));
+        // Data is immediately available; should NOT return EINTR
+        assert_eq!(read_fut.poll(&mut context), Ready(Ok(3)));
+    }
+
+    #[test]
+    fn write_returns_eintr_when_interrupted_by_signal() {
+        let system = VirtualSystem::new();
+        system.sigaction(SIGINT, Disposition::Catch).unwrap();
+        let (_reader, writer) = system.pipe().unwrap();
+        // Fill the pipe to make the next write block
+        system
+            .write(writer, &[0u8; PIPE_SIZE])
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        let woken = Arc::new(WakeFlag::new());
+        let waker = std::task::Waker::from(woken.clone());
+        let mut context = Context::from_waker(&waker);
+
+        let mut write_fut = pin!(system.write(writer, &[1]));
+
+        // First poll: no space, should be pending
+        assert_eq!(write_fut.as_mut().poll(&mut context), Pending);
+
+        // Deliver a signal
+        let _ = system.current_process_mut().raise_signal(SIGINT);
+        assert!(woken.is_woken(), "signal should have woken the write task");
+
+        // Second poll: signal delivered, should return EINTR
+        let woken = Arc::new(WakeFlag::new());
+        let waker = std::task::Waker::from(woken.clone());
+        let mut context = Context::from_waker(&waker);
+        assert_eq!(write_fut.poll(&mut context), Ready(Err(Errno::EINTR)));
+    }
+
+    #[test]
+    fn write_returns_partial_count_when_interrupted_by_signal_after_partial_write() {
+        // Write a buffer larger than PIPE_SIZE (= 2 * PIPE_BUF) to a blocking
+        // pipe.  The pipe can hold PIPE_SIZE bytes; after those are written the
+        // write blocks waiting for room for the rest.  When a signal arrives
+        // during that blocking phase, the write must return the count of bytes
+        // already written rather than Err(EINTR).
+        let system = VirtualSystem::new();
+        system.sigaction(SIGINT, Disposition::Catch).unwrap();
+        let (reader, writer) = system.pipe().unwrap();
+
+        // A buffer larger than the pipe can hold: the write will fill the pipe
+        // and then block waiting for space.
+        let big_buf: Vec<u8> = (0..2 * PIPE_SIZE).map(|i| i as u8).collect();
+
+        let woken = Arc::new(WakeFlag::new());
+        let waker = std::task::Waker::from(woken.clone());
+        let mut context = Context::from_waker(&waker);
+        let mut write_fut = pin!(system.write(writer, &big_buf));
+
+        // First poll: writes PIPE_SIZE bytes (filling the pipe), then blocks.
+        assert_eq!(write_fut.as_mut().poll(&mut context), Pending);
+
+        // A signal arrives while the write is blocking.
+        let _ = system.current_process_mut().raise_signal(SIGINT);
+        assert!(woken.is_woken(), "signal should have woken the write task");
+
+        // Second poll: the write returns the bytes written so far, not EINTR.
+        let woken = Arc::new(WakeFlag::new());
+        let waker = std::task::Waker::from(woken.clone());
+        let mut context = Context::from_waker(&waker);
+        assert_eq!(
+            write_fut.poll(&mut context),
+            Ready(Ok(PIPE_SIZE)),
+            "expected partial byte count written before the signal"
+        );
+
+        // The bytes already written should be available for reading.
+        let mut read_buf = [0u8; PIPE_SIZE];
+        assert_eq!(
+            system.read(reader, &mut read_buf).now_or_never().unwrap(),
+            Ok(PIPE_SIZE)
+        );
+        assert_eq!(read_buf, big_buf[..PIPE_SIZE]);
+
+        // The signal must have been recorded as caught.
+        assert_eq!(
+            system.current_process().caught_signals,
+            [SIGINT],
+            "SIGINT should be in the caught signals list"
+        );
+    }
+
+    #[test]
+    fn write_large_buffer_completes_fully_without_signal() {
+        // A large write in blocking mode (without a signal) must eventually
+        // transfer the entire buffer.  The pipe can hold PIPE_SIZE bytes at a
+        // time; the write fills it and blocks, a reader drains it, and the
+        // pattern repeats until all bytes are written.
+        let big_buf: Vec<u8> = (0..2 * PIPE_SIZE).map(|i| i as u8).collect();
+        let system = VirtualSystem::new();
+        let (reader, writer) = system.pipe().unwrap();
+
+        let woken = Arc::new(WakeFlag::new());
+        let waker = std::task::Waker::from(woken.clone());
+        let mut context = Context::from_waker(&waker);
+        let mut write_fut = pin!(system.write(writer, &big_buf));
+
+        // First poll: fills the pipe (PIPE_SIZE bytes), then blocks.
+        assert_eq!(write_fut.as_mut().poll(&mut context), Pending);
+
+        // Drain the pipe so the write can continue.
+        let mut read_buf = [0u8; PIPE_SIZE];
+        assert_eq!(
+            system.read(reader, &mut read_buf).now_or_never().unwrap(),
+            Ok(PIPE_SIZE)
+        );
+        assert_eq!(read_buf, big_buf[..PIPE_SIZE]);
+        assert!(
+            woken.is_woken(),
+            "draining the pipe should wake the write task"
+        );
+
+        // Second poll: writes the remaining bytes.
+        let woken = Arc::new(WakeFlag::new());
+        let waker = std::task::Waker::from(woken.clone());
+        let mut context = Context::from_waker(&waker);
+        assert_eq!(
+            write_fut.poll(&mut context),
+            Ready(Ok(2 * PIPE_SIZE)),
+            "large write without signal must complete the full buffer"
+        );
+
+        // The second half of the buffer must also be readable from the pipe.
+        let mut read_buf2 = [0u8; PIPE_SIZE];
+        assert_eq!(
+            system.read(reader, &mut read_buf2).now_or_never().unwrap(),
+            Ok(PIPE_SIZE)
+        );
+        assert_eq!(read_buf2, big_buf[PIPE_SIZE..]);
+    }
+
+    #[test]
+    fn write_returns_eintr_when_space_and_signal_arrive_simultaneously() {
+        // When a write is blocked on a full pipe, both the availability of
+        // space in the pipe and the delivery of a signal will wake the write
+        // task. In the current implementation, if both events occur before the
+        // next poll, the signal takes precedence and the write returns EINTR
+        // without writing any more bytes. This test verifies that behavior.
+        let system = VirtualSystem::new();
+        system.sigaction(SIGINT, Disposition::Catch).unwrap();
+        let (reader, writer) = system.pipe().unwrap();
+        // Fill the pipe so the next write blocks.
+        system
+            .write(writer, &[0u8; PIPE_SIZE])
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        let woken = Arc::new(WakeFlag::new());
+        let waker = std::task::Waker::from(woken.clone());
+        let mut context = Context::from_waker(&waker);
+        let mut write_fut = pin!(system.write(writer, &[1]));
+
+        // First poll: pipe is full, should be pending.
+        assert_eq!(write_fut.as_mut().poll(&mut context), Pending);
+
+        // Drain the pipe (space available, wakes the write task) and deliver a
+        // signal before the next poll — both events occur simultaneously.
+        let mut drain_buf = [0u8; PIPE_SIZE];
+        system
+            .read(reader, &mut drain_buf)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        let _ = system.current_process_mut().raise_signal(SIGINT);
+        assert!(woken.is_woken(), "write task should have been woken");
+
+        // Second poll: even though space is available, the signal should interrupt.
+        let woken = Arc::new(WakeFlag::new());
+        let waker = std::task::Waker::from(woken.clone());
+        let mut context = Context::from_waker(&waker);
+        assert_eq!(
+            write_fut.as_mut().poll(&mut context),
+            Ready(Err(Errno::EINTR)),
+            "signal should interrupt write even when space is available"
+        );
+
+        // A fresh read on the now-drained pipe must block (return Pending)
+        // because the interrupted write left it empty: no bytes were
+        // transferred when EINTR was returned.
+        let mut probe_buf = [0u8; 1];
+        assert_eq!(
+            system.read(reader, &mut probe_buf).now_or_never(),
+            None,
+            "no bytes must be transferred when EINTR is returned"
+        );
+    }
+
+    #[test]
+    fn write_does_not_check_signals_before_first_block() {
+        // A signal caught *before* write is called must not cause the write to
+        // return EINTR if the operation never had to block. The signal-
+        // precedence policy only applies once the write has blocked at least
+        // once.
+        let system = VirtualSystem::new();
+        system.sigaction(SIGINT, Disposition::Catch).unwrap();
+        let (_reader, writer) = system.pipe().unwrap();
+        let _ = system.current_process_mut().raise_signal(SIGINT);
+
+        let result = system.write(writer, &[42]).now_or_never().unwrap();
+        assert_eq!(
+            result,
+            Ok(1),
+            "write that does not block must succeed even with a pending signal"
+        );
+    }
+
+    #[test]
+    fn write_returns_partial_count_when_space_and_signal_arrive_simultaneously() {
+        // Verifies that when a large write has already written some bytes and then
+        // blocked, and both space becomes available and a signal is caught before
+        // the next poll, the write returns the byte count already written rather
+        // than continuing to write more.
+        let system = VirtualSystem::new();
+        system.sigaction(SIGINT, Disposition::Catch).unwrap();
+        let (reader, writer) = system.pipe().unwrap();
+
+        let big_buf: Vec<u8> = (0..2 * PIPE_SIZE).map(|i| i as u8).collect();
+
+        let woken = Arc::new(WakeFlag::new());
+        let waker = std::task::Waker::from(woken.clone());
+        let mut context = Context::from_waker(&waker);
+        let mut write_fut = pin!(system.write(writer, &big_buf));
+
+        // First poll: writes PIPE_SIZE bytes (filling the pipe), then blocks.
+        assert_eq!(write_fut.as_mut().poll(&mut context), Pending);
+
+        // Drain the pipe AND deliver a signal before the next poll.
+        let mut drain_buf = [0u8; PIPE_SIZE];
+        system
+            .read(reader, &mut drain_buf)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        let _ = system.current_process_mut().raise_signal(SIGINT);
+        assert!(woken.is_woken(), "write task should have been woken");
+
+        // Second poll: the write should return the bytes written so far rather
+        // than continuing to write more.
+        let woken = Arc::new(WakeFlag::new());
+        let waker = std::task::Waker::from(woken.clone());
+        let mut context = Context::from_waker(&waker);
+        assert_eq!(
+            write_fut.poll(&mut context),
+            Ready(Ok(PIPE_SIZE)),
+            "signal should interrupt large write and return bytes written so far"
+        );
+    }
+
+    #[test]
+    fn write_to_non_blocking_pipe_does_not_block() {
+        // A write on a non-blocking FD must complete immediately and never return
+        // Pending, even when the buffer is larger than the pipe capacity.
+        let system = VirtualSystem::new();
+        let (_reader, writer) = system.pipe().unwrap();
+        system.get_and_set_nonblocking(writer, true).unwrap();
+
+        // Writing a buffer larger than the pipe capacity should return
+        // immediately with the number of bytes that fit.
+        let big_buf = vec![0u8; PIPE_SIZE * 2];
+        let result = system.write(writer, &big_buf).now_or_never();
+        assert_eq!(
+            result,
+            Some(Ok(PIPE_SIZE)),
+            "non-blocking write should return immediately with bytes that fit"
+        );
+
+        // A subsequent write to the now-full pipe should return EAGAIN immediately.
+        let result = system.write(writer, &[1]).now_or_never();
+        assert_eq!(
+            result,
+            Some(Err(Errno::EAGAIN)),
+            "non-blocking write to full pipe should return EAGAIN"
+        );
     }
 
     #[test]

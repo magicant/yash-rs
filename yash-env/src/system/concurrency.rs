@@ -165,7 +165,7 @@ where
                 match this.inner.read(fd, buffer).await {
                     // EWOULDBLOCK is unreachable if it has the same value as EAGAIN.
                     #[allow(unreachable_patterns)]
-                    Err(Errno::EAGAIN | Errno::EWOULDBLOCK) => {
+                    Err(Errno::EAGAIN | Errno::EWOULDBLOCK | Errno::EINTR) => {
                         this.yield_for_read(fd, &waker).await
                     }
 
@@ -202,7 +202,7 @@ where
                 match this.inner.write(fd, buffer).await {
                     // EWOULDBLOCK is unreachable if it has the same value as EAGAIN.
                     #[allow(unreachable_patterns)]
-                    Err(Errno::EAGAIN | Errno::EWOULDBLOCK) => {
+                    Err(Errno::EAGAIN | Errno::EWOULDBLOCK | Errno::EINTR) => {
                         this.yield_for_write(fd, &waker).await
                     }
 

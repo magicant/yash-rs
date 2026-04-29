@@ -44,6 +44,8 @@ A _private dependency_ is used internally and not visible to downstream users.
       performs a read operation.
     - `poll_write`: Polls for the file descriptor to be ready for writing and
       performs a write operation.
+    - `poll_write_full`: Calls `poll_write` repeatedly to write the entire buffer
+      to a pipe (FIFO).
 - The new module `waker` has been added containing the `WakerSet` and
   `ScheduledWakerQueue` structs for storing and activating wakers.
 - The read and write operations of the `system::virtual::VirtualSystem`
@@ -196,6 +198,18 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Fixed
 
+- `system::virtual::VirtualSystem::read` and `system::virtual::VirtualSystem::write`
+  now return `Errno::EINTR` when a signal is caught while the operation is
+  blocking. Previously, these methods would block indefinitely, ignoring any
+  signals that were caught.
+- When a blocking write to a FIFO or pipe with a buffer larger than `PIPE_BUF`
+  is interrupted by a signal after some bytes have already been written, the
+  write operation now returns the count of bytes written rather than `EINTR`.
+- `system::real::RealSystem::read` and `system::real::RealSystem::write` no
+  longer silently retry on `Errno::EINTR`. When the underlying system call
+  is interrupted by a signal, the error is now returned to the caller directly.
+  Callers are responsible for handling `EINTR` (e.g., by retrying the operation
+  or propagating the error).
 - `system::virtual::VirtualSystem::select` now correctly sends SIGCHLD to the
   parent process when temporarily changing the signal mask causes the process
   state to change.
