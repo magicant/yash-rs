@@ -44,6 +44,8 @@ A _private dependency_ is used internally and not visible to downstream users.
       performs a read operation.
     - `poll_write`: Polls for the file descriptor to be ready for writing and
       performs a write operation.
+    - `poll_write_full`: Calls `poll_write` repeatedly to write the entire buffer
+      to a pipe (FIFO).
 - The new module `waker` has been added containing the `WakerSet` and
   `ScheduledWakerQueue` structs for storing and activating wakers.
 - The read and write operations of the `system::virtual::VirtualSystem`

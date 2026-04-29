@@ -17,6 +17,7 @@
 //! I/O within a virtual system.
 
 use super::super::Errno;
+use super::super::FileType;
 use super::FdFlag;
 use super::FileBody;
 use super::Inode;
@@ -282,6 +283,68 @@ impl OpenFileDescription {
         poll
     }
 
+    /// Drives a `write(2)`-equivalent loop on this open file description.
+    ///
+    /// This helper encapsulates the POSIX rule that a single blocking `write(2)`
+    /// call to a pipe must, in the absence of a signal, transfer the entire
+    /// buffer even when the buffer is larger than [`PIPE_BUF`]. For a blocking
+    /// FIFO it repeatedly calls [`poll_write`](Self::poll_write), advancing
+    /// `bytes_written` until either the buffer is exhausted (returns
+    /// `Ready(Ok(*bytes_written))`), no more bytes fit and the next call would
+    /// block (returns `Pending` after registering the waker), or an error is
+    /// reported (returns `Ready(Err(_))` if no bytes have been transferred yet,
+    /// or `Ready(Ok(*bytes_written))` otherwise).
+    ///
+    /// For non-FIFO files or non-blocking file descriptors it returns after a
+    /// single `poll_write` call without looping; this matches POSIX `write(2)`
+    /// semantics for those cases.
+    ///
+    /// `bytes_written` is updated in place so that the caller can resume the
+    /// operation across multiple polls without losing the running total when a
+    /// signal interrupts the operation. This function will panic if
+    /// `bytes_written` exceeds the length of `buffer`. `get_waker` has the same
+    /// contract as for [`poll_write`](Self::poll_write).
+    ///
+    /// [`PIPE_BUF`]: super::PIPE_BUF
+    pub fn poll_write_full<F>(
+        &mut self,
+        buffer: &[u8],
+        bytes_written: &mut usize,
+        mut get_waker: F,
+    ) -> Poll<Result<usize, Errno>>
+    where
+        F: FnMut() -> Weak<Cell<Option<Waker>>>,
+    {
+        // Whether to keep looping after a successful partial write. Only a
+        // blocking FIFO requires looping; everything else returns after the
+        // first successful poll_write call.
+        let loop_on_success =
+            !self.is_nonblocking && self.file.borrow().body.r#type() == FileType::Fifo;
+        loop {
+            let remaining = &buffer[*bytes_written..];
+            if remaining.is_empty() {
+                return Poll::Ready(Ok(*bytes_written));
+            }
+            match self.poll_write(remaining, &mut get_waker) {
+                Poll::Ready(Ok(n)) => {
+                    *bytes_written += n;
+                    if !loop_on_success || n == 0 {
+                        return Poll::Ready(Ok(*bytes_written));
+                    }
+                    // Blocking FIFO with bytes still remaining: try again.
+                }
+                Poll::Ready(Err(e)) => {
+                    return Poll::Ready(if *bytes_written > 0 {
+                        Ok(*bytes_written)
+                    } else {
+                        Err(e)
+                    });
+                }
+                Poll::Pending => return Poll::Pending,
+            }
+        }
+    }
+
     /// Moves the file offset and returns the new offset.
     pub fn seek(&mut self, position: SeekFrom) -> Result<usize, Errno> {
         let len = match &self.file.borrow().body {
@@ -522,6 +585,93 @@ mod tests {
 
         let result = open_file.poll_write(&[9; 4], || unreachable!());
         assert_eq!(result, Poll::Ready(Ok(4)));
+    }
+
+    #[test]
+    fn poll_write_full_regular_file_returns_after_one_call() {
+        // For a regular file, poll_write_full must not loop. Even though
+        // FileBody::Regular always writes the whole buffer in one call, the
+        // helper must not branch on FIFO-specific logic.
+        let mut open_file = OpenFileDescription {
+            file: Rc::new(RefCell::new(Inode::new([]))),
+            offset: 0,
+            is_readable: false,
+            is_writable: true,
+            is_appending: false,
+            is_nonblocking: false,
+        };
+        let mut bytes_written = 0usize;
+        let buffer = [1, 2, 3, 4, 5];
+        let result = open_file.poll_write_full(&buffer, &mut bytes_written, || unreachable!());
+        assert_eq!(result, Poll::Ready(Ok(5)));
+        assert_eq!(bytes_written, 5);
+        assert_matches!(
+            &open_file.file.borrow().body,
+            FileBody::Regular { content, .. } => {
+                assert_eq!(content[..], [1, 2, 3, 4, 5]);
+            }
+        );
+    }
+
+    #[test]
+    fn poll_write_full_blocking_fifo_loops_until_full() {
+        // For a blocking FIFO, poll_write_full must keep calling poll_write
+        // until either the buffer is exhausted or no more bytes fit (returning
+        // Pending).
+        let fifo = Rc::new(RefCell::new(Inode {
+            body: FileBody::Fifo {
+                content: VecDeque::new(),
+                readers: 1,
+                writers: 1,
+                pending_open_wakers: WakerSet::new(),
+                pending_read_wakers: WakerSet::new(),
+                pending_write_wakers: WakerSet::new(),
+            },
+            permissions: Mode::default(),
+        }));
+        let mut open_file = OpenFileDescription::new(
+            fifo, /* offset */ 0, /* is_readable */ false, /* is_writable */ true,
+            /* is_appending */ false, /* is_nonblocking */ false,
+        );
+
+        // Write a buffer larger than the pipe capacity. The helper writes as
+        // much as fits (PIPE_SIZE bytes) and then returns Pending.
+        let buffer = [7u8; PIPE_SIZE + 1];
+        let waker_holder: Rc<Cell<Option<Waker>>> = Rc::new(Cell::new(Some(Waker::noop().clone())));
+        let mut bytes_written = 0usize;
+        let result =
+            open_file.poll_write_full(&buffer, &mut bytes_written, || Rc::downgrade(&waker_holder));
+        assert_eq!(result, Poll::Pending);
+        assert_eq!(bytes_written, PIPE_SIZE);
+    }
+
+    #[test]
+    fn poll_write_full_nonblocking_fifo_returns_after_one_chunk() {
+        // For a non-blocking FIFO, poll_write_full must not loop even if more
+        // bytes could be written across multiple poll_write calls.
+        let fifo = Rc::new(RefCell::new(Inode {
+            body: FileBody::Fifo {
+                content: VecDeque::new(),
+                readers: 1,
+                writers: 1,
+                pending_open_wakers: WakerSet::new(),
+                pending_read_wakers: WakerSet::new(),
+                pending_write_wakers: WakerSet::new(),
+            },
+            permissions: Mode::default(),
+        }));
+        let mut open_file = OpenFileDescription::new(
+            fifo, /* offset */ 0, /* is_readable */ false, /* is_writable */ true,
+            /* is_appending */ false, /* is_nonblocking */ true,
+        );
+
+        let buffer = [3u8; PIPE_SIZE * 2];
+        let mut bytes_written = 0usize;
+        let result = open_file.poll_write_full(&buffer, &mut bytes_written, || unreachable!());
+        // The first chunk fits entirely; the helper returns immediately rather
+        // than calling poll_write again (which would return EAGAIN).
+        assert_eq!(result, Poll::Ready(Ok(PIPE_SIZE)));
+        assert_eq!(bytes_written, PIPE_SIZE);
     }
 
     #[test]
