@@ -839,13 +839,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "yash-env-test-helper"
-version = "0.11.0"
-dependencies = [
- "yash-env",
-]
-
-[[package]]
 name = "yash-executor"
 version = "1.0.1"
 

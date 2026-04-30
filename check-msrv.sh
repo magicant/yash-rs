@@ -34,7 +34,6 @@ check yash-arith
 check yash-builtin --no-default-features --all-features
 check yash-cli
 check yash-env
-check yash-env-test-helper
 check yash-executor
 check yash-fnmatch
 check yash-prompt
