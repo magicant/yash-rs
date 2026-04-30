@@ -24,7 +24,15 @@ jobs:
       with:
         components: clippy, rustfmt
     - uses: Swatinem/rust-cache@v2
-    - name: Run basic tests
+    # Building tests and docs before running ./check.sh is redundant but it
+    # allows us to measure the build times for these steps separately.
+    - name: Build tests
+      run: cargo build --tests
+    - name: Build docs
+      run: cargo doc --no-deps
+    - name: Run lint checks
+      run: cargo clippy --all-targets
+    - name: Run tests
       run: ./check.sh -v
   clippy:
     runs-on: ubuntu-latest
