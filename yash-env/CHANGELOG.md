@@ -9,6 +9,20 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.13.2] - Unreleased
+
+### Added
+
+- The `system::virtual::Executor` trait is now implemented for
+  `futures_executor::LocalSpawner`, allowing it to be used as an executor for
+  the virtual system in tests that use the `test-helper` feature.
+
+### Deprecated
+
+- The `test_helper::LocalExecutor` struct is now deprecated in favor of using
+  `futures_executor::LocalSpawner` directly as the executor for the virtual
+  system in tests.
+
 ## [0.13.1] - 2026-04-30
 
 ### Fixed
@@ -1078,6 +1092,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Initial implementation of the `yash-env` crate
 
+[0.13.2]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.13.2
 [0.13.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.13.1
 [0.13.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.13.0
 [0.12.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.12.1

@@ -1607,17 +1607,6 @@ mod tests {
     use std::task::Context;
     use std::task::Poll::{Pending, Ready};
 
-    impl Executor for futures_executor::LocalSpawner {
-        fn spawn(
-            &self,
-            task: Pin<Box<dyn Future<Output = ()>>>,
-        ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-            use futures_util::task::LocalSpawnExt;
-            self.spawn_local(task)
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
-        }
-    }
-
     #[test]
     fn fstatat_non_existent_file() {
         let system = VirtualSystem::new();
