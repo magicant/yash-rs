@@ -86,7 +86,7 @@ fi
 ./check.sh
 ./check-extra.sh
 for package do
-    ./check-release.sh "$package"
+    ./check-release-readiness.sh "$package"
 done
 
 # Confirm the release
