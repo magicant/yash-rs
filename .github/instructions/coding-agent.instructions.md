@@ -51,7 +51,7 @@ Time: ~1.5-2 minutes
 This runs:
 1. `cargo fmt -- --check` - Verify formatting
 2. `cargo test -- --quiet` - Run all tests (quiet mode)
-3. `cargo doc` - Build documentation
+3. `cargo doc --no-deps` - Build documentation
 4. `cargo clippy --all-targets` - Lint with Clippy
 
 ### Individual Build Commands
