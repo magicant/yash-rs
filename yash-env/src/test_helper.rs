@@ -28,10 +28,25 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::str::from_utf8;
 
+/// This implementation is provided only when the `test-helper` feature is enabled.
+impl Executor for LocalSpawner {
+    fn spawn(
+        &self,
+        task: Pin<Box<dyn Future<Output = ()>>>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Ok(self.spawn_local(task)?)
+    }
+}
+
 /// Adapter for [`LocalSpawner`] to [`Executor`]
+#[deprecated(
+    since = "0.13.2",
+    note = "LocalSpawner can be used directly as an Executor, so this adapter is no longer needed"
+)]
 #[derive(Clone, Debug)]
 pub struct LocalExecutor(pub LocalSpawner);
 
+#[allow(deprecated)]
 impl Executor for LocalExecutor {
     fn spawn(
         &self,

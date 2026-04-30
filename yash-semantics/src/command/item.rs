@@ -160,7 +160,6 @@ mod tests {
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::Inode;
     use yash_env::system::r#virtual::SystemState;
-    use yash_env::test_helper::LocalExecutor;
     use yash_env::test_helper::assert_stderr;
     use yash_env::test_helper::assert_stdout;
     use yash_env::test_helper::in_virtual_system;
@@ -201,7 +200,7 @@ mod tests {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut executor = futures_executor::LocalPool::new();
-        state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
+        state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
         let mut env = Env::with_system(system);
         env.builtins.insert("echo", echo_builtin());
 
