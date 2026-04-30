@@ -110,8 +110,14 @@ cargo install taplo-cli cargo-semver-checks
 This script verifies:
 - TOML formatting (all Cargo.toml files)
 - Unused dependencies check
-- Feature combination builds for all crates
+- Feature combination builds
 - Semantic versioning compliance (semver-checks)
+
+**Release build checks:**
+```sh
+./check-release-build.sh
+```
+This builds the release version of the crates to allow CI to catch any release-only build issues.
 
 **MSRV checks (Minimum Supported Rust Version):**
 ```sh

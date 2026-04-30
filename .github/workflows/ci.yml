@@ -54,6 +54,18 @@ jobs:
       run: cargo install cargo-semver-checks
     - name: Run extra tests
       run: ./check-extra.sh -v
+  release-build:
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -D warnings
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@v6
+    - uses: dtolnay/rust-toolchain@stable
+    - uses: Swatinem/rust-cache@v2
+    - name: Run release build checks
+      run: ./check-release-build.sh
   msrv:
     strategy:
       matrix:
@@ -113,7 +125,7 @@ jobs:
       run: ./check-docs.sh
   summarize:
     runs-on: ubuntu-latest
-    needs: [check, clippy, extra, msrv, windows, docs]
+    needs: [check, clippy, extra, release-build, msrv, windows, docs]
     permissions:
       actions: read
     if: ${{ always() }}

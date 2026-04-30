@@ -85,6 +85,7 @@ fi
 # Check if the packages are ready for release
 ./check.sh
 ./check-extra.sh
+./check-release-build.sh
 for package do
     ./check-release-readiness.sh "$package"
 done

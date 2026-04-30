@@ -20,23 +20,6 @@ RUSTFLAGS='-D unused_crate_dependencies' cargo check --package 'yash-env' --no-d
 RUSTFLAGS='-D unused_crate_dependencies' cargo check --package 'yash-builtin' --no-default-features
 RUSTFLAGS='-D unused_crate_dependencies' cargo check --package 'yash-builtin' --no-default-features --features yash-semantics
 
-# Make sure the crates can be built with all combinations of features.
-cargo build --release --package 'yash-arith' --all-targets
-cargo build --release --package 'yash-builtin' --all-targets
-cargo build --release --package 'yash-builtin' --all-targets --no-default-features
-cargo build --release --package 'yash-builtin' --all-targets --no-default-features --features yash-semantics
-cargo build --release --package 'yash-cli' --all-targets
-cargo build --release --package 'yash-env' --all-targets
-cargo build --release --package 'yash-env' --all-targets --no-default-features
-cargo build --release --package 'yash-env' --all-targets --no-default-features --features test-helper
-cargo build --release --package 'yash-env-test-helper' --all-targets
-cargo build --release --package 'yash-executor' --all-targets
-cargo build --release --package 'yash-fnmatch' --all-targets
-cargo build --release --package 'yash-prompt' --all-targets
-cargo build --release --package 'yash-quote' --all-targets
-cargo build --release --package 'yash-semantics' --all-targets
-cargo build --release --package 'yash-syntax' --all-targets
-
 # Test with non-default feature configurations.
 #cargo test --package 'yash-arith' -- $quiet
 #cargo test --package 'yash-builtin' -- $quiet
