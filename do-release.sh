@@ -86,6 +86,7 @@ fi
 ./check.sh
 ./check-extra.sh
 ./check-release-build.sh
+./check-semver.sh
 for package do
     ./check-release-readiness.sh "$package"
 done
