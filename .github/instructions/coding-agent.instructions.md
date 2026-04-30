@@ -51,7 +51,7 @@ Time: ~1.5-2 minutes
 This runs:
 1. `cargo fmt -- --check` - Verify formatting
 2. `cargo test -- --quiet` - Run all tests (quiet mode)
-3. `cargo doc` - Build documentation
+3. `cargo doc --no-deps` - Build documentation
 4. `cargo clippy --all-targets` - Lint with Clippy
 
 ### Individual Build Commands
@@ -105,13 +105,28 @@ Time: ~17 seconds (output in `target/doc/`)
 ```
 **Prerequisites:** Install first with:
 ```sh
-cargo install taplo-cli cargo-semver-checks
+cargo install taplo-cli
 ```
 This script verifies:
 - TOML formatting (all Cargo.toml files)
 - Unused dependencies check
-- Feature combination builds for all crates
-- Semantic versioning compliance (semver-checks)
+- Feature combination builds
+
+**Release build checks:**
+```sh
+./check-release-build.sh
+```
+This builds the release version of the crates to allow CI to catch any release-only build issues.
+
+**Semantic versioning checks:**
+```sh
+./check-semver.sh
+```
+This runs `cargo semver-checks` to ensure the next release version specified in `Cargo.toml` matches the semver rules based on API changes since the last release.
+**Prerequisites:** Install first with:
+```sh
+cargo install cargo-semver-checks
+```
 
 **MSRV checks (Minimum Supported Rust Version):**
 ```sh

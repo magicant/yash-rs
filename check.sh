@@ -6,5 +6,5 @@ set -x
 
 cargo fmt -- --check
 cargo test -- $quiet
-cargo doc
+cargo doc --no-deps
 cargo clippy --all-targets
