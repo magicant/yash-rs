@@ -120,8 +120,6 @@ jobs:
       run: cargo test --all-features --package yash-syntax
     - name: Test yash-env
       run: cargo test --all-features --package yash-env
-    - name: Test yash-env-test-helper
-      run: cargo test --all-features --package yash-env-test-helper
     - name: Test yash-semantics
       run: cargo test --all-features --package yash-semantics
     - name: Test yash-prompt

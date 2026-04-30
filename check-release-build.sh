@@ -11,7 +11,6 @@ cargo build --release --package 'yash-cli' --all-targets
 cargo build --release --package 'yash-env' --all-targets --no-default-features
 cargo build --release --package 'yash-env' --all-targets --no-default-features --features test-helper
 cargo build --release --package 'yash-env' --all-targets --no-default-features --features yash-executor
-cargo build --release --package 'yash-env-test-helper' --all-targets
 cargo build --release --package 'yash-executor' --all-targets
 cargo build --release --package 'yash-fnmatch' --all-targets
 cargo build --release --package 'yash-prompt' --all-targets

@@ -4,7 +4,6 @@ set -Ceux
 cargo semver-checks --package 'yash-arith'
 cargo semver-checks --package 'yash-builtin'
 cargo semver-checks --package 'yash-env'
-cargo semver-checks --package 'yash-env-test-helper'
 cargo semver-checks --package 'yash-executor'
 cargo semver-checks --package 'yash-fnmatch'
 cargo semver-checks --package 'yash-prompt'
