@@ -9,6 +9,14 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.14.0] - Unreleased
+
+### Added
+
+- The `run_in_child_process` method has been added to the `system::Fork` trait.
+  It provides a new way to create child processes that is cleaner and more
+  usable than the existing `new_child_process` method.
+
 ## [0.13.2] - 2026-05-01
 
 ### Added
@@ -1092,6 +1100,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Initial implementation of the `yash-env` crate
 
+[0.14.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.14.0
 [0.13.2]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.13.2
 [0.13.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.13.1
 [0.13.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.13.0

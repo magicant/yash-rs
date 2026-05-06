@@ -9,12 +9,13 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
-## [0.11.1] - Unreleased
+## [0.12.0] - Unreleased
 
 ### Changed
 
 - Public dependency versions:
-    - yash-env 0.13.0 → 0.13.1
+    - yash-env 0.13.0 → 0.14.0
+    - yash-syntax 0.20.0 → 0.21.0
 
 ## [0.11.0] - 2026-04-29
 
@@ -166,7 +167,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Initial implementation of the `yash-prompt` crate
 
-[0.11.1]: https://github.com/magicant/yash-rs/releases/tag/yash-prompt-0.11.1
+[0.12.0]: https://github.com/magicant/yash-rs/releases/tag/yash-prompt-0.12.0
 [0.11.0]: https://github.com/magicant/yash-rs/releases/tag/yash-prompt-0.11.0
 [0.10.0]: https://github.com/magicant/yash-rs/releases/tag/yash-prompt-0.10.0
 [0.9.0]: https://github.com/magicant/yash-rs/releases/tag/yash-prompt-0.9.0

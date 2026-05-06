@@ -1217,6 +1217,62 @@ impl TcSetPgrp for VirtualSystem {
 }
 
 impl Fork for VirtualSystem {
+    /// Runs a task in a new child process.
+    ///
+    /// This method implements [`Fork::run_in_child_process`] by adding a new
+    /// process to the system state and running the given task concurrently in
+    /// the same real process. It does not create any real child process.
+    ///
+    /// To run the concurrent task, this function needs an executor that has
+    /// been set in the [`SystemState`]. If the system state does not have an
+    /// executor, this function fails with `Errno::ENOSYS`.
+    ///
+    /// The child task must terminate itself by calling [`Exit::exit`] or
+    /// killing itself with a signal. The task returning without doing so will
+    /// cause a panic.
+    ///
+    /// The process ID of the child will be the maximum of existing process IDs
+    /// plus 1. If there are no other processes, it will be 2.
+    fn run_in_child_process<D, F>(&self, shared_data: D, child_task: F) -> (Result<Pid>, D)
+    where
+        D: Clone + 'static,
+        F: AsyncFnOnce(Self, D) + 'static,
+    {
+        let mut state = self.state.borrow_mut();
+        let Some(executor) = state.executor.clone() else {
+            return (Err(Errno::ENOSYS), shared_data);
+        };
+        let child_process_id = state
+            .processes
+            .keys()
+            .max()
+            .map_or(Pid(2), |pid| Pid(pid.0 + 1));
+        let parent_process = &state.processes[&self.process_id];
+        let child_process = Process::fork_from(self.process_id, parent_process);
+        state.processes.insert(child_process_id, child_process);
+        drop(state);
+
+        let child_system = VirtualSystem {
+            state: Rc::clone(&self.state),
+            process_id: child_process_id,
+        };
+        let data_clone = shared_data.clone();
+        let child_task = async move {
+            child_task(child_system.clone(), data_clone).await;
+            assert!(
+                !child_system.current_process().state().is_alive(),
+                "the child task should have terminated itself by exiting or signaling itself: pid={}",
+                child_system.process_id
+            );
+        };
+
+        executor
+            .spawn(Box::pin(child_task))
+            .expect("the executor failed to start the child process task");
+
+        (Ok(child_process_id), shared_data)
+    }
+
     /// Creates a new child process.
     ///
     /// This implementation does not create any real child process. Instead,
@@ -3048,6 +3104,83 @@ mod tests {
             .now_or_never()
             .unwrap();
         assert_eq!(result, Err(Errno::EPERM));
+    }
+
+    #[test]
+    fn run_in_child_process_shares_data() {
+        let (system, mut executor) = virtual_system_with_executor();
+        let data = "foo".to_string();
+        let (_pid_or_error, data) =
+            system.run_in_child_process(data, |child_system: VirtualSystem, data| async move {
+                assert_eq!(data, "foo");
+                child_system.exit(ExitStatus(0)).await;
+            });
+
+        assert_eq!(data, "foo");
+        executor.run_until_stalled();
+    }
+
+    #[test]
+    fn run_in_child_process_chooses_minimal_unused_pid() {
+        let (system, _executor) = virtual_system_with_executor();
+        let dummy_process = Process::with_parent_and_group(system.process_id, Pid(1));
+        system
+            .state
+            .borrow_mut()
+            .processes
+            .insert(Pid(42), dummy_process);
+
+        let (pid_or_error, ()) = system.run_in_child_process((), |_, ()| pending());
+        assert_eq!(pid_or_error, Ok(Pid(43)));
+    }
+
+    #[test]
+    fn run_in_child_process_adds_child_to_process_table() {
+        let (system, mut executor) = virtual_system_with_executor();
+        let child_pid = Rc::new(Cell::new(None));
+
+        let (pid_or_error, child_pid) = system.run_in_child_process(
+            child_pid,
+            |child_system: VirtualSystem, child_pid: Rc<Cell<Option<Pid>>>| async move {
+                child_pid.set(Some(child_system.getpid()));
+                child_system.exit(ExitStatus(0)).await;
+            },
+        );
+        executor.run_until_stalled();
+
+        let child_pid = child_pid.get().expect("child task should have set pid");
+        assert_eq!(pid_or_error, Ok(child_pid));
+        let state = system.state.borrow();
+        let child_process = state
+            .processes
+            .get(&child_pid)
+            .expect("child process should be in process table");
+        assert_eq!(child_process.ppid(), system.process_id);
+    }
+
+    #[test]
+    #[should_panic = "the child task should have terminated itself by exiting or signaling itself: pid=3"]
+    fn run_in_child_process_panics_on_child_task_not_exiting() {
+        let (system, mut executor) = virtual_system_with_executor();
+
+        system
+            .run_in_child_process((), |_, ()| async { /* exit() */ })
+            .0
+            .unwrap();
+
+        executor.run_until_stalled();
+    }
+
+    #[test]
+    fn run_in_child_process_fails_without_executor() {
+        let system = VirtualSystem::new();
+        let result = system
+            .run_in_child_process((), |_, ()| {
+                unreachable!("child task should not run without executor")
+                    as std::future::Pending<()>
+            })
+            .0;
+        assert_eq!(result, Err(Errno::ENOSYS));
     }
 
     #[test]
