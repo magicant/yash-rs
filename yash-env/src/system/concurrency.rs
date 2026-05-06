@@ -15,6 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! Items for concurrent task execution
+//!
+//! This module provides the [`Concurrent`] struct, which is a wrapper for
+//! systems that enables concurrent execution of multiple possibly blocking I/O
+//! tasks on a single thread.
 
 use super::{CaughtSignals, Clock, Errno, Fcntl, Read, Result, Select, Write};
 use crate::io::Fd;
@@ -371,8 +375,8 @@ where
     /// }
     /// ```
     ///
-    /// The [`run_real`](Self::run_real) and [`run_virtual`](Self::run_virtual)
-    /// methods provide a convenient way to implement such a main loop.
+    /// The [`RunLoop`] trait declares an interface for implementing such a main
+    /// loop.
     ///
     /// The future returned by this method will be pending if and only if the
     /// future returned by the inner system's [`select`](Select::select) method
@@ -522,6 +526,37 @@ impl SignalList {
         // `unwrap` is safe because the list is initialized before being made available to the user.
         self.0.into_inner().unwrap()
     }
+}
+
+/// Trait for implementing a main loop that runs concurrent tasks
+///
+/// This crate provides implementations of this trait for `RealSystem` and
+/// `VirtualSystem`, which delegate to [`Concurrent::run_real`] and
+/// [`Concurrent::run_virtual`], respectively. They are used in the
+/// implementation of [`Fork`] for `Rc<Concurrent<_>>`.
+///
+/// [`Fork`]: super::Fork
+pub trait RunLoop {
+    /// Runs the given task with concurrency support.
+    ///
+    /// This function implements the main loop of the shell process. It runs the
+    /// given task while also calling [`select`](Concurrent::select) to handle
+    /// signals and other events. The task is expected to perform I/O operations
+    /// using the methods of the given `Concurrent` instance, so that it can
+    /// yield when the operations would block.
+    ///
+    /// To allow an external executor to run multiple virtual processes (each
+    /// with its own run loop) concurrently, this method is asynchronous and
+    /// returns a future that completes when the task finishes or the process is
+    /// terminated. When the future is polled, it returns `Pending` if the task
+    /// is being blocked and wants to yield to other tasks.
+    fn run_loop<'c, F>(
+        concurrent: &'c Concurrent<Self>,
+        task: F,
+    ) -> impl Future<Output = ()> + use<'c, Self, F>
+    where
+        Self: Sized,
+        F: Future<Output = ()>;
 }
 
 mod delegates;

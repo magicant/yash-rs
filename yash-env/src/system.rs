@@ -88,7 +88,7 @@
 //!   testing purposes (see the [`virtual`] module).
 //!
 //! Additionally, [`Concurrent`] is a wrapper that extends the interface with
-//! asynchronous methods for concurrency.
+//! asynchronous methods for concurrency. (See the [`concurrency`] module.)
 //! ([`SharedSystem`] is a former wrapper that provided similar functionality
 //! but is now deprecated in favor of `Concurrent`.)
 //!
@@ -104,7 +104,7 @@
 //! concurrently. `RealSystem` implementations return ready futures after the
 //! underlying system calls complete (which may block the current thread).
 
-mod concurrency;
+pub mod concurrency;
 mod errno;
 mod file_system;
 mod future;

@@ -20,6 +20,7 @@
 
 use super::super::real::RealSystem;
 use super::Concurrent;
+use super::RunLoop;
 use futures_util::poll;
 use std::pin::pin;
 
@@ -59,6 +60,18 @@ impl Concurrent<RealSystem> {
             Ready(result) => result,
             Pending => unreachable!("`RealSystem::select` should never return `Pending`"),
         }
+    }
+}
+
+/// Allows the [`Concurrent::run_real`] method to be used via the [`RunLoop`] trait.
+impl RunLoop for RealSystem {
+    /// Returns a future that calls [`Concurrent::run_real`].
+    #[inline(always)]
+    async fn run_loop<F>(concurrent: &Concurrent<Self>, task: F)
+    where
+        F: Future<Output = ()>,
+    {
+        concurrent.run_real(task)
     }
 }
 

@@ -18,6 +18,7 @@
 
 use super::super::r#virtual::VirtualSystem;
 use super::Concurrent;
+use super::RunLoop;
 use crate::job::ProcessState;
 use futures_util::{pending, poll};
 use std::pin::pin;
@@ -29,8 +30,8 @@ impl Concurrent<VirtualSystem> {
     /// given task while also calling [`select`](Self::select) to handle signals
     /// and other events. The task is expected to perform I/O operations using
     /// the methods of this `Concurrent` instance, so that it can yield when the
-    /// operations would block. The function returns the output of the task when
-    /// it completes.
+    /// operations would block. The function returns when the task completes or
+    /// the process is terminated.
     ///
     /// This is the `VirtualSystem` counterpart for the
     /// [`run_real`](Self::run_real) method. To allow `VirtualSystem` to run
@@ -89,6 +90,21 @@ impl Concurrent<VirtualSystem> {
                 }
             }
         }
+    }
+}
+
+/// Allows the [`Concurrent::run_virtual`] method to be used via the [`RunLoop`] trait.
+impl RunLoop for VirtualSystem {
+    /// Calls [`Concurrent::run_virtual`].
+    #[inline(always)]
+    fn run_loop<'c, F>(
+        concurrent: &'c Concurrent<Self>,
+        task: F,
+    ) -> impl Future<Output = ()> + use<'c, F>
+    where
+        F: Future<Output = ()>,
+    {
+        concurrent.run_virtual(task)
     }
 }
 

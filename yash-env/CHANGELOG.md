@@ -16,6 +16,18 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `run_in_child_process` method has been added to the `system::Fork` trait.
   It provides a new way to create child processes that is cleaner and more
   usable than the existing `new_child_process` method.
+- The `system::concurrency` module has been added, containing the following
+  items:
+    - `Concurrent`: A wrapper around a `System` implementation that provides
+      asynchronous methods for concurrency.
+    - `RunLoop`: A trait for providing a common interface to call
+      `Concurrent`'s runner methods from different contexts (e.g., real vs
+      virtual systems). This trait is now implemented for `RealSystem` and
+      `VirtualSystem`.
+    - `SignalList`: A struct representing a list of signals, used for the return
+      type of some methods.
+- `system::Concurrent` and `system::SignalList` are now re-exports of the above
+  items in the `system::concurrency` module.
 
 ## [0.13.2] - 2026-05-01
 
