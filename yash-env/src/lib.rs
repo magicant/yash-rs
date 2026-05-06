@@ -43,6 +43,7 @@
 use self::alias::AliasSet;
 use self::any::DataSet;
 use self::builtin::Builtin;
+use self::fork::ForkEnvState;
 use self::function::FunctionSet;
 use self::io::Fd;
 use self::job::JobList;
@@ -62,6 +63,7 @@ use self::system::Close;
 use self::system::Concurrent;
 use self::system::Dup;
 use self::system::Errno;
+use self::system::Fork;
 use self::system::Fstat;
 use self::system::GetCwd;
 use self::system::GetPid;
@@ -419,6 +421,44 @@ impl<S> Env<S> {
         }
     }
 
+    /// Runs a task in a new child process.
+    ///
+    /// This function creates a new child process and runs the given
+    /// `child_task` in it. The `shared_data` is passed to the child task as an
+    /// argument and also returned to the caller. The signature of this method
+    /// is analogous to [`Fork::run_in_child_process`] but the child task
+    /// receives a clone of the current `Env` instead of the inner `Concurrent`
+    /// instance.
+    ///
+    /// You should generally use [`Subshell`](crate::subshell::Subshell) instead
+    /// of this method to create a subshell, so that the environment can
+    /// condition the state of the child process before it starts running.
+    pub fn run_in_child_process<D, F>(
+        &mut self,
+        shared_data: D,
+        child_task: F,
+    ) -> (Result<Pid, Errno>, D)
+    where
+        S: 'static,
+        Rc<Concurrent<S>>: Fork,
+        D: Clone + 'static,
+        F: AsyncFnOnce(Self, D) + 'static,
+    {
+        let state = ForkEnvState::extract_from_env(self);
+
+        let (pid_or_error, (state, shared_data)) = self.system.run_in_child_process(
+            (state, shared_data),
+            |child_concurrent, (state, shared_data): (ForkEnvState<S>, D)| async move {
+                let child_env = state.into_env_with_system(child_concurrent);
+                child_task(child_env, shared_data).await
+            },
+        );
+
+        state.restore_into_env(self);
+
+        (pid_or_error, shared_data)
+    }
+
     /// Waits for a subshell to terminate, suspend, or resume.
     ///
     /// This function waits for a subshell to change its execution state. The
@@ -625,6 +665,8 @@ pub mod trap;
 pub mod variable;
 pub mod waker;
 
+mod fork;
+
 #[cfg(any(test, feature = "yash-executor"))]
 mod executor_helper;
 #[cfg(any(test, feature = "test-helper"))]
@@ -637,12 +679,14 @@ mod tests {
     use crate::job::Job;
     use crate::source::Location;
     use crate::subshell::Subshell;
+    use crate::system::Exit as _;
     use crate::system::r#virtual::Inode;
     use crate::system::r#virtual::SIGCHLD;
     use crate::test_helper::in_virtual_system;
     use crate::trap::Action;
     use futures_executor::LocalPool;
     use futures_util::FutureExt as _;
+    use std::cell::Cell;
     use std::cell::RefCell;
 
     #[test]
@@ -743,6 +787,91 @@ mod tests {
                 Ok(())
             })
             .unwrap();
+    }
+
+    #[test]
+    fn run_in_child_process_runs_child_and_returns_shared_data() {
+        in_virtual_system(|mut env, _state| async move {
+            let parent_pid = env.system.getpid();
+            let child_seen_pid = Rc::new(Cell::new(None));
+            let child_seen_ppid = Rc::new(Cell::new(None));
+            let child_seen_pid_2 = Rc::clone(&child_seen_pid);
+            let child_seen_ppid_2 = Rc::clone(&child_seen_ppid);
+
+            let (result, shared_data) = env.run_in_child_process(
+                42_u32,
+                |child_env: Env<VirtualSystem>, data| async move {
+                    assert_eq!(data, 42);
+                    child_seen_pid_2.set(Some(child_env.system.getpid()));
+                    child_seen_ppid_2.set(Some(child_env.system.getppid()));
+                    child_env.system.exit(ExitStatus(13)).await;
+                },
+            );
+
+            assert_eq!(shared_data, 42);
+            let child_pid = result.unwrap();
+            assert_ne!(child_pid, parent_pid);
+            assert_eq!(
+                env.wait_for_subshell(child_pid).await,
+                Ok((child_pid, ProcessState::exited(13)))
+            );
+            assert_eq!(child_seen_pid.get(), Some(child_pid));
+            assert_eq!(child_seen_ppid.get(), Some(parent_pid));
+        });
+    }
+
+    #[test]
+    fn run_in_child_process_passes_clone_of_parent_env_to_child() {
+        in_virtual_system(|mut env, _state| async move {
+            env.arg0 = "parent-shell".to_string();
+            env.exit_status = ExitStatus(5);
+            env.variables
+                .get_or_new("PARENT", Scope::Global)
+                .assign("before", None)
+                .unwrap();
+
+            let (result, ()) =
+                env.run_in_child_process((), |child_env: Env<VirtualSystem>, ()| async move {
+                    assert_eq!(child_env.arg0, "parent-shell");
+                    assert_eq!(child_env.exit_status, ExitStatus(5));
+                    assert_eq!(child_env.variables.get_scalar("PARENT"), Some("before"));
+                    child_env.system.exit(ExitStatus(0)).await;
+                });
+
+            let child_pid = result.unwrap();
+            _ = env.wait_for_subshell(child_pid).await;
+        })
+    }
+
+    #[test]
+    fn run_in_child_process_restores_parent_environment() {
+        in_virtual_system(|mut env, _state| async move {
+            env.arg0 = "parent-shell".to_string();
+            env.exit_status = ExitStatus(5);
+            env.variables
+                .get_or_new("PARENT", Scope::Global)
+                .assign("before", None)
+                .unwrap();
+
+            let (result, ()) =
+                env.run_in_child_process((), |mut child_env: Env<VirtualSystem>, ()| async move {
+                    child_env
+                        .variables
+                        .get_or_new("PARENT", Scope::Global)
+                        .assign("after", None)
+                        .unwrap();
+                    child_env.system.exit(ExitStatus(0)).await;
+                });
+
+            let child_pid = result.unwrap();
+            assert_eq!(
+                env.wait_for_subshell(child_pid).await,
+                Ok((child_pid, ProcessState::exited(0)))
+            );
+            assert_eq!(env.arg0, "parent-shell");
+            assert_eq!(env.exit_status, ExitStatus(5));
+            assert_eq!(env.variables.get_scalar("PARENT"), Some("before"));
+        });
     }
 
     #[test]

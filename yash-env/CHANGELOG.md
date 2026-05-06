@@ -32,6 +32,9 @@ A _private dependency_ is used internally and not visible to downstream users.
       type of some methods.
 - `system::Concurrent` and `system::SignalList` are now re-exports of the above
   items in the `system::concurrency` module.
+- The `Env::run_in_child_process` method has been added as a convenient wrapper
+  around `system::Fork::run_in_child_process` for running a task in a child
+  process with the current environment state.
 
 ## [0.13.2] - 2026-05-01
 
