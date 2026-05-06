@@ -2925,7 +2925,7 @@ mod tests {
         let (system, _executor) = virtual_system_with_executor();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let child = env.system.new_child_process().unwrap();
+        let child = env.system.as_ref().new_child_process().unwrap();
         let pid = child(&mut env, Box::new(|_env| Box::pin(pending())));
 
         let result = env.system.setpgid(pid, pid);
@@ -2940,7 +2940,7 @@ mod tests {
         let (system, mut executor) = virtual_system_with_executor();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let child = env.system.new_child_process().unwrap();
+        let child = env.system.as_ref().new_child_process().unwrap();
         let pid = child(
             &mut env,
             Box::new(|child_env| {
@@ -2962,10 +2962,10 @@ mod tests {
         let (system, _executor) = virtual_system_with_executor();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let child_1 = env.system.new_child_process().unwrap();
+        let child_1 = env.system.as_ref().new_child_process().unwrap();
         let pid_1 = child_1(&mut env, Box::new(|_env| Box::pin(pending())));
         env.system.setpgid(pid_1, pid_1).unwrap();
-        let child_2 = env.system.new_child_process().unwrap();
+        let child_2 = env.system.as_ref().new_child_process().unwrap();
         let pid_2 = child_2(&mut env, Box::new(|_env| Box::pin(pending())));
 
         let result = env.system.setpgid(pid_2, pid_1);
@@ -2980,7 +2980,7 @@ mod tests {
         let (system, _executor) = virtual_system_with_executor();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let child = env.system.new_child_process().unwrap();
+        let child = env.system.as_ref().new_child_process().unwrap();
         let pid = child(&mut env, Box::new(|_env| Box::pin(pending())));
 
         let dummy_pid = Pid(123);
@@ -2997,7 +2997,7 @@ mod tests {
         let parent_pid = system.process_id;
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let child = env.system.new_child_process().unwrap();
+        let child = env.system.as_ref().new_child_process().unwrap();
         let _pid = child(
             &mut env,
             Box::new(move |child_env| {
@@ -3028,7 +3028,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         state.borrow_mut().file_system.save(path, content).unwrap();
         let mut env = Env::with_system(system);
-        let child = env.system.new_child_process().unwrap();
+        let child = env.system.as_ref().new_child_process().unwrap();
         let pid = child(
             &mut env,
             Box::new(move |child_env| {
@@ -3053,10 +3053,10 @@ mod tests {
         let (system, mut executor) = virtual_system_with_executor();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let child_1 = env.system.new_child_process().unwrap();
+        let child_1 = env.system.as_ref().new_child_process().unwrap();
         let pid_1 = child_1(&mut env, Box::new(|_env| Box::pin(pending())));
         // env.system.setpgid(pid_1, pid_1).unwrap();
-        let child_2 = env.system.new_child_process().unwrap();
+        let child_2 = env.system.as_ref().new_child_process().unwrap();
         let pid_2 = child_2(&mut env, Box::new(|_env| Box::pin(pending())));
         executor.run_until_stalled();
 

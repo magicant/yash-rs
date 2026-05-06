@@ -20,8 +20,11 @@
 //! systems that enables concurrent execution of multiple possibly blocking I/O
 //! tasks on a single thread.
 
-use super::{CaughtSignals, Clock, Errno, Fcntl, Read, Result, Select, Write};
+use super::{
+    CaughtSignals, ChildProcessStarter, Clock, Errno, Fcntl, Fork, Read, Result, Select, Write,
+};
 use crate::io::Fd;
+use crate::job::Pid;
 use crate::waker::{ScheduledWakerQueue, WakerSet};
 use std::cell::{Cell, LazyCell, OnceCell, RefCell};
 use std::collections::HashMap;
@@ -132,6 +135,31 @@ struct State {
     /// from this mask so they can interrupt `select`. The value is `None` until
     /// the signal mask is first updated by [`Concurrent::sigmask`].
     select_mask: Option<Vec<crate::signal::Number>>,
+}
+
+impl State {
+    /// Creates a clone of the current state for use in a child process.
+    ///
+    /// This method is intended to be used when forking a new process, allowing
+    /// the child process to have a clean state while still being able to
+    /// inherit necessary information from the parent process.
+    #[must_use]
+    fn clone_for_fork(&self) -> Self {
+        Self {
+            // The child process inherits the same signal disposition and mask
+            // as the parent process, so the child should also have the same
+            // mask for `select` as the parent process.
+            select_mask: self.select_mask.clone(),
+
+            // The other fields manage tasks and wakers for the current process,
+            // so they should be reset for the child process.
+            reads: Default::default(),
+            writes: Default::default(),
+            timeouts: Default::default(),
+            catches: Default::default(),
+            signals: Default::default(),
+        }
+    }
 }
 
 impl<S> Concurrent<S> {
@@ -525,6 +553,49 @@ impl SignalList {
     pub fn into_vec(self) -> Vec<crate::signal::Number> {
         // `unwrap` is safe because the list is initialized before being made available to the user.
         self.0.into_inner().unwrap()
+    }
+}
+
+impl<S> Fork for Rc<Concurrent<S>>
+where
+    S: Fork + RunLoop + Sized,
+{
+    /// Runs a task in a new child process.
+    ///
+    /// This method wraps the inner system's [`Fork::run_in_child_process`] to
+    /// create a new child process. The child task is run by calling
+    /// [`RunLoop::run_loop`].
+    fn run_in_child_process<D, F>(&self, shared_data: D, child_task: F) -> (Result<Pid>, D)
+    where
+        D: Clone + 'static,
+        F: AsyncFnOnce(Self, D) + 'static,
+    {
+        let child_state = RefCell::new(self.state.borrow().clone_for_fork());
+
+        self.inner
+            .run_in_child_process(shared_data, |child_inner, shared_data| async {
+                let child_concurrent = Rc::new(Concurrent {
+                    inner: child_inner,
+                    state: child_state,
+                });
+                let runner = Rc::clone(&child_concurrent);
+                let child_task = child_task(child_concurrent, shared_data);
+                RunLoop::run_loop(&runner, child_task).await;
+            })
+    }
+
+    /// This method is not implemented for `Rc<Concurrent<_>>`.
+    ///
+    /// If called, this method will panic with an "unimplemented" message. We
+    /// cannot implement this method because the return type of this method does
+    /// not match with that of the inner system `S`.
+    ///
+    /// The [`run_in_child_process`](Self::run_in_child_process) method should
+    /// be used instead to create child processes in the context of `Concurrent`
+    /// systems. The inherent method [`Concurrent::new_child_process`] can also
+    /// be used but it will be deprecated/removed soon.
+    fn new_child_process(&self) -> Result<ChildProcessStarter<Self>> {
+        unimplemented!("use `run_in_child_process` instead")
     }
 }
 

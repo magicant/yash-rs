@@ -16,6 +16,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `run_in_child_process` method has been added to the `system::Fork` trait.
   It provides a new way to create child processes that is cleaner and more
   usable than the existing `new_child_process` method.
+- The `system::Fork` trait is now implemented for `Rc<Concurrent<_>>`, allowing
+  the new `run_in_child_process` method to be used with `Concurrent` systems.
+  Note that the `new_child_process` method in this implementation is not
+  supported and will panic if called.
 - The `system::concurrency` module has been added, containing the following
   items:
     - `Concurrent`: A wrapper around a `System` implementation that provides
