@@ -89,6 +89,11 @@ fi
 ./check-semver.sh
 for package do
     ./check-release-readiness.sh "$package"
+
+    # check-release-build.sh already performs `cargo check --release` but we
+    # also do `cargo build --release` just in case there are any issues that
+    # only manifest during the build step.
+    cargo build --release --package "$package" --all-targets --all-features
 done
 
 # Confirm the release
