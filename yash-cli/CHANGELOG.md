@@ -9,6 +9,12 @@ used by other programs.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.8] - Unreleased
+
+### Fixed
+
+- Fixed a bug where subshells may not respond to signals correctly.
+
 ## [3.0.7] - 2026-04-30
 
 ### Changed
@@ -320,6 +326,7 @@ later.
 
 - Initial release of the shell
 
+[3.0.8]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.0.8
 [3.0.7]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.0.7
 [3.0.5]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.0.5
 [3.0.4]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.0.4

@@ -795,7 +795,7 @@ dependencies = [
 
 [[package]]
 name = "yash-cli"
-version = "3.0.7"
+version = "3.0.8"
 dependencies = [
  "assert_matches",
  "futures-util",
