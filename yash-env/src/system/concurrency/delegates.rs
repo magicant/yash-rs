@@ -478,8 +478,13 @@ where
     /// [`Fork::new_child_process`] method. This method is an inherent method of
     /// `Concurrent<S>` instead of an implementation of the `Fork` trait because
     /// the return type does not match with that of the inner system `S`.
+    #[deprecated(
+        since = "0.14.0",
+        note = "use the `Fork::run_in_child_process` method instead"
+    )]
     #[inline]
     pub fn new_child_process(&self) -> Result<ChildProcessStarter<S>> {
+        #[allow(deprecated)]
         self.inner.new_child_process()
     }
 }

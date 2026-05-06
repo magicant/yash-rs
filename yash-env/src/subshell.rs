@@ -32,7 +32,6 @@ use crate::job::tcsetpgrp_with_block;
 use crate::semantics::exit_or_raise;
 use crate::signal;
 use crate::stack::Frame;
-use crate::system::ChildProcessTask;
 use crate::system::Close;
 use crate::system::Dup;
 use crate::system::Errno;
@@ -203,45 +202,38 @@ where
 
         // Define the child process task
         const ME: Pid = Pid(0);
-        let task: ChildProcessTask<S> = Box::new(move |env| {
-            Box::pin(async move {
-                let mut env = env.push_frame(Frame::Subshell);
-                let env = &mut *env;
+        let task = move |mut child_env: Env<S>, ()| async move {
+            let env = &mut *child_env.push_frame(Frame::Subshell);
 
-                if let Some(job_control) = job_control {
-                    if let Ok(()) = env.system.setpgid(ME, ME) {
-                        match job_control {
-                            JobControl::Background => (),
-                            JobControl::Foreground => {
-                                if let Some(tty) = tty {
-                                    let pgid = env.system.getpgrp();
-                                    tcsetpgrp_with_block(&env.system, tty, pgid).await.ok();
-                                }
+            if let Some(job_control) = job_control {
+                if let Ok(()) = env.system.setpgid(ME, ME) {
+                    match job_control {
+                        JobControl::Background => (),
+                        JobControl::Foreground => {
+                            if let Some(tty) = tty {
+                                let pgid = env.system.getpgrp();
+                                tcsetpgrp_with_block(&env.system, tty, pgid).await.ok();
                             }
                         }
                     }
                 }
-                env.jobs.disown_all();
+            }
+            env.jobs.disown_all();
 
-                env.traps
-                    .enter_subshell(
-                        &env.system,
-                        ignore_sigint_sigquit,
-                        keep_internal_dispositions_for_stoppers,
-                    )
-                    .await;
+            env.traps
+                .enter_subshell(
+                    &env.system,
+                    ignore_sigint_sigquit,
+                    keep_internal_dispositions_for_stoppers,
+                )
+                .await;
 
-                (self.task)(env, job_control).await;
-                exit_or_raise(&env.system, env.exit_status).await
-            })
-        });
+            (self.task)(env, job_control).await;
+            exit_or_raise(&env.system, env.exit_status).await
+        };
 
         // Start the child
-        let result = env
-            .system
-            .as_ref()
-            .new_child_process()
-            .map(|child| child(env, task));
+        let (result, ()) = env.run_in_child_process((), task);
 
         // Restore the original signal mask in the parent process. Need to do
         // this before returning the error if the child process creation failed,

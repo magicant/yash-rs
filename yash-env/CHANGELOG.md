@@ -43,6 +43,13 @@ A _private dependency_ is used internally and not visible to downstream users.
   `semantics::command::run_external_utility_in_subshell` function. For the
   `Subshell` struct, the bound `S: 'static` has also been added.
 
+### Deprecated
+
+- The `system::Fork::new_child_process` and
+  `system::Concurrent::new_child_process` methods are now deprecated in favor of
+  the new `run_in_child_process` method, which provides a more ergonomic way to
+  create child processes.
+
 ## [0.13.2] - 2026-05-01
 
 ### Added

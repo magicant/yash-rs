@@ -176,7 +176,6 @@ pub trait Fork {
         D: Clone + 'static,
         F: AsyncFnOnce(Self, D) + 'static;
 
-    // XXX: This method should be deprecated and removed (#662)
     /// Creates a new child process.
     ///
     /// This is a wrapper around the [`fork` system
@@ -190,6 +189,10 @@ pub trait Fork {
     /// a [`ChildProcessStarter`] function that takes the parent environment and
     /// the child task. The caller must call the starter to make sure the parent
     /// and child processes perform correctly after forking.
+    #[deprecated(
+        since = "0.14.0",
+        note = "use the `run_in_child_process` method instead"
+    )]
     fn new_child_process(&self) -> Result<ChildProcessStarter<Self>>
     where
         Self: Sized;
