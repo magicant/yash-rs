@@ -13,6 +13,12 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- The `Runtime` trait now requires the `yash_env::system::concurrency::RunLoop`
+  trait as a supertrait.
+- The type parameter bound `S: yash_env::system::concurrency::RunLoop` has been
+  added to the following items:
+    - `impl<S> Runtime for S`
+    - `command::simple_command::start_external_utility_in_subshell_and_wait`
 - Public dependency versions:
     - yash-env 0.13.0 → 0.14.0
     - yash-syntax 0.20.0 → 0.21.0

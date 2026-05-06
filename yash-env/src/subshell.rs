@@ -48,6 +48,7 @@ use crate::system::SigmaskOp;
 use crate::system::Signals;
 use crate::system::TcSetPgrp;
 use crate::system::Wait;
+use crate::system::concurrency::RunLoop;
 use crate::system::resource::SetRlimit;
 use std::marker::PhantomData;
 use std::pin::Pin;
@@ -89,13 +90,15 @@ where
         + Fork
         + GetPid
         + Open
+        + RunLoop
         + SendSignal
         + SetPgid
         + SetRlimit
         + Sigaction
         + Sigmask
         + Signals
-        + TcSetPgrp,
+        + TcSetPgrp
+        + 'static,
     F: for<'a> FnOnce(&'a mut Env<S>, Option<JobControl>) -> Pin<Box<dyn Future<Output = ()> + 'a>>
         + 'static,
     // TODO Revisit to simplify this function type when impl Future is allowed in return type
@@ -234,7 +237,11 @@ where
         });
 
         // Start the child
-        let result = env.system.new_child_process().map(|child| child(env, task));
+        let result = env
+            .system
+            .as_ref()
+            .new_child_process()
+            .map(|child| child(env, task));
 
         // Restore the original signal mask in the parent process. Need to do
         // this before returning the error if the child process creation failed,

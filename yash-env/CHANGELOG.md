@@ -36,6 +36,13 @@ A _private dependency_ is used internally and not visible to downstream users.
   around `system::Fork::run_in_child_process` for running a task in a child
   process with the current environment state.
 
+### Changed
+
+- The type parameter bound `S: system::concurrency::RunLoop` has been added to
+  the `subshell::Subshell` struct and
+  `semantics::command::run_external_utility_in_subshell` function. For the
+  `Subshell` struct, the bound `S: 'static` has also been added.
+
 ## [0.13.2] - 2026-05-01
 
 ### Added

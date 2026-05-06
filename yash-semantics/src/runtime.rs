@@ -17,6 +17,7 @@
 //! Definition of `Runtime`
 
 use std::fmt::Debug;
+use yash_env::system::concurrency::RunLoop;
 use yash_env::system::resource::SetRlimit;
 use yash_env::system::{
     CaughtSignals, Clock, Close, Dup, Exec, Exit, Fcntl, Fork, Fstat, GetPid, GetPw,
@@ -50,6 +51,7 @@ pub trait Runtime:
     + Open
     + Pipe
     + Read
+    + RunLoop
     + Seek
     + Select
     + SendSignal
@@ -85,6 +87,7 @@ impl<S> Runtime for S where
         + Open
         + Pipe
         + Read
+        + RunLoop
         + Seek
         + Select
         + SendSignal

@@ -96,6 +96,7 @@ use yash_env::builtin::Type::{Elective, Mandatory, Special, Substitutive};
 pub use yash_env::builtin::*;
 #[cfg(doc)]
 use yash_env::stack::{Frame, Stack};
+use yash_env::system::concurrency::RunLoop;
 use yash_env::system::resource::{GetRlimit, SetRlimit};
 use yash_env::system::{
     Chdir, Clock, Close, Dup, Exec, Exit, Fcntl, Fork, Fstat, GetCwd, GetPid, GetPw, GetUid,
@@ -131,6 +132,7 @@ where
         + Open
         + Pipe
         + Read
+        + RunLoop
         + Seek
         + SendSignal
         + SetPgid

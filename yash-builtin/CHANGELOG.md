@@ -13,6 +13,12 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- The type parameter bound `S: yash_env::system::concurrency::RunLoop` has been
+  added to the following items:
+    - `iter`
+    - `command::main`
+    - `command::Command::execute`
+    - `command::Invoke::execute`
 - Public dependency versions:
     - yash-env 0.13.0 → 0.14.0
     - yash-semantics (optional) 0.15.0 → 0.16.0
