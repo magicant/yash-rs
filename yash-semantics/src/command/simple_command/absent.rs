@@ -132,7 +132,6 @@ mod tests {
         });
     }
 
-    #[ignore = "non-blocking I/O on pipes is under reconstruction and this test currently causes a deadlock"]
     #[test]
     fn simple_command_returns_command_substitution_exit_status_from_redirection() {
         in_virtual_system(|mut env, _state| async move {
@@ -143,7 +142,6 @@ mod tests {
         });
     }
 
-    #[ignore = "non-blocking I/O on pipes is under reconstruction and this test currently causes a deadlock"]
     #[test]
     fn simple_command_handles_redirection_error_with_absent_target() {
         in_virtual_system(|mut env, _state| async move {

@@ -631,7 +631,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "the new VirtualSystem::select behavior does not fit well with in_virtual_system"]
     fn process_group_id_of_job_controlled_pipeline() {
         fn stub_builtin(
             env: &mut Env<VirtualSystem>,
