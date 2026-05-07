@@ -31,7 +31,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   preventing the crate from building in the release profile. This bug was
   introduced in 0.13.0.
 
-## [0.13.0] - 2026-04-29
+## [0.13.0] - 2026-04-29 (YANKED)
+
+This version has been yanked due to an issue that prevents the crate from building in release mode. A fixed version, 0.13.1, has been released.
 
 ### Added
 
