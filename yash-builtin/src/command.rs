@@ -170,6 +170,7 @@ impl From<Identify> for Command {
 }
 
 impl Command {
+    /// Executes the `command` built-in with the specified environment.
     pub async fn execute<S>(self, env: &mut Env<S>) -> crate::Result
     where
         S: Close
