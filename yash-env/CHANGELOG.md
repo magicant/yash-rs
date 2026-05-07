@@ -9,6 +9,47 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.14.0] - Unreleased
+
+### Added
+
+- The `run_in_child_process` method has been added to the `system::Fork` trait.
+  It provides a new way to create child processes that is cleaner and more
+  usable than the existing `new_child_process` method.
+- The `system::Fork` trait is now implemented for `Rc<Concurrent<_>>`, allowing
+  the new `run_in_child_process` method to be used with `Concurrent` systems.
+  Note that the `new_child_process` method in this implementation is not
+  supported and will panic if called.
+- The `system::concurrency` module has been added, containing the following
+  items:
+    - `Concurrent`: A wrapper around a `System` implementation that provides
+      asynchronous methods for concurrency.
+    - `RunLoop`: A trait for providing a common interface to call
+      `Concurrent`'s runner methods from different contexts (e.g., real vs
+      virtual systems). This trait is now implemented for `RealSystem` and
+      `VirtualSystem`.
+    - `SignalList`: A struct representing a list of signals, used for the return
+      type of some methods.
+- `system::Concurrent` and `system::SignalList` are now re-exports of the above
+  items in the `system::concurrency` module.
+- The `Env::run_in_child_process` method has been added as a convenient wrapper
+  around `system::Fork::run_in_child_process` for running a task in a child
+  process with the current environment state.
+
+### Changed
+
+- The type parameter bound `S: system::concurrency::RunLoop` has been added to
+  the `subshell::Subshell` struct and
+  `semantics::command::run_external_utility_in_subshell` function. For the
+  `Subshell` struct, the bound `S: 'static` has also been added.
+
+### Deprecated
+
+- The `system::Fork::new_child_process` and
+  `system::Concurrent::new_child_process` methods are now deprecated in favor of
+  the new `run_in_child_process` method, which provides a more ergonomic way to
+  create child processes.
+
 ## [0.13.2] - 2026-05-01
 
 ### Added
@@ -1094,6 +1135,7 @@ This version has been yanked due to an issue that prevents the crate from buildi
 
 - Initial implementation of the `yash-env` crate
 
+[0.14.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.14.0
 [0.13.2]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.13.2
 [0.13.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.13.1
 [0.13.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.13.0

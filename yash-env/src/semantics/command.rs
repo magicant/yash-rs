@@ -27,6 +27,7 @@ use crate::semantics::{ExitStatus, Field, Result};
 use crate::source::Location;
 use crate::source::pretty::{Report, ReportType, Snippet};
 use crate::subshell::{JobControl, Subshell};
+use crate::system::concurrency::RunLoop;
 use crate::system::resource::SetRlimit;
 use crate::system::{
     Close, Dup, Errno, Exec, Exit, Fork, GetPid, Open, SendSignal, SetPgid, ShellPath, Sigaction,
@@ -261,6 +262,7 @@ where
         + Fork
         + GetPid
         + Open
+        + RunLoop
         + SendSignal
         + SetPgid
         + SetRlimit

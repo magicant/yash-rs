@@ -34,6 +34,7 @@ use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::semantics::command::ReplaceCurrentProcessError;
 use yash_env::semantics::command::run_external_utility_in_subshell;
+use yash_env::system::concurrency::RunLoop;
 use yash_env::system::resource::SetRlimit;
 use yash_env::system::{
     Close, Dup, Exec, Exit, Fcntl, Fork, GetPid, Isatty, Open, SendSignal, SetPgid, ShellPath,
@@ -113,6 +114,7 @@ where
         + GetPid
         + Isatty
         + Open
+        + RunLoop
         + SendSignal
         + SetPgid
         + SetRlimit

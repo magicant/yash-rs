@@ -109,11 +109,14 @@ use std::num::NonZero;
 use std::ops::RangeInclusive;
 use std::os::unix::ffi::OsStrExt as _;
 use std::os::unix::io::IntoRawFd;
+use std::pin::pin;
 use std::ptr::NonNull;
 use std::rc::Rc;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering;
 use std::sync::atomic::compiler_fence;
+use std::task::Context;
+use std::task::Waker;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -973,6 +976,31 @@ impl TcSetPgrp for RealSystem {
 }
 
 impl Fork for RealSystem {
+    /// Runs a task in a new child process.
+    ///
+    /// This implementation calls the `fork` system call to create a new
+    /// process. The child task must run to completion without returning
+    /// `Poll::Pending` and terminate the process by calling
+    /// [`RealSystem::exit`] or signaling itself. If a [`Future::poll`] call
+    /// for the child task returns, the child process will panic.
+    fn run_in_child_process<D, F>(&self, shared_data: D, child_task: F) -> (Result<Pid>, D)
+    where
+        D: Clone + 'static,
+        F: AsyncFnOnce(Self, D) + 'static,
+    {
+        match unsafe { libc::fork() }.errno_if_m1() {
+            Ok(0) => {}                                            // Child process
+            Ok(raw_pid) => return (Ok(Pid(raw_pid)), shared_data), // Parent process
+            Err(e) => return (Err(e), shared_data),
+        }
+
+        // Child process
+        let child_task = pin!(child_task(RealSystem(()), shared_data));
+        let mut context = Context::from_waker(Waker::noop());
+        _ = child_task.poll(&mut context);
+        panic!("child task running in RealSystem should not return");
+    }
+
     /// Creates a new child process.
     ///
     /// This implementation calls the `fork` system call and returns both in the

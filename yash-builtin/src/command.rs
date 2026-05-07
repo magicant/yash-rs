@@ -48,6 +48,7 @@ use enumset::EnumSet;
 use enumset::EnumSetType;
 use yash_env::Env;
 use yash_env::semantics::Field;
+use yash_env::system::concurrency::RunLoop;
 #[cfg(all(doc, unix))]
 use yash_env::system::real::RealSystem;
 use yash_env::system::resource::SetRlimit;
@@ -169,6 +170,7 @@ impl From<Identify> for Command {
 }
 
 impl Command {
+    /// Executes the `command` built-in with the specified environment.
     pub async fn execute<S>(self, env: &mut Env<S>) -> crate::Result
     where
         S: Close
@@ -183,6 +185,7 @@ impl Command {
             + IsExecutableFile
             + Isatty
             + Open
+            + RunLoop
             + SendSignal
             + SetPgid
             + SetRlimit
@@ -225,6 +228,7 @@ where
         + IsExecutableFile
         + Isatty
         + Open
+        + RunLoop
         + SendSignal
         + SetPgid
         + SetRlimit

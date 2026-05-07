@@ -468,23 +468,6 @@ where
     }
 }
 
-// Concurrent<S> cannot implement Fork because the return type of the fork
-// method does not match with that of the inner system S. Instead, Concurrent<S>
-// provides an inherent method `new_child_process` that returns a
-// `ChildProcessStarter<S>` as returned by the inner method.
-// impl<S> Fork for Concurrent<S>
-// where
-//     S: Fork,
-// {
-//     #[inline]
-//     fn new_child_process(&self) -> Result<ChildProcessStarter<Self>>
-//     where
-//         Self: Sized,
-//     {
-//         todo!()
-//     }
-// }
-
 impl<S> Concurrent<S>
 where
     S: Fork,
@@ -495,8 +478,13 @@ where
     /// [`Fork::new_child_process`] method. This method is an inherent method of
     /// `Concurrent<S>` instead of an implementation of the `Fork` trait because
     /// the return type does not match with that of the inner system `S`.
+    #[deprecated(
+        since = "0.14.0",
+        note = "use the `Fork::run_in_child_process` method instead"
+    )]
     #[inline]
     pub fn new_child_process(&self) -> Result<ChildProcessStarter<S>> {
+        #[allow(deprecated)]
         self.inner.new_child_process()
     }
 }
