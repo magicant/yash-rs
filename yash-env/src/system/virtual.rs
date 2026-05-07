@@ -1225,7 +1225,8 @@ impl Fork for VirtualSystem {
     ///
     /// To run the concurrent task, this function needs an executor that has
     /// been set in the [`SystemState`]. If the system state does not have an
-    /// executor, this function fails with `Errno::ENOSYS`.
+    /// executor, this function fails with `Errno::ENOSYS`. If the executor
+    /// fails to spawn the child task, this function fails with `Errno::EAGAIN`.
     ///
     /// The child task must terminate itself by calling [`Exit::exit`] or
     /// killing itself with a signal. The task returning without doing so will
@@ -1239,7 +1240,7 @@ impl Fork for VirtualSystem {
         F: AsyncFnOnce(Self, D) + 'static,
     {
         let mut state = self.state.borrow_mut();
-        let Some(executor) = state.executor.clone() else {
+        let Some(executor) = state.executor.as_ref() else {
             return (Err(Errno::ENOSYS), shared_data);
         };
         let child_process_id = state
@@ -1247,11 +1248,6 @@ impl Fork for VirtualSystem {
             .keys()
             .max()
             .map_or(Pid(2), |pid| Pid(pid.0 + 1));
-        let parent_process = &state.processes[&self.process_id];
-        let child_process = Process::fork_from(self.process_id, parent_process);
-        state.processes.insert(child_process_id, child_process);
-        drop(state);
-
         let child_system = VirtualSystem {
             state: Rc::clone(&self.state),
             process_id: child_process_id,
@@ -1266,9 +1262,13 @@ impl Fork for VirtualSystem {
             );
         };
 
-        executor
-            .spawn(Box::pin(child_task))
-            .expect("the executor failed to start the child process task");
+        if executor.spawn(Box::pin(child_task)).is_err() {
+            return (Err(Errno::EAGAIN), shared_data);
+        }
+
+        let parent_process = &state.processes[&self.process_id];
+        let child_process = Process::fork_from(self.process_id, parent_process);
+        state.processes.insert(child_process_id, child_process);
 
         (Ok(child_process_id), shared_data)
     }
