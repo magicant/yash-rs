@@ -171,6 +171,11 @@ The CI pipeline (`.github/workflows/ci.yml`) runs on push/PR to master with 6 jo
 
 ## Making Code Changes
 
+### Commit Separation
+
+- Make separate commits for different features, bug fixes, or refactors.
+- Bundle related code changes and documentation updates together in the same commit. For example, if you add a new feature, the commit should include code changes, documentation updates, and changelog entries for that feature.
+
 ### Version Bumping Rules (CRITICAL)
 
 When making changes, **update version numbers** in affected crates' `Cargo.toml` according to the type of change:
@@ -189,15 +194,7 @@ For yash-cli: Observable behavior changes drive version bumps.
 
 ### Changelog Requirements
 
-Add `[x.y.z] - Unreleased` section to `<crate>/CHANGELOG.md` if not present, with changes grouped by:
-- Added
-- Changed
-- Deprecated
-- Removed
-- Fixed
-- Security
-
-For yash-cli CHANGELOG: Include changes in observable behavior even if yash-cli code didn't change directly.
+The `CHANGELOG.md` for each crate must be updated according to the guidelines in `.agents/skills/update-changelog/SKILL.md`. Bundle code changes and changelog updates together in the same commit.
 
 ### Test Requirements
 
