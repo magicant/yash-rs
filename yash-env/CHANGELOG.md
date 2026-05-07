@@ -50,6 +50,15 @@ A _private dependency_ is used internally and not visible to downstream users.
   the new `run_in_child_process` method, which provides a more ergonomic way to
   create child processes.
 
+### Removed
+
+- The `system::SharedSystem` struct has been removed in favor of the new
+  `system::Concurrent` struct.
+- The `input::FdReader` struct has been removed in favor of the new
+  `input::FdReader2` struct.
+- The `system::virtual::SystemState::select_all` method has been removed as it
+  is no longer necessary with the new `Concurrent` implementation.
+
 ## [0.13.2] - 2026-05-01
 
 ### Added

@@ -16,6 +16,11 @@ A _private dependency_ is used internally and not visible to downstream users.
 - Public dependency versions:
     - yash-env 0.13.0 → 0.14.0
 
+### Removed
+
+- The `input::FdReader` type is no longer re-exported from `yash_env::input`, as
+  it was removed in `yash-env` 0.14.0.
+
 ## [0.20.0] - 2026-04-29
 
 ### Changed

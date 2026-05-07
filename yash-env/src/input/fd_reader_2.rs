@@ -32,8 +32,10 @@ use std::slice::from_mut;
 /// the original and clone share the same `Concurrent<S>`, reading a line from
 /// one instance will affect the next read from the other.
 ///
-/// `FdReader2` is a variant of [`FdReader`](super::FdReader) that depends on
-/// `Concurrent<S>` instead of [`SharedSystem`](crate::system::SharedSystem).
+/// This struct is named `FdReader2` to distinguish it from `FdReader`, an older
+/// implementation that existed before the `Concurrent` system was implemented.
+/// The `FdReader` struct has been removed, but the name `FdReader2` is kept for
+/// backward compatibility.
 #[derive(Debug)]
 #[must_use = "FdReader2 does nothing unless used by a parser"]
 pub struct FdReader2<S> {

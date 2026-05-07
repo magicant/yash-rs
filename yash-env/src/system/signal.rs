@@ -17,7 +17,7 @@
 //! Signal-related functionality for the system module
 
 #[cfg(doc)]
-use super::{Concurrent, SharedSystem};
+use super::Concurrent;
 use super::{Pid, Result};
 pub use crate::signal::{Name, Number, RawNumber};
 use std::borrow::Cow;
@@ -461,8 +461,7 @@ pub trait Sigmask: Signals {
     /// Gets and/or sets the signal blocking mask.
     ///
     /// This trait is usually not used directly. Instead, it is used by
-    /// [`Concurrent`] and [`SharedSystem`] to configure signal handling
-    /// behavior of the process.
+    /// [`Concurrent`] to configure signal handling behavior of the process.
     ///
     /// This is a thin wrapper around the [`sigprocmask` system
     /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_sigmask.html).
@@ -537,8 +536,7 @@ pub trait Sigaction: GetSigaction {
     /// Gets and sets the disposition for a signal.
     ///
     /// This trait is usually not used directly. Instead, it is used by
-    /// [`Concurrent`] and [`SharedSystem`] to configure signal handling
-    /// behavior of the process.
+    /// [`Concurrent`] to configure signal handling behavior of the process.
     ///
     /// This is an abstract wrapper around the [`sigaction` system
     /// call](https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigaction.html).
@@ -569,8 +567,7 @@ pub trait CaughtSignals: Signals {
     /// Returns signals this process has caught, if any.
     ///
     /// This trait is usually not used directly. Instead, it is used by
-    /// [`Concurrent`] and [`SharedSystem`] to collect signals caught by the
-    /// process.
+    /// [`Concurrent`] to collect signals caught by the process.
     ///
     /// Implementors of this trait usually also implement [`Sigaction`] to allow
     /// setting which signals are caught.
