@@ -89,8 +89,6 @@
 //!
 //! Additionally, [`Concurrent`] is a wrapper that extends the interface with
 //! asynchronous methods for concurrency. (See the [`concurrency`] module.)
-//! ([`SharedSystem`] is a former wrapper that provided similar functionality
-//! but is now deprecated in favor of `Concurrent`.)
 //!
 //! This module has a deprecated trait, [`System`], that combines all the traits
 //! above. To promote interface segregation, user code should generally depend
@@ -114,7 +112,6 @@ mod process;
 pub mod real;
 pub mod resource;
 mod select;
-mod shared;
 mod signal;
 mod sysconf;
 mod terminal;
@@ -138,12 +135,8 @@ pub use self::process::{
 };
 #[cfg(all(doc, unix))]
 use self::real::RealSystem;
-use self::resource::{GetRlimit, LimitPair, Resource, SetRlimit};
+use self::resource::{GetRlimit, SetRlimit};
 pub use self::select::Select;
-use self::select::SelectSystem;
-use self::select::SignalStatus;
-#[allow(deprecated)]
-pub use self::shared::SharedSystem;
 pub use self::signal::{
     CaughtSignals, Disposition, GetSigaction, SendSignal, Sigaction, Sigmask, SigmaskOp, Signals,
 };
@@ -157,13 +150,9 @@ use crate::io::Fd;
 #[cfg(doc)]
 use crate::io::MIN_INTERNAL_FD;
 use crate::job::Pid;
-use crate::path::Path;
-use crate::path::PathBuf;
 use crate::semantics::ExitStatus;
-use crate::str::UnixString;
 #[cfg(doc)]
 use crate::subshell::Subshell;
-use crate::trap::SignalSystem;
 use std::convert::Infallible;
 use std::fmt::Debug;
 

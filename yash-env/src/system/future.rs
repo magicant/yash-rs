@@ -29,11 +29,7 @@ use std::task::{Context, Poll};
 /// allocation if the future is already known to be ready.
 ///
 /// This type does not have a lifetime parameter, so the contained future must
-/// have a `'static` lifetime. ~~This is because `FlexFuture` is also used in
-/// [`SharedSystem`](super::SharedSystem), which performs dynamic lifetime
-/// checking to access its internal state guarded by a `RefCell`. Instead of
-/// borrowing the system, the future must share ownership of the system to keep
-/// it alive until the future is resolved.~~
+/// have a `'static` lifetime.
 #[deprecated(note = "FlexFuture is no longer used in this crate", since = "0.12.0")]
 pub enum FlexFuture<T> {
     /// Future that is already ready with a value

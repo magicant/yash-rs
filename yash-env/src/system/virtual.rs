@@ -1578,23 +1578,6 @@ impl SystemState {
         self.scheduled_wakers.wake(new_current_time);
     }
 
-    /// Does nothing.
-    ///
-    /// This function is a no-op and is only provided for backward
-    /// compatibility. It is not necessary to call this function manually, as
-    /// virtual processes are now automatically woken up when they are ready to
-    /// make progress. If you have existing code that calls this function, you
-    /// can safely remove those calls.
-    ///
-    /// This function used to perform
-    /// [`select`](crate::system::SharedSystem::select) on all processes in the
-    /// system.
-    #[deprecated(
-        note = "you no longer need to call this function manually",
-        since = "0.13.0"
-    )]
-    pub fn select_all(_: &RefCell<Self>) {}
-
     /// Finds a child process to wait for.
     ///
     /// This is a helper function for `VirtualSystem::wait`.
