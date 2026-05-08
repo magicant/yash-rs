@@ -32,6 +32,8 @@ A _private dependency_ is used internally and not visible to downstream users.
       specified duration.
     - `WaitForSignals`: A trait for providing the `wait_for_signals` method,
       which waits for signals to be delivered to the process.
+    - `Select`: A trait for providing the `select` method, which waits for
+      events on file descriptors and signals.
     - `RunLoop`: A trait for providing a common interface to call
       `Concurrent`'s runner methods from different contexts (e.g., real vs
       virtual systems). This trait is now implemented for `RealSystem` and
@@ -60,6 +62,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `sleep` (`system::concurrency::Sleep`)
     - `sleep_until` (`system::concurrency::Sleep`)
     - `wait_for_signals` (`system::concurrency::WaitForSignals`)
+    - `peek` (`system::concurrency::Select`)
+    - `select` (`system::concurrency::Select`)
 
 ### Deprecated
 

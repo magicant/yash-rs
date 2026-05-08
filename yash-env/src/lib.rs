@@ -81,6 +81,7 @@ use self::system::Signals;
 pub use self::system::System;
 use self::system::TcSetPgrp;
 use self::system::Wait;
+use self::system::concurrency::Select as _;
 use self::system::concurrency::WaitForSignals as _;
 #[cfg(unix)]
 pub use self::system::real::RealSystem;

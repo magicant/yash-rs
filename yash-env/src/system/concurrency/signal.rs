@@ -43,7 +43,7 @@ where
     /// returns the old disposition.
     ///
     /// This implementation both updates the signal disposition and the signal
-    /// mask to ensure that the [`select`](Concurrent::select) method can
+    /// mask to ensure that the [`select`](super::Select::select) method can
     /// respond to received signals without race conditions. Specifically:
     ///
     /// - When setting the disposition to `Default` or `Ignore`, the signal is

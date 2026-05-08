@@ -28,6 +28,15 @@ use std::rc::Rc;
 use std::time::Duration;
 
 /// Trait for performing the `select` operation
+///
+/// This trait provides the `select` method, which represents the `select`
+/// system call. This trait is different from the
+/// [same-named trait in the `concurrency` submodule](super::concurrency::Select),
+/// which provides a higher-level interface for waiting on multiple events. The
+/// `Select` trait in this module is a lower-level interface that directly
+/// represents the behavior of the `select` system call. It is used by the
+/// `Select` trait in the `concurrency` submodule to implement its
+/// functionality.
 pub trait Select: Signals {
     /// Waits for a next event.
     ///
@@ -36,7 +45,7 @@ pub trait Select: Signals {
     /// handling, and timer functions.
     ///
     /// This function blocks the calling thread until one of the following
-    /// condition is met:
+    /// conditions is met:
     ///
     /// - An FD in `readers` becomes ready for reading.
     /// - An FD in `writers` becomes ready for writing.
