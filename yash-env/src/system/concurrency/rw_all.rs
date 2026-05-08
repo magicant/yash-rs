@@ -21,11 +21,10 @@ use crate::io::Fd;
 use crate::system::{Errno, Fcntl, Read, Write};
 use std::cell::LazyCell;
 use std::iter::repeat_n;
+use std::rc::Rc;
 
-impl<S> Concurrent<S>
-where
-    S: Fcntl + Read,
-{
+/// Trait for reading all data from a file descriptor until EOF is reached
+pub trait ReadAll {
     /// Reads from the file descriptor until EOF is reached, appending the data
     /// to the provided buffer.
     ///
@@ -34,7 +33,42 @@ where
     ///
     /// Use [`read_all`](Self::read_all) if you don't have an existing buffer to
     /// append to.
-    pub async fn read_all_to(&self, fd: Fd, buffer: &mut Vec<u8>) -> Result<(), Errno> {
+    fn read_all_to(&self, fd: Fd, buffer: &mut Vec<u8>) -> impl Future<Output = Result<(), Errno>>;
+
+    /// Reads from the file descriptor until EOF is reached, returning the
+    /// collected data as a `Vec<u8>`.
+    ///
+    /// This is a convenience method that allocates a buffer and calls
+    /// [`read_all_to`](Self::read_all_to).
+    fn read_all(&self, fd: Fd) -> impl Future<Output = Result<Vec<u8>, Errno>> {
+        async move {
+            let mut buffer = Vec::new();
+            self.read_all_to(fd, &mut buffer).await?;
+            Ok(buffer)
+        }
+    }
+}
+
+impl<S> ReadAll for Rc<S>
+where
+    S: ReadAll,
+{
+    #[inline]
+    fn read_all_to(&self, fd: Fd, buffer: &mut Vec<u8>) -> impl Future<Output = Result<(), Errno>> {
+        (self as &S).read_all_to(fd, buffer)
+    }
+
+    #[inline]
+    fn read_all(&self, fd: Fd) -> impl Future<Output = Result<Vec<u8>, Errno>> {
+        (self as &S).read_all(fd)
+    }
+}
+
+impl<S> ReadAll for Concurrent<S>
+where
+    S: Fcntl + Read,
+{
+    async fn read_all_to(&self, fd: Fd, buffer: &mut Vec<u8>) -> Result<(), Errno> {
         let this = TemporaryNonBlockingGuard::new(self, fd);
         let waker = LazyCell::default();
         let mut effective_length = buffer.len();
@@ -64,17 +98,6 @@ where
                 }
             }
         }
-    }
-
-    /// Reads from the file descriptor until EOF is reached, returning the
-    /// collected data as a `Vec<u8>`.
-    ///
-    /// This is a convenience method that allocates a buffer and calls
-    /// [`read_all_to`](Self::read_all_to).
-    pub async fn read_all(&self, fd: Fd) -> Result<Vec<u8>, Errno> {
-        let mut buffer = Vec::new();
-        self.read_all_to(fd, &mut buffer).await?;
-        Ok(buffer)
     }
 }
 

@@ -636,6 +636,8 @@ mod run_virtual;
 mod rw_all;
 mod signal;
 
+pub use rw_all::ReadAll;
+
 #[cfg(test)]
 mod tests {
     use super::super::{

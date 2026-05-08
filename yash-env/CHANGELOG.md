@@ -24,6 +24,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   items:
     - `Concurrent`: A wrapper around a `System` implementation that provides
       asynchronous methods for concurrency.
+    - `ReadAll`: A trait for providing the `read_all_to` method, which reads
+      from a file descriptor until EOF and appends the data to a buffer.
     - `RunLoop`: A trait for providing a common interface to call
       `Concurrent`'s runner methods from different contexts (e.g., real vs
       virtual systems). This trait is now implemented for `RealSystem` and
@@ -42,6 +44,11 @@ A _private dependency_ is used internally and not visible to downstream users.
   the `subshell::Subshell` struct and
   `semantics::command::run_external_utility_in_subshell` function. For the
   `Subshell` struct, the bound `S: 'static` has also been added.
+- The following methods of `system::Concurrent`, which were inherent methods,
+  are now provided as trait implementations. You may have to import the
+  corresponding traits to use these methods:
+    - `read_all_to` (`system::concurrency::ReadAll`)
+    - `read_all` (`system::concurrency::ReadAll`)
 
 ### Deprecated
 
