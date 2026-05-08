@@ -41,6 +41,7 @@ use yash_env::Env;
 use yash_env::option::OptionSet;
 use yash_env::option::State;
 use yash_env::semantics::Field;
+use yash_env::system::concurrency::WriteAll as _;
 use yash_env::variable::PS4;
 use yash_quote::quoted;
 use yash_syntax::syntax::Text;
@@ -287,7 +288,8 @@ pub async fn finish<S: Runtime + 'static>(env: &mut Env<S>, xtrace: Option<XTrac
 }
 
 /// Convenience function for [finish]ing and
-/// [print](yash_env::system::Concurrent::print_error)ing an (optional) `XTrace`.
+/// [print](yash_env::system::concurrency::WriteAll::print_error)ing an
+/// (optional) `XTrace`.
 pub async fn print<S, X>(env: &mut Env<S>, xtrace: X)
 where
     S: Runtime + 'static,

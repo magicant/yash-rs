@@ -81,6 +81,8 @@ use self::system::Signals;
 pub use self::system::System;
 use self::system::TcSetPgrp;
 use self::system::Wait;
+use self::system::concurrency::Select as _;
+use self::system::concurrency::WaitForSignals as _;
 #[cfg(unix)]
 pub use self::system::real::RealSystem;
 pub use self::system::r#virtual::VirtualSystem;
@@ -268,7 +270,8 @@ impl<S> Env<S> {
     ///
     /// Returns an array of signals caught.
     ///
-    /// This function is a wrapper for [`Concurrent::wait_for_signals`].
+    /// This function is a wrapper for
+    /// [`WaitForSignals::wait_for_signals`](system::concurrency::WaitForSignals::wait_for_signals).
     /// Before the function returns, it passes the results to
     /// [`TrapSet::catch_signal`] so the trap set can remember the signals
     /// caught to be handled later.

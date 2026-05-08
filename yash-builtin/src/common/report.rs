@@ -28,6 +28,7 @@ use yash_env::source::pretty::{
 };
 #[cfg(doc)]
 use yash_env::stack::Stack;
+use yash_env::system::concurrency::WriteAll as _;
 use yash_env::system::{Fcntl, Isatty, Write};
 
 /// Convenience function for constructing an error report and a divert value.
@@ -47,11 +48,11 @@ use yash_env::system::{Fcntl, Isatty, Write};
 /// in a built-in. This ensures that the message contains the built-in name
 /// in a unified format.
 ///
-/// Use [`Concurrent::print_error`] to print the returned message and
+/// Use [`WriteAll::print_error`] to print the returned message and
 /// [`crate::Result::with_exit_status_and_divert`] to return the divert value
 /// along with an exit status.
 ///
-/// [`Concurrent::print_error`]: yash_env::system::Concurrent::print_error
+/// [`WriteAll::print_error`]: yash_env::system::concurrency::WriteAll::print_error
 #[must_use = "returned message should be printed"]
 pub fn prepare_report_message_and_divert<'e, 'r, S>(
     env: &'e Env<S>,
@@ -115,6 +116,7 @@ where
 /// # use yash_env::builtin::Result;
 /// # use yash_env::semantics::ExitStatus;
 /// # use yash_env::source::pretty::{Report, ReportType, Snippet};
+/// # use yash_env::system::concurrency::WriteAll as _;
 /// # async {
 /// # let mut env = yash_env::Env::new_virtual();
 /// # let mut report = Report::new();

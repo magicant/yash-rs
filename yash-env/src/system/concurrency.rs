@@ -20,9 +20,7 @@
 //! systems that enables concurrent execution of multiple possibly blocking I/O
 //! tasks on a single thread.
 
-use super::{
-    CaughtSignals, ChildProcessStarter, Clock, Errno, Fcntl, Fork, Read, Result, Select, Write,
-};
+use super::{CaughtSignals, ChildProcessStarter, Clock, Errno, Fcntl, Fork, Read, Result, Write};
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::waker::{ScheduledWakerQueue, WakerSet};
@@ -41,13 +39,13 @@ use std::time::{Duration, Instant};
 /// This struct is used as a wrapper for systems for enabling concurrent
 /// execution of multiple possibly blocking I/O tasks on a single thread. The
 /// inner system is expected to implement the [`Read`], [`Write`], and
-/// [`Select`] traits with synchronous (blocking) behavior. This struct leaves
+/// [`super::Select`] traits with synchronous (blocking) behavior. This struct leaves
 /// [`Future`]s returned by I/O methods pending until the I/O operation is ready
 /// to avoid blocking the entire process. This allows you to start multiple I/O
 /// tasks and wait for them to complete concurrently on a single thread. This
 /// struct also provides methods for waiting for signals and waiting for a
 /// specified duration, which are represented as [`Future`]s as well. The
-/// [`select`](Self::select) method of this struct consolidates blocking
+/// [`select`](Select::select) method of this struct consolidates blocking
 /// behavior into a single system call so that the process can resume execution
 /// as soon as any of the specified events occurs.
 ///
@@ -69,6 +67,8 @@ use std::time::{Duration, Instant};
 /// ```
 /// # use std::rc::Rc;
 /// # use yash_env::system::{Concurrent, Pipe as _, Read as _, Write as _};
+/// # use yash_env::system::concurrency::Select as _;
+/// # use yash_env::system::concurrency::WriteAll as _;
 /// # use yash_env::VirtualSystem;
 /// # use futures_util::task::LocalSpawnExt as _;
 /// let system = Rc::new(Concurrent::new(VirtualSystem::new()));
@@ -178,7 +178,7 @@ impl<S> Concurrent<S> {
 /// the read operation. If the read operation would block (i.e., returns
 /// `EAGAIN` or `EWOULDBLOCK`), the method registers the current task's waker in
 /// the internal state so that it can be woken up by
-/// [`select`](Concurrent::select) when the file descriptor becomes ready for
+/// [`select`](Select::select) when the file descriptor becomes ready for
 /// reading.
 impl<S> Read for Rc<Concurrent<S>>
 where
@@ -215,7 +215,7 @@ where
 /// the write operation. If the write operation would block (i.e., returns
 /// `EAGAIN` or `EWOULDBLOCK`), the method registers the current task's waker in
 /// the internal state so that it can be woken up by
-/// [`select`](Concurrent::select) when the file descriptor becomes ready for
+/// [`select`](Select::select) when the file descriptor becomes ready for
 /// writing.
 impl<S> Write for Rc<Concurrent<S>>
 where
@@ -289,15 +289,41 @@ impl<S> Concurrent<S> {
     }
 }
 
-impl<S> Concurrent<S>
-where
-    S: Clock,
-{
+/// Trait for sleeping until a specified time or duration
+pub trait Sleep {
     /// Waits until the specified deadline.
     ///
     /// The returned future will be pending until the specified deadline is
     /// reached, at which point it will complete.
-    pub async fn sleep_until(&self, deadline: Instant) {
+    fn sleep_until(&self, deadline: Instant) -> impl Future<Output = ()>;
+
+    /// Waits for the specified duration to elapse.
+    ///
+    /// The returned future will be pending until the specified duration has
+    /// elapsed, at which point it will complete.
+    fn sleep(&self, duration: Duration) -> impl Future<Output = ()>;
+}
+
+impl<S> Sleep for Rc<S>
+where
+    S: Sleep,
+{
+    #[inline]
+    fn sleep_until(&self, deadline: Instant) -> impl Future<Output = ()> {
+        (self as &S).sleep_until(deadline)
+    }
+
+    #[inline]
+    fn sleep(&self, duration: Duration) -> impl Future<Output = ()> {
+        (self as &S).sleep(duration)
+    }
+}
+
+impl<S> Sleep for Concurrent<S>
+where
+    S: Clock,
+{
+    async fn sleep_until(&self, deadline: Instant) {
         let waker: LazyCell<Rc<Cell<Option<Waker>>>> = LazyCell::default();
         poll_fn(|context| {
             if self.inner.now() >= deadline {
@@ -314,18 +340,15 @@ where
         .await
     }
 
-    /// Waits for the specified duration to elapse.
-    ///
-    /// The returned future will be pending until the specified duration has
-    /// elapsed, at which point it will complete.
-    pub async fn sleep(&self, duration: Duration) {
+    async fn sleep(&self, duration: Duration) {
         let now = self.inner.now();
         let deadline = now + duration;
         self.sleep_until(deadline).await;
     }
 }
 
-impl<S> Concurrent<S> {
+/// Trait for waiting until caught signals become available
+pub trait WaitForSignals {
     /// Waits for signals to be caught.
     ///
     /// The returned future will be pending until any signal is caught, at which
@@ -341,7 +364,21 @@ impl<S> Concurrent<S> {
     /// method, so that the trap set can handle the signals properly.
     ///
     /// [`set_disposition`]: crate::trap::SignalSystem::set_disposition
-    pub async fn wait_for_signals(&self) -> Rc<SignalList> {
+    fn wait_for_signals(&self) -> impl Future<Output = Rc<SignalList>>;
+}
+
+impl<S> WaitForSignals for Rc<S>
+where
+    S: WaitForSignals,
+{
+    #[inline]
+    fn wait_for_signals(&self) -> impl Future<Output = Rc<SignalList>> {
+        (self as &S).wait_for_signals()
+    }
+}
+
+impl<S> WaitForSignals for Concurrent<S> {
+    async fn wait_for_signals(&self) -> Rc<SignalList> {
         let signals = {
             let mut state = self.state.borrow_mut();
             state.signals.upgrade().unwrap_or_else(|| {
@@ -370,23 +407,28 @@ impl<S> Concurrent<S> {
     }
 }
 
-impl<S> Concurrent<S>
-where
-    S: CaughtSignals + Clock + Select,
-{
+/// Trait for peeking and waiting for pending concurrent events
+///
+/// This trait is different from the [`super::Select`] trait implemented by the
+/// inner system. The inner system's `select` method is expected to perform a
+/// single `select` system call with the specified file descriptors and timeout,
+/// and return the result of the system call. In contrast, the methods of this
+/// trait are designed to be used in the main loop of the process to handle all
+/// pending tasks and events. The `peek` method performs a `select` system call
+/// with a zero timeout to check for any ready events without blocking, while
+/// the `select` method performs a `select` system call with the appropriate
+/// file descriptors and timeout based on the current state of pending tasks,
+/// and returns a future that completes when any event becomes ready.
+pub trait Select {
     /// Peeks for any ready events without blocking.
     ///
     /// This method performs a `select` system call with the file descriptors
     /// and timeout of pending tasks, and wakes the tasks whose events are
-    /// ready. This method is similar to [`select`](Concurrent::select), but it
+    /// ready. This method is similar to [`select`](Self::select), but it
     /// does not block and returns immediately.
-    pub fn peek(&self) {
-        let select = pin!(self.select_impl(true));
-        let poll = select.poll(&mut Context::from_waker(Waker::noop()));
-        debug_assert_eq!(poll, Ready(()), "peek should not block");
-    }
+    fn peek(&self);
 
-    /// Waits for any of pending tasks to become ready.
+    /// Waits for any of the pending tasks to become ready.
     ///
     /// This method performs a `select` system call with the file descriptors
     /// and timeout of pending tasks, and wakes the tasks whose events are
@@ -407,12 +449,45 @@ where
     /// loop.
     ///
     /// The future returned by this method will be pending if and only if the
-    /// future returned by the inner system's [`select`](Select::select) method
-    /// is pending.
-    pub async fn select(&self) {
-        self.select_impl(false).await;
+    /// future returned by the inner system's
+    /// [`select`](super::Select::select) method is pending.
+    fn select(&self) -> impl Future<Output = ()> + use<'_, Self>;
+}
+
+impl<S> Select for Rc<S>
+where
+    S: Select,
+{
+    #[inline]
+    fn peek(&self) {
+        (self as &S).peek()
     }
 
+    #[inline]
+    fn select(&self) -> impl Future<Output = ()> + use<'_, S> {
+        (self as &S).select()
+    }
+}
+
+impl<S> Select for Concurrent<S>
+where
+    S: CaughtSignals + Clock + super::Select,
+{
+    fn peek(&self) {
+        let select = pin!(self.select_impl(true));
+        let poll = select.poll(&mut Context::from_waker(Waker::noop()));
+        debug_assert_eq!(poll, Ready(()), "peek should not block");
+    }
+
+    fn select(&self) -> impl Future<Output = ()> + use<'_, S> {
+        self.select_impl(false)
+    }
+}
+
+impl<S> Concurrent<S>
+where
+    S: CaughtSignals + Clock + super::Select,
+{
     #[allow(clippy::await_holding_refcell_ref)]
     async fn select_impl(&self, peek: bool) {
         // In this method, we keep the borrow of `state` across the `await` point. This is
@@ -520,10 +595,11 @@ impl<'a, S: Fcntl> Deref for TemporaryNonBlockingGuard<'a, S> {
 
 /// List of received signals
 ///
-/// This struct is returned by the [`Concurrent::wait_for_signals`] method to
-/// represent the list of signals that have been caught. This is a simple
-/// wrapper around `Vec<crate::signal::Number>` that is accessible through
-/// `Deref` and `DerefMut`.
+/// This struct is returned by the
+/// [`WaitForSignals::wait_for_signals`] method to represent the list of
+/// signals that have been caught. This is a simple wrapper around
+/// `Vec<crate::signal::Number>` that is accessible through `Deref` and
+/// `DerefMut`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SignalList(OnceCell<Vec<crate::signal::Number>>);
 
@@ -611,10 +687,11 @@ pub trait RunLoop {
     /// Runs the given task with concurrency support.
     ///
     /// This function implements the main loop of the shell process. It runs the
-    /// given task while also calling [`select`](Concurrent::select) to handle
+    /// given task while also calling [`select`](Select::select) to handle
     /// signals and other events. The task is expected to perform I/O operations
-    /// using the methods of the given `Concurrent` instance, so that it can
-    /// yield when the operations would block.
+    /// using the methods of the given `Concurrent` instance like
+    /// [`ReadAll::read_all`] and [`WriteAll::write_all`], so that it can yield
+    /// when the operations would block.
     ///
     /// To allow an external executor to run multiple virtual processes (each
     /// with its own run loop) concurrently, this method is asynchronous and
@@ -635,6 +712,9 @@ mod run_real;
 mod run_virtual;
 mod rw_all;
 mod signal;
+
+pub use rw_all::ReadAll;
+pub use rw_all::WriteAll;
 
 #[cfg(test)]
 mod tests {

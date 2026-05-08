@@ -20,6 +20,7 @@ use super::{Context, Input, Result};
 use crate::Env;
 use crate::io::Fd;
 use crate::option::{IgnoreEof as IgnoreEofOption, Interactive, Off};
+use crate::system::concurrency::WriteAll as _;
 use crate::system::{Fcntl, Isatty, Write};
 use std::cell::RefCell;
 

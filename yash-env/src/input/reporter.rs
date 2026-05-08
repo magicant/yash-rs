@@ -19,6 +19,7 @@ use crate::Env;
 use crate::io::Fd;
 use crate::job::fmt::Accumulator;
 use crate::option::{Interactive, Monitor, Off};
+use crate::system::concurrency::WriteAll as _;
 use crate::system::{Fcntl, Signals, Write};
 use std::cell::RefCell;
 

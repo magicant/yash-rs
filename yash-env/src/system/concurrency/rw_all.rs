@@ -21,11 +21,10 @@ use crate::io::Fd;
 use crate::system::{Errno, Fcntl, Read, Write};
 use std::cell::LazyCell;
 use std::iter::repeat_n;
+use std::rc::Rc;
 
-impl<S> Concurrent<S>
-where
-    S: Fcntl + Read,
-{
+/// Trait for reading all data from a file descriptor until EOF is reached
+pub trait ReadAll {
     /// Reads from the file descriptor until EOF is reached, appending the data
     /// to the provided buffer.
     ///
@@ -34,7 +33,42 @@ where
     ///
     /// Use [`read_all`](Self::read_all) if you don't have an existing buffer to
     /// append to.
-    pub async fn read_all_to(&self, fd: Fd, buffer: &mut Vec<u8>) -> Result<(), Errno> {
+    fn read_all_to(&self, fd: Fd, buffer: &mut Vec<u8>) -> impl Future<Output = Result<(), Errno>>;
+
+    /// Reads from the file descriptor until EOF is reached, returning the
+    /// collected data as a `Vec<u8>`.
+    ///
+    /// This is a convenience method that allocates a buffer and calls
+    /// [`read_all_to`](Self::read_all_to).
+    fn read_all(&self, fd: Fd) -> impl Future<Output = Result<Vec<u8>, Errno>> {
+        async move {
+            let mut buffer = Vec::new();
+            self.read_all_to(fd, &mut buffer).await?;
+            Ok(buffer)
+        }
+    }
+}
+
+impl<S> ReadAll for Rc<S>
+where
+    S: ReadAll,
+{
+    #[inline]
+    fn read_all_to(&self, fd: Fd, buffer: &mut Vec<u8>) -> impl Future<Output = Result<(), Errno>> {
+        (self as &S).read_all_to(fd, buffer)
+    }
+
+    #[inline]
+    fn read_all(&self, fd: Fd) -> impl Future<Output = Result<Vec<u8>, Errno>> {
+        (self as &S).read_all(fd)
+    }
+}
+
+impl<S> ReadAll for Concurrent<S>
+where
+    S: Fcntl + Read,
+{
+    async fn read_all_to(&self, fd: Fd, buffer: &mut Vec<u8>) -> Result<(), Errno> {
         let this = TemporaryNonBlockingGuard::new(self, fd);
         let waker = LazyCell::default();
         let mut effective_length = buffer.len();
@@ -65,23 +99,10 @@ where
             }
         }
     }
-
-    /// Reads from the file descriptor until EOF is reached, returning the
-    /// collected data as a `Vec<u8>`.
-    ///
-    /// This is a convenience method that allocates a buffer and calls
-    /// [`read_all_to`](Self::read_all_to).
-    pub async fn read_all(&self, fd: Fd) -> Result<Vec<u8>, Errno> {
-        let mut buffer = Vec::new();
-        self.read_all_to(fd, &mut buffer).await?;
-        Ok(buffer)
-    }
 }
 
-impl<S> Concurrent<S>
-where
-    S: Fcntl + Write,
-{
+/// Trait for writing all data to a file descriptor
+pub trait WriteAll {
     /// Writes all data from the provided buffer to the file descriptor.
     ///
     /// This method ensures that all data is written, even if multiple write
@@ -89,7 +110,37 @@ where
     ///
     /// If the data is empty, this method will return immediately without
     /// performing write operations.
-    pub async fn write_all(&self, fd: Fd, mut data: &[u8]) -> Result<(), Errno> {
+    fn write_all(&self, fd: Fd, data: &[u8]) -> impl Future<Output = Result<(), Errno>>;
+
+    /// Writes the given message to standard error.
+    ///
+    /// This is a convenience method that calls [`write_all`](Self::write_all)
+    /// with [`Fd::STDERR`].
+    fn print_error<T: AsRef<[u8]>>(&self, message: T) -> impl Future<Output = ()> {
+        async move { _ = self.write_all(Fd::STDERR, message.as_ref()).await }
+    }
+}
+
+impl<S> WriteAll for Rc<S>
+where
+    S: WriteAll,
+{
+    #[inline]
+    fn write_all(&self, fd: Fd, data: &[u8]) -> impl Future<Output = Result<(), Errno>> {
+        (self as &S).write_all(fd, data)
+    }
+
+    #[inline]
+    fn print_error<T: AsRef<[u8]>>(&self, message: T) -> impl Future<Output = ()> {
+        (self as &S).print_error(message)
+    }
+}
+
+impl<S> WriteAll for Concurrent<S>
+where
+    S: Fcntl + Write,
+{
+    async fn write_all(&self, fd: Fd, mut data: &[u8]) -> Result<(), Errno> {
         if data.is_empty() {
             return Ok(());
         }
@@ -115,20 +166,12 @@ where
             }
         }
     }
-
-    /// Writes the given message to standard error.
-    ///
-    /// This is a convenience method that calls [`write_all`](Self::write_all)
-    /// with [`Fd::STDERR`].
-    #[inline]
-    pub async fn print_error<T: AsRef<[u8]>>(&self, message: T) {
-        _ = self.write_all(Fd::STDERR, message.as_ref()).await
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::system::concurrency::Select as _;
     use crate::system::r#virtual::{PIPE_SIZE, VirtualSystem};
     use crate::system::{Close as _, Mode, OfdAccess, Open as _, OpenFlag, Pipe as _};
     use futures_util::FutureExt as _;

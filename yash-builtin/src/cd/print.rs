@@ -22,6 +22,7 @@ use yash_env::Env;
 use yash_env::io::Fd;
 use yash_env::path::Path;
 use yash_env::source::pretty::{Report, ReportType};
+use yash_env::system::concurrency::WriteAll as _;
 use yash_env::system::{Errno, Fcntl, Isatty, Write};
 
 impl Origin {

@@ -46,6 +46,7 @@ use yash_env::option::State::Off;
 use yash_env::semantics::Divert::Interrupt;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
+use yash_env::system::concurrency::WriteAll as _;
 use yash_env::system::{
     Close, Dup, Fcntl, Isatty, Open, SendSignal, Sigaction, Sigmask, Signals, TcSetPgrp, Wait,
     Write,

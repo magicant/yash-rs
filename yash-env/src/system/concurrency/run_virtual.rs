@@ -19,6 +19,7 @@
 use super::super::r#virtual::VirtualSystem;
 use super::Concurrent;
 use super::RunLoop;
+use super::Select as _;
 use crate::job::ProcessState;
 use futures_util::{pending, poll};
 use std::pin::pin;
@@ -27,7 +28,7 @@ impl Concurrent<VirtualSystem> {
     /// Runs the given task with concurrency support.
     ///
     /// This function implements the main loop of the shell process. It runs the
-    /// given task while also calling [`select`](Self::select) to handle signals
+    /// given task while also calling [`select`](super::Select::select) to handle signals
     /// and other events. The task is expected to perform I/O operations using
     /// the methods of this `Concurrent` instance, so that it can yield when the
     /// operations would block. The function returns when the task completes or
@@ -110,6 +111,7 @@ impl RunLoop for VirtualSystem {
 
 #[cfg(test)]
 mod tests {
+    use super::super::Sleep as _;
     use super::*;
     use crate::semantics::ExitStatus;
     use crate::system::r#virtual::{SIGCONT, SIGKILL, SIGSTOP};

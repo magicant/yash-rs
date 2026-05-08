@@ -21,6 +21,7 @@
 use super::super::real::RealSystem;
 use super::Concurrent;
 use super::RunLoop;
+use super::Select as _;
 use futures_util::poll;
 use std::pin::pin;
 
@@ -28,7 +29,7 @@ impl Concurrent<RealSystem> {
     /// Runs the given task with concurrency support.
     ///
     /// This function implements the main loop of the shell process. It runs the
-    /// given task while also calling [`select`](Self::select) to handle signals
+    /// given task while also calling [`select`](super::Select::select) to handle signals
     /// and other events. The task is expected to perform I/O operations using
     /// the methods of this `Concurrent` instance, so that it can yield when the
     /// operations would block. The function returns the output of the task when
@@ -77,6 +78,7 @@ impl RunLoop for RealSystem {
 
 #[cfg(test)]
 mod tests {
+    use super::super::Sleep as _;
     use super::*;
     use std::cell::Cell;
     use std::time::Duration;

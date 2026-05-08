@@ -342,13 +342,14 @@ where
 ///
 /// This implementation of `Sigmask` simply delegates to the inner system's
 /// `sigmask` method, which bypasses the internal state of `Concurrent` and may
-/// prevent the [`peek`](Concurrent::peek) and [`select`](Concurrent::select)
-/// methods from responding to received signals without race conditions. To
-/// ensure that the signal mask is configured in a way that allows `Concurrent`
-/// to respond to signals correctly, direct calls to `sigmask` should be
-/// avoided, and, if necessary, only used to temporarily change the signal mask
-/// for specific operations while ensuring that the original mask is restored
-/// afterward before a next call to `peek`, `select`, or `set_disposition`.
+/// prevent the [`peek`](super::Select::peek) and
+/// [`select`](super::Select::select) methods from responding to received
+/// signals without race conditions. To ensure that the signal mask is
+/// configured in a way that allows `Concurrent` to respond to signals
+/// correctly, direct calls to `sigmask` should be avoided, and, if necessary,
+/// only used to temporarily change the signal mask for specific operations
+/// while ensuring that the original mask is restored afterward before a next
+/// call to `peek`, `select`, or `set_disposition`.
 impl<S> Sigmask for Concurrent<S>
 where
     S: Sigmask,
@@ -377,14 +378,14 @@ where
 ///
 /// This implementation of `Sigaction` simply delegates to the inner system's
 /// `sigaction` method, which bypasses the internal state of `Concurrent` and
-/// may prevent the [`peek`](Concurrent::peek) and
-/// [`select`](Concurrent::select) methods from responding to received signals
-/// without race conditions. To ensure that signal dispositions are configured
-/// in a way that allows `Concurrent` to respond to signals correctly, direct
-/// calls to `sigaction` should be avoided, and, if necessary, only used to
-/// temporarily change the signal disposition for specific operations while
-/// ensuring that the original disposition is restored afterward before a next
-/// call to `peek`, `select`, or `set_disposition`.
+/// may prevent the [`peek`](super::Select::peek) and
+/// [`select`](super::Select::select) methods from responding to received
+/// signals without race conditions. To ensure that signal dispositions are
+/// configured in a way that allows `Concurrent` to respond to signals
+/// correctly, direct calls to `sigaction` should be avoided, and, if necessary,
+/// only used to temporarily change the signal disposition for specific
+/// operations while ensuring that the original disposition is restored
+/// afterward before a next call to `peek`, `select`, or `set_disposition`.
 ///
 /// The standard way to set a signal disposition to `Concurrent` is to use the
 /// `set_disposition` method provided by the [`SignalSystem`] trait, which

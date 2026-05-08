@@ -51,6 +51,7 @@ use yash_env::option::Option::Monitor;
 use yash_env::option::State::Off;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
+use yash_env::system::concurrency::WriteAll as _;
 use yash_env::system::{Errno, Fcntl, Isatty, SendSignal, Signals, Write};
 
 // Some definitions in this module are shared with the `fg` built-in.

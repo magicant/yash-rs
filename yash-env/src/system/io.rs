@@ -207,8 +207,8 @@ pub trait Write {
     /// The implementation for [`Rc<Concurrent<_>>`](super::Concurrent) provides
     /// asynchronous writing by using non-blocking I/O, which allows concurrent
     /// multitasking in `async` function contexts. Use
-    /// [`Concurrent::write_all`](super::Concurrent::write_all) to write the
-    /// entire buffer.
+    /// [`WriteAll::write_all`](super::concurrency::WriteAll::write_all) to
+    /// write the entire buffer.
     fn write<'a>(
         &self,
         fd: Fd,

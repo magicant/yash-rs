@@ -28,6 +28,7 @@ use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 #[cfg(doc)]
 use yash_env::stack::Stack;
+use yash_env::system::concurrency::WriteAll as _;
 use yash_env::system::{Chdir, Errno, Fcntl, Isatty, Write};
 
 /// Error invoking the underlying system call
@@ -83,9 +84,9 @@ pub fn failure_message<S: Isatty>(
 /// Prints an error message to the standard error.
 ///
 /// This function constructs a message with [`failure_message`] and prints it
-/// with [`Concurrent::print_error`].
+/// with [`WriteAll::print_error`].
 ///
-/// [`Concurrent::print_error`]: yash_env::system::Concurrent::print_error
+/// [`WriteAll::print_error`]: yash_env::system::concurrency::WriteAll::print_error
 pub async fn report_failure<S>(
     env: &mut Env<S>,
     operand: Option<&Field>,

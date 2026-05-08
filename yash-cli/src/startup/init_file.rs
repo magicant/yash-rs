@@ -40,6 +40,7 @@ use yash_env::option::Option::Interactive;
 use yash_env::option::State::Off;
 use yash_env::parser::Config;
 use yash_env::stack::Frame;
+use yash_env::system::concurrency::WriteAll as _;
 use yash_env::system::{
     Close, Dup, Errno, Fcntl, GetUid, Isatty, Mode, OfdAccess, Open, OpenFlag, Write,
 };

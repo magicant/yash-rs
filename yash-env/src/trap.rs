@@ -42,8 +42,6 @@ use self::state::{EnterSubshellOption, GrandState};
 use crate::Env;
 use crate::signal;
 use crate::source::Location;
-#[cfg(doc)]
-use crate::system::Concurrent;
 use crate::system::{Disposition, Errno, Signals};
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
@@ -389,8 +387,9 @@ impl TrapSet {
     ///
     /// You should install the internal disposition for `SIGCHLD` by using this
     /// function before waiting for `SIGCHLD` with [`crate::system::Wait::wait`]
-    /// and [`Concurrent::wait_for_signals`]. The disposition allows catching
-    /// `SIGCHLD`.
+    /// and
+    /// [`WaitForSignals::wait_for_signals`](crate::system::concurrency::WaitForSignals::wait_for_signals).
+    /// The disposition allows catching `SIGCHLD`.
     ///
     /// This function remembers that the disposition has been installed, so a
     /// second call to the function will be a no-op.

@@ -31,6 +31,7 @@ use yash_env::io::Fd;
 use yash_env::job::Pid;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
+use yash_env::system::concurrency::ReadAll as _;
 use yash_env::system::{
     Close, Dup as _, Errno, Fcntl, Pipe as _, Read, Sigaction, Sigmask, Signals, Wait,
 };
