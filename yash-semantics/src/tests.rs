@@ -34,6 +34,7 @@ use yash_env::system::Isatty;
 use yash_env::system::Read;
 use yash_env::system::SendSignal;
 use yash_env::system::Write;
+use yash_env::system::concurrency::WriteAll as _;
 use yash_env::system::r#virtual::SIGSTOP;
 use yash_env::variable::Scope;
 

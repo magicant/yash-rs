@@ -101,10 +101,8 @@ where
     }
 }
 
-impl<S> Concurrent<S>
-where
-    S: Fcntl + Write,
-{
+/// Trait for writing all data to a file descriptor
+pub trait WriteAll {
     /// Writes all data from the provided buffer to the file descriptor.
     ///
     /// This method ensures that all data is written, even if multiple write
@@ -112,7 +110,37 @@ where
     ///
     /// If the data is empty, this method will return immediately without
     /// performing write operations.
-    pub async fn write_all(&self, fd: Fd, mut data: &[u8]) -> Result<(), Errno> {
+    fn write_all(&self, fd: Fd, data: &[u8]) -> impl Future<Output = Result<(), Errno>>;
+
+    /// Writes the given message to standard error.
+    ///
+    /// This is a convenience method that calls [`write_all`](Self::write_all)
+    /// with [`Fd::STDERR`].
+    fn print_error<T: AsRef<[u8]>>(&self, message: T) -> impl Future<Output = ()> {
+        async move { _ = self.write_all(Fd::STDERR, message.as_ref()).await }
+    }
+}
+
+impl<S> WriteAll for Rc<S>
+where
+    S: WriteAll,
+{
+    #[inline]
+    fn write_all(&self, fd: Fd, data: &[u8]) -> impl Future<Output = Result<(), Errno>> {
+        (self as &S).write_all(fd, data)
+    }
+
+    #[inline]
+    fn print_error<T: AsRef<[u8]>>(&self, message: T) -> impl Future<Output = ()> {
+        (self as &S).print_error(message)
+    }
+}
+
+impl<S> WriteAll for Concurrent<S>
+where
+    S: Fcntl + Write,
+{
+    async fn write_all(&self, fd: Fd, mut data: &[u8]) -> Result<(), Errno> {
         if data.is_empty() {
             return Ok(());
         }
@@ -137,15 +165,6 @@ where
                 Err(e) => return Err(e),
             }
         }
-    }
-
-    /// Writes the given message to standard error.
-    ///
-    /// This is a convenience method that calls [`write_all`](Self::write_all)
-    /// with [`Fd::STDERR`].
-    #[inline]
-    pub async fn print_error<T: AsRef<[u8]>>(&self, message: T) {
-        _ = self.write_all(Fd::STDERR, message.as_ref()).await
     }
 }
 

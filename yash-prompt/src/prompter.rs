@@ -20,6 +20,7 @@ use super::expand_posix;
 use std::cell::RefCell;
 use yash_env::Env;
 use yash_env::input::{Context, Input, Result};
+use yash_env::system::concurrency::WriteAll as _;
 use yash_env::system::{Fcntl, Write};
 use yash_env::variable::{PS1, PS2, VariableSet};
 

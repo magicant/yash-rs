@@ -29,6 +29,7 @@ use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 #[cfg(doc)]
 use yash_env::subshell::Subshell;
+use yash_env::system::concurrency::WriteAll as _;
 use yash_syntax::syntax;
 use yash_syntax::syntax::Redir;
 

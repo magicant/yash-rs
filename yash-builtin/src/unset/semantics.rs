@@ -23,11 +23,10 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Span, SpanRole, add_span};
-#[cfg(doc)]
-use yash_env::system::Concurrent;
 use yash_env::system::Fcntl;
 use yash_env::system::Isatty;
 use yash_env::system::Write;
+use yash_env::system::concurrency::WriteAll as _;
 use yash_env::variable::Scope::Global;
 
 /// Error returned by [`unset_variables`].
@@ -157,7 +156,9 @@ where
 /// Prints an error message to the standard error.
 ///
 /// This function constructs a message with [`unset_variables_error_message`]
-/// and prints it with [`Concurrent::print_error`].
+/// and prints it with [`WriteAll::print_error`].
+///
+/// [`WriteAll::print_error`]: yash_env::system::concurrency::WriteAll::print_error
 #[deprecated(
     note = "use `merge_reports` and `report_failure` directly",
     since = "0.11.0"
@@ -292,7 +293,9 @@ where
 /// Prints an error message to the standard error.
 ///
 /// This function constructs a message with [`unset_functions_error_message`]
-/// and prints it with [`Concurrent::print_error`].
+/// and prints it with [`WriteAll::print_error`].
+///
+/// [`WriteAll::print_error`]: yash_env::system::concurrency::WriteAll::print_error
 #[deprecated(
     note = "use `merge_reports` and `report_failure` directly",
     since = "0.11.0"

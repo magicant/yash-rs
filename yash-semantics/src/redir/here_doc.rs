@@ -20,6 +20,7 @@ use super::ErrorCause;
 use yash_env::Env;
 use yash_env::io::Fd;
 use yash_env::path::Path;
+use yash_env::system::concurrency::WriteAll as _;
 use yash_env::system::{Close, Errno, Fcntl, Open, Seek, Write};
 
 async fn fill_content<S>(env: &mut Env<S>, fd: Fd, content: &str) -> Result<(), Errno>

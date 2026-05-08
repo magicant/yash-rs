@@ -30,6 +30,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
+use yash_env::system::concurrency::WriteAll as _;
 use yash_env::system::{Close, Mode, OfdAccess, Open};
 use yash_syntax::source::Location;
 use yash_syntax::syntax;

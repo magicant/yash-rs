@@ -35,6 +35,7 @@ use std::num::NonZeroUsize;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
+use yash_env::system::concurrency::WriteAll as _;
 use yash_env::system::{Fcntl, Isatty, Write};
 use yash_env::variable::OPTIND;
 

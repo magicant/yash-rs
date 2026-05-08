@@ -69,6 +69,7 @@ use std::time::{Duration, Instant};
 /// ```
 /// # use std::rc::Rc;
 /// # use yash_env::system::{Concurrent, Pipe as _, Read as _, Write as _};
+/// # use yash_env::system::concurrency::WriteAll as _;
 /// # use yash_env::VirtualSystem;
 /// # use futures_util::task::LocalSpawnExt as _;
 /// let system = Rc::new(Concurrent::new(VirtualSystem::new()));
@@ -637,6 +638,7 @@ mod rw_all;
 mod signal;
 
 pub use rw_all::ReadAll;
+pub use rw_all::WriteAll;
 
 #[cfg(test)]
 mod tests {

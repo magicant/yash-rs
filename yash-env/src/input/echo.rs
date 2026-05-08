@@ -20,6 +20,7 @@ use super::{Context, Input, Result};
 use crate::Env;
 use crate::option::Option::Verbose;
 use crate::option::State::On;
+use crate::system::concurrency::WriteAll as _;
 use crate::system::{Fcntl, Write};
 use std::cell::RefCell;
 

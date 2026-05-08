@@ -21,6 +21,7 @@
 
 use yash_env::Env;
 use yash_env::io::Fd;
+use yash_env::system::concurrency::WriteAll as _;
 use yash_env::system::{Fcntl, Isatty, Write};
 
 pub mod report;

@@ -35,6 +35,7 @@ use yash_env::Env;
 use yash_env::RealSystem;
 use yash_env::option::{Interactive, On};
 use yash_env::semantics::{Divert, ExitStatus, exit_or_raise};
+use yash_env::system::concurrency::WriteAll as _;
 use yash_env::system::resource::GetRlimit;
 use yash_env::system::{
     Chdir, Disposition, Errno, Fcntl, GetCwd, GetUid, Isatty, Sigaction, Signals, Sysconf,
