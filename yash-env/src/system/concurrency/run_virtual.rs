@@ -110,6 +110,7 @@ impl RunLoop for VirtualSystem {
 
 #[cfg(test)]
 mod tests {
+    use super::super::Sleep as _;
     use super::*;
     use crate::semantics::ExitStatus;
     use crate::system::r#virtual::{SIGCONT, SIGKILL, SIGSTOP};

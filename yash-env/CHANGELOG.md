@@ -28,6 +28,8 @@ A _private dependency_ is used internally and not visible to downstream users.
       from a file descriptor until EOF and appends the data to a buffer.
     - `WriteAll`: A trait for providing the `write_all` method, which writes
       all data to a file descriptor.
+    - `Sleep`: A trait for providing the `sleep` method, which sleeps for a
+      specified duration.
     - `RunLoop`: A trait for providing a common interface to call
       `Concurrent`'s runner methods from different contexts (e.g., real vs
       virtual systems). This trait is now implemented for `RealSystem` and
@@ -53,6 +55,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `read_all` (`system::concurrency::ReadAll`)
     - `write_all` (`system::concurrency::WriteAll`)
     - `print_error` (`system::concurrency::WriteAll`)
+    - `sleep` (`system::concurrency::Sleep`)
+    - `sleep_until` (`system::concurrency::Sleep`)
 
 ### Deprecated
 

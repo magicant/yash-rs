@@ -290,15 +290,41 @@ impl<S> Concurrent<S> {
     }
 }
 
-impl<S> Concurrent<S>
-where
-    S: Clock,
-{
+/// Trait for sleeping until a specified time or duration
+pub trait Sleep {
     /// Waits until the specified deadline.
     ///
     /// The returned future will be pending until the specified deadline is
     /// reached, at which point it will complete.
-    pub async fn sleep_until(&self, deadline: Instant) {
+    fn sleep_until(&self, deadline: Instant) -> impl Future<Output = ()>;
+
+    /// Waits for the specified duration to elapse.
+    ///
+    /// The returned future will be pending until the specified duration has
+    /// elapsed, at which point it will complete.
+    fn sleep(&self, duration: Duration) -> impl Future<Output = ()>;
+}
+
+impl<S> Sleep for Rc<S>
+where
+    S: Sleep,
+{
+    #[inline]
+    fn sleep_until(&self, deadline: Instant) -> impl Future<Output = ()> {
+        (self as &S).sleep_until(deadline)
+    }
+
+    #[inline]
+    fn sleep(&self, duration: Duration) -> impl Future<Output = ()> {
+        (self as &S).sleep(duration)
+    }
+}
+
+impl<S> Sleep for Concurrent<S>
+where
+    S: Clock,
+{
+    async fn sleep_until(&self, deadline: Instant) {
         let waker: LazyCell<Rc<Cell<Option<Waker>>>> = LazyCell::default();
         poll_fn(|context| {
             if self.inner.now() >= deadline {
@@ -315,11 +341,7 @@ where
         .await
     }
 
-    /// Waits for the specified duration to elapse.
-    ///
-    /// The returned future will be pending until the specified duration has
-    /// elapsed, at which point it will complete.
-    pub async fn sleep(&self, duration: Duration) {
+    async fn sleep(&self, duration: Duration) {
         let now = self.inner.now();
         let deadline = now + duration;
         self.sleep_until(deadline).await;

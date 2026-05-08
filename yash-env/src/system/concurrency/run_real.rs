@@ -77,6 +77,7 @@ impl RunLoop for RealSystem {
 
 #[cfg(test)]
 mod tests {
+    use super::super::Sleep as _;
     use super::*;
     use std::cell::Cell;
     use std::time::Duration;
