@@ -38,7 +38,7 @@ use std::cell::RefCell;
 /// The decorator reads from the inner input and usually returns the result
 /// as is. However, if the result is an empty string and the above conditions
 /// are met, the decorator will re-read the input until a non-empty string
-/// is obtained, an error occurs, or this process is repeated 20 times.
+/// is obtained, an error occurs, or this process is repeated 50 times.
 ///
 /// [`Interactive`]: crate::option::Interactive
 #[derive(Debug)]

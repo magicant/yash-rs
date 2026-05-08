@@ -59,6 +59,13 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `system::virtual::SystemState::select_all` method has been removed as it
   is no longer necessary with the new `Concurrent` implementation.
 
+## Fixed
+
+- The documentation for `input::IgnoreEof` now correctly states that it will
+  re-read the input up to 50 times before giving up. The previous documentation
+  incorrectly stated that it would re-read up to 20 times. The implementation
+  is unchanged, as it already used 50 as the limit.
+
 ## [0.13.2] - 2026-05-01
 
 ### Added
