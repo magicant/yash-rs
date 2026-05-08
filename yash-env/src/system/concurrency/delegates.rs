@@ -342,7 +342,8 @@ where
 ///
 /// This implementation of `Sigmask` simply delegates to the inner system's
 /// `sigmask` method, which bypasses the internal state of `Concurrent` and may
-/// prevent the [`peek`](Concurrent::peek) and [`select`](Concurrent::select)
+/// prevent the [`peek`](crate::system::concurrency::Select::peek) and
+/// [`select`](crate::system::concurrency::Select::select)
 /// methods from responding to received signals without race conditions. To
 /// ensure that the signal mask is configured in a way that allows `Concurrent`
 /// to respond to signals correctly, direct calls to `sigmask` should be
@@ -377,8 +378,9 @@ where
 ///
 /// This implementation of `Sigaction` simply delegates to the inner system's
 /// `sigaction` method, which bypasses the internal state of `Concurrent` and
-/// may prevent the [`peek`](Concurrent::peek) and
-/// [`select`](Concurrent::select) methods from responding to received signals
+/// may prevent the [`peek`](crate::system::concurrency::Select::peek) and
+/// [`select`](crate::system::concurrency::Select::select) methods from
+/// responding to received signals
 /// without race conditions. To ensure that signal dispositions are configured
 /// in a way that allows `Concurrent` to respond to signals correctly, direct
 /// calls to `sigaction` should be avoided, and, if necessary, only used to

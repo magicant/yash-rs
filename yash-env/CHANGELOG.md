@@ -44,6 +44,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   `Subshell` struct, the bound `S: 'static` has also been added.
 - The `Concurrent::wait_for_signals` method has been moved to the new
   `system::concurrency::WaitForSignals` trait.
+- The `Concurrent::peek` and `Concurrent::select` methods have been moved to
+  the new `system::concurrency::Select` trait.
 
 ### Deprecated
 

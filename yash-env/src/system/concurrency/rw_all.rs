@@ -129,6 +129,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::system::concurrency::Select as _;
     use crate::system::r#virtual::{PIPE_SIZE, VirtualSystem};
     use crate::system::{Close as _, Mode, OfdAccess, Open as _, OpenFlag, Pipe as _};
     use futures_util::FutureExt as _;
