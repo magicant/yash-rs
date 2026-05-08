@@ -20,7 +20,7 @@ use super::Command;
 use crate::Runtime;
 use crate::trap::run_exit_trap;
 use enumset::EnumSet;
-use itertools::Itertools;
+use itertools::Itertools as _;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::Env;
@@ -335,7 +335,7 @@ mod tests {
     use crate::tests::return_builtin;
     use crate::tests::suspend_builtin;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::pin::Pin;
     use std::rc::Rc;
     use yash_env::VirtualSystem;

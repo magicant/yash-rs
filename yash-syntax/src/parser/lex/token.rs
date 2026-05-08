@@ -24,7 +24,7 @@ use super::core::WordLexer;
 use super::core::is_blank;
 use super::op::is_operator_char;
 use crate::parser::core::Result;
-use crate::syntax::MaybeLiteral;
+use crate::syntax::MaybeLiteral as _;
 use crate::syntax::TextUnit;
 use crate::syntax::Word;
 use crate::syntax::WordUnit;

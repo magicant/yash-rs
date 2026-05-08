@@ -316,7 +316,7 @@ where
 mod tests {
     use super::*;
     use crate::Result;
-    use futures_util::future::FutureExt;
+    use futures_util::future::FutureExt as _;
     use std::ops::ControlFlow::{Break, Continue};
     use std::rc::Rc;
     use yash_env::Env;

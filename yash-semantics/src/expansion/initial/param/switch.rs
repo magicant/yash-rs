@@ -24,7 +24,7 @@ use crate::Runtime;
 use crate::expansion::AssignReadOnlyError;
 use crate::expansion::ErrorCause;
 use crate::expansion::attr::Origin;
-use crate::expansion::attr_strip::Strip;
+use crate::expansion::attr_strip::Strip as _;
 use crate::expansion::expand_word;
 use crate::expansion::initial::Expand as _;
 use crate::expansion::quote_removal::skip_quotes;
@@ -306,7 +306,7 @@ mod tests {
     use super::*;
     use crate::expansion::attr::AttrChar;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use yash_env::variable::IFS;
     use yash_syntax::syntax::SpecialParam;
     use yash_syntax::syntax::SwitchAction::*;

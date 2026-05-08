@@ -98,12 +98,12 @@
 use crate::Env;
 use crate::semantics::Field;
 use crate::source::Location;
-use itertools::Itertools;
+use itertools::Itertools as _;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::ffi::CString;
-use std::fmt::Write;
+use std::fmt::Write as _;
 use std::hash::Hash;
 use std::iter::FusedIterator;
 use thiserror::Error;

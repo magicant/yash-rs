@@ -153,7 +153,7 @@ fn to_field(value: &str) -> Vec<AttrChar> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::variable::{IFS, Scope};
     use yash_syntax::syntax::{Switch, SwitchAction, SwitchCondition};

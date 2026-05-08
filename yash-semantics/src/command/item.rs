@@ -149,8 +149,8 @@ mod tests {
     use crate::tests::cat_builtin;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use futures_util::FutureExt;
-    use futures_util::task::LocalSpawnExt;
+    use futures_util::FutureExt as _;
+    use futures_util::task::LocalSpawnExt as _;
     use std::cell::RefCell;
     use std::rc::Rc;
     use yash_env::VirtualSystem;

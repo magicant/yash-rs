@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use super::*;
-use std::fmt::Write;
+use std::fmt::Write as _;
 use yash_env::variable::{Value, VariableSet};
 
 impl PrintVariables {

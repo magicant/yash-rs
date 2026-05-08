@@ -17,7 +17,7 @@
 //! Implementation of the compound command semantics.
 
 use super::Command;
-use crate::Handle;
+use crate::Handle as _;
 use crate::Runtime;
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
@@ -158,7 +158,7 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::ops::ControlFlow::{Break, Continue};
     use std::pin::Pin;
     use std::rc::Rc;

@@ -110,7 +110,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::rc::Rc;
     use yash_env::VirtualSystem;
     use yash_env::semantics::ExitStatus;

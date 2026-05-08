@@ -28,7 +28,7 @@ use super::lex::TokenId::*;
 use crate::alias::Glossary;
 use crate::parser::lex::is_blank;
 use crate::syntax::HereDoc;
-use crate::syntax::MaybeLiteral;
+use crate::syntax::MaybeLiteral as _;
 use crate::syntax::Word;
 use std::rc::Rc;
 
@@ -450,7 +450,7 @@ mod tests {
     use crate::alias::HashEntry;
     use crate::source::Location;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::cell::OnceCell;
 
     #[test]

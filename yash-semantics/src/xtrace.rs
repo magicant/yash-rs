@@ -34,7 +34,7 @@
 //! [`XTrace::from_options`] is a convenient method to do so.
 
 use crate::expansion::expand_text;
-use crate::{Handle, Runtime};
+use crate::{Handle as _, Runtime};
 use std::fmt::Write;
 use std::ops::{Deref, DerefMut};
 use yash_env::Env;
@@ -306,7 +306,7 @@ where
 mod tests {
     use super::*;
     use crate::tests::echo_builtin;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::test_helper::in_virtual_system;
     use yash_env::variable::Scope::Global;

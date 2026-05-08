@@ -719,7 +719,7 @@ pub use rw_all::WriteAll;
 #[cfg(test)]
 mod tests {
     use super::super::{
-        Close as _, Disposition, Mode, OfdAccess, Open as _, OpenFlag, Pipe as _, SendSignal,
+        Close as _, Disposition, Mode, OfdAccess, Open as _, OpenFlag, Pipe as _, SendSignal as _,
     };
     use super::*;
     use crate::system::r#virtual::{PIPE_SIZE, SIGCHLD, SIGINT, SIGUSR2, VirtualSystem};

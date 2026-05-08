@@ -23,7 +23,7 @@ use crate::parser::error::SyntaxError;
 use crate::syntax::HereDoc;
 use crate::syntax::Text;
 use crate::syntax::TextUnit::{self, Literal};
-use crate::syntax::Unquote;
+use crate::syntax::Unquote as _;
 
 const NEWLINE: char = '\n';
 
@@ -119,7 +119,7 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::TextUnit::*;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::cell::OnceCell;
 
     #[test]

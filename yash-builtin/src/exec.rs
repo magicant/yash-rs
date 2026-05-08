@@ -128,7 +128,7 @@ impl<'a> From<NotFound<'a>> for Report<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::cell::RefCell;
     use std::ops::ControlFlow::Continue;
     use std::rc::Rc;

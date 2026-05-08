@@ -17,7 +17,7 @@
 //! Simple command semantics for functions
 
 use super::perform_assignments;
-use crate::Handle;
+use crate::Handle as _;
 use crate::Runtime;
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
@@ -102,7 +102,7 @@ mod tests {
     use crate::tests::local_builtin;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::rc::Rc;
     use std::str::from_utf8;
     use yash_env::VirtualSystem;

@@ -18,7 +18,7 @@
 
 use super::Command;
 use crate::common::syntax::{OptionOccurrence, OptionSpec};
-use itertools::Itertools;
+use itertools::Itertools as _;
 use thiserror::Error;
 use yash_env::semantics::Field;
 use yash_env::signal::RawNumber;

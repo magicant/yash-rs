@@ -18,7 +18,7 @@
 
 use super::evaluate_condition;
 use crate::Runtime;
-use crate::command::Command;
+use crate::command::Command as _;
 use std::ops::ControlFlow::Continue;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
@@ -55,7 +55,7 @@ mod tests {
     use super::*;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::cell::RefCell;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;

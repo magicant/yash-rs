@@ -135,7 +135,7 @@ impl<'a> Quoted<'a> {
 /// Quotes the contained string.
 impl std::fmt::Display for Quoted<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use std::fmt::Write;
+        use std::fmt::Write as _;
         if !self.needs_quoting {
             f.write_str(self.raw)
         } else if !self.raw.contains('\'') {

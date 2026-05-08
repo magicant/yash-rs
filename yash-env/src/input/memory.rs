@@ -45,7 +45,7 @@ impl Input for Memory<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Context, Input, Memory};
+    use super::{Context, Input as _, Memory};
     use futures_util::FutureExt as _;
 
     #[test]

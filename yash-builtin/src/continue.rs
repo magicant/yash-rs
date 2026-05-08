@@ -61,7 +61,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
     use yash_env::Env;

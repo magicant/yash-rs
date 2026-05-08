@@ -80,7 +80,7 @@ impl AttrField {
     /// [`remove_quotes`](super::quote_removal::remove_quotes) and
     /// [`strip`](super::attr_strip::Strip::strip) separately.
     pub fn remove_quotes_and_strip(self) -> Field {
-        use super::attr_strip::Strip;
+        use super::attr_strip::Strip as _;
         use super::quote_removal::skip_quotes;
         let value = skip_quotes(self.chars).strip().collect();
         let origin = self.origin;

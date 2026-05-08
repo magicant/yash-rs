@@ -21,7 +21,7 @@
 //! of simple commands, see the implementation of [`Command`] for
 //! [`syntax::SimpleCommand`].
 
-use crate::Handle;
+use crate::Handle as _;
 use crate::Runtime;
 use crate::command::Command;
 use crate::command::search::classify;
@@ -248,7 +248,7 @@ pub use yash_env::semantics::command::replace_current_process;
 mod tests {
     use super::*;
     use crate::tests::return_builtin;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::ops::ControlFlow::Break;
     use yash_env::option::Option::ErrExit;
     use yash_env::option::State::On;

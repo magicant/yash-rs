@@ -196,7 +196,7 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::CaseContinuation;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn parser_case_item_esac() {

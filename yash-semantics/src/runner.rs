@@ -16,9 +16,9 @@
 
 //! Implementation of the read-eval loop
 
-use crate::command::Command;
+use crate::command::Command as _;
 use crate::trap::run_traps_for_caught_signals;
-use crate::{Handle, Runtime};
+use crate::{Handle as _, Runtime};
 use std::cell::RefCell;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
@@ -207,7 +207,7 @@ mod tests {
     use super::*;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::rc::Rc;
     use yash_env::input::Echo;
     use yash_env::input::Memory;

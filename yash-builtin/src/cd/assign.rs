@@ -110,7 +110,7 @@ pub fn new_pwd<T: GetCwd>(env: &Env<T>, mode: Mode, path: &Path) -> Result<PathB
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::rc::Rc;
     use yash_env::VirtualSystem;
     use yash_env::semantics::ExitStatus;

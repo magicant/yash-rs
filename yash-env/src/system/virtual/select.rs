@@ -17,7 +17,8 @@
 //! Implementation of [`Select`] for [`VirtualSystem`]
 
 use super::{
-    Duration, Errno, Fd, Result, Select, SigmaskOp, TryInto, VirtualSystem, raise_sigchld, signal,
+    Duration, Errno, Fd, Result, Select, SigmaskOp, TryInto as _, VirtualSystem, raise_sigchld,
+    signal,
 };
 use crate::job::ProcessState;
 use std::cell::{Cell, LazyCell};

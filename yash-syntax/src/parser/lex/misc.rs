@@ -67,7 +67,7 @@ impl Lexer<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn lexer_skip_blanks() {

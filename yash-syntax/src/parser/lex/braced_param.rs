@@ -210,7 +210,7 @@ mod tests {
     use crate::syntax::TrimLength;
     use crate::syntax::TrimSide;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn lexer_braced_param_none() {

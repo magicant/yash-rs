@@ -78,7 +78,7 @@ use crate::Runtime;
 use self::attr::AttrChar;
 use self::attr::AttrField;
 use self::attr::Origin;
-use self::attr_strip::Strip;
+use self::attr_strip::Strip as _;
 use self::glob::glob;
 use self::initial::ArithError;
 #[cfg(doc)]
@@ -515,7 +515,7 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use yash_env::test_helper::in_virtual_system;
     use yash_env::variable::Scope;
 

@@ -417,7 +417,7 @@ mod tests {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        use fuzed_iterator::IteratorExt;
+        use fuzed_iterator::IteratorExt as _;
         super::parse(args.into_iter().fuze())
     }
 

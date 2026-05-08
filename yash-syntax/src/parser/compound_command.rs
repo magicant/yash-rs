@@ -103,7 +103,7 @@ mod tests {
     use crate::syntax::ExpansionMode;
     use crate::syntax::SimpleCommand;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn parser_do_clause_none() {

@@ -16,18 +16,18 @@
 
 //! Execution of the for loop
 
-use crate::Handle;
+use crate::Handle as _;
 use crate::Runtime;
 use crate::assign::Error;
 use crate::assign::ErrorCause;
-use crate::command::Command;
+use crate::command::Command as _;
 use crate::expansion::AssignReadOnlyError;
 use crate::expansion::expand_word;
 use crate::expansion::expand_words;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;
 use crate::xtrace::trace_fields;
-use std::fmt::Write;
+use std::fmt::Write as _;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
 use yash_env::semantics::Divert;
@@ -122,7 +122,7 @@ mod tests {
     use crate::tests::continue_builtin;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::pin::Pin;
     use std::rc::Rc;
     use yash_env::VirtualSystem;

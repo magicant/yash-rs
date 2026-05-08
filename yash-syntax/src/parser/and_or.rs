@@ -76,7 +76,7 @@ mod tests {
     use super::super::lex::Lexer;
     use super::*;
     use crate::source::Source;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn parser_and_or_list_eof() {

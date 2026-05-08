@@ -126,7 +126,7 @@ where
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use futures_util::future::FutureExt;
+    use futures_util::future::FutureExt as _;
     use std::rc::Rc;
     use yash_env::io::Fd;
     use yash_env::job::Job;

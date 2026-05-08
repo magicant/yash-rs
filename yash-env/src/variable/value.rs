@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use either::{Left, Right};
-use itertools::Itertools;
+use itertools::Itertools as _;
 use std::borrow::Cow;
 
 /// Value of a variable.

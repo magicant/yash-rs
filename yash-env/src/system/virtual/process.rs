@@ -605,8 +605,8 @@ mod tests {
     use crate::system::r#virtual::io::OpenFileDescription;
     use crate::test_helper::WakeFlag;
     use enumset::EnumSet;
-    use futures_util::FutureExt;
-    use futures_util::task::LocalSpawnExt;
+    use futures_util::FutureExt as _;
+    use futures_util::task::LocalSpawnExt as _;
     use std::cell::RefCell;
     use std::collections::VecDeque;
     use std::future::poll_fn;

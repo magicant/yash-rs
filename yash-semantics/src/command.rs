@@ -90,7 +90,7 @@ mod tests {
     use super::*;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::r#virtual::SIGUSR1;

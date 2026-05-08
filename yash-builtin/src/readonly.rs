@@ -94,7 +94,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use yash_env::Env;
     use yash_env::semantics::ExitStatus;
     use yash_env::variable::Value;

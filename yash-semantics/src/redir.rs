@@ -85,7 +85,7 @@ use enumset::enum_set;
 use std::borrow::Cow;
 use std::ffi::CString;
 use std::ffi::NulError;
-use std::fmt::Write;
+use std::fmt::Write as _;
 use std::num::ParseIntError;
 use std::ops::Deref;
 use std::ops::DerefMut;
@@ -106,7 +106,7 @@ use yash_syntax::syntax::HereDoc;
 use yash_syntax::syntax::Redir;
 use yash_syntax::syntax::RedirBody;
 use yash_syntax::syntax::RedirOp;
-use yash_syntax::syntax::Unquote;
+use yash_syntax::syntax::Unquote as _;
 
 /// Record of saving an open file description in another file descriptor.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -714,7 +714,7 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::cell::RefCell;
     use std::rc::Rc;
     use yash_env::Env;

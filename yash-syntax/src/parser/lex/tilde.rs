@@ -226,7 +226,7 @@ mod tests {
     use crate::syntax::Text;
     use crate::syntax::TextUnit::Backslashed;
     use crate::syntax::WordUnit::{DoubleQuote, SingleQuote};
-    use std::str::FromStr;
+    use std::str::FromStr as _;
 
     fn parse_tilde_front(word: &Word) -> Word {
         let mut word = word.clone();

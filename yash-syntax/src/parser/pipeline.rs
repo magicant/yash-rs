@@ -108,7 +108,7 @@ mod tests {
     use crate::alias::{AliasSet, HashEntry};
     use crate::source::Location;
     use crate::source::Source;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn parser_pipeline_eof() {

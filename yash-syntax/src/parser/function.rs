@@ -97,7 +97,7 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::ExpansionMode;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn parser_short_function_definition_not_one_word_name() {
