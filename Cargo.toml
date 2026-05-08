@@ -36,6 +36,7 @@ yash-semantics = { path = "yash-semantics", version = "0.16.0" }
 yash-syntax = { path = "yash-syntax", version = "0.21.0" }
 
 [workspace.lints.clippy]
+assigning_clones = "warn"
 unused_trait_names = "warn"
 
 [workspace.metadata.cargo-semver-checks.lints]
