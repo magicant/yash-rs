@@ -42,6 +42,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   the `subshell::Subshell` struct and
   `semantics::command::run_external_utility_in_subshell` function. For the
   `Subshell` struct, the bound `S: 'static` has also been added.
+- The `Concurrent::wait_for_signals` method has been moved to the new
+  `system::concurrency::WaitForSignals` trait.
 
 ### Deprecated
 

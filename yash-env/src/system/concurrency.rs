@@ -325,7 +325,8 @@ where
     }
 }
 
-impl<S> Concurrent<S> {
+/// Trait for waiting until caught signals become available
+pub trait WaitForSignals {
     /// Waits for signals to be caught.
     ///
     /// The returned future will be pending until any signal is caught, at which
@@ -341,7 +342,27 @@ impl<S> Concurrent<S> {
     /// method, so that the trap set can handle the signals properly.
     ///
     /// [`set_disposition`]: crate::trap::SignalSystem::set_disposition
-    pub async fn wait_for_signals(&self) -> Rc<SignalList> {
+    #[allow(async_fn_in_trait)]
+    async fn wait_for_signals(&self) -> Rc<SignalList>;
+}
+
+impl<S> WaitForSignals for Concurrent<S> {
+    /// Waits for signals to be caught.
+    ///
+    /// The returned future will be pending until any signal is caught, at which
+    /// point it will complete with a list of caught signals. The list is shared
+    /// among all tasks waiting for signals, so that they can see the same list
+    /// of caught signals when they are woken up.
+    ///
+    /// Before calling this method, the caller needs to [`set_disposition`] for
+    /// the signals it wants to catch.
+    ///
+    /// If this `Concurrent` system is used in an `Env`, you should call
+    /// [`Env::wait_for_signals`](crate::Env::wait_for_signals) instead of this
+    /// method, so that the trap set can handle the signals properly.
+    ///
+    /// [`set_disposition`]: crate::trap::SignalSystem::set_disposition
+    async fn wait_for_signals(&self) -> Rc<SignalList> {
         let signals = {
             let mut state = self.state.borrow_mut();
             state.signals.upgrade().unwrap_or_else(|| {
@@ -520,10 +541,11 @@ impl<'a, S: Fcntl> Deref for TemporaryNonBlockingGuard<'a, S> {
 
 /// List of received signals
 ///
-/// This struct is returned by the [`Concurrent::wait_for_signals`] method to
-/// represent the list of signals that have been caught. This is a simple
-/// wrapper around `Vec<crate::signal::Number>` that is accessible through
-/// `Deref` and `DerefMut`.
+/// This struct is returned by the
+/// [`WaitForSignals::wait_for_signals`] method to represent the list of
+/// signals that have been caught. This is a simple wrapper around
+/// `Vec<crate::signal::Number>` that is accessible through `Deref` and
+/// `DerefMut`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SignalList(OnceCell<Vec<crate::signal::Number>>);
 
