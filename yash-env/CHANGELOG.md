@@ -30,6 +30,8 @@ A _private dependency_ is used internally and not visible to downstream users.
       all data to a file descriptor.
     - `Sleep`: A trait for providing the `sleep` method, which sleeps for a
       specified duration.
+    - `WaitForSignals`: A trait for providing the `wait_for_signals` method,
+      which waits for signals to be delivered to the process.
     - `RunLoop`: A trait for providing a common interface to call
       `Concurrent`'s runner methods from different contexts (e.g., real vs
       virtual systems). This trait is now implemented for `RealSystem` and
@@ -57,6 +59,7 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `print_error` (`system::concurrency::WriteAll`)
     - `sleep` (`system::concurrency::Sleep`)
     - `sleep_until` (`system::concurrency::Sleep`)
+    - `wait_for_signals` (`system::concurrency::WaitForSignals`)
 
 ### Deprecated
 

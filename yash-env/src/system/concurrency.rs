@@ -348,7 +348,8 @@ where
     }
 }
 
-impl<S> Concurrent<S> {
+/// Trait for waiting until caught signals become available
+pub trait WaitForSignals {
     /// Waits for signals to be caught.
     ///
     /// The returned future will be pending until any signal is caught, at which
@@ -364,7 +365,21 @@ impl<S> Concurrent<S> {
     /// method, so that the trap set can handle the signals properly.
     ///
     /// [`set_disposition`]: crate::trap::SignalSystem::set_disposition
-    pub async fn wait_for_signals(&self) -> Rc<SignalList> {
+    fn wait_for_signals(&self) -> impl Future<Output = Rc<SignalList>>;
+}
+
+impl<S> WaitForSignals for Rc<S>
+where
+    S: WaitForSignals,
+{
+    #[inline]
+    fn wait_for_signals(&self) -> impl Future<Output = Rc<SignalList>> {
+        (self as &S).wait_for_signals()
+    }
+}
+
+impl<S> WaitForSignals for Concurrent<S> {
+    async fn wait_for_signals(&self) -> Rc<SignalList> {
         let signals = {
             let mut state = self.state.borrow_mut();
             state.signals.upgrade().unwrap_or_else(|| {
@@ -543,10 +558,11 @@ impl<'a, S: Fcntl> Deref for TemporaryNonBlockingGuard<'a, S> {
 
 /// List of received signals
 ///
-/// This struct is returned by the [`Concurrent::wait_for_signals`] method to
-/// represent the list of signals that have been caught. This is a simple
-/// wrapper around `Vec<crate::signal::Number>` that is accessible through
-/// `Deref` and `DerefMut`.
+/// This struct is returned by the
+/// [`WaitForSignals::wait_for_signals`] method to represent the list of
+/// signals that have been caught. This is a simple wrapper around
+/// `Vec<crate::signal::Number>` that is accessible through `Deref` and
+/// `DerefMut`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SignalList(OnceCell<Vec<crate::signal::Number>>);
 
