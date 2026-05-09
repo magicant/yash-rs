@@ -485,7 +485,7 @@ where
     )]
     #[inline]
     pub fn new_child_process(&self) -> Result<ChildProcessStarter<S>> {
-        #[allow(deprecated)]
+        #[allow(deprecated, reason = "the caller and callee are both deprecated")]
         self.inner.new_child_process()
     }
 }

@@ -238,7 +238,7 @@ pub use function::execute_function_body;
 mod external;
 use external::execute_external_utility;
 pub use external::start_external_utility_in_subshell_and_wait;
-#[allow(deprecated)]
+#[allow(deprecated, reason = "for backward compatible API")]
 pub use external::to_c_strings;
 
 #[doc(no_inline)]

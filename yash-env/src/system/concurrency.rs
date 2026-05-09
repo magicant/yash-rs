@@ -195,8 +195,10 @@ where
             let waker = LazyCell::default();
             loop {
                 match this.inner.read(fd, buffer).await {
-                    // EWOULDBLOCK is unreachable if it has the same value as EAGAIN.
-                    #[allow(unreachable_patterns)]
+                    #[allow(
+                        unreachable_patterns,
+                        reason = "EWOULDBLOCK is unreachable if it has the same value as EAGAIN"
+                    )]
                     Err(Errno::EAGAIN | Errno::EWOULDBLOCK | Errno::EINTR) => {
                         this.yield_for_read(fd, &waker).await
                     }
@@ -232,8 +234,10 @@ where
             let waker = LazyCell::default();
             loop {
                 match this.inner.write(fd, buffer).await {
-                    // EWOULDBLOCK is unreachable if it has the same value as EAGAIN.
-                    #[allow(unreachable_patterns)]
+                    #[allow(
+                        unreachable_patterns,
+                        reason = "EWOULDBLOCK is unreachable if it has the same value as EAGAIN"
+                    )]
                     Err(Errno::EAGAIN | Errno::EWOULDBLOCK | Errno::EINTR) => {
                         this.yield_for_write(fd, &waker).await
                     }
@@ -488,7 +492,10 @@ impl<S> Concurrent<S>
 where
     S: CaughtSignals + Clock + super::Select,
 {
-    #[allow(clippy::await_holding_refcell_ref)]
+    #[allow(
+        clippy::await_holding_refcell_ref,
+        reason = "see the comment in the method body"
+    )]
     async fn select_impl(&self, peek: bool) {
         // In this method, we keep the borrow of `state` across the `await` point. This is
         // intentional because the real `select` call blocks the entire process, so there cannot

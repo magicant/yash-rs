@@ -77,7 +77,7 @@ use self::system::Sigaction;
 use self::system::Sigmask;
 use self::system::SignalList;
 use self::system::Signals;
-#[allow(deprecated)]
+#[allow(deprecated, reason = "for backward compatible API")]
 pub use self::system::System;
 use self::system::TcSetPgrp;
 use self::system::Wait;

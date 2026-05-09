@@ -165,7 +165,7 @@ mod tests {
     #[test]
     fn parser_grouping_aliasing() {
         let mut lexer = Lexer::with_code(" { :; end ");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(

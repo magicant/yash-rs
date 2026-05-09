@@ -134,9 +134,10 @@ pub async fn interactive_read_eval_loop<S: Runtime + 'static>(
     read_eval_loop_impl(env, lexer, /* is_interactive */ true).await
 }
 
-// The RefCell should be local to the loop, so it is safe to keep the mutable
-// borrow across await points.
-#[allow(clippy::await_holding_refcell_ref)]
+#[allow(
+    clippy::await_holding_refcell_ref,
+    reason = "the parser does not run concurrently with the executor"
+)]
 async fn read_eval_loop_impl<S: Runtime + 'static>(
     env: &RefCell<&mut Env<S>>,
     lexer: &mut Lexer<'_>,

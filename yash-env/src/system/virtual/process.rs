@@ -284,7 +284,10 @@ impl Process {
             .map(|l| l.soft)
             .unwrap_or(INFINITY);
 
-        #[allow(clippy::unnecessary_cast)]
+        #[allow(
+            clippy::unnecessary_cast,
+            reason = "the types of FD and limit may vary across platforms"
+        )]
         if limit == INFINITY || (fd.0 as u64) < limit as u64 {
             Ok(self.fds.insert(fd, body))
         } else {

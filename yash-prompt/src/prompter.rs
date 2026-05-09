@@ -68,7 +68,10 @@ where
     S: Fcntl + Write + 'static,
     T: Input,
 {
-    #[allow(clippy::await_holding_refcell_ref)]
+    #[allow(
+        clippy::await_holding_refcell_ref,
+        reason = "other decorators, the parser, or the executor do not run concurrently with this method"
+    )]
     async fn next_line(&mut self, context: &Context) -> Result {
         print_prompt(&mut self.env.borrow_mut(), context).await;
         self.inner.next_line(context).await

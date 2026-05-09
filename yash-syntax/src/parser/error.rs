@@ -254,7 +254,7 @@ impl SyntaxError {
             UnclosedPatternList => "the pattern list is not properly closed by a `)`",
             MissingPattern => "a pattern is missing in the `case` command",
             InvalidPattern => "the pattern is not a valid word token",
-            #[allow(deprecated)]
+            #[allow(deprecated, reason = "for backward compatible API")]
             EsacAsPattern => "`esac` cannot be the first of a pattern list",
             UnclosedCase { .. } => "the `case` command is missing its closing `esac`",
             UnmatchedParenthesis => "`)` is missing after `(`",
@@ -341,7 +341,7 @@ impl SyntaxError {
             UnopenedIf => "not in an `if` command",
             UnclosedIf { .. } => "expected `fi`",
             MissingIn { .. } => "expected `in`",
-            #[allow(deprecated)]
+            #[allow(deprecated, reason = "for backward compatible API")]
             EsacAsPattern => "needs quoting",
             UnopenedCase => "not in a `case` command",
             UnclosedCase { .. } => "expected `esac`",

@@ -333,7 +333,7 @@ pub fn search_path<E: PathEnv>(env: &mut E, name: &str) -> Option<CString> {
         .find(|path| env.is_executable_file(path))
 }
 
-#[allow(clippy::field_reassign_with_default)]
+#[allow(clippy::field_reassign_with_default, reason = "for readability")]
 #[cfg(test)]
 mod tests {
     use super::*;

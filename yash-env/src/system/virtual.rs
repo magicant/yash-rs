@@ -3151,7 +3151,7 @@ mod tests {
     #[test]
     fn new_child_process_without_executor() {
         let system = VirtualSystem::new();
-        #[allow(deprecated)]
+        #[allow(deprecated, reason = "it's what we want to test")]
         let result = system.new_child_process();
         match result {
             Ok(_) => panic!("unexpected Ok value"),
@@ -3163,7 +3163,7 @@ mod tests {
     fn new_child_process_with_executor() {
         let (system, _executor) = virtual_system_with_executor();
 
-        #[allow(deprecated)]
+        #[allow(deprecated, reason = "it's what we want to test")]
         let result = system.new_child_process();
 
         let state = system.state.borrow();

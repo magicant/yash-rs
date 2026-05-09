@@ -53,8 +53,10 @@ where
     env.exit_status = result.exit_status();
 }
 
-// The RefCell is local to this function, so it is safe to keep borrows across await points.
-#[allow(clippy::await_holding_refcell_ref)]
+#[allow(
+    clippy::await_holding_refcell_ref,
+    reason = "`print_error` does not run concurrently with the input decorators or read-eval loop"
+)]
 async fn run_as_shell_process<S>(env: &mut Env<S>)
 where
     S: Chdir

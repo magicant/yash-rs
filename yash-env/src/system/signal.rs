@@ -172,7 +172,7 @@ pub trait Signals {
     fn iter_sigrt(&self) -> impl DoubleEndedIterator<Item = Number> + use<Self> {
         let range = match self.sigrt_range() {
             Some(range) => range.start().as_raw()..=range.end().as_raw(),
-            #[allow(clippy::reversed_empty_ranges)]
+            #[allow(clippy::reversed_empty_ranges, reason = "false positive")]
             None => 0..=-1,
         };
         // If NonZero implemented Step, we could use range.map(...)

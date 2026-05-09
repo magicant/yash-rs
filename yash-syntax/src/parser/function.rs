@@ -85,7 +85,10 @@ impl Parser<'_, '_> {
     }
 }
 
-#[allow(clippy::bool_assert_comparison)]
+#[allow(
+    clippy::bool_assert_comparison,
+    reason = "to make the expected values clearer"
+)]
 #[cfg(test)]
 mod tests {
     use super::super::error::ErrorCause;
@@ -205,7 +208,7 @@ mod tests {
     #[test]
     fn parser_short_function_definition_close_parenthesis_alias() {
         let mut lexer = Lexer::with_code(" a b ");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
@@ -246,7 +249,7 @@ mod tests {
     #[test]
     fn parser_short_function_definition_body_alias_and_newline() {
         let mut lexer = Lexer::with_code(" a b ");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
@@ -287,7 +290,7 @@ mod tests {
     #[test]
     fn parser_short_function_definition_alias_inapplicable() {
         let mut lexer = Lexer::with_code("()b");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(

@@ -170,7 +170,7 @@ pub async fn report_variables_error<S>(
 where
     S: Fcntl + Isatty + Write,
 {
-    #[allow(deprecated)]
+    #[allow(deprecated, reason = "the caller and callee are both deprecated")]
     let (message, divert) = unset_variables_error_message(env, errors);
     env.system.print_error(&message).await;
     crate::Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
@@ -307,7 +307,7 @@ pub async fn report_functions_error<S>(
 where
     S: Fcntl + Isatty + Write,
 {
-    #[allow(deprecated)]
+    #[allow(deprecated, reason = "the caller and callee are both deprecated")]
     let (message, divert) = unset_functions_error_message(env, errors);
     env.system.print_error(&message).await;
     crate::Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)

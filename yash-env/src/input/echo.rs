@@ -62,9 +62,10 @@ impl<S, T: Clone> Clone for Echo<'_, '_, S, T> {
 }
 
 impl<S: Fcntl + Write, T: Input> Input for Echo<'_, '_, S, T> {
-    // The RefCell should be local to the calling read-eval loop, so it is safe
-    // to keep the mutable borrow across await points.
-    #[allow(clippy::await_holding_refcell_ref)]
+    #[allow(
+        clippy::await_holding_refcell_ref,
+        reason = "other decorators, the parser, or the executor do not run concurrently with this method"
+    )]
     async fn next_line(&mut self, context: &Context) -> Result {
         let line = self.inner.next_line(context).await?;
 

@@ -251,7 +251,8 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     /// Reads a next token if the current token is `None`.
     async fn require_token(&mut self) {
-        #[allow(clippy::question_mark)] // TODO https://github.com/rust-lang/rust-clippy/issues/9518
+        #[allow(clippy::question_mark, reason = "false positive")]
+        // TODO https://github.com/rust-lang/rust-clippy/issues/9518
         if self.token.is_none() {
             self.token = Some(if let Err(e) = self.lexer.skip_blanks_and_comment().await {
                 Err(e)
@@ -442,7 +443,10 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 }
 
-#[allow(clippy::bool_assert_comparison)]
+#[allow(
+    clippy::bool_assert_comparison,
+    reason = "to make the expected values clearer"
+)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -456,7 +460,7 @@ mod tests {
     #[test]
     fn parser_take_token_manual_successful_substitution() {
         let mut lexer = Lexer::with_code("X");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
             "X".to_string(),
@@ -477,7 +481,7 @@ mod tests {
     #[test]
     fn parser_take_token_manual_not_command_name() {
         let mut lexer = Lexer::with_code("X");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
             "X".to_string(),
@@ -495,7 +499,7 @@ mod tests {
     #[test]
     fn parser_take_token_manual_not_literal() {
         let mut lexer = Lexer::with_code(r"\X");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
             "X".to_string(),
@@ -519,7 +523,7 @@ mod tests {
     #[test]
     fn parser_take_token_manual_operator() {
         let mut lexer = Lexer::with_code(";");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
             ";".to_string(),
@@ -548,7 +552,7 @@ mod tests {
     #[test]
     fn parser_take_token_manual_recursive_substitution() {
         let mut lexer = Lexer::with_code("X");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
             "X".to_string(),
@@ -586,7 +590,7 @@ mod tests {
     #[test]
     fn parser_take_token_manual_after_blank_ending_substitution() {
         let mut lexer = Lexer::with_code("X\tY");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
             "X".to_string(),
@@ -620,7 +624,7 @@ mod tests {
     #[test]
     fn parser_take_token_manual_not_after_blank_ending_substitution() {
         let mut lexer = Lexer::with_code("X\tY");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
             "X".to_string(),
@@ -651,7 +655,7 @@ mod tests {
     #[test]
     fn parser_take_token_manual_global() {
         let mut lexer = Lexer::with_code("X");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
             "X".to_string(),
@@ -672,7 +676,7 @@ mod tests {
     #[test]
     fn parser_take_token_auto_non_keyword() {
         let mut lexer = Lexer::with_code("X");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
             "X".to_string(),
@@ -689,7 +693,7 @@ mod tests {
     #[test]
     fn parser_take_token_auto_keyword_matched() {
         let mut lexer = Lexer::with_code("if");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
             "if".to_string(),
@@ -710,7 +714,7 @@ mod tests {
     #[test]
     fn parser_take_token_auto_keyword_unmatched() {
         let mut lexer = Lexer::with_code("if");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
             "if".to_string(),
@@ -727,7 +731,7 @@ mod tests {
     #[test]
     fn parser_take_token_auto_alias_substitution_to_keyword_matched() {
         let mut lexer = Lexer::with_code("X");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         aliases.insert(HashEntry::new(
             "X".to_string(),

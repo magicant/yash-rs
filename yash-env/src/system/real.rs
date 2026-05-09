@@ -1095,9 +1095,8 @@ impl Exec for RealSystem {
 }
 
 impl Exit for RealSystem {
-    #[allow(unreachable_code)]
     fn exit(&self, exit_status: ExitStatus) -> impl Future<Output = Infallible> + use<> {
-        ready(unsafe { libc::_exit(exit_status.0) })
+        (unsafe { libc::_exit(exit_status.0) }) as std::future::Ready<Infallible>
     }
 }
 
@@ -1164,7 +1163,7 @@ impl Sysconf for RealSystem {
             return Ok(UnixString::from_vec(buffer));
         }
 
-        #[allow(unreachable_code)]
+        #[allow(unreachable_code, reason = "for readability")] // TODO: use cfg_select
         Err(Errno::ENOSYS)
     }
 }

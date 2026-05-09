@@ -38,7 +38,7 @@ pub trait Command<S> {
     ///
     /// Implementations of this method is expected to update `env.exit_status`
     /// reflecting the result of the command execution.
-    #[allow(async_fn_in_trait)] // We don't support Send
+    #[allow(async_fn_in_trait, reason = "we don't support Send")]
     async fn execute(&self, env: &mut Env<S>) -> Result;
 }
 

@@ -501,7 +501,6 @@ fn trace_here_doc(xtrace: Option<&mut XTrace>, target_fd: Fd, here_doc: &HereDoc
 mod here_doc;
 
 /// Performs a redirection.
-#[allow(clippy::await_holding_refcell_ref)]
 async fn perform<S>(
     env: &mut Env<S>,
     redir: &Redir,

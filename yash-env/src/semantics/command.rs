@@ -86,7 +86,7 @@ type EnvPrepHook<S> = fn(&mut Env<S>) -> PinFuture<'_, ()>;
 /// # register_run_function(&mut Env::new_virtual());
 /// ```
 pub struct RunFunction<S>(
-    #[allow(clippy::type_complexity)]
+    #[allow(clippy::type_complexity, reason = "we can't make this simpler")]
     pub  for<'a> fn(
         &'a mut Env<S>,
         Rc<Function<S>>,

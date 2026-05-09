@@ -31,7 +31,7 @@ use yash_syntax::source::Source;
 /// standard interface for implementing that behavior.
 pub trait Handle<S> {
     /// Handles the argument error.
-    #[allow(async_fn_in_trait)] // We don't support Send
+    #[allow(async_fn_in_trait, reason = "we don't support Send")]
     async fn handle(&self, env: &mut Env<S>) -> super::Result;
 }
 

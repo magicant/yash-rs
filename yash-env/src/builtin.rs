@@ -248,7 +248,10 @@ pub type Main<S> = fn(&mut Env<S>, Vec<Field>) -> Pin<Box<dyn Future<Output = Re
 /// equality comparisons for values of this type. See
 /// <https://doc.rust-lang.org/std/ptr/fn.fn_addr_eq.html> for the
 /// characteristics of function pointer comparisons.
-#[allow(unpredictable_function_pointer_comparisons)]
+#[allow(
+    unpredictable_function_pointer_comparisons,
+    reason = "we implement PartialEq for this type for historical reasons"
+)]
 #[non_exhaustive]
 pub struct Builtin<S> {
     /// Type of the built-in
