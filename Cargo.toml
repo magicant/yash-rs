@@ -38,6 +38,7 @@ yash-syntax = { path = "yash-syntax", version = "0.21.0" }
 [workspace.lints.clippy]
 allow_attributes_without_reason = "warn"
 assigning_clones = "warn"
+ignore_without_reason = "warn"
 unused_trait_names = "warn"
 
 [workspace.metadata.cargo-semver-checks.lints]

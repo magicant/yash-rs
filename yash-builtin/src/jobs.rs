@@ -452,7 +452,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO Support parsing long option
     fn verbose_option() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -512,7 +511,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO Support parsing long option
     fn pgid_only_option() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
