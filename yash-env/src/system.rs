@@ -127,7 +127,7 @@ pub use self::file_system::{
     AT_FDCWD, Chdir, Dir, DirEntry, FileType, Fstat, GetCwd, IsExecutableFile, Mode, OfdAccess,
     Open, OpenFlag, RawMode, Seek, Stat, Umask,
 };
-#[allow(deprecated)]
+#[allow(deprecated, reason = "for backward compatible API")]
 pub use self::future::FlexFuture;
 pub use self::io::{Close, Dup, Fcntl, FdFlag, Pipe, Read, Write};
 pub use self::process::{
@@ -210,7 +210,7 @@ pub trait System:
 {
 }
 
-#[allow(deprecated)]
+#[allow(deprecated, reason = "for backward compatible API")]
 impl<T> System for T where
     T: CaughtSignals
         + Chdir
@@ -255,7 +255,7 @@ impl<T> System for T where
 /// Extension for [`System`]
 ///
 /// This trait provides some extension methods for `System`.
-#[allow(deprecated)]
+#[allow(deprecated, reason = "the caller and callee are both deprecated")]
 #[deprecated(
     note = "use functions in the `yash-env::io` and `yash-env::job` modules instead",
     since = "0.11.0"
@@ -377,5 +377,5 @@ pub trait SystemEx: System {
     }
 }
 
-#[allow(deprecated)]
+#[allow(deprecated, reason = "for backward compatible API")]
 impl<T: System + ?Sized> SystemEx for T {}

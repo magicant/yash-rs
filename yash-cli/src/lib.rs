@@ -38,8 +38,8 @@ use yash_env::semantics::{Divert, ExitStatus, exit_or_raise};
 use yash_env::system::concurrency::WriteAll as _;
 use yash_env::system::resource::GetRlimit;
 use yash_env::system::{
-    Chdir, Disposition, Errno, Fcntl, GetCwd, GetUid, Isatty, Sigaction, Signals, Sysconf,
-    TcGetPgrp, Times, Umask, Write,
+    Chdir, Disposition, Errno, Fcntl, GetCwd, GetUid, Isatty, Sigaction as _, Signals as _,
+    Sysconf, TcGetPgrp, Times, Umask, Write,
 };
 use yash_semantics::trap::run_exit_trap;
 use yash_semantics::{Runtime, interactive_read_eval_loop, read_eval_loop};
@@ -53,8 +53,10 @@ where
     env.exit_status = result.exit_status();
 }
 
-// The RefCell is local to this function, so it is safe to keep borrows across await points.
-#[allow(clippy::await_holding_refcell_ref)]
+#[allow(
+    clippy::await_holding_refcell_ref,
+    reason = "`print_error` does not run concurrently with the input decorators or read-eval loop"
+)]
 async fn run_as_shell_process<S>(env: &mut Env<S>)
 where
     S: Chdir

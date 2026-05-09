@@ -66,7 +66,7 @@ impl<'a, S> Env<'a, S> {
 /// [`expand`](Self::expand) themselves to a [`Phrase`].
 pub trait Expand<S> {
     /// Performs initial expansion.
-    #[allow(async_fn_in_trait)] // We don't support Send
+    #[allow(async_fn_in_trait, reason = "we don't support Send")]
     async fn expand(&self, env: &mut Env<'_, S>) -> Result<Phrase, Error>;
 }
 

@@ -17,7 +17,7 @@
 //! Semantics of subshell compound commands
 
 use crate::Runtime;
-use crate::command::Command;
+use crate::command::Command as _;
 use crate::trap::run_exit_trap;
 use std::ops::ControlFlow::Break;
 use std::rc::Rc;
@@ -73,7 +73,7 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use crate::tests::suspend_builtin;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::ops::ControlFlow::Continue;
     use std::pin::Pin;
     use std::rc::Rc;

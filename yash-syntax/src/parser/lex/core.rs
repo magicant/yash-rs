@@ -413,11 +413,10 @@ impl<'a> LexerCore<'a> {
             }
 
             if let Source::Alias { ref alias, .. } = *sc.value.location.code.source {
-                #[allow(clippy::collapsible_if)]
-                if ends_with_blank(&alias.replacement) {
-                    if !is_same_alias(alias, self.source.get(index + 1)) {
-                        return true;
-                    }
+                if ends_with_blank(&alias.replacement)
+                    && !is_same_alias(alias, self.source.get(index + 1))
+                {
+                    return true;
                 }
             }
         }
@@ -476,7 +475,7 @@ pub struct Config {
     pub source: Option<Rc<Source>>,
 }
 
-#[allow(deprecated)]
+#[allow(deprecated, reason = "for backward compatible API")]
 impl Config {
     /// Creates a new configuration with default settings.
     ///
@@ -500,7 +499,7 @@ impl Config {
     }
 }
 
-#[allow(deprecated)]
+#[allow(deprecated, reason = "for backward compatible API")]
 impl Default for Config {
     fn default() -> Self {
         Self::new()
@@ -573,7 +572,7 @@ impl<'a> Lexer<'a> {
     ///
     /// The `Config` struct defined in this module is deprecated. Use
     /// [`yash_env::parser::Config`] instead.
-    #[allow(deprecated)]
+    #[allow(deprecated, reason = "for backward compatible API")]
     #[deprecated(since = "0.17.0", note = "use `yash_env::parser::Config` instead")]
     #[inline(always)]
     pub fn config() -> Config {
@@ -989,7 +988,7 @@ mod tests {
     use crate::parser::error::ErrorCause;
     use crate::parser::error::SyntaxError;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn lexer_core_peek_char_empty_source() {

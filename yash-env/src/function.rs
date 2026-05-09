@@ -37,7 +37,7 @@ pub trait FunctionBody<S>: Debug + Display {
     ///
     /// The implementation of this method is expected to update
     /// `env.exit_status` reflecting the result of the function execution.
-    #[allow(async_fn_in_trait)] // We don't support Send
+    #[allow(async_fn_in_trait, reason = "we don't support Send")]
     async fn execute(&self, env: &mut Env<S>) -> crate::semantics::Result;
 }
 
@@ -240,7 +240,10 @@ impl<S> Debug for FunctionSet<S> {
 // Not derived automatically because S may not implement Clone
 impl<S> Clone for FunctionSet<S> {
     fn clone(&self) -> Self {
-        #[allow(clippy::mutable_key_type)]
+        #[allow(
+            clippy::mutable_key_type,
+            reason = "we use Rc but it's effectively immutable"
+        )]
         let entries = self.entries.clone();
         Self { entries }
     }
@@ -249,7 +252,10 @@ impl<S> Clone for FunctionSet<S> {
 // Not derived automatically because S may not implement Default
 impl<S> Default for FunctionSet<S> {
     fn default() -> Self {
-        #[allow(clippy::mutable_key_type)]
+        #[allow(
+            clippy::mutable_key_type,
+            reason = "we use Rc but it's effectively immutable"
+        )]
         let entries = HashSet::default();
         Self { entries }
     }
@@ -385,7 +391,10 @@ impl<S> FunctionSet<S> {
         &mut self,
         function: F,
     ) -> Result<Option<Rc<Function<S>>>, DefineError<S>> {
-        #[allow(clippy::mutable_key_type)]
+        #[allow(
+            clippy::mutable_key_type,
+            reason = "we use Rc but it's effectively immutable"
+        )]
         fn inner<S>(
             entries: &mut HashSet<HashEntry<S>>,
             new: Rc<Function<S>>,

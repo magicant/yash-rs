@@ -40,7 +40,7 @@ pub enum FlexFuture<T> {
     Generic(Pin<Box<dyn Future<Output = T>>>),
 }
 
-#[allow(deprecated)]
+#[allow(deprecated, reason = "for backward compatible API")]
 impl<T: Debug> Debug for FlexFuture<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -51,42 +51,42 @@ impl<T: Debug> Debug for FlexFuture<T> {
     }
 }
 
-#[allow(deprecated)]
+#[allow(deprecated, reason = "for backward compatible API")]
 impl<T> From<T> for FlexFuture<T> {
     fn from(value: T) -> Self {
         FlexFuture::Ready(std::future::ready(value))
     }
 }
 
-#[allow(deprecated)]
+#[allow(deprecated, reason = "for backward compatible API")]
 impl<T> From<std::future::Ready<T>> for FlexFuture<T> {
     fn from(ready: std::future::Ready<T>) -> Self {
         FlexFuture::Ready(ready)
     }
 }
 
-#[allow(deprecated)]
+#[allow(deprecated, reason = "for backward compatible API")]
 impl<T> From<std::future::Pending<T>> for FlexFuture<T> {
     fn from(pending: std::future::Pending<T>) -> Self {
         FlexFuture::Pending(pending)
     }
 }
 
-#[allow(deprecated)]
+#[allow(deprecated, reason = "for backward compatible API")]
 impl<T> From<Pin<Box<dyn Future<Output = T>>>> for FlexFuture<T> {
     fn from(future: Pin<Box<dyn Future<Output = T>>>) -> Self {
         FlexFuture::Generic(future)
     }
 }
 
-#[allow(deprecated)]
+#[allow(deprecated, reason = "for backward compatible API")]
 impl<T> From<Box<dyn Future<Output = T>>> for FlexFuture<T> {
     fn from(future: Box<dyn Future<Output = T>>) -> Self {
         FlexFuture::Generic(Box::into_pin(future))
     }
 }
 
-#[allow(deprecated)]
+#[allow(deprecated, reason = "for backward compatible API")]
 impl<T> FlexFuture<T> {
     /// Creates a new `FlexFuture` from any future.
     ///
@@ -112,14 +112,14 @@ impl<T> FlexFuture<T> {
     }
 }
 
-#[allow(deprecated)]
+#[allow(deprecated, reason = "for backward compatible API")]
 impl<T: 'static> From<FlexFuture<T>> for Pin<Box<dyn Future<Output = T>>> {
     fn from(future: FlexFuture<T>) -> Self {
         future.into_boxed()
     }
 }
 
-#[allow(deprecated)]
+#[allow(deprecated, reason = "for backward compatible API")]
 impl<T> Future for FlexFuture<T> {
     type Output = T;
 

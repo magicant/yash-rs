@@ -186,7 +186,7 @@ mod tests {
     use crate::syntax::TextUnit::{Backslashed, BracedParam, CommandSubst, Literal};
     use crate::syntax::WordUnit::{DollarSingleQuote, Tilde};
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn lexer_word_unit_unquoted() {

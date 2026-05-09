@@ -83,7 +83,7 @@ pub async fn apply<S: Runtime + 'static>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn shortest_prefix_with_scalar() {

@@ -38,7 +38,7 @@ pub trait Command<S> {
     ///
     /// Implementations of this method is expected to update `env.exit_status`
     /// reflecting the result of the command execution.
-    #[allow(async_fn_in_trait)] // We don't support Send
+    #[allow(async_fn_in_trait, reason = "we don't support Send")]
     async fn execute(&self, env: &mut Env<S>) -> Result;
 }
 
@@ -90,7 +90,7 @@ mod tests {
     use super::*;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::r#virtual::SIGUSR1;

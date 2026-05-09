@@ -23,7 +23,7 @@ use crate::parser::error::SyntaxError;
 use crate::syntax::HereDoc;
 use crate::syntax::Text;
 use crate::syntax::TextUnit::{self, Literal};
-use crate::syntax::Unquote;
+use crate::syntax::Unquote as _;
 
 const NEWLINE: char = '\n';
 
@@ -61,7 +61,6 @@ impl Lexer<'_> {
     /// future resolves to the final result.
     ///
     /// In case of an error, partial results may be left in `here_doc.content`.
-    #[allow(clippy::await_holding_refcell_ref)]
     pub async fn here_doc_content(&mut self, here_doc: &HereDoc) -> Result<()> {
         fn is_escapable(c: char) -> bool {
             matches!(c, '$' | '`' | '\\')
@@ -111,7 +110,10 @@ impl Lexer<'_> {
     }
 }
 
-#[allow(clippy::bool_assert_comparison)]
+#[allow(
+    clippy::bool_assert_comparison,
+    reason = "to make the expected values clearer"
+)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -119,7 +121,7 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::TextUnit::*;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::cell::OnceCell;
 
     #[test]

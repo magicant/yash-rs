@@ -67,7 +67,7 @@ mod tests {
     use crate::syntax::SpecialParam;
     use crate::syntax::Text;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn lexer_dollar_unit_no_dollar() {

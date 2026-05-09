@@ -88,8 +88,10 @@ where
                     effective_length += n;
                 }
 
-                // EWOULDBLOCK is unreachable if it has the same value as EAGAIN.
-                #[allow(unreachable_patterns)]
+                #[allow(
+                    unreachable_patterns,
+                    reason = "EWOULDBLOCK is unreachable if it has the same value as EAGAIN"
+                )]
                 Err(Errno::EAGAIN | Errno::EWOULDBLOCK) => this.yield_for_read(fd, &waker).await,
 
                 Err(e) => {
@@ -149,8 +151,10 @@ where
         let waker = LazyCell::default();
         loop {
             match this.inner.write(fd, data).await {
-                // EWOULDBLOCK is unreachable if it has the same value as EAGAIN.
-                #[allow(unreachable_patterns)]
+                #[allow(
+                    unreachable_patterns,
+                    reason = "EWOULDBLOCK is unreachable if it has the same value as EAGAIN"
+                )]
                 Ok(0) | Err(Errno::EAGAIN | Errno::EWOULDBLOCK) => {
                     this.yield_for_write(fd, &waker).await
                 }

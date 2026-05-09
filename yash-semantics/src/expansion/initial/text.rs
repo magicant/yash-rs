@@ -26,7 +26,7 @@ use super::param::ParamRef;
 use crate::Runtime;
 use yash_syntax::syntax::Text;
 use yash_syntax::syntax::TextUnit::{self, *};
-use yash_syntax::syntax::Unquote;
+use yash_syntax::syntax::Unquote as _;
 
 /// Expands the text unit.
 ///
@@ -150,7 +150,7 @@ mod tests {
     use super::super::param::tests::braced_variable;
     use super::*;
     use crate::tests::echo_builtin;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use yash_env::test_helper::in_virtual_system;
     use yash_env::variable::Scope;
     use yash_syntax::source::Location;

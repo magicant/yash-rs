@@ -618,7 +618,10 @@ impl From<AndOr> for Operator {
     }
 }
 
-#[allow(clippy::bool_assert_comparison)]
+#[allow(
+    clippy::bool_assert_comparison,
+    reason = "to make the expected values clearer"
+)]
 #[cfg(test)]
 mod tests {
     use super::*;

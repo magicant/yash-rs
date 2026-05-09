@@ -102,7 +102,7 @@ mod tests {
     use crate::source::Location;
     use crate::source::Source;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn parser_while_loop_short() {
@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn parser_while_loop_aliasing() {
         let mut lexer = Lexer::with_code(" while :; DO :; done");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
@@ -273,7 +273,7 @@ mod tests {
     #[test]
     fn parser_until_loop_aliasing() {
         let mut lexer = Lexer::with_code(" until :; DO :; done");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(

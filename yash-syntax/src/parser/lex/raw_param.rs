@@ -107,7 +107,7 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::Param;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn test_is_portable_name() {

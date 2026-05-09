@@ -312,7 +312,7 @@ mod tests {
     use super::*;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::Errno;
     use yash_env::test_helper::in_virtual_system;
@@ -321,7 +321,7 @@ mod tests {
 
     #[test]
     fn var_env_get_variable_success() {
-        use yash_arith::Env;
+        use yash_arith::Env as _;
         let mut env = yash_env::Env::new_virtual();
         env.variables
             .get_or_new("v", Global)
@@ -340,7 +340,7 @@ mod tests {
 
     #[test]
     fn var_env_get_variable_unset() {
-        use yash_arith::Env;
+        use yash_arith::Env as _;
         let mut env = yash_env::Env::new_virtual();
         let location = Location::dummy("my location");
         let env = VarEnv {
@@ -355,7 +355,7 @@ mod tests {
 
     #[test]
     fn var_env_get_variable_nounset() {
-        use yash_arith::Env;
+        use yash_arith::Env as _;
         let mut env = yash_env::Env::new_virtual();
         env.options.set(Unset, Off);
         let location = Location::dummy("my location");

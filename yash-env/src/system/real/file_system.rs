@@ -63,9 +63,10 @@ impl Stat {
     }
 }
 
-// The actual types of the fields in `libc::stat` may vary across platforms,
-// so some casts may be necessary.
-#[allow(clippy::unnecessary_cast)]
+#[allow(
+    clippy::unnecessary_cast,
+    reason = "the field types in `libc::stat` may vary across platforms"
+)]
 impl super::super::Stat for Stat {
     #[inline(always)]
     fn dev(&self) -> u64 {

@@ -92,7 +92,10 @@ impl<S, T: Clone> Clone for IgnoreEof<'_, '_, S, T> {
 }
 
 impl<S: Fcntl + Isatty + Write, T: Input> Input for IgnoreEof<'_, '_, S, T> {
-    #[allow(clippy::await_holding_refcell_ref)]
+    #[allow(
+        clippy::await_holding_refcell_ref,
+        reason = "other decorators, the parser, or the executor do not run concurrently with this method"
+    )]
     async fn next_line(&mut self, context: &Context) -> Result {
         let mut remaining_tries = 50;
 

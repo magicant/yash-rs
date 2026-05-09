@@ -207,7 +207,7 @@ mod tests {
     // This ordering is not specified by POSIX, but it is consistent with the
     // older versions of yash.
     #[test]
-    #[allow(non_snake_case)]
+    #[allow(non_snake_case, reason = "for concise naming")]
     fn last_specified_option_wins_between_v_and_V() {
         let env = Env::new_virtual();
 

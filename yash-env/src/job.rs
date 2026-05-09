@@ -1161,7 +1161,10 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::bool_assert_comparison)]
+    #[allow(
+        clippy::bool_assert_comparison,
+        reason = "to make the expected values clearer"
+    )]
     fn updating_job_status_without_expected_state() {
         let mut list = JobList::default();
         let state = ProcessState::exited(15);
@@ -1184,7 +1187,10 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::bool_assert_comparison)]
+    #[allow(
+        clippy::bool_assert_comparison,
+        reason = "to make the expected values clearer"
+    )]
     fn updating_job_status_with_matching_expected_state() {
         let mut list = JobList::default();
         let pid = Pid(20);
@@ -1202,7 +1208,10 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::bool_assert_comparison)]
+    #[allow(
+        clippy::bool_assert_comparison,
+        reason = "to make the expected values clearer"
+    )]
     fn updating_job_status_with_unmatched_expected_state() {
         let mut list = JobList::default();
         let pid = Pid(20);
@@ -1221,7 +1230,10 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::bool_assert_comparison)]
+    #[allow(
+        clippy::bool_assert_comparison,
+        reason = "to make the expected values clearer"
+    )]
     fn disowning_jobs() {
         let mut list = JobList::default();
         let i10 = list.add(Job::new(Pid(10)));

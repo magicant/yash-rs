@@ -16,16 +16,16 @@
 
 //! Execution of the case command
 
-use crate::Handle;
+use crate::Handle as _;
 use crate::Runtime;
-use crate::command::Command;
+use crate::command::Command as _;
 use crate::expansion::attr_fnmatch::apply_escapes;
 use crate::expansion::attr_fnmatch::to_pattern_chars;
 use crate::expansion::expand_word;
 use crate::expansion::expand_word_attr;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;
-use std::fmt::Write;
+use std::fmt::Write as _;
 use std::ops::ControlFlow::Continue;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
@@ -125,7 +125,7 @@ mod tests {
     use super::*;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::cell::RefCell;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;

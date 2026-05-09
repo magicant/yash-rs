@@ -17,7 +17,7 @@
 //! Execution of the while and until loop
 
 use crate::Runtime;
-use crate::command::Command;
+use crate::command::Command as _;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
 use yash_env::semantics::Divert;
@@ -107,7 +107,7 @@ mod tests {
     use crate::tests::continue_builtin;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::cell::RefCell;
     use std::pin::Pin;
     use std::rc::Rc;

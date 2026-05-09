@@ -162,7 +162,7 @@ mod tests {
     use crate::alias::{AliasSet, HashEntry};
     use crate::source::Source;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn parser_for_loop_short() {
@@ -330,7 +330,7 @@ mod tests {
     #[test]
     fn parser_for_loop_aliasing_on_semicolon() {
         let mut lexer = Lexer::with_code(" FOR_A if :; done");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
@@ -361,7 +361,7 @@ mod tests {
     #[test]
     fn parser_for_loop_aliasing_on_do() {
         let mut lexer = Lexer::with_code(" FOR_A if :; done");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
@@ -435,7 +435,7 @@ mod tests {
     fn parser_for_loop_invalid_name() {
         // Alias substitution results in "for & do :; done"
         let mut lexer = Lexer::with_code("FOR if do :; done");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
@@ -494,7 +494,7 @@ mod tests {
     fn parser_for_loop_invalid_values_delimiter() {
         // Alias substitution results in "for A in a b & c; do :; done"
         let mut lexer = Lexer::with_code("for_A_in_a_b if c; do :; done");
-        #[allow(clippy::mutable_key_type)]
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(

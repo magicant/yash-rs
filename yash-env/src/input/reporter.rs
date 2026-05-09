@@ -58,7 +58,10 @@ impl<S, T: Clone> Clone for Reporter<'_, '_, S, T> {
 }
 
 impl<S: Fcntl + Signals + Write, T: Input> Input for Reporter<'_, '_, S, T> {
-    #[allow(clippy::await_holding_refcell_ref)]
+    #[allow(
+        clippy::await_holding_refcell_ref,
+        reason = "other decorators, the parser, or the executor do not run concurrently with this method"
+    )]
     async fn next_line(&mut self, context: &Context) -> Result {
         report(&mut self.env.borrow_mut()).await;
         self.inner.next_line(context).await

@@ -46,7 +46,7 @@ impl Executor for LocalSpawner {
 #[derive(Clone, Debug)]
 pub struct LocalExecutor(pub LocalSpawner);
 
-#[allow(deprecated)]
+#[allow(deprecated, reason = "for backward compatible API")]
 impl Executor for LocalExecutor {
     fn spawn(
         &self,

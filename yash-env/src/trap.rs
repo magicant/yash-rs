@@ -308,7 +308,7 @@ impl TrapSet {
                 Condition::Exit => EnterSubshellOption::ClearInternalDisposition,
                 Condition::Signal(signal) =>
                 {
-                    #[allow(clippy::if_same_then_else)]
+                    #[allow(clippy::if_same_then_else, reason = "for readability")]
                     if signal == S::SIGCHLD {
                         EnterSubshellOption::KeepInternalDisposition
                     } else if ignore_sigint_sigquit && (signal == S::SIGINT || signal == S::SIGQUIT)

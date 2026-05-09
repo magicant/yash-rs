@@ -17,7 +17,7 @@
 //! Simple command semantics for built-ins
 
 use super::perform_assignments;
-use crate::Handle;
+use crate::Handle as _;
 use crate::Runtime;
 use crate::command::search::search_path;
 use crate::redir::RedirGuard;
@@ -103,12 +103,12 @@ pub async fn execute_builtin<S: Runtime + 'static>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::command::Command;
+    use crate::command::Command as _;
     use crate::tests::echo_builtin;
     use crate::tests::local_builtin;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::cell::RefCell;
     use std::pin::Pin;
     use std::rc::Rc;

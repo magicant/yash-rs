@@ -17,7 +17,8 @@
 //! Implementation of [`Select`] for [`VirtualSystem`]
 
 use super::{
-    Duration, Errno, Fd, Result, Select, SigmaskOp, TryInto, VirtualSystem, raise_sigchld, signal,
+    Duration, Errno, Fd, Result, Select, SigmaskOp, TryInto as _, VirtualSystem, raise_sigchld,
+    signal,
 };
 use crate::job::ProcessState;
 use std::cell::{Cell, LazyCell};
@@ -46,7 +47,7 @@ impl Select for VirtualSystem {
     ) -> impl Future<Output = Result<c_int>> + use<'a> {
         let this = self.clone();
         let signal_mask = signal_mask.map(|mask| mask.to_vec());
-        #[allow(clippy::await_holding_refcell_ref)] // False positive
+        #[allow(clippy::await_holding_refcell_ref, reason = "false positive")]
         async move {
             let (old_mask, old_caught_signals, deadline) = {
                 let state = &mut *this.state.borrow_mut();

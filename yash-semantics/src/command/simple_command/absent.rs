@@ -17,12 +17,12 @@
 //! Simple command semantics for the absent target
 
 use super::perform_assignments;
-use crate::Handle;
+use crate::Handle as _;
 use crate::Runtime;
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;
-use itertools::Itertools;
+use itertools::Itertools as _;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::Env;
@@ -101,10 +101,10 @@ pub async fn execute_absent_target<S: Runtime + 'static>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::command::Command;
+    use crate::command::Command as _;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::rc::Rc;
     use std::str::from_utf8;
     use yash_env::VirtualSystem;

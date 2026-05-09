@@ -16,7 +16,7 @@
 
 //! Implementations of function definition semantics.
 
-use crate::Handle;
+use crate::Handle as _;
 use crate::Runtime;
 use crate::command::Command;
 use crate::expansion::Field;
@@ -145,7 +145,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::ops::ControlFlow::Break;
     use yash_env::VirtualSystem;
     use yash_env::option::On;

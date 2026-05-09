@@ -150,7 +150,7 @@ fn to_pattern(field: &[AttrChar]) -> Option<Pattern> {
 }
 
 fn remove_quotes_and_strip(chars: &[AttrChar]) -> impl Iterator<Item = char> + '_ {
-    use super::attr_strip::Strip;
+    use super::attr_strip::Strip as _;
     use super::quote_removal::skip_quotes;
     skip_quotes(chars.iter().copied()).strip()
 }

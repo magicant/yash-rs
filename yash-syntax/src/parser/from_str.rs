@@ -30,7 +30,7 @@ use std::str::FromStr;
 
 /// Polls the given future, assuming it returns `Ready`.
 fn unwrap_ready<F: Future>(f: F) -> <F as Future>::Output {
-    use futures_util::future::FutureExt;
+    use futures_util::future::FutureExt as _;
     f.now_or_never()
         .expect("the lexer should not block when reading from a string")
 }

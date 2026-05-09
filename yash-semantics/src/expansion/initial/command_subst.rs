@@ -21,7 +21,7 @@ use super::super::attr::Origin;
 use super::super::phrase::Phrase;
 use super::Env;
 use super::Error;
-use crate::Handle;
+use crate::Handle as _;
 use crate::Runtime;
 use crate::expansion::ErrorCause;
 use crate::read_eval_loop;
@@ -176,7 +176,7 @@ mod tests {
     use super::*;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use yash_env::semantics::ExitStatus;
     use yash_env::test_helper::in_virtual_system;
 

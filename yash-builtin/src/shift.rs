@@ -124,7 +124,7 @@ fn report_for_too_large_operand<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
     use std::vec;

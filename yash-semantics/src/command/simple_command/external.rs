@@ -17,7 +17,7 @@
 //! Simple command semantics for external utilities
 
 use super::perform_assignments;
-use crate::Handle;
+use crate::Handle as _;
 use crate::Runtime;
 use crate::command::search::search_path;
 use crate::redir::RedirGuard;
@@ -169,9 +169,9 @@ pub fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::command::Command;
+    use crate::command::Command as _;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::cell::RefCell;
     use std::ops::ControlFlow::Continue;
     use std::rc::Rc;

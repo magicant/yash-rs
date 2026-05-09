@@ -90,11 +90,14 @@ where
     }
 }
 
-#[allow(clippy::bool_assert_comparison)]
+#[allow(
+    clippy::bool_assert_comparison,
+    reason = "to make the expected values clearer"
+)]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use yash_env::Env;
     use yash_env::semantics::ExitStatus;
     use yash_env::variable::Value;

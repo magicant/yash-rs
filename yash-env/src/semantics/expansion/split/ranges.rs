@@ -134,7 +134,7 @@ where
 
 impl<I> FusedIterator for Ranges<'_, I> where I: Iterator<Item = AttrChar> {}
 
-#[allow(clippy::single_range_in_vec_init)]
+#[allow(clippy::single_range_in_vec_init, reason = "false positive")]
 #[cfg(test)]
 mod tests {
     use super::*;

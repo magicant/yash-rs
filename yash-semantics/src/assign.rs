@@ -20,7 +20,7 @@ use crate::Runtime;
 use crate::expansion::AssignReadOnlyError;
 use crate::expansion::expand_value;
 use crate::xtrace::XTrace;
-use std::fmt::Write;
+use std::fmt::Write as _;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 
@@ -107,7 +107,7 @@ mod tests {
     use super::*;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use yash_env::test_helper::in_virtual_system;
     use yash_env::variable::Value;
     use yash_env::variable::Variable;

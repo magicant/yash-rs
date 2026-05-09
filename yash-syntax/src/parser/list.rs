@@ -200,7 +200,10 @@ impl Parser<'_, '_> {
     }
 }
 
-#[allow(clippy::bool_assert_comparison)]
+#[allow(
+    clippy::bool_assert_comparison,
+    reason = "to make the expected values clearer"
+)]
 #[cfg(test)]
 mod tests {
     use super::super::error::ErrorCause;
@@ -212,7 +215,7 @@ mod tests {
     use crate::syntax::Pipeline;
     use crate::syntax::RedirBody;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn parser_list_eof() {

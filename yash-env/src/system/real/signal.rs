@@ -40,11 +40,9 @@ pub fn rt_range() -> RangeInclusive<RawNumber> {
     ))]
     return libc::SIGRTMIN()..=libc::SIGRTMAX();
 
-    #[allow(unreachable_code)]
-    {
-        #[allow(clippy::reversed_empty_ranges)]
-        return 0..=-1;
-    }
+    #[allow(unreachable_code, reason = "for readability")] // TODO: use cfg_select
+    #[allow(clippy::reversed_empty_ranges, reason = "false positive")]
+    return 0..=-1;
 }
 
 impl Name {
@@ -303,12 +301,19 @@ impl Disposition {
             (&raw mut (*sa_ptr).sa_flags).write(0);
             libc::sigemptyset(&raw mut (*sa_ptr).sa_mask);
 
+            // TODO: use cfg_select
             #[cfg(not(target_os = "aix"))]
-            #[allow(clippy::useless_transmute)] // See from_sigaction below
+            #[allow(
+                clippy::useless_transmute,
+                reason = "the type of sa_sigaction may vary across platforms"
+            )]
             (&raw mut (*sa_ptr).sa_sigaction).write(std::mem::transmute(handler));
 
             #[cfg(target_os = "aix")]
-            #[allow(clippy::useless_transmute)] // See from_sigaction below
+            #[allow(
+                clippy::useless_transmute,
+                reason = "the type of __su_sigaction may vary across platforms"
+            )]
             (&raw mut (*sa_ptr).sa_union.__su_sigaction).write(std::mem::transmute(handler));
         }
         sa
@@ -317,14 +322,17 @@ impl Disposition {
     /// Converts the `sigaction` to the signal disposition for the real system.
     pub(super) unsafe fn from_sigaction(sa: &MaybeUninit<libc::sigaction>) -> Self {
         unsafe {
+            // TODO: use cfg_select
             #[cfg(not(target_os = "aix"))]
             let handler = (*sa.as_ptr()).sa_sigaction;
 
             #[cfg(target_os = "aix")]
             let handler = (*sa.as_ptr()).sa_union.__su_sigaction;
 
-            // It is platform-specific whether we really need to transmute the handler.
-            #[allow(clippy::useless_transmute)]
+            #[allow(
+                clippy::useless_transmute,
+                reason = "the type of handler may vary across platforms"
+            )]
             match std::mem::transmute(handler) {
                 libc::SIG_DFL => Self::Default,
                 libc::SIG_IGN => Self::Ignore,

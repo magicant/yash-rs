@@ -274,7 +274,7 @@ mod tests {
     use crate::parser::ErrorCause;
     use crate::source::Source;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn escape_unit_literal() {

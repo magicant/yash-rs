@@ -16,7 +16,7 @@
 
 //! Utility for unit tests
 
-use itertools::Itertools;
+use itertools::Itertools as _;
 use std::future::ready;
 use std::ops::ControlFlow::Break;
 use std::pin::Pin;

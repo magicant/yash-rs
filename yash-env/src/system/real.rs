@@ -97,7 +97,7 @@ use enumset::EnumSet;
 pub use file_system::Stat;
 use libc::DIR;
 use std::convert::Infallible;
-use std::convert::TryInto;
+use std::convert::TryInto as _;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
@@ -108,7 +108,7 @@ use std::mem::MaybeUninit;
 use std::num::NonZero;
 use std::ops::RangeInclusive;
 use std::os::unix::ffi::OsStrExt as _;
-use std::os::unix::io::IntoRawFd;
+use std::os::unix::io::IntoRawFd as _;
 use std::pin::pin;
 use std::ptr::NonNull;
 use std::rc::Rc;
@@ -1095,9 +1095,8 @@ impl Exec for RealSystem {
 }
 
 impl Exit for RealSystem {
-    #[allow(unreachable_code)]
     fn exit(&self, exit_status: ExitStatus) -> impl Future<Output = Infallible> + use<> {
-        ready(unsafe { libc::_exit(exit_status.0) })
+        (unsafe { libc::_exit(exit_status.0) }) as std::future::Ready<Infallible>
     }
 }
 
@@ -1164,7 +1163,7 @@ impl Sysconf for RealSystem {
             return Ok(UnixString::from_vec(buffer));
         }
 
-        #[allow(unreachable_code)]
+        #[allow(unreachable_code, reason = "for readability")] // TODO: use cfg_select
         Err(Errno::ENOSYS)
     }
 }

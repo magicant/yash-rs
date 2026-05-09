@@ -169,7 +169,7 @@ mod tests {
     use super::super::param::tests::braced_param;
     use super::super::param::tests::env_with_positional_params_and_ifs;
     use super::*;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use yash_syntax::syntax::SpecialParam;
     use yash_syntax::syntax::Text;
     use yash_syntax::syntax::TextUnit;

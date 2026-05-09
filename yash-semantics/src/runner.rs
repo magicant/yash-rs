@@ -16,9 +16,9 @@
 
 //! Implementation of the read-eval loop
 
-use crate::command::Command;
+use crate::command::Command as _;
 use crate::trap::run_traps_for_caught_signals;
-use crate::{Handle, Runtime};
+use crate::{Handle as _, Runtime};
 use std::cell::RefCell;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
@@ -134,9 +134,10 @@ pub async fn interactive_read_eval_loop<S: Runtime + 'static>(
     read_eval_loop_impl(env, lexer, /* is_interactive */ true).await
 }
 
-// The RefCell should be local to the loop, so it is safe to keep the mutable
-// borrow across await points.
-#[allow(clippy::await_holding_refcell_ref)]
+#[allow(
+    clippy::await_holding_refcell_ref,
+    reason = "the parser does not run concurrently with the executor"
+)]
 async fn read_eval_loop_impl<S: Runtime + 'static>(
     env: &RefCell<&mut Env<S>>,
     lexer: &mut Lexer<'_>,
@@ -207,7 +208,7 @@ mod tests {
     use super::*;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
     use std::rc::Rc;
     use yash_env::input::Echo;
     use yash_env::input::Memory;

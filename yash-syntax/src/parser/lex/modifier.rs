@@ -153,7 +153,7 @@ mod tests {
     use crate::syntax::TextUnit;
     use crate::syntax::WordUnit;
     use assert_matches::assert_matches;
-    use futures_util::FutureExt;
+    use futures_util::FutureExt as _;
 
     #[test]
     fn lexer_suffix_modifier_eof() {
