@@ -23,6 +23,14 @@ A _private dependency_ is used internally and not visible to downstream users.
     - yash-env 0.13.0 → 0.14.0
     - yash-semantics (optional) 0.15.0 → 0.16.0
 
+### Removed
+
+- The following formerly deprecated functions have been removed:
+    - `unset::semantics::report_functions_error`
+    - `unset::semantics::report_variables_error`
+    - `unset::semantics::unset_functions_error_message`
+    - `unset::semantics::unset_variables_error_message`
+
 ## [0.16.0] - 2026-04-29
 
 ### Changed

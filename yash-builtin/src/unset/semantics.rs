@@ -16,17 +16,11 @@
 
 //! Defines the behavior of the unset built-in.
 
-use crate::common::report::prepare_report_message_and_divert;
 use thiserror::Error;
 use yash_env::Env;
-use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Span, SpanRole, add_span};
-use yash_env::system::Fcntl;
-use yash_env::system::Isatty;
-use yash_env::system::Write;
-use yash_env::system::concurrency::WriteAll as _;
 use yash_env::variable::Scope::Global;
 
 /// Error returned by [`unset_variables`].
@@ -110,72 +104,6 @@ pub fn unset_variables<'a, S>(
     errors
 }
 
-/// Creates a message that describes the errors.
-///
-/// See [`prepare_report_message_and_divert`] for the second return value.
-#[deprecated(
-    note = "use `merge_reports` and `prepare_report_message_and_divert` directly",
-    since = "0.11.0"
-)]
-#[must_use = "returned message should be printed"]
-pub fn unset_variables_error_message<S>(
-    env: &Env<S>,
-    errors: &[UnsetVariablesError],
-) -> (String, yash_env::semantics::Result)
-where
-    S: Fcntl + Isatty + Write,
-{
-    let mut report = Report::new();
-    report.r#type = ReportType::Error;
-    report.title = "cannot unset variable".into();
-    for error in errors {
-        add_span(
-            &error.name.origin.code,
-            Span {
-                range: error.name.origin.byte_range(),
-                role: SpanRole::Primary {
-                    label: error.to_string().into(),
-                },
-            },
-            &mut report.snippets,
-        );
-        add_span(
-            &error.read_only_location.code,
-            Span {
-                range: error.read_only_location.byte_range(),
-                role: SpanRole::Supplementary {
-                    label: format!("variable `{}` was made read-only here", error.name).into(),
-                },
-            },
-            &mut report.snippets,
-        );
-    }
-    prepare_report_message_and_divert(env, report)
-}
-
-/// Prints an error message to the standard error.
-///
-/// This function constructs a message with [`unset_variables_error_message`]
-/// and prints it with [`WriteAll::print_error`].
-///
-/// [`WriteAll::print_error`]: yash_env::system::concurrency::WriteAll::print_error
-#[deprecated(
-    note = "use `merge_reports` and `report_failure` directly",
-    since = "0.11.0"
-)]
-pub async fn report_variables_error<S>(
-    env: &mut Env<S>,
-    errors: &[UnsetVariablesError<'_>],
-) -> crate::Result
-where
-    S: Fcntl + Isatty + Write,
-{
-    #[allow(deprecated, reason = "the caller and callee are both deprecated")]
-    let (message, divert) = unset_variables_error_message(env, errors);
-    env.system.print_error(&message).await;
-    crate::Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
-}
-
 /// Error returned by [`unset_functions`].
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[error("cannot unset read-only function `{name}`")]
@@ -245,72 +173,6 @@ pub fn unset_functions<'a, S>(
         }
     }
     errors
-}
-
-/// Creates a message that describes the errors.
-///
-/// See [`prepare_report_message_and_divert`] for the second return value.
-#[deprecated(
-    note = "use `merge_reports` and `prepare_report_message_and_divert` directly",
-    since = "0.11.0"
-)]
-#[must_use = "returned message should be printed"]
-pub fn unset_functions_error_message<S>(
-    env: &mut Env<S>,
-    errors: &[UnsetFunctionsError<'_>],
-) -> (String, yash_env::semantics::Result)
-where
-    S: Fcntl + Isatty + Write,
-{
-    let mut report = Report::new();
-    report.r#type = ReportType::Error;
-    report.title = "cannot unset function".into();
-    for error in errors {
-        add_span(
-            &error.name.origin.code,
-            Span {
-                range: error.name.origin.byte_range(),
-                role: SpanRole::Primary {
-                    label: error.to_string().into(),
-                },
-            },
-            &mut report.snippets,
-        );
-        add_span(
-            &error.read_only_location.code,
-            Span {
-                range: error.read_only_location.byte_range(),
-                role: SpanRole::Supplementary {
-                    label: format!("function `{}` was made read-only here", error.name).into(),
-                },
-            },
-            &mut report.snippets,
-        );
-    }
-    prepare_report_message_and_divert(env, report)
-}
-
-/// Prints an error message to the standard error.
-///
-/// This function constructs a message with [`unset_functions_error_message`]
-/// and prints it with [`WriteAll::print_error`].
-///
-/// [`WriteAll::print_error`]: yash_env::system::concurrency::WriteAll::print_error
-#[deprecated(
-    note = "use `merge_reports` and `report_failure` directly",
-    since = "0.11.0"
-)]
-pub async fn report_functions_error<S>(
-    env: &mut Env<S>,
-    errors: &[UnsetFunctionsError<'_>],
-) -> crate::Result
-where
-    S: Fcntl + Isatty + Write,
-{
-    #[allow(deprecated, reason = "the caller and callee are both deprecated")]
-    let (message, divert) = unset_functions_error_message(env, errors);
-    env.system.print_error(&message).await;
-    crate::Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
 }
 
 #[cfg(test)]
