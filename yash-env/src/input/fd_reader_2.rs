@@ -18,31 +18,31 @@
 
 use super::{Context, Input, Result};
 use crate::io::Fd;
-use crate::system::{Concurrent, Fcntl, Read};
-use std::rc::Rc;
+use crate::system::Read;
 use std::slice::from_mut;
 
 /// [Input function](Input) that reads from a file descriptor
 ///
-/// An instance of `FdReader2<S>` contains a `Rc<Concurrent<S>>` to read input
-/// from a file descriptor.
+/// An instance of `FdReader2<S>` contains a system of type `S` that is used to
+/// read from the file descriptor. The system must implement the `Read` trait to
+/// allow the reading operation.
 ///
-/// Although `FdReader2` implements `Clone`, it does not mean you can create and
-/// keep a copy of a `FdReader2` instance to replay the input later. Since both
-/// the original and clone share the same `Concurrent<S>`, reading a line from
-/// one instance will affect the next read from the other.
+/// Although `FdReader2` implements `Clone`, cloning an instance does not allow
+/// you to replay the input later. If the system is contained in `Rc`, for
+/// example, reading from one instance will affect subsequent reads from the
+/// other, since they share the same system and file descriptor.
 ///
 /// This struct is named `FdReader2` to distinguish it from `FdReader`, an older
 /// implementation that existed before the `Concurrent` system was implemented.
 /// The `FdReader` struct has been removed, but the name `FdReader2` is kept for
 /// backward compatibility.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[must_use = "FdReader2 does nothing unless used by a parser"]
 pub struct FdReader2<S> {
     /// File descriptor to read from
     fd: Fd,
     /// System to interact with the FD
-    system: Rc<Concurrent<S>>,
+    system: S,
 }
 
 impl<S> FdReader2<S> {
@@ -51,22 +51,12 @@ impl<S> FdReader2<S> {
     /// The `fd` argument is the file descriptor to read from. It should be
     /// readable, have the close-on-exec flag set, and remain open for the
     /// lifetime of the `FdReader2` instance.
-    pub fn new(fd: Fd, system: Rc<Concurrent<S>>) -> Self {
+    pub fn new(fd: Fd, system: S) -> Self {
         FdReader2 { fd, system }
     }
 }
 
-// Not derived automatically because S may not implement Clone
-impl<S> Clone for FdReader2<S> {
-    fn clone(&self) -> Self {
-        Self {
-            fd: self.fd,
-            system: self.system.clone(),
-        }
-    }
-}
-
-impl<S: Fcntl + Read> Input for FdReader2<S> {
+impl<S: Read> Input for FdReader2<S> {
     async fn next_line(&mut self, _context: &Context) -> Result {
         // TODO Read many bytes at once if seekable
 
@@ -100,6 +90,7 @@ impl<S: Fcntl + Read> Input for FdReader2<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::system::Concurrent;
     use crate::system::Errno;
     use crate::system::Mode;
     use crate::system::OfdAccess;
@@ -109,6 +100,7 @@ mod tests {
     use crate::system::r#virtual::Inode;
     use crate::system::r#virtual::VirtualSystem;
     use futures_util::FutureExt as _;
+    use std::rc::Rc;
 
     #[test]
     fn empty_reader() {

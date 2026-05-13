@@ -64,6 +64,12 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `wait_for_signals` (`system::concurrency::WaitForSignals`)
     - `peek` (`system::concurrency::Select`)
     - `select` (`system::concurrency::Select`)
+- The `input::FdReader2::new` function now takes a system of any type instead of
+  specifically an `Rc<Concurrent<S>>`. This allows `FdReader2` to be used with
+  any system that implements the necessary traits for reading from file
+  descriptors, rather than being limited to `Concurrent` systems. The
+  implementation of `input::Input` for `FdReader2` now only requires the system
+  to implement the `Read` trait.
 
 ### Deprecated
 
@@ -116,6 +122,9 @@ This version has been yanked due to an issue that prevents the crate from buildi
 
 ### Added
 
+- The `input::FdReader2` struct has been added as a replacement for the previous
+  `FdReader` struct. The new `FdReader2` struct is designed to work with the new
+  `Concurrent` system.
 - The `system::Stat` trait has been added to represent file metadata.
 - The `system::Fstat` trait now has the associated type `Stat` to represent
   the type of file metadata returned by `fstat` and `fstatat` methods.
