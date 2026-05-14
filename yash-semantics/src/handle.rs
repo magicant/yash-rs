@@ -21,7 +21,8 @@ use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
 use yash_env::io::print_report;
 use yash_env::semantics::Divert;
-use yash_env::system::{Fcntl, Isatty, Write};
+use yash_env::system::Isatty;
+use yash_env::system::concurrency::WriteAll;
 use yash_syntax::source::Source;
 
 /// Error handler.
@@ -46,7 +47,7 @@ pub trait Handle<S> {
 /// exit statuses instead of `ExitStatus::ERROR`.
 impl<S> Handle<S> for yash_syntax::parser::Error
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     async fn handle(&self, env: &mut Env<S>) -> super::Result {
         print_report(env, &self.to_report()).await;
@@ -74,7 +75,7 @@ where
 /// [`ErrExit`]: yash_env::option::Option::ErrExit
 impl<S> Handle<S> for crate::expansion::Error
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     async fn handle(&self, env: &mut Env<S>) -> super::Result {
         print_report(env, &self.to_report()).await;
@@ -101,7 +102,7 @@ where
 /// interrupting accordingly.
 impl<S> Handle<S> for crate::redir::Error
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     async fn handle(&self, env: &mut Env<S>) -> super::Result {
         print_report(env, &self.to_report()).await;

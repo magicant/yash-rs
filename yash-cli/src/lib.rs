@@ -35,10 +35,10 @@ use yash_env::Env;
 use yash_env::RealSystem;
 use yash_env::option::{Interactive, On};
 use yash_env::semantics::{Divert, ExitStatus, exit_or_raise};
-use yash_env::system::concurrency::WriteAll as _;
+use yash_env::system::concurrency::WriteAll;
 use yash_env::system::resource::GetRlimit;
 use yash_env::system::{
-    Chdir, Disposition, Errno, Fcntl, GetCwd, GetUid, Isatty, Sigaction as _, Signals as _,
+    Chdir, Concurrent, Disposition, Errno, GetCwd, GetUid, Isatty, Sigaction as _, Signals as _,
     Sysconf, TcGetPgrp, Times, Umask, Write,
 };
 use yash_semantics::trap::run_exit_trap;
@@ -46,7 +46,7 @@ use yash_semantics::{Runtime, interactive_read_eval_loop, read_eval_loop};
 
 async fn print_version<S>(env: &mut Env<S>)
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     let version = env!("CARGO_PKG_VERSION");
     let result = yash_builtin::common::output(env, &format!("yash {version}\n")).await;
@@ -60,6 +60,7 @@ where
 async fn run_as_shell_process<S>(env: &mut Env<S>)
 where
     S: Chdir
+        + Clone
         + GetCwd
         + GetRlimit
         + GetUid
@@ -68,6 +69,7 @@ where
         + TcGetPgrp
         + Times
         + Umask
+        + Write
         + 'static,
 {
     // Parse the command-line arguments
@@ -140,19 +142,20 @@ pub fn main() -> ! {
     // SAFETY: This is the only instance of RealSystem we create in the whole
     // process.
     let system = unsafe { RealSystem::new() };
-    let mut env = Env::with_system(system);
 
     // Rust by default sets SIGPIPE to SIG_IGN, which is not desired.
     // As an imperfect workaround, we set SIGPIPE to SIG_DFL here.
     // TODO Use unix_sigpipe: https://github.com/rust-lang/rust/issues/97889
-    env.system
+    system
         .sigaction(RealSystem::SIGPIPE, Disposition::Default)
         .ok();
 
-    let system = Rc::clone(&env.system);
+    let system = Rc::new(Concurrent::new(system));
+    let runner = Rc::clone(&system);
     let task = async {
+        let mut env = Env::with_system(system);
         run_as_shell_process(&mut env).await;
         exit_or_raise(&env.system, env.exit_status).await
     };
-    system.run_real(task)
+    runner.run_real(task)
 }

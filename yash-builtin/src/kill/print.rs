@@ -28,7 +28,8 @@ use yash_env::Env;
 use yash_env::semantics::{ExitStatus, Field};
 use yash_env::signal::{Number, RawNumber};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
-use yash_env::system::{Fcntl, Isatty, Signals, Write};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Isatty, Signals};
 
 /// Returns an iterator over all supported signals.
 ///
@@ -150,7 +151,7 @@ pub fn print<'a, S: Signals>(
 /// Executes the `Print` command.
 pub async fn execute<S>(env: &mut Env<S>, signals: &[Field], verbose: bool) -> crate::Result
 where
-    S: Fcntl + Isatty + Signals + Write,
+    S: Isatty + Signals + WriteAll,
 {
     match print(&env.system, signals, verbose) {
         Ok(output) => crate::common::output(env, &output).await,

@@ -274,7 +274,7 @@ mod tests {
     }
 
     fn env_with_dummy_arg0_and_optarg() -> Env<VirtualSystem> {
-        let mut env = Env::new_virtual();
+        let mut env = Env::default();
         env.arg0 = "some/arg0".to_string();
         env.get_or_create_variable(OPTARG, Scope::Global)
             .assign("DUMMY", None)

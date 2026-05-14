@@ -154,11 +154,13 @@ fn to_field(value: &str) -> Vec<AttrChar> {
 pub mod tests {
     use super::*;
     use futures_util::FutureExt as _;
+    use std::rc::Rc;
+    use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::variable::{IFS, Scope};
     use yash_syntax::syntax::{Switch, SwitchAction, SwitchCondition};
 
-    pub fn env_with_positional_params_and_ifs() -> yash_env::Env<VirtualSystem> {
+    pub fn env_with_positional_params_and_ifs() -> yash_env::Env<Rc<Concurrent<VirtualSystem>>> {
         let mut env = yash_env::Env::new_virtual();
         env.variables.positional_params_mut().values = vec!["a".to_string(), "c".to_string()];
         env.variables

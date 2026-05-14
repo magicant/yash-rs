@@ -53,11 +53,12 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
-use yash_env::system::{Fcntl, Isatty, Write};
+use yash_env::system::Isatty;
+use yash_env::system::concurrency::WriteAll;
 
 // TODO Split into syntax and semantics submodules
 
-async fn operand_parse_error<S: Fcntl + Isatty + Write>(
+async fn operand_parse_error<S: Isatty + WriteAll>(
     env: &mut Env<S>,
     location: &Location,
     error: ParseIntError,
@@ -70,7 +71,7 @@ async fn operand_parse_error<S: Fcntl + Isatty + Write>(
 /// See the [module-level documentation](self) for details.
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     // TODO Support non-POSIX options
     let args = match parse_arguments(&[], Mode::with_env(env), args) {
@@ -101,6 +102,7 @@ mod tests {
     use yash_env::VirtualSystem;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
+    use yash_env::system::Concurrent;
     use yash_env::test_helper::assert_stderr;
 
     #[test]
@@ -138,7 +140,7 @@ mod tests {
     fn exit_with_negative_exit_status_operand() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("exit"),
             is_special: true,
@@ -158,7 +160,7 @@ mod tests {
     fn exit_with_non_integer_exit_status_operand() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("exit"),
             is_special: true,
@@ -178,7 +180,7 @@ mod tests {
     fn exit_with_too_large_exit_status_operand() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("exit"),
             is_special: true,
@@ -201,7 +203,7 @@ mod tests {
     fn exit_with_too_many_arguments() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("exit"),
             is_special: true,

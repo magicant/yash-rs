@@ -28,12 +28,13 @@ use yash_env::semantics::Field;
 use yash_env::semantics::command::RunFunction;
 use yash_env::semantics::command::run_external_utility_in_subshell;
 use yash_env::semantics::command::search::{Target, search};
-use yash_env::system::concurrency::RunLoop;
+use yash_env::system::concurrency::{WaitForSignals, WriteAll};
 use yash_env::system::resource::SetRlimit;
 use yash_env::system::{
-    Close, Dup, Exec, Exit, Fcntl, Fork, GetPid, IsExecutableFile, Isatty, Open, SendSignal,
-    SetPgid, ShellPath, Sigaction, Sigmask, Signals, Sysconf, TcSetPgrp, Wait, Write,
+    Close, Dup, Exec, Exit, Fork, GetPid, IsExecutableFile, Isatty, Open, SendSignal, SetPgid,
+    ShellPath, Sigaction, Sigmask, Sysconf, TcSetPgrp, Wait,
 };
+use yash_env::trap::SignalSystem;
 
 impl Invoke {
     /// Execute the command
@@ -43,24 +44,23 @@ impl Invoke {
             + Dup
             + Exec
             + Exit
-            + Fcntl
             + Fork
             + GetPid
             + IsExecutableFile
             + Isatty
             + Open
-            + RunLoop
             + SendSignal
             + SetPgid
             + SetRlimit
             + ShellPath
             + Sigaction
             + Sigmask
-            + Signals
+            + SignalSystem
             + Sysconf
             + TcSetPgrp
             + Wait
-            + Write
+            + WaitForSignals
+            + WriteAll
             + 'static,
     {
         let Some(name) = self.fields.first() else {
@@ -98,22 +98,21 @@ where
         + Dup
         + Exec
         + Exit
-        + Fcntl
         + Fork
         + GetPid
         + Isatty
         + Open
-        + RunLoop
         + SendSignal
         + SetPgid
         + SetRlimit
         + ShellPath
         + Sigaction
         + Sigmask
-        + Signals
+        + SignalSystem
         + TcSetPgrp
         + Wait
-        + Write
+        + WaitForSignals
+        + WriteAll
         + 'static,
 {
     match target {
@@ -173,6 +172,7 @@ mod tests {
     use yash_env::function::{Function, FunctionBody, FunctionBodyObject};
     use yash_env::semantics::Field;
     use yash_env::source::Location;
+    use yash_env::system::Concurrent;
     use yash_env::test_helper::assert_stderr;
     use yash_env::test_helper::assert_stdout;
     use yash_semantics::Divert::Return;
@@ -211,7 +211,7 @@ mod tests {
     fn command_not_found() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins
             .insert("foo", Builtin::new(Special, |_, _| unreachable!()));
         let invoke = Invoke {
@@ -260,19 +260,20 @@ mod tests {
     #[test]
     fn invoking_function() {
         let mut env = Env::new_virtual();
-        env.any.insert(Box::new(RunFunction::<VirtualSystem>(
-            |env, function, fields, env_prep_hook| {
-                Box::pin(async move {
-                    yash_semantics::command::simple_command::execute_function_body(
-                        env,
-                        function,
-                        fields,
-                        env_prep_hook,
-                    )
-                    .await
-                })
-            },
-        )));
+        env.any
+            .insert(Box::new(RunFunction::<Rc<Concurrent<VirtualSystem>>>(
+                |env, function, fields, env_prep_hook| {
+                    Box::pin(async move {
+                        yash_semantics::command::simple_command::execute_function_body(
+                            env,
+                            function,
+                            fields,
+                            env_prep_hook,
+                        )
+                        .await
+                    })
+                },
+            )));
         env.builtins.insert(
             ":",
             Builtin::new(Special, |_, args| {

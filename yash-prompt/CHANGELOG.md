@@ -13,6 +13,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- The implementation of `yash_env::input::Input` for `Prompter` now requires the
+  trait bound `S: yash_env::system::concurrency::WriteAll` instead of
+  `S: yash_env::system::Fcntl + yash_env::system::Write`.
 - Public dependency versions:
     - yash-env 0.13.0 → 0.14.0
     - yash-syntax 0.20.0 → 0.21.0

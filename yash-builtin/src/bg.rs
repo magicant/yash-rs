@@ -51,8 +51,8 @@ use yash_env::option::Option::Monitor;
 use yash_env::option::State::Off;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
-use yash_env::system::concurrency::WriteAll as _;
-use yash_env::system::{Errno, Fcntl, Isatty, SendSignal, Signals, Write};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Errno, Isatty, SendSignal, Signals};
 
 // Some definitions in this module are shared with the `fg` built-in.
 
@@ -116,7 +116,7 @@ impl<'a> From<&'a OperandError> for Report<'a> {
 /// This function panics if there is no job at the specified index.
 async fn resume_job_by_index<S>(env: &mut Env<S>, index: usize) -> Result<(), ResumeError>
 where
-    S: Signals + SendSignal + Fcntl + Write,
+    S: Signals + SendSignal + WriteAll,
 {
     let mut job = env.jobs.get_mut(index).unwrap();
     if !job.is_owned {
@@ -153,7 +153,7 @@ where
 /// Resumes the job specified by the operand.
 async fn resume_job_by_id<S>(env: &mut Env<S>, job_id: &str) -> Result<(), OperandErrorKind>
 where
-    S: Signals + SendSignal + Fcntl + Write,
+    S: Signals + SendSignal + WriteAll,
 {
     let job_id = parse(job_id)?;
     let index = job_id.find(&env.jobs)?;
@@ -164,7 +164,7 @@ where
 /// Entry point of the `bg` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
-    S: Signals + SendSignal + Fcntl + Isatty + Write,
+    S: Signals + SendSignal + Isatty + WriteAll,
 {
     let (options, operands) = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok(result) => result,
@@ -204,12 +204,14 @@ where
 mod tests {
     use super::*;
     use futures_util::FutureExt as _;
+    use std::rc::Rc;
     use yash_env::VirtualSystem;
     use yash_env::job::Job;
     use yash_env::job::Pid;
     use yash_env::job::ProcessState;
     use yash_env::option::State::On;
     use yash_env::semantics::ExitStatus;
+    use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::Process;
     use yash_env::system::r#virtual::{SIGSTOP, SIGTSTP, SIGTTIN};
     use yash_env::test_helper::assert_stderr;
@@ -218,7 +220,7 @@ mod tests {
     #[test]
     fn resume_job_by_index_sends_sigcont() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         let pgid = Pid(123);
         let child_id = Pid(124);
         let orphan_id = Pid(456);
@@ -261,7 +263,7 @@ mod tests {
     #[test]
     fn resume_job_by_index_prints_job_name() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.name = "echo my job".into();
@@ -278,7 +280,7 @@ mod tests {
     #[test]
     fn resume_job_by_index_sets_expected_state() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         let pid = Pid(123);
         let mut job = Job::new(pid);
         job.job_controlled = true;
@@ -298,7 +300,7 @@ mod tests {
     #[test]
     fn resume_job_by_index_makes_target_current_job() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         let pgid = Pid(123);
         let orphan_id = Pid(456);
         let mut job = Job::new(pgid);
@@ -329,7 +331,7 @@ mod tests {
     #[test]
     fn resume_job_by_index_sends_no_sigcont_to_dead_process() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         let pid = Pid(123);
         let mut job = Job::new(pid);
         job.job_controlled = true;
@@ -359,7 +361,7 @@ mod tests {
     #[test]
     fn resume_job_by_index_sets_last_async_pid() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.state = ProcessState::exited(ExitStatus::SUCCESS);
@@ -394,7 +396,7 @@ mod tests {
     #[test]
     fn main_without_operands_resumes_current_job() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         env.options.set(Monitor, On);
         let pgid = Pid(100);
         let orphan_id = Pid(200);
@@ -433,7 +435,7 @@ mod tests {
     #[test]
     fn main_without_operands_fails_if_there_is_no_current_job() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         env.options.set(Monitor, On);
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
@@ -447,7 +449,7 @@ mod tests {
     #[test]
     fn main_with_operands_resumes_specified_jobs() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         env.options.set(Monitor, On);
         let pgid1 = Pid(100);
         let pgid2 = Pid(200);
@@ -498,7 +500,7 @@ mod tests {
         // function fails on the first operand, but it should try to handle the
         // remaining operands.
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         env.options.set(Monitor, On);
         let pgid = Pid(100);
         let mut job = Job::new(pgid);

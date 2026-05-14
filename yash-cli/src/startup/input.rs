@@ -38,8 +38,9 @@ use yash_env::io::move_fd_internal;
 use yash_env::option::Option::Interactive;
 use yash_env::option::State::{Off, On};
 use yash_env::parser::Config;
+use yash_env::system::concurrency::WriteAll;
 use yash_env::system::{
-    Close, Dup, Errno, Fcntl, Fstat, Isatty, Mode, OfdAccess, Open, OpenFlag, Read, Signals, Write,
+    Close, Dup, Errno, Fcntl, Fstat, Isatty, Mode, OfdAccess, Open, OpenFlag, Read, Signals,
 };
 use yash_prompt::Prompter;
 use yash_syntax::input::InputObject;
@@ -85,7 +86,7 @@ pub async fn prepare_input<'s, 'i, 'e, S>(
 ) -> Result<Lexer<'i>, PrepareInputError<'e>>
 where
     's: 'i + 'e,
-    S: Close + Dup + Fcntl + Fstat + Isatty + Open + Read + Signals + Write + 'static,
+    S: Clone + Close + Dup + Fcntl + Fstat + Isatty + Open + Read + Signals + WriteAll + 'static,
 {
     fn lexer_with_input_and_source<'a>(
         input: Box<dyn InputObject + 'a>,
@@ -159,7 +160,7 @@ where
 /// applied to the input object.
 fn prepare_fd_input<'i, S>(fd: Fd, ref_env: &'i RefCell<&mut Env<S>>) -> Box<dyn InputObject + 'i>
 where
-    S: Fcntl + Isatty + Read + Signals + Write + 'static,
+    S: Clone + Isatty + Read + Signals + WriteAll + 'static,
 {
     let env = ref_env.borrow();
     let system = env.system.clone();

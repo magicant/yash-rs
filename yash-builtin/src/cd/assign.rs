@@ -22,7 +22,8 @@ use yash_env::Env;
 use yash_env::path::Path;
 use yash_env::path::PathBuf;
 use yash_env::source::pretty::{Report, ReportType, Snippet, Span, SpanRole};
-use yash_env::system::{Errno, Fcntl, GetCwd, Isatty, Write};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Errno, GetCwd, Isatty};
 use yash_env::variable::AssignError;
 use yash_env::variable::OLDPWD;
 use yash_env::variable::PWD;
@@ -38,7 +39,7 @@ use yash_env::variable::Value::Scalar;
 /// the cd built-in.
 pub async fn set_oldpwd<S>(env: &mut Env<S>, value: String) -> crate::Result
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     set_variable(env, OLDPWD, value).await
 }
@@ -53,7 +54,7 @@ where
 /// the cd built-in.
 pub async fn set_pwd<S>(env: &mut Env<S>, path: PathBuf) -> crate::Result
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     let value = path.into_unix_string().into_string().unwrap_or_default();
     set_variable(env, PWD, value).await
@@ -61,7 +62,7 @@ where
 
 async fn set_variable<S>(env: &mut Env<S>, name: &str, value: String) -> crate::Result
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     let current_builtin = env.stack.current_builtin();
     let current_location = current_builtin.map(|builtin| builtin.name.origin.clone());
@@ -77,7 +78,7 @@ where
 /// Prints an error message for a read-only variable.
 async fn handle_assign_error<S>(env: &mut Env<S>, name: &str, error: AssignError) -> crate::Result
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     let mut report = Report::new();
     report.r#type = ReportType::Error;
@@ -118,13 +119,14 @@ mod tests {
     use yash_env::source::Location;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
+    use yash_env::system::Concurrent;
     use yash_env::test_helper::{assert_stderr, assert_stdout};
 
     #[test]
     fn set_oldpwd_new() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let cd = Field::dummy("cd");
         let location = cd.origin.clone();
         let mut env = env.push_frame(Frame::Builtin(Builtin {
@@ -150,7 +152,7 @@ mod tests {
     fn set_oldpwd_overwrites_existing_variable() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let cd = Field::dummy("cd");
         let location = cd.origin.clone();
         let mut env = env.push_frame(Frame::Builtin(Builtin {
@@ -179,7 +181,7 @@ mod tests {
     fn set_oldpwd_read_only_error() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("cd"),
             is_special: false,
@@ -205,7 +207,7 @@ mod tests {
     fn set_pwd_new() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let cd = Field::dummy("cd");
         let location = cd.origin.clone();
         let mut env = env.push_frame(Frame::Builtin(Builtin {
@@ -231,7 +233,7 @@ mod tests {
     fn set_pwd_overwrites_existing_variable() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let cd = Field::dummy("cd");
         let location = cd.origin.clone();
         let mut env = env.push_frame(Frame::Builtin(Builtin {
@@ -260,7 +262,7 @@ mod tests {
     fn set_pwd_read_only_error() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let cd = Field::dummy("cd");
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: cd,

@@ -36,7 +36,8 @@ use yash_env::semantics::Field;
 use yash_env::source::pretty::Report;
 use yash_env::source::pretty::ReportType;
 use yash_env::source::pretty::Snippet;
-use yash_env::system::{Fcntl, Isatty, Signals, Write};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Isatty, Signals};
 
 // TODO Split into syntax and semantics submodules
 
@@ -60,7 +61,7 @@ fn find_error_report(error: FindError, operand: &Field) -> Report<'_> {
 /// Entry point for executing the `jobs` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
-    S: Fcntl + Isatty + Signals + Write,
+    S: Isatty + Signals + WriteAll,
 {
     let (options, operands) = match parse_arguments(OPTIONS, Mode::with_env(env), args) {
         Ok(result) => result,
@@ -136,6 +137,7 @@ mod tests {
     use yash_env::semantics::ExitStatus;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
+    use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::system::r#virtual::{SIGINT, SIGQUIT, SIGSTOP, SIGTSTP};
     use yash_env::test_helper::assert_stderr;
@@ -145,7 +147,7 @@ mod tests {
     fn no_operands_no_jobs() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
@@ -155,7 +157,7 @@ mod tests {
     fn no_operands_some_jobs() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut job = Job::new(Pid(42));
         job.name = "echo first".to_string();
         env.jobs.add(job);
@@ -228,7 +230,7 @@ mod tests {
     fn specifying_valid_job_ids() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut job = Job::new(Pid(42));
         job.name = "echo first".to_string();
         env.jobs.add(job);
@@ -300,7 +302,7 @@ mod tests {
     fn specifying_job_ids_without_the_initial_percent() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut job = Job::new(Pid(2));
         job.name = "echo first".to_string();
         env.jobs.add(job);
@@ -325,7 +327,7 @@ mod tests {
     fn specifying_job_ids_of_non_existing_jobs() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.jobs.add(Job::new(Pid(2)));
 
         let args = Field::dummies(["%2"]);
@@ -345,7 +347,7 @@ mod tests {
     fn specifying_ambiguous_job_id() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut job = Job::new(Pid(42));
         job.name = "echo first".to_string();
         env.jobs.add(job);
@@ -372,7 +374,7 @@ mod tests {
     fn jobs_not_removed_in_case_of_error() {
         let system = VirtualSystem::new();
         system.current_process_mut().close_fd(Fd::STDOUT);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
 
         let mut job = Job::new(Pid(10));
         job.state = ProcessState::exited(0);
@@ -413,7 +415,7 @@ mod tests {
     fn state_changed_flag_not_cleared_in_case_of_error() {
         let system = VirtualSystem::new();
         system.current_process_mut().close_fd(Fd::STDOUT);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let i72 = env.jobs.add(Job::new(Pid(72)));
 
         let mut env = env.push_frame(Frame::Builtin(Builtin {
@@ -429,7 +431,7 @@ mod tests {
     fn l_option() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut job = Job::new(Pid(42));
         job.name = "echo first".to_string();
         env.jobs.add(job);
@@ -455,7 +457,7 @@ mod tests {
     fn verbose_option() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut job = Job::new(Pid(42));
         job.name = "echo first".to_string();
         env.jobs.add(job);
@@ -476,7 +478,7 @@ mod tests {
     fn p_option() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut job = Job::new(Pid(42));
         job.name = "echo first".to_string();
         env.jobs.add(job);
@@ -495,7 +497,7 @@ mod tests {
     fn p_option_cancels_l_option() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut job = Job::new(Pid(42));
         job.name = "echo first".to_string();
         env.jobs.add(job);
@@ -514,7 +516,7 @@ mod tests {
     fn pgid_only_option() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut job = Job::new(Pid(42));
         job.name = "echo first".to_string();
         env.jobs.add(job);

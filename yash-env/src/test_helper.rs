@@ -19,6 +19,7 @@
 //! This module is conditionally compiled when the `test-helper` feature is enabled.
 
 use crate::Env;
+use crate::system::Concurrent;
 use crate::system::r#virtual::{Executor, FileBody, Inode, SystemState, VirtualSystem};
 use assert_matches::assert_matches;
 use futures_executor::LocalSpawner;
@@ -72,7 +73,7 @@ impl Executor for LocalExecutor {
 /// that need to be run concurrently with the main task.
 pub fn in_virtual_system<F, Fut, T>(task: F) -> T
 where
-    F: FnOnce(Env<VirtualSystem>, Rc<RefCell<SystemState>>) -> Fut,
+    F: FnOnce(Env<Rc<Concurrent<VirtualSystem>>>, Rc<RefCell<SystemState>>) -> Fut,
     Fut: Future<Output = T> + 'static,
     T: 'static,
 {
@@ -81,8 +82,8 @@ where
     let global_executor = yash_executor::Executor::new();
     state.borrow_mut().executor = Some(Rc::new(global_executor.spawner()));
 
-    let env = Env::with_system(system);
-    let concurrent = env.system.clone();
+    let env = Env::with_system(Rc::new(Concurrent::new(system)));
+    let concurrent = Rc::clone(&env.system);
     let task = task(env, Rc::clone(&state));
 
     let result = Rc::new(Cell::new(None));

@@ -29,7 +29,6 @@ use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 #[cfg(doc)]
 use yash_env::subshell::Subshell;
-use yash_env::system::concurrency::WriteAll as _;
 use yash_syntax::syntax;
 use yash_syntax::syntax::Redir;
 
@@ -171,6 +170,7 @@ mod tests {
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
+    use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::test_helper::assert_stderr;
     use yash_env::test_helper::assert_stdout;
@@ -178,7 +178,7 @@ mod tests {
     #[test]
     fn stack_in_condition() {
         fn stub_builtin(
-            env: &mut Env<VirtualSystem>,
+            env: &mut Env<Rc<Concurrent<VirtualSystem>>>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
@@ -205,7 +205,7 @@ mod tests {
     fn redirecting_compound_command() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("echo", echo_builtin());
         let command: syntax::FullCompoundCommand = "{ echo 1; echo 2; } > /file".parse().unwrap();
         let result = command.execute(&mut env).now_or_never().unwrap();
@@ -223,7 +223,7 @@ mod tests {
     fn tracing_redirections() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("echo", echo_builtin());
         env.options.set(yash_env::option::Option::XTrace, On);
         let command: syntax::FullCompoundCommand = "{ echo X; } > /file < /file".parse().unwrap();
@@ -237,7 +237,7 @@ mod tests {
     fn redirection_error_prevents_command_execution() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("echo", echo_builtin());
         let command: syntax::FullCompoundCommand =
             "{ echo not reached; } < /no/such/file".parse().unwrap();

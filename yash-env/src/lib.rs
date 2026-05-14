@@ -22,15 +22,17 @@
 //! parts are implemented in pure Rust in this crate. Many application-managed
 //! parts like [function]s and [variable]s can be manipulated independently of
 //! interactions with the underlying system. System-managed parts, on the other
-//! hand, depend on the underlying system. Attributes like the working directory
+//! hand, reside in the underlying system. Attributes like the working directory
 //! and umask are managed by the system to be accessed only by interaction with
 //! the system interface.
 //!
 //! Traits declared in the [`system`] module define the interface to the
 //! system-managed parts of the environment.
-//! [`RealSystem`] provides an implementation for them that interacts with
-//! the underlying system. [`VirtualSystem`] simulates a system for testing
-//! purposes.
+//! [`RealSystem`] provides an implementation that interacts with the actual
+//! underlying system. [`VirtualSystem`] simulates a system in memory for
+//! testing purposes. [`Concurrent`] is a wrapper that adds support for
+//! concurrent execution of multiple tasks on top of any system that implements
+//! the required traits.
 //!
 //! We assume that the shell process is single-threaded. This means that the
 //! shell process itself must not create threads, and all interactions with the
@@ -57,8 +59,6 @@ use self::semantics::Divert;
 use self::semantics::ExitStatus;
 use self::stack::Frame;
 use self::stack::Stack;
-use self::system::CaughtSignals;
-use self::system::Clock;
 use self::system::Close;
 use self::system::Concurrent;
 use self::system::Dup;
@@ -72,7 +72,6 @@ use self::system::Mode;
 use self::system::OfdAccess;
 use self::system::Open;
 use self::system::OpenFlag;
-use self::system::Select;
 use self::system::Sigaction;
 use self::system::Sigmask;
 use self::system::SignalList;
@@ -81,11 +80,12 @@ use self::system::Signals;
 pub use self::system::System;
 use self::system::TcSetPgrp;
 use self::system::Wait;
-use self::system::concurrency::Select as _;
-use self::system::concurrency::WaitForSignals as _;
+use self::system::concurrency::Select;
+use self::system::concurrency::WaitForSignals;
 #[cfg(unix)]
 pub use self::system::real::RealSystem;
 pub use self::system::r#virtual::VirtualSystem;
+use self::trap::SignalSystem;
 use self::trap::TrapSet;
 use self::variable::PPID;
 use self::variable::Scope;
@@ -94,6 +94,7 @@ use self::variable::VariableSet;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::ops::ControlFlow::{self, Break, Continue};
+use std::pin::pin;
 use std::rc::Rc;
 use std::task::Context;
 use std::task::Poll;
@@ -103,17 +104,13 @@ pub use unix_str as str;
 
 /// Whole shell execution environment.
 ///
-/// The shell execution environment consists of application-managed parts and
-/// system-managed parts. Application-managed parts are directly implemented in
-/// the `Env` instance. System-managed parts are managed by a [`Concurrent`]
-/// wrapping a `System` instance.
+/// See the [module-level documentation](self) for details.
 ///
-/// # Cloning
-///
-/// `Env::clone` effectively clones the application-managed parts of the
-/// environment. Since [`Concurrent`] is reference-counted, you will not get a
-/// deep copy of the system-managed parts. See also
-/// [`clone_with_system`](Self::clone_with_system).
+/// This struct is typically instantiated as `Env<Rc<Concurrent<RealSystem>>>`
+/// in the actual shell, but it can be used with other system types for testing
+/// or other purposes. For example, `Env<VirtualSystem>` can be used for testing
+/// without concurrency, and `Env<Rc<Concurrent<VirtualSystem>>>` can be used
+/// for testing with concurrency.
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct Env<S> {
@@ -167,7 +164,7 @@ pub struct Env<S> {
     pub any: DataSet,
 
     /// Interface to the system-managed parts of the environment
-    pub system: Rc<Concurrent<S>>,
+    pub system: S,
 }
 
 impl<S> Env<S> {
@@ -176,7 +173,7 @@ impl<S> Env<S> {
     /// Members of the new environments are default-constructed except that:
     /// - `main_pgid` is initialized as `system.getpgrp()`
     /// - `main_pid` is initialized as `system.getpid()`
-    /// - `system` is initialized as `Rc::new(Concurrent::new(system))`
+    /// - `system` is initialized as the provided `system` instance
     #[must_use]
     pub fn with_system(system: S) -> Self
     where
@@ -197,7 +194,7 @@ impl<S> Env<S> {
             tty: Default::default(),
             variables: Default::default(),
             any: Default::default(),
-            system: Rc::new(Concurrent::new(system)),
+            system,
         }
     }
 
@@ -223,16 +220,32 @@ impl<S> Env<S> {
             tty: self.tty,
             variables: self.variables.clone(),
             any: self.any.clone(),
-            system: Rc::new(Concurrent::new(system)),
+            system,
         }
     }
 }
 
-impl Env<VirtualSystem> {
-    /// Creates a new environment with a default-constructed [`VirtualSystem`].
+impl<S> Default for Env<S>
+where
+    S: Default + GetPid,
+{
+    /// Creates a new environment with a default-constructed system.
+    ///
+    /// This is equivalent to `Env::with_system(S::default())`.
+    fn default() -> Self {
+        Self::with_system(S::default())
+    }
+}
+
+impl Env<Rc<Concurrent<VirtualSystem>>> {
+    /// Creates a new environment with a default-constructed [`VirtualSystem`]
+    /// wrapped in [`Concurrent`].
+    ///
+    /// This is equivalent to `Env::<Rc<Concurrent<VirtualSystem>>>::default()`,
+    /// but more explicit about the type of the system.
     #[must_use]
     pub fn new_virtual() -> Self {
-        Env::with_system(VirtualSystem::default())
+        Self::default()
     }
 }
 
@@ -270,12 +283,14 @@ impl<S> Env<S> {
     ///
     /// Returns an array of signals caught.
     ///
-    /// This function is a wrapper for
-    /// [`WaitForSignals::wait_for_signals`](system::concurrency::WaitForSignals::wait_for_signals).
+    /// This function is a wrapper for [`WaitForSignals::wait_for_signals`].
     /// Before the function returns, it passes the results to
     /// [`TrapSet::catch_signal`] so the trap set can remember the signals
     /// caught to be handled later.
-    pub async fn wait_for_signals(&mut self) -> Rc<SignalList> {
+    pub async fn wait_for_signals(&mut self) -> Rc<SignalList>
+    where
+        S: WaitForSignals,
+    {
         let result = self.system.wait_for_signals().await;
         for signal in result.iter().copied() {
             self.traps.catch_signal(signal);
@@ -287,7 +302,10 @@ impl<S> Env<S> {
     ///
     /// This function calls [`wait_for_signals`](Self::wait_for_signals)
     /// repeatedly until it returns results containing the specified `signal`.
-    pub async fn wait_for_signal(&mut self, signal: signal::Number) {
+    pub async fn wait_for_signal(&mut self, signal: signal::Number)
+    where
+        S: WaitForSignals,
+    {
         while !self.wait_for_signals().await.contains(&signal) {}
     }
 
@@ -296,31 +314,43 @@ impl<S> Env<S> {
     /// This function is similar to
     /// [`wait_for_signals`](Self::wait_for_signals) but does not wait for
     /// signals to be caught. Instead, it only checks if any signals have been
-    /// caught but not yet consumed in the [`Concurrent`] instance. If no
-    /// signals have been caught, it returns `None`.
+    /// caught but not yet consumed in the system. If no signals have been
+    /// caught, it returns `None`.
+    ///
+    /// Before the function returns, it passes the results to
+    /// [`TrapSet::catch_signal`] so the trap set can remember the signals
+    /// caught to be handled later.
     pub fn poll_signals(&mut self) -> Option<Rc<SignalList>>
     where
-        S: Select + CaughtSignals + Clock,
+        S: WaitForSignals + Select,
     {
-        let system = Rc::clone(&self.system);
+        fn poll<S: WaitForSignals + Select>(system: &S) -> Option<Rc<SignalList>> {
+            let mut future = pin!(system.wait_for_signals());
+            let mut context = Context::from_waker(Waker::noop());
 
-        let mut future = std::pin::pin!(self.wait_for_signals());
-        let mut context = Context::from_waker(Waker::noop());
+            // Check if the result is ready before peeking the system
+            if let Poll::Ready(signals) = future.as_mut().poll(&mut context) {
+                return Some(signals);
+            }
 
-        // Check if the result is ready before peeking the system
-        if let Poll::Ready(signals) = future.as_mut().poll(&mut context) {
-            return Some(signals);
+            // Peek to handle any pending signals
+            system.peek();
+
+            // Check again if the result is ready after peeking
+            if let Poll::Ready(signals) = future.poll(&mut context) {
+                return Some(signals);
+            }
+
+            None
         }
 
-        // Peek to handle any pending signals
-        system.peek();
-
-        // Check again if the result is ready after peeking
-        if let Poll::Ready(signals) = future.poll(&mut context) {
-            return Some(signals);
+        let signals = poll(&self.system);
+        if let Some(signals) = &signals {
+            for signal in signals.iter().copied() {
+                self.traps.catch_signal(signal);
+            }
         }
-
-        None
+        signals
     }
 
     /// Whether error messages should be printed in color
@@ -440,8 +470,7 @@ impl<S> Env<S> {
         child_task: F,
     ) -> (Result<Pid, Errno>, D)
     where
-        S: 'static,
-        Rc<Concurrent<S>>: Fork,
+        S: Fork + 'static,
         D: Clone + 'static,
         F: AsyncFnOnce(Self, D) + 'static,
     {
@@ -449,8 +478,8 @@ impl<S> Env<S> {
 
         let (pid_or_error, (state, shared_data)) = self.system.run_in_child_process(
             (state, shared_data),
-            |child_concurrent, (state, shared_data): (ForkEnvState<S>, D)| async move {
-                let child_env = state.into_env_with_system(child_concurrent);
+            |child_system, (state, shared_data): (ForkEnvState<S>, D)| async move {
+                let child_env = state.into_env_with_system(child_system);
                 child_task(child_env, shared_data).await
             },
         );
@@ -470,7 +499,7 @@ impl<S> Env<S> {
     /// - `pid`: the child whose process ID is `pid`
     /// - `-pgid`: any child in the process group whose process group ID is `pgid`
     ///
-    /// When [`self.system.wait`](system::Wait::wait) returned a new state of the
+    /// When [`self.system.wait`](Wait::wait) returned a new state of the
     /// target, it is sent to `self.jobs` ([`JobList::update_status`]) before
     /// being returned from this function.
     ///
@@ -482,7 +511,7 @@ impl<S> Env<S> {
     /// instead.
     pub async fn wait_for_subshell(&mut self, target: Pid) -> Result<(Pid, ProcessState), Errno>
     where
-        S: Signals + Sigmask + Sigaction + Wait,
+        S: SignalSystem + WaitForSignals + Wait,
     {
         // We need to set the internal disposition before calling `wait` so we don't
         // miss any `SIGCHLD` that may arrive between `wait` and `wait_for_signal`.
@@ -510,7 +539,7 @@ impl<S> Env<S> {
         target: Pid,
     ) -> Result<(Pid, ProcessResult), Errno>
     where
-        S: Signals + Sigmask + Sigaction + Wait,
+        S: SignalSystem + WaitForSignals + Wait,
     {
         loop {
             let (pid, state) = self.wait_for_subshell(target).await?;
@@ -532,7 +561,7 @@ impl<S> Env<S> {
         target: Pid,
     ) -> Result<(Pid, ExitStatus), Errno>
     where
-        S: Signals + Sigmask + Sigaction + Wait,
+        S: SignalSystem + WaitForSignals + Wait,
     {
         loop {
             let (pid, result) = self.wait_for_subshell_to_halt(target).await?;
@@ -544,7 +573,7 @@ impl<S> Env<S> {
 
     /// Applies all job status updates to jobs in `self.jobs`.
     ///
-    /// This function calls [`self.system.wait`](system::Wait::wait) repeatedly until
+    /// This function calls [`self.system.wait`](Wait::wait) repeatedly until
     /// all status updates available are applied to `self.jobs`
     /// ([`JobList::update_status`]).
     ///
@@ -558,9 +587,7 @@ impl<S> Env<S> {
             self.jobs.update_status(pid, state);
         }
     }
-}
 
-impl<S> Env<S> {
     /// Tests whether the current environment is an interactive shell.
     ///
     /// This function returns true if and only if:
@@ -716,9 +743,9 @@ mod tests {
         })
     }
 
-    fn poll_signals_env() -> (Env<VirtualSystem>, VirtualSystem) {
+    fn poll_signals_env() -> (Env<Rc<Concurrent<VirtualSystem>>>, VirtualSystem) {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         env.traps
             .set_action(
                 &env.system,
@@ -801,7 +828,7 @@ mod tests {
 
             let (result, shared_data) = env.run_in_child_process(
                 42_u32,
-                |child_env: Env<VirtualSystem>, data| async move {
+                |child_env: Env<Rc<Concurrent<VirtualSystem>>>, data| async move {
                     assert_eq!(data, 42);
                     child_seen_pid_2.set(Some(child_env.system.getpid()));
                     child_seen_ppid_2.set(Some(child_env.system.getppid()));
@@ -831,13 +858,15 @@ mod tests {
                 .assign("before", None)
                 .unwrap();
 
-            let (result, ()) =
-                env.run_in_child_process((), |child_env: Env<VirtualSystem>, ()| async move {
+            let (result, ()) = env.run_in_child_process(
+                (),
+                |child_env: Env<Rc<Concurrent<VirtualSystem>>>, ()| async move {
                     assert_eq!(child_env.arg0, "parent-shell");
                     assert_eq!(child_env.exit_status, ExitStatus(5));
                     assert_eq!(child_env.variables.get_scalar("PARENT"), Some("before"));
                     child_env.system.exit(ExitStatus(0)).await;
-                });
+                },
+            );
 
             let child_pid = result.unwrap();
             _ = env.wait_for_subshell(child_pid).await;
@@ -854,15 +883,17 @@ mod tests {
                 .assign("before", None)
                 .unwrap();
 
-            let (result, ()) =
-                env.run_in_child_process((), |mut child_env: Env<VirtualSystem>, ()| async move {
+            let (result, ()) = env.run_in_child_process(
+                (),
+                |mut child_env: Env<Rc<Concurrent<VirtualSystem>>>, ()| async move {
                     child_env
                         .variables
                         .get_or_new("PARENT", Scope::Global)
                         .assign("after", None)
                         .unwrap();
                     child_env.system.exit(ExitStatus(0)).await;
-                });
+                },
+            );
 
             let child_pid = result.unwrap();
             assert_eq!(
@@ -909,7 +940,7 @@ mod tests {
         let system = VirtualSystem::new();
         let mut executor = LocalPool::new();
         system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         executor.run_until(async move {
             let result = env.wait_for_subshell(Pid::ALL).await;
             assert_eq!(result, Err(Errno::ECHILD));
@@ -928,7 +959,7 @@ mod tests {
         let mut executor = futures_executor::LocalPool::new();
         system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
 
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
 
         let [job_1, job_2, job_3] = executor.run_until(async {
             // Run a subshell.

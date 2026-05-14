@@ -24,7 +24,8 @@ use crate::common::report::report_error;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::signal::RawNumber;
-use yash_env::system::{Fcntl, Isatty, SendSignal, Signals, Write};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Isatty, SendSignal, Signals};
 
 /// Parsed command line arguments
 ///
@@ -79,7 +80,7 @@ impl Command {
     /// Executes the built-in.
     pub async fn execute<S>(&self, env: &mut Env<S>) -> crate::Result
     where
-        S: Fcntl + Isatty + SendSignal + Signals + Write,
+        S: Isatty + SendSignal + Signals + WriteAll,
     {
         match self {
             Self::Send {
@@ -96,7 +97,7 @@ impl Command {
 /// Entry point of the kill built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
-    S: Fcntl + Isatty + SendSignal + Signals + Write,
+    S: Isatty + SendSignal + Signals + WriteAll,
 {
     match syntax::parse(env, args) {
         Ok(command) => command.execute(env).await,

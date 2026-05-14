@@ -30,7 +30,8 @@ use yash_env::job::{JobList, id::FindError};
 use yash_env::semantics::Field;
 use yash_env::signal::{Number, RawNumber};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
-use yash_env::system::{Errno, Fcntl, Isatty, SendSignal, Signals, Write};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Errno, Isatty, SendSignal, Signals};
 
 /// Error that may occur while [sending](send) a signal.
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -161,7 +162,7 @@ pub async fn execute<S>(
     targets: &[Field],
 ) -> crate::Result
 where
-    S: Fcntl + Isatty + SendSignal + Signals + Write,
+    S: Isatty + SendSignal + Signals + WriteAll,
 {
     let signal_number = NonZero::new(signal).map(Number::from_raw_unchecked);
 
@@ -194,6 +195,7 @@ mod tests {
     use yash_env::job::Job;
     use yash_env::job::ProcessState;
     use yash_env::semantics::ExitStatus;
+    use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::test_helper::assert_stderr;
 
@@ -283,7 +285,7 @@ mod tests {
         let system = VirtualSystem::new();
         let pid = system.process_id.to_string();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let result = execute(
             &mut env,
             -1,

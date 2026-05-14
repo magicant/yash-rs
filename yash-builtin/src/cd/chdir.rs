@@ -28,8 +28,8 @@ use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 #[cfg(doc)]
 use yash_env::stack::Stack;
-use yash_env::system::concurrency::WriteAll as _;
-use yash_env::system::{Chdir, Errno, Fcntl, Isatty, Write};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Chdir, Errno, Isatty};
 
 /// Error invoking the underlying system call
 #[derive(Debug, Clone, Eq, Error, PartialEq)]
@@ -94,7 +94,7 @@ pub async fn report_failure<S>(
     error: &Error,
 ) -> crate::Result
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     let (message, divert) = failure_message(env, operand, path, error);
     env.system.print_error(&message).await;

@@ -29,12 +29,10 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::Errno;
-use yash_env::system::Fcntl;
 use yash_env::system::Isatty;
 use yash_env::system::Read;
 use yash_env::system::SendSignal;
-use yash_env::system::Write;
-use yash_env::system::concurrency::WriteAll as _;
+use yash_env::system::concurrency::WriteAll;
 use yash_env::system::r#virtual::SIGSTOP;
 use yash_env::variable::Scope;
 
@@ -134,7 +132,7 @@ fn local_builtin_main<S>(
     args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>>
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     Box::pin(async move {
         for Field { value, origin } in args {
@@ -165,7 +163,7 @@ where
 
 pub fn local_builtin<S>() -> Builtin<S>
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     let mut builtin = Builtin::new(Mandatory, local_builtin_main);
     builtin.is_declaration_utility = Some(true);
@@ -177,7 +175,7 @@ fn echo_builtin_main<S>(
     args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>>
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     Box::pin(async move {
         let fields = args.iter().map(|f| &f.value).format(" ");
@@ -193,7 +191,7 @@ where
 /// Returns a minimal implementation of the `echo` built-in.
 pub fn echo_builtin<S>() -> Builtin<S>
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     Builtin::new(Mandatory, echo_builtin_main)
 }
@@ -203,11 +201,11 @@ fn cat_builtin_main<S>(
     _args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>>
 where
-    S: Fcntl + Isatty + Read + Write,
+    S: Isatty + Read + WriteAll,
 {
     async fn inner<S>(env: &mut Env<S>) -> std::result::Result<(), Errno>
     where
-        S: Fcntl + Isatty + Read + Write,
+        S: Isatty + Read + WriteAll,
     {
         let mut buffer = [0; 1024];
         loop {
@@ -231,7 +229,7 @@ where
 /// Returns a minimal implementation of the `cat` built-in.
 pub fn cat_builtin<S>() -> Builtin<S>
 where
-    S: Fcntl + Isatty + Read + Write,
+    S: Isatty + Read + WriteAll,
 {
     Builtin::new(Mandatory, cat_builtin_main)
 }

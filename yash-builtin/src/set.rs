@@ -43,9 +43,9 @@ use yash_env::parser::IsName;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::stack::Frame::Subshell;
-use yash_env::system::{
-    Close, Dup, Fcntl, GetPid, Isatty, Open, Sigaction, Sigmask, Signals, TcSetPgrp, Write,
-};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Close, Dup, GetPid, Isatty, Open, Sigaction, Sigmask, TcSetPgrp};
+use yash_env::trap::SignalSystem;
 use yash_env::variable::Scope::Global;
 
 /// Interpretation of command-line arguments that determine the behavior of the
@@ -77,7 +77,7 @@ pub mod syntax;
 /// depending on the `Interactive` and `Monitor` option states.
 async fn update_internal_dispositions_for_stoppers<S>(env: &mut Env<S>)
 where
-    S: Signals + Sigmask + Sigaction,
+    S: SignalSystem,
 {
     if env.options.get(Interactive) == State::On && env.options.get(Monitor) == State::On {
         env.traps
@@ -95,7 +95,7 @@ where
 /// option is enabled.
 async fn ensure_foreground<S>(env: &mut Env<S>)
 where
-    S: Open + Dup + Close + GetPid + Signals + Sigmask + Sigaction + TcSetPgrp,
+    S: Open + Dup + Close + GetPid + Sigmask + Sigaction + TcSetPgrp,
 {
     if env.options.get(Monitor) == State::On {
         env.ensure_foreground().await.ok();
@@ -108,7 +108,7 @@ async fn modify<S>(
     options: Vec<(yash_env::option::Option, State)>,
     positional_params: Option<Vec<Field>>,
 ) where
-    S: Open + Dup + Close + GetPid + Signals + Sigmask + Sigaction + TcSetPgrp,
+    S: Open + Dup + Close + GetPid + Sigaction + Sigmask + SignalSystem + TcSetPgrp,
 {
     // Modify options
     let mut monitor_changed = false;
@@ -143,14 +143,13 @@ where
     S: Open
         + Dup
         + Close
-        + Fcntl
         + GetPid
         + Isatty
-        + Signals
+        + SignalSystem
         + Sigmask
         + Sigaction
         + TcSetPgrp
-        + Write
+        + WriteAll
         + 'static,
 {
     use std::fmt::Write as _;
@@ -221,6 +220,7 @@ mod tests {
     use yash_env::option::Option::*;
     use yash_env::option::OptionSet;
     use yash_env::option::State::*;
+    use yash_env::system::Concurrent;
     use yash_env::system::Disposition;
     use yash_env::system::r#virtual::SIGTSTP;
     use yash_env::test_helper::assert_stderr;
@@ -234,11 +234,11 @@ mod tests {
     fn printing_variables() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.any
-            .insert(Box::new(IsName::<VirtualSystem>(|_env, name| {
-                yash_syntax::parser::lex::is_name(name)
-            })));
+            .insert(Box::new(IsName::<Rc<Concurrent<VirtualSystem>>>(
+                |_env, name| yash_syntax::parser::lex::is_name(name),
+            )));
         let mut var = env.variables.get_or_new("foo", Scope::Global);
         var.assign("value", None).unwrap();
         var.export(true);
@@ -261,7 +261,7 @@ mod tests {
     fn printing_options_human_readable() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(AllExport, On);
         env.options.set(Unset, Off);
 
@@ -300,7 +300,7 @@ xtrace           off
     fn printing_options_machine_readable() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Clobber, Off);
         env.options.set(Verbose, On);
         let options = env.options;
@@ -365,7 +365,7 @@ xtrace           off
     fn enabling_monitor_option() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         let args = Field::dummies(["-m"]);
 
@@ -383,7 +383,7 @@ xtrace           off
     fn disabling_monitor_option() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         let args = Field::dummies(["-m"]);
         _ = main(&mut env, args).now_or_never().unwrap();
@@ -403,7 +403,7 @@ xtrace           off
     fn internal_dispositions_not_enabled_for_stoppers_in_non_interactive_shell() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let args = Field::dummies(["-m"]);
 
         let result = main(&mut env, args).now_or_never().unwrap();
@@ -420,7 +420,7 @@ xtrace           off
     fn internal_dispositions_not_enabled_for_stoppers_in_subshell() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Subshell);
         env.options.set(Interactive, On);
         let args = Field::dummies(["-m"]);

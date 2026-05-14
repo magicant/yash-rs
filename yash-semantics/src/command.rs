@@ -87,12 +87,15 @@ impl<S: Runtime + 'static> Command<S> for syntax::List {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use super::*;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use futures_util::FutureExt as _;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
+    use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::SIGUSR1;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::test_helper::assert_stdout;
@@ -102,7 +105,7 @@ mod tests {
     #[test]
     fn command_handles_traps() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         env.builtins.insert("echo", echo_builtin());
         env.traps
             .set_action(

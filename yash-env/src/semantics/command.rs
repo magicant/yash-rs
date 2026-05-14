@@ -27,12 +27,13 @@ use crate::semantics::{ExitStatus, Field, Result};
 use crate::source::Location;
 use crate::source::pretty::{Report, ReportType, Snippet};
 use crate::subshell::{JobControl, Subshell};
-use crate::system::concurrency::RunLoop;
+use crate::system::concurrency::WaitForSignals;
 use crate::system::resource::SetRlimit;
 use crate::system::{
     Close, Dup, Errno, Exec, Exit, Fork, GetPid, Open, SendSignal, SetPgid, ShellPath, Sigaction,
-    Sigmask, Signals, TcSetPgrp, Wait,
+    Sigmask, TcSetPgrp, Wait,
 };
+use crate::trap::SignalSystem;
 use itertools::Itertools as _;
 use std::convert::Infallible;
 use std::ffi::CString;
@@ -139,7 +140,7 @@ pub struct ReplaceCurrentProcessError {
 ///
 /// This function is for implementing the simple command execution semantics and
 /// the `exec` built-in utility.
-pub async fn replace_current_process<S: Exec + ShellPath + Signals + Sigmask + Sigaction>(
+pub async fn replace_current_process<S: Exec + ShellPath + SignalSystem>(
     env: &mut Env<S>,
     path: CString,
     args: Vec<Field>,
@@ -262,16 +263,16 @@ where
         + Fork
         + GetPid
         + Open
-        + RunLoop
         + SendSignal
         + SetPgid
         + SetRlimit
         + ShellPath
         + Sigaction
         + Sigmask
-        + Signals
+        + SignalSystem
         + TcSetPgrp
         + Wait
+        + WaitForSignals
         + 'static,
 {
     let utility = args[0].clone();

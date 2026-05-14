@@ -115,16 +115,17 @@ mod tests {
     use yash_env::builtin::Builtin;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
+    use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::test_helper::assert_stdout;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
     use yash_syntax::syntax::CompoundCommand;
 
-    fn fixture() -> (Env<VirtualSystem>, Rc<RefCell<SystemState>>) {
+    fn fixture() -> (Env<Rc<Concurrent<VirtualSystem>>>, Rc<RefCell<SystemState>>) {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         (env, state)
@@ -197,7 +198,7 @@ mod tests {
     #[test]
     fn stack_frame_in_while_loop() {
         fn execute(
-            env: &mut Env<VirtualSystem>,
+            env: &mut Env<Rc<Concurrent<VirtualSystem>>>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
@@ -222,7 +223,7 @@ mod tests {
     fn break_while_loop_condition() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("break", break_builtin());
         env.builtins.insert("echo", echo_builtin());
         env.exit_status = ExitStatus(123);
@@ -238,7 +239,7 @@ mod tests {
     fn break_while_loop_body() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("break", break_builtin());
         env.builtins.insert("echo", echo_builtin());
         env.exit_status = ExitStatus(123);
@@ -275,7 +276,7 @@ mod tests {
     fn break_outer_loop_of_while() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("break", break_builtin());
         env.builtins.insert("echo", echo_builtin());
         let command: CompoundCommand = "while break $n; do echo 1; done".parse().unwrap();
@@ -298,7 +299,7 @@ mod tests {
     fn continue_while_loop_condition() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("continue", continue_builtin());
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
@@ -317,7 +318,7 @@ mod tests {
     fn continue_while_loop_body() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("continue", continue_builtin());
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
@@ -360,7 +361,7 @@ mod tests {
     fn continue_outer_loop_of_while() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("continue", continue_builtin());
         env.builtins.insert("echo", echo_builtin());
         let command: CompoundCommand = "while continue $n; do echo 1; done".parse().unwrap();
@@ -445,7 +446,7 @@ mod tests {
     #[test]
     fn stack_frame_in_until_loop() {
         fn execute(
-            env: &mut Env<VirtualSystem>,
+            env: &mut Env<Rc<Concurrent<VirtualSystem>>>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
@@ -470,7 +471,7 @@ mod tests {
     fn break_until_loop_condition() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("break", break_builtin());
         env.builtins.insert("echo", echo_builtin());
         env.exit_status = ExitStatus(123);
@@ -486,7 +487,7 @@ mod tests {
     fn break_until_loop_body() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("break", break_builtin());
         env.builtins.insert("echo", echo_builtin());
         env.exit_status = ExitStatus(123);
@@ -519,7 +520,7 @@ mod tests {
     fn break_outer_loop_of_until() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("break", break_builtin());
         env.builtins.insert("echo", echo_builtin());
         let command: CompoundCommand = "until ! break $n; do echo 1; done".parse().unwrap();
@@ -542,7 +543,7 @@ mod tests {
     fn continue_until_loop_condition() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("continue", continue_builtin());
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
@@ -561,7 +562,7 @@ mod tests {
     fn continue_until_loop_body() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("continue", continue_builtin());
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
@@ -604,7 +605,7 @@ mod tests {
     fn continue_outer_loop_of_until() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("continue", continue_builtin());
         env.builtins.insert("echo", echo_builtin());
         let command: CompoundCommand = "until continue $n; do echo 1; done".parse().unwrap();

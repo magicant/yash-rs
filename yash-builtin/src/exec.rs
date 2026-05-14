@@ -44,16 +44,16 @@ use yash_env::semantics::command::{ReplaceCurrentProcessError, replace_current_p
 use yash_env::semantics::{Divert::Abort, ExitStatus, Field};
 use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
-use yash_env::system::{
-    Exec, Fcntl, IsExecutableFile, Isatty, ShellPath, Sigaction, Sigmask, Signals, Write,
-};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Exec, IsExecutableFile, Isatty, ShellPath, Sigaction, Sigmask};
+use yash_env::trap::SignalSystem;
 
 // TODO Split into syntax and semantics submodules
 
 /// Entry point for executing the `exec` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
-    S: Exec + Fcntl + IsExecutableFile + Isatty + ShellPath + Sigmask + Sigaction + Signals + Write,
+    S: Exec + IsExecutableFile + Isatty + ShellPath + Sigmask + Sigaction + SignalSystem + WriteAll,
 {
     // TODO Support non-POSIX options
     let args = match parse_arguments(&[], Mode::with_env(env), args) {
@@ -135,8 +135,8 @@ mod tests {
     use yash_env::VirtualSystem;
     use yash_env::option::Option::Interactive;
     use yash_env::option::State::On;
-    use yash_env::system::Mode;
     use yash_env::system::r#virtual::{FileBody, Inode};
+    use yash_env::system::{Concurrent, Mode};
     use yash_env::variable::{PATH, Scope};
 
     fn dummy_file(is_native_executable: bool) -> Inode {
@@ -168,7 +168,7 @@ mod tests {
     #[test]
     fn executes_external_utility_when_given_operand() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
 
         // Prepare the external utility file
         system
@@ -196,7 +196,7 @@ mod tests {
     #[test]
     fn accepts_double_hyphen_separator() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
 
         // Prepare the external utility file
         system
@@ -218,7 +218,7 @@ mod tests {
     #[test]
     fn passing_argument_to_external_utility() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
 
         // Prepare the external utility file
         system
@@ -246,7 +246,7 @@ mod tests {
     #[test]
     fn utility_name_with_slash() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
 
         // Prepare the external utility file
         system
@@ -269,7 +269,7 @@ mod tests {
     #[test]
     fn utility_not_found() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
 
         // Prepare the external utility file
         system
@@ -293,7 +293,7 @@ mod tests {
     #[test]
     fn utility_not_executable() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
 
         // Prepare the file without executable permission
         let content = non_executable_file();
@@ -313,7 +313,7 @@ mod tests {
     #[test]
     fn utility_not_executable_interactive_no_abort() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         env.options.set(Interactive, On);
 
         // Prepare the file without executable permission

@@ -35,8 +35,8 @@ use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
-use yash_env::system::concurrency::WriteAll as _;
-use yash_env::system::{Close, Dup, Errno, Fcntl, Isatty, Pipe, Write};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Close, Dup, Errno, Isatty, Pipe};
 use yash_syntax::syntax;
 
 /// Executes the pipeline.
@@ -201,7 +201,7 @@ async fn execute_multi_command_pipeline<S: Runtime + 'static>(
 
 async fn shift_or_fail<S>(env: &mut Env<S>, pipes: &mut PipeSet, has_next: bool) -> Result
 where
-    S: Close + Fcntl + Isatty + Pipe + Write,
+    S: Close + Isatty + Pipe + WriteAll,
 {
     match pipes.shift(env, has_next) {
         Ok(()) => Continue(()),
@@ -237,7 +237,7 @@ async fn pid_or_fail<S>(
     start_result: std::result::Result<(Pid, Option<JobControl>), Errno>,
 ) -> Result<Pid>
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     match start_result {
         Ok((pid, job_control)) => {
@@ -345,6 +345,7 @@ mod tests {
     use yash_env::job::ProcessState;
     use yash_env::option::Option::{ErrExit, Monitor};
     use yash_env::semantics::Field;
+    use yash_env::system::Concurrent;
     use yash_env::system::GetPid as _;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::SIGSTOP;
@@ -591,7 +592,7 @@ mod tests {
     #[test]
     fn stack_without_inversion() {
         fn stub_builtin(
-            env: &mut Env<VirtualSystem>,
+            env: &mut Env<Rc<Concurrent<VirtualSystem>>>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
@@ -611,7 +612,7 @@ mod tests {
     #[test]
     fn stack_with_inversion() {
         fn stub_builtin(
-            env: &mut Env<VirtualSystem>,
+            env: &mut Env<Rc<Concurrent<VirtualSystem>>>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
@@ -634,7 +635,7 @@ mod tests {
     #[test]
     fn process_group_id_of_job_controlled_pipeline() {
         fn stub_builtin(
-            env: &mut Env<VirtualSystem>,
+            env: &mut Env<Rc<Concurrent<VirtualSystem>>>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             let pgid = env.system.getpgrp().0 as _;

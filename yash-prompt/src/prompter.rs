@@ -20,8 +20,7 @@ use super::expand_posix;
 use std::cell::RefCell;
 use yash_env::Env;
 use yash_env::input::{Context, Input, Result};
-use yash_env::system::concurrency::WriteAll as _;
-use yash_env::system::{Fcntl, Write};
+use yash_env::system::concurrency::WriteAll;
 use yash_env::variable::{PS1, PS2, VariableSet};
 
 /// [`Input`] decorator that shows a command prompt
@@ -65,7 +64,7 @@ impl<S, T: Clone> Clone for Prompter<'_, '_, S, T> {
 
 impl<S, T> Input for Prompter<'_, '_, S, T>
 where
-    S: Fcntl + Write + 'static,
+    S: WriteAll + 'static,
     T: Input,
 {
     #[allow(
@@ -80,7 +79,7 @@ where
 
 async fn print_prompt<S>(env: &mut Env<S>, context: &Context)
 where
-    S: Fcntl + Write + 'static,
+    S: WriteAll + 'static,
 {
     // Obtain the prompt string
     let prompt = fetch_posix(&env.variables, context);
@@ -116,6 +115,7 @@ mod tests {
     use futures_util::FutureExt as _;
     use std::rc::Rc;
     use yash_env::input::Memory;
+    use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::test_helper::assert_stderr;
@@ -146,7 +146,7 @@ mod tests {
     fn prompter_shows_prompt_before_reading() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = env_with_expand_text_and_system(system);
+        let mut env = env_with_expand_text_and_system(Rc::new(Concurrent::new(system)));
         define_variable(&mut env, PS1, PS1_INITIAL_VALUE_NON_ROOT);
 
         struct InputMock(Rc<RefCell<SystemState>>);
@@ -175,7 +175,7 @@ mod tests {
     fn ps1_variable_defines_main_prompt() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = env_with_expand_text_and_system(system);
+        let mut env = env_with_expand_text_and_system(Rc::new(Concurrent::new(system)));
         define_variable(&mut env, PS1, "my_custom_prompt !! >");
         let ref_env = RefCell::new(&mut env);
         let mut prompter = Prompter::new(Memory::new(""), &ref_env);
@@ -193,7 +193,7 @@ mod tests {
     fn ps2_variable_defines_continuation_prompt() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = env_with_expand_text_and_system(system);
+        let mut env = env_with_expand_text_and_system(Rc::new(Concurrent::new(system)));
         define_variable(&mut env, PS2, "continuation ! >");
         let ref_env = RefCell::new(&mut env);
         let mut prompter = Prompter::new(Memory::new(""), &ref_env);
@@ -209,7 +209,7 @@ mod tests {
     fn parameter_expansion_in_prompt_string() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = env_with_expand_text_and_system(system);
+        let mut env = env_with_expand_text_and_system(Rc::new(Concurrent::new(system)));
         define_variable(&mut env, PS1, "$X $ ");
         define_variable(&mut env, "X", "foo");
         let ref_env = RefCell::new(&mut env);

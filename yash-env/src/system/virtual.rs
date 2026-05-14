@@ -132,6 +132,7 @@ use crate::semantics::ExitStatus;
 use crate::str::UnixStr;
 use crate::str::UnixString;
 use crate::system::ChildProcessStarter;
+use crate::system::Concurrent;
 use crate::waker::ScheduledWakerQueue;
 use crate::waker::WakerSet;
 use enumset::EnumSet;
@@ -1301,7 +1302,7 @@ impl Fork for VirtualSystem {
         let state = Rc::clone(&self.state);
         Ok(Box::new(move |parent_env, task| {
             let system = VirtualSystem { state, process_id };
-            let mut child_env = parent_env.clone_with_system(system.clone());
+            let mut child_env = parent_env.clone_with_system(Rc::new(Concurrent::new(system)));
             let concurrent = Rc::clone(&child_env.system);
 
             let task_runner = async move {
@@ -3170,7 +3171,7 @@ mod tests {
         assert_eq!(state.processes.len(), 2);
         drop(state);
 
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let child_process = result.unwrap();
         let pid = child_process(
             &mut env,

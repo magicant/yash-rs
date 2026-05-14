@@ -23,8 +23,8 @@ use yash_env::prompt::GetPrompt;
 use yash_env::semantics::expansion::attr::AttrChar;
 use yash_env::semantics::expansion::attr::Origin;
 use yash_env::source::pretty::{Report, ReportType};
-use yash_env::system::concurrency::WriteAll as _;
-use yash_env::system::{Errno, Fcntl, Isatty, Read, Write};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Errno, Isatty, Read};
 
 /// Error reading from the standard input
 ///
@@ -108,7 +108,7 @@ pub async fn read<S>(
     is_raw: bool,
 ) -> Result<(Vec<AttrChar>, bool), Error>
 where
-    S: Fcntl + Isatty + Read + Write + 'static,
+    S: Isatty + Read + WriteAll + 'static,
 {
     let mut result = Vec::new();
 
@@ -148,7 +148,7 @@ where
 /// If the input is not a valid UTF-8 sequence, this function returns an error.
 async fn read_char<S>(env: &mut Env<S>) -> Result<Option<char>, Error>
 where
-    S: Fcntl + Isatty + Read + Write,
+    S: Isatty + Read + WriteAll,
 {
     // Any character is at most 4 bytes in UTF-8.
     let mut buffer = [0; 4];
@@ -202,7 +202,7 @@ where
 /// **panics**.
 async fn print_prompt<S>(env: &mut Env<S>)
 where
-    S: Fcntl + Isatty + Write + 'static,
+    S: Isatty + WriteAll + 'static,
 {
     if !env.is_interactive() || !env.system.isatty(Fd::STDIN) {
         return;

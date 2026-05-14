@@ -34,7 +34,8 @@ use yash_env::semantics::Field;
 use yash_env::semantics::command::search::{Target, search};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::str::UnixStr;
-use yash_env::system::{Fcntl, Fstat, GetCwd, IsExecutableFile, Isatty, Sysconf, Write};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Fstat, GetCwd, IsExecutableFile, Isatty, Sysconf};
 use yash_quote::quoted;
 
 /// Result of [categorizing](categorize) a command
@@ -371,7 +372,7 @@ impl Identify {
     /// Performs the identifying semantics.
     pub async fn execute<S>(&self, env: &mut Env<S>) -> crate::Result
     where
-        S: Fcntl + Fstat + GetCwd + IsExecutableFile + Isatty + Sysconf + Write + 'static,
+        S: Fstat + GetCwd + IsExecutableFile + Isatty + Sysconf + WriteAll + 'static,
     {
         let (result, errors) = self.result(env);
 
@@ -399,6 +400,7 @@ mod tests {
     use yash_env::builtin::Builtin;
     use yash_env::function::Function;
     use yash_env::source::Location;
+    use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::test_helper::function::FunctionBodyStub;
 
@@ -491,10 +493,12 @@ mod tests {
         let name = &Field::dummy("if");
         let env = &mut Env::new_virtual();
         env.any
-            .insert(Box::new(IsKeyword::<VirtualSystem>(|_env, word| {
-                assert_eq!(word, "if");
-                true
-            })));
+            .insert(Box::new(IsKeyword::<Rc<Concurrent<VirtualSystem>>>(
+                |_env, word| {
+                    assert_eq!(word, "if");
+                    true
+                },
+            )));
         let params = &Search::default_for_identify();
         let env = &mut SearchEnv { env, params };
 
@@ -507,10 +511,12 @@ mod tests {
         let name = &Field::dummy("foo");
         let env = &mut Env::new_virtual();
         env.any
-            .insert(Box::new(IsKeyword::<VirtualSystem>(|_env, word| {
-                assert_eq!(word, "foo");
-                false
-            })));
+            .insert(Box::new(IsKeyword::<Rc<Concurrent<VirtualSystem>>>(
+                |_env, word| {
+                    assert_eq!(word, "foo");
+                    false
+                },
+            )));
         let params = &Search::default_for_identify();
         let env = &mut SearchEnv { env, params };
 
@@ -543,7 +549,9 @@ mod tests {
         let alias = entry.0.clone();
         env.aliases.insert(entry);
         env.any
-            .insert(Box::new(IsKeyword::<VirtualSystem>(|_, _| false)));
+            .insert(Box::new(IsKeyword::<Rc<Concurrent<VirtualSystem>>>(
+                |_, _| false,
+            )));
         let params = &Search::default_for_identify();
         let env = &mut SearchEnv { env, params };
 
@@ -556,7 +564,9 @@ mod tests {
         let name = &Field::dummy("a");
         let env = &mut Env::new_virtual();
         env.any
-            .insert(Box::new(IsKeyword::<VirtualSystem>(|_, _| false)));
+            .insert(Box::new(IsKeyword::<Rc<Concurrent<VirtualSystem>>>(
+                |_, _| false,
+            )));
         let params = &Search::default_for_identify();
         let env = &mut SearchEnv { env, params };
 
@@ -575,7 +585,9 @@ mod tests {
             Location::dummy("a"),
         ));
         env.any
-            .insert(Box::new(IsKeyword::<VirtualSystem>(|_, _| false)));
+            .insert(Box::new(IsKeyword::<Rc<Concurrent<VirtualSystem>>>(
+                |_, _| false,
+            )));
         let params = &mut Search::default_for_identify();
         params.categories.remove(Category::Alias);
         let env = &mut SearchEnv { env, params };
@@ -707,7 +719,9 @@ mod tests {
     fn identify_result_without_error() {
         let env = &mut Env::new_virtual();
         env.any
-            .insert(Box::new(IsKeyword::<VirtualSystem>(|_, _| true)));
+            .insert(Box::new(IsKeyword::<Rc<Concurrent<VirtualSystem>>>(
+                |_, _| true,
+            )));
 
         let mut identify = Identify::default();
         let (result, errors) = identify.result(env);
@@ -734,9 +748,9 @@ mod tests {
     fn identify_result_with_error() {
         let env = &mut Env::new_virtual();
         env.any
-            .insert(Box::new(IsKeyword::<VirtualSystem>(|_, word| {
-                word == "if" || word == "fi"
-            })));
+            .insert(Box::new(IsKeyword::<Rc<Concurrent<VirtualSystem>>>(
+                |_, word| word == "if" || word == "fi",
+            )));
         let identify = Identify {
             names: Field::dummies(["if", "oops", "fi", "bar"]),
             ..Identify::default()

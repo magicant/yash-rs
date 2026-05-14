@@ -41,7 +41,6 @@ use yash_env::Env;
 use yash_env::option::OptionSet;
 use yash_env::option::State;
 use yash_env::semantics::Field;
-use yash_env::system::concurrency::WriteAll as _;
 use yash_env::variable::PS4;
 use yash_quote::quoted;
 use yash_syntax::syntax::Text;
@@ -307,6 +306,8 @@ mod tests {
     use super::*;
     use crate::tests::echo_builtin;
     use futures_util::FutureExt as _;
+    use std::rc::Rc;
+    use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::test_helper::in_virtual_system;
     use yash_env::variable::Scope::Global;
@@ -322,7 +323,7 @@ mod tests {
         assert_eq!(xtrace.here_doc_contents, "");
     }
 
-    fn fixture() -> Env<VirtualSystem> {
+    fn fixture() -> Env<Rc<Concurrent<VirtualSystem>>> {
         let mut env = Env::new_virtual();
         env.variables
             .get_or_new(PS4, Global)

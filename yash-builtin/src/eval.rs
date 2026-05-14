@@ -38,7 +38,8 @@ use yash_env::parser::Config;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::{Field, RunReadEvalLoop};
 use yash_env::source::Source;
-use yash_env::system::{Fcntl, Isatty, Write};
+use yash_env::system::Isatty;
+use yash_env::system::concurrency::WriteAll;
 
 /// Entry point of the `eval` built-in execution
 ///
@@ -53,7 +54,7 @@ use yash_env::system::{Fcntl, Isatty, Write};
 /// found, the function **panics**.
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
-    S: Fcntl + Isatty + Write + 'static,
+    S: Isatty + WriteAll + 'static,
 {
     // TODO Support non-POSIX options
     let args = match parse_arguments(&[], Mode::with_env(env), args) {

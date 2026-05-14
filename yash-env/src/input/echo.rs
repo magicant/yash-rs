@@ -20,8 +20,7 @@ use super::{Context, Input, Result};
 use crate::Env;
 use crate::option::Option::Verbose;
 use crate::option::State::On;
-use crate::system::concurrency::WriteAll as _;
-use crate::system::{Fcntl, Write};
+use crate::system::concurrency::WriteAll;
 use std::cell::RefCell;
 
 /// `Input` decorator that echoes the input.
@@ -61,7 +60,7 @@ impl<S, T: Clone> Clone for Echo<'_, '_, S, T> {
     }
 }
 
-impl<S: Fcntl + Write, T: Input> Input for Echo<'_, '_, S, T> {
+impl<S: WriteAll, T: Input> Input for Echo<'_, '_, S, T> {
     #[allow(
         clippy::await_holding_refcell_ref,
         reason = "other decorators, the parser, or the executor do not run concurrently with this method"
@@ -82,6 +81,7 @@ impl<S: Fcntl + Write, T: Input> Input for Echo<'_, '_, S, T> {
 mod tests {
     use super::super::Memory;
     use super::*;
+    use crate::system::Concurrent;
     use crate::system::r#virtual::VirtualSystem;
     use crate::test_helper::assert_stderr;
     use futures_util::FutureExt as _;
@@ -91,7 +91,7 @@ mod tests {
     fn verbose_off() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let ref_env = RefCell::new(&mut env);
         let memory = Memory::new("echo test\n");
         let mut echo = Echo::new(memory, &ref_env);
@@ -109,7 +109,7 @@ mod tests {
     fn verbose_on() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Verbose, On);
         let ref_env = RefCell::new(&mut env);
         let memory = Memory::new("echo test\nfoo");

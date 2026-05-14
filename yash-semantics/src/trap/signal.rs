@@ -118,15 +118,16 @@ mod tests {
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
     use yash_env::signal;
+    use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::system::r#virtual::{SIGINT, SIGTERM, SIGUSR1, SIGUSR2};
     use yash_env::test_helper::assert_stdout;
     use yash_env::trap::Action;
     use yash_syntax::source::Location;
 
-    fn signal_env() -> (Env<VirtualSystem>, VirtualSystem) {
+    fn signal_env() -> (Env<Rc<Concurrent<VirtualSystem>>>, VirtualSystem) {
         let system = VirtualSystem::default();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         env.builtins.insert("echo", echo_builtin());
         env.traps
             .set_action(
@@ -213,7 +214,7 @@ mod tests {
     #[test]
     fn stack_frame_in_trap_action() {
         fn execute(
-            env: &mut Env<VirtualSystem>,
+            env: &mut Env<Rc<Concurrent<VirtualSystem>>>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
@@ -222,7 +223,7 @@ mod tests {
             })
         }
         let system = VirtualSystem::default();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         env.builtins.insert(
             "check",
             Builtin::new(yash_env::builtin::Type::Mandatory, execute),

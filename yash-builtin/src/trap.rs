@@ -39,7 +39,8 @@ use yash_env::option::State::On;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
-use yash_env::system::{Fcntl, Isatty, Sigaction, Sigmask, Signals, Write};
+use yash_env::system::Isatty;
+use yash_env::system::concurrency::WriteAll;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
 use yash_env::trap::SetActionError;
@@ -225,7 +226,7 @@ impl Command {
     /// output. On failure, returns a non-empty list of errors.
     pub async fn execute<S>(self, env: &mut Env<S>) -> Result<String, Vec<Error>>
     where
-        S: Signals + Sigmask + Sigaction,
+        S: SignalSystem,
     {
         match self {
             Self::PrintAll { include_default } => Ok(display_all_traps(
@@ -274,7 +275,7 @@ impl Command {
 /// Entry point for executing the `trap` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
-    S: Fcntl + Isatty + Signals + Sigmask + Sigaction + Write,
+    S: Isatty + SignalSystem + WriteAll,
 {
     let (options, operands) = match parse_arguments(syntax::OPTION_SPECS, Mode::with_env(env), args)
     {
@@ -325,8 +326,8 @@ mod tests {
     use yash_env::semantics::Divert;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
-    use yash_env::system::Disposition;
     use yash_env::system::r#virtual::{SIGINT, SIGPIPE, SIGUSR1, SIGUSR2};
+    use yash_env::system::{Concurrent, Disposition};
     use yash_env::test_helper::assert_stderr;
     use yash_env::test_helper::assert_stdout;
 
@@ -335,7 +336,7 @@ mod tests {
         let system = VirtualSystem::new();
         let pid = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let args = Field::dummies(["", "USR1"]);
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
@@ -348,7 +349,7 @@ mod tests {
         let system = VirtualSystem::new();
         let pid = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let args = Field::dummies(["echo", "USR2"]);
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
@@ -361,7 +362,7 @@ mod tests {
         let system = VirtualSystem::new();
         let pid = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let args = Field::dummies(["-", "PIPE"]);
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
@@ -373,7 +374,7 @@ mod tests {
     fn printing_no_trap() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
@@ -384,7 +385,7 @@ mod tests {
     fn printing_some_trap() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let args = Field::dummies(["echo", "INT"]);
         let _ = main(&mut env, args).now_or_never().unwrap();
 
@@ -397,7 +398,7 @@ mod tests {
     fn printing_some_traps() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let args = Field::dummies(["echo", "EXIT"]);
         let _ = main(&mut env, args).now_or_never().unwrap();
         let args = Field::dummies(["echo t", "TERM"]);
@@ -416,7 +417,7 @@ mod tests {
         system
             .current_process_mut()
             .set_disposition(SIGINT, Disposition::Ignore);
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
@@ -429,7 +430,7 @@ mod tests {
     fn printing_specified_traps() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let args = Field::dummies(["echo", "EXIT"]);
         let _ = main(&mut env, args).now_or_never().unwrap();
         let args = Field::dummies(["echo t", "TERM"]);
@@ -449,7 +450,7 @@ mod tests {
         let system = VirtualSystem::new();
         system.current_process_mut().close_fd(Fd::STDOUT);
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("trap"),
             is_special: true,
@@ -470,7 +471,7 @@ mod tests {
     fn unknown_condition() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("trap"),
             is_special: true,
@@ -488,7 +489,7 @@ mod tests {
     fn missing_condition() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("trap"),
             is_special: true,
@@ -508,7 +509,7 @@ mod tests {
         system
             .current_process_mut()
             .set_disposition(SIGINT, Disposition::Ignore);
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("trap"),
             is_special: true,
@@ -530,7 +531,7 @@ mod tests {
         system
             .current_process_mut()
             .set_disposition(SIGINT, Disposition::Ignore);
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         env.options.set(Interactive, On);
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("trap"),
@@ -551,7 +552,7 @@ mod tests {
     fn trying_to_trap_sigkill() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("trap"),
             is_special: true,
@@ -571,7 +572,7 @@ mod tests {
     fn printing_traps_in_subshell() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let args = Field::dummies(["echo", "INT"]);
         let _ = main(&mut env, args).now_or_never().unwrap();
         let args = Field::dummies(["", "TERM"]);
@@ -592,7 +593,7 @@ mod tests {
     fn printing_traps_after_setting_in_subshell() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let args = Field::dummies(["echo", "INT"]);
         let _ = main(&mut env, args).now_or_never().unwrap();
         let args = Field::dummies(["", "TERM"]);

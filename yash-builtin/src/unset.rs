@@ -25,7 +25,8 @@ use crate::Result;
 use crate::common::report::{merge_reports, report_error, report_failure};
 use yash_env::Env;
 use yash_env::semantics::Field;
-use yash_env::system::{Fcntl, Isatty, Write};
+use yash_env::system::Isatty;
+use yash_env::system::concurrency::WriteAll;
 
 /// Selection of what to unset
 #[derive(Debug, Clone, Copy, Default, Eq, Hash, PartialEq)]
@@ -56,7 +57,7 @@ pub mod syntax;
 /// Entry point of the `unset` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     let command = match syntax::parse(env, args) {
         Ok(command) => command,

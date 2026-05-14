@@ -44,12 +44,14 @@
 //! # async {
 //! use std::cell::RefCell;
 //! use std::ops::ControlFlow::Continue;
+//! use std::rc::Rc;
 //! use yash_env::Env;
 //! use yash_env::input::FdReader2;
 //! use yash_env::io::Fd;
 //! use yash_env::parser::Config;
 //! use yash_env::semantics::ExitStatus;
 //! use yash_env::source::Source;
+//! use yash_env::system::concurrency::Concurrent;
 //! use yash_env::system::r#virtual::VirtualSystem;
 //! use yash_prompt::{ExpandText, Prompter};
 //! use yash_semantics::expansion::expand_text;
@@ -57,7 +59,7 @@
 //! use yash_syntax::parser::lex::Lexer;
 //!
 //! let mut env = Env::new_virtual();
-//! env.any.insert(Box::new(ExpandText::<VirtualSystem>(|env, text| {
+//! env.any.insert(Box::new(ExpandText::<Rc<Concurrent<VirtualSystem>>>(|env, text| {
 //!     Box::pin(async move { expand_text(env, text).await.ok() })
 //! })));
 //!
@@ -88,6 +90,8 @@ pub use prompter::fetch_posix;
 #[cfg(test)]
 mod tests {
     use super::ExpandText;
+    use std::rc::Rc;
+    use yash_env::system::Concurrent;
     use yash_env::{Env, VirtualSystem};
     use yash_semantics::Runtime;
 
@@ -102,7 +106,7 @@ mod tests {
         env
     }
 
-    pub(crate) fn env_with_expand_text() -> Env<VirtualSystem> {
-        env_with_expand_text_and_system(VirtualSystem::new())
+    pub(crate) fn env_with_expand_text() -> Env<Rc<Concurrent<VirtualSystem>>> {
+        env_with_expand_text_and_system(Rc::new(Concurrent::new(VirtualSystem::new())))
     }
 }

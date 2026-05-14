@@ -43,7 +43,8 @@ use crate::typeset::syntax::parse;
 use yash_env::Env;
 use yash_env::option::State::On;
 use yash_env::semantics::Field;
-use yash_env::system::{Fcntl, Isatty, Write};
+use yash_env::system::Isatty;
+use yash_env::system::concurrency::WriteAll;
 
 /// List of portable options applicable to the export built-in
 pub const PORTABLE_OPTIONS: &[OptionSpec<'static>] = &[PRINT_OPTION];
@@ -58,7 +59,7 @@ pub const PRINT_CONTEXT: PrintContext<'static> = PrintContext {
 /// Entry point of the export built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> yash_env::builtin::Result
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     match parse(PORTABLE_OPTIONS, args) {
         Ok((options, operands)) => match interpret(options, operands) {

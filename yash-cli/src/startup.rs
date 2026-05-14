@@ -27,7 +27,7 @@ use yash_env::parser::IsName;
 use yash_env::prompt::GetPrompt;
 use yash_env::semantics::command::RunFunction;
 use yash_env::system::resource::GetRlimit;
-use yash_env::system::{Chdir, GetCwd, GetUid, Isatty, Sysconf, TcGetPgrp, Times, Umask};
+use yash_env::system::{Chdir, GetCwd, GetUid, Isatty, Sysconf, TcGetPgrp, Times, Umask, Write};
 use yash_env::trap::RunSignalTrapIfCaught;
 use yash_prompt::ExpandText;
 use yash_semantics::expansion::expand_text;
@@ -68,6 +68,7 @@ pub fn auto_interactive<S: Isatty>(system: &S, run: &Run) -> bool {
 pub async fn configure_environment<S>(env: &mut Env<S>, run: Run) -> Work
 where
     S: Chdir
+        + Clone
         + GetCwd
         + GetRlimit
         + GetUid
@@ -76,6 +77,7 @@ where
         + TcGetPgrp
         + Times
         + Umask
+        + Write
         + 'static,
 {
     // Apply the parsed options to the environment

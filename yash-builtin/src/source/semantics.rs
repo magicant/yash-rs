@@ -33,9 +33,8 @@ use yash_env::semantics::{Divert, ExitStatus, Field, RunReadEvalLoop};
 use yash_env::source::Source;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::stack::Frame;
-use yash_env::system::{
-    Close, Dup, Errno, Fcntl, Isatty, Mode, OfdAccess, Open, OpenFlag, Read, Write,
-};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Close, Dup, Errno, Isatty, Mode, OfdAccess, Open, OpenFlag, Read};
 use yash_env::variable::PATH;
 
 impl Command {
@@ -45,7 +44,7 @@ impl Command {
     /// to the standard error and returns `ExitStatus::FAILURE.into()`.
     pub async fn execute<S>(self, env: &mut Env<S>) -> crate::Result
     where
-        S: Close + Dup + Fcntl + Isatty + Open + Read + Write + 'static,
+        S: Clone + Close + Dup + Isatty + Open + Read + WriteAll + 'static,
     {
         let env = &mut *env.push_frame(Frame::DotScript);
 
@@ -153,7 +152,7 @@ async fn report_find_and_open_file_failure<S>(
     errno: Errno,
 ) -> crate::Result
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     let mut report = Report::new();
     report.r#type = ReportType::Error;
@@ -173,8 +172,8 @@ mod tests {
     use yash_env::VirtualSystem;
     use yash_env::io::MIN_INTERNAL_FD;
     use yash_env::path::Path;
-    use yash_env::system::FdFlag;
     use yash_env::system::r#virtual::Inode;
+    use yash_env::system::{Concurrent, FdFlag};
     use yash_env::variable::Scope;
 
     fn system_with_file<P: AsRef<Path>, C: Into<Vec<u8>>>(path: P, content: C) -> VirtualSystem {
@@ -274,10 +273,11 @@ mod tests {
     #[test]
     fn fd_is_closed_after_execute() {
         let system = system_with_file("/foo/file", "");
-        let mut env = Env::with_system(system.clone());
-        env.any.insert(Box::new(RunReadEvalLoop::<VirtualSystem>(
-            |_env, _lexer| Box::pin(async { ControlFlow::Continue(()) }),
-        )));
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
+        env.any
+            .insert(Box::new(RunReadEvalLoop::<Rc<Concurrent<VirtualSystem>>>(
+                |_env, _lexer| Box::pin(async { ControlFlow::Continue(()) }),
+            )));
         let command = Command {
             file: Field::dummy("/foo/file"),
             params: vec![],

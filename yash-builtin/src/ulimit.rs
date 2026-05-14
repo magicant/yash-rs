@@ -30,8 +30,9 @@ use crate::common::output;
 use crate::common::report::{report_error, report_simple_failure};
 use yash_env::Env;
 use yash_env::semantics::Field;
+use yash_env::system::concurrency::WriteAll;
 use yash_env::system::resource::{GetRlimit, Limit, Resource, SetRlimit};
-use yash_env::system::{Errno, Fcntl, Isatty, Write};
+use yash_env::system::{Errno, Isatty};
 
 /// Type of limit to show
 ///
@@ -134,7 +135,7 @@ impl Command {
 /// This is the main entry point for the `ulimit` built-in.
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
-    S: GetRlimit + SetRlimit + Fcntl + Isatty + Write,
+    S: GetRlimit + SetRlimit + Isatty + WriteAll,
 {
     match syntax::parse(env, args) {
         Ok(command) => match command.execute(env).await {
