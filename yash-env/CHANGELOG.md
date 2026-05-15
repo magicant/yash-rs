@@ -62,7 +62,7 @@ A _private dependency_ is used internally and not visible to downstream users.
       `S: system::concurrency::WaitForSignals + system::concurrency::Select`.
     - The `Env::wait_for_subshell`, `Env::wait_for_subshell_to_halt`, and
       `Env::wait_for_subshell_to_finish` methods now require the trait bound
-      `S: system::SignalSystem + system::concurrency::WaitForSignals + system::concurrency::Wait`
+      `S: trap::SignalSystem + system::concurrency::WaitForSignals + system::Wait`
       instead of `S: system::Signals + system::Sigmask + system::Sigaction + system::Wait`.
     - The inherent methods of `subshell::Subshell` now additionally require the
       trait bound `S: trap::SignalSystem + 'static`.
