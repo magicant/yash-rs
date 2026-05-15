@@ -26,12 +26,10 @@ use crate::job::{JobList, Pid};
 use crate::option::OptionSet;
 use crate::semantics::ExitStatus;
 use crate::stack::Stack;
-use crate::system::Concurrent;
 use crate::trap::TrapSet;
 use crate::variable::VariableSet;
 use std::collections::HashMap;
 use std::mem::take;
-use std::rc::Rc;
 
 /// Subset of [`Env`] for optimizing child process creation
 ///
@@ -140,7 +138,7 @@ impl<S> ForkEnvState<S> {
     /// instance that was created in the parent process, so the child process
     /// will have the same environment as the parent.
     #[must_use]
-    pub fn into_env_with_system(self, system: Rc<Concurrent<S>>) -> Env<S> {
+    pub fn into_env_with_system(self, system: S) -> Env<S> {
         Env {
             aliases: self.aliases,
             arg0: self.arg0,

@@ -28,7 +28,8 @@ use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::{Footnote, FootnoteType, Report, ReportType};
-use yash_env::system::{Chdir, Errno, Fcntl, Fstat, GetCwd, Isatty, Write};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Chdir, Errno, Fstat, GetCwd, Isatty};
 use yash_env::variable::PWD;
 
 /// Exit status when the built-in succeeds
@@ -101,7 +102,7 @@ fn get_pwd<S>(env: &Env<S>) -> String {
 /// corresponding exit status.
 async fn report_pwd_error<S>(env: &mut Env<S>, errno: Errno, ensure_pwd: bool) -> Result
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     let (r#type, exit_status) = if ensure_pwd {
         (ReportType::Error, EXIT_STATUS_STALE_PWD)
@@ -124,7 +125,7 @@ where
 /// This function uses functions in the submodules to execute the built-in.
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
-    S: Chdir + Fcntl + Fstat + GetCwd + Isatty + Write,
+    S: Chdir + Fstat + GetCwd + Isatty + WriteAll,
 {
     let command = match syntax::parse(env, args) {
         Ok(command) => command,
@@ -167,13 +168,14 @@ mod tests {
     use futures_util::FutureExt as _;
     use std::rc::Rc;
     use yash_env::VirtualSystem;
+    use yash_env::system::Concurrent;
     use yash_env::test_helper::assert_stderr;
 
     #[test]
     fn report_pwd_error_with_ensure_pwd() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
 
         let result = report_pwd_error(&mut env, Errno::ENAMETOOLONG, true)
             .now_or_never()
@@ -189,7 +191,7 @@ mod tests {
     fn report_pwd_error_without_ensure_pwd() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
 
         let result = report_pwd_error(&mut env, Errno::ENAMETOOLONG, false)
             .now_or_never()

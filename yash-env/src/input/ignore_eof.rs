@@ -20,8 +20,8 @@ use super::{Context, Input, Result};
 use crate::Env;
 use crate::io::Fd;
 use crate::option::{IgnoreEof as IgnoreEofOption, Interactive, Off};
-use crate::system::concurrency::WriteAll as _;
-use crate::system::{Fcntl, Isatty, Write};
+use crate::system::Isatty;
+use crate::system::concurrency::WriteAll;
 use std::cell::RefCell;
 
 /// `Input` decorator that ignores EOF on a terminal
@@ -91,7 +91,7 @@ impl<S, T: Clone> Clone for IgnoreEof<'_, '_, S, T> {
     }
 }
 
-impl<S: Fcntl + Isatty + Write, T: Input> Input for IgnoreEof<'_, '_, S, T> {
+impl<S: Isatty + WriteAll, T: Input> Input for IgnoreEof<'_, '_, S, T> {
     #[allow(
         clippy::await_holding_refcell_ref,
         reason = "other decorators, the parser, or the executor do not run concurrently with this method"
@@ -124,8 +124,8 @@ mod tests {
     use super::super::Memory;
     use super::*;
     use crate::option::On;
-    use crate::system::Mode;
     use crate::system::r#virtual::{FdBody, FileBody, Inode, OpenFileDescription, VirtualSystem};
+    use crate::system::{Concurrent, Mode};
     use crate::test_helper::assert_stderr;
     use enumset::EnumSet;
     use futures_util::FutureExt as _;
@@ -205,7 +205,7 @@ mod tests {
     fn decorator_reads_from_inner_input() {
         let mut system = VirtualSystem::new();
         set_stdin_to_tty(&mut system);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         env.options.set(IgnoreEofOption, On);
         let ref_env = RefCell::new(&mut env);
@@ -228,7 +228,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         set_stdin_to_tty(&mut system);
         let state = system.state.clone();
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         env.options.set(IgnoreEofOption, On);
         let ref_env = RefCell::new(&mut env);
@@ -255,7 +255,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         set_stdin_to_tty(&mut system);
         let state = system.state.clone();
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         env.options.set(IgnoreEofOption, On);
         let ref_env = RefCell::new(&mut env);
@@ -284,7 +284,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         set_stdin_to_tty(&mut system);
         let state = system.state.clone();
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         env.options.set(IgnoreEofOption, On);
         let ref_env = RefCell::new(&mut env);
@@ -313,7 +313,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         set_stdin_to_tty(&mut system);
         let state = system.state.clone();
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, Off);
         env.options.set(IgnoreEofOption, On);
         let ref_env = RefCell::new(&mut env);
@@ -340,7 +340,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         set_stdin_to_tty(&mut system);
         let state = system.state.clone();
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         env.options.set(IgnoreEofOption, Off);
         let ref_env = RefCell::new(&mut env);
@@ -367,7 +367,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         set_stdin_to_regular_file(&mut system);
         let state = system.state.clone();
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         env.options.set(IgnoreEofOption, On);
         let ref_env = RefCell::new(&mut env);

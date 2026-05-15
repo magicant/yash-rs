@@ -30,11 +30,12 @@ use yash_env::source::Location;
 use yash_env::source::pretty::{
     Footnote, FootnoteType, Report, ReportType, Snippet, Span, SpanRole, add_span,
 };
-use yash_env::system::{Fcntl, Isatty, Write};
+use yash_env::system::Isatty;
+use yash_env::system::concurrency::WriteAll;
 
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     // TODO Support non-POSIX options
     let args = match parse_arguments(&[], Mode::with_env(env), args) {
@@ -134,6 +135,7 @@ mod tests {
     use yash_env::source::Location;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
+    use yash_env::system::Concurrent;
     use yash_env::test_helper::assert_stderr;
 
     #[test]
@@ -211,7 +213,7 @@ mod tests {
     fn shifting_without_operand_without_params() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("shift"),
             is_special: true,
@@ -235,7 +237,7 @@ mod tests {
     fn shifting_more_than_the_number_of_params() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("shift"),
             is_special: true,
@@ -262,7 +264,7 @@ mod tests {
     fn non_integral_operand_in_posix_mode() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         // TODO Enable POSIX mode
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("shift"),
@@ -286,7 +288,7 @@ mod tests {
     fn too_many_operands() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("shift"),
             is_special: true,

@@ -80,6 +80,7 @@ mod tests {
     use yash_env::job::ProcessState;
     use yash_env::option::Option::{ErrExit, Monitor};
     use yash_env::option::State::On;
+    use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::SIGSTOP;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::test_helper::assert_stderr;
@@ -105,7 +106,7 @@ mod tests {
     #[test]
     fn divert_in_subshell() {
         fn exit_builtin(
-            _env: &mut Env<VirtualSystem>,
+            _env: &mut Env<Rc<Concurrent<VirtualSystem>>>,
             _args: Vec<yash_env::semantics::Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
@@ -133,7 +134,7 @@ mod tests {
     fn error_starting_subshell() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         let command: CompoundCommand = "(foo=bar; echo $foo; return -n 123)".parse().unwrap();
@@ -207,7 +208,7 @@ mod tests {
     #[test]
     fn exit_trap() {
         fn trap_builtin(
-            env: &mut Env<VirtualSystem>,
+            env: &mut Env<Rc<Concurrent<VirtualSystem>>>,
             _args: Vec<yash_env::semantics::Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {

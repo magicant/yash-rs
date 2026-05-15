@@ -35,7 +35,8 @@ use crate::common::report::{report_error, report_simple_failure};
 use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
-use yash_env::system::{Fcntl, Isatty, Write};
+use yash_env::system::Isatty;
+use yash_env::system::concurrency::WriteAll;
 
 // pub mod display;
 pub mod semantics;
@@ -46,7 +47,7 @@ pub use super::r#break::syntax;
 /// This function uses the [`syntax`] and [`semantics`] modules to execute the built-in.
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     match syntax::parse(env, args) {
         Ok(count) => match semantics::run(&env.stack, count) {
@@ -72,6 +73,7 @@ mod tests {
     use yash_env::semantics::Field;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
+    use yash_env::system::Concurrent;
     use yash_env::test_helper::assert_stderr;
     use yash_env::test_helper::assert_stdout;
 
@@ -85,7 +87,7 @@ mod tests {
     fn no_enclosing_loop() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("continue"),
             is_special: true,
@@ -107,7 +109,7 @@ mod tests {
     fn omitted_operand_with_one_enclosing_loop() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("continue"),
@@ -127,7 +129,7 @@ mod tests {
     fn omitted_operand_with_many_enclosing_loops() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Loop);
@@ -149,7 +151,7 @@ mod tests {
     fn explicit_operand_1_with_many_enclosing_loops() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Loop);
@@ -172,7 +174,7 @@ mod tests {
     fn explicit_operand_3_with_many_enclosing_loops() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Loop);
@@ -195,7 +197,7 @@ mod tests {
     fn explicit_operand_greater_than_number_of_loops() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Loop);
@@ -219,7 +221,7 @@ mod tests {
     fn explicit_operand_0() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("continue"),
@@ -245,7 +247,7 @@ mod tests {
     fn explicit_operand_too_large() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("continue"),
@@ -266,7 +268,7 @@ mod tests {
     fn too_many_operands() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("continue"),
@@ -289,7 +291,7 @@ mod tests {
     fn argument_separator() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("continue"),

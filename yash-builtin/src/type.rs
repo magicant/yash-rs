@@ -31,7 +31,8 @@ use crate::common::syntax::parse_arguments;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
-use yash_env::system::{Fcntl, Fstat, GetCwd, IsExecutableFile, Isatty, Sysconf, Write};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Fstat, GetCwd, IsExecutableFile, Isatty, Sysconf};
 
 const OPTION_SPECS: &[OptionSpec] = &[
     // TODO: Non-standard options
@@ -63,7 +64,7 @@ fn parse<S>(env: &mut Env<S>, args: Vec<Field>) -> Result<Identify, crate::comma
 /// Entry point of the `type` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
-    S: Fcntl + Fstat + GetCwd + IsExecutableFile + Isatty + Sysconf + Write + 'static,
+    S: Fstat + GetCwd + IsExecutableFile + Isatty + Sysconf + WriteAll + 'static,
 {
     match parse(env, args) {
         Ok(identify) => identify.execute(env).await,

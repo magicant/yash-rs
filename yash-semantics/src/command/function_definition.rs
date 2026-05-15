@@ -30,7 +30,8 @@ use yash_env::function::FunctionBody;
 use yash_env::function::FunctionBodyObject;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
-use yash_env::system::{Fcntl, Isatty, Write};
+use yash_env::system::Isatty;
+use yash_env::system::concurrency::WriteAll;
 use yash_syntax::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
 use yash_syntax::syntax;
 
@@ -108,7 +109,7 @@ async fn define_function<S: Runtime + 'static>(
 /// This function assumes `error.existing.read_only_location.is_some()`.
 async fn report_define_error<S>(env: &mut Env<S>, error: &DefineError<S>)
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     let mut report = Report::new();
     report.r#type = ReportType::Error;
@@ -151,6 +152,7 @@ mod tests {
     use yash_env::option::On;
     use yash_env::option::Option::ErrExit;
     use yash_env::semantics::Divert;
+    use yash_env::system::Concurrent;
     use yash_env::test_helper::assert_stderr;
     use yash_env::test_helper::function::FunctionBodyStub;
     use yash_syntax::source::Location;
@@ -208,7 +210,7 @@ mod tests {
     fn function_definition_read_only() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let function = Rc::new(Function {
             name: "foo".to_string(),
             body: FunctionBodyStub::rc_dyn(),

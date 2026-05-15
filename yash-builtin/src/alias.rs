@@ -30,7 +30,8 @@ use crate::common::syntax::parse_arguments;
 use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
-use yash_env::system::{Fcntl, Isatty, Write};
+use yash_env::system::Isatty;
+use yash_env::system::concurrency::WriteAll;
 
 /// Parsed command line arguments
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -45,7 +46,7 @@ pub mod semantics;
 /// Entry point for executing the `alias` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
-    S: Isatty + Fcntl + Write,
+    S: Isatty + WriteAll,
 {
     let mode = Mode::with_env(env);
     // TODO support options

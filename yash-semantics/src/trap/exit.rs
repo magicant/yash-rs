@@ -64,6 +64,7 @@ mod tests {
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
     use yash_env::stack::Frame;
+    use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::test_helper::assert_stdout;
     use yash_syntax::source::Location;
@@ -78,7 +79,7 @@ mod tests {
     fn runs_exit_trap() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("echo", echo_builtin());
         env.traps
             .set_action(
@@ -99,7 +100,7 @@ mod tests {
     #[test]
     fn stack_frame_in_trap_action() {
         fn execute(
-            env: &mut Env<VirtualSystem>,
+            env: &mut Env<Rc<Concurrent<VirtualSystem>>>,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
@@ -151,7 +152,7 @@ mod tests {
     fn exit_status_inside_trap() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("echo", echo_builtin());
         env.traps
             .set_action(

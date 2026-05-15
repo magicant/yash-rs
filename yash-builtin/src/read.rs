@@ -34,7 +34,8 @@ use crate::common::report::{merge_reports, report, report_simple};
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::system::{Fcntl, Isatty, Read, Write};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Isatty, Read};
 
 pub mod assigning;
 pub mod input;
@@ -85,7 +86,7 @@ pub struct Command {
 /// Entry point of the `read` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
-    S: Fcntl + Isatty + Read + Write + 'static,
+    S: Isatty + Read + WriteAll + 'static,
 {
     let command = match syntax::parse(env, args) {
         Ok(command) => command,

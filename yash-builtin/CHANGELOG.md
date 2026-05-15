@@ -13,15 +13,103 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
-- The type parameter bound `S: yash_env::system::concurrency::RunLoop` has been
-  added to the following items:
-    - `iter`
-    - `command::main`
+- The `iter` function now requires
+  `S: std::clone::Clone + yash_env::system::concurrency::WaitForSignals + yash_env::system::concurrency::WriteAll + yash_env::trap::SignalSystem`
+  in addition to the existing bounds on `S`.
+- The following functions now require the bound
+  `S: yash_env::system::Isatty + yash_env::system::concurrency::WriteAll` instead of
+  `S: yash_env::system::Isatty + yash_env::system::Fcntl + yash_env::system::Write`:
+    - `alias::main`
+    - `break::main`
+    - `cd::assign::set_oldpwd`
+    - `cd::assign::set_pwd`
+    - `cd::chdir::report_failure`
+    - `cd::print::print_path`
+    - `common::output`
+    - `common::report::report`
+    - `common::report::report_failure`
+    - `common::report::report_error`
+    - `common::report::report_simple`
+    - `common::report::report_simple_failure`
+    - `common::report::report_simple_error`
+    - `common::report::syntax_error`
+    - `continue::main`
+    - `exit::main`
+    - `export::main`
+    - `getopts::main`
+    - `readonly::main`
+    - `return::main`
+    - `shift::main`
+    - `source::syntax::Error::report`
+    - `typeset::main`
+    - `unalias::main`
+    - `unset::main`
+- Likewise, the bound `S: yash_env::system::Fcntl + yash_env::system::Write` has
+  been replaced with `S: yash_env::system::WriteAll` for the following functions
+  while other bounds remain unchanged:
+    - `bg::main`
+    - `cd::main`
+    - `command::Identify::execute`
+    - `eval::main`
+    - `jobs::main`
+    - `kill::Command::execute`
+    - `kill::main`
+    - `kill::print::execute`
+    - `kill::send::execute`
+    - `pwd::main`
+    - `read::input::read`
+    - `read::main`
+    - `times::main`
+    - `type::main`
+    - `ulimit::main`
+    - `umask::main`
+- In the following functions, the bound
+  `S: yash_env::system::Fcntl + yash_env::system::Write` has been removed and the bound
+  `S: yash_env::system::concurrency::WriteAll + yash_env::trap::SignalSystem`
+  has been added while other bounds remain unchanged:
+    - `exec::main`
+    - `set::main`
+- In the following functions, the bound
+  `S: yash_env::system::Fcntl + yash_env::system::Write` has been removed and the bound
+  `S: std::clone::Clone + yash_env::system::concurrency::WriteAll`
+  has been added while other bounds remain unchanged:
+    - `source::Command::execute`
+    - `source::main`
+- In the following functions, the bound
+  `S: yash_env::system::Fcntl + yash_env::system::Write` has been removed and the bound
+  `S: yash_env::system::concurrency::WaitForSignals + yash_env::system::concurrency::WriteAll + yash_env::trap::SignalSystem`
+  has been added:
     - `command::Command::execute`
     - `command::Invoke::execute`
+    - `command::main`
+    - `fg::main`
+- The `trap::Command::execute` function now requires the bound
+  `S: yash_env::trap::SignalSystem` instead of
+  `S: yash_env::system::Sigaction + yash_env::system::Sigmask`.
+- The `trap::main` function now requires the bound
+  `S: yash_env::system::Isatty + yash_env::trap::SignalSystem + yash_env::system::concurrency::WriteAll`
+  instead of
+  `S: yash_env::system::Fcntl + yash_env::system::Isatty + yash_env::system::Sigaction + yash_env::system::Sigmask + yash_env::system::Write`.
+- The `wait::core::wait_for_any_job_or_trap` and `wait::status::wait_while_running`
+  functions now require the bound
+  `S: yash_env::system::concurrency::WaitForSignals + yash_env::system::Wait + yash_env::trap::SignalSystem + 'static`
+  instead of
+  `S: yash_env::system::Sigaction + yash_env::system::Sigmask + yash_env::system::Wait + 'static`.
+- The `wait::main` and `wait::Command::execute` functions now require the bound
+  `S: yash_env::system::Isatty + yash_env::system::concurrency::WaitForSignals + yash_env::system::Wait + yash_env::trap::SignalSystem + 'static`
+  instead of
+  `S: yash_env::system::Fcntl + yash_env::system::Isatty + yash_env::system::Sigaction + yash_env::system::Sigmask + yash_env::system::Wait + yash_env::system::Write + 'static`.
 - Public dependency versions:
     - yash-env 0.13.0 → 0.14.0
     - yash-semantics (optional) 0.15.0 → 0.16.0
+
+### Removed
+
+- The following formerly deprecated functions have been removed:
+    - `unset::semantics::report_functions_error`
+    - `unset::semantics::report_variables_error`
+    - `unset::semantics::unset_functions_error_message`
+    - `unset::semantics::unset_variables_error_message`
 
 ## [0.16.0] - 2026-04-29
 

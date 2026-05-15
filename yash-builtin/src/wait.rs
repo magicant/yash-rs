@@ -35,7 +35,9 @@ use yash_env::job::Pid;
 use yash_env::option::State::Off;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::system::{Fcntl, Isatty, Sigaction, Sigmask, Signals, Wait, Write};
+use yash_env::system::concurrency::{WaitForSignals, WriteAll};
+use yash_env::system::{Isatty, Wait};
+use yash_env::trap::SignalSystem;
 
 /// Job specification (job ID or process ID)
 ///
@@ -69,7 +71,7 @@ impl Command {
     /// If `indexes` is empty, waits for all jobs.
     async fn await_jobs<S, I>(env: &mut Env<S>, indexes: I) -> Result<ExitStatus, core::Error>
     where
-        S: Signals + Sigmask + Sigaction + Wait + 'static,
+        S: SignalSystem + Wait + WaitForSignals + 'static,
         I: IntoIterator<Item = Option<usize>>,
     {
         // Currently, we ignore the job control option as required by POSIX.
@@ -98,7 +100,7 @@ impl Command {
     /// Executes the `wait` built-in.
     pub async fn execute<S>(self, env: &mut Env<S>) -> crate::Result
     where
-        S: Fcntl + Isatty + Sigaction + Sigmask + Signals + Wait + Write + 'static,
+        S: Isatty + SignalSystem + Wait + WaitForSignals + WriteAll + 'static,
     {
         // Resolve job specifications to indexes
         let jobs = self.jobs.into_iter();
@@ -123,7 +125,7 @@ impl Command {
 /// Entry point for executing the `wait` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
-    S: Fcntl + Isatty + Sigaction + Sigmask + Signals + Wait + Write + 'static,
+    S: Isatty + SignalSystem + Wait + WaitForSignals + WriteAll + 'static,
 {
     match syntax::parse(env, args) {
         Ok(command) => command.execute(env).await,
@@ -136,14 +138,14 @@ mod tests {
     use super::*;
     use futures_util::poll;
     use std::pin::pin;
+    use std::rc::Rc;
     use std::task::Poll;
     use yash_env::job::{Job, ProcessResult};
     use yash_env::option::{Monitor, On};
     use yash_env::subshell::{JobControl, Subshell};
-    use yash_env::system::GetPid as _;
-    use yash_env::system::SendSignal as _;
     use yash_env::system::r#virtual::SIGSTOP;
     use yash_env::system::r#virtual::VirtualSystem;
+    use yash_env::system::{Concurrent, GetPid, SendSignal};
     use yash_env::test_helper::{in_virtual_system, stub_tty};
     use yash_env::trap::RunSignalTrapIfCaught;
 
@@ -153,12 +155,12 @@ mod tests {
         })));
     }
 
-    async fn suspend(env: &mut Env<VirtualSystem>) {
+    async fn suspend<S: GetPid + SendSignal>(env: &mut Env<S>) {
         let target = env.system.getpid();
         env.system.kill(target, Some(SIGSTOP)).await.unwrap();
     }
 
-    async fn start_self_suspending_job(env: &mut Env<VirtualSystem>) {
+    async fn start_self_suspending_job(env: &mut Env<Rc<Concurrent<VirtualSystem>>>) {
         let subshell =
             Subshell::new(|env, _| Box::pin(suspend(env))).job_control(JobControl::Foreground);
         let (pid, subshell_result) = subshell.start_and_wait(env).await.unwrap();

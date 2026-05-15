@@ -45,13 +45,51 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `Env::run_in_child_process` method has been added as a convenient wrapper
   around `system::Fork::run_in_child_process` for running a task in a child
   process with the current environment state.
+- The `Default` trait is now implemented for `Env<S>` where
+  `S: Default + system::GetPid`.
 
 ### Changed
 
-- The type parameter bound `S: system::concurrency::RunLoop` has been added to
-  the `subshell::Subshell` struct and
-  `semantics::command::run_external_utility_in_subshell` function. For the
-  `Subshell` struct, the bound `S: 'static` has also been added.
+- The `system` field of `Env` now holds an `S` instead of `Rc<Concurrent<S>>`.
+  This allows the environment to hold broader types of systems without being
+  tied to the `Concurrent` wrapper. The following changes have been made to
+  accommodate this:
+    - The `new_virtual` method is now implemented for
+      `Env<Rc<Concurrent<VirtualSystem>>>` instead of `Env<VirtualSystem>`.
+    - The `Env::wait_for_signal` and `Env::wait_for_signals` methods now require
+      the trait bound `S: system::concurrency::WaitForSignals`.
+    - The `Env::poll_signals` method now requires the trait bound
+      `S: system::concurrency::WaitForSignals + system::concurrency::Select`.
+    - The `Env::wait_for_subshell`, `Env::wait_for_subshell_to_halt`, and
+      `Env::wait_for_subshell_to_finish` methods now require the trait bound
+      `S: trap::SignalSystem + system::concurrency::WaitForSignals + system::Wait`
+      instead of `S: system::Signals + system::Sigmask + system::Sigaction + system::Wait`.
+    - The inherent methods of `subshell::Subshell` now additionally require the
+      trait bound `S: trap::SignalSystem + 'static`.
+    - The `io::print_report` and `io::print_error` functions now require the trait bound
+      `S: system::Isatty + system::concurrency::WriteAll` instead of
+      `S: system::Isatty + system::Fcntl + system::Write`
+    - The `semantics::command::replace_current_process` function now requires the trait bound
+      `S: system::Exec + system::ShellPath + trap::SignalSystem` instead of
+      `S: system::Exec + system::ShellPath + system::Sigmask + system::Sigaction`.
+    - The `semantics::command::run_external_utility_in_subshell` function now
+      additionally requires the trait bound
+      `S: system::concurrency::WaitForSignals + trap::SignalSystem`.
+    - The implementation of `input::Input` for `input::Echo` now requires the
+      trait bound `S: system::concurrency::WriteAll` instead of
+      `S: system::Fcntl + system::Write`.
+    - The implementation of `input::Input` for `input::IgnoreEof` now requires
+      the trait bound `S: system::Isatty + system::concurrency::WriteAll`
+      instead of `S: system::Isatty + system::Fcntl + system::Write`.
+    - The implementation of `input::Input` for `input::reporter::Reporter` now
+      requires the trait bound `S: system::Signals + system::concurrency::WriteAll`
+      instead of `S: system::Fcntl + system::Signals + system::Write`.
+    - The `system::ChildProcessStarter` and `system::ChildProcessTask` type
+      aliases now abstract functions that take `&mut Env<Rc<Concurrent<S>>>`
+      instead of `&mut Env<S>`.
+    - The `test_helper::in_virtual_system` function now provides an
+      `Env<Rc<Concurrent<VirtualSystem>>>` to the provided task instead of
+      `Env<VirtualSystem>`.
 - The following methods of `system::Concurrent`, which were inherent methods,
   are now provided as trait implementations. You may have to import the
   corresponding traits to use these methods:
@@ -64,6 +102,12 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `wait_for_signals` (`system::concurrency::WaitForSignals`)
     - `peek` (`system::concurrency::Select`)
     - `select` (`system::concurrency::Select`)
+- The `input::FdReader2::new` function now takes a system of any type instead of
+  specifically an `Rc<Concurrent<S>>`. This allows `FdReader2` to be used with
+  any system that implements the necessary traits for reading from file
+  descriptors, rather than being limited to `Concurrent` systems. The
+  implementation of `input::Input` for `FdReader2` now only requires the system
+  to implement the `Read` trait.
 
 ### Deprecated
 
@@ -116,6 +160,9 @@ This version has been yanked due to an issue that prevents the crate from buildi
 
 ### Added
 
+- The `input::FdReader2` struct has been added as a replacement for the previous
+  `FdReader` struct. The new `FdReader2` struct is designed to work with the new
+  `Concurrent` system.
 - The `system::Stat` trait has been added to represent file metadata.
 - The `system::Fstat` trait now has the associated type `Stat` to represent
   the type of file metadata returned by `fstat` and `fstatat` methods.

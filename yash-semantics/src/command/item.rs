@@ -30,7 +30,6 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
-use yash_env::system::concurrency::WriteAll as _;
 use yash_env::system::{Close, Mode, OfdAccess, Open};
 use yash_syntax::source::Location;
 use yash_syntax::syntax;
@@ -157,6 +156,7 @@ mod tests {
     use yash_env::job::ProcessState;
     use yash_env::option::Option::{Interactive, Monitor};
     use yash_env::option::State::On;
+    use yash_env::system::Concurrent;
     use yash_env::system::Signals as _;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::Inode;
@@ -202,7 +202,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut executor = futures_executor::LocalPool::new();
         state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("echo", echo_builtin());
 
         let and_or: syntax::AndOrList = "echo foo".parse().unwrap();
@@ -295,7 +295,7 @@ mod tests {
     fn item_execute_async_fail() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("return", return_builtin());
 
         let and_or: syntax::AndOrList = "return -n 42".parse().unwrap();
@@ -334,7 +334,7 @@ mod tests {
         })
     }
 
-    fn ignore_sigttin(env: &mut Env<VirtualSystem>) {
+    fn ignore_sigttin(env: &mut Env<Rc<Concurrent<VirtualSystem>>>) {
         env.traps
             .set_action(
                 &env.system,

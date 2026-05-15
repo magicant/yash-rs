@@ -24,8 +24,9 @@ use thiserror::Error;
 use yash_env::Env;
 use yash_env::job::Pid;
 use yash_env::signal;
-use yash_env::system::{Errno, Sigaction, Sigmask, Signals, Wait};
-use yash_env::trap::RunSignalTrapIfCaught;
+use yash_env::system::concurrency::WaitForSignals;
+use yash_env::system::{Errno, Wait};
+use yash_env::trap::{RunSignalTrapIfCaught, SignalSystem};
 
 /// Errors that may occur while waiting for a job
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
@@ -62,7 +63,7 @@ pub enum Error {
 /// `Err(Error::NothingToWait)` immediately.
 pub async fn wait_for_any_job_or_trap<S>(env: &mut Env<S>) -> Result<(), Error>
 where
-    S: Signals + Sigmask + Sigaction + Wait + 'static,
+    S: SignalSystem + Wait + WaitForSignals + 'static,
 {
     let RunSignalTrapIfCaught(run_trap_if_caught) = *env
         .any
@@ -115,6 +116,7 @@ mod tests {
     use std::future::{pending, ready};
     use std::ops::ControlFlow::Continue;
     use std::pin::pin;
+    use std::rc::Rc;
     use std::task::Poll;
     use yash_env::VirtualSystem;
     use yash_env::job::Job;
@@ -122,6 +124,7 @@ mod tests {
     use yash_env::semantics::ExitStatus;
     use yash_env::source::Location;
     use yash_env::subshell::Subshell;
+    use yash_env::system::Concurrent;
     use yash_env::system::SendSignal as _;
     use yash_env::system::r#virtual::{SIGSTOP, SIGTERM};
     use yash_env::test_helper::in_virtual_system;
@@ -187,14 +190,14 @@ mod tests {
     #[test]
     fn trap() {
         in_virtual_system(|mut env, state| async move {
-            env.any
-                .insert(Box::new(RunSignalTrapIfCaught::<VirtualSystem>(
-                    |env, signal| {
-                        Box::pin(async move {
-                            yash_semantics::trap::run_trap_if_caught(env, signal).await
-                        })
-                    },
-                )));
+            type TestSystem = Rc<Concurrent<VirtualSystem>>;
+            env.any.insert(Box::new(RunSignalTrapIfCaught::<TestSystem>(
+                |env, signal| {
+                    Box::pin(
+                        async move { yash_semantics::trap::run_trap_if_caught(env, signal).await },
+                    )
+                },
+            )));
 
             let system = VirtualSystem {
                 state,

@@ -25,7 +25,8 @@ use crate::common::report::report_error;
 use crate::common::report::report_failure;
 use yash_env::Env;
 use yash_env::semantics::Field;
-use yash_env::system::{Fcntl, Isatty, Write};
+use yash_env::system::Isatty;
+use yash_env::system::concurrency::WriteAll;
 
 /// Parsed command arguments for the `unalias` built-in
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -42,7 +43,7 @@ pub mod syntax;
 /// Entry point for executing the `unalias` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     match syntax::parse(env, args) {
         Ok(command) => {

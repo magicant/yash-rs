@@ -61,14 +61,15 @@ mod tests {
     use std::rc::Rc;
     use yash_env::VirtualSystem;
     use yash_env::semantics::Divert;
+    use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::test_helper::assert_stdout;
     use yash_syntax::syntax::CompoundCommand;
 
-    fn fixture() -> (Env<VirtualSystem>, Rc<RefCell<SystemState>>) {
+    fn fixture() -> (Env<Rc<Concurrent<VirtualSystem>>>, Rc<RefCell<SystemState>>) {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         (env, state)

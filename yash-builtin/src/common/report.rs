@@ -28,8 +28,8 @@ use yash_env::source::pretty::{
 };
 #[cfg(doc)]
 use yash_env::stack::Stack;
-use yash_env::system::concurrency::WriteAll as _;
-use yash_env::system::{Fcntl, Isatty, Write};
+use yash_env::system::Isatty;
+use yash_env::system::concurrency::WriteAll;
 
 /// Convenience function for constructing an error report and a divert value.
 ///
@@ -134,10 +134,10 @@ pub async fn report<'a, S, R>(
     exit_status: ExitStatus,
 ) -> yash_env::builtin::Result
 where
-    S: Isatty + Fcntl + Write,
+    S: Isatty + WriteAll,
     R: Into<Report<'a>> + 'a,
 {
-    async fn inner<S: Isatty + Fcntl + Write>(
+    async fn inner<S: Isatty + WriteAll>(
         env: &mut Env<S>,
         report: Report<'_>,
         exit_status: ExitStatus,
@@ -155,7 +155,7 @@ where
 #[inline]
 pub async fn report_failure<'a, S, R>(env: &mut Env<S>, report: R) -> yash_env::builtin::Result
 where
-    S: Isatty + Fcntl + Write,
+    S: Isatty + WriteAll,
     R: Into<Report<'a>> + 'a,
 {
     self::report(env, report, ExitStatus::FAILURE).await
@@ -167,7 +167,7 @@ where
 #[inline]
 pub async fn report_error<'a, S, R>(env: &mut Env<S>, report: R) -> yash_env::builtin::Result
 where
-    S: Isatty + Fcntl + Write,
+    S: Isatty + WriteAll,
     R: Into<Report<'a>> + 'a,
 {
     self::report(env, report, ExitStatus::ERROR).await
@@ -188,7 +188,7 @@ pub async fn report_simple<S>(
     exit_status: ExitStatus,
 ) -> yash_env::builtin::Result
 where
-    S: Isatty + Fcntl + Write,
+    S: Isatty + WriteAll,
 {
     let mut report = Report::new();
     report.r#type = ReportType::Error;
@@ -201,7 +201,7 @@ where
 /// This is a simple shortcut for calling [`report_simple`] with [`ExitStatus::FAILURE`].
 pub async fn report_simple_failure<S>(env: &mut Env<S>, title: &str) -> yash_env::builtin::Result
 where
-    S: Isatty + Fcntl + Write,
+    S: Isatty + WriteAll,
 {
     report_simple(env, title, ExitStatus::FAILURE).await
 }
@@ -211,7 +211,7 @@ where
 /// This is a simple shortcut for calling [`report_simple`] with [`ExitStatus::ERROR`].
 pub async fn report_simple_error<S>(env: &mut Env<S>, title: &str) -> yash_env::builtin::Result
 where
-    S: Isatty + Fcntl + Write,
+    S: Isatty + WriteAll,
 {
     report_simple(env, title, ExitStatus::ERROR).await
 }
@@ -226,7 +226,7 @@ pub async fn syntax_error<S>(
     location: &Location,
 ) -> yash_env::builtin::Result
 where
-    S: Isatty + Fcntl + Write,
+    S: Isatty + WriteAll,
 {
     let mut report = Report::new();
     report.r#type = ReportType::Error;

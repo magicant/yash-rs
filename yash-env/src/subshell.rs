@@ -44,11 +44,11 @@ use crate::system::SetPgid;
 use crate::system::Sigaction;
 use crate::system::Sigmask;
 use crate::system::SigmaskOp;
-use crate::system::Signals;
 use crate::system::TcSetPgrp;
 use crate::system::Wait;
-use crate::system::concurrency::RunLoop;
+use crate::system::concurrency::WaitForSignals;
 use crate::system::resource::SetRlimit;
+use crate::trap::SignalSystem;
 use std::marker::PhantomData;
 use std::pin::Pin;
 
@@ -89,14 +89,14 @@ where
         + Fork
         + GetPid
         + Open
-        + RunLoop
         + SendSignal
         + SetPgid
         + SetRlimit
         + Sigaction
         + Sigmask
-        + Signals
+        + SignalSystem
         + TcSetPgrp
+        + WaitForSignals
         + 'static,
     F: for<'a> FnOnce(&'a mut Env<S>, Option<JobControl>) -> Pin<Box<dyn Future<Output = ()> + 'a>>
         + 'static,
@@ -324,10 +324,9 @@ mod tests {
     use crate::option::State::On;
     use crate::semantics::ExitStatus;
     use crate::source::Location;
-    use crate::system::Disposition;
-    use crate::system::r#virtual::Inode;
-    use crate::system::r#virtual::SystemState;
+    use crate::system::r#virtual::{Inode, SystemState, VirtualSystem};
     use crate::system::r#virtual::{SIGCHLD, SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU};
+    use crate::system::{Concurrent, Disposition};
     use crate::test_helper::in_virtual_system;
     use crate::trap::Action;
     use assert_matches::assert_matches;
@@ -350,12 +349,14 @@ mod tests {
             let parent_pid = env.main_pid;
             let child_pid = Rc::new(Cell::new(None));
             let child_pid_2 = Rc::clone(&child_pid);
-            let subshell = Subshell::new(move |env, _job_control| {
-                Box::pin(async move {
-                    child_pid_2.set(Some(env.system.getpid()));
-                    assert_eq!(env.system.getppid(), parent_pid);
-                })
-            });
+            let subshell = Subshell::new(
+                move |env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
+                    Box::pin(async move {
+                        child_pid_2.set(Some(env.system.getpid()));
+                        assert_eq!(env.system.getppid(), parent_pid);
+                    })
+                },
+            );
             let result = subshell.start(&mut env).await.unwrap().0;
             env.wait_for_subshell(result).await.unwrap();
             assert_eq!(Some(result), child_pid.get());
@@ -434,14 +435,16 @@ mod tests {
 
             let parent_pgid = state.borrow().processes[&parent_env.main_pid].pgid;
             let state_2 = Rc::clone(&state);
-            let (child_pid, job_control) = Subshell::new(move |child_env, job_control| {
-                Box::pin(async move {
-                    let child_pid = child_env.system.getpid();
-                    assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
-                    assert_eq!(state_2.borrow().foreground, None);
-                    assert_eq!(job_control, None);
-                })
-            })
+            let (child_pid, job_control) = Subshell::new(
+                move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>, job_control| {
+                    Box::pin(async move {
+                        let child_pid = child_env.system.getpid();
+                        assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
+                        assert_eq!(state_2.borrow().foreground, None);
+                        assert_eq!(job_control, None);
+                    })
+                },
+            )
             .job_control(None)
             .start(&mut parent_env)
             .await
@@ -462,14 +465,16 @@ mod tests {
             parent_env.options.set(Monitor, On);
 
             let state_2 = Rc::clone(&state);
-            let (child_pid, job_control) = Subshell::new(move |child_env, job_control| {
-                Box::pin(async move {
-                    let child_pid = child_env.system.getpid();
-                    assert_eq!(state_2.borrow().processes[&child_pid].pgid, child_pid);
-                    assert_eq!(state_2.borrow().foreground, None);
-                    assert_eq!(job_control, Some(JobControl::Background));
-                })
-            })
+            let (child_pid, job_control) = Subshell::new(
+                move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>, job_control| {
+                    Box::pin(async move {
+                        let child_pid = child_env.system.getpid();
+                        assert_eq!(state_2.borrow().processes[&child_pid].pgid, child_pid);
+                        assert_eq!(state_2.borrow().foreground, None);
+                        assert_eq!(job_control, Some(JobControl::Background));
+                    })
+                },
+            )
             .job_control(JobControl::Background)
             .start(&mut parent_env)
             .await
@@ -491,14 +496,16 @@ mod tests {
             stub_tty(&state);
 
             let state_2 = Rc::clone(&state);
-            let (child_pid, job_control) = Subshell::new(move |child_env, job_control| {
-                Box::pin(async move {
-                    let child_pid = child_env.system.getpid();
-                    assert_eq!(state_2.borrow().processes[&child_pid].pgid, child_pid);
-                    assert_eq!(state_2.borrow().foreground, Some(child_pid));
-                    assert_eq!(job_control, Some(JobControl::Foreground));
-                })
-            })
+            let (child_pid, job_control) = Subshell::new(
+                move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>, job_control| {
+                    Box::pin(async move {
+                        let child_pid = child_env.system.getpid();
+                        assert_eq!(state_2.borrow().processes[&child_pid].pgid, child_pid);
+                        assert_eq!(state_2.borrow().foreground, Some(child_pid));
+                        assert_eq!(job_control, Some(JobControl::Foreground));
+                    })
+                },
+            )
             .job_control(JobControl::Foreground)
             .start(&mut parent_env)
             .await
@@ -538,13 +545,15 @@ mod tests {
             parent_env.options.set(Monitor, On);
 
             let state_2 = Rc::clone(&state);
-            let (child_pid, job_control) = Subshell::new(move |child_env, job_control| {
-                Box::pin(async move {
-                    let child_pid = child_env.system.getpid();
-                    assert_eq!(state_2.borrow().processes[&child_pid].pgid, child_pid);
-                    assert_eq!(job_control, Some(JobControl::Foreground));
-                })
-            })
+            let (child_pid, job_control) = Subshell::new(
+                move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>, job_control| {
+                    Box::pin(async move {
+                        let child_pid = child_env.system.getpid();
+                        assert_eq!(state_2.borrow().processes[&child_pid].pgid, child_pid);
+                        assert_eq!(job_control, Some(JobControl::Foreground));
+                    })
+                },
+            )
             .job_control(JobControl::Foreground)
             .start(&mut parent_env)
             .await
@@ -564,13 +573,15 @@ mod tests {
 
             let parent_pgid = state.borrow().processes[&parent_env.main_pid].pgid;
             let state_2 = Rc::clone(&state);
-            let (child_pid, job_control) = Subshell::new(move |child_env, _job_control| {
-                Box::pin(async move {
-                    let child_pid = child_env.system.getpid();
-                    assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
-                    assert_eq!(state_2.borrow().foreground, None);
-                })
-            })
+            let (child_pid, job_control) = Subshell::new(
+                move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
+                    Box::pin(async move {
+                        let child_pid = child_env.system.getpid();
+                        assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
+                        assert_eq!(state_2.borrow().foreground, None);
+                    })
+                },
+            )
             .job_control(JobControl::Foreground)
             .start(&mut parent_env)
             .await
@@ -594,13 +605,15 @@ mod tests {
 
             let parent_pgid = state.borrow().processes[&parent_env.main_pid].pgid;
             let state_2 = Rc::clone(&state);
-            let (child_pid, job_control) = Subshell::new(move |child_env, _job_control| {
-                Box::pin(async move {
-                    let child_pid = child_env.system.getpid();
-                    assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
-                    assert_eq!(state_2.borrow().foreground, None);
-                })
-            })
+            let (child_pid, job_control) = Subshell::new(
+                move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
+                    Box::pin(async move {
+                        let child_pid = child_env.system.getpid();
+                        assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
+                        assert_eq!(state_2.borrow().foreground, None);
+                    })
+                },
+            )
             .job_control(JobControl::Foreground)
             .start(&mut parent_env)
             .await

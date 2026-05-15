@@ -20,12 +20,12 @@ use super::ErrorCause;
 use yash_env::Env;
 use yash_env::io::Fd;
 use yash_env::path::Path;
-use yash_env::system::concurrency::WriteAll as _;
-use yash_env::system::{Close, Errno, Fcntl, Open, Seek, Write};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Close, Errno, Open, Seek};
 
 async fn fill_content<S>(env: &mut Env<S>, fd: Fd, content: &str) -> Result<(), Errno>
 where
-    S: Fcntl + Seek + Write,
+    S: Seek + WriteAll,
 {
     env.system.write_all(fd, content.as_bytes()).await?;
     env.system.lseek(fd, std::io::SeekFrom::Start(0))?;
@@ -39,7 +39,7 @@ where
 /// from.
 pub(super) async fn open_fd<S>(env: &mut Env<S>, content: String) -> Result<Fd, ErrorCause>
 where
-    S: Close + Fcntl + Open + Seek + Write,
+    S: Close + Open + Seek + WriteAll,
 {
     // TODO Use a pipe for short content
     let fd = match env.system.open_tmpfile(Path::new("/tmp")) {

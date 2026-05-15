@@ -34,7 +34,9 @@ use yash_env::job::ProcessResult;
 use yash_env::job::ProcessState;
 use yash_env::option::State;
 use yash_env::semantics::ExitStatus;
-use yash_env::system::{Sigaction, Sigmask, Signals, Wait};
+use yash_env::system::Wait;
+use yash_env::system::concurrency::WaitForSignals;
+use yash_env::trap::SignalSystem;
 
 /// Waits while the given job is running.
 ///
@@ -46,7 +48,7 @@ pub async fn wait_while_running<S>(
     job_status: &mut dyn FnMut(&mut JobList) -> ControlFlow<ExitStatus>,
 ) -> Result<ExitStatus, Error>
 where
-    S: Signals + Sigmask + Sigaction + Wait + 'static,
+    S: SignalSystem + Wait + WaitForSignals + 'static,
 {
     loop {
         if let ControlFlow::Break(exit_status) = job_status(&mut env.jobs) {

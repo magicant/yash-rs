@@ -16,7 +16,7 @@
 
 //! Items related to process management
 
-use super::{ExitStatus, Result, Signals};
+use super::{Concurrent, ExitStatus, Result, Signals};
 use crate::Env;
 #[cfg(all(doc, unix))]
 use crate::RealSystem;
@@ -113,7 +113,8 @@ type PinFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 /// Note that the output type of the task is `Infallible`. This is to ensure
 /// that the task [exits](super::Exit::exit) cleanly or
 /// [kills](super::SendSignal::kill) itself with a signal.
-pub type ChildProcessTask<S> = Box<dyn for<'a> FnOnce(&'a mut Env<S>) -> PinFuture<'a, Infallible>>;
+pub type ChildProcessTask<S> =
+    Box<dyn for<'a> FnOnce(&'a mut Env<Rc<Concurrent<S>>>) -> PinFuture<'a, Infallible>>;
 
 /// Abstract function that starts a child process
 ///
@@ -137,7 +138,8 @@ pub type ChildProcessTask<S> = Box<dyn for<'a> FnOnce(&'a mut Env<S>) -> PinFutu
 /// This function only starts the child, which continues to run asynchronously
 /// after the function returns its PID. To wait for the child to finish and
 /// obtain its exit status, use [`wait`](Wait::wait).
-pub type ChildProcessStarter<S> = Box<dyn FnOnce(&mut Env<S>, ChildProcessTask<S>) -> Pid>;
+pub type ChildProcessStarter<S> =
+    Box<dyn FnOnce(&mut Env<Rc<Concurrent<S>>>, ChildProcessTask<S>) -> Pid>;
 
 /// Trait for spawning new processes
 pub trait Fork {

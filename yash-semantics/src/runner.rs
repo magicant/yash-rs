@@ -214,6 +214,7 @@ mod tests {
     use yash_env::input::Memory;
     use yash_env::option::Option::Verbose;
     use yash_env::option::State::On;
+    use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::SIGUSR1;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::test_helper::assert_stderr;
@@ -238,7 +239,7 @@ mod tests {
     fn exit_status_in_out() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.exit_status = ExitStatus(42);
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
@@ -255,7 +256,7 @@ mod tests {
     fn executing_many_lines_of_code() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("echo", echo_builtin());
         let mut lexer = Lexer::with_code("echo 1\necho 2\necho 3;");
         let ref_env = RefCell::new(&mut env);
@@ -270,7 +271,7 @@ mod tests {
         use yash_syntax::alias::{Alias, HashEntry};
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.aliases.insert(HashEntry(Rc::new(Alias {
             name: "echo".to_string(),
             replacement: "echo alias\necho ok".to_string(),
@@ -291,7 +292,7 @@ mod tests {
     fn verbose_option() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Verbose, On);
         let ref_env = RefCell::new(&mut env);
         let input = Box::new(Echo::new(Memory::new("case _ in esac"), &ref_env));
@@ -310,7 +311,7 @@ mod tests {
         // the loop continues
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("echo", echo_builtin());
         let mut lexer = Lexer::with_code("${X?}\necho $?\n");
         let ref_env = RefCell::new(&mut env);
@@ -328,7 +329,7 @@ mod tests {
         // interactive mode, the loop breaks
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         let mut lexer = Lexer::with_code("return 123\necho $?\n");
@@ -347,7 +348,7 @@ mod tests {
         // the loop breaks
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("echo", echo_builtin());
         let mut lexer = Lexer::with_code("${X?}\necho $?\n");
         let ref_env = RefCell::new(&mut env);
@@ -361,7 +362,7 @@ mod tests {
     fn handling_syntax_error() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let mut lexer = Lexer::with_code(";;");
         let ref_env = RefCell::new(&mut env);
         let result = read_eval_loop(&ref_env, &mut lexer).now_or_never().unwrap();
@@ -373,7 +374,7 @@ mod tests {
     fn syntax_error_aborts_non_interactive_loop() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("echo", echo_builtin());
         let mut lexer = Lexer::with_code(";;\necho !");
         let ref_env = RefCell::new(&mut env);
@@ -387,7 +388,7 @@ mod tests {
     fn syntax_error_continues_interactive_loop() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("echo", echo_builtin());
         // The ";;" causes a syntax error, the following "(" is ignored, and the
         // loop continues with the command "echo $?" on the next line.
@@ -426,8 +427,9 @@ mod tests {
     #[test]
     fn running_traps_between_parsing_and_executing() {
         let system = VirtualSystem::new();
+        let pid = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.builtins.insert("echo", echo_builtin());
         env.traps
             .set_action(
@@ -443,7 +445,7 @@ mod tests {
         let _ = state
             .borrow_mut()
             .processes
-            .get_mut(&system.process_id)
+            .get_mut(&pid)
             .unwrap()
             .raise_signal(SIGUSR1);
         let mut lexer = Lexer::with_code("echo $?");

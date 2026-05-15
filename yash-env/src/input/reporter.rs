@@ -19,8 +19,8 @@ use crate::Env;
 use crate::io::Fd;
 use crate::job::fmt::Accumulator;
 use crate::option::{Interactive, Monitor, Off};
-use crate::system::concurrency::WriteAll as _;
-use crate::system::{Fcntl, Signals, Write};
+use crate::system::Signals;
+use crate::system::concurrency::WriteAll;
 use std::cell::RefCell;
 
 /// `Input` decorator that reports job status changes before reading a line
@@ -57,7 +57,7 @@ impl<S, T: Clone> Clone for Reporter<'_, '_, S, T> {
     }
 }
 
-impl<S: Fcntl + Signals + Write, T: Input> Input for Reporter<'_, '_, S, T> {
+impl<S: Signals + WriteAll, T: Input> Input for Reporter<'_, '_, S, T> {
     #[allow(
         clippy::await_holding_refcell_ref,
         reason = "other decorators, the parser, or the executor do not run concurrently with this method"
@@ -68,7 +68,7 @@ impl<S: Fcntl + Signals + Write, T: Input> Input for Reporter<'_, '_, S, T> {
     }
 }
 
-async fn report<S: Fcntl + Signals + Write>(env: &mut Env<S>) {
+async fn report<S: Signals + WriteAll>(env: &mut Env<S>) {
     if env.options.get(Interactive) == Off || env.options.get(Monitor) == Off {
         return;
     }
@@ -100,6 +100,7 @@ mod tests {
     use crate::VirtualSystem;
     use crate::job::{Job, Pid, ProcessState};
     use crate::option::On;
+    use crate::system::Concurrent;
     use crate::system::r#virtual::SystemState;
     use crate::test_helper::assert_stderr;
     use futures_util::FutureExt as _;
@@ -121,7 +122,7 @@ mod tests {
     fn reporter_shows_job_status_before_reading_input() {
         let system = VirtualSystem::new();
         let state = system.state.clone();
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.jobs.add({
             let mut job = Job::new(Pid(10));
             job.state_changed = true;
@@ -157,7 +158,7 @@ mod tests {
     fn all_jobs_with_changed_status_are_reported() {
         let system = VirtualSystem::new();
         let state = system.state.clone();
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.jobs.add({
             let mut job = Job::new(Pid(10));
             job.state_changed = true;
@@ -229,7 +230,7 @@ mod tests {
     fn no_report_if_not_interactive() {
         let system = VirtualSystem::new();
         let state = system.state.clone();
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.jobs.add({
             let mut job = Job::new(Pid(10));
             job.state_changed = true;
@@ -253,7 +254,7 @@ mod tests {
     fn no_report_if_not_monitor() {
         let system = VirtualSystem::new();
         let state = system.state.clone();
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.jobs.add({
             let mut job = Job::new(Pid(10));
             job.state_changed = true;

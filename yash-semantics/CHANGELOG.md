@@ -13,12 +13,23 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
-- The `Runtime` trait now requires the `yash_env::system::concurrency::RunLoop`
-  trait as a supertrait.
-- The type parameter bound `S: yash_env::system::concurrency::RunLoop` has been
-  added to the following items:
-    - `impl<S> Runtime for S`
-    - `command::simple_command::start_external_utility_in_subshell_and_wait`
+- The `Runtime` trait now requires the `yash_env::system::concurrency::ReadAll`,
+  `yash_env::system::concurrency::Select`,
+  `yash_env::system::concurrency::WaitForSignals`,
+  `yash_env::system::concurrency::WriteAll`, and
+  `yash_env::trap::SignalSystem`
+  traits as supertraits, and no longer requires the
+  `yash_env::system::CaughtSignals`, `yash_env::system::Select`, and
+  `yash_env::system::Write` traits. The blanket implementation of `Runtime` has
+  been adjusted accordingly.
+- The type parameter bound
+  `S: yash_env::system::concurrency::WaitForSignals + yash_env::system::concurrency::WriteAll + yash_env::trap::SignalSystem`
+  has been added to `command::simple_command::start_external_utility_in_subshell_and_wait`.
+- The implementation of the `Handle` trait for `yash_syntax::parser::Error`,
+  `expansion::Error`, and `redir::Error` now requires the trait bounds
+  `S: yash_env::system::concurrency::WriteAll + yash_env::system::Isatty`
+  instead of
+  `S: yash_env::system::Fcntl + yash_env::system::Write + yash_env::system::Isatty`.
 - Public dependency versions:
     - yash-env 0.13.0 → 0.14.0
     - yash-syntax 0.20.0 → 0.21.0

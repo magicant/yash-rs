@@ -22,8 +22,8 @@ use yash_env::Env;
 use yash_env::io::Fd;
 use yash_env::path::Path;
 use yash_env::source::pretty::{Report, ReportType};
-use yash_env::system::concurrency::WriteAll as _;
-use yash_env::system::{Errno, Fcntl, Isatty, Write};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Errno, Isatty};
 
 impl Origin {
     /// Whether the built-in should print the target directory path.
@@ -39,7 +39,7 @@ impl Origin {
 /// Prints the new working directory path if needed.
 pub async fn print_path<S>(env: &mut Env<S>, path: &Path, origin: &Origin)
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     if !origin.should_print_path() {
         return;
@@ -57,7 +57,7 @@ where
 /// The message is only a warning because it does not affect the exit status.
 async fn handle_print_error<S>(env: &mut Env<S>, errno: Errno)
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     let mut report = Report::new();
     report.r#type = ReportType::Warning;

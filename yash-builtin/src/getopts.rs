@@ -35,8 +35,8 @@ use std::num::NonZeroUsize;
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::system::concurrency::WriteAll as _;
-use yash_env::system::{Fcntl, Isatty, Write};
+use yash_env::system::Isatty;
+use yash_env::system::concurrency::WriteAll;
 use yash_env::variable::OPTIND;
 
 pub mod model;
@@ -65,7 +65,7 @@ fn indexes_to_optind(arg_index: NonZeroUsize, char_index: NonZeroUsize) -> Strin
 /// Entry point of the getopts built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     // Parse arguments
     let operands = match parse_arguments(&[], Mode::with_env(env), args) {

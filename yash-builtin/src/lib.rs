@@ -96,13 +96,14 @@ use yash_env::builtin::Type::{Elective, Mandatory, Special, Substitutive};
 pub use yash_env::builtin::*;
 #[cfg(doc)]
 use yash_env::stack::{Frame, Stack};
-use yash_env::system::concurrency::RunLoop;
+use yash_env::system::concurrency::{WaitForSignals, WriteAll};
 use yash_env::system::resource::{GetRlimit, SetRlimit};
 use yash_env::system::{
     Chdir, Clock, Close, Dup, Exec, Exit, Fcntl, Fork, Fstat, GetCwd, GetPid, GetPw, GetUid,
     IsExecutableFile, Isatty, Open, Pipe, Read, Seek, SendSignal, SetPgid, ShellPath, Sigaction,
-    Sigmask, Signals, Sysconf, TcGetPgrp, TcSetPgrp, Times, Umask, Wait, Write,
+    Sigmask, Sysconf, TcGetPgrp, TcSetPgrp, Times, Umask, Wait, Write,
 };
+use yash_env::trap::SignalSystem;
 
 /// Returns an iterator over all the implemented built-in utilities.
 ///
@@ -115,6 +116,7 @@ where
     // here for future extensibility.
     S: Chdir
         + Clock
+        + Clone
         + Close
         + Dup
         + Exec
@@ -132,7 +134,6 @@ where
         + Open
         + Pipe
         + Read
-        + RunLoop
         + Seek
         + SendSignal
         + SetPgid
@@ -140,14 +141,16 @@ where
         + ShellPath
         + Sigaction
         + Sigmask
-        + Signals
+        + SignalSystem
         + Sysconf
         + TcGetPgrp
         + TcSetPgrp
         + Times
         + Umask
         + Wait
+        + WaitForSignals
         + Write
+        + WriteAll
         + 'static,
 {
     [
@@ -301,10 +304,12 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::rc::Rc;
+    use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::VirtualSystem;
 
     #[test]
     fn iter_is_sorted() {
-        assert!(iter::<VirtualSystem>().is_sorted_by_key(|pair| pair.0));
+        assert!(iter::<Rc<Concurrent<VirtualSystem>>>().is_sorted_by_key(|pair| pair.0));
     }
 }

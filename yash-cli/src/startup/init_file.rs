@@ -40,10 +40,8 @@ use yash_env::option::Option::Interactive;
 use yash_env::option::State::Off;
 use yash_env::parser::Config;
 use yash_env::stack::Frame;
-use yash_env::system::concurrency::WriteAll as _;
-use yash_env::system::{
-    Close, Dup, Errno, Fcntl, GetUid, Isatty, Mode, OfdAccess, Open, OpenFlag, Write,
-};
+use yash_env::system::concurrency::WriteAll;
+use yash_env::system::{Close, Dup, Errno, GetUid, Isatty, Mode, OfdAccess, Open, OpenFlag};
 use yash_env::variable::ENV;
 use yash_semantics::expansion::expand_text;
 use yash_semantics::read_eval_loop;
@@ -65,7 +63,7 @@ pub enum DefaultFilePathError {
 
 impl<S> Handle<S> for DefaultFilePathError
 where
-    S: Fcntl + Isatty + Write,
+    S: Isatty + WriteAll,
 {
     async fn handle(&self, env: &mut Env<S>) -> yash_semantics::Result {
         match self {
@@ -153,7 +151,7 @@ where
 /// If `path` is an empty string, the function returns immediately.
 pub async fn run_init_file<S>(env: &mut Env<S>, path: &str)
 where
-    S: Runtime + 'static,
+    S: Clone + Runtime + 'static,
 {
     if path.is_empty() {
         return;
@@ -216,7 +214,7 @@ where
 /// path are reported to the standard error.
 pub async fn run_rcfile<S>(env: &mut Env<S>, file: InitFile)
 where
-    S: GetUid + Runtime + 'static,
+    S: Clone + GetUid + Runtime + 'static,
 {
     match resolve_rcfile_path(env, file).await {
         Ok(path) => run_init_file(env, &path).await,
@@ -231,7 +229,7 @@ mod tests {
     use futures_util::FutureExt as _;
     use yash_env::VirtualSystem;
     use yash_env::option::State::On;
-    use yash_env::system::{Gid, Uid};
+    use yash_env::system::{Concurrent, Gid, Uid};
     use yash_env::variable::Scope::Global;
 
     #[test]
@@ -334,7 +332,7 @@ mod tests {
         let system = VirtualSystem::new();
         system.current_process_mut().set_uid(Uid(0));
         system.current_process_mut().set_euid(Uid(10));
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         let path = "/path/to/rcfile".to_string();
         let file = InitFile::File { path };
@@ -347,7 +345,7 @@ mod tests {
         let system = VirtualSystem::new();
         system.current_process_mut().set_gid(Gid(0));
         system.current_process_mut().set_egid(Gid(10));
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         let path = "/path/to/rcfile".to_string();
         let file = InitFile::File { path };

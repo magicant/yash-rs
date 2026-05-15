@@ -48,14 +48,15 @@ use enumset::EnumSet;
 use enumset::EnumSetType;
 use yash_env::Env;
 use yash_env::semantics::Field;
-use yash_env::system::concurrency::RunLoop;
+use yash_env::system::concurrency::{WaitForSignals, WriteAll};
 #[cfg(all(doc, unix))]
 use yash_env::system::real::RealSystem;
 use yash_env::system::resource::SetRlimit;
 use yash_env::system::{
-    Close, Dup, Exec, Exit, Fcntl, Fork, Fstat, GetCwd, GetPid, IsExecutableFile, Isatty, Open,
-    SendSignal, SetPgid, ShellPath, Sigaction, Sigmask, Signals, Sysconf, TcSetPgrp, Wait, Write,
+    Close, Dup, Exec, Exit, Fork, Fstat, GetCwd, GetPid, IsExecutableFile, Isatty, Open,
+    SendSignal, SetPgid, ShellPath, Sigaction, Sigmask, Sysconf, TcSetPgrp, Wait,
 };
+use yash_env::trap::SignalSystem;
 
 /// Category of command name resolution
 ///
@@ -177,7 +178,6 @@ impl Command {
             + Dup
             + Exec
             + Exit
-            + Fcntl
             + Fork
             + Fstat
             + GetCwd
@@ -185,18 +185,18 @@ impl Command {
             + IsExecutableFile
             + Isatty
             + Open
-            + RunLoop
             + SendSignal
             + SetPgid
             + SetRlimit
             + ShellPath
             + Sigaction
             + Sigmask
-            + Signals
+            + SignalSystem
             + Sysconf
             + TcSetPgrp
             + Wait
-            + Write
+            + WaitForSignals
+            + WriteAll
             + 'static,
     {
         match self {
@@ -220,7 +220,6 @@ where
         + Dup
         + Exec
         + Exit
-        + Fcntl
         + Fork
         + Fstat
         + GetCwd
@@ -228,18 +227,18 @@ where
         + IsExecutableFile
         + Isatty
         + Open
-        + RunLoop
         + SendSignal
         + SetPgid
         + SetRlimit
         + ShellPath
         + Sigaction
         + Sigmask
-        + Signals
+        + SignalSystem
         + Sysconf
         + TcSetPgrp
         + Wait
-        + Write
+        + WaitForSignals
+        + WriteAll
         + 'static,
 {
     match syntax::parse(env, args) {

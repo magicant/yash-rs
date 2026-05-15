@@ -17,13 +17,13 @@
 //! Definition of `Runtime`
 
 use std::fmt::Debug;
-use yash_env::system::concurrency::RunLoop;
+use yash_env::system::concurrency::{ReadAll, Select, WaitForSignals, WriteAll};
 use yash_env::system::resource::SetRlimit;
 use yash_env::system::{
-    CaughtSignals, Clock, Close, Dup, Exec, Exit, Fcntl, Fork, Fstat, GetPid, GetPw,
-    IsExecutableFile, Isatty, Open, Pipe, Read, Seek, Select, SendSignal, SetPgid, ShellPath,
-    Sigaction, Sigmask, Signals, TcSetPgrp, Wait, Write,
+    Clock, Close, Dup, Exec, Exit, Fcntl, Fork, Fstat, GetPid, GetPw, IsExecutableFile, Isatty,
+    Open, Pipe, Read, Seek, SendSignal, SetPgid, ShellPath, Sigaction, Sigmask, TcSetPgrp, Wait,
 };
+use yash_env::trap::SignalSystem;
 
 /// Runtime environment for executing shell commands
 ///
@@ -34,8 +34,7 @@ use yash_env::system::{
 /// implementation. Therefore, this trait serves as a convenient shorthand to
 /// express the required capabilities.
 pub trait Runtime:
-    CaughtSignals
-    + Clock
+    Clock
     + Close
     + Debug
     + Dup
@@ -51,7 +50,7 @@ pub trait Runtime:
     + Open
     + Pipe
     + Read
-    + RunLoop
+    + ReadAll
     + Seek
     + Select
     + SendSignal
@@ -60,18 +59,18 @@ pub trait Runtime:
     + ShellPath
     + Sigaction
     + Sigmask
-    + Signals
+    + SignalSystem
     + TcSetPgrp
     + Wait
-    + Write
+    + WaitForSignals
+    + WriteAll
 {
 }
 
 /// Any type automatically implements `Runtime` if it implements all the
 /// supertraits of `Runtime`.
 impl<S> Runtime for S where
-    S: CaughtSignals
-        + Clock
+    S: Clock
         + Close
         + Debug
         + Dup
@@ -87,7 +86,7 @@ impl<S> Runtime for S where
         + Open
         + Pipe
         + Read
-        + RunLoop
+        + ReadAll
         + Seek
         + Select
         + SendSignal
@@ -96,9 +95,10 @@ impl<S> Runtime for S where
         + ShellPath
         + Sigaction
         + Sigmask
-        + Signals
+        + SignalSystem
         + TcSetPgrp
         + Wait
-        + Write
+        + WaitForSignals
+        + WriteAll
 {
 }

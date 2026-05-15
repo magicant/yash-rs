@@ -46,11 +46,9 @@ use yash_env::option::State::Off;
 use yash_env::semantics::Divert::Interrupt;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::system::concurrency::WriteAll as _;
-use yash_env::system::{
-    Close, Dup, Fcntl, Isatty, Open, SendSignal, Sigaction, Sigmask, Signals, TcSetPgrp, Wait,
-    Write,
-};
+use yash_env::system::concurrency::{WaitForSignals, WriteAll};
+use yash_env::system::{Close, Dup, Isatty, Open, SendSignal, Sigaction, Sigmask, TcSetPgrp, Wait};
+use yash_env::trap::SignalSystem;
 
 /// Resumes the job at the specified index.
 ///
@@ -65,16 +63,16 @@ async fn resume_job_by_index<S>(
 where
     S: Close
         + Dup
-        + Fcntl
         + Isatty
         + Open
         + SendSignal
-        + Signals
+        + SignalSystem
         + Sigmask
         + Sigaction
         + TcSetPgrp
         + Wait
-        + Write,
+        + WaitForSignals
+        + WriteAll,
 {
     let tty = env.get_tty().await.ok();
 
@@ -137,16 +135,16 @@ async fn resume_job_by_id<S>(
 where
     S: Close
         + Dup
-        + Fcntl
         + Isatty
         + Open
         + SendSignal
-        + Signals
+        + SignalSystem
         + Sigmask
         + Sigaction
         + TcSetPgrp
         + Wait
-        + Write,
+        + WaitForSignals
+        + WriteAll,
 {
     let job_id = parse(job_id)?;
     let index = job_id.find(&env.jobs)?;
@@ -158,16 +156,16 @@ pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
     S: Close
         + Dup
-        + Fcntl
         + Isatty
         + Open
         + SendSignal
-        + Signals
+        + SignalSystem
         + Sigmask
         + Sigaction
         + TcSetPgrp
         + Wait
-        + Write,
+        + WaitForSignals
+        + WriteAll,
 {
     let (options, operands) = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok(result) => result,
@@ -216,6 +214,7 @@ mod tests {
     use yash_env::option::State::On;
     use yash_env::subshell::JobControl;
     use yash_env::subshell::Subshell;
+    use yash_env::system::Concurrent;
     use yash_env::system::GetPid as _;
     use yash_env::system::TcGetPgrp as _;
     use yash_env::system::r#virtual::Process;
@@ -225,7 +224,7 @@ mod tests {
     use yash_env::test_helper::in_virtual_system;
     use yash_env::test_helper::stub_tty;
 
-    async fn suspend(env: &mut Env<VirtualSystem>) {
+    async fn suspend(env: &mut Env<Rc<Concurrent<VirtualSystem>>>) {
         let target = env.system.getpid();
         env.system.kill(target, Some(SIGSTOP)).await.unwrap();
     }
@@ -388,7 +387,7 @@ mod tests {
     #[test]
     fn resume_job_by_index_sends_no_sigcont_to_dead_process() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         env.options.set(Monitor, On);
         let pid = Pid(123);
         let mut job = Job::new(pid);
@@ -484,7 +483,7 @@ mod tests {
     #[test]
     fn main_without_operands_fails_if_there_is_no_current_job() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         env.options.set(Monitor, On);
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
@@ -539,7 +538,7 @@ mod tests {
     #[test]
     fn main_with_operand_fails_if_jobs_is_not_found() {
         let system = VirtualSystem::new();
-        let mut env = Env::with_system(system.clone());
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         env.options.set(Monitor, On);
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
