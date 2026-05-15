@@ -49,6 +49,7 @@ use crate::system::Wait;
 use crate::system::concurrency::WaitForSignals;
 use crate::system::resource::SetRlimit;
 use crate::trap::SignalSystem;
+use std::marker::PhantomData;
 use std::pin::Pin;
 
 /// Job state of a newly created subshell
@@ -68,7 +69,7 @@ pub struct Subshell<S, F> {
     task: F,
     job_control: Option<JobControl>,
     ignores_sigint_sigquit: bool,
-    phantom_data: std::marker::PhantomData<fn(&mut Env<S>)>,
+    phantom_data: PhantomData<fn(&mut Env<S>)>,
 }
 
 impl<S, F> std::fmt::Debug for Subshell<S, F> {
@@ -106,7 +107,7 @@ where
             task,
             job_control: None,
             ignores_sigint_sigquit: false,
-            phantom_data: std::marker::PhantomData,
+            phantom_data: PhantomData,
         }
     }
 
