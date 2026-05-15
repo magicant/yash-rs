@@ -27,7 +27,7 @@ Produce:
 ## Procedure
 
 1. Inspect the intended commit scope.
-   Decide whether to describe staged changes, unstaged changes, or a specific set of files. If the scope is unclear, ask or state the assumption.
+   Decide whether to describe staged changes, unstaged changes, or a specific set of files. If the scope is unclear, first ask the user for clarification. If no response is provided, explicitly state the assumed scope as either staged changes, unstaged changes, or all files, and explain why this assumption was made.
 
 2. Identify the core change.
    Reduce the diff to one primary action such as fixing a bug, adding behavior, refactoring an internal path, updating docs, or adjusting tests.
@@ -36,7 +36,7 @@ Produce:
    Extract the concrete edits first, then identify the reason, regression, invariant, or user-facing effect. If the reason is not visible in the diff, say so instead of guessing.
 
 4. Choose the message shape.
-   Use a subject only for small self-explanatory changes. Add a body when the change affects behavior, touches multiple areas, has follow-up constraints, or needs context for reviewers.
+   Use a subject-only message for small self-explanatory changes. Add a body when the change affects behavior, touches multiple areas, has follow-up constraints, or needs context for reviewers.
 
 5. Write the subject line.
    Prefer the imperative mood. Keep it specific and compact. Target 50 characters or fewer when possible, and keep the subject at 72 characters or fewer.
@@ -47,6 +47,7 @@ Produce:
 
 7. Validate against the diff.
    Check that every claim is supported by the changes. Remove filler words, avoid generic verbs like "add", "fix", "update" or "improve", and make sure unrelated edits are not bundled into the description.
+   If the provided diff is incomplete or irrelevant, inform the user and request clarification or a valid diff.
    Confirm the subject does not match marker patterns like `^[a-z]+(\([^\)]*\))?!?:`.
 
 ## Decision Points
@@ -78,7 +79,7 @@ Use this structure:
 <optional body>
 ```
 
-Keep the subject at 72 characters or fewer, preferably 50 or fewer, and wrap each body line at 72 characters.
+Keep the subject concise and under 72 characters. Wrap body lines at 72 characters.
 
 If useful, also provide 2 to 3 alternative subject lines with different emphasis, such as user-visible behavior, subsystem, or bug fix framing. The alternatives can be outside the code block.
 
