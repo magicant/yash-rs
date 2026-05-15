@@ -100,7 +100,6 @@ impl Command {
     /// Executes the `wait` built-in.
     pub async fn execute<S>(self, env: &mut Env<S>) -> crate::Result
     where
-        // S: Fcntl + Isatty + Sigaction + Sigmask + Signals + Wait + Write + 'static,
         S: Isatty + SignalSystem + Wait + WaitForSignals + WriteAll + 'static,
     {
         // Resolve job specifications to indexes
