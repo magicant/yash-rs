@@ -21,7 +21,7 @@
 //! After configuring the builder with some options, you can
 //! [start](Subshell::start) the subshell.
 //!
-//! [`Subshell`] is implemented as a wrapper around [`Fork::new_child_process`].
+//! [`Subshell`] is implemented as a wrapper around [`Env::run_in_child_process`].
 //! You should prefer `Subshell` for the purpose of creating a subshell because
 //! it helps to arrange the child process properly.
 
@@ -49,7 +49,6 @@ use crate::system::Wait;
 use crate::system::concurrency::WaitForSignals;
 use crate::system::resource::SetRlimit;
 use crate::trap::SignalSystem;
-use std::marker::PhantomData;
 use std::pin::Pin;
 
 /// Job state of a newly created subshell
@@ -69,7 +68,7 @@ pub struct Subshell<S, F> {
     task: F,
     job_control: Option<JobControl>,
     ignores_sigint_sigquit: bool,
-    phantom_data: PhantomData<fn(&mut Env<S>)>,
+    phantom_data: std::marker::PhantomData<fn(&mut Env<S>)>,
 }
 
 impl<S, F> std::fmt::Debug for Subshell<S, F> {
@@ -83,24 +82,11 @@ impl<S, F> std::fmt::Debug for Subshell<S, F> {
 
 impl<S, F> Subshell<S, F>
 where
-    S: Close
-        + Dup
-        + Exit
-        + Fork
-        + GetPid
-        + Open
-        + SendSignal
-        + SetPgid
-        + SetRlimit
-        + Sigaction
-        + Sigmask
-        + SignalSystem
-        + TcSetPgrp
-        + WaitForSignals
-        + 'static,
     F: for<'a> FnOnce(&'a mut Env<S>, Option<JobControl>) -> Pin<Box<dyn Future<Output = ()> + 'a>>
         + 'static,
-    // TODO Revisit to simplify this function type when impl Future is allowed in return type
+    // TODO Revisit to simplify this function type.
+    // Using `AsyncFnOnce(&mut Env<S>, Option<JobControl>)` was investigated but async closures
+    // do not currently satisfy the required higher-ranked trait bound in Rust.
 {
     /// Creates a new subshell builder with a task.
     ///
@@ -120,7 +106,7 @@ where
             task,
             job_control: None,
             ignores_sigint_sigquit: false,
-            phantom_data: PhantomData,
+            phantom_data: std::marker::PhantomData,
         }
     }
 
@@ -158,7 +144,28 @@ where
         self.ignores_sigint_sigquit = ignore;
         self
     }
+}
 
+impl<S, F> Subshell<S, F>
+where
+    S: Close
+        + Dup
+        + Exit
+        + Fork
+        + GetPid
+        + Open
+        + SendSignal
+        + SetPgid
+        + SetRlimit
+        + Sigaction
+        + Sigmask
+        + SignalSystem
+        + TcSetPgrp
+        + WaitForSignals
+        + 'static,
+    F: for<'a> FnOnce(&'a mut Env<S>, Option<JobControl>) -> Pin<Box<dyn Future<Output = ()> + 'a>>
+        + 'static,
+{
     /// Starts the subshell.
     ///
     /// This function creates a new child process that runs the task contained
@@ -367,8 +374,9 @@ mod tests {
     fn subshell_start_failing() {
         let mut executor = LocalPool::new();
         let env = &mut Env::new_virtual();
-        let subshell =
-            Subshell::new(|_env, _job_control| unreachable!("subshell not expected to run"));
+        let subshell = Subshell::new(|_env, _job_control| -> Pin<Box<dyn Future<Output = ()>>> {
+            unreachable!("subshell not expected to run")
+        });
         let result = executor.run_until(subshell.start(env));
         assert_eq!(result, Err(Errno::ENOSYS));
     }
@@ -527,7 +535,7 @@ mod tests {
             parent_env.options.set(Monitor, On);
             stub_tty(&state);
 
-            let _ = Subshell::new(move |_, _| Box::pin(std::future::ready(())))
+            let _ = Subshell::new(|_, _| Box::pin(std::future::ready(())))
                 .job_control(JobControl::Foreground)
                 .start(&mut parent_env)
                 .await

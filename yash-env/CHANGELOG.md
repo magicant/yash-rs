@@ -66,6 +66,12 @@ A _private dependency_ is used internally and not visible to downstream users.
       instead of `S: system::Signals + system::Sigmask + system::Sigaction + system::Wait`.
     - The inherent methods of `subshell::Subshell` now additionally require the
       trait bound `S: trap::SignalSystem + 'static`.
+    - The `Subshell::new`, `Subshell::job_control`, and
+      `Subshell::ignore_sigint_sigquit` methods no longer require the heavy
+      `S: Close + Dup + …` bounds that were previously on the entire impl block.
+      These bounds are now only required by `Subshell::start` and
+      `Subshell::start_and_wait`, allowing `Subshell` to be created and
+      configured without those bounds.
     - The `io::print_report` and `io::print_error` functions now require the trait bound
       `S: system::Isatty + system::concurrency::WriteAll` instead of
       `S: system::Isatty + system::Fcntl + system::Write`
