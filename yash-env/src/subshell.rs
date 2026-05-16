@@ -31,10 +31,7 @@
 use crate::Env;
 use crate::job::Pid;
 use crate::job::ProcessResult;
-use crate::job::tcsetpgrp_with_block;
-use crate::semantics::exit_or_raise;
 use crate::signal;
-use crate::stack::Frame;
 use crate::system::Close;
 use crate::system::Dup;
 use crate::system::Errno;
@@ -169,6 +166,14 @@ where
         self
     }
 
+    fn into_config_and_task(self) -> (Config, F) {
+        let config = Config {
+            job_control: self.job_control,
+            ignores_sigint_sigquit: self.ignores_sigint_sigquit,
+        };
+        (config, self.task)
+    }
+
     /// Starts the subshell.
     ///
     /// This function creates a new child process that runs the task contained
@@ -191,81 +196,12 @@ where
     /// child process ID and the actual job control. Otherwise, it indicates the
     /// error.
     pub async fn start(self, env: &mut Env<S>) -> Result<(Pid, Option<JobControl>), Errno> {
-        // Do some preparation before starting a child process
-        let job_control = env.controls_jobs().then_some(self.job_control).flatten();
-        let tty = match job_control {
-            None | Some(JobControl::Background) => None,
-            // Open the tty in the parent process so we can reuse the FD for other jobs
-            Some(JobControl::Foreground) => env.get_tty().await.ok(),
-        };
-
-        let ignore_sigint_sigquit = self.ignores_sigint_sigquit && job_control.is_none();
-        let original_mask = if ignore_sigint_sigquit {
-            // Block SIGINT and SIGQUIT before forking the child process to
-            // prevent the child from being killed by those signals until the
-            // child starts ignoring them.
-            Some(block_sigint_sigquit(&env.system).await?)
-        } else {
-            None
-        };
-        let keep_internal_dispositions_for_stoppers = job_control.is_none();
-
-        // Define the child process task
-        const ME: Pid = Pid(0);
-        let task = move |mut child_env: Env<S>, ()| async move {
-            let env = &mut *child_env.push_frame(Frame::Subshell);
-
-            if let Some(job_control) = job_control {
-                if let Ok(()) = env.system.setpgid(ME, ME) {
-                    match job_control {
-                        JobControl::Background => (),
-                        JobControl::Foreground => {
-                            if let Some(tty) = tty {
-                                let pgid = env.system.getpgrp();
-                                tcsetpgrp_with_block(&env.system, tty, pgid).await.ok();
-                            }
-                        }
-                    }
-                }
-            }
-            env.jobs.disown_all();
-
-            env.traps
-                .enter_subshell(
-                    &env.system,
-                    ignore_sigint_sigquit,
-                    keep_internal_dispositions_for_stoppers,
-                )
-                .await;
-
-            (self.task)(env, job_control).await;
-            exit_or_raise(&env.system, env.exit_status).await
-        };
-
-        // Start the child
-        let (result, ()) = env.run_in_child_process((), task);
-
-        // Restore the original signal mask in the parent process. Need to do
-        // this before returning the error if the child process creation failed,
-        // to avoid leaving the parent process with an unexpected signal mask.
-        if let Some(mask) = original_mask {
-            restore_sigmask(&env.system, &mask).await.ok();
-        }
-
-        let child_pid = result?;
-
-        // The finishing
-        if job_control.is_some() {
-            // We should setpgid not only in the child but also in the parent to
-            // make sure the child is in a new process group before the parent
-            // returns from the start function.
-            let _ = env.system.setpgid(child_pid, ME);
-
-            // We don't tcsetpgrp in the parent. It would mess up the child
-            // which may have started another shell doing its own job control.
-        }
-
-        Ok((child_pid, job_control))
+        let (config, task) = self.into_config_and_task();
+        config
+            .start(env, async move |env, job_control| {
+                task(env, job_control).await
+            })
+            .await
     }
 
     /// Starts the subshell and waits for it to finish.
@@ -291,23 +227,12 @@ where
     where
         S: Wait,
     {
-        let (pid, job_control) = self.start(env).await?;
-        let result = loop {
-            let result = env.wait_for_subshell_to_halt(pid).await?.1;
-            if !result.is_stopped() || job_control.is_some() {
-                break result;
-            }
-        };
-
-        if job_control == Some(JobControl::Foreground) {
-            if let Some(tty) = env.tty {
-                tcsetpgrp_with_block(&env.system, tty, env.main_pgid)
-                    .await
-                    .ok();
-            }
-        }
-
-        Ok((pid, result))
+        let (config, task) = self.into_config_and_task();
+        config
+            .start_and_wait(env, async move |env, job_control| {
+                task(env, job_control).await
+            })
+            .await
     }
 }
 
@@ -338,6 +263,7 @@ mod tests {
     use crate::option::State::On;
     use crate::semantics::ExitStatus;
     use crate::source::Location;
+    use crate::stack::Frame;
     use crate::system::r#virtual::{Inode, SystemState, VirtualSystem};
     use crate::system::r#virtual::{SIGCHLD, SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU};
     use crate::system::{Concurrent, Disposition};
