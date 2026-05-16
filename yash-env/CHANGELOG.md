@@ -45,6 +45,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `Env::run_in_child_process` method has been added as a convenient wrapper
   around `system::Fork::run_in_child_process` for running a task in a child
   process with the current environment state.
+- The `subshell::Config` struct has been added as a new API for creating and
+  starting subshells. It replaces the previous `Subshell` struct and provides a
+  more flexible and ergonomic way to configure subshells.
 - The `Default` trait is now implemented for `Env<S>` where
   `S: Default + system::GetPid`.
 
@@ -115,6 +118,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   `system::Concurrent::new_child_process` methods are now deprecated in favor of
   the new `run_in_child_process` method, which provides a more ergonomic way to
   create child processes.
+- The `subshell::Subshell` struct is now deprecated in favor of
+  `subshell::Config`.
 
 ### Removed
 

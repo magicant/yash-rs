@@ -123,7 +123,7 @@ mod tests {
     use yash_env::job::ProcessState;
     use yash_env::semantics::ExitStatus;
     use yash_env::source::Location;
-    use yash_env::subshell::Subshell;
+    use yash_env::subshell::Config;
     use yash_env::system::Concurrent;
     use yash_env::system::SendSignal as _;
     use yash_env::system::r#virtual::{SIGSTOP, SIGTERM};
@@ -137,8 +137,10 @@ mod tests {
             stub_run_signal_trap_if_caught(&mut env);
 
             // Start a child process that never exits.
-            let subshell = Subshell::new(|_, _| Box::pin(pending()));
-            subshell.start(&mut env).await.unwrap();
+            Config::new()
+                .start(&mut env, async |_, _| pending().await)
+                .await
+                .unwrap();
 
             // The job is not finished, so the function keeps waiting.
             let future = pin!(wait_for_any_job_or_trap(&mut env));
@@ -152,8 +154,11 @@ mod tests {
             stub_run_signal_trap_if_caught(&mut env);
 
             // Start a child process that exits immediately.
-            let subshell = Subshell::new(|_, _| Box::pin(ready(())));
-            let pid = subshell.start(&mut env).await.unwrap().0;
+            let pid = Config::new()
+                .start(&mut env, async |_, _| ready(()).await)
+                .await
+                .unwrap()
+                .0;
             let index = env.jobs.add(Job::new(pid));
 
             // The job is finished, so the function returns immediately.
@@ -173,8 +178,11 @@ mod tests {
             stub_run_signal_trap_if_caught(&mut env);
 
             // Start a child process that never exits.
-            let subshell = Subshell::new(|_, _| Box::pin(pending()));
-            let pid = subshell.start(&mut env).await.unwrap().0;
+            let pid = Config::new()
+                .start(&mut env, async |_, _| pending().await)
+                .await
+                .unwrap()
+                .0;
             let index = env.jobs.add(Job::new(pid));
             // Suspend the child process.
             env.system.kill(pid, Some(SIGSTOP)).await.unwrap();
@@ -205,8 +213,10 @@ mod tests {
             };
 
             // Start a child process that never exits.
-            let subshell = Subshell::new(|_, _| Box::pin(pending()));
-            subshell.start(&mut env).await.unwrap();
+            Config::new()
+                .start(&mut env, async |_, _| pending().await)
+                .await
+                .unwrap();
 
             // Set a trap for SIGTERM.
             env.traps

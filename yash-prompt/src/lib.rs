@@ -77,6 +77,8 @@
 //! # }.now_or_never().unwrap();
 //! ```
 
+#![cfg_attr(test, recursion_limit = "256")]
+
 mod expand_posix;
 pub use expand_posix::ExpandText;
 pub use expand_posix::expand_posix;

@@ -31,8 +31,7 @@ use yash_env::job::add_job_if_suspended;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
-use yash_env::subshell::JobControl;
-use yash_env::subshell::Subshell;
+use yash_env::subshell::Config;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
 
@@ -46,29 +45,25 @@ pub async fn execute_absent_target<S: Runtime + 'static>(
     let redir_exit_status = if let Some(redir) = redirs.first() {
         let first_redir_location = redir.body.operand().location.clone();
         let redirs_2 = Rc::clone(redirs);
-        let subshell = Subshell::new(move |env, _job_control| {
-            Box::pin(async move {
-                let env = &mut RedirGuard::new(env);
-                let mut xtrace = XTrace::from_options(&env.options);
+        let subshell = Config::foreground().start_and_wait(env, async move |env, _job_control| {
+            let env = &mut RedirGuard::new(env);
+            let mut xtrace = XTrace::from_options(&env.options);
 
-                let redir_exit_status =
-                    match env.perform_redirs(redirs_2.iter(), xtrace.as_mut()).await {
-                        Ok(exit_status) => exit_status,
-                        Err(error) => {
-                            let result = error.handle(env).await;
-                            env.apply_result(result);
-                            return;
-                        }
-                    };
+            let redir_exit_status = match env.perform_redirs(redirs_2.iter(), xtrace.as_mut()).await
+            {
+                Ok(exit_status) => exit_status,
+                Err(error) => {
+                    let result = error.handle(env).await;
+                    env.apply_result(result);
+                    return;
+                }
+            };
 
-                print(env, xtrace).await;
+            print(env, xtrace).await;
 
-                env.exit_status = redir_exit_status.unwrap_or(exit_status);
-            })
-        })
-        .job_control(JobControl::Foreground);
-
-        match subshell.start_and_wait(env).await {
+            env.exit_status = redir_exit_status.unwrap_or(exit_status);
+        });
+        match subshell.await {
             Ok((pid, result)) => add_job_if_suspended(env, pid, result, || {
                 redirs
                     .iter()

@@ -1,5 +1,5 @@
 // This file is part of yash, an extended POSIX shell.
-// Copyright (C) 2023 WATANABE Yuki
+// Copyright (C) 2026 WATANABE Yuki
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,194 +14,217 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Utility for starting subshells
-//!
-//! This module defines [`Config`], a builder for starting a subshell. It is a
-//! collection of options for starting a subshell, and provides methods to start
-//! a subshell with the configured options. These methods are implemented as
-//! wrappers around [`Env::run_in_child_process`], which in turn uses
-//! [`Fork::run_in_child_process`]. You should prefer `Config` for the purpose
-//! of creating a subshell because it helps to arrange the child process
-//! properly.
-//!
-//! This module also defines a deprecated struct [`Subshell`] with a similar API
-//! to `Config` for backward compatibility. New code should use `Config` instead
-//! of `Subshell`.
+//! Subshell creation via [`Config`]
 
+use super::JobControl;
+use super::block_sigint_sigquit;
+use super::restore_sigmask;
 use crate::Env;
-use crate::job::Pid;
-use crate::job::ProcessResult;
-use crate::signal;
-use crate::system::Close;
-use crate::system::Dup;
-use crate::system::Errno;
-use crate::system::Exit;
-use crate::system::Fork;
-use crate::system::GetPid;
-use crate::system::Open;
-use crate::system::SendSignal;
-use crate::system::SetPgid;
-use crate::system::Sigaction;
-use crate::system::Sigmask;
-use crate::system::SigmaskOp;
-use crate::system::TcSetPgrp;
-use crate::system::Wait;
+use crate::job::tcsetpgrp_with_block;
+use crate::job::{Pid, ProcessResult};
+use crate::semantics::exit_or_raise;
+use crate::stack::Frame;
 use crate::system::concurrency::WaitForSignals;
 use crate::system::resource::SetRlimit;
+use crate::system::{
+    Close, Dup, Errno, Exit, Fork, GetPid, Open, SendSignal, SetPgid, Sigaction, Sigmask,
+    TcSetPgrp, Wait,
+};
 use crate::trap::SignalSystem;
-use std::marker::PhantomData;
-use std::pin::Pin;
 
-/// Job state of a newly created subshell
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum JobControl {
-    /// The subshell becomes the foreground process group.
-    Foreground,
-    /// The subshell becomes a background process group.
-    Background,
-}
-
-/// Subshell builder
+/// Configuration for subshell creation
 ///
-/// This is a helper for starting a subshell provided before [`Config`] was
-/// introduced. Use `Config` instead since it provides a better API.
-#[deprecated(
-    note = "use `Config` for subshell configuration instead",
-    since = "0.14.0"
-)]
-#[must_use = "a subshell is not started unless you call `Subshell::start`"]
-pub struct Subshell<S, F> {
-    task: F,
-    job_control: Option<JobControl>,
-    ignores_sigint_sigquit: bool,
-    phantom_data: PhantomData<fn(&mut Env<S>)>,
-}
-
-#[allow(deprecated, reason = "for backward compatible API")]
-impl<S, F> std::fmt::Debug for Subshell<S, F> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Subshell")
-            .field("job_control", &self.job_control)
-            .field("ignores_sigint_sigquit", &self.ignores_sigint_sigquit)
-            .finish_non_exhaustive()
-    }
-}
-
-#[allow(deprecated, reason = "for backward compatible API")]
-impl<S, F> Subshell<S, F>
-where
-    S: Close
-        + Dup
-        + Exit
-        + Fork
-        + GetPid
-        + Open
-        + SendSignal
-        + SetPgid
-        + SetRlimit
-        + Sigaction
-        + Sigmask
-        + SignalSystem
-        + TcSetPgrp
-        + WaitForSignals
-        + 'static,
-    F: for<'a> FnOnce(&'a mut Env<S>, Option<JobControl>) -> Pin<Box<dyn Future<Output = ()> + 'a>>
-        + 'static,
-    // TODO Revisit to simplify this function type when impl Future is allowed in return type
-{
-    /// Creates a new subshell builder with a task.
-    ///
-    /// The task will run in a subshell after it is started. The task takes two
-    /// arguments:
-    ///
-    /// 1. The environment in which the subshell runs, and
-    /// 2. Job control status for the subshell.
-    ///
-    /// If the task returns an `Err(Divert::...)`, it is handled as follows:
-    ///
-    /// - `Interrupt` and `Exit` with `Some(exit_status)` override the exit
-    ///   status in `Env`.
-    /// - Other `Divert` values are ignored.
-    pub fn new(task: F) -> Self {
-        Subshell {
-            task,
-            job_control: None,
-            ignores_sigint_sigquit: false,
-            phantom_data: PhantomData,
-        }
-    }
-
+/// This struct configures how a subshell is created. An instance of `Config`
+/// can be created with [`new`](Self::new) or [`foreground`](Self::foreground),
+/// and modified by setting the fields. To start a subshell, call
+/// [`start`](Self::start) or [`start_and_wait`](Self::start_and_wait).
+#[derive(Debug, Default, Clone)]
+#[non_exhaustive]
+pub struct Config {
     /// Specifies disposition of the subshell with respect to job control.
     ///
-    /// If the argument is `None` (which is the default), the subshell runs in
+    /// If this value is `None` (which is the default), the subshell runs in
     /// the same process group as the parent process. If it is `Some(_)`, the
-    /// subshell becomes a new process group. For `JobControl::Foreground`, it
-    /// also brings itself to the foreground.
+    /// subshell becomes a new process group leader. For
+    /// `Some(JobControl::Foreground)`, it also brings itself to the foreground.
     ///
-    /// This parameter is ignored if the shell is not [controlling
-    /// jobs](Env::controls_jobs) when starting the subshell. You can tell the
-    /// actual job control status of the subshell by the second return value of
-    /// [`start`](Self::start) in the parent environment and the second argument
-    /// passed to the task in the subshell environment.
+    /// This parameter is ignored if the shell is not
+    /// [controlling jobs](Env::controls_jobs) when starting the subshell. You
+    /// can tell the actual job control status of the subshell by checking the
+    /// second return value of [`start`](Self::start) in the parent environment
+    /// and the second argument passed to the task in the subshell environment.
     ///
     /// If the parent process is a job-controlling interactive shell, but the
     /// subshell is not job-controlled, the subshell's signal dispositions for
-    /// SIGTSTP, SIGTTIN, and SIGTTOU are set to `Ignore`. This is to prevent
-    /// the subshell from being stopped by a job-stopping signal. Were the
-    /// subshell stopped, you could never resume it since it is not
+    /// `SIGTSTP`, `SIGTTIN`, and `SIGTTOU` are set to `Ignore`. This is to
+    /// prevent the subshell from being stopped by a job-stopping signal. Were
+    /// the subshell stopped, you could never resume it since it is not
     /// job-controlled.
-    pub fn job_control<J: Into<Option<JobControl>>>(mut self, job_control: J) -> Self {
-        self.job_control = job_control.into();
-        self
+    pub job_control: Option<JobControl>,
+
+    /// If `true`, the subshell ignores `SIGINT` and `SIGQUIT`.
+    ///
+    /// This parameter is for implementing the POSIX requirement that
+    /// asynchronous and-or lists ignore `SIGINT` and `SIGQUIT` if job control
+    /// is disabled. The value is passed to
+    /// [`TrapSet::enter_subshell`](crate::trap::TrapSet::enter_subshell) to
+    /// modify the signal dispositions for `SIGINT` and `SIGQUIT` in the
+    /// subshell.
+    ///
+    /// This parameter has no effect if the subshell is job-controlled (see
+    /// [`job_control`](Self::job_control)). The default value is `false`.
+    pub ignores_sigint_sigquit: bool,
+}
+
+impl Config {
+    /// Creates a new `Config` with default settings.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    /// Makes the subshell ignore SIGINT and SIGQUIT.
+    /// Creates a new `Config` with foreground job control.
     ///
-    /// If `ignore` is true and the subshell is not job-controlled, the subshell
-    /// sets its signal dispositions for SIGINT and SIGQUIT to `Ignore`.
-    ///
-    /// The default is `false`.
-    pub fn ignore_sigint_sigquit(mut self, ignore: bool) -> Self {
-        self.ignores_sigint_sigquit = ignore;
-        self
-    }
-
-    fn into_config_and_task(self) -> (Config, F) {
-        let config = Config {
-            job_control: self.job_control,
-            ignores_sigint_sigquit: self.ignores_sigint_sigquit,
-        };
-        (config, self.task)
+    /// This is a convenient function to create a `Config` for a subshell that
+    /// should run in the foreground if job control is active. The returned
+    /// `Config` has [`job_control`](Self::job_control) set to
+    /// `Some(JobControl::Foreground)`, and the other fields set to their
+    /// default values.
+    #[must_use]
+    pub fn foreground() -> Self {
+        Self {
+            job_control: Some(JobControl::Foreground),
+            ..Self::default()
+        }
     }
 
     /// Starts the subshell.
     ///
-    /// This function creates a new child process that runs the task contained
-    /// in this builder.
+    /// This function creates a new child process that runs the task provided as
+    /// an argument.
     ///
     /// Although this function is `async`, it does not wait for the child to
     /// finish, which means the parent and child processes will run
-    /// concurrently. To wait for the child to finish, you need to call
-    /// [`Env::wait_for_subshell`] or [`Env::wait_for_subshell_to_finish`]. If
-    /// job control is active, you may want to add the process ID to `env.jobs`
-    /// before waiting.
+    /// concurrently. To wait for the child to change state, call
+    /// [`Env::wait_for_subshell`], [`Env::wait_for_subshell_to_halt`], or
+    /// [`Env::wait_for_subshell_to_finish`]. If job control is active, you may
+    /// want to add the process ID to [`Env::jobs`] before waiting. To start the
+    /// subshell and wait for it to finish at once, use
+    /// [`start_and_wait`](Self::start_and_wait).
     ///
     /// If you set [`job_control`](Self::job_control) to
-    /// `JobControl::Foreground`, this function opens `env.tty` by calling
-    /// [`Env::get_tty`]. The `tty` is used to change the foreground job to the
-    /// new subshell. However, `job_control` is effective only when the shell is
-    /// [controlling jobs](Env::controls_jobs).
+    /// `Some(JobControl::Foreground)`, this function opens [`Env::tty`] by
+    /// calling [`Env::get_tty`]. The `tty` is used to change the foreground job
+    /// to the new subshell. However, `job_control` is effective only when the
+    /// shell is [controlling jobs](Env::controls_jobs).
     ///
     /// If the subshell started successfully, the return value is a pair of the
-    /// child process ID and the actual job control. Otherwise, it indicates the
-    /// error.
-    pub async fn start(self, env: &mut Env<S>) -> Result<(Pid, Option<JobControl>), Errno> {
-        let (config, task) = self.into_config_and_task();
-        config
-            .start(env, async move |env, job_control| {
-                task(env, job_control).await
-            })
-            .await
+    /// child process ID and the actual job control status. Otherwise, it
+    /// indicates the error.
+    pub async fn start<S, F>(
+        // This method may be declared to take `self` by reference, but doing so
+        // would make the returned future capture `self` by reference, which
+        // demands the caller to keep the `Config` alive until the future is
+        // dropped. To allow code like below, we take `self` by value and
+        // implement `Clone` for `Config`.
+        //   let future = Config::new().start(...);
+        //   let result = future.await;
+        self,
+        env: &mut Env<S>,
+        task: F,
+    ) -> Result<(Pid, Option<JobControl>), Errno>
+    where
+        S: Close
+            + Dup
+            + Exit
+            + Fork
+            + GetPid
+            + Open
+            + SendSignal
+            + SetPgid
+            + SetRlimit
+            + Sigaction
+            + Sigmask
+            + SignalSystem
+            + TcSetPgrp
+            + 'static,
+        F: AsyncFnOnce(&mut Env<S>, Option<JobControl>) + 'static,
+    {
+        // Do some preparation before starting a child process
+        let job_control = env.controls_jobs().then_some(self.job_control).flatten();
+        let tty = match job_control {
+            None | Some(JobControl::Background) => None,
+            // Open the tty in the parent process so we can reuse the FD for other jobs
+            Some(JobControl::Foreground) => env.get_tty().await.ok(),
+        };
+
+        let ignore_sigint_sigquit = self.ignores_sigint_sigquit && job_control.is_none();
+        let original_mask = if ignore_sigint_sigquit {
+            // Block SIGINT and SIGQUIT before forking the child process to
+            // prevent the child from being killed by those signals until the
+            // child starts ignoring them.
+            Some(block_sigint_sigquit(&env.system).await?)
+        } else {
+            None
+        };
+        let keep_internal_dispositions_for_stoppers = job_control.is_none();
+
+        // Define the child process task
+        const ME: Pid = Pid(0);
+        let child_task = move |mut child_env: Env<S>, ()| async move {
+            let env = &mut *child_env.push_frame(Frame::Subshell);
+
+            if let Some(job_control) = job_control {
+                if let Ok(()) = env.system.setpgid(ME, ME) {
+                    match job_control {
+                        JobControl::Background => (),
+                        JobControl::Foreground => {
+                            if let Some(tty) = tty {
+                                let pgid = env.system.getpgrp();
+                                tcsetpgrp_with_block(&env.system, tty, pgid).await.ok();
+                            }
+                        }
+                    }
+                }
+            }
+            env.jobs.disown_all();
+
+            env.traps
+                .enter_subshell(
+                    &env.system,
+                    ignore_sigint_sigquit,
+                    keep_internal_dispositions_for_stoppers,
+                )
+                .await;
+
+            task(env, job_control).await;
+            exit_or_raise(&env.system, env.exit_status).await
+        };
+
+        // Start the child
+        let (result, ()) = env.run_in_child_process((), child_task);
+
+        // Restore the original signal mask in the parent process. Need to do
+        // this before returning the error if the child process creation failed,
+        // to avoid leaving the parent process with an unexpected signal mask.
+        if let Some(mask) = original_mask {
+            restore_sigmask(&env.system, &mask).await.ok();
+        }
+
+        let child_pid = result?;
+
+        // The finishing
+        if job_control.is_some() {
+            // We should setpgid not only in the child but also in the parent to
+            // make sure the child is in a new process group before the parent
+            // returns from the start function.
+            let _ = env.system.setpgid(child_pid, ME);
+
+            // We don't tcsetpgrp in the parent. It would mess up the child
+            // which may have started another shell doing its own job control.
+        }
+
+        Ok((child_pid, job_control))
     }
 
     /// Starts the subshell and waits for it to finish.
@@ -223,38 +246,51 @@ where
     ///
     /// When a job-controlled subshell suspends, this function does not add it
     /// to `env.jobs`. You have to do it for yourself if necessary.
-    pub async fn start_and_wait(self, env: &mut Env<S>) -> Result<(Pid, ProcessResult), Errno>
+    pub async fn start_and_wait<S, F>(
+        // Why take `self` by value? See the comment in `start`.
+        self,
+        env: &mut Env<S>,
+        task: F,
+    ) -> Result<(Pid, ProcessResult), Errno>
     where
-        S: Wait,
+        S: Close
+            + Dup
+            + Exit
+            + Fork
+            + GetPid
+            + Open
+            + SendSignal
+            + SetPgid
+            + SetRlimit
+            + Sigaction
+            + Sigmask
+            + SignalSystem
+            + TcSetPgrp
+            + Wait
+            + WaitForSignals
+            + 'static,
+        F: AsyncFnOnce(&mut Env<S>, Option<JobControl>) + 'static,
     {
-        let (config, task) = self.into_config_and_task();
-        config
-            .start_and_wait(env, async move |env, job_control| {
-                task(env, job_control).await
-            })
-            .await
+        let (pid, job_control) = self.start(env, task).await?;
+        let result = loop {
+            let result = env.wait_for_subshell_to_halt(pid).await?.1;
+            if !result.is_stopped() || job_control.is_some() {
+                break result;
+            }
+        };
+
+        if job_control == Some(JobControl::Foreground) {
+            if let Some(tty) = env.tty {
+                tcsetpgrp_with_block(&env.system, tty, env.main_pgid)
+                    .await
+                    .ok();
+            }
+        }
+
+        Ok((pid, result))
     }
 }
 
-async fn block_sigint_sigquit<S: Sigmask>(system: &S) -> Result<Vec<signal::Number>, Errno> {
-    let mut old_mask = Vec::new();
-    system
-        .sigmask(
-            Some((SigmaskOp::Add, &[S::SIGINT, S::SIGQUIT])),
-            Some(&mut old_mask),
-        )
-        .await?;
-    Ok(old_mask)
-}
-
-async fn restore_sigmask<S: Sigmask>(system: &S, mask: &[signal::Number]) -> Result<(), Errno> {
-    system.sigmask(Some((SigmaskOp::Set, mask)), None).await
-}
-
-mod config;
-pub use config::Config;
-
-#[allow(deprecated, reason = "for backward compatible API")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -263,7 +299,6 @@ mod tests {
     use crate::option::State::On;
     use crate::semantics::ExitStatus;
     use crate::source::Location;
-    use crate::stack::Frame;
     use crate::system::r#virtual::{Inode, SystemState, VirtualSystem};
     use crate::system::r#virtual::{SIGCHLD, SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU};
     use crate::system::{Concurrent, Disposition};
@@ -284,42 +319,52 @@ mod tests {
     }
 
     #[test]
-    fn subshell_start_returns_child_process_id() {
+    fn start_returns_child_process_id() {
         in_virtual_system(|mut env, _state| async move {
             let parent_pid = env.main_pid;
             let child_pid = Rc::new(Cell::new(None));
             let child_pid_2 = Rc::clone(&child_pid);
-            let subshell = Subshell::new(
-                move |env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
-                    Box::pin(async move {
+            let result = Config::new()
+                .start(
+                    &mut env,
+                    async move |env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
                         child_pid_2.set(Some(env.system.getpid()));
                         assert_eq!(env.system.getppid(), parent_pid);
-                    })
-                },
-            );
-            let result = subshell.start(&mut env).await.unwrap().0;
+                    },
+                )
+                .await
+                .unwrap()
+                .0;
             env.wait_for_subshell(result).await.unwrap();
             assert_eq!(Some(result), child_pid.get());
         });
     }
 
     #[test]
-    fn subshell_start_failing() {
+    fn start_failing() {
         let mut executor = LocalPool::new();
         let env = &mut Env::new_virtual();
-        let subshell =
-            Subshell::new(|_env, _job_control| unreachable!("subshell not expected to run"));
-        let result = executor.run_until(subshell.start(env));
+        let result = executor.run_until(
+            Config::new().start(env, async |_env: &mut Env<_>, _job_control| {
+                unreachable!("subshell not expected to run")
+            }),
+        );
         assert_eq!(result, Err(Errno::ENOSYS));
     }
 
     #[test]
     fn stack_frame_in_subshell() {
         in_virtual_system(|mut env, _state| async move {
-            let subshell = Subshell::new(|env, _job_control| {
-                Box::pin(async { assert_eq!(env.stack[..], [Frame::Subshell]) })
-            });
-            let pid = subshell.start(&mut env).await.unwrap().0;
+            let pid = Config::new()
+                .start(
+                    &mut env,
+                    async |env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
+                        assert_eq!(env.stack[..], [Frame::Subshell])
+                    },
+                )
+                .await
+                .unwrap()
+                .0;
             assert_eq!(env.stack[..], []);
 
             env.wait_for_subshell(pid).await.unwrap();
@@ -330,10 +375,16 @@ mod tests {
     fn jobs_disowned_in_subshell() {
         in_virtual_system(|mut env, _state| async move {
             let index = env.jobs.add(Job::new(Pid(123)));
-            let subshell = Subshell::new(move |env, _job_control| {
-                Box::pin(async move { assert!(!env.jobs[index].is_owned) })
-            });
-            let pid = subshell.start(&mut env).await.unwrap().0;
+            let pid = Config::new()
+                .start(
+                    &mut env,
+                    async move |env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
+                        assert!(!env.jobs[index].is_owned)
+                    },
+                )
+                .await
+                .unwrap()
+                .0;
             env.wait_for_subshell(pid).await.unwrap();
 
             assert!(env.jobs[index].is_owned);
@@ -353,17 +404,21 @@ mod tests {
                 )
                 .await
                 .unwrap();
-            let subshell = Subshell::new(|env, _job_control| {
-                Box::pin(async {
-                    let (current, parent) = env.traps.get_state(SIGCHLD);
-                    assert_eq!(current.unwrap().action, Action::Default);
-                    assert_matches!(
-                        &parent.unwrap().action,
-                        Action::Command(body) => assert_eq!(&**body, "echo foo")
-                    );
-                })
-            });
-            let pid = subshell.start(&mut env).await.unwrap().0;
+            let pid = Config::new()
+                .start(
+                    &mut env,
+                    async |env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
+                        let (current, parent) = env.traps.get_state(SIGCHLD);
+                        assert_eq!(current.unwrap().action, Action::Default);
+                        assert_matches!(
+                            &parent.unwrap().action,
+                            Action::Command(body) => assert_eq!(&**body, "echo foo")
+                        );
+                    },
+                )
+                .await
+                .unwrap()
+                .0;
             env.wait_for_subshell(pid).await.unwrap();
         });
     }
@@ -375,20 +430,18 @@ mod tests {
 
             let parent_pgid = state.borrow().processes[&parent_env.main_pid].pgid;
             let state_2 = Rc::clone(&state);
-            let (child_pid, job_control) = Subshell::new(
-                move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>, job_control| {
-                    Box::pin(async move {
+            let (child_pid, job_control) = Config::new()
+                .start(
+                    &mut parent_env,
+                    async move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>, job_control| {
                         let child_pid = child_env.system.getpid();
                         assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
                         assert_eq!(state_2.borrow().foreground, None);
                         assert_eq!(job_control, None);
-                    })
-                },
-            )
-            .job_control(None)
-            .start(&mut parent_env)
-            .await
-            .unwrap();
+                    },
+                )
+                .await
+                .unwrap();
             assert_eq!(job_control, None);
             assert_eq!(state.borrow().processes[&child_pid].pgid, parent_pgid);
             assert_eq!(state.borrow().foreground, None);
@@ -405,20 +458,22 @@ mod tests {
             parent_env.options.set(Monitor, On);
 
             let state_2 = Rc::clone(&state);
-            let (child_pid, job_control) = Subshell::new(
-                move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>, job_control| {
-                    Box::pin(async move {
+            let config = Config {
+                job_control: Some(JobControl::Background),
+                ..Config::new()
+            };
+            let (child_pid, job_control) = config
+                .start(
+                    &mut parent_env,
+                    async move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>, job_control| {
                         let child_pid = child_env.system.getpid();
                         assert_eq!(state_2.borrow().processes[&child_pid].pgid, child_pid);
                         assert_eq!(state_2.borrow().foreground, None);
                         assert_eq!(job_control, Some(JobControl::Background));
-                    })
-                },
-            )
-            .job_control(JobControl::Background)
-            .start(&mut parent_env)
-            .await
-            .unwrap();
+                    },
+                )
+                .await
+                .unwrap();
             assert_eq!(job_control, Some(JobControl::Background));
             assert_eq!(state.borrow().processes[&child_pid].pgid, child_pid);
             assert_eq!(state.borrow().foreground, None);
@@ -436,20 +491,18 @@ mod tests {
             stub_tty(&state);
 
             let state_2 = Rc::clone(&state);
-            let (child_pid, job_control) = Subshell::new(
-                move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>, job_control| {
-                    Box::pin(async move {
+            let (child_pid, job_control) = Config::foreground()
+                .start(
+                    &mut parent_env,
+                    async move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>, job_control| {
                         let child_pid = child_env.system.getpid();
                         assert_eq!(state_2.borrow().processes[&child_pid].pgid, child_pid);
                         assert_eq!(state_2.borrow().foreground, Some(child_pid));
                         assert_eq!(job_control, Some(JobControl::Foreground));
-                    })
-                },
-            )
-            .job_control(JobControl::Foreground)
-            .start(&mut parent_env)
-            .await
-            .unwrap();
+                    },
+                )
+                .await
+                .unwrap();
             assert_eq!(job_control, Some(JobControl::Foreground));
             assert_eq!(state.borrow().processes[&child_pid].pgid, child_pid);
             // The child may not yet have become the foreground job.
@@ -467,9 +520,11 @@ mod tests {
             parent_env.options.set(Monitor, On);
             stub_tty(&state);
 
-            let _ = Subshell::new(move |_, _| Box::pin(std::future::ready(())))
-                .job_control(JobControl::Foreground)
-                .start(&mut parent_env)
+            let _ = Config::foreground()
+                .start(
+                    &mut parent_env,
+                    async move |_: &mut Env<Rc<Concurrent<VirtualSystem>>>, _| (),
+                )
                 .await
                 .unwrap();
             assert_matches!(parent_env.tty, Some(_));
@@ -485,19 +540,17 @@ mod tests {
             parent_env.options.set(Monitor, On);
 
             let state_2 = Rc::clone(&state);
-            let (child_pid, job_control) = Subshell::new(
-                move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>, job_control| {
-                    Box::pin(async move {
+            let (child_pid, job_control) = Config::foreground()
+                .start(
+                    &mut parent_env,
+                    async move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>, job_control| {
                         let child_pid = child_env.system.getpid();
                         assert_eq!(state_2.borrow().processes[&child_pid].pgid, child_pid);
                         assert_eq!(job_control, Some(JobControl::Foreground));
-                    })
-                },
-            )
-            .job_control(JobControl::Foreground)
-            .start(&mut parent_env)
-            .await
-            .unwrap();
+                    },
+                )
+                .await
+                .unwrap();
             assert_eq!(job_control, Some(JobControl::Foreground));
             assert_eq!(state.borrow().processes[&child_pid].pgid, child_pid);
 
@@ -513,19 +566,18 @@ mod tests {
 
             let parent_pgid = state.borrow().processes[&parent_env.main_pid].pgid;
             let state_2 = Rc::clone(&state);
-            let (child_pid, job_control) = Subshell::new(
-                move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
-                    Box::pin(async move {
+            let (child_pid, job_control) = Config::foreground()
+                .start(
+                    &mut parent_env,
+                    async move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>,
+                                _job_control| {
                         let child_pid = child_env.system.getpid();
                         assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
                         assert_eq!(state_2.borrow().foreground, None);
-                    })
-                },
-            )
-            .job_control(JobControl::Foreground)
-            .start(&mut parent_env)
-            .await
-            .unwrap();
+                    },
+                )
+                .await
+                .unwrap();
             assert_eq!(job_control, None);
             assert_eq!(state.borrow().processes[&child_pid].pgid, parent_pgid);
             assert_eq!(state.borrow().foreground, None);
@@ -545,19 +597,18 @@ mod tests {
 
             let parent_pgid = state.borrow().processes[&parent_env.main_pid].pgid;
             let state_2 = Rc::clone(&state);
-            let (child_pid, job_control) = Subshell::new(
-                move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
-                    Box::pin(async move {
+            let (child_pid, job_control) = Config::foreground()
+                .start(
+                    &mut parent_env,
+                    async move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>,
+                                _job_control| {
                         let child_pid = child_env.system.getpid();
                         assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
                         assert_eq!(state_2.borrow().foreground, None);
-                    })
-                },
-            )
-            .job_control(JobControl::Foreground)
-            .start(&mut parent_env)
-            .await
-            .unwrap();
+                    },
+                )
+                .await
+                .unwrap();
             assert_eq!(job_control, None);
             assert_eq!(state.borrow().processes[&child_pid].pgid, parent_pgid);
             assert_eq!(state.borrow().foreground, None);
@@ -571,10 +622,15 @@ mod tests {
     #[test]
     fn wait_without_job_control() {
         in_virtual_system(|mut env, _state| async move {
-            let subshell = Subshell::new(|env, _job_control| {
-                Box::pin(async { env.exit_status = ExitStatus(42) })
-            });
-            let (_pid, process_result) = subshell.start_and_wait(&mut env).await.unwrap();
+            let (_pid, process_result) = Config::new()
+                .start_and_wait(
+                    &mut env,
+                    async |env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
+                        env.exit_status = ExitStatus(42)
+                    },
+                )
+                .await
+                .unwrap();
             assert_eq!(process_result, ProcessResult::exited(42));
         });
     }
@@ -585,11 +641,15 @@ mod tests {
             env.options.set(Monitor, On);
             stub_tty(&state);
 
-            let subshell = Subshell::new(|env, _job_control| {
-                Box::pin(async { env.exit_status = ExitStatus(123) })
-            })
-            .job_control(JobControl::Foreground);
-            let (_pid, process_result) = subshell.start_and_wait(&mut env).await.unwrap();
+            let (_pid, process_result) = Config::foreground()
+                .start_and_wait(
+                    &mut env,
+                    async |env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
+                        env.exit_status = ExitStatus(123)
+                    },
+                )
+                .await
+                .unwrap();
             assert_eq!(process_result, ProcessResult::exited(123));
             assert_eq!(state.borrow().foreground, Some(env.main_pgid));
         });
@@ -601,11 +661,16 @@ mod tests {
     #[test]
     fn sigint_sigquit_not_ignored_by_default() {
         in_virtual_system(|mut parent_env, state| async move {
-            let (child_pid, _) = Subshell::new(|env, _job_control| {
-                Box::pin(async { env.exit_status = ExitStatus(123) })
-            })
-            .job_control(JobControl::Background)
-            .start(&mut parent_env)
+            let (child_pid, _) = Config {
+                job_control: Some(JobControl::Background),
+                ..Config::new()
+            }
+            .start(
+                &mut parent_env,
+                async |env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
+                    env.exit_status = ExitStatus(123)
+                },
+            )
             .await
             .unwrap();
             parent_env.wait_for_subshell(child_pid).await.unwrap();
@@ -620,12 +685,16 @@ mod tests {
     #[test]
     fn sigint_sigquit_ignored_in_uncontrolled_job() {
         in_virtual_system(|mut parent_env, state| async move {
-            let (child_pid, _) = Subshell::new(|env, _job_control| {
-                Box::pin(async { env.exit_status = ExitStatus(123) })
-            })
-            .job_control(JobControl::Background)
-            .ignore_sigint_sigquit(true)
-            .start(&mut parent_env)
+            let (child_pid, _) = Config {
+                job_control: Some(JobControl::Background),
+                ignores_sigint_sigquit: true,
+            }
+            .start(
+                &mut parent_env,
+                async |env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
+                    env.exit_status = ExitStatus(123)
+                },
+            )
             .await
             .unwrap();
 
@@ -659,12 +728,16 @@ mod tests {
             parent_env.options.set(Monitor, On);
             stub_tty(&state);
 
-            let (child_pid, _) = Subshell::new(|env, _job_control| {
-                Box::pin(async { env.exit_status = ExitStatus(123) })
-            })
-            .job_control(JobControl::Background)
-            .ignore_sigint_sigquit(true)
-            .start(&mut parent_env)
+            let (child_pid, _) = Config {
+                job_control: Some(JobControl::Background),
+                ignores_sigint_sigquit: true,
+            }
+            .start(
+                &mut parent_env,
+                async |env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
+                    env.exit_status = ExitStatus(123)
+                },
+            )
             .await
             .unwrap();
             parent_env.wait_for_subshell(child_pid).await.unwrap();
@@ -689,12 +762,15 @@ mod tests {
                 .unwrap();
             stub_tty(&state);
 
-            let (child_pid, _) = Subshell::new(|env, _job_control| {
-                Box::pin(async { env.exit_status = ExitStatus(123) })
-            })
-            .start(&mut parent_env)
-            .await
-            .unwrap();
+            let (child_pid, _) = Config::new()
+                .start(
+                    &mut parent_env,
+                    async |env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
+                        env.exit_status = ExitStatus(123)
+                    },
+                )
+                .await
+                .unwrap();
 
             let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
             assert_eq!(child_result, (child_pid, ProcessState::exited(123)));
@@ -719,11 +795,16 @@ mod tests {
                 .unwrap();
             stub_tty(&state);
 
-            let (child_pid, _) = Subshell::new(|env, _job_control| {
-                Box::pin(async { env.exit_status = ExitStatus(123) })
-            })
-            .job_control(JobControl::Background)
-            .start(&mut parent_env)
+            let (child_pid, _) = Config {
+                job_control: Some(JobControl::Background),
+                ..Config::new()
+            }
+            .start(
+                &mut parent_env,
+                async |env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
+                    env.exit_status = ExitStatus(123)
+                },
+            )
             .await
             .unwrap();
 
@@ -744,12 +825,15 @@ mod tests {
             parent_env.options.set(Interactive, On);
             stub_tty(&state);
 
-            let (child_pid, _) = Subshell::new(|env, _job_control| {
-                Box::pin(async { env.exit_status = ExitStatus(123) })
-            })
-            .start(&mut parent_env)
-            .await
-            .unwrap();
+            let (child_pid, _) = Config::new()
+                .start(
+                    &mut parent_env,
+                    async |env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
+                        env.exit_status = ExitStatus(123)
+                    },
+                )
+                .await
+                .unwrap();
 
             let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
             assert_eq!(child_result, (child_pid, ProcessState::exited(123)));
@@ -769,12 +853,15 @@ mod tests {
             parent_env.options.set(Monitor, On);
             stub_tty(&state);
 
-            let (child_pid, _) = Subshell::new(|env, _job_control| {
-                Box::pin(async { env.exit_status = ExitStatus(123) })
-            })
-            .start(&mut parent_env)
-            .await
-            .unwrap();
+            let (child_pid, _) = Config::new()
+                .start(
+                    &mut parent_env,
+                    async |env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {
+                        env.exit_status = ExitStatus(123)
+                    },
+                )
+                .await
+                .unwrap();
 
             let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
             assert_eq!(child_result, (child_pid, ProcessState::exited(123)));

@@ -29,8 +29,8 @@ use crate::trap::run_exit_trap;
 use std::cell::RefCell;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
+use yash_env::subshell::Config;
 use yash_env::subshell::JobControl;
-use yash_env::subshell::Subshell;
 use yash_env::system::concurrency::ReadAll;
 use yash_env::system::concurrency::WaitForSignals;
 use yash_env::system::{Close, Errno, Wait};
@@ -63,14 +63,13 @@ where
     };
 
     // Start a subshell to run the command
-    let subshell = Subshell::new(move |env, _job_control| {
-        Box::pin(async move {
+    let subshell_result = Config::new()
+        .start(env.inner, async move |env, _job_control| {
             let result = subshell_body(env, reader, writer, original, command).await;
             env.apply_result(result);
             run_exit_trap(env).await;
         })
-    });
-    let subshell_result = subshell.start(env.inner).await;
+        .await;
 
     expand_common(reader, writer, subshell_result, location, env).await
 }

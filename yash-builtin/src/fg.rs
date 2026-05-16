@@ -212,8 +212,7 @@ mod tests {
     use yash_env::job::ProcessResult;
     use yash_env::option::Option::Interactive;
     use yash_env::option::State::On;
-    use yash_env::subshell::JobControl;
-    use yash_env::subshell::Subshell;
+    use yash_env::subshell::Config;
     use yash_env::system::Concurrent;
     use yash_env::system::GetPid as _;
     use yash_env::system::TcGetPgrp as _;
@@ -236,8 +235,8 @@ mod tests {
             env.options.set(Monitor, On);
             let reached = Rc::new(Cell::new(false));
             let reached2 = Rc::clone(&reached);
-            let subshell = Subshell::new(|env, _| {
-                Box::pin(async move {
+            let (pid, subshell_result) = Config::foreground()
+                .start_and_wait(&mut env, async move |env, _| {
                     suspend(env).await;
 
                     // When resumed, the subshell should be in the foreground.
@@ -245,9 +244,8 @@ mod tests {
                     assert_eq!(env.system.tcgetpgrp(tty).unwrap(), env.system.getpid());
                     reached2.set(true);
                 })
-            })
-            .job_control(JobControl::Foreground);
-            let (pid, subshell_result) = subshell.start_and_wait(&mut env).await.unwrap();
+                .await
+                .unwrap();
             assert_eq!(subshell_result, ProcessResult::Stopped(SIGSTOP));
             let mut job = Job::new(pid);
             job.job_controlled = true;
@@ -266,14 +264,13 @@ mod tests {
             env.options.set(Monitor, On);
             let reached = Rc::new(Cell::new(false));
             let reached2 = Rc::clone(&reached);
-            let subshell = Subshell::new(|env, _| {
-                Box::pin(async move {
+            let (pid, subshell_result) = Config::foreground()
+                .start_and_wait(&mut env, async move |env, _| {
                     suspend(env).await;
                     reached2.set(true);
                 })
-            })
-            .job_control(JobControl::Foreground);
-            let (pid, subshell_result) = subshell.start_and_wait(&mut env).await.unwrap();
+                .await
+                .unwrap();
             assert_eq!(subshell_result, ProcessResult::Stopped(SIGSTOP));
             let mut job = Job::new(pid);
             job.job_controlled = true;
@@ -290,9 +287,10 @@ mod tests {
     fn resume_job_by_index_prints_job_name() {
         in_virtual_system(|mut env, state| async move {
             env.options.set(Monitor, On);
-            let subshell =
-                Subshell::new(|env, _| Box::pin(suspend(env))).job_control(JobControl::Foreground);
-            let (pid, subshell_result) = subshell.start_and_wait(&mut env).await.unwrap();
+            let (pid, subshell_result) = Config::foreground()
+                .start_and_wait(&mut env, async |env, _| suspend(env).await)
+                .await
+                .unwrap();
             assert_eq!(subshell_result, ProcessResult::Stopped(SIGSTOP));
             let mut job = Job::new(pid);
             job.job_controlled = true;
@@ -310,14 +308,13 @@ mod tests {
     fn resume_job_by_index_returns_after_job_exits() {
         in_virtual_system(|mut env, state| async move {
             env.options.set(Monitor, On);
-            let subshell = Subshell::new(|env, _| {
-                Box::pin(async move {
+            let (pid, subshell_result) = Config::foreground()
+                .start_and_wait(&mut env, async |env, _| {
                     suspend(env).await;
                     env.exit_status = ExitStatus(42);
                 })
-            })
-            .job_control(JobControl::Foreground);
-            let (pid, subshell_result) = subshell.start_and_wait(&mut env).await.unwrap();
+                .await
+                .unwrap();
             assert_eq!(subshell_result, ProcessResult::Stopped(SIGSTOP));
             let mut job = Job::new(pid);
             job.job_controlled = true;
@@ -338,15 +335,14 @@ mod tests {
     fn resume_job_by_index_returns_after_job_suspends() {
         in_virtual_system(|mut env, state| async move {
             env.options.set(Monitor, On);
-            let subshell = Subshell::new(|env, _| {
-                Box::pin(async move {
+            let (pid, subshell_result) = Config::foreground()
+                .start_and_wait(&mut env, async |env, _| {
                     suspend(env).await;
                     suspend(env).await;
                     unreachable!("child process should not be resumed twice");
                 })
-            })
-            .job_control(JobControl::Foreground);
-            let (pid, subshell_result) = subshell.start_and_wait(&mut env).await.unwrap();
+                .await
+                .unwrap();
             assert_eq!(subshell_result, ProcessResult::Stopped(SIGSTOP));
             let mut job = Job::new(pid);
             job.job_controlled = true;
@@ -368,9 +364,10 @@ mod tests {
         in_virtual_system(|mut env, state| async move {
             stub_tty(&state);
             env.options.set(Monitor, On);
-            let subshell =
-                Subshell::new(|env, _| Box::pin(suspend(env))).job_control(JobControl::Foreground);
-            let (pid, subshell_result) = subshell.start_and_wait(&mut env).await.unwrap();
+            let (pid, subshell_result) = Config::foreground()
+                .start_and_wait(&mut env, async |env, _| suspend(env).await)
+                .await
+                .unwrap();
             assert_eq!(subshell_result, ProcessResult::Stopped(SIGSTOP));
             let mut job = Job::new(pid);
             job.job_controlled = true;
@@ -445,23 +442,23 @@ mod tests {
             stub_tty(&state);
             env.options.set(Monitor, On);
             // previous job
-            let subshell = Subshell::new(|env, _| {
-                Box::pin(async move {
+            let (pid1, subshell_result_1) = Config::foreground()
+                .start_and_wait(&mut env, async |env, _| {
                     suspend(env).await;
                     unreachable!("previous job should not be resumed");
                 })
-            })
-            .job_control(JobControl::Foreground);
-            let (pid1, subshell_result_1) = subshell.start_and_wait(&mut env).await.unwrap();
+                .await
+                .unwrap();
             assert_eq!(subshell_result_1, ProcessResult::Stopped(SIGSTOP));
             let mut job = Job::new(pid1);
             job.job_controlled = true;
             job.state = subshell_result_1.into();
             env.jobs.add(job);
             // current job
-            let subshell =
-                Subshell::new(|env, _| Box::pin(suspend(env))).job_control(JobControl::Foreground);
-            let (pid2, subshell_result_2) = subshell.start_and_wait(&mut env).await.unwrap();
+            let (pid2, subshell_result_2) = Config::foreground()
+                .start_and_wait(&mut env, async |env, _| suspend(env).await)
+                .await
+                .unwrap();
             assert_eq!(subshell_result_2, ProcessResult::Stopped(SIGSTOP));
             let mut job = Job::new(pid2);
             job.job_controlled = true;
@@ -499,9 +496,10 @@ mod tests {
         in_virtual_system(|mut env, state| async move {
             env.options.set(Monitor, On);
             // previous job
-            let subshell =
-                Subshell::new(|env, _| Box::pin(suspend(env))).job_control(JobControl::Foreground);
-            let (pid1, subshell_result_1) = subshell.start_and_wait(&mut env).await.unwrap();
+            let (pid1, subshell_result_1) = Config::foreground()
+                .start_and_wait(&mut env, async |env, _| suspend(env).await)
+                .await
+                .unwrap();
             assert_eq!(subshell_result_1, ProcessResult::Stopped(SIGSTOP));
             let mut job = Job::new(pid1);
             job.job_controlled = true;
@@ -509,14 +507,13 @@ mod tests {
             job.name = "previous job".to_string();
             let index1 = env.jobs.add(job);
             // current job
-            let subshell = Subshell::new(|env, _| {
-                Box::pin(async move {
+            let (pid2, subshell_result_2) = Config::foreground()
+                .start_and_wait(&mut env, async |env, _| {
                     suspend(env).await;
                     unreachable!("current job should not be resumed");
                 })
-            })
-            .job_control(JobControl::Foreground);
-            let (pid2, subshell_result_2) = subshell.start_and_wait(&mut env).await.unwrap();
+                .await
+                .unwrap();
             assert_eq!(subshell_result_2, ProcessResult::Stopped(SIGSTOP));
             let mut job = Job::new(pid2);
             job.job_controlled = true;
@@ -560,15 +557,14 @@ mod tests {
         in_virtual_system(|mut env, _| async move {
             env.options.set(Monitor, On);
             env.exit_status = ExitStatus(42);
-            let subshell = Subshell::new(|env, _| {
-                Box::pin(async move {
+            let (pid, subshell_result) = Config::foreground()
+                .start_and_wait(&mut env, async |env, _| {
                     suspend(env).await;
                     suspend(env).await;
                     unreachable!("child process should not be resumed twice");
                 })
-            })
-            .job_control(JobControl::Foreground);
-            let (pid, subshell_result) = subshell.start_and_wait(&mut env).await.unwrap();
+                .await
+                .unwrap();
             assert_eq!(subshell_result, ProcessResult::Stopped(SIGSTOP));
             let mut job = Job::new(pid);
             job.job_controlled = true;
@@ -587,15 +583,14 @@ mod tests {
             env.options.set(Interactive, On);
             env.options.set(Monitor, On);
             env.exit_status = ExitStatus(42);
-            let subshell = Subshell::new(|env, _| {
-                Box::pin(async move {
+            let (pid, subshell_result) = Config::foreground()
+                .start_and_wait(&mut env, async |env, _| {
                     suspend(env).await;
                     suspend(env).await;
                     unreachable!("child process should not be resumed twice");
                 })
-            })
-            .job_control(JobControl::Foreground);
-            let (pid, subshell_result) = subshell.start_and_wait(&mut env).await.unwrap();
+                .await
+                .unwrap();
             assert_eq!(subshell_result, ProcessResult::Stopped(SIGSTOP));
             let mut job = Job::new(pid);
             job.job_controlled = true;
