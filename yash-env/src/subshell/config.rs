@@ -147,7 +147,6 @@ impl Config {
             + Sigmask
             + SignalSystem
             + TcSetPgrp
-            + WaitForSignals
             + 'static,
         F: AsyncFnOnce(&mut Env<S>, Option<JobControl>) + 'static,
     {
