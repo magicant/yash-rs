@@ -53,6 +53,8 @@
 //!   [`RunSignalTrapIfCaught`](yash_env::trap::RunSignalTrapIfCaught) instance
 //!   to handle trapped signals while waiting for jobs.
 
+#![cfg_attr(test, recursion_limit = "256")]
+
 pub mod alias;
 pub mod bg;
 pub mod r#break;
