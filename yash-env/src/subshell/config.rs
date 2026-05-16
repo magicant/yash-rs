@@ -34,7 +34,10 @@ use crate::trap::SignalSystem;
 
 /// Configuration for subshell creation
 ///
-/// This struct configures how a subshell is created.
+/// This struct configures how a subshell is created. An instance of `Config`
+/// can be created with [`new`](Self::new) or [`foreground`](Self::foreground),
+/// and modified by setting the fields. To start a subshell, call
+/// [`start`](Self::start) or [`start_and_wait`](Self::start_and_wait).
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
 pub struct Config {

@@ -16,16 +16,17 @@
 
 //! Utility for starting subshells
 //!
-//! This module defines [`Subshell`], a builder for starting a subshell. It is
-//! [constructed](Subshell::new) with a function you want to run in a subshell.
-//! After configuring the builder with some options, you can
-//! [start](Subshell::start) the subshell.
-//!
-//! [`Subshell`] is implemented as a wrapper around
-//! [`Env::run_in_child_process`], which in turn uses
-//! [`Fork::run_in_child_process`]. You should prefer `Subshell` for the purpose
+//! This module defines [`Config`], a builder for starting a subshell. It is a
+//! collection of options for starting a subshell, and provides methods to start
+//! a subshell with the configured options. These methods are implemented as
+//! wrappers around [`Env::run_in_child_process`], which in turn uses
+//! [`Fork::run_in_child_process`]. You should prefer `Config` for the purpose
 //! of creating a subshell because it helps to arrange the child process
 //! properly.
+//!
+//! This module also defines a deprecated struct [`Subshell`] with a similar API
+//! to `Config` for backward compatibility. New code should use `Config` instead
+//! of `Subshell`.
 
 use crate::Env;
 use crate::job::Pid;
@@ -65,7 +66,8 @@ pub enum JobControl {
 
 /// Subshell builder
 ///
-/// See the [module documentation](self) for details.
+/// This is a helper for starting a subshell provided before [`Config`] was
+/// introduced. Use `Config` instead since it provides a better API.
 #[deprecated(
     note = "use `Config` for subshell configuration instead",
     since = "0.14.0"
