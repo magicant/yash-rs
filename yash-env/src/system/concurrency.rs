@@ -20,7 +20,9 @@
 //! systems that enables concurrent execution of multiple possibly blocking I/O
 //! tasks on a single thread.
 
-use super::{CaughtSignals, ChildProcessStarter, Clock, Errno, Fcntl, Fork, Read, Result, Write};
+use super::{
+    CaughtSignals, ChildProcessStarter, Clock, Errno, Fcntl, Fork, Read, Result, Sigmask, Write,
+};
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::waker::{ScheduledWakerQueue, WakerSet};
@@ -103,7 +105,7 @@ use std::time::{Duration, Instant};
 ///
 /// [`Pipe`]: super::Pipe
 #[derive(Clone, Debug, Default)]
-pub struct Concurrent<S> {
+pub struct Concurrent<S: Sigmask> {
     inner: S,
     state: RefCell<State>,
 }
@@ -162,7 +164,7 @@ impl State {
     }
 }
 
-impl<S> Concurrent<S> {
+impl<S: Sigmask> Concurrent<S> {
     /// Creates a new `Concurrent` system that wraps the given inner system.
     #[must_use]
     pub fn new(inner: S) -> Self {
@@ -182,7 +184,7 @@ impl<S> Concurrent<S> {
 /// reading.
 impl<S> Read for Rc<Concurrent<S>>
 where
-    S: Fcntl + Read,
+    S: Fcntl + Read + Sigmask,
 {
     fn read<'a>(
         &self,
@@ -221,7 +223,7 @@ where
 /// writing.
 impl<S> Write for Rc<Concurrent<S>>
 where
-    S: Fcntl + Write,
+    S: Fcntl + Write + Sigmask,
 {
     fn write<'a>(
         &self,
@@ -249,7 +251,7 @@ where
     }
 }
 
-impl<S> Concurrent<S> {
+impl<S: Sigmask> Concurrent<S> {
     async fn yield_for_read<F>(&self, fd: Fd, waker: &LazyCell<Rc<Cell<Option<Waker>>>, F>)
     where
         F: FnOnce() -> Rc<Cell<Option<Waker>>>,
@@ -310,7 +312,7 @@ pub trait Sleep {
 
 impl<S> Sleep for Rc<S>
 where
-    S: Sleep,
+    S: Sigmask + Sleep,
 {
     #[inline]
     fn sleep_until(&self, deadline: Instant) -> impl Future<Output = ()> {
@@ -325,7 +327,7 @@ where
 
 impl<S> Sleep for Concurrent<S>
 where
-    S: Clock,
+    S: Clock + Sigmask,
 {
     async fn sleep_until(&self, deadline: Instant) {
         let waker: LazyCell<Rc<Cell<Option<Waker>>>> = LazyCell::default();
@@ -381,7 +383,7 @@ where
     }
 }
 
-impl<S> WaitForSignals for Concurrent<S> {
+impl<S: Sigmask> WaitForSignals for Concurrent<S> {
     async fn wait_for_signals(&self) -> Rc<SignalList> {
         let signals = {
             let mut state = self.state.borrow_mut();
@@ -475,7 +477,7 @@ where
 
 impl<S> Select for Concurrent<S>
 where
-    S: CaughtSignals + Clock + super::Select,
+    S: CaughtSignals + Clock + super::Select + Sigmask,
 {
     fn peek(&self) {
         let select = pin!(self.select_impl(true));
@@ -490,7 +492,7 @@ where
 
 impl<S> Concurrent<S>
 where
-    S: CaughtSignals + Clock + super::Select,
+    S: CaughtSignals + Clock + super::Select + Sigmask,
 {
     #[allow(
         clippy::await_holding_refcell_ref,
@@ -565,13 +567,13 @@ fn wake_tasks_for_ready_fds(task_map: &mut HashMap<Fd, WakerSet>, ready_fds: &[F
 /// Guard for temporarily setting a file descriptor to non-blocking mode and
 /// restoring the original blocking mode when dropped
 #[derive(Debug)]
-struct TemporaryNonBlockingGuard<'a, S: Fcntl> {
+struct TemporaryNonBlockingGuard<'a, S: Fcntl + Sigmask> {
     system: &'a Concurrent<S>,
     fd: Fd,
     original_nonblocking: bool,
 }
 
-impl<'a, S: Fcntl> TemporaryNonBlockingGuard<'a, S> {
+impl<'a, S: Fcntl + Sigmask> TemporaryNonBlockingGuard<'a, S> {
     fn new(system: &'a Concurrent<S>, fd: Fd) -> Self {
         Self {
             system,
@@ -581,7 +583,7 @@ impl<'a, S: Fcntl> TemporaryNonBlockingGuard<'a, S> {
     }
 }
 
-impl<'a, S: Fcntl> Drop for TemporaryNonBlockingGuard<'a, S> {
+impl<'a, S: Fcntl + Sigmask> Drop for TemporaryNonBlockingGuard<'a, S> {
     fn drop(&mut self) {
         if !self.original_nonblocking {
             self.system
@@ -592,7 +594,7 @@ impl<'a, S: Fcntl> Drop for TemporaryNonBlockingGuard<'a, S> {
     }
 }
 
-impl<'a, S: Fcntl> Deref for TemporaryNonBlockingGuard<'a, S> {
+impl<'a, S: Fcntl + Sigmask> Deref for TemporaryNonBlockingGuard<'a, S> {
     type Target = Concurrent<S>;
 
     fn deref(&self) -> &Self::Target {
@@ -641,7 +643,7 @@ impl SignalList {
 
 impl<S> Fork for Rc<Concurrent<S>>
 where
-    S: Fork + RunLoop + Sized,
+    S: Fork + RunLoop + Sigmask + Sized,
 {
     /// Runs a task in a new child process.
     ///
@@ -710,7 +712,7 @@ pub trait RunLoop {
         task: F,
     ) -> impl Future<Output = ()> + use<'c, Self, F>
     where
-        Self: Sized,
+        Self: Sigmask + Sized,
         F: Future<Output = ()>;
 }
 

@@ -101,6 +101,9 @@ A _private dependency_ is used internally and not visible to downstream users.
       `Env<VirtualSystem>`.
 - The `system::Sigmask` trait now has the associated type `Sigset`, which must
   be specified when implementing the trait.
+- The `system::Concurrent` struct now requires the inner system type `S` to
+  implement the `system::Sigmask` trait. The `S: system::Sigmask` bound has also
+  been added to relevant methods and trait implementations for `Concurrent`.
 - The following methods of `system::Concurrent`, which were inherent methods,
   are now provided as trait implementations. You may have to import the
   corresponding traits to use these methods:
