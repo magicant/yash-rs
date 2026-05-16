@@ -119,7 +119,14 @@ impl Config {
     /// child process ID and the actual job control status. Otherwise, it
     /// indicates the error.
     pub async fn start<S, F>(
-        &self,
+        // This method may be declared to take `self` by reference, but doing so
+        // would make the returned future capture `self` by reference, which
+        // demands the caller to keep the `Config` alive until the future is
+        // dropped. To allow code like below, we take `self` by value and
+        // implement `Clone` for `Config`.
+        //   let future = Config::new().start(...);
+        //   let result = future.await;
+        self,
         env: &mut Env<S>,
         task: F,
     ) -> Result<(Pid, Option<JobControl>), Errno>
@@ -238,7 +245,8 @@ impl Config {
     /// When a job-controlled subshell suspends, this function does not add it
     /// to `env.jobs`. You have to do it for yourself if necessary.
     pub async fn start_and_wait<S, F>(
-        &self,
+        // Why take `self` by value? See the comment in `start`.
+        self,
         env: &mut Env<S>,
         task: F,
     ) -> Result<(Pid, ProcessResult), Errno>

@@ -282,12 +282,12 @@ where
     } else {
         String::new()
     };
-    let config = Config::foreground();
-    let subshell_result = config.start_and_wait(env, async move |env, _job_control| {
-        let location = args[0].origin.clone();
-        let Err(e) = replace_current_process(env, path, args).await;
-        handle_replace_current_process_error(env, e, location).await;
-    });
+    let subshell_result =
+        Config::foreground().start_and_wait(env, async move |env, _job_control| {
+            let location = args[0].origin.clone();
+            let Err(e) = replace_current_process(env, path, args).await;
+            handle_replace_current_process_error(env, e, location).await;
+        });
 
     match subshell_result.await {
         Ok((pid, result)) => add_job_if_suspended(env, pid, result, || job_name),

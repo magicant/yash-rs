@@ -38,8 +38,7 @@ pub async fn execute<S: Runtime + 'static>(
     location: &Location,
 ) -> Result {
     let body_2 = Rc::clone(&body);
-    let config = Config::foreground();
-    let subshell = config.start_and_wait(env, async move |sub_env, _job_control| {
+    let subshell = Config::foreground().start_and_wait(env, async move |sub_env, _job_control| {
         subshell_main(sub_env, body_2).await
     });
     match subshell.await {

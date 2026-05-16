@@ -161,8 +161,7 @@ mod tests {
     }
 
     async fn start_self_suspending_job(env: &mut Env<Rc<Concurrent<VirtualSystem>>>) {
-        let config = Config::foreground();
-        let (pid, subshell_result) = config
+        let (pid, subshell_result) = Config::foreground()
             .start_and_wait(env, async |env, _| suspend(env).await)
             .await
             .unwrap();
