@@ -27,8 +27,8 @@ use yash_env::job::add_job_if_suspended;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
+use yash_env::subshell::Config;
 use yash_env::subshell::JobControl;
-use yash_env::subshell::Subshell;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::List;
 
@@ -39,9 +39,12 @@ pub async fn execute<S: Runtime + 'static>(
     location: &Location,
 ) -> Result {
     let body_2 = Rc::clone(&body);
-    let subshell = Subshell::new(|sub_env, _job_control| Box::pin(subshell_main(sub_env, body_2)));
-    let subshell = subshell.job_control(JobControl::Foreground);
-    match subshell.start_and_wait(env).await {
+    let mut config = Config::new();
+    config.job_control = Some(JobControl::Foreground);
+    let subshell = config.start_and_wait(env, async move |sub_env, _job_control| {
+        subshell_main(sub_env, body_2).await
+    });
+    match subshell.await {
         Ok((pid, result)) => {
             env.exit_status = add_job_if_suspended(env, pid, result, || body.to_string())?;
             env.apply_errexit()

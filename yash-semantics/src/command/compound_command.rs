@@ -27,8 +27,6 @@ use yash_env::Env;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
-#[cfg(doc)]
-use yash_env::subshell::Subshell;
 use yash_syntax::syntax;
 use yash_syntax::syntax::Redir;
 
@@ -87,7 +85,7 @@ impl<S: Runtime + 'static> Command<S> for syntax::FullCompoundCommand {
 /// # Subshell
 ///
 /// A subshell is executed by running the contained list in a separate
-/// environment ([`Subshell`]).
+/// environment ([`yash_env::subshell`]).
 ///
 /// After the subshell has finished, [`Env::apply_errexit`] is called.
 ///

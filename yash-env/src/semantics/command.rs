@@ -26,7 +26,7 @@ use crate::job::add_job_if_suspended;
 use crate::semantics::{ExitStatus, Field, Result};
 use crate::source::Location;
 use crate::source::pretty::{Report, ReportType, Snippet};
-use crate::subshell::{JobControl, Subshell};
+use crate::subshell::{Config, JobControl};
 use crate::system::concurrency::WaitForSignals;
 use crate::system::resource::SetRlimit;
 use crate::system::{
@@ -282,16 +282,15 @@ where
     } else {
         String::new()
     };
-    let subshell = Subshell::new(move |env, _job_control| {
-        Box::pin(async move {
-            let location = args[0].origin.clone();
-            let Err(e) = replace_current_process(env, path, args).await;
-            handle_replace_current_process_error(env, e, location).await;
-        })
-    })
-    .job_control(JobControl::Foreground);
+    let mut config = Config::new();
+    config.job_control = Some(JobControl::Foreground);
+    let subshell_result = config.start_and_wait(env, async move |env, _job_control| {
+        let location = args[0].origin.clone();
+        let Err(e) = replace_current_process(env, path, args).await;
+        handle_replace_current_process_error(env, e, location).await;
+    });
 
-    match subshell.start_and_wait(env).await {
+    match subshell_result.await {
         Ok((pid, result)) => add_job_if_suspended(env, pid, result, || job_name),
         Err(errno) => {
             handle_start_subshell_error(env, StartSubshellError { utility, errno }).await;

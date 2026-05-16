@@ -706,7 +706,7 @@ mod tests {
     use crate::io::MIN_INTERNAL_FD;
     use crate::job::Job;
     use crate::source::Location;
-    use crate::subshell::Subshell;
+    use crate::subshell::Config;
     use crate::system::Exit as _;
     use crate::system::r#virtual::Inode;
     use crate::system::r#virtual::SIGCHLD;
@@ -909,10 +909,12 @@ mod tests {
     #[test]
     fn start_and_wait_for_subshell() {
         in_virtual_system(|mut env, _state| async move {
-            let subshell = Subshell::new(|env, _job_control| {
-                Box::pin(async { env.exit_status = ExitStatus(42) })
-            });
-            let (pid, _) = subshell.start(&mut env).await.unwrap();
+            let (pid, _) = Config::new()
+                .start(&mut env, async |env, _job_control| {
+                    env.exit_status = ExitStatus(42)
+                })
+                .await
+                .unwrap();
             let result = env.wait_for_subshell(pid).await;
             assert_eq!(result, Ok((pid, ProcessState::exited(42))));
         });
@@ -921,10 +923,12 @@ mod tests {
     #[test]
     fn start_and_wait_for_subshell_with_job_list() {
         in_virtual_system(|mut env, _state| async move {
-            let subshell = Subshell::new(|env, _job_control| {
-                Box::pin(async { env.exit_status = ExitStatus(42) })
-            });
-            let (pid, _) = subshell.start(&mut env).await.unwrap();
+            let (pid, _) = Config::new()
+                .start(&mut env, async |env, _job_control| {
+                    env.exit_status = ExitStatus(42)
+                })
+                .await
+                .unwrap();
             let mut job = Job::new(pid);
             job.name = "my job".to_string();
             let job_index = env.jobs.add(job.clone());
@@ -963,27 +967,36 @@ mod tests {
 
         let [job_1, job_2, job_3] = executor.run_until(async {
             // Run a subshell.
-            let subshell_1 = Subshell::new(|env, _job_control| {
-                Box::pin(async { env.exit_status = ExitStatus(12) })
-            });
-            let (pid_1, _) = subshell_1.start(&mut env).await.unwrap();
+            let (pid_1, _) = Config::new()
+                .start(&mut env, async |env, _job_control| {
+                    env.exit_status = ExitStatus(12)
+                })
+                .await
+                .unwrap();
 
             // Run another subshell.
-            let subshell_2 = Subshell::new(|env, _job_control| {
-                Box::pin(async { env.exit_status = ExitStatus(35) })
-            });
-            let (pid_2, _) = subshell_2.start(&mut env).await.unwrap();
+            let (pid_2, _) = Config::new()
+                .start(&mut env, async |env, _job_control| {
+                    env.exit_status = ExitStatus(35)
+                })
+                .await
+                .unwrap();
 
             // This one will never finish.
-            let subshell_3 =
-                Subshell::new(|_env, _job_control| Box::pin(futures_util::future::pending()));
-            let (pid_3, _) = subshell_3.start(&mut env).await.unwrap();
+            let (pid_3, _) = Config::new()
+                .start(&mut env, async |_env, _job_control| {
+                    futures_util::future::pending().await
+                })
+                .await
+                .unwrap();
 
             // Yet another subshell. We don't make this into a job.
-            let subshell_4 = Subshell::new(|env, _job_control| {
-                Box::pin(async { env.exit_status = ExitStatus(100) })
-            });
-            let (_pid_4, _) = subshell_4.start(&mut env).await.unwrap();
+            let (_pid_4, _) = Config::new()
+                .start(&mut env, async |env, _job_control| {
+                    env.exit_status = ExitStatus(100)
+                })
+                .await
+                .unwrap();
 
             // Create jobs.
             let job_1 = env.jobs.add(Job::new(pid_1));

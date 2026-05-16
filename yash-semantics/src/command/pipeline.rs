@@ -33,8 +33,8 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
+use yash_env::subshell::Config;
 use yash_env::subshell::JobControl;
-use yash_env::subshell::Subshell;
 use yash_env::system::concurrency::WriteAll;
 use yash_env::system::{Close, Dup, Errno, Isatty, Pipe};
 use yash_syntax::syntax;
@@ -125,16 +125,14 @@ async fn execute_job_controlled_pipeline<S: Runtime + 'static>(
     commands: &[Rc<syntax::Command>],
 ) -> Result {
     let commands_2 = commands.to_vec();
-    let subshell = Subshell::new(|sub_env, _job_control| {
-        Box::pin(async move {
-            let result = execute_multi_command_pipeline(sub_env, &commands_2).await;
-            sub_env.apply_result(result);
-            run_exit_trap(sub_env).await;
-        })
-    })
-    .job_control(JobControl::Foreground);
-
-    match subshell.start_and_wait(env).await {
+    let mut config = Config::new();
+    config.job_control = Some(JobControl::Foreground);
+    let subshell = config.start_and_wait(env, async move |sub_env, _job_control| {
+        let result = execute_multi_command_pipeline(sub_env, &commands_2).await;
+        sub_env.apply_result(result);
+        run_exit_trap(sub_env).await;
+    });
+    match subshell.await {
         Ok((pid, result)) => {
             env.exit_status = add_job_if_suspended(env, pid, result, || to_job_name(commands))?;
             Continue(())
@@ -168,14 +166,13 @@ async fn execute_multi_command_pipeline<S: Runtime + 'static>(
         shift_or_fail(env, &mut pipes, has_next).await?;
 
         let pipes = pipes;
-        let subshell = Subshell::new(move |env, _job_control| {
-            Box::pin(async move {
+        let start_result = Config::new()
+            .start(env, async move |env, _job_control| {
                 let result = connect_pipe_and_execute_command(env, pipes, command).await;
                 env.apply_result(result);
                 run_exit_trap(env).await;
             })
-        });
-        let start_result = subshell.start(env).await;
+            .await;
         pids.push(pid_or_fail(env, start_result).await?);
     }
 

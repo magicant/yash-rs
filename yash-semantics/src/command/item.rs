@@ -28,8 +28,8 @@ use yash_env::job::Job;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
+use yash_env::subshell::Config;
 use yash_env::subshell::JobControl;
-use yash_env::subshell::Subshell;
 use yash_env::system::{Close, Mode, OfdAccess, Open};
 use yash_syntax::source::Location;
 use yash_syntax::syntax;
@@ -71,13 +71,13 @@ async fn execute_async<S: Runtime + 'static>(
     async_flag: &Location,
 ) -> Result {
     let and_or_2 = Rc::clone(and_or);
-    let subshell = Subshell::new(|env_2, job_control| {
-        Box::pin(async move { async_body(env_2, job_control, &and_or_2).await })
+    let mut config = Config::new();
+    config.job_control = Some(JobControl::Background);
+    config.ignores_sigint_sigquit = true;
+    let subshell = config.start(env, async move |env_2, job_control| {
+        async_body(env_2, job_control, &and_or_2).await
     });
-    let subshell = subshell
-        .job_control(JobControl::Background)
-        .ignore_sigint_sigquit(true);
-    match subshell.start(env).await {
+    match subshell.await {
         Ok((pid, job_control)) => {
             // remember the process ID as a job
             let mut job = Job::new(pid);
