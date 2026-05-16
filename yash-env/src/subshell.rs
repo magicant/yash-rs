@@ -66,6 +66,10 @@ pub enum JobControl {
 /// Subshell builder
 ///
 /// See the [module documentation](self) for details.
+#[deprecated(
+    note = "use `Config` for subshell configuration instead",
+    since = "0.14.0"
+)]
 #[must_use = "a subshell is not started unless you call `Subshell::start`"]
 pub struct Subshell<S, F> {
     task: F,
@@ -74,6 +78,7 @@ pub struct Subshell<S, F> {
     phantom_data: PhantomData<fn(&mut Env<S>)>,
 }
 
+#[allow(deprecated, reason = "for backward compatible API")]
 impl<S, F> std::fmt::Debug for Subshell<S, F> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Subshell")
@@ -83,6 +88,7 @@ impl<S, F> std::fmt::Debug for Subshell<S, F> {
     }
 }
 
+#[allow(deprecated, reason = "for backward compatible API")]
 impl<S, F> Subshell<S, F>
 where
     S: Close
@@ -321,6 +327,7 @@ async fn restore_sigmask<S: Sigmask>(system: &S, mask: &[signal::Number]) -> Res
 mod config;
 pub use config::Config;
 
+#[allow(deprecated, reason = "for backward compatible API")]
 #[cfg(test)]
 mod tests {
     use super::*;
