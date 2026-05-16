@@ -16,7 +16,9 @@
 
 //! Signal implementation for the real system
 
+use super::super::Result;
 use super::Disposition;
+use super::ErrnoIfM1 as _;
 pub use crate::signal::*;
 use std::ffi::c_int;
 use std::mem::MaybeUninit;
@@ -257,6 +259,73 @@ impl Name {
                 None
             }
         }
+    }
+}
+
+/// Signal set for the real system, wrapping the `sigset_t` type from libc
+///
+/// This is an implementation of the [`Sigset` trait](super::super::Sigset) for the
+/// [`RealSystem`](super::RealSystem).
+#[derive(Clone, Debug)]
+#[repr(transparent)]
+pub struct Sigset(MaybeUninit<libc::sigset_t>);
+// TODO: The auto-derived Debug implementation does not provide useful information.
+// Consider implementing a custom Debug that shows the contents.
+
+impl Sigset {
+    /// Converts a raw `sigset_t` structure to a `Sigset` object.
+    ///
+    /// This function assumes the `sigset_t` structure to be initialized by the
+    /// `sigemptyset` or `sigfillset` calls, but it is passed as `MaybeUninit`
+    /// because of possible padding or extension fields in the structure which
+    /// may not be initialized by those calls.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the provided `sigset_t` structure is properly
+    /// initialized by a call like `sigemptyset` or `sigfillset`.
+    pub(super) const unsafe fn from_raw(sigset: MaybeUninit<libc::sigset_t>) -> Self {
+        Self(sigset)
+    }
+}
+
+impl Default for Sigset {
+    /// Creates an empty signal set.
+    fn default() -> Self {
+        let mut sigset = MaybeUninit::<libc::sigset_t>::uninit();
+        unsafe {
+            libc::sigemptyset(sigset.as_mut_ptr())
+                .errno_if_m1()
+                .expect("sigemptyset should always succeed");
+            Self::from_raw(sigset)
+        }
+    }
+}
+
+impl super::super::Sigset for Sigset {
+    fn full() -> Self {
+        let mut sigset = MaybeUninit::<libc::sigset_t>::uninit();
+        unsafe {
+            libc::sigfillset(sigset.as_mut_ptr())
+                .errno_if_m1()
+                .expect("sigfillset should always succeed");
+            Self::from_raw(sigset)
+        }
+    }
+
+    fn add(&mut self, signal: Number) -> Result<()> {
+        let result = unsafe { libc::sigaddset(self.0.as_mut_ptr(), signal.as_raw()) };
+        result.errno_if_m1().map(drop)
+    }
+
+    fn remove(&mut self, signal: Number) -> Result<()> {
+        let result = unsafe { libc::sigdelset(self.0.as_mut_ptr(), signal.as_raw()) };
+        result.errno_if_m1().map(drop)
+    }
+
+    fn contains(&self, signal: Number) -> Result<bool> {
+        let result = unsafe { libc::sigismember(self.0.as_ptr(), signal.as_raw()) };
+        result.errno_if_m1().map(|r| r > 0)
     }
 }
 

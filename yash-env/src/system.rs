@@ -139,6 +139,7 @@ use self::resource::{GetRlimit, SetRlimit};
 pub use self::select::Select;
 pub use self::signal::{
     CaughtSignals, Disposition, GetSigaction, SendSignal, Sigaction, Sigmask, SigmaskOp, Signals,
+    Sigset,
 };
 pub use self::sysconf::{ShellPath, Sysconf};
 pub use self::terminal::{Isatty, TcGetPgrp, TcSetPgrp};

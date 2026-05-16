@@ -354,6 +354,8 @@ impl<S> Sigmask for Concurrent<S>
 where
     S: Sigmask,
 {
+    type Sigset = S::Sigset;
+
     #[inline]
     fn sigmask(
         &self,

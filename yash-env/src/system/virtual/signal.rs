@@ -16,7 +16,11 @@
 
 //! Functions about signals
 
+use super::super::Result;
+use super::VirtualSystem;
 pub(super) use crate::signal::*;
+use crate::system::Signals as _;
+use std::collections::HashSet;
 use std::num::NonZero;
 
 /// Signal number for `SIGABRT` in the virtual system
@@ -342,5 +346,60 @@ impl SignalEffect {
             Name::Xfsz => Self::Terminate { core_dump: true },
             Name::Rtmin(_) | Name::Rtmax(_) => Self::Terminate { core_dump: false },
         }
+    }
+}
+
+/// Set of signal numbers
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[repr(transparent)]
+pub struct Sigset(pub HashSet<Number>);
+
+impl super::super::Sigset for Sigset {
+    /// Creates a new set containing all the signals supported by the virtual system.
+    fn full() -> Self {
+        let named = VirtualSystem::NAMED_SIGNALS.iter().filter_map(|(_, n)| *n);
+        let realtime = VirtualSystem::new().iter_sigrt();
+        Self(HashSet::from_iter(named.chain(realtime)))
+    }
+
+    /// Adds the specified signal to the set.
+    ///
+    /// The current implementation does not check whether the given signal is
+    /// valid or not. The future implementation may return an error if the
+    /// signal is invalid.
+    fn add(&mut self, signal: Number) -> Result<()> {
+        self.0.insert(signal);
+        Ok(())
+    }
+
+    /// Removes the specified signal from the set.
+    ///
+    /// The current implementation does not check whether the given signal is
+    /// valid or not. The future implementation may return an error if the
+    /// signal is invalid.
+    fn remove(&mut self, signal: Number) -> Result<()> {
+        self.0.remove(&signal);
+        Ok(())
+    }
+
+    /// Checks whether the specified signal is in the set or not.
+    ///
+    /// The current implementation does not check whether the given signal is
+    /// valid or not. The future implementation may return an error if the
+    /// signal is invalid.
+    fn contains(&self, signal: Number) -> Result<bool> {
+        Ok(self.0.contains(&signal))
+    }
+
+    /// Creates a new set containing the signals in the given iterator.
+    ///
+    /// The current implementation does not check whether the given signals are
+    /// valid or not. The future implementation may return an error if any of
+    /// the signals is invalid.
+    fn from_signals<I>(iter: I) -> Result<Self>
+    where
+        I: IntoIterator<Item = Number>,
+    {
+        Ok(Self(HashSet::from_iter(iter)))
     }
 }

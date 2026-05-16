@@ -13,6 +13,12 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Added
 
+- The `system::Sigset` trait has been added to represent a set of signals,
+  abstracting the `sigset_t` type from POSIX.
+- The `system::real::Sigset` struct has been added as the concrete `Sigset`
+  implementation for the real system.
+- The `system::virtual::Sigset` struct has been added as the concrete `Sigset`
+  implementation for the virtual system.
 - The `run_in_child_process` method has been added to the `system::Fork` trait.
   It provides a new way to create child processes that is cleaner and more
   usable than the existing `new_child_process` method.
@@ -93,6 +99,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - The `test_helper::in_virtual_system` function now provides an
       `Env<Rc<Concurrent<VirtualSystem>>>` to the provided task instead of
       `Env<VirtualSystem>`.
+- The `system::Sigmask` trait now has the associated type `Sigset`, which must
+  be specified when implementing the trait.
 - The following methods of `system::Concurrent`, which were inherent methods,
   are now provided as trait implementations. You may have to import the
   corresponding traits to use these methods:

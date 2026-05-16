@@ -1027,6 +1027,8 @@ impl SetPgid for VirtualSystem {
 }
 
 impl Sigmask for VirtualSystem {
+    type Sigset = signal::Sigset;
+
     fn sigmask(
         &self,
         op: Option<(SigmaskOp, &[signal::Number])>,

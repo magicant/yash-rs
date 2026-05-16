@@ -96,6 +96,7 @@ use crate::str::UnixString;
 use enumset::EnumSet;
 pub use file_system::Stat;
 use libc::DIR;
+pub use signal::Sigset;
 use std::convert::Infallible;
 use std::convert::TryInto as _;
 use std::ffi::CStr;
@@ -779,6 +780,8 @@ impl Signals for RealSystem {
 }
 
 impl Sigmask for RealSystem {
+    type Sigset = signal::Sigset;
+
     fn sigmask(
         &self,
         op: Option<(SigmaskOp, &[signal::Number])>,
