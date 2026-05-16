@@ -26,7 +26,7 @@ use crate::job::add_job_if_suspended;
 use crate::semantics::{ExitStatus, Field, Result};
 use crate::source::Location;
 use crate::source::pretty::{Report, ReportType, Snippet};
-use crate::subshell::{Config, JobControl};
+use crate::subshell::Config;
 use crate::system::concurrency::WaitForSignals;
 use crate::system::resource::SetRlimit;
 use crate::system::{
@@ -282,8 +282,7 @@ where
     } else {
         String::new()
     };
-    let mut config = Config::new();
-    config.job_control = Some(JobControl::Foreground);
+    let config = Config::foreground();
     let subshell_result = config.start_and_wait(env, async move |env, _job_control| {
         let location = args[0].origin.clone();
         let Err(e) = replace_current_process(env, path, args).await;

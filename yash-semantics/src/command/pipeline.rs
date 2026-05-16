@@ -125,8 +125,7 @@ async fn execute_job_controlled_pipeline<S: Runtime + 'static>(
     commands: &[Rc<syntax::Command>],
 ) -> Result {
     let commands_2 = commands.to_vec();
-    let mut config = Config::new();
-    config.job_control = Some(JobControl::Foreground);
+    let config = Config::foreground();
     let subshell = config.start_and_wait(env, async move |sub_env, _job_control| {
         let result = execute_multi_command_pipeline(sub_env, &commands_2).await;
         sub_env.apply_result(result);

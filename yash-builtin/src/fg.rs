@@ -213,7 +213,6 @@ mod tests {
     use yash_env::option::Option::Interactive;
     use yash_env::option::State::On;
     use yash_env::subshell::Config;
-    use yash_env::subshell::JobControl;
     use yash_env::system::Concurrent;
     use yash_env::system::GetPid as _;
     use yash_env::system::TcGetPgrp as _;
@@ -229,12 +228,6 @@ mod tests {
         env.system.kill(target, Some(SIGSTOP)).await.unwrap();
     }
 
-    fn foreground_config() -> Config {
-        let mut config = Config::new();
-        config.job_control = Some(JobControl::Foreground);
-        config
-    }
-
     #[test]
     fn resume_job_by_index_resumes_job_in_foreground() {
         in_virtual_system(|mut env, state| async move {
@@ -242,7 +235,7 @@ mod tests {
             env.options.set(Monitor, On);
             let reached = Rc::new(Cell::new(false));
             let reached2 = Rc::clone(&reached);
-            let (pid, subshell_result) = foreground_config()
+            let (pid, subshell_result) = Config::foreground()
                 .start_and_wait(&mut env, async move |env, _| {
                     suspend(env).await;
 
@@ -271,7 +264,7 @@ mod tests {
             env.options.set(Monitor, On);
             let reached = Rc::new(Cell::new(false));
             let reached2 = Rc::clone(&reached);
-            let (pid, subshell_result) = foreground_config()
+            let (pid, subshell_result) = Config::foreground()
                 .start_and_wait(&mut env, async move |env, _| {
                     suspend(env).await;
                     reached2.set(true);
@@ -294,7 +287,7 @@ mod tests {
     fn resume_job_by_index_prints_job_name() {
         in_virtual_system(|mut env, state| async move {
             env.options.set(Monitor, On);
-            let (pid, subshell_result) = foreground_config()
+            let (pid, subshell_result) = Config::foreground()
                 .start_and_wait(&mut env, async |env, _| suspend(env).await)
                 .await
                 .unwrap();
@@ -315,7 +308,7 @@ mod tests {
     fn resume_job_by_index_returns_after_job_exits() {
         in_virtual_system(|mut env, state| async move {
             env.options.set(Monitor, On);
-            let (pid, subshell_result) = foreground_config()
+            let (pid, subshell_result) = Config::foreground()
                 .start_and_wait(&mut env, async |env, _| {
                     suspend(env).await;
                     env.exit_status = ExitStatus(42);
@@ -342,7 +335,7 @@ mod tests {
     fn resume_job_by_index_returns_after_job_suspends() {
         in_virtual_system(|mut env, state| async move {
             env.options.set(Monitor, On);
-            let (pid, subshell_result) = foreground_config()
+            let (pid, subshell_result) = Config::foreground()
                 .start_and_wait(&mut env, async |env, _| {
                     suspend(env).await;
                     suspend(env).await;
@@ -371,7 +364,7 @@ mod tests {
         in_virtual_system(|mut env, state| async move {
             stub_tty(&state);
             env.options.set(Monitor, On);
-            let (pid, subshell_result) = foreground_config()
+            let (pid, subshell_result) = Config::foreground()
                 .start_and_wait(&mut env, async |env, _| suspend(env).await)
                 .await
                 .unwrap();
@@ -449,7 +442,7 @@ mod tests {
             stub_tty(&state);
             env.options.set(Monitor, On);
             // previous job
-            let (pid1, subshell_result_1) = foreground_config()
+            let (pid1, subshell_result_1) = Config::foreground()
                 .start_and_wait(&mut env, async |env, _| {
                     suspend(env).await;
                     unreachable!("previous job should not be resumed");
@@ -462,7 +455,7 @@ mod tests {
             job.state = subshell_result_1.into();
             env.jobs.add(job);
             // current job
-            let (pid2, subshell_result_2) = foreground_config()
+            let (pid2, subshell_result_2) = Config::foreground()
                 .start_and_wait(&mut env, async |env, _| suspend(env).await)
                 .await
                 .unwrap();
@@ -503,7 +496,7 @@ mod tests {
         in_virtual_system(|mut env, state| async move {
             env.options.set(Monitor, On);
             // previous job
-            let (pid1, subshell_result_1) = foreground_config()
+            let (pid1, subshell_result_1) = Config::foreground()
                 .start_and_wait(&mut env, async |env, _| suspend(env).await)
                 .await
                 .unwrap();
@@ -514,7 +507,7 @@ mod tests {
             job.name = "previous job".to_string();
             let index1 = env.jobs.add(job);
             // current job
-            let (pid2, subshell_result_2) = foreground_config()
+            let (pid2, subshell_result_2) = Config::foreground()
                 .start_and_wait(&mut env, async |env, _| {
                     suspend(env).await;
                     unreachable!("current job should not be resumed");
@@ -564,7 +557,7 @@ mod tests {
         in_virtual_system(|mut env, _| async move {
             env.options.set(Monitor, On);
             env.exit_status = ExitStatus(42);
-            let (pid, subshell_result) = foreground_config()
+            let (pid, subshell_result) = Config::foreground()
                 .start_and_wait(&mut env, async |env, _| {
                     suspend(env).await;
                     suspend(env).await;
@@ -590,7 +583,7 @@ mod tests {
             env.options.set(Interactive, On);
             env.options.set(Monitor, On);
             env.exit_status = ExitStatus(42);
-            let (pid, subshell_result) = foreground_config()
+            let (pid, subshell_result) = Config::foreground()
                 .start_and_wait(&mut env, async |env, _| {
                     suspend(env).await;
                     suspend(env).await;

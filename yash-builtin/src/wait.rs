@@ -142,7 +142,7 @@ mod tests {
     use std::task::Poll;
     use yash_env::job::{Job, ProcessResult};
     use yash_env::option::{Monitor, On};
-    use yash_env::subshell::{Config, JobControl};
+    use yash_env::subshell::Config;
     use yash_env::system::r#virtual::SIGSTOP;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::system::{Concurrent, GetPid, SendSignal};
@@ -161,8 +161,7 @@ mod tests {
     }
 
     async fn start_self_suspending_job(env: &mut Env<Rc<Concurrent<VirtualSystem>>>) {
-        let mut config = Config::new();
-        config.job_control = Some(JobControl::Foreground);
+        let config = Config::foreground();
         let (pid, subshell_result) = config
             .start_and_wait(env, async |env, _| suspend(env).await)
             .await

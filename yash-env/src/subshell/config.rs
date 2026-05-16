@@ -80,6 +80,21 @@ impl Config {
         Self::default()
     }
 
+    /// Creates a new `Config` with foreground job control.
+    ///
+    /// This is a convenient function to create a `Config` for a subshell that
+    /// should run in the foreground if job control is active. The returned
+    /// `Config` has [`job_control`](Self::job_control) set to
+    /// `Some(JobControl::Foreground)`, and the other fields set to their
+    /// default values.
+    #[must_use]
+    pub fn foreground() -> Self {
+        Self {
+            job_control: Some(JobControl::Foreground),
+            ..Self::default()
+        }
+    }
+
     /// Starts the subshell.
     ///
     /// This function creates a new child process that runs the task contained
@@ -466,11 +481,7 @@ mod tests {
             stub_tty(&state);
 
             let state_2 = Rc::clone(&state);
-            let config = Config {
-                job_control: Some(JobControl::Foreground),
-                ..Config::new()
-            };
-            let (child_pid, job_control) = config
+            let (child_pid, job_control) = Config::foreground()
                 .start(
                     &mut parent_env,
                     async move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>, job_control| {
@@ -499,16 +510,13 @@ mod tests {
             parent_env.options.set(Monitor, On);
             stub_tty(&state);
 
-            let _ = Config {
-                job_control: Some(JobControl::Foreground),
-                ..Config::new()
-            }
-            .start(
-                &mut parent_env,
-                async move |_: &mut Env<Rc<Concurrent<VirtualSystem>>>, _| (),
-            )
-            .await
-            .unwrap();
+            let _ = Config::foreground()
+                .start(
+                    &mut parent_env,
+                    async move |_: &mut Env<Rc<Concurrent<VirtualSystem>>>, _| (),
+                )
+                .await
+                .unwrap();
             assert_matches!(parent_env.tty, Some(_));
         });
     }
@@ -522,11 +530,7 @@ mod tests {
             parent_env.options.set(Monitor, On);
 
             let state_2 = Rc::clone(&state);
-            let config = Config {
-                job_control: Some(JobControl::Foreground),
-                ..Config::new()
-            };
-            let (child_pid, job_control) = config
+            let (child_pid, job_control) = Config::foreground()
                 .start(
                     &mut parent_env,
                     async move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>, job_control| {
@@ -552,11 +556,7 @@ mod tests {
 
             let parent_pgid = state.borrow().processes[&parent_env.main_pid].pgid;
             let state_2 = Rc::clone(&state);
-            let config = Config {
-                job_control: Some(JobControl::Foreground),
-                ..Config::new()
-            };
-            let (child_pid, job_control) = config
+            let (child_pid, job_control) = Config::foreground()
                 .start(
                     &mut parent_env,
                     async move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>,
@@ -587,11 +587,7 @@ mod tests {
 
             let parent_pgid = state.borrow().processes[&parent_env.main_pid].pgid;
             let state_2 = Rc::clone(&state);
-            let config = Config {
-                job_control: Some(JobControl::Foreground),
-                ..Config::new()
-            };
-            let (child_pid, job_control) = config
+            let (child_pid, job_control) = Config::foreground()
                 .start(
                     &mut parent_env,
                     async move |child_env: &mut Env<Rc<Concurrent<VirtualSystem>>>,
@@ -635,11 +631,7 @@ mod tests {
             env.options.set(Monitor, On);
             stub_tty(&state);
 
-            let config = Config {
-                job_control: Some(JobControl::Foreground),
-                ..Config::new()
-            };
-            let (_pid, process_result) = config
+            let (_pid, process_result) = Config::foreground()
                 .start_and_wait(
                     &mut env,
                     async |env: &mut Env<Rc<Concurrent<VirtualSystem>>>, _job_control| {

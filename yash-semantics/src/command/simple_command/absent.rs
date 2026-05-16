@@ -32,7 +32,6 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::Config;
-use yash_env::subshell::JobControl;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
 
@@ -46,8 +45,7 @@ pub async fn execute_absent_target<S: Runtime + 'static>(
     let redir_exit_status = if let Some(redir) = redirs.first() {
         let first_redir_location = redir.body.operand().location.clone();
         let redirs_2 = Rc::clone(redirs);
-        let mut config = Config::new();
-        config.job_control = Some(JobControl::Foreground);
+        let config = Config::foreground();
         let subshell = config.start_and_wait(env, async move |env, _job_control| {
             let env = &mut RedirGuard::new(env);
             let mut xtrace = XTrace::from_options(&env.options);

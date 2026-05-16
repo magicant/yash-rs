@@ -28,7 +28,6 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::subshell::Config;
-use yash_env::subshell::JobControl;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::List;
 
@@ -39,8 +38,7 @@ pub async fn execute<S: Runtime + 'static>(
     location: &Location,
 ) -> Result {
     let body_2 = Rc::clone(&body);
-    let mut config = Config::new();
-    config.job_control = Some(JobControl::Foreground);
+    let config = Config::foreground();
     let subshell = config.start_and_wait(env, async move |sub_env, _job_control| {
         subshell_main(sub_env, body_2).await
     });
