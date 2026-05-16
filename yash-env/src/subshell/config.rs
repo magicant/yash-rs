@@ -100,8 +100,8 @@ impl Config {
 
     /// Starts the subshell.
     ///
-    /// This function creates a new child process that runs the task contained
-    /// in this builder.
+    /// This function creates a new child process that runs the task provided as
+    /// an argument.
     ///
     /// Although this function is `async`, it does not wait for the child to
     /// finish, which means the parent and child processes will run
