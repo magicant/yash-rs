@@ -17,8 +17,8 @@
 //! Implementation of [`Select`] for [`VirtualSystem`]
 
 use super::{
-    Duration, Errno, Fd, Result, Select, SigmaskOp, TryInto as _, VirtualSystem, raise_sigchld,
-    signal,
+    Duration, Errno, Fd, Result, Select, SigmaskOp, Sigset, TryInto as _, VirtualSystem,
+    raise_sigchld, signal,
 };
 use crate::job::ProcessState;
 use std::cell::{Cell, LazyCell};
@@ -43,10 +43,11 @@ impl Select for VirtualSystem {
         readers: &'a mut Vec<Fd>,
         writers: &'a mut Vec<Fd>,
         timeout: Option<Duration>,
-        signal_mask: Option<&[signal::Number]>,
+        signal_mask: Option<&Sigset>,
     ) -> impl Future<Output = Result<c_int>> + use<'a> {
         let this = self.clone();
-        let signal_mask = signal_mask.map(|mask| mask.to_vec());
+        let signal_mask =
+            signal_mask.map(|mask| mask.0.iter().copied().collect::<Vec<signal::Number>>());
         #[allow(clippy::await_holding_refcell_ref, reason = "false positive")]
         async move {
             let (old_mask, old_caught_signals, deadline) = {
@@ -67,7 +68,7 @@ impl Select for VirtualSystem {
                             .copied()
                             .collect::<Vec<signal::Number>>();
 
-                        let result = proc.block_signals(SigmaskOp::Set, &new_mask);
+                        let result = proc.block_signals(SigmaskOp::Set, new_mask);
                         if result.process_state_changed {
                             let ppid = proc.ppid;
                             raise_sigchld(state, ppid);
@@ -185,7 +186,7 @@ impl Select for VirtualSystem {
                     .processes
                     .get_mut(&this.process_id)
                     .expect("the current process should be in the system state");
-                let result = proc.block_signals(SigmaskOp::Set, &old_mask);
+                let result = proc.block_signals(SigmaskOp::Set, old_mask);
                 if result.process_state_changed {
                     let ppid = proc.ppid;
                     raise_sigchld(&mut state, ppid);
@@ -207,7 +208,7 @@ mod tests {
     use crate::job::Pid;
     use crate::system::{
         CaughtSignals as _, Close as _, Disposition, Pipe as _, Read as _, SendSignal as _,
-        Sigaction as _, Sigmask as _, Write as _,
+        Sigaction as _, Sigmask as _, Sigset as _, Write as _,
     };
     use crate::test_helper::WakeFlag;
     use futures_util::FutureExt as _;
@@ -476,7 +477,7 @@ mod tests {
     fn system_for_catching_sigchld() -> VirtualSystem {
         let system = VirtualSystem::new();
         system
-            .sigmask(Some((SigmaskOp::Add, &[SIGCHLD])), None)
+            .sigmask(Some((SigmaskOp::Add, &Sigset::from(SIGCHLD))), None)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -491,7 +492,8 @@ mod tests {
         let mut readers = vec![];
         let mut writers = vec![];
 
-        let mut select = pin!(system.select(&mut readers, &mut writers, None, Some(&[])));
+        let mut select =
+            pin!(system.select(&mut readers, &mut writers, None, Some(&Sigset::new())));
 
         let woken = Arc::new(WakeFlag::new());
         let waker = Waker::from(Arc::clone(&woken));
@@ -501,13 +503,13 @@ mod tests {
         assert!(!woken.is_woken());
         assert_eq!(system.caught_signals(), [SIGCHLD]);
         // Check that the signal mask is the same as before the select call.
-        let mut mask = Vec::new();
+        let mut mask = Sigset::new();
         system
             .sigmask(None, Some(&mut mask))
             .now_or_never()
             .unwrap()
             .unwrap();
-        assert_eq!(mask, [SIGCHLD]);
+        assert_eq!(mask, Sigset::from(SIGCHLD));
     }
 
     #[test]
@@ -555,7 +557,8 @@ mod tests {
         let mut readers = vec![];
         let mut writers = vec![];
 
-        let mut select = pin!(system.select(&mut readers, &mut writers, None, Some(&[])));
+        let mut select =
+            pin!(system.select(&mut readers, &mut writers, None, Some(&Sigset::new())));
 
         // The future should not be ready yet, and it should not be woken up.
         let woken = Arc::new(WakeFlag::new());
@@ -565,13 +568,13 @@ mod tests {
         assert_eq!(poll, Poll::Pending);
         assert!(!woken.is_woken());
         // While waiting, the signal mask passed to select should be in effect
-        let mut mask = Vec::new();
+        let mut mask = Sigset::new();
         system
             .sigmask(None, Some(&mut mask))
             .now_or_never()
             .unwrap()
             .unwrap();
-        assert_eq!(mask, []);
+        assert_eq!(mask, Sigset::new());
 
         // Even if not woken, it must be safe to poll the future again,
         // and it should still not be ready.
@@ -595,13 +598,13 @@ mod tests {
         assert!(!woken.is_woken());
         assert_eq!(system.caught_signals(), [SIGCHLD]);
         // Check that the signal mask is the same as before the select call.
-        let mut mask = Vec::new();
+        let mut mask = Sigset::new();
         system
             .sigmask(None, Some(&mut mask))
             .now_or_never()
             .unwrap()
             .unwrap();
-        assert_eq!(mask, [SIGCHLD]);
+        assert_eq!(mask, Sigset::from(SIGCHLD));
     }
 
     #[test]
@@ -685,7 +688,7 @@ mod tests {
         let now = Instant::now();
         system.state.borrow_mut().now = Some(now);
         system
-            .sigmask(Some((SigmaskOp::Add, &[SIGTSTP])), None)
+            .sigmask(Some((SigmaskOp::Add, &Sigset::from(SIGTSTP))), None)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -700,7 +703,7 @@ mod tests {
             &mut readers,
             &mut writers,
             Some(Duration::from_secs(1)),
-            Some(&[])
+            Some(&Sigset::new())
         ));
 
         let woken = Arc::new(WakeFlag::new());
@@ -760,7 +763,7 @@ mod tests {
             &mut readers,
             &mut writers,
             Some(Duration::from_secs(1)),
-            Some(&[SIGTSTP])
+            Some(&Sigset::from(SIGTSTP))
         ));
 
         // Initially, the future should not be ready.
@@ -772,13 +775,13 @@ mod tests {
         assert!(!woken.is_woken());
 
         // While waiting, SIGTSTP is blocked by the temporary signal mask.
-        let mut mask = Vec::new();
+        let mut mask = Sigset::new();
         system
             .sigmask(None, Some(&mut mask))
             .now_or_never()
             .unwrap()
             .unwrap();
-        assert_eq!(mask, [SIGTSTP]);
+        assert_eq!(mask, Sigset::from(SIGTSTP));
 
         // Send SIGTSTP while it is blocked. It should remain pending.
         system.raise(SIGTSTP).now_or_never().unwrap().unwrap();

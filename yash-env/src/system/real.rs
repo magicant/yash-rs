@@ -780,60 +780,32 @@ impl Signals for RealSystem {
 }
 
 impl Sigmask for RealSystem {
-    type Sigset = signal::Sigset;
+    type Sigset = Sigset;
 
     fn sigmask(
         &self,
-        op: Option<(SigmaskOp, &[signal::Number])>,
-        old_mask: Option<&mut Vec<signal::Number>>,
+        op: Option<(SigmaskOp, &Sigset)>,
+        old_mask: Option<&mut Sigset>,
     ) -> impl Future<Output = Result<()>> + use<> {
-        ready((|| unsafe {
+        ready(unsafe {
             let (how, raw_mask) = match op {
-                None => (libc::SIG_BLOCK, None),
+                None => (libc::SIG_BLOCK, std::ptr::null()),
                 Some((op, mask)) => {
                     let how = match op {
                         SigmaskOp::Add => libc::SIG_BLOCK,
                         SigmaskOp::Remove => libc::SIG_UNBLOCK,
                         SigmaskOp::Set => libc::SIG_SETMASK,
                     };
-
-                    let mut raw_mask = MaybeUninit::<libc::sigset_t>::uninit();
-                    libc::sigemptyset(raw_mask.as_mut_ptr()).errno_if_m1()?;
-                    for &signal in mask {
-                        libc::sigaddset(raw_mask.as_mut_ptr(), signal.as_raw()).errno_if_m1()?;
-                    }
-
-                    (how, Some(raw_mask))
+                    (how, mask.0.as_ptr())
                 }
             };
-            let mut old_mask_pair = match old_mask {
-                None => None,
-                Some(old_mask) => {
-                    let mut raw_old_mask = MaybeUninit::<libc::sigset_t>::uninit();
-                    // POSIX requires *all* sigset_t objects to be initialized before use.
-                    libc::sigemptyset(raw_old_mask.as_mut_ptr()).errno_if_m1()?;
-                    Some((old_mask, raw_old_mask))
-                }
-            };
+            let raw_old_mask =
+                old_mask.map_or(std::ptr::null_mut(), |old_mask| old_mask.0.as_mut_ptr());
 
-            let raw_set_ptr = raw_mask
-                .as_ref()
-                .map_or(std::ptr::null(), |raw_set| raw_set.as_ptr());
-            let raw_old_set_ptr = old_mask_pair
-                .as_mut()
-                .map_or(std::ptr::null_mut(), |(_, raw_old_mask)| {
-                    raw_old_mask.as_mut_ptr()
-                });
-            let result = libc::sigprocmask(how, raw_set_ptr, raw_old_set_ptr);
-            result.errno_if_m1().map(drop)?;
-
-            if let Some((old_mask, raw_old_mask)) = old_mask_pair {
-                old_mask.clear();
-                signal::sigset_to_vec(raw_old_mask.as_ptr(), old_mask);
-            }
-
-            Ok(())
-        })())
+            libc::sigprocmask(how, raw_mask, raw_old_mask)
+                .errno_if_m1()
+                .map(drop)
+        })
     }
 }
 
@@ -892,7 +864,7 @@ impl Select for RealSystem {
         readers: &'a mut Vec<Fd>,
         writers: &'a mut Vec<Fd>,
         timeout: Option<Duration>,
-        signal_mask: Option<&[signal::Number]>,
+        signal_mask: Option<&Sigset>,
     ) -> impl Future<Output = Result<c_int>> + use<'a> {
         ready((|| {
             use std::ptr::{null, null_mut};
@@ -919,25 +891,10 @@ impl Select for RealSystem {
             let writers_ptr = raw_writers.as_mut_ptr();
             let errors = null_mut();
 
-            let timeout_spec = to_timespec(timeout.unwrap_or_default());
-            let timeout_ptr = if timeout.is_some() {
-                timeout_spec.as_ptr()
-            } else {
-                null()
-            };
+            let timeout_spec = timeout.map(to_timespec);
+            let timeout_ptr = timeout_spec.as_ref().map_or(null(), |spec| spec.as_ptr());
 
-            let mut raw_mask = MaybeUninit::<libc::sigset_t>::uninit();
-            let raw_mask_ptr = match signal_mask {
-                None => null(),
-                Some(signal_mask) => {
-                    unsafe { libc::sigemptyset(raw_mask.as_mut_ptr()) }.errno_if_m1()?;
-                    for &signal in signal_mask {
-                        unsafe { libc::sigaddset(raw_mask.as_mut_ptr(), signal.as_raw()) }
-                            .errno_if_m1()?;
-                    }
-                    raw_mask.as_ptr()
-                }
-            };
+            let raw_mask_ptr = signal_mask.map_or(null(), |mask| mask.0.as_ptr());
 
             let count = unsafe {
                 libc::pselect(

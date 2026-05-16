@@ -403,3 +403,17 @@ impl super::super::Sigset for Sigset {
         Ok(Self(HashSet::from_iter(iter)))
     }
 }
+
+impl From<Number> for Sigset {
+    fn from(signal: Number) -> Self {
+        let mut set = Sigset::default();
+        set.0.insert(signal);
+        set
+    }
+}
+
+impl FromIterator<Number> for Sigset {
+    fn from_iter<T: IntoIterator<Item = Number>>(iter: T) -> Self {
+        Self(HashSet::from_iter(iter))
+    }
+}

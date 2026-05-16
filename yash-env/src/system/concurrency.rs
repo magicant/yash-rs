@@ -107,12 +107,12 @@ use std::time::{Duration, Instant};
 #[derive(Clone, Debug, Default)]
 pub struct Concurrent<S: Sigmask> {
     inner: S,
-    state: RefCell<State>,
+    state: RefCell<State<S::Sigset>>,
 }
 
 /// Internal state for `Concurrent` system
 #[derive(Clone, Debug, Default)]
-struct State {
+struct State<S> {
     /// Wakers for tasks waiting for read readiness on each file descriptor
     reads: HashMap<Fd, WakerSet>,
     /// Wakers for tasks waiting for write readiness on each file descriptor
@@ -132,14 +132,15 @@ struct State {
     /// Signal mask for the `select` method
     ///
     /// This cache is initialized from the signal mask the shell inherited from
-    /// the parent shell and then updated by [`Concurrent::sigmask`] for use by
-    /// `select`. In particular, signals the shell wants to catch are removed
-    /// from this mask so they can interrupt `select`. The value is `None` until
-    /// the signal mask is first updated by [`Concurrent::sigmask`].
-    select_mask: Option<Vec<crate::signal::Number>>,
+    /// the parent shell and then updated by
+    /// [`Concurrent::update_sigmask_and_select_mask`] for use by `select`. In
+    /// particular, signals the shell wants to catch are removed from this mask
+    /// so they can interrupt `select`. The value is `None` until the signal
+    /// mask is first updated by `update_sigmask_and_select_mask`.
+    select_mask: Option<S>,
 }
 
-impl State {
+impl<S: Clone> State<S> {
     /// Creates a clone of the current state for use in a child process.
     ///
     /// This method is intended to be used when forking a new process, allowing
@@ -275,7 +276,7 @@ impl<S: Sigmask> Concurrent<S> {
         target: G,
     ) where
         F: FnOnce() -> Rc<Cell<Option<Waker>>>,
-        G: Fn(&mut State) -> &mut HashMap<Fd, WakerSet>,
+        G: Fn(&mut State<S::Sigset>) -> &mut HashMap<Fd, WakerSet>,
     {
         let mut first_time = true;
         poll_fn(|context| {
@@ -517,7 +518,7 @@ where
                 .map(|target| target.saturating_duration_since(self.inner.now()))
         };
         let signal_mask = (state.signals.strong_count() > 0)
-            .then(|| state.select_mask.as_deref())
+            .then(|| state.select_mask.as_ref())
             .flatten();
 
         // Perform the `select` call

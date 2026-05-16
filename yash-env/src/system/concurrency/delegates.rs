@@ -359,8 +359,8 @@ where
     #[inline]
     fn sigmask(
         &self,
-        op_and_signals: Option<(SigmaskOp, &[signal::Number])>,
-        old_mask: Option<&mut Vec<signal::Number>>,
+        op_and_signals: Option<(SigmaskOp, &Self::Sigset)>,
+        old_mask: Option<&mut Self::Sigset>,
     ) -> impl Future<Output = Result<()>> + use<S> {
         self.inner.sigmask(op_and_signals, old_mask)
     }

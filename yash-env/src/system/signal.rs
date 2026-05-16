@@ -531,8 +531,8 @@ pub trait Sigmask: Signals {
     /// call. See the [module-level documentation](super) for details.
     fn sigmask(
         &self,
-        op: Option<(SigmaskOp, &[Number])>,
-        old_mask: Option<&mut Vec<Number>>,
+        op: Option<(SigmaskOp, &Self::Sigset)>,
+        old_mask: Option<&mut Self::Sigset>,
     ) -> impl Future<Output = Result<()>> + use<Self>;
 }
 
@@ -543,8 +543,8 @@ impl<S: Sigmask> Sigmask for Rc<S> {
     #[inline]
     fn sigmask(
         &self,
-        op: Option<(SigmaskOp, &[Number])>,
-        old_mask: Option<&mut Vec<Number>>,
+        op: Option<(SigmaskOp, &Self::Sigset)>,
+        old_mask: Option<&mut Self::Sigset>,
     ) -> impl Future<Output = Result<()>> + use<S> {
         (self as &S).sigmask(op, old_mask)
     }

@@ -31,7 +31,6 @@
 use crate::Env;
 use crate::job::Pid;
 use crate::job::ProcessResult;
-use crate::signal;
 use crate::system::Close;
 use crate::system::Dup;
 use crate::system::Errno;
@@ -44,6 +43,7 @@ use crate::system::SetPgid;
 use crate::system::Sigaction;
 use crate::system::Sigmask;
 use crate::system::SigmaskOp;
+use crate::system::Sigset as _;
 use crate::system::TcSetPgrp;
 use crate::system::Wait;
 use crate::system::concurrency::WaitForSignals;
@@ -236,18 +236,21 @@ where
     }
 }
 
-async fn block_sigint_sigquit<S: Sigmask>(system: &S) -> Result<Vec<signal::Number>, Errno> {
-    let mut old_mask = Vec::new();
+async fn block_sigint_sigquit<S: Sigmask>(system: &S) -> Result<S::Sigset, Errno> {
+    let mut old_mask = S::Sigset::new();
     system
         .sigmask(
-            Some((SigmaskOp::Add, &[S::SIGINT, S::SIGQUIT])),
+            Some((
+                SigmaskOp::Add,
+                &S::Sigset::from_signals([S::SIGINT, S::SIGQUIT])?,
+            )),
             Some(&mut old_mask),
         )
         .await?;
     Ok(old_mask)
 }
 
-async fn restore_sigmask<S: Sigmask>(system: &S, mask: &[signal::Number]) -> Result<(), Errno> {
+async fn restore_sigmask<S: Sigmask>(system: &S, mask: &S::Sigset) -> Result<(), Errno> {
     system.sigmask(Some((SigmaskOp::Set, mask)), None).await
 }
 

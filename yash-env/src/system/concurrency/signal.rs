@@ -18,6 +18,7 @@
 
 use super::Concurrent;
 use crate::signal::Number;
+use crate::system::signal::Sigset as _;
 use crate::system::{Disposition, Errno, Sigaction, Sigmask, SigmaskOp};
 use crate::trap::SignalSystem;
 use std::rc::Rc;
@@ -89,17 +90,18 @@ where
         op: SigmaskOp,
         signal: Number,
     ) -> Result<(), Errno> {
-        let mut old_mask = Vec::new();
+        let mut mask_of_signal = S::Sigset::new();
+        mask_of_signal.add(signal)?;
+        let mut old_mask = S::Sigset::new();
         self.inner
-            .sigmask(Some((op, &[signal])), Some(&mut old_mask))
+            .sigmask(Some((op, &mask_of_signal)), Some(&mut old_mask))
             .await?;
 
         self.state
             .borrow_mut()
             .select_mask
             .get_or_insert(old_mask)
-            .retain(|&s| s != signal);
-        Ok(())
+            .remove(signal)
     }
 }
 
@@ -108,7 +110,7 @@ mod tests {
     use super::*;
     use crate::job::{ProcessResult, ProcessState};
     use crate::system::SendSignal as _;
-    use crate::system::r#virtual::{SIGQUIT, SIGTERM, SIGUSR1, VirtualSystem};
+    use crate::system::r#virtual::{SIGQUIT, SIGTERM, SIGUSR1, Sigset, VirtualSystem};
     use futures_util::FutureExt as _;
     use std::num::NonZero;
 
@@ -194,7 +196,7 @@ mod tests {
         let inner = VirtualSystem::new();
         _ = inner
             .current_process_mut()
-            .block_signals(SigmaskOp::Set, &[SIGQUIT, SIGTERM, SIGUSR1]);
+            .block_signals(SigmaskOp::Set, [SIGQUIT, SIGTERM, SIGUSR1]);
         let system = Rc::new(Concurrent::new(inner.clone()));
 
         let result = system
@@ -216,7 +218,7 @@ mod tests {
         let inner = VirtualSystem::new();
         _ = inner
             .current_process_mut()
-            .block_signals(SigmaskOp::Set, &[SIGQUIT, SIGTERM, SIGUSR1]);
+            .block_signals(SigmaskOp::Set, [SIGQUIT, SIGTERM, SIGUSR1]);
         let system = Rc::new(Concurrent::new(inner.clone()));
 
         system
@@ -225,8 +227,8 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(
-            system.state.borrow().select_mask.as_deref(),
-            Some([SIGQUIT, SIGUSR1].as_slice())
+            system.state.borrow().select_mask,
+            Some(Sigset::from_iter([SIGQUIT, SIGUSR1]))
         );
     }
 
@@ -240,7 +242,7 @@ mod tests {
             .now_or_never()
             .unwrap();
         assert_eq!(result, Err(Errno::EINVAL));
-        assert_eq!(system.state.borrow().select_mask.as_deref(), None);
+        assert_eq!(system.state.borrow().select_mask, None);
     }
 
     #[test]
@@ -248,7 +250,7 @@ mod tests {
         let inner = VirtualSystem::new();
         _ = inner
             .current_process_mut()
-            .block_signals(SigmaskOp::Set, &[SIGQUIT, SIGTERM, SIGUSR1]);
+            .block_signals(SigmaskOp::Set, [SIGQUIT, SIGTERM, SIGUSR1]);
         let system = Rc::new(Concurrent::new(inner.clone()));
 
         system
@@ -262,8 +264,8 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(
-            system.state.borrow().select_mask.as_deref(),
-            Some([SIGUSR1].as_slice())
+            system.state.borrow().select_mask,
+            Some(Sigset::from(SIGUSR1))
         );
     }
 }
