@@ -52,7 +52,7 @@ impl SigsetTrait for Sigset {
     /// The current implementation does not check whether the given signal is
     /// valid or not. The future implementation may return an error if the
     /// signal is invalid.
-    fn add(&mut self, signal: Number) -> Result<()> {
+    fn insert(&mut self, signal: Number) -> Result<()> {
         self.0.insert(signal);
         Ok(())
     }

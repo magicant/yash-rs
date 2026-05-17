@@ -91,7 +91,7 @@ where
         signal: Number,
     ) -> Result<(), Errno> {
         let mut mask_of_signal = S::Sigset::new();
-        mask_of_signal.add(signal)?;
+        mask_of_signal.insert(signal)?;
         let mut old_mask = S::Sigset::new();
         self.inner
             .sigmask(Some((op, &mask_of_signal)), Some(&mut old_mask))

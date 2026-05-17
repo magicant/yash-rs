@@ -97,7 +97,7 @@ impl super::super::Sigset for Sigset {
         }
     }
 
-    fn add(&mut self, signal: Number) -> Result<()> {
+    fn insert(&mut self, signal: Number) -> Result<()> {
         let result = unsafe { libc::sigaddset(self.0.as_mut_ptr(), signal.as_raw()) };
         result.errno_if_m1().map(drop)
     }

@@ -479,7 +479,7 @@ pub trait Sigset: Clone + Default + 'static {
     fn full() -> Self;
 
     /// Adds a signal to the set.
-    fn add(&mut self, signal: Number) -> Result<()>;
+    fn insert(&mut self, signal: Number) -> Result<()>;
 
     /// Removes a signal from the set.
     fn remove(&mut self, signal: Number) -> Result<()>;
@@ -491,16 +491,16 @@ pub trait Sigset: Clone + Default + 'static {
     ///
     /// This method is a convenient way to create a signal set from a list of
     /// signal numbers. It iterates over the provided signal numbers and
-    /// [adds](Self::add) them to a new signal set. If any call to `add`
-    /// fails, this method returns the error immediately. Otherwise, it returns
-    /// the resulting signal set.
+    /// [inserts](Self::insert) them to a new signal set. If any call to
+    /// `insert` fails, this method returns the error immediately. Otherwise, it
+    /// returns the resulting signal set.
     fn from_signals<I>(iter: I) -> Result<Self>
     where
         I: IntoIterator<Item = Number>,
     {
         let mut set = Self::new();
         for signal in iter {
-            set.add(signal)?;
+            set.insert(signal)?;
         }
         Ok(set)
     }

@@ -556,7 +556,7 @@ impl Process {
             && signal != signal::SIGSTOP
             && self.blocked_signals().contains(signal) == Ok(true)
         {
-            self.pending_signals.add(signal).ok();
+            self.pending_signals.insert(signal).ok();
             SignalResult::default()
         } else {
             self.deliver_signal(signal)
