@@ -16,7 +16,7 @@
 
 //! Items related to process management
 
-use super::{Concurrent, ExitStatus, Result, Signals};
+use super::{Concurrent, ExitStatus, Result, Sigmask, Signals};
 use crate::Env;
 #[cfg(all(doc, unix))]
 use crate::RealSystem;
@@ -197,7 +197,7 @@ pub trait Fork {
     )]
     fn new_child_process(&self) -> Result<ChildProcessStarter<Self>>
     where
-        Self: Sized;
+        Self: Sigmask + Sized;
 }
 
 /// Trait for waiting for child processes

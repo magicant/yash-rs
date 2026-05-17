@@ -1027,10 +1027,12 @@ impl SetPgid for VirtualSystem {
 }
 
 impl Sigmask for VirtualSystem {
+    type Sigset = Sigset;
+
     fn sigmask(
         &self,
-        op: Option<(SigmaskOp, &[signal::Number])>,
-        old_mask: Option<&mut Vec<signal::Number>>,
+        op: Option<(SigmaskOp, &Sigset)>,
+        old_mask: Option<&mut Sigset>,
     ) -> impl Future<Output = Result<()>> + use<> {
         let state_changed = {
             let mut state = self.state.borrow_mut();
@@ -1040,12 +1042,11 @@ impl Sigmask for VirtualSystem {
                 .expect("the current process should be in the system state");
 
             if let Some(old_mask) = old_mask {
-                old_mask.clear();
-                old_mask.extend(process.blocked_signals());
+                old_mask.clone_from(process.blocked_signals());
             }
 
             if let Some((op, mask)) = op {
-                let result = process.block_signals(op, mask);
+                let result = process.block_signals(op, mask.iter().copied());
                 if result.process_state_changed {
                     let parent_pid = process.ppid;
                     raise_sigchld(&mut state, parent_pid);
@@ -2628,7 +2629,7 @@ mod tests {
         let system = VirtualSystem::new();
         // Block SIGTSTP first
         system
-            .sigmask(Some((SigmaskOp::Add, &[SIGTSTP])), None)
+            .sigmask(Some((SigmaskOp::Add, &Sigset::from(SIGTSTP))), None)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -2636,7 +2637,7 @@ mod tests {
         let _ = system.current_process_mut().raise_signal(SIGTSTP);
         // Unblocking SIGTSTP should deliver it, stopping the process
         let result = system
-            .sigmask(Some((SigmaskOp::Remove, &[SIGTSTP])), None)
+            .sigmask(Some((SigmaskOp::Remove, &Sigset::from(SIGTSTP))), None)
             .now_or_never();
         // The future should be pending because the process is stopped
         assert_eq!(result, None);
@@ -2656,7 +2657,7 @@ mod tests {
                 // Block SIGTSTP (signal will become pending when raised)
                 child_env
                     .system
-                    .sigmask(Some((SigmaskOp::Add, &[SIGTSTP])), None)
+                    .sigmask(Some((SigmaskOp::Add, &Sigset::from(SIGTSTP))), None)
                     .await
                     .unwrap();
                 // Raise SIGTSTP; since it is blocked, it becomes pending
@@ -2665,7 +2666,7 @@ mod tests {
                 // future suspends until the process is resumed
                 child_env
                     .system
-                    .sigmask(Some((SigmaskOp::Remove, &[SIGTSTP])), None)
+                    .sigmask(Some((SigmaskOp::Remove, &Sigset::from(SIGTSTP))), None)
                     .await
                     .unwrap();
                 // After being resumed, exit cleanly

@@ -21,7 +21,9 @@ use crate::signal;
 use crate::source::Location;
 use crate::system::resource::{LimitPair, Resource, SetRlimit};
 use crate::system::r#virtual::SignalEffect;
-use crate::system::{Disposition, Exit, SendSignal, Sigaction, Sigmask, SigmaskOp, Signals};
+use crate::system::{
+    Disposition, Exit, SendSignal, Sigaction, Sigmask, SigmaskOp, Signals, Sigset as _,
+};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::ffi::c_int;
@@ -374,7 +376,10 @@ where
 
         // Unblock the signal
         system
-            .sigmask(Some((SigmaskOp::Remove, &[signal.1])), None)
+            .sigmask(
+                Some((SigmaskOp::Remove, &S::Sigset::from_signals([signal.1])?)),
+                None,
+            )
             .await?;
 
         // Send the signal to the current process

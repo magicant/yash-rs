@@ -21,6 +21,7 @@ use super::Concurrent;
 use super::{Pid, Result};
 pub use crate::signal::{Name, Number, RawNumber};
 use std::borrow::Cow;
+use std::fmt::Debug;
 use std::num::NonZero;
 use std::ops::RangeInclusive;
 use std::rc::Rc;
@@ -456,8 +457,59 @@ pub enum SigmaskOp {
     Set,
 }
 
+/// Interface for signal sets
+///
+/// This trait is implemented by types that represent sets of signals,
+/// abstracting the functionality of the `sigset_t` type in POSIX.
+///
+/// Implementors of this trait must also implement the `Default` trait, where
+/// the default value must be an empty signal set.
+pub trait Sigset: Clone + Default + 'static {
+    /// Creates a new, empty signal set.
+    ///
+    /// The provided implementation simply calls [`Default::default`].
+    #[inline(always)]
+    #[must_use]
+    fn new() -> Self {
+        Default::default()
+    }
+
+    /// Creates a new signal set containing all signals.
+    #[must_use]
+    fn full() -> Self;
+
+    /// Adds a signal to the set.
+    fn add(&mut self, signal: Number) -> Result<()>;
+
+    /// Removes a signal from the set.
+    fn remove(&mut self, signal: Number) -> Result<()>;
+
+    /// Checks if a signal is in the set.
+    fn contains(&self, signal: Number) -> Result<bool>;
+
+    /// Creates a signal set from an iterator of signal numbers.
+    ///
+    /// This method is a convenient way to create a signal set from a list of
+    /// signal numbers. It iterates over the provided signal numbers and
+    /// [adds](Self::add) them to a new signal set. If any call to `add`
+    /// fails, this method returns the error immediately. Otherwise, it returns
+    /// the resulting signal set.
+    fn from_signals<I>(iter: I) -> Result<Self>
+    where
+        I: IntoIterator<Item = Number>,
+    {
+        let mut set = Self::new();
+        for signal in iter {
+            set.add(signal)?;
+        }
+        Ok(set)
+    }
+}
+
 /// Trait for managing signal blocking mask
 pub trait Sigmask: Signals {
+    type Sigset: Sigset + Debug;
+
     /// Gets and/or sets the signal blocking mask.
     ///
     /// This trait is usually not used directly. Instead, it is used by
@@ -479,18 +531,20 @@ pub trait Sigmask: Signals {
     /// call. See the [module-level documentation](super) for details.
     fn sigmask(
         &self,
-        op: Option<(SigmaskOp, &[Number])>,
-        old_mask: Option<&mut Vec<Number>>,
+        op: Option<(SigmaskOp, &Self::Sigset)>,
+        old_mask: Option<&mut Self::Sigset>,
     ) -> impl Future<Output = Result<()>> + use<Self>;
 }
 
 /// Delegates the `Sigmask` trait to the contained instance of `S`
 impl<S: Sigmask> Sigmask for Rc<S> {
+    type Sigset = S::Sigset;
+
     #[inline]
     fn sigmask(
         &self,
-        op: Option<(SigmaskOp, &[Number])>,
-        old_mask: Option<&mut Vec<Number>>,
+        op: Option<(SigmaskOp, &Self::Sigset)>,
+        old_mask: Option<&mut Self::Sigset>,
     ) -> impl Future<Output = Result<()>> + use<S> {
         (self as &S).sigmask(op, old_mask)
     }

@@ -708,6 +708,7 @@ mod tests {
     use crate::source::Location;
     use crate::subshell::Config;
     use crate::system::Exit as _;
+    use crate::system::Sigset as _;
     use crate::system::r#virtual::Inode;
     use crate::system::r#virtual::SIGCHLD;
     use crate::test_helper::in_virtual_system;
@@ -733,7 +734,7 @@ mod tests {
             {
                 let mut state = state.borrow_mut();
                 let process = state.processes.get_mut(&env.main_pid).unwrap();
-                assert!(process.blocked_signals().contains(&SIGCHLD));
+                assert_eq!(process.blocked_signals().contains(SIGCHLD), Ok(true));
                 let _ = process.raise_signal(SIGCHLD);
             }
             env.wait_for_signal(SIGCHLD).await;
@@ -773,7 +774,7 @@ mod tests {
         {
             let mut state = system.state.borrow_mut();
             let process = state.processes.get_mut(&system.process_id).unwrap();
-            assert!(process.blocked_signals().contains(&SIGCHLD));
+            assert_eq!(process.blocked_signals().contains(SIGCHLD), Ok(true));
             let _ = process.raise_signal(SIGCHLD);
         }
 

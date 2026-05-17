@@ -19,9 +19,8 @@
 #[cfg(doc)]
 use super::Concurrent;
 use super::Result;
-use super::signal;
+use super::Sigmask;
 use crate::io::Fd;
-use crate::system::Signals;
 use std::ffi::c_int;
 use std::future::Future;
 use std::rc::Rc;
@@ -37,7 +36,7 @@ use std::time::Duration;
 /// represents the behavior of the `select` system call. It is used by the
 /// `Select` trait in the `concurrency` submodule to implement its
 /// functionality.
-pub trait Select: Signals {
+pub trait Select: Sigmask {
     /// Waits for a next event.
     ///
     /// In a typical configuration, this trait is not used directly. Instead,
@@ -78,7 +77,7 @@ pub trait Select: Signals {
         readers: &'a mut Vec<Fd>,
         writers: &'a mut Vec<Fd>,
         timeout: Option<Duration>,
-        signal_mask: Option<&[signal::Number]>,
+        signal_mask: Option<&Self::Sigset>,
     ) -> impl Future<Output = Result<c_int>> + use<'a, Self>;
 }
 
@@ -90,7 +89,7 @@ impl<S: Select> Select for Rc<S> {
         readers: &'a mut Vec<Fd>,
         writers: &'a mut Vec<Fd>,
         timeout: Option<Duration>,
-        signal_mask: Option<&[signal::Number]>,
+        signal_mask: Option<&S::Sigset>,
     ) -> impl Future<Output = Result<c_int>> + use<'a, S> {
         (self as &S).select(readers, writers, timeout, signal_mask)
     }

@@ -18,7 +18,7 @@
 
 use super::{Concurrent, TemporaryNonBlockingGuard};
 use crate::io::Fd;
-use crate::system::{Errno, Fcntl, Read, Write};
+use crate::system::{Errno, Fcntl, Read, Sigmask, Write};
 use std::cell::LazyCell;
 use std::iter::repeat_n;
 use std::rc::Rc;
@@ -66,7 +66,7 @@ where
 
 impl<S> ReadAll for Concurrent<S>
 where
-    S: Fcntl + Read,
+    S: Fcntl + Read + Sigmask,
 {
     async fn read_all_to(&self, fd: Fd, buffer: &mut Vec<u8>) -> Result<(), Errno> {
         let this = TemporaryNonBlockingGuard::new(self, fd);
@@ -140,7 +140,7 @@ where
 
 impl<S> WriteAll for Concurrent<S>
 where
-    S: Fcntl + Write,
+    S: Fcntl + Sigmask + Write,
 {
     async fn write_all(&self, fd: Fd, mut data: &[u8]) -> Result<(), Errno> {
         if data.is_empty() {

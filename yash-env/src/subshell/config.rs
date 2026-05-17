@@ -301,7 +301,7 @@ mod tests {
     use crate::source::Location;
     use crate::system::r#virtual::{Inode, SystemState, VirtualSystem};
     use crate::system::r#virtual::{SIGCHLD, SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU};
-    use crate::system::{Concurrent, Disposition};
+    use crate::system::{Concurrent, Disposition, Sigset as _};
     use crate::test_helper::in_virtual_system;
     use crate::trap::Action;
     use assert_matches::assert_matches;
@@ -714,8 +714,11 @@ mod tests {
 
             let state = state.borrow();
             let parent_process = &state.processes[&parent_env.main_pid];
-            assert!(!parent_process.blocked_signals().contains(&SIGINT));
-            assert!(!parent_process.blocked_signals().contains(&SIGQUIT));
+            assert_eq!(parent_process.blocked_signals().contains(SIGINT), Ok(false));
+            assert_eq!(
+                parent_process.blocked_signals().contains(SIGQUIT),
+                Ok(false)
+            );
             let child_process = &state.processes[&child_pid];
             assert_eq!(child_process.disposition(SIGINT), Disposition::Ignore);
             assert_eq!(child_process.disposition(SIGQUIT), Disposition::Ignore);

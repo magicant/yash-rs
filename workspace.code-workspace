@@ -103,6 +103,7 @@
 			"sigprocmask",
 			"SIGQUIT",
 			"SIGSEGV",
+			"sigset",
 			"SIGSTOP",
 			"SIGTERM",
 			"SIGTSTP",

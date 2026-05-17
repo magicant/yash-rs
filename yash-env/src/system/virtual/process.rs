@@ -20,6 +20,7 @@ use super::Disposition;
 use super::Gid;
 use super::Mode;
 use super::SigmaskOp;
+use super::Sigset;
 use super::Uid;
 use super::WakerSet;
 use super::io::FdBody;
@@ -30,12 +31,12 @@ use crate::job::ProcessResult;
 use crate::job::ProcessState;
 use crate::path::Path;
 use crate::path::PathBuf;
+use crate::system::Sigset as _;
 use crate::system::resource::INFINITY;
 use crate::system::resource::LimitPair;
 use crate::system::resource::Resource;
 use std::cell::Cell;
 use std::collections::BTreeMap;
-use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::fmt::Debug;
@@ -94,10 +95,10 @@ pub struct Process {
     dispositions: HashMap<signal::Number, Disposition>,
 
     /// Set of blocked signals
-    blocked_signals: BTreeSet<signal::Number>,
+    blocked_signals: Sigset,
 
     /// Set of pending signals
-    pending_signals: BTreeSet<signal::Number>,
+    pending_signals: Sigset,
 
     /// List of signals that have been delivered and caught
     pub(crate) caught_signals: Vec<signal::Number>,
@@ -160,8 +161,8 @@ impl Process {
             state_has_changed: false,
             resumption_awaiters: WakerSet::new(),
             dispositions: HashMap::new(),
-            blocked_signals: BTreeSet::new(),
-            pending_signals: BTreeSet::new(),
+            blocked_signals: Sigset::default(),
+            pending_signals: Sigset::default(),
             caught_signals: Vec::new(),
             caught_signals_count: 0,
             signal_wakers: WakerSet::new(),
@@ -407,7 +408,7 @@ impl Process {
     }
 
     /// Returns the currently blocked signals.
-    pub fn blocked_signals(&self) -> &BTreeSet<signal::Number> {
+    pub fn blocked_signals(&self) -> &Sigset {
         &self.blocked_signals
     }
 
@@ -415,7 +416,7 @@ impl Process {
     ///
     /// A signal is pending when it has been raised but not yet delivered
     /// because it is being blocked.
-    pub fn pending_signals(&self) -> &BTreeSet<signal::Number> {
+    pub fn pending_signals(&self) -> &Sigset {
         &self.pending_signals
     }
 
@@ -428,22 +429,30 @@ impl Process {
     /// that case, the caller must send a SIGCHLD to the parent process of this
     /// process.
     #[must_use = "send SIGCHLD if process state has changed"]
-    pub fn block_signals(&mut self, how: SigmaskOp, signals: &[signal::Number]) -> SignalResult {
+    pub fn block_signals<I>(&mut self, how: SigmaskOp, signals: I) -> SignalResult
+    where
+        I: IntoIterator<Item = signal::Number>,
+    {
         match how {
-            SigmaskOp::Set => self.blocked_signals = signals.iter().copied().collect(),
+            SigmaskOp::Set => self.blocked_signals = signals.into_iter().collect(),
             SigmaskOp::Add => self.blocked_signals.extend(signals),
             SigmaskOp::Remove => {
                 for signal in signals {
-                    self.blocked_signals.remove(signal);
+                    self.blocked_signals.remove(signal).ok();
                 }
             }
         }
 
-        let signals_to_deliver = self.pending_signals.difference(&self.blocked_signals);
-        let signals_to_deliver = signals_to_deliver.copied().collect::<Vec<signal::Number>>();
+        self.deliver_pending_signals()
+    }
+
+    fn deliver_pending_signals(&mut self) -> SignalResult {
+        let signals_to_deliver = self
+            .pending_signals
+            .difference_to_vec(&self.blocked_signals);
         let mut result = SignalResult::default();
         for signal in signals_to_deliver {
-            self.pending_signals.remove(&signal);
+            self.pending_signals.remove(signal).ok();
             result |= self.deliver_signal(signal);
         }
         result
@@ -545,9 +554,9 @@ impl Process {
 
         let mut result = if signal != signal::SIGKILL
             && signal != signal::SIGSTOP
-            && self.blocked_signals().contains(&signal)
+            && self.blocked_signals().contains(signal) == Ok(true)
         {
-            self.pending_signals.insert(signal);
+            self.pending_signals.add(signal).ok();
             SignalResult::default()
         } else {
             self.deliver_signal(signal)
@@ -741,55 +750,55 @@ mod tests {
     #[test]
     fn process_sigmask_setmask() {
         let mut process = Process::with_parent_and_group(Pid(10), Pid(11));
-        let result = process.block_signals(SigmaskOp::Set, &[signal::SIGINT, signal::SIGCHLD]);
+        let result = process.block_signals(SigmaskOp::Set, [signal::SIGINT, signal::SIGCHLD]);
         assert_eq!(result, SignalResult::default());
 
         let result_set = process.blocked_signals();
-        assert!(result_set.contains(&signal::SIGINT));
-        assert!(result_set.contains(&signal::SIGCHLD));
+        assert_eq!(result_set.contains(signal::SIGINT), Ok(true));
+        assert_eq!(result_set.contains(signal::SIGCHLD), Ok(true));
         assert_eq!(result_set.len(), 2);
 
-        let result = process.block_signals(SigmaskOp::Set, &[signal::SIGINT, signal::SIGQUIT]);
+        let result = process.block_signals(SigmaskOp::Set, [signal::SIGINT, signal::SIGQUIT]);
         assert_eq!(result, SignalResult::default());
 
         let result_set = process.blocked_signals();
-        assert!(result_set.contains(&signal::SIGINT));
-        assert!(result_set.contains(&signal::SIGQUIT));
+        assert_eq!(result_set.contains(signal::SIGINT), Ok(true));
+        assert_eq!(result_set.contains(signal::SIGQUIT), Ok(true));
         assert_eq!(result_set.len(), 2);
     }
 
     #[test]
     fn process_sigmask_block() {
         let mut process = Process::with_parent_and_group(Pid(10), Pid(11));
-        let result = process.block_signals(SigmaskOp::Add, &[signal::SIGINT, signal::SIGCHLD]);
+        let result = process.block_signals(SigmaskOp::Add, [signal::SIGINT, signal::SIGCHLD]);
         assert_eq!(result, SignalResult::default());
 
         let result_set = process.blocked_signals();
-        assert!(result_set.contains(&signal::SIGINT));
-        assert!(result_set.contains(&signal::SIGCHLD));
+        assert_eq!(result_set.contains(signal::SIGINT), Ok(true));
+        assert_eq!(result_set.contains(signal::SIGCHLD), Ok(true));
         assert_eq!(result_set.len(), 2);
 
-        let result = process.block_signals(SigmaskOp::Add, &[signal::SIGINT, signal::SIGQUIT]);
+        let result = process.block_signals(SigmaskOp::Add, [signal::SIGINT, signal::SIGQUIT]);
         assert_eq!(result, SignalResult::default());
 
         let result_set = process.blocked_signals();
-        assert!(result_set.contains(&signal::SIGINT));
-        assert!(result_set.contains(&signal::SIGQUIT));
-        assert!(result_set.contains(&signal::SIGCHLD));
+        assert_eq!(result_set.contains(signal::SIGINT), Ok(true));
+        assert_eq!(result_set.contains(signal::SIGQUIT), Ok(true));
+        assert_eq!(result_set.contains(signal::SIGCHLD), Ok(true));
         assert_eq!(result_set.len(), 3);
     }
 
     #[test]
     fn process_sigmask_unblock() {
         let mut process = Process::with_parent_and_group(Pid(10), Pid(11));
-        let result = process.block_signals(SigmaskOp::Add, &[signal::SIGINT, signal::SIGCHLD]);
+        let result = process.block_signals(SigmaskOp::Add, [signal::SIGINT, signal::SIGCHLD]);
         assert_eq!(result, SignalResult::default());
 
-        let result = process.block_signals(SigmaskOp::Remove, &[signal::SIGINT, signal::SIGQUIT]);
+        let result = process.block_signals(SigmaskOp::Remove, [signal::SIGINT, signal::SIGQUIT]);
         assert_eq!(result, SignalResult::default());
 
         let result_set = process.blocked_signals();
-        assert!(result_set.contains(&signal::SIGCHLD));
+        assert_eq!(result_set.contains(signal::SIGCHLD), Ok(true));
         assert_eq!(result_set.len(), 1);
     }
 
@@ -929,7 +938,7 @@ mod tests {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
         let _ = process.set_state(ProcessState::stopped(signal::SIGTTOU));
         let _ = process.set_disposition(signal::SIGCONT, Disposition::Ignore);
-        let _ = process.block_signals(SigmaskOp::Add, &[signal::SIGCONT]);
+        let _ = process.block_signals(SigmaskOp::Add, [signal::SIGCONT]);
         let result = process.raise_signal(signal::SIGCONT);
         assert_eq!(
             result,
@@ -941,7 +950,7 @@ mod tests {
         );
         assert_eq!(process.state(), ProcessState::Running);
         assert_eq!(process.caught_signals, []);
-        assert!(process.pending_signals.contains(&signal::SIGCONT));
+        assert_eq!(process.pending_signals.contains(signal::SIGCONT), Ok(true));
     }
 
     #[test]
@@ -970,7 +979,7 @@ mod tests {
     fn process_raise_signal_blocked() {
         let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
         process.set_disposition(signal::SIGCHLD, Disposition::Catch);
-        let result = process.block_signals(SigmaskOp::Add, &[signal::SIGCHLD]);
+        let result = process.block_signals(SigmaskOp::Add, [signal::SIGCHLD]);
         assert_eq!(
             result,
             SignalResult {
@@ -992,7 +1001,7 @@ mod tests {
         assert_eq!(process.state(), ProcessState::Running);
         assert_eq!(process.caught_signals, []);
 
-        let result = process.block_signals(SigmaskOp::Set, &[]);
+        let result = process.block_signals(SigmaskOp::Set, []);
         assert_eq!(
             result,
             SignalResult {

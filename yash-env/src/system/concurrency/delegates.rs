@@ -39,7 +39,7 @@ use unix_str::UnixString;
 
 impl<S> Fstat for Concurrent<S>
 where
-    S: Fstat,
+    S: Fstat + Sigmask,
 {
     type Stat = S::Stat;
 
@@ -63,7 +63,7 @@ where
 
 impl<S> IsExecutableFile for Concurrent<S>
 where
-    S: IsExecutableFile,
+    S: IsExecutableFile + Sigmask,
 {
     #[inline]
     fn is_executable_file(&self, path: &CStr) -> bool {
@@ -73,7 +73,7 @@ where
 
 impl<S> Pipe for Concurrent<S>
 where
-    S: Pipe,
+    S: Pipe + Sigmask,
 {
     #[inline]
     fn pipe(&self) -> Result<(Fd, Fd)> {
@@ -83,7 +83,7 @@ where
 
 impl<S> Dup for Concurrent<S>
 where
-    S: Dup,
+    S: Dup + Sigmask,
 {
     #[inline]
     fn dup(&self, from: Fd, to_min: Fd, flags: EnumSet<FdFlag>) -> Result<Fd> {
@@ -99,7 +99,7 @@ where
 /// This implementation does not (yet) support non-blocking open operations.
 impl<S> Open for Concurrent<S>
 where
-    S: Open,
+    S: Open + Sigmask,
 {
     #[inline]
     fn open(
@@ -130,7 +130,7 @@ where
 
 impl<S> Close for Concurrent<S>
 where
-    S: Close,
+    S: Close + Sigmask,
 {
     #[inline]
     fn close(&self, fd: Fd) -> Result<()> {
@@ -140,7 +140,7 @@ where
 
 impl<S> Fcntl for Concurrent<S>
 where
-    S: Fcntl,
+    S: Fcntl + Sigmask,
 {
     #[inline]
     fn ofd_access(&self, fd: Fd) -> Result<OfdAccess> {
@@ -165,7 +165,7 @@ where
 
 impl<S> Seek for Concurrent<S>
 where
-    S: Seek,
+    S: Seek + Sigmask,
 {
     #[inline]
     fn lseek(&self, fd: Fd, position: SeekFrom) -> Result<u64> {
@@ -175,7 +175,7 @@ where
 
 impl<S> Umask for Concurrent<S>
 where
-    S: Umask,
+    S: Sigmask + Umask,
 {
     #[inline]
     fn umask(&self, new_mask: Mode) -> Mode {
@@ -185,7 +185,7 @@ where
 
 impl<S> GetCwd for Concurrent<S>
 where
-    S: GetCwd,
+    S: GetCwd + Sigmask,
 {
     #[inline]
     fn getcwd(&self) -> Result<PathBuf> {
@@ -195,7 +195,7 @@ where
 
 impl<S> Chdir for Concurrent<S>
 where
-    S: Chdir,
+    S: Chdir + Sigmask,
 {
     #[inline]
     fn chdir(&self, path: &CStr) -> Result<()> {
@@ -205,7 +205,7 @@ where
 
 impl<S> Clock for Concurrent<S>
 where
-    S: Clock,
+    S: Clock + Sigmask,
 {
     #[inline]
     fn now(&self) -> Instant {
@@ -215,7 +215,7 @@ where
 
 impl<S> Times for Concurrent<S>
 where
-    S: Times,
+    S: Sigmask + Times,
 {
     #[inline]
     fn times(&self) -> Result<CpuTimes> {
@@ -225,7 +225,7 @@ where
 
 impl<S> GetPid for Concurrent<S>
 where
-    S: GetPid,
+    S: GetPid + Sigmask,
 {
     #[inline]
     fn getpid(&self) -> Pid {
@@ -247,7 +247,7 @@ where
 
 impl<S> SetPgid for Concurrent<S>
 where
-    S: SetPgid,
+    S: SetPgid + Sigmask,
 {
     #[inline]
     fn setpgid(&self, pid: Pid, pgid: Pid) -> Result<()> {
@@ -257,7 +257,7 @@ where
 
 impl<S> Signals for Concurrent<S>
 where
-    S: Signals,
+    S: Sigmask,
 {
     const SIGABRT: signal::Number = S::SIGABRT;
     const SIGALRM: signal::Number = S::SIGALRM;
@@ -354,11 +354,13 @@ impl<S> Sigmask for Concurrent<S>
 where
     S: Sigmask,
 {
+    type Sigset = S::Sigset;
+
     #[inline]
     fn sigmask(
         &self,
-        op_and_signals: Option<(SigmaskOp, &[signal::Number])>,
-        old_mask: Option<&mut Vec<signal::Number>>,
+        op_and_signals: Option<(SigmaskOp, &Self::Sigset)>,
+        old_mask: Option<&mut Self::Sigset>,
     ) -> impl Future<Output = Result<()>> + use<S> {
         self.inner.sigmask(op_and_signals, old_mask)
     }
@@ -366,7 +368,7 @@ where
 
 impl<S> GetSigaction for Concurrent<S>
 where
-    S: GetSigaction,
+    S: GetSigaction + Sigmask,
 {
     #[inline]
     fn get_sigaction(&self, signal: signal::Number) -> Result<signal::Disposition> {
@@ -395,7 +397,7 @@ where
 /// [`SignalSystem`]: crate::trap::SignalSystem
 impl<S> Sigaction for Concurrent<S>
 where
-    S: Sigaction,
+    S: Sigaction + Sigmask,
 {
     #[inline]
     fn sigaction(
@@ -423,7 +425,7 @@ where
 
 impl<S> SendSignal for Concurrent<S>
 where
-    S: SendSignal,
+    S: SendSignal + Sigmask,
 {
     #[inline]
     fn kill(
@@ -441,7 +443,7 @@ where
 
 impl<S> Isatty for Concurrent<S>
 where
-    S: Isatty,
+    S: Isatty + Sigmask,
 {
     #[inline]
     fn isatty(&self, fd: Fd) -> bool {
@@ -451,7 +453,7 @@ where
 
 impl<S> TcGetPgrp for Concurrent<S>
 where
-    S: TcGetPgrp,
+    S: Sigmask + TcGetPgrp,
 {
     #[inline]
     fn tcgetpgrp(&self, fd: Fd) -> Result<Pid> {
@@ -461,7 +463,7 @@ where
 
 impl<S> TcSetPgrp for Concurrent<S>
 where
-    S: TcSetPgrp,
+    S: Sigmask + TcSetPgrp,
 {
     #[inline]
     fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> + use<S> {
@@ -471,7 +473,7 @@ where
 
 impl<S> Concurrent<S>
 where
-    S: Fork,
+    S: Fork + Sigmask,
 {
     /// Creates a new child process.
     ///
@@ -492,7 +494,7 @@ where
 
 impl<S> Wait for Concurrent<S>
 where
-    S: Wait,
+    S: Sigmask + Wait,
 {
     #[inline]
     fn wait(&self, target: Pid) -> Result<Option<(Pid, ProcessState)>> {
@@ -502,7 +504,7 @@ where
 
 impl<S> Exec for Concurrent<S>
 where
-    S: Exec,
+    S: Exec + Sigmask,
 {
     #[inline]
     fn execve(
@@ -517,7 +519,7 @@ where
 
 impl<S> Exit for Concurrent<S>
 where
-    S: Exit,
+    S: Exit + Sigmask,
 {
     #[inline]
     fn exit(&self, exit_status: ExitStatus) -> impl Future<Output = Infallible> + use<S> {
@@ -527,7 +529,7 @@ where
 
 impl<S> GetUid for Concurrent<S>
 where
-    S: GetUid,
+    S: GetUid + Sigmask,
 {
     #[inline]
     fn getuid(&self) -> Uid {
@@ -549,7 +551,7 @@ where
 
 impl<S> GetPw for Concurrent<S>
 where
-    S: GetPw,
+    S: GetPw + Sigmask,
 {
     #[inline]
     fn getpwnam_dir(&self, name: &CStr) -> Result<Option<PathBuf>> {
@@ -559,7 +561,7 @@ where
 
 impl<S> Sysconf for Concurrent<S>
 where
-    S: Sysconf,
+    S: Sysconf + Sigmask,
 {
     #[inline]
     fn confstr_path(&self) -> Result<UnixString> {
@@ -569,7 +571,7 @@ where
 
 impl<S> ShellPath for Concurrent<S>
 where
-    S: ShellPath,
+    S: ShellPath + Sigmask,
 {
     #[inline]
     fn shell_path(&self) -> CString {
@@ -579,7 +581,7 @@ where
 
 impl<S> GetRlimit for Concurrent<S>
 where
-    S: GetRlimit,
+    S: GetRlimit + Sigmask,
 {
     #[inline]
     fn getrlimit(&self, resource: Resource) -> Result<LimitPair> {
@@ -589,7 +591,7 @@ where
 
 impl<S> SetRlimit for Concurrent<S>
 where
-    S: SetRlimit,
+    S: SetRlimit + Sigmask,
 {
     #[inline]
     fn setrlimit(&self, resource: Resource, limits: LimitPair) -> Result<()> {
