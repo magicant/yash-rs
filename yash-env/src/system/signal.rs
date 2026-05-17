@@ -508,6 +508,10 @@ pub trait Sigset: Clone + Default + 'static {
 
 /// Trait for managing signal blocking mask
 pub trait Sigmask: Signals {
+    /// The type representing a set of signals for this system
+    ///
+    /// This type is used in the [`sigmask`](Self::sigmask) method to specify
+    /// which signals to block or unblock.
     type Sigset: Sigset + Debug;
 
     /// Gets and/or sets the signal blocking mask.
