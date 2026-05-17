@@ -113,6 +113,9 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `system::Select::select`
 - The `system::Select` trait now requires the `system::Sigmask` trait as a
   supertrait.
+- The `system::Select` trait now has the associated type `FdSet`, which must be
+  specified when implementing the trait. This type is now used in the signature
+  of the `select` method to represent the set of file descriptors to monitor.
 - The `system::virtual::Process::blocked_signals` and
   `system::virtual::Process::pending_signals` methods now return a reference to
   `system::virtual::Sigset` instead of a reference to

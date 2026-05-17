@@ -22,6 +22,7 @@ use super::Result;
 use super::Sigmask;
 use crate::io::Fd;
 use std::ffi::c_int;
+use std::fmt::Debug;
 use std::future::Future;
 use std::rc::Rc;
 use std::time::Duration;
@@ -67,6 +68,24 @@ pub trait FdSet: Clone + Default + 'static {
     /// If the provided FD is greater than [`MAX_FD`](Self::MAX_FD) or negative,
     /// this function will return `false`.
     fn contains(&self, fd: Fd) -> bool;
+
+    /// Creates a new FD set from an iterator of FDs.
+    ///
+    /// This is a convenience method that creates a new FD set and inserts all
+    /// the FDs from the provided iterator into it. If any FD in the iterator is
+    /// greater than [`MAX_FD`](Self::MAX_FD) or negative, it will be silently
+    /// ignored.
+    #[must_use]
+    fn from_fds<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = Fd>,
+    {
+        let mut set = Self::new();
+        for fd in iter {
+            set.insert(fd);
+        }
+        set
+    }
 }
 
 /// Trait for performing the `select` operation
@@ -80,6 +99,13 @@ pub trait FdSet: Clone + Default + 'static {
 /// `Select` trait in the `concurrency` submodule to implement its
 /// functionality.
 pub trait Select: Sigmask {
+    /// The type of the file descriptor set used in the `select` method
+    ///
+    /// This type is used in the [`select`](Self::select) method to specify
+    /// file descriptor sets. The exact type will depend on the implementation
+    /// of the trait.
+    type FdSet: FdSet + Debug;
+
     /// Waits for a next event.
     ///
     /// In a typical configuration, this trait is not used directly. Instead,
@@ -117,8 +143,8 @@ pub trait Select: Sigmask {
     /// details.
     fn select<'a>(
         &self,
-        readers: &'a mut Vec<Fd>,
-        writers: &'a mut Vec<Fd>,
+        readers: &'a mut Self::FdSet,
+        writers: &'a mut Self::FdSet,
         timeout: Option<Duration>,
         signal_mask: Option<&Self::Sigset>,
     ) -> impl Future<Output = Result<c_int>> + use<'a, Self>;
@@ -126,11 +152,13 @@ pub trait Select: Sigmask {
 
 /// Delegates the `Select` trait to the contained instance of `S`
 impl<S: Select> Select for Rc<S> {
+    type FdSet = S::FdSet;
+
     #[inline]
     fn select<'a>(
         &self,
-        readers: &'a mut Vec<Fd>,
-        writers: &'a mut Vec<Fd>,
+        readers: &'a mut S::FdSet,
+        writers: &'a mut S::FdSet,
         timeout: Option<Duration>,
         signal_mask: Option<&S::Sigset>,
     ) -> impl Future<Output = Result<c_int>> + use<'a, S> {

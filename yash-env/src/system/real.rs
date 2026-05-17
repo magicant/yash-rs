@@ -861,36 +861,21 @@ impl SendSignal for RealSystem {
 }
 
 impl Select for RealSystem {
+    type FdSet = FdSet;
+
     fn select<'a>(
         &self,
-        readers: &'a mut Vec<Fd>,
-        writers: &'a mut Vec<Fd>,
+        readers: &'a mut FdSet,
+        writers: &'a mut FdSet,
         timeout: Option<Duration>,
         signal_mask: Option<&Sigset>,
     ) -> impl Future<Output = Result<c_int>> + use<'a> {
-        ready((|| {
+        ready({
             use std::ptr::{null, null_mut};
 
-            let max_fd = readers.iter().chain(writers.iter()).max();
-            let nfds = max_fd
-                .map(|fd| fd.0.checked_add(1).ok_or(Errno::EBADF))
-                .transpose()?
-                .unwrap_or(0);
-
-            fn to_raw_fd_set(fds: &[Fd]) -> MaybeUninit<libc::fd_set> {
-                let mut raw_fds = MaybeUninit::<libc::fd_set>::uninit();
-                unsafe {
-                    libc::FD_ZERO(raw_fds.as_mut_ptr());
-                    for fd in fds {
-                        libc::FD_SET(fd.0, raw_fds.as_mut_ptr());
-                    }
-                }
-                raw_fds
-            }
-            let mut raw_readers = to_raw_fd_set(readers);
-            let mut raw_writers = to_raw_fd_set(writers);
-            let readers_ptr = raw_readers.as_mut_ptr();
-            let writers_ptr = raw_writers.as_mut_ptr();
+            let upper_bound = readers.upper_bound().max(writers.upper_bound());
+            let readers_ptr = readers.as_mut_ptr();
+            let writers_ptr = writers.as_mut_ptr();
             let errors = null_mut();
 
             let timeout_spec = timeout.map(to_timespec);
@@ -898,9 +883,9 @@ impl Select for RealSystem {
 
             let raw_mask_ptr = signal_mask.map_or(null(), |mask| mask.0.as_ptr());
 
-            let count = unsafe {
+            unsafe {
                 libc::pselect(
-                    nfds,
+                    upper_bound.0,
                     readers_ptr,
                     writers_ptr,
                     errors,
@@ -908,13 +893,8 @@ impl Select for RealSystem {
                     raw_mask_ptr,
                 )
             }
-            .errno_if_m1()?;
-
-            readers.retain(|fd| unsafe { libc::FD_ISSET(fd.0, readers_ptr) });
-            writers.retain(|fd| unsafe { libc::FD_ISSET(fd.0, writers_ptr) });
-
-            Ok(count)
-        })())
+            .errno_if_m1()
+        })
     }
 }
 
