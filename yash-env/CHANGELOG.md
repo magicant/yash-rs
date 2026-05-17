@@ -17,8 +17,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   abstracting the `sigset_t` type from POSIX.
 - The `system::real::Sigset` struct has been added as the concrete `Sigset`
   implementation for the real system.
-- The `system::virtual::Sigset` struct has been added as the concrete `Sigset`
-  implementation for the virtual system.
+- The `system::virtual::sigset` module has been added, containing the `Sigset`
+  struct as the concrete `Sigset` implementation for the virtual system. This
+  module also contains iterators for iterating over the signals in a `Sigset`.
 - The `run_in_child_process` method has been added to the `system::Fork` trait.
   It provides a new way to create child processes that is cleaner and more
   usable than the existing `new_child_process` method.

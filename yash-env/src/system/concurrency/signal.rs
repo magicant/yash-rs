@@ -110,7 +110,8 @@ mod tests {
     use super::*;
     use crate::job::{ProcessResult, ProcessState};
     use crate::system::SendSignal as _;
-    use crate::system::r#virtual::{SIGQUIT, SIGTERM, SIGUSR1, Sigset, VirtualSystem};
+    use crate::system::r#virtual::sigset::Sigset;
+    use crate::system::r#virtual::{SIGQUIT, SIGTERM, SIGUSR1, VirtualSystem};
     use futures_util::FutureExt as _;
     use std::num::NonZero;
 
