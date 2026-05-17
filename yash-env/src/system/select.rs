@@ -22,9 +22,71 @@ use super::Result;
 use super::Sigmask;
 use crate::io::Fd;
 use std::ffi::c_int;
+use std::fmt::Debug;
 use std::future::Future;
 use std::rc::Rc;
 use std::time::Duration;
+
+/// Trait for representing a set of file descriptors (FDs)
+///
+/// This is an abstraction over the `fd_set` type used in the `select` system
+/// call. It represents a set of [`Fd`]s that can be monitored for events such
+/// as readability or writability.
+///
+/// As per POSIX, an `fd_set` can only contain FDs in the range of `0` to
+/// `FD_SETSIZE - 1`. The [`MAX_FD`](Self::MAX_FD) associated constant in this
+/// trait represents the maximum FD that can be stored in the set.
+pub trait FdSet: Clone + Default + 'static {
+    /// The maximum FD that can be stored in the set. This corresponds to
+    /// `FD_SETSIZE - 1` in C libraries. The exact value may depend on the
+    /// implementation.
+    const MAX_FD: Fd;
+
+    /// Creates a new, empty FD set.
+    ///
+    /// The provided implementation simply calls [`Default::default`].
+    #[inline(always)]
+    #[must_use]
+    fn new() -> Self {
+        Default::default()
+    }
+
+    /// Adds an FD to the set.
+    ///
+    /// If the provided FD is greater than [`MAX_FD`](Self::MAX_FD) or negative,
+    /// it will be silently ignored.
+    fn insert(&mut self, fd: Fd);
+
+    /// Removes an FD from the set.
+    ///
+    /// If the provided FD is greater than [`MAX_FD`](Self::MAX_FD) or negative,
+    /// it will be silently ignored.
+    fn remove(&mut self, fd: Fd);
+
+    /// Checks if an FD is in the set.
+    ///
+    /// If the provided FD is greater than [`MAX_FD`](Self::MAX_FD) or negative,
+    /// this function will return `false`.
+    fn contains(&self, fd: Fd) -> bool;
+
+    /// Creates a new FD set from an iterator of FDs.
+    ///
+    /// This is a convenience method that creates a new FD set and inserts all
+    /// the FDs from the provided iterator into it. If any FD in the iterator is
+    /// greater than [`MAX_FD`](Self::MAX_FD) or negative, it will be silently
+    /// ignored.
+    #[must_use]
+    fn from_fds<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = Fd>,
+    {
+        let mut set = Self::new();
+        for fd in iter {
+            set.insert(fd);
+        }
+        set
+    }
+}
 
 /// Trait for performing the `select` operation
 ///
@@ -37,6 +99,13 @@ use std::time::Duration;
 /// `Select` trait in the `concurrency` submodule to implement its
 /// functionality.
 pub trait Select: Sigmask {
+    /// The type of the file descriptor set used in the `select` method
+    ///
+    /// This type is used in the [`select`](Self::select) method to specify
+    /// file descriptor sets. The exact type will depend on the implementation
+    /// of the trait.
+    type FdSet: FdSet + Debug;
+
     /// Waits for a next event.
     ///
     /// In a typical configuration, this trait is not used directly. Instead,
@@ -74,8 +143,8 @@ pub trait Select: Sigmask {
     /// details.
     fn select<'a>(
         &self,
-        readers: &'a mut Vec<Fd>,
-        writers: &'a mut Vec<Fd>,
+        readers: &'a mut Self::FdSet,
+        writers: &'a mut Self::FdSet,
         timeout: Option<Duration>,
         signal_mask: Option<&Self::Sigset>,
     ) -> impl Future<Output = Result<c_int>> + use<'a, Self>;
@@ -83,11 +152,13 @@ pub trait Select: Sigmask {
 
 /// Delegates the `Select` trait to the contained instance of `S`
 impl<S: Select> Select for Rc<S> {
+    type FdSet = S::FdSet;
+
     #[inline]
     fn select<'a>(
         &self,
-        readers: &'a mut Vec<Fd>,
-        writers: &'a mut Vec<Fd>,
+        readers: &'a mut S::FdSet,
+        writers: &'a mut S::FdSet,
         timeout: Option<Duration>,
         signal_mask: Option<&S::Sigset>,
     ) -> impl Future<Output = Result<c_int>> + use<'a, S> {

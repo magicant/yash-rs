@@ -16,11 +16,13 @@
 
 //! Implementation of [`Select`] for [`VirtualSystem`]
 
+use super::fd_set::FdSet;
 use super::{
-    Duration, Errno, Fd, Result, Select, SigmaskOp, Sigset, TryInto as _, VirtualSystem,
-    raise_sigchld, signal,
+    Duration, Errno, Result, Select, SigmaskOp, Sigset, TryInto as _, VirtualSystem, raise_sigchld,
+    signal,
 };
 use crate::job::ProcessState;
+use crate::system::FdSet as _;
 use std::cell::{Cell, LazyCell};
 use std::ffi::c_int;
 use std::future::poll_fn;
@@ -28,6 +30,8 @@ use std::rc::Rc;
 use std::task::{Poll, Waker};
 
 impl Select for VirtualSystem {
+    type FdSet = FdSet;
+
     /// Waits for a next event.
     ///
     /// The `VirtualSystem` implementation for this method simulates the
@@ -40,8 +44,8 @@ impl Select for VirtualSystem {
     /// while still providing the expected behavior of `select`.
     fn select<'a>(
         &self,
-        readers: &'a mut Vec<Fd>,
-        writers: &'a mut Vec<Fd>,
+        readers: &'a mut FdSet,
+        writers: &'a mut FdSet,
         timeout: Option<Duration>,
         signal_mask: Option<&Sigset>,
     ) -> impl Future<Output = Result<c_int>> + use<'a> {
@@ -114,15 +118,15 @@ impl Select for VirtualSystem {
                 }
 
                 // Find ready FDs
-                let mut ready_readers = Vec::new();
-                let mut ready_writers = Vec::new();
+                let mut ready_readers = FdSet::new();
+                let mut ready_writers = FdSet::new();
                 for fd in readers.iter().cloned() {
                     let Some(fd_body) = proc.fds().get(&fd) else {
                         return Poll::Ready(Err(Errno::EBADF));
                     };
                     let ofd = fd_body.open_file_description.borrow();
                     if ofd.is_ready_for_reading() {
-                        ready_readers.push(fd);
+                        ready_readers.insert(fd);
                     }
                 }
                 for fd in writers.iter().cloned() {
@@ -131,7 +135,7 @@ impl Select for VirtualSystem {
                     };
                     let ofd = fd_body.open_file_description.borrow();
                     if ofd.is_ready_for_writing() {
-                        ready_writers.push(fd);
+                        ready_writers.insert(fd);
                     }
                 }
                 let count = (ready_readers.len() + ready_writers.len())
@@ -153,8 +157,8 @@ impl Select for VirtualSystem {
                     }
                 };
                 if expired {
-                    readers.clear();
-                    writers.clear();
+                    *readers = FdSet::new();
+                    *writers = FdSet::new();
                     return Poll::Ready(Ok(0));
                 }
 
@@ -204,6 +208,7 @@ mod tests {
     use super::super::Process;
     use super::super::{PIPE_BUF, PIPE_SIZE, SIGCHLD, SIGCONT, SIGTSTP};
     use super::*;
+    use crate::io::Fd;
     use crate::job::Pid;
     use crate::system::{
         CaughtSignals as _, Close as _, Disposition, Pipe as _, Read as _, SendSignal as _,
@@ -219,8 +224,8 @@ mod tests {
     #[test]
     fn select_with_no_condition_blocks_forever() {
         let system = VirtualSystem::new();
-        let mut readers = vec![];
-        let mut writers = vec![];
+        let mut readers = FdSet::new();
+        let mut writers = FdSet::new();
         let mut select = pin!(system.select(&mut readers, &mut writers, None, None));
 
         // Polling the future should return pending, and it should not be woken up.
@@ -235,8 +240,8 @@ mod tests {
     #[test]
     fn select_with_zero_timeout_returns_immediately() {
         let system = VirtualSystem::new();
-        let mut readers = vec![];
-        let mut writers = vec![];
+        let mut readers = FdSet::new();
+        let mut writers = FdSet::new();
         let mut select =
             pin!(system.select(&mut readers, &mut writers, Some(Duration::ZERO), None));
 
@@ -252,8 +257,8 @@ mod tests {
     #[test]
     fn select_regular_file_is_always_ready() {
         let system = VirtualSystem::new();
-        let mut readers = vec![Fd::STDIN];
-        let mut writers = vec![Fd::STDOUT, Fd::STDERR];
+        let mut readers = FdSet::from_fds([Fd::STDIN]);
+        let mut writers = FdSet::from_fds([Fd::STDOUT, Fd::STDERR]);
         {
             let mut select = pin!(system.select(&mut readers, &mut writers, None, None));
 
@@ -264,8 +269,8 @@ mod tests {
             assert_eq!(poll, Poll::Ready(Ok(3)));
             assert!(!woken.is_woken());
         }
-        assert_eq!(readers, [Fd::STDIN]);
-        assert_eq!(writers, [Fd::STDOUT, Fd::STDERR]);
+        assert_eq!(readers, FdSet::from_fds([Fd::STDIN]));
+        assert_eq!(writers, FdSet::from_fds([Fd::STDOUT, Fd::STDERR]));
     }
 
     #[test]
@@ -273,8 +278,8 @@ mod tests {
         let system = VirtualSystem::new();
         let (reader, writer) = system.pipe().unwrap();
         system.close(writer).unwrap();
-        let mut readers = vec![reader];
-        let mut writers = vec![];
+        let mut readers = FdSet::from_fds([reader]);
+        let mut writers = FdSet::new();
         {
             let mut select = pin!(system.select(&mut readers, &mut writers, None, None));
 
@@ -285,8 +290,8 @@ mod tests {
             assert_eq!(poll, Poll::Ready(Ok(1)));
             assert!(!woken.is_woken());
         }
-        assert_eq!(readers, [reader]);
-        assert_eq!(writers, []);
+        assert_eq!(readers, FdSet::from_fds([reader]));
+        assert_eq!(writers, FdSet::new());
     }
 
     #[test]
@@ -294,8 +299,8 @@ mod tests {
         let system = VirtualSystem::new();
         let (reader, writer) = system.pipe().unwrap();
         system.write(writer, &[0]).now_or_never().unwrap().unwrap();
-        let mut readers = vec![reader];
-        let mut writers = vec![];
+        let mut readers = FdSet::from_fds([reader]);
+        let mut writers = FdSet::new();
         {
             let mut select = pin!(system.select(&mut readers, &mut writers, None, None));
 
@@ -306,16 +311,16 @@ mod tests {
             assert_eq!(poll, Poll::Ready(Ok(1)));
             assert!(!woken.is_woken());
         }
-        assert_eq!(readers, [reader]);
-        assert_eq!(writers, []);
+        assert_eq!(readers, FdSet::from_fds([reader]));
+        assert_eq!(writers, FdSet::new());
     }
 
     #[test]
     fn select_pipe_reader_gets_ready_when_some_data_is_written() {
         let system = VirtualSystem::new();
         let (reader, writer) = system.pipe().unwrap();
-        let mut readers = vec![reader];
-        let mut writers = vec![];
+        let mut readers = FdSet::from_fds([reader]);
+        let mut writers = FdSet::new();
         {
             let mut select = pin!(system.select(&mut readers, &mut writers, None, None));
 
@@ -340,16 +345,16 @@ mod tests {
             assert_eq!(poll, Poll::Ready(Ok(1)));
             assert!(!woken.is_woken());
         }
-        assert_eq!(readers, [reader]);
-        assert_eq!(writers, []);
+        assert_eq!(readers, FdSet::from_fds([reader]));
+        assert_eq!(writers, FdSet::new());
     }
 
     #[test]
     fn select_pipe_writer_is_ready_if_pipe_is_not_full() {
         let system = VirtualSystem::new();
         let (_reader, writer) = system.pipe().unwrap();
-        let mut readers = vec![];
-        let mut writers = vec![writer];
+        let mut readers = FdSet::new();
+        let mut writers = FdSet::from_fds([writer]);
         {
             let mut select = pin!(system.select(&mut readers, &mut writers, None, None));
 
@@ -360,16 +365,16 @@ mod tests {
             assert_eq!(poll, Poll::Ready(Ok(1)));
             assert!(!woken.is_woken());
         }
-        assert_eq!(readers, []);
-        assert_eq!(writers, [writer]);
+        assert_eq!(readers, FdSet::new());
+        assert_eq!(writers, FdSet::from_fds([writer]));
     }
 
     #[test]
     fn select_pipe_writer_gets_ready_when_some_data_is_read() {
         let system = VirtualSystem::new();
         let (reader, writer) = system.pipe().unwrap();
-        let mut readers = vec![];
-        let mut writers = vec![writer];
+        let mut readers = FdSet::new();
+        let mut writers = FdSet::from_fds([writer]);
 
         // Fill the pipe buffer.
         system
@@ -405,41 +410,41 @@ mod tests {
             assert_eq!(poll, Poll::Ready(Ok(1)));
             assert!(!woken.is_woken());
         }
-        assert_eq!(readers, []);
-        assert_eq!(writers, [writer]);
+        assert_eq!(readers, FdSet::new());
+        assert_eq!(writers, FdSet::from_fds([writer]));
     }
 
     #[test]
     fn select_on_unreadable_fd() {
         let system = VirtualSystem::new();
         let (_reader, writer) = system.pipe().unwrap();
-        let mut fds = vec![writer];
+        let mut fds = FdSet::from_fds([writer]);
         let result = system
-            .select(&mut fds, &mut vec![], None, None)
+            .select(&mut fds, &mut FdSet::new(), None, None)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Ok(1));
-        assert_eq!(fds, [writer]);
+        assert_eq!(fds, FdSet::from_fds([writer]));
     }
 
     #[test]
     fn select_on_unwritable_fd() {
         let system = VirtualSystem::new();
         let (reader, _writer) = system.pipe().unwrap();
-        let mut fds = vec![reader];
+        let mut fds = FdSet::from_fds([reader]);
         let result = system
-            .select(&mut vec![], &mut fds, None, None)
+            .select(&mut FdSet::new(), &mut fds, None, None)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Ok(1));
-        assert_eq!(fds, [reader]);
+        assert_eq!(fds, FdSet::from_fds([reader]));
     }
 
     #[test]
     fn select_on_invalid_fd_for_readers() {
         let system = VirtualSystem::new();
-        let mut readers = vec![Fd(17)];
-        let mut writers = vec![];
+        let mut readers = FdSet::from_fds([Fd(17)]);
+        let mut writers = FdSet::new();
         {
             let mut select = pin!(system.select(&mut readers, &mut writers, None, None));
 
@@ -450,15 +455,15 @@ mod tests {
             assert_eq!(poll, Poll::Ready(Err(Errno::EBADF)));
             assert!(!woken.is_woken());
         }
-        assert_eq!(readers, [Fd(17)]);
-        assert_eq!(writers, []);
+        assert_eq!(readers, FdSet::from_fds([Fd(17)]));
+        assert_eq!(writers, FdSet::new());
     }
 
     #[test]
     fn select_on_invalid_fd_for_writers() {
         let system = VirtualSystem::new();
-        let mut readers = vec![];
-        let mut writers = vec![Fd(17)];
+        let mut readers = FdSet::new();
+        let mut writers = FdSet::from_fds([Fd(17)]);
         {
             let mut select = pin!(system.select(&mut readers, &mut writers, None, None));
 
@@ -469,8 +474,8 @@ mod tests {
             assert_eq!(poll, Poll::Ready(Err(Errno::EBADF)));
             assert!(!woken.is_woken());
         }
-        assert_eq!(readers, []);
-        assert_eq!(writers, [Fd(17)]);
+        assert_eq!(readers, FdSet::new());
+        assert_eq!(writers, FdSet::from_fds([Fd(17)]));
     }
 
     fn system_for_catching_sigchld() -> VirtualSystem {
@@ -488,8 +493,8 @@ mod tests {
     fn select_on_pending_signal() {
         let system = system_for_catching_sigchld();
         let _ = system.current_process_mut().raise_signal(SIGCHLD);
-        let mut readers = vec![];
-        let mut writers = vec![];
+        let mut readers = FdSet::new();
+        let mut writers = FdSet::new();
 
         let mut select =
             pin!(system.select(&mut readers, &mut writers, None, Some(&Sigset::new())));
@@ -515,8 +520,8 @@ mod tests {
     fn select_interrupted_by_signal() {
         let system = VirtualSystem::new();
         system.sigaction(SIGCHLD, Disposition::Catch).unwrap();
-        let mut readers = vec![];
-        let mut writers = vec![];
+        let mut readers = FdSet::new();
+        let mut writers = FdSet::new();
 
         let mut select = pin!(system.select(&mut readers, &mut writers, None, None));
 
@@ -553,8 +558,8 @@ mod tests {
     #[test]
     fn select_on_signal_delivered_while_waiting() {
         let system = system_for_catching_sigchld();
-        let mut readers = vec![];
-        let mut writers = vec![];
+        let mut readers = FdSet::new();
+        let mut writers = FdSet::new();
 
         let mut select =
             pin!(system.select(&mut readers, &mut writers, None, Some(&Sigset::new())));
@@ -621,8 +626,8 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap();
-        let mut readers = vec![reader_1];
-        let mut writers = vec![writer_2];
+        let mut readers = FdSet::from_fds([reader_1]);
+        let mut writers = FdSet::from_fds([writer_2]);
         let timeout = Duration::new(42, 195);
 
         {
@@ -664,8 +669,8 @@ mod tests {
             assert_eq!(poll, Poll::Ready(Ok(0)));
         }
         // After a timeout, no readers or writers should be ready
-        assert_eq!(readers, []);
-        assert_eq!(writers, []);
+        assert_eq!(readers, FdSet::new());
+        assert_eq!(writers, FdSet::new());
     }
 
     fn virtual_system_with_parent_process() -> VirtualSystem {
@@ -695,8 +700,8 @@ mod tests {
         // Send SIGTSTP while it is blocked
         system.raise(SIGTSTP).now_or_never().unwrap().unwrap();
 
-        let mut readers = vec![];
-        let mut writers = vec![];
+        let mut readers = FdSet::new();
+        let mut writers = FdSet::new();
 
         let mut select = pin!(system.select(
             &mut readers,
@@ -755,8 +760,8 @@ mod tests {
         let now = Instant::now();
         system.state.borrow_mut().now = Some(now);
 
-        let mut readers = vec![];
-        let mut writers = vec![];
+        let mut readers = FdSet::new();
+        let mut writers = FdSet::new();
 
         let mut select = pin!(system.select(
             &mut readers,

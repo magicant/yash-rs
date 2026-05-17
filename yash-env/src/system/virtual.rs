@@ -57,6 +57,7 @@
 //!
 //! TBD: Explain how to use `VirtualSystem` with an executor.
 
+pub mod fd_set;
 mod file_body;
 mod file_system;
 mod io;

@@ -21,7 +21,8 @@
 //! tasks on a single thread.
 
 use super::{
-    CaughtSignals, ChildProcessStarter, Clock, Errno, Fcntl, Fork, Read, Result, Sigmask, Write,
+    CaughtSignals, ChildProcessStarter, Clock, Errno, Fcntl, FdSet, Fork, Read, Result, Sigmask,
+    Write,
 };
 use crate::io::Fd;
 use crate::job::Pid;
@@ -507,8 +508,8 @@ where
         let mut state = self.state.borrow_mut();
 
         // Prepare parameters for the `select` call based on the current state
-        let mut readers = state.reads.keys().cloned().collect();
-        let mut writers = state.writes.keys().cloned().collect();
+        let mut readers = S::FdSet::from_fds(state.reads.keys().cloned());
+        let mut writers = S::FdSet::from_fds(state.writes.keys().cloned());
         let timeout = if peek {
             Some(Duration::ZERO)
         } else {
@@ -554,8 +555,8 @@ where
     }
 }
 
-fn wake_tasks_for_ready_fds(task_map: &mut HashMap<Fd, WakerSet>, ready_fds: &[Fd]) {
-    task_map.retain(|fd, wakers| {
+fn wake_tasks_for_ready_fds<S: FdSet>(task_map: &mut HashMap<Fd, WakerSet>, ready_fds: &S) {
+    task_map.retain(|&fd, wakers| {
         if ready_fds.contains(fd) {
             wakers.wake_all();
             false
