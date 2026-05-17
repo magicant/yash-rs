@@ -358,7 +358,7 @@ impl super::super::Sigset for Sigset {
     /// Creates a new set containing all the signals supported by the virtual system.
     fn full() -> Self {
         let named = VirtualSystem::NAMED_SIGNALS.iter().filter_map(|(_, n)| *n);
-        let realtime = VirtualSystem::new().iter_sigrt();
+        let realtime = RT_RANGE.map(|num| Number::from_raw_unchecked(NonZero::new(num).unwrap()));
         Self(HashSet::from_iter(named.chain(realtime)))
     }
 
