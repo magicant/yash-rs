@@ -106,6 +106,10 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `system::Select::select`
 - The `system::Select` trait now requires the `system::Sigmask` trait as a
   supertrait.
+- The `system::virtual::Process::blocked_signals` and
+  `system::virtual::Process::pending_signals` methods now return a reference to
+  `system::virtual::Sigset` instead of a reference to
+  `BTreeSet<signal::Number>`.
 - The `system::virtual::Process::block_signals` method now takes an iterator of
   signal numbers instead of a slice, allowing for more flexible ways to specify
   the signals to block (e.g., using a `HashSet` or other collection).

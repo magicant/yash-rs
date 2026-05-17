@@ -1042,12 +1042,11 @@ impl Sigmask for VirtualSystem {
                 .expect("the current process should be in the system state");
 
             if let Some(old_mask) = old_mask {
-                old_mask.0.clear();
-                old_mask.0.extend(process.blocked_signals());
+                old_mask.clone_from(process.blocked_signals());
             }
 
             if let Some((op, mask)) = op {
-                let result = process.block_signals(op, mask.0.iter().copied());
+                let result = process.block_signals(op, mask.iter().copied());
                 if result.process_state_changed {
                     let parent_pid = process.ppid;
                     raise_sigchld(&mut state, parent_pid);

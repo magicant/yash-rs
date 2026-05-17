@@ -46,8 +46,7 @@ impl Select for VirtualSystem {
         signal_mask: Option<&Sigset>,
     ) -> impl Future<Output = Result<c_int>> + use<'a> {
         let this = self.clone();
-        let signal_mask =
-            signal_mask.map(|mask| mask.0.iter().copied().collect::<Vec<signal::Number>>());
+        let signal_mask = signal_mask.map(|mask| mask.iter().copied().collect::<Vec<_>>());
         #[allow(clippy::await_holding_refcell_ref, reason = "false positive")]
         async move {
             let (old_mask, old_caught_signals, deadline) = {
