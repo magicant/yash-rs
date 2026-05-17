@@ -63,12 +63,14 @@ mod io;
 mod process;
 mod select;
 mod signal;
+pub mod sigset;
 
 pub use self::file_body::*;
 pub use self::file_system::*;
 pub use self::io::*;
 pub use self::process::*;
 pub use self::signal::*;
+use self::sigset::Sigset;
 use super::AT_FDCWD;
 use super::CaughtSignals;
 use super::Chdir;
