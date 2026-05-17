@@ -313,7 +313,7 @@ pub trait Sleep {
 
 impl<S> Sleep for Rc<S>
 where
-    S: Sigmask + Sleep,
+    S: Sleep,
 {
     #[inline]
     fn sleep_until(&self, deadline: Instant) -> impl Future<Output = ()> {
