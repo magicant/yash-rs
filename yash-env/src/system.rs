@@ -136,7 +136,7 @@ pub use self::process::{
 #[cfg(all(doc, unix))]
 use self::real::RealSystem;
 use self::resource::{GetRlimit, SetRlimit};
-pub use self::select::Select;
+pub use self::select::{FdSet, Select};
 pub use self::signal::{
     CaughtSignals, Disposition, GetSigaction, SendSignal, Sigaction, Sigmask, SigmaskOp, Signals,
     Sigset,

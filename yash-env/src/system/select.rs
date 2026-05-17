@@ -26,6 +26,49 @@ use std::future::Future;
 use std::rc::Rc;
 use std::time::Duration;
 
+/// Trait for representing a set of file descriptors (FDs)
+///
+/// This is an abstraction over the `fd_set` type used in the `select` system
+/// call. It represents a set of [`Fd`]s that can be monitored for events such
+/// as readability or writability.
+///
+/// As per POSIX, an `fd_set` can only contain FDs in the range of `0` to
+/// `FD_SETSIZE - 1`. The [`MAX_FD`](Self::MAX_FD) associated constant in this
+/// trait represents the maximum FD that can be stored in the set.
+pub trait FdSet: Clone + Default + 'static {
+    /// The maximum FD that can be stored in the set. This corresponds to
+    /// `FD_SETSIZE - 1` in C libraries. The exact value may depend on the
+    /// implementation.
+    const MAX_FD: Fd;
+
+    /// Creates a new, empty FD set.
+    ///
+    /// The provided implementation simply calls [`Default::default`].
+    #[inline(always)]
+    #[must_use]
+    fn new() -> Self {
+        Default::default()
+    }
+
+    /// Adds an FD to the set.
+    ///
+    /// If the provided FD is greater than [`MAX_FD`](Self::MAX_FD) or negative,
+    /// it will be silently ignored.
+    fn insert(&mut self, fd: Fd);
+
+    /// Removes an FD from the set.
+    ///
+    /// If the provided FD is greater than [`MAX_FD`](Self::MAX_FD) or negative,
+    /// it will be silently ignored.
+    fn remove(&mut self, fd: Fd);
+
+    /// Checks if an FD is in the set.
+    ///
+    /// If the provided FD is greater than [`MAX_FD`](Self::MAX_FD) or negative,
+    /// this function will return `false`.
+    fn contains(&self, fd: Fd) -> bool;
+}
+
 /// Trait for performing the `select` operation
 ///
 /// This trait provides the `select` method, which represents the `select`

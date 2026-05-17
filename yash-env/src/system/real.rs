@@ -22,6 +22,7 @@
 //! shell environment.
 
 mod errno;
+mod fd_set;
 mod file_system;
 mod open_flag;
 mod resource;
@@ -94,6 +95,7 @@ use crate::semantics::ExitStatus;
 use crate::str::UnixStr;
 use crate::str::UnixString;
 use enumset::EnumSet;
+pub use fd_set::FdSet;
 pub use file_system::Stat;
 use libc::DIR;
 pub use signal::Sigset;

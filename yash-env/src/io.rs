@@ -24,10 +24,10 @@ use crate::system::{Close, Dup, FdFlag, Isatty};
 use annotate_snippets::Renderer;
 use std::borrow::Cow;
 #[cfg(unix)]
-use std::os::unix::io::RawFd;
+pub(crate) use std::os::unix::io::RawFd;
 
 #[cfg(not(unix))]
-type RawFd = i32;
+pub(crate) type RawFd = i32;
 
 /// File descriptor
 ///

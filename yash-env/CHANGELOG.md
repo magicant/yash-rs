@@ -13,6 +13,12 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Added
 
+- The `system::FdSet` trait has been added to represent a set of file
+  descriptors, abstracting the `fd_set` type from POSIX.
+- The `system::real::FdSet` struct has been added as the concrete `FdSet`
+  implementation for the real system.
+- The `system::virtual::fd_set` module has been added, containing the `FdSet`
+  struct as the concrete `FdSet` implementation for the virtual system.
 - The `system::Sigset` trait has been added to represent a set of signals,
   abstracting the `sigset_t` type from POSIX.
 - The `system::real::Sigset` struct has been added as the concrete `Sigset`
