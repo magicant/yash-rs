@@ -18,9 +18,72 @@
 
 use super::Pid;
 use crate::io::Fd;
+use crate::signal;
+#[cfg(doc)]
+use crate::system::Concurrent;
 use crate::system::{
     Disposition, Result, Sigaction, Sigmask, SigmaskOp, Signals, Sigset as _, TcSetPgrp,
 };
+
+/// A trait to run a function with a signal blocked
+///
+/// This trait represents the capability required by [`tcsetpgrp_with_block`] to
+/// run a function with a signal blocked. It is automatically implemented for
+/// any type that implements [`Sigmask`]. Additionally, [`Concurrent`]
+/// implements this trait by delegating to the inner type while not implementing
+/// [`Sigmask`] itself, which allows `Concurrent` to maintain internal
+/// consistency about signal masks while still providing this capability.
+///
+/// This trait defines a higher-level interface to temporarily modify the signal
+/// mask. Typical implementations of this trait will internally depend on
+/// [`Sigmask`] to perform the actual signal mask modification, but the trait
+/// itself does not require this as a supertrait.
+pub trait RunBlocking: Signals {
+    /// Runs the given function with the specified signal blocked.
+    ///
+    /// This function blocks the given signal, runs the given function, and then
+    /// restores the original signal mask. If all operations succeed, the result
+    /// of the function is returned. If any operation fails, an error is
+    /// returned.
+    ///
+    /// This function restores the original signal mask even if the given
+    /// function returns an error, in which case any error restoring the signal
+    /// mask is discarded. If the signal cannot be blocked, this function
+    /// returns an error without running the function.
+    fn run_blocking<F, T>(
+        &self,
+        signal: signal::Number,
+        f: F,
+    ) -> impl Future<Output = Result<T>> + use<'_, Self, F, T>
+    where
+        F: AsyncFnOnce() -> Result<T>;
+}
+
+impl<S> RunBlocking for S
+where
+    S: Sigmask + ?Sized,
+{
+    async fn run_blocking<F, T>(&self, signal: signal::Number, f: F) -> Result<T>
+    where
+        F: AsyncFnOnce() -> Result<T>,
+    {
+        let mut old_mask = S::Sigset::new();
+        self.sigmask(
+            Some((SigmaskOp::Add, &S::Sigset::from_signals([signal])?)),
+            Some(&mut old_mask),
+        )
+        .await?;
+
+        let main_result = f().await;
+
+        let restore_result = self.sigmask(Some((SigmaskOp::Set, &old_mask)), None).await;
+        if main_result.is_ok() {
+            restore_result?;
+        }
+
+        main_result
+    }
+}
 
 /// Switches the foreground process group with SIGTTOU blocked.
 ///
@@ -28,30 +91,19 @@ use crate::system::{
 /// safely. If you call [`TcSetPgrp::tcsetpgrp`] from a background process, the
 /// process is stopped by SIGTTOU by default. To prevent this effect, SIGTTOU
 /// must be blocked or ignored when `tcsetpgrp` is called. This function uses
-/// [`Sigmask::sigmask`] to block SIGTTOU before calling `tcsetpgrp` and also to
-/// restore the original signal mask after `tcsetpgrp`.
+/// [`RunBlocking::run_blocking`] to block SIGTTOU while calling `tcsetpgrp`,
+/// which ensures that the shell is not suspended even if it is not in the
+/// foreground.
 ///
 /// Use [`tcsetpgrp_without_block`] if you need to make sure the shell is in the
 /// foreground before changing the foreground job.
 pub async fn tcsetpgrp_with_block<S>(system: &S, fd: Fd, pgid: Pid) -> Result<()>
 where
-    S: Signals + Sigmask + TcSetPgrp + ?Sized,
+    S: RunBlocking + TcSetPgrp + ?Sized,
 {
-    let mut old_mask = S::Sigset::new();
     system
-        .sigmask(
-            Some((SigmaskOp::Add, &S::Sigset::from_signals([S::SIGTTOU])?)),
-            Some(&mut old_mask),
-        )
-        .await?;
-
-    let result = system.tcsetpgrp(fd, pgid).await;
-
-    let result_2 = system
-        .sigmask(Some((SigmaskOp::Set, &old_mask)), None)
-        .await;
-
-    result.and(result_2)
+        .run_blocking(S::SIGTTOU, || system.tcsetpgrp(fd, pgid))
+        .await
 }
 
 /// Switches the foreground process group with the default SIGTTOU settings.

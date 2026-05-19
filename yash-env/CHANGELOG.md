@@ -63,6 +63,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   more flexible and ergonomic way to configure subshells.
 - The `Default` trait is now implemented for `Env<S>` where
   `S: Default + system::GetPid`.
+- The `job::RunBlocking` trait has been added to provide a higher-level interface
+  for running a function with a signal blocked.
 
 ### Changed
 
@@ -146,6 +148,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   descriptors, rather than being limited to `Concurrent` systems. The
   implementation of `input::Input` for `FdReader2` now only requires the system
   to implement the `Read` trait.
+- The `job::tcsetpgrp_with_block` function now requires the trait bound
+  `S: job::RunBlocking + system::TcSetPgrp` instead of
+  `S: system::Sigmask + system::TcSetPgrp`.
 
 ### Deprecated
 
