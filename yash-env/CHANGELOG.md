@@ -63,8 +63,12 @@ A _private dependency_ is used internally and not visible to downstream users.
   more flexible and ergonomic way to configure subshells.
 - The `Default` trait is now implemented for `Env<S>` where
   `S: Default + system::GetPid`.
-- The `job::RunBlocking` trait has been added to provide a higher-level interface
-  for running a function with a signal blocked.
+- The `job::RunBlocking` and `job::RunUnblocking` traits have been added to
+  provide higher-level interfaces for running functions with signals blocked or
+  unblocked, respectively. These traits are now used in the
+  `job::tcsetpgrp_with_block` and `job::tcsetpgrp_without_block` functions
+  instead of the previous `system::Sigmask` and `system::Sigaction` trait
+  bounds.
 
 ### Changed
 
@@ -151,6 +155,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `job::tcsetpgrp_with_block` function now requires the trait bound
   `S: job::RunBlocking + system::TcSetPgrp` instead of
   `S: system::Sigmask + system::TcSetPgrp`.
+- The `job::tcsetpgrp_without_block` function now requires the trait bound
+  `S: job::RunUnblocking + system::TcSetPgrp` instead of
+  `S: system::Sigmask + system::Sigaction + system::TcSetPgrp`.
 
 ### Deprecated
 
