@@ -158,6 +158,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `job::tcsetpgrp_without_block` function now requires the trait bound
   `S: job::RunUnblocking + system::TcSetPgrp` instead of
   `S: system::Sigmask + system::Sigaction + system::TcSetPgrp`.
+- The `semantics::exit_or_raise` function now requires the trait bound
+  `S: job::RunUnblocking + system::SendSignal + system::resource::SetRlimit + system::Exit`
+  instead of
+  `S: system::Sigmask + system::Sigaction + system::SendSignal + system::resource::SetRlimit + system::Exit`.
 
 ### Deprecated
 
