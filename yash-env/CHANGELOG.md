@@ -69,6 +69,10 @@ A _private dependency_ is used internally and not visible to downstream users.
   `job::tcsetpgrp_with_block` and `job::tcsetpgrp_without_block` functions
   instead of the previous `system::Sigmask` and `system::Sigaction` trait
   bounds.
+- The `subshell::BlockSignals` trait has been added to provide a higher-level
+  interface for blocking signals in the subshell configuration. This trait is
+  now used in the `subshell::Config::start` method instead of the previous
+  `system::Sigmask` and `system::Sigaction` trait bounds.
 
 ### Changed
 
@@ -162,6 +166,16 @@ A _private dependency_ is used internally and not visible to downstream users.
   `S: job::RunUnblocking + system::SendSignal + system::resource::SetRlimit + system::Exit`
   instead of
   `S: system::Sigmask + system::Sigaction + system::SendSignal + system::resource::SetRlimit + system::Exit`.
+- The `S: job::RunBlocking + job::RunUnblocking + subshell::BlockSignals` bound
+  has been added to and the `S: system::Sigmask + system::Sigaction` bound has
+  been removed from the following functions:
+    - `subshell::Config::start`
+    - `subshell::Config::start_and_wait`
+    - `subshell::Subshell::new`
+    - `subshell::Subshell::job_control`
+    - `subshell::Subshell::ignore_sigint_sigquit`
+    - `subshell::Subshell::start`
+    - `subshell::Subshell::start_and_wait`
 
 ### Deprecated
 

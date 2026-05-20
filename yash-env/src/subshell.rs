@@ -31,6 +31,8 @@
 use crate::Env;
 use crate::job::Pid;
 use crate::job::ProcessResult;
+use crate::job::RunBlocking;
+use crate::job::RunUnblocking;
 use crate::system::Close;
 use crate::system::Dup;
 use crate::system::Errno;
@@ -40,9 +42,9 @@ use crate::system::GetPid;
 use crate::system::Open;
 use crate::system::SendSignal;
 use crate::system::SetPgid;
-use crate::system::Sigaction;
 use crate::system::Sigmask;
 use crate::system::SigmaskOp;
+use crate::system::Signals;
 use crate::system::Sigset as _;
 use crate::system::TcSetPgrp;
 use crate::system::Wait;
@@ -90,17 +92,18 @@ impl<S, F> std::fmt::Debug for Subshell<S, F> {
 #[allow(deprecated, reason = "for backward compatible API")]
 impl<S, F> Subshell<S, F>
 where
-    S: Close
+    S: BlockSignals
+        + Close
         + Dup
         + Exit
         + Fork
         + GetPid
         + Open
+        + RunBlocking
+        + RunUnblocking
         + SendSignal
         + SetPgid
         + SetRlimit
-        + Sigaction
-        + Sigmask
         + SignalSystem
         + TcSetPgrp
         + WaitForSignals
@@ -236,10 +239,59 @@ where
     }
 }
 
-async fn block_sigint_sigquit<S: Sigmask>(system: &S) -> Result<S::Sigset, Errno> {
-    let mut old_mask = S::Sigset::new();
-    system
-        .sigmask(
+/// Trait to temporarily block the SIGINT and SIGQUIT signals
+///
+/// This trait represents the capability required by [`Config::start`] to
+/// temporarily block SIGINT and SIGQUIT while starting a subshell. Any type
+/// that implements [`Sigmask`] automatically implements this trait.
+/// Additionally, [`Concurrent`] implements this trait by delegating to the
+/// inner system while not implementing `Sigmask` itself, which allows
+/// `Concurrent` to maintain internal invariants about signal masks while still
+/// providing this capability to its users.
+///
+/// This trait defines a higher-level interface to temporarily modify the signal
+/// mask. Typically, implementors of this trait will internally depend on
+/// `Sigmask` to perform the actual signal mask modification, but the details
+/// are abstracted away.
+///
+/// [`Concurrent`]: crate::system::concurrency::Concurrent
+pub trait BlockSignals: Signals {
+    type SavedMask;
+
+    /// Blocks SIGINT and SIGQUIT, returning the previous signal mask.
+    ///
+    /// After this function returns successfully, one of the following must be
+    /// performed:
+    ///
+    /// - Call [`restore_sigmask`](Self::restore_sigmask) with the returned mask
+    ///   to restore the original signal mask,
+    /// - Call [`SignalSystem::set_disposition`] to re-set the disposition of
+    ///   SIGINT and SIGQUIT, which installs a new signal mask,
+    /// - [Exit](Exit::exit) the process without restoring the signal mask.
+    fn block_sigint_sigquit(
+        &self,
+    ) -> impl Future<Output = Result<Self::SavedMask, Errno>> + use<'_, Self>;
+
+    /// Restores the signal mask.
+    ///
+    /// This function restores the signal mask to the state represented by
+    /// `mask`, which should be a value returned by a previous call to
+    /// [`block_sigint_sigquit`](Self::block_sigint_sigquit).
+    fn restore_sigmask(
+        &self,
+        mask: Self::SavedMask,
+    ) -> impl Future<Output = Result<(), Errno>> + use<'_, Self>;
+}
+
+impl<S> BlockSignals for S
+where
+    S: Sigmask + ?Sized,
+{
+    type SavedMask = S::Sigset;
+
+    async fn block_sigint_sigquit(&self) -> Result<Self::SavedMask, Errno> {
+        let mut old_mask = S::Sigset::new();
+        self.sigmask(
             Some((
                 SigmaskOp::Add,
                 &S::Sigset::from_signals([S::SIGINT, S::SIGQUIT])?,
@@ -247,11 +299,12 @@ async fn block_sigint_sigquit<S: Sigmask>(system: &S) -> Result<S::Sigset, Errno
             Some(&mut old_mask),
         )
         .await?;
-    Ok(old_mask)
-}
+        Ok(old_mask)
+    }
 
-async fn restore_sigmask<S: Sigmask>(system: &S, mask: &S::Sigset) -> Result<(), Errno> {
-    system.sigmask(Some((SigmaskOp::Set, mask)), None).await
+    async fn restore_sigmask(&self, mask: Self::SavedMask) -> Result<(), Errno> {
+        self.sigmask(Some((SigmaskOp::Set, &mask)), None).await
+    }
 }
 
 mod config;

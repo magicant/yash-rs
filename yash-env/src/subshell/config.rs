@@ -16,19 +16,16 @@
 
 //! Subshell creation via [`Config`]
 
+use super::BlockSignals;
 use super::JobControl;
-use super::block_sigint_sigquit;
-use super::restore_sigmask;
 use crate::Env;
-use crate::job::tcsetpgrp_with_block;
-use crate::job::{Pid, ProcessResult};
+use crate::job::{Pid, ProcessResult, RunBlocking, RunUnblocking, tcsetpgrp_with_block};
 use crate::semantics::exit_or_raise;
 use crate::stack::Frame;
 use crate::system::concurrency::WaitForSignals;
 use crate::system::resource::SetRlimit;
 use crate::system::{
-    Close, Dup, Errno, Exit, Fork, GetPid, Open, SendSignal, SetPgid, Sigaction, Sigmask,
-    TcSetPgrp, Wait,
+    Close, Dup, Errno, Exit, Fork, GetPid, Open, SendSignal, SetPgid, TcSetPgrp, Wait,
 };
 use crate::trap::SignalSystem;
 
@@ -134,17 +131,18 @@ impl Config {
         task: F,
     ) -> Result<(Pid, Option<JobControl>), Errno>
     where
-        S: Close
+        S: BlockSignals
+            + Close
             + Dup
             + Exit
             + Fork
             + GetPid
             + Open
+            + RunBlocking
+            + RunUnblocking
             + SendSignal
             + SetPgid
             + SetRlimit
-            + Sigaction
-            + Sigmask
             + SignalSystem
             + TcSetPgrp
             + 'static,
@@ -163,7 +161,7 @@ impl Config {
             // Block SIGINT and SIGQUIT before forking the child process to
             // prevent the child from being killed by those signals until the
             // child starts ignoring them.
-            Some(block_sigint_sigquit(&env.system).await?)
+            Some(env.system.block_sigint_sigquit().await?)
         } else {
             None
         };
@@ -208,7 +206,7 @@ impl Config {
         // this before returning the error if the child process creation failed,
         // to avoid leaving the parent process with an unexpected signal mask.
         if let Some(mask) = original_mask {
-            restore_sigmask(&env.system, &mask).await.ok();
+            env.system.restore_sigmask(mask).await.ok();
         }
 
         let child_pid = result?;
@@ -253,17 +251,18 @@ impl Config {
         task: F,
     ) -> Result<(Pid, ProcessResult), Errno>
     where
-        S: Close
+        S: BlockSignals
+            + Close
             + Dup
             + Exit
             + Fork
             + GetPid
             + Open
+            + RunBlocking
+            + RunUnblocking
             + SendSignal
             + SetPgid
             + SetRlimit
-            + Sigaction
-            + Sigmask
             + SignalSystem
             + TcSetPgrp
             + Wait
