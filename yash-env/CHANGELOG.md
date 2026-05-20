@@ -63,6 +63,16 @@ A _private dependency_ is used internally and not visible to downstream users.
   more flexible and ergonomic way to configure subshells.
 - The `Default` trait is now implemented for `Env<S>` where
   `S: Default + system::GetPid`.
+- The `job::RunBlocking` and `job::RunUnblocking` traits have been added to
+  provide higher-level interfaces for running functions with signals blocked or
+  unblocked, respectively. These traits are now used in the
+  `job::tcsetpgrp_with_block` and `job::tcsetpgrp_without_block` functions
+  instead of the previous `system::Sigmask` and `system::Sigaction` trait
+  bounds.
+- The `subshell::BlockSignals` trait has been added to provide a higher-level
+  interface for blocking signals in the subshell configuration. This trait is
+  now used in the `subshell::Config::start` method instead of the previous
+  `system::Sigmask` and `system::Sigaction` trait bounds.
 
 ### Changed
 
@@ -146,6 +156,26 @@ A _private dependency_ is used internally and not visible to downstream users.
   descriptors, rather than being limited to `Concurrent` systems. The
   implementation of `input::Input` for `FdReader2` now only requires the system
   to implement the `Read` trait.
+- The `job::tcsetpgrp_with_block` function now requires the trait bound
+  `S: job::RunBlocking + system::TcSetPgrp` instead of
+  `S: system::Sigmask + system::TcSetPgrp`.
+- The `job::tcsetpgrp_without_block` function now requires the trait bound
+  `S: job::RunUnblocking + system::TcSetPgrp` instead of
+  `S: system::Sigmask + system::Sigaction + system::TcSetPgrp`.
+- The `semantics::exit_or_raise` function now requires the trait bound
+  `S: job::RunUnblocking + system::SendSignal + system::resource::SetRlimit + system::Exit`
+  instead of
+  `S: system::Sigmask + system::Sigaction + system::SendSignal + system::resource::SetRlimit + system::Exit`.
+- The `S: job::RunBlocking + job::RunUnblocking + subshell::BlockSignals` bound
+  has been added to and the `S: system::Sigmask + system::Sigaction` bound has
+  been removed from the following functions:
+    - `subshell::Config::start`
+    - `subshell::Config::start_and_wait`
+    - `subshell::Subshell::new`
+    - `subshell::Subshell::job_control`
+    - `subshell::Subshell::ignore_sigint_sigquit`
+    - `subshell::Subshell::start`
+    - `subshell::Subshell::start_and_wait`
 
 ### Deprecated
 

@@ -17,13 +17,12 @@
 //! Type definitions for command execution.
 
 use crate::Env;
+use crate::job::RunUnblocking;
 use crate::signal;
 use crate::source::Location;
 use crate::system::resource::{LimitPair, Resource, SetRlimit};
 use crate::system::r#virtual::SignalEffect;
-use crate::system::{
-    Disposition, Exit, SendSignal, Sigaction, Sigmask, SigmaskOp, Signals, Sigset as _,
-};
+use crate::system::{Exit, SendSignal, Signals};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::ffi::c_int;
@@ -349,11 +348,11 @@ pub mod expansion;
 /// terminates the process with the given exit status.
 pub async fn exit_or_raise<S>(system: &S, exit_status: ExitStatus) -> !
 where
-    S: Signals + Sigmask + Sigaction + SendSignal + SetRlimit + Exit + ?Sized,
+    S: RunUnblocking + SendSignal + SetRlimit + Exit + ?Sized,
 {
     async fn maybe_raise<S>(system: &S, exit_status: ExitStatus) -> crate::system::Result<()>
     where
-        S: Signals + Sigmask + Sigaction + SendSignal + SetRlimit + ?Sized,
+        S: RunUnblocking + SendSignal + SetRlimit + ?Sized,
     {
         let Some(signal) = exit_status.to_signal(system, /* exact */ true) else {
             return Ok(());
@@ -369,21 +368,10 @@ where
         // Disable core dump
         system.setrlimit(Resource::CORE, LimitPair { soft: 0, hard: 0 })?;
 
-        if signal.1 != S::SIGKILL {
-            // Reset signal disposition
-            system.sigaction(signal.1, Disposition::Default)?;
-        }
-
-        // Unblock the signal
-        system
-            .sigmask(
-                Some((SigmaskOp::Remove, &S::Sigset::from_signals([signal.1])?)),
-                None,
-            )
-            .await?;
-
         // Send the signal to the current process
-        system.raise(signal.1).await?;
+        system
+            .run_unblocking(signal.1, || system.raise(signal.1))
+            .await?;
 
         Ok(())
     }
