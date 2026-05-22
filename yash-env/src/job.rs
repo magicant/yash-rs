@@ -1581,9 +1581,6 @@ mod tests {
         assert_eq!(list.previous_job(), Some(i10));
     }
 
-    // TODO tcsetpgrp_with_block tests
-    // TODO tcsetpgrp_without_block tests
-
     #[test]
     fn do_not_add_job_if_exited() {
         let mut env = Env::new_virtual();

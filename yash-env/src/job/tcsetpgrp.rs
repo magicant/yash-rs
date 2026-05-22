@@ -221,3 +221,411 @@ where
         .run_unblocking(S::SIGTTOU, || system.tcsetpgrp(fd, pgid))
         .await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::signal;
+    use crate::system::r#virtual::{
+        SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCONT, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGIOT,
+        SIGKILL, SIGPIPE, SIGPROF, SIGQUIT, SIGSEGV, SIGSTOP, SIGSYS, SIGTERM, SIGTRAP, SIGTSTP,
+        SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU, SIGXFSZ,
+    };
+    use crate::system::{Errno, GetSigaction};
+    use futures_util::FutureExt as _;
+    use std::cell::{Cell, RefCell};
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::ops::RangeInclusive;
+
+    #[derive(Clone, Debug, Default, Eq, PartialEq)]
+    struct TestSigset(BTreeSet<signal::Number>);
+
+    impl crate::system::Sigset for TestSigset {
+        fn full() -> Self {
+            unimplemented!("not needed for tests")
+        }
+
+        fn insert(&mut self, signal: signal::Number) -> Result<()> {
+            self.0.insert(signal);
+            Ok(())
+        }
+
+        fn remove(&mut self, signal: signal::Number) -> Result<()> {
+            self.0.remove(&signal);
+            Ok(())
+        }
+
+        fn contains(&self, signal: signal::Number) -> Result<bool> {
+            Ok(self.0.contains(&signal))
+        }
+    }
+
+    #[derive(Default)]
+    struct MockSystem {
+        mask: RefCell<TestSigset>,
+        dispositions: RefCell<BTreeMap<signal::Number, Disposition>>,
+        sigmask_errors: RefCell<BTreeMap<usize, Errno>>,
+        sigaction_errors: RefCell<BTreeMap<usize, Errno>>,
+        sigmask_call_count: Cell<usize>,
+        sigaction_call_count: Cell<usize>,
+    }
+
+    impl MockSystem {
+        fn set_mask(&self, mask: TestSigset) {
+            self.mask.replace(mask);
+        }
+
+        fn set_disposition(&self, signal: signal::Number, disposition: Disposition) {
+            self.dispositions.borrow_mut().insert(signal, disposition);
+        }
+
+        fn disposition_of(&self, signal: signal::Number) -> Disposition {
+            self.dispositions
+                .borrow()
+                .get(&signal)
+                .copied()
+                .unwrap_or_default()
+        }
+
+        fn is_blocked(&self, signal: signal::Number) -> bool {
+            self.mask
+                .borrow()
+                .contains(signal)
+                .expect("signals in tests are always valid")
+        }
+
+        fn set_sigmask_error_on_call(&self, call: usize, error: Errno) {
+            self.sigmask_errors.borrow_mut().insert(call, error);
+        }
+
+        fn set_sigaction_error_on_call(&self, call: usize, error: Errno) {
+            self.sigaction_errors.borrow_mut().insert(call, error);
+        }
+    }
+
+    impl Signals for MockSystem {
+        const SIGABRT: signal::Number = SIGABRT;
+        const SIGALRM: signal::Number = SIGALRM;
+        const SIGBUS: signal::Number = SIGBUS;
+        const SIGCHLD: signal::Number = SIGCHLD;
+        const SIGCLD: Option<signal::Number> = None;
+        const SIGCONT: signal::Number = SIGCONT;
+        const SIGEMT: Option<signal::Number> = None;
+        const SIGFPE: signal::Number = SIGFPE;
+        const SIGHUP: signal::Number = SIGHUP;
+        const SIGILL: signal::Number = SIGILL;
+        const SIGINFO: Option<signal::Number> = None;
+        const SIGINT: signal::Number = SIGINT;
+        const SIGIO: Option<signal::Number> = None;
+        const SIGIOT: signal::Number = SIGIOT;
+        const SIGKILL: signal::Number = SIGKILL;
+        const SIGLOST: Option<signal::Number> = None;
+        const SIGPIPE: signal::Number = SIGPIPE;
+        const SIGPOLL: Option<signal::Number> = None;
+        const SIGPROF: signal::Number = SIGPROF;
+        const SIGPWR: Option<signal::Number> = None;
+        const SIGQUIT: signal::Number = SIGQUIT;
+        const SIGSEGV: signal::Number = SIGSEGV;
+        const SIGSTKFLT: Option<signal::Number> = None;
+        const SIGSTOP: signal::Number = SIGSTOP;
+        const SIGSYS: signal::Number = SIGSYS;
+        const SIGTERM: signal::Number = SIGTERM;
+        const SIGTHR: Option<signal::Number> = None;
+        const SIGTRAP: signal::Number = SIGTRAP;
+        const SIGTSTP: signal::Number = SIGTSTP;
+        const SIGTTIN: signal::Number = SIGTTIN;
+        const SIGTTOU: signal::Number = SIGTTOU;
+        const SIGURG: signal::Number = SIGURG;
+        const SIGUSR1: signal::Number = SIGUSR1;
+        const SIGUSR2: signal::Number = SIGUSR2;
+        const SIGVTALRM: signal::Number = SIGVTALRM;
+        const SIGWINCH: signal::Number = SIGWINCH;
+        const SIGXCPU: signal::Number = SIGXCPU;
+        const SIGXFSZ: signal::Number = SIGXFSZ;
+
+        fn sigrt_range(&self) -> Option<RangeInclusive<signal::Number>> {
+            None
+        }
+    }
+
+    impl Sigmask for MockSystem {
+        type Sigset = TestSigset;
+
+        fn sigmask(
+            &self,
+            op: Option<(SigmaskOp, &Self::Sigset)>,
+            old_mask: Option<&mut Self::Sigset>,
+        ) -> impl Future<Output = Result<()>> + use<> {
+            let call_count = self.sigmask_call_count.get() + 1;
+            self.sigmask_call_count.set(call_count);
+
+            if let Some(error) = self.sigmask_errors.borrow_mut().remove(&call_count) {
+                return std::future::ready(Err(error));
+            }
+
+            let result = {
+                let mut mask = self.mask.borrow_mut();
+                if let Some(old_mask) = old_mask {
+                    old_mask.clone_from(&mask);
+                }
+
+                if let Some((op, signals)) = op {
+                    match op {
+                        SigmaskOp::Add => {
+                            for &signal in &signals.0 {
+                                mask.insert(signal).unwrap();
+                            }
+                        }
+                        SigmaskOp::Remove => {
+                            for &signal in &signals.0 {
+                                mask.remove(signal).unwrap();
+                            }
+                        }
+                        SigmaskOp::Set => {
+                            *mask = signals.clone();
+                        }
+                    }
+                }
+
+                Ok(())
+            };
+
+            std::future::ready(result)
+        }
+    }
+
+    impl GetSigaction for MockSystem {
+        fn get_sigaction(&self, signal: signal::Number) -> Result<Disposition> {
+            Ok(self.disposition_of(signal))
+        }
+    }
+
+    impl Sigaction for MockSystem {
+        fn sigaction(&self, signal: signal::Number, action: Disposition) -> Result<Disposition> {
+            let call_count = self.sigaction_call_count.get() + 1;
+            self.sigaction_call_count.set(call_count);
+
+            if let Some(error) = self.sigaction_errors.borrow_mut().remove(&call_count) {
+                return Err(error);
+            }
+
+            Ok(self
+                .dispositions
+                .borrow_mut()
+                .insert(signal, action)
+                .unwrap_or_default())
+        }
+    }
+
+    #[test]
+    fn run_blocking_blocks_signal_and_restores_mask_on_success() {
+        let system = MockSystem::default();
+        let called = Cell::new(false);
+
+        let result = system
+            .run_blocking(MockSystem::SIGTTOU, async || {
+                called.set(true);
+                assert!(system.is_blocked(MockSystem::SIGTTOU));
+                Ok(())
+            })
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, Ok(()));
+        assert!(called.get());
+        assert!(!system.is_blocked(MockSystem::SIGTTOU));
+    }
+
+    #[test]
+    fn run_blocking_does_not_run_function_when_initial_sigmask_fails() {
+        let system = MockSystem::default();
+        system.set_sigmask_error_on_call(1, Errno::EINVAL);
+
+        let result = system
+            .run_blocking(MockSystem::SIGTTOU, async || -> Result<()> {
+                unreachable!("closure should not be called")
+            })
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, Err(Errno::EINVAL));
+    }
+
+    #[test]
+    fn run_blocking_discards_restore_error_when_function_returns_error() {
+        let system = MockSystem::default();
+        system.set_sigmask_error_on_call(2, Errno::EPERM);
+
+        let result = system
+            .run_blocking(MockSystem::SIGTTOU, async || Err::<(), _>(Errno::EINTR))
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, Err(Errno::EINTR));
+    }
+
+    #[test]
+    fn run_blocking_propagates_restore_error_when_function_succeeds() {
+        let system = MockSystem::default();
+        system.set_sigmask_error_on_call(2, Errno::EPERM);
+
+        let result = system
+            .run_blocking(MockSystem::SIGTTOU, async || Ok(()))
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, Err(Errno::EPERM));
+    }
+
+    #[test]
+    fn run_unblocking_for_sigkill_runs_function_without_sigaction_or_sigmask() {
+        let system = MockSystem::default();
+        let called = Cell::new(false);
+
+        let result = system
+            .run_unblocking(MockSystem::SIGKILL, async || {
+                called.set(true);
+                Err::<(), _>(Errno::EINTR)
+            })
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, Err(Errno::EINTR));
+        assert!(called.get());
+        assert_eq!(system.sigmask_call_count.get(), 0);
+        assert_eq!(system.sigaction_call_count.get(), 0);
+    }
+
+    #[test]
+    fn run_unblocking_for_sigstop_runs_function_without_sigaction_or_sigmask() {
+        let system = MockSystem::default();
+        let called = Cell::new(false);
+
+        let result = system
+            .run_unblocking(MockSystem::SIGSTOP, async || {
+                called.set(true);
+                Err::<(), _>(Errno::EINTR)
+            })
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, Err(Errno::EINTR));
+        assert!(called.get());
+        assert_eq!(system.sigmask_call_count.get(), 0);
+        assert_eq!(system.sigaction_call_count.get(), 0);
+    }
+
+    #[test]
+    fn run_unblocking_sets_default_unblocks_and_restores_on_success() {
+        let system = MockSystem::default();
+        let called = Cell::new(false);
+        let mut initial_mask = TestSigset::new();
+        initial_mask.insert(MockSystem::SIGTTOU).unwrap();
+        system.set_mask(initial_mask.clone());
+        system.set_disposition(MockSystem::SIGTTOU, Disposition::Ignore);
+
+        let result = system
+            .run_unblocking(MockSystem::SIGTTOU, async || {
+                called.set(true);
+                assert_eq!(
+                    system.disposition_of(MockSystem::SIGTTOU),
+                    Disposition::Default
+                );
+                assert!(!system.is_blocked(MockSystem::SIGTTOU));
+                Ok(())
+            })
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, Ok(()));
+        assert!(called.get());
+        assert!(system.is_blocked(MockSystem::SIGTTOU));
+        assert_eq!(
+            system.disposition_of(MockSystem::SIGTTOU),
+            Disposition::Ignore
+        );
+    }
+
+    #[test]
+    fn run_unblocking_returns_error_when_unblock_sigmask_fails_and_restores_disposition() {
+        let system = MockSystem::default();
+        system.set_disposition(MockSystem::SIGTTOU, Disposition::Ignore);
+        system.set_sigmask_error_on_call(1, Errno::EPERM);
+
+        let result = system
+            .run_unblocking(MockSystem::SIGTTOU, async || -> Result<()> {
+                unreachable!("closure should not be called")
+            })
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, Err(Errno::EPERM));
+        assert_eq!(
+            system.disposition_of(MockSystem::SIGTTOU),
+            Disposition::Ignore
+        );
+    }
+
+    #[test]
+    fn run_unblocking_discards_restore_errors_when_function_returns_error() {
+        let system = MockSystem::default();
+        let called = Cell::new(false);
+        system.set_sigmask_error_on_call(2, Errno::EPERM);
+        system.set_sigaction_error_on_call(2, Errno::EINVAL);
+
+        let result = system
+            .run_unblocking(MockSystem::SIGTTOU, async || {
+                called.set(true);
+                Err::<(), _>(Errno::EINTR)
+            })
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, Err(Errno::EINTR));
+        assert!(called.get());
+    }
+
+    #[test]
+    fn run_unblocking_propagates_restore_mask_error_when_function_succeeds() {
+        let system = MockSystem::default();
+        system.set_sigmask_error_on_call(2, Errno::EPERM);
+
+        let result = system
+            .run_unblocking(MockSystem::SIGTTOU, async || Ok(()))
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, Err(Errno::EPERM));
+    }
+
+    #[test]
+    fn run_unblocking_restores_sigaction_on_sigmask_restoration_error() {
+        let system = MockSystem::default();
+        system.set_disposition(MockSystem::SIGTTOU, Disposition::Ignore);
+        system.set_sigmask_error_on_call(2, Errno::EPERM);
+
+        let result = system
+            .run_unblocking(MockSystem::SIGTTOU, async || Ok(()))
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, Err(Errno::EPERM));
+        assert_eq!(
+            system.disposition_of(MockSystem::SIGTTOU),
+            Disposition::Ignore
+        );
+    }
+
+    #[test]
+    fn run_unblocking_propagates_restore_action_error_when_function_succeeds() {
+        let system = MockSystem::default();
+        system.set_sigaction_error_on_call(2, Errno::EINVAL);
+
+        let result = system
+            .run_unblocking(MockSystem::SIGTTOU, async || Ok(()))
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, Err(Errno::EINVAL));
+    }
+}
