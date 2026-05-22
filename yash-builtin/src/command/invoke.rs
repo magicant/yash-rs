@@ -23,16 +23,19 @@ use crate::common::report::report_failure;
 use crate::exec::ExecFailure;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
+use yash_env::job::RunBlocking;
+use yash_env::job::RunUnblocking;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::command::RunFunction;
 use yash_env::semantics::command::run_external_utility_in_subshell;
 use yash_env::semantics::command::search::{Target, search};
+use yash_env::subshell::BlockSignals;
 use yash_env::system::concurrency::{WaitForSignals, WriteAll};
 use yash_env::system::resource::SetRlimit;
 use yash_env::system::{
     Close, Dup, Exec, Exit, Fork, GetPid, IsExecutableFile, Isatty, Open, SendSignal, SetPgid,
-    ShellPath, Sigaction, Sigmask, Sysconf, TcSetPgrp, Wait,
+    ShellPath, Sysconf, TcSetPgrp, Wait,
 };
 use yash_env::trap::SignalSystem;
 
@@ -40,7 +43,8 @@ impl Invoke {
     /// Execute the command
     pub async fn execute<S>(self, env: &mut Env<S>) -> crate::Result
     where
-        S: Close
+        S: BlockSignals
+            + Close
             + Dup
             + Exec
             + Exit
@@ -49,12 +53,12 @@ impl Invoke {
             + IsExecutableFile
             + Isatty
             + Open
+            + RunBlocking
+            + RunUnblocking
             + SendSignal
             + SetPgid
             + SetRlimit
             + ShellPath
-            + Sigaction
-            + Sigmask
             + SignalSystem
             + Sysconf
             + TcSetPgrp
@@ -94,7 +98,8 @@ async fn invoke_target<S>(
     mut fields: Vec<Field>,
 ) -> crate::Result
 where
-    S: Close
+    S: BlockSignals
+        + Close
         + Dup
         + Exec
         + Exit
@@ -102,12 +107,12 @@ where
         + GetPid
         + Isatty
         + Open
+        + RunBlocking
+        + RunUnblocking
         + SendSignal
         + SetPgid
         + SetRlimit
         + ShellPath
-        + Sigaction
-        + Sigmask
         + SignalSystem
         + TcSetPgrp
         + Wait

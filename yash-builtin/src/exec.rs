@@ -45,7 +45,7 @@ use yash_env::semantics::{Divert::Abort, ExitStatus, Field};
 use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::concurrency::WriteAll;
-use yash_env::system::{Exec, IsExecutableFile, Isatty, ShellPath, Sigaction, Sigmask};
+use yash_env::system::{Exec, IsExecutableFile, Isatty, ShellPath};
 use yash_env::trap::SignalSystem;
 
 // TODO Split into syntax and semantics submodules
@@ -53,7 +53,7 @@ use yash_env::trap::SignalSystem;
 /// Entry point for executing the `exec` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
-    S: Exec + IsExecutableFile + Isatty + ShellPath + Sigmask + Sigaction + SignalSystem + WriteAll,
+    S: Exec + IsExecutableFile + Isatty + ShellPath + SignalSystem + WriteAll,
 {
     // TODO Support non-POSIX options
     let args = match parse_arguments(&[], Mode::with_env(env), args) {

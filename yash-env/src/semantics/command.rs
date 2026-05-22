@@ -22,16 +22,16 @@ pub mod search;
 
 use crate::Env;
 use crate::function::Function;
-use crate::job::add_job_if_suspended;
+use crate::job::{RunBlocking, RunUnblocking, add_job_if_suspended};
 use crate::semantics::{ExitStatus, Field, Result};
 use crate::source::Location;
 use crate::source::pretty::{Report, ReportType, Snippet};
-use crate::subshell::Config;
+use crate::subshell::{BlockSignals, Config};
 use crate::system::concurrency::WaitForSignals;
 use crate::system::resource::SetRlimit;
 use crate::system::{
-    Close, Dup, Errno, Exec, Exit, Fork, GetPid, Open, SendSignal, SetPgid, ShellPath, Sigaction,
-    Sigmask, TcSetPgrp, Wait,
+    Close, Dup, Errno, Exec, Exit, Fork, GetPid, Open, SendSignal, SetPgid, ShellPath, TcSetPgrp,
+    Wait,
 };
 use crate::trap::SignalSystem;
 use itertools::Itertools as _;
@@ -256,19 +256,20 @@ pub async fn run_external_utility_in_subshell<S>(
     ) -> PinFuture<'_>,
 ) -> Result<ExitStatus>
 where
-    S: Close
+    S: BlockSignals
+        + Close
         + Dup
         + Exec
         + Exit
         + Fork
         + GetPid
         + Open
+        + RunBlocking
+        + RunUnblocking
         + SendSignal
         + SetPgid
         + SetRlimit
         + ShellPath
-        + Sigaction
-        + Sigmask
         + SignalSystem
         + TcSetPgrp
         + Wait

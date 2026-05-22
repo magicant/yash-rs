@@ -52,6 +52,8 @@ use self::job::JobList;
 use self::job::Pid;
 use self::job::ProcessResult;
 use self::job::ProcessState;
+use self::job::RunBlocking;
+use self::job::RunUnblocking;
 use self::option::On;
 use self::option::OptionSet;
 use self::option::{AllExport, ErrExit, Interactive, Monitor};
@@ -72,10 +74,7 @@ use self::system::Mode;
 use self::system::OfdAccess;
 use self::system::Open;
 use self::system::OpenFlag;
-use self::system::Sigaction;
-use self::system::Sigmask;
 use self::system::SignalList;
-use self::system::Signals;
 #[allow(deprecated, reason = "for backward compatible API")]
 pub use self::system::System;
 use self::system::TcSetPgrp;
@@ -441,7 +440,7 @@ impl<S> Env<S> {
     /// job-controlling process that can bring the shell into the foreground.
     pub async fn ensure_foreground(&mut self) -> Result<(), Errno>
     where
-        S: Open + Dup + Close + GetPid + Signals + Sigmask + Sigaction + TcSetPgrp,
+        S: Open + Dup + Close + GetPid + RunBlocking + RunUnblocking + TcSetPgrp,
     {
         let fd = self.get_tty().await?;
 

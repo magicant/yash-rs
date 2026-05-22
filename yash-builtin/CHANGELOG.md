@@ -14,8 +14,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 ### Changed
 
 - The `iter` function now requires
-  `S: std::clone::Clone + yash_env::system::concurrency::WaitForSignals + yash_env::system::concurrency::WriteAll + yash_env::trap::SignalSystem`
-  in addition to the existing bounds on `S`.
+  `S: std::clone::Clone + yash_env::job::RunBlocking + yash_env::job::RunUnblocking + yash_env::subshell::BlockSignals + yash_env::system::concurrency::WaitForSignals + yash_env::system::concurrency::WriteAll + yash_env::trap::SignalSystem`
+  in addition to the existing bounds on `S`, and no longer requires
+  `S: yash_env::system::Sigaction + yash_env::system::Sigmask`.
 - The following functions now require the bound
   `S: yash_env::system::Isatty + yash_env::system::concurrency::WriteAll` instead of
   `S: yash_env::system::Isatty + yash_env::system::Fcntl + yash_env::system::Write`:
@@ -83,22 +84,37 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `command::Invoke::execute`
     - `command::main`
     - `fg::main`
-- The `trap::Command::execute` function now requires the bound
-  `S: yash_env::trap::SignalSystem` instead of
+- In the following functions, the bound
+  `S: yash_env::system::Sigaction + yash_env::system::Sigmask` has been removed and the bound
+  `S: yash_env::subshell::BlockSignals + yash_env::job::RunBlocking + yash_env::job::RunUnblocking`
+  has been added while other bounds remain unchanged:
+    - `command::Command::execute`
+    - `command::Invoke::execute`
+    - `command::main`
+- In the `fg::main` function, the bound
+  `S: yash_env::system::Sigaction + yash_env::system::Sigmask` has been removed and the bound
+  `S: yash_env::job::RunBlocking` has been added while other bounds remain unchanged.
+- In the `set::main` function, the bound
+  `S: yash_env::system::Sigaction + yash_env::system::Sigmask` has been removed and the bound
+  `S: yash_env::job::RunBlocking + yash_env::job::RunUnblocking` has been added while other bounds remain unchanged.
+- The `exec::main` function no longer requires
   `S: yash_env::system::Sigaction + yash_env::system::Sigmask`.
-- The `trap::main` function now requires the bound
-  `S: yash_env::system::Isatty + yash_env::trap::SignalSystem + yash_env::system::concurrency::WriteAll`
-  instead of
-  `S: yash_env::system::Fcntl + yash_env::system::Isatty + yash_env::system::Sigaction + yash_env::system::Sigmask + yash_env::system::Write`.
-- The `wait::core::wait_for_any_job_or_trap` and `wait::status::wait_while_running`
-  functions now require the bound
-  `S: yash_env::system::concurrency::WaitForSignals + yash_env::system::Wait + yash_env::trap::SignalSystem + 'static`
-  instead of
-  `S: yash_env::system::Sigaction + yash_env::system::Sigmask + yash_env::system::Wait + 'static`.
-- The `wait::main` and `wait::Command::execute` functions now require the bound
-  `S: yash_env::system::Isatty + yash_env::system::concurrency::WaitForSignals + yash_env::system::Wait + yash_env::trap::SignalSystem + 'static`
-  instead of
-  `S: yash_env::system::Fcntl + yash_env::system::Isatty + yash_env::system::Sigaction + yash_env::system::Sigmask + yash_env::system::Wait + yash_env::system::Write + 'static`.
+- In the `trap::Command::execute` function, the bound
+  `S: yash_env::system::Sigaction + yash_env::system::Sigmask` has been removed and the bound
+  `S: yash_env::trap::SignalSystem` has been added while other bounds remain unchanged.
+- In the `trap::main` function, the bound
+  `S: yash_env::system::Fcntl + yash_env::system::Isatty + yash_env::system::Sigaction + yash_env::system::Sigmask + yash_env::system::Write` has been removed and the bound
+  `S: yash_env::system::Isatty + yash_env::trap::SignalSystem + yash_env::system::concurrency::WriteAll` has been added while other bounds remain unchanged.
+- In the following functions, the bound
+  `S: yash_env::system::Sigaction + yash_env::system::Sigmask` has been removed and the bound
+  `S: yash_env::system::concurrency::WaitForSignals + yash_env::trap::SignalSystem` has been added while other bounds remain unchanged:
+    - `wait::core::wait_for_any_job_or_trap`
+    - `wait::status::wait_while_running`
+- In the following functions, the bound
+  `S: yash_env::system::Fcntl + yash_env::system::Sigaction + yash_env::system::Sigmask + yash_env::system::Write` has been removed and the bound
+  `S: yash_env::system::concurrency::WaitForSignals + yash_env::trap::SignalSystem` has been added while other bounds remain unchanged:
+    - `wait::main`
+    - `wait::Command::execute`
 - Public dependency versions:
     - yash-env 0.13.0 → 0.14.0
     - yash-semantics (optional) 0.15.0 → 0.16.0

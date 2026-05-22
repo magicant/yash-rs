@@ -17,11 +17,13 @@
 //! Definition of `Runtime`
 
 use std::fmt::Debug;
+use yash_env::job::{RunBlocking, RunUnblocking};
+use yash_env::subshell::BlockSignals;
 use yash_env::system::concurrency::{ReadAll, Select, WaitForSignals, WriteAll};
 use yash_env::system::resource::SetRlimit;
 use yash_env::system::{
     Clock, Close, Dup, Exec, Exit, Fcntl, Fork, Fstat, GetPid, GetPw, IsExecutableFile, Isatty,
-    Open, Pipe, Read, Seek, SendSignal, SetPgid, ShellPath, Sigaction, Sigmask, TcSetPgrp, Wait,
+    Open, Pipe, Read, Seek, SendSignal, SetPgid, ShellPath, TcSetPgrp, Wait,
 };
 use yash_env::trap::SignalSystem;
 
@@ -34,7 +36,8 @@ use yash_env::trap::SignalSystem;
 /// implementation. Therefore, this trait serves as a convenient shorthand to
 /// express the required capabilities.
 pub trait Runtime:
-    Clock
+    BlockSignals
+    + Clock
     + Close
     + Debug
     + Dup
@@ -51,14 +54,14 @@ pub trait Runtime:
     + Pipe
     + Read
     + ReadAll
+    + RunBlocking
+    + RunUnblocking
     + Seek
     + Select
     + SendSignal
     + SetPgid
     + SetRlimit
     + ShellPath
-    + Sigaction
-    + Sigmask
     + SignalSystem
     + TcSetPgrp
     + Wait
@@ -70,7 +73,8 @@ pub trait Runtime:
 /// Any type automatically implements `Runtime` if it implements all the
 /// supertraits of `Runtime`.
 impl<S> Runtime for S where
-    S: Clock
+    S: BlockSignals
+        + Clock
         + Close
         + Debug
         + Dup
@@ -87,14 +91,14 @@ impl<S> Runtime for S where
         + Pipe
         + Read
         + ReadAll
+        + RunBlocking
+        + RunUnblocking
         + Seek
         + Select
         + SendSignal
         + SetPgid
         + SetRlimit
         + ShellPath
-        + Sigaction
-        + Sigmask
         + SignalSystem
         + TcSetPgrp
         + Wait

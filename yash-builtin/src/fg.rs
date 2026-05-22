@@ -39,6 +39,7 @@ use yash_env::io::Fd;
 use yash_env::job::JobList;
 use yash_env::job::ProcessResult;
 use yash_env::job::ProcessState;
+use yash_env::job::RunBlocking;
 use yash_env::job::id::parse;
 use yash_env::job::tcsetpgrp_with_block;
 use yash_env::option::Option::Monitor;
@@ -47,7 +48,7 @@ use yash_env::semantics::Divert::Interrupt;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::concurrency::{WaitForSignals, WriteAll};
-use yash_env::system::{Close, Dup, Isatty, Open, SendSignal, Sigaction, Sigmask, TcSetPgrp, Wait};
+use yash_env::system::{Close, Dup, Isatty, Open, SendSignal, TcSetPgrp, Wait};
 use yash_env::trap::SignalSystem;
 
 /// Resumes the job at the specified index.
@@ -65,10 +66,9 @@ where
         + Dup
         + Isatty
         + Open
+        + RunBlocking
         + SendSignal
         + SignalSystem
-        + Sigmask
-        + Sigaction
         + TcSetPgrp
         + Wait
         + WaitForSignals
@@ -137,10 +137,9 @@ where
         + Dup
         + Isatty
         + Open
+        + RunBlocking
         + SendSignal
         + SignalSystem
-        + Sigmask
-        + Sigaction
         + TcSetPgrp
         + Wait
         + WaitForSignals
@@ -158,10 +157,9 @@ where
         + Dup
         + Isatty
         + Open
+        + RunBlocking
         + SendSignal
         + SignalSystem
-        + Sigmask
-        + Sigaction
         + TcSetPgrp
         + Wait
         + WaitForSignals

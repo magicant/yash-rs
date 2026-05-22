@@ -31,6 +31,8 @@ use crate::common::output;
 use crate::common::report::report_error;
 use yash_env::Env;
 use yash_env::builtin::Result;
+use yash_env::job::RunBlocking;
+use yash_env::job::RunUnblocking;
 use yash_env::option::State;
 #[cfg(doc)]
 use yash_env::option::canonicalize;
@@ -44,7 +46,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::stack::Frame::Subshell;
 use yash_env::system::concurrency::WriteAll;
-use yash_env::system::{Close, Dup, GetPid, Isatty, Open, Sigaction, Sigmask, TcSetPgrp};
+use yash_env::system::{Close, Dup, GetPid, Isatty, Open, TcSetPgrp};
 use yash_env::trap::SignalSystem;
 use yash_env::variable::Scope::Global;
 
@@ -95,7 +97,7 @@ where
 /// option is enabled.
 async fn ensure_foreground<S>(env: &mut Env<S>)
 where
-    S: Open + Dup + Close + GetPid + Sigmask + Sigaction + TcSetPgrp,
+    S: Open + Dup + Close + GetPid + RunBlocking + RunUnblocking + TcSetPgrp,
 {
     if env.options.get(Monitor) == State::On {
         env.ensure_foreground().await.ok();
@@ -108,7 +110,7 @@ async fn modify<S>(
     options: Vec<(yash_env::option::Option, State)>,
     positional_params: Option<Vec<Field>>,
 ) where
-    S: Open + Dup + Close + GetPid + Sigaction + Sigmask + SignalSystem + TcSetPgrp,
+    S: Open + Dup + Close + GetPid + RunBlocking + RunUnblocking + SignalSystem + TcSetPgrp,
 {
     // Modify options
     let mut monitor_changed = false;
@@ -145,9 +147,9 @@ where
         + Close
         + GetPid
         + Isatty
+        + RunBlocking
+        + RunUnblocking
         + SignalSystem
-        + Sigmask
-        + Sigaction
         + TcSetPgrp
         + WriteAll
         + 'static,

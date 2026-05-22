@@ -99,8 +99,9 @@ A _private dependency_ is used internally and not visible to downstream users.
       `S: system::Exec + system::ShellPath + trap::SignalSystem` instead of
       `S: system::Exec + system::ShellPath + system::Sigmask + system::Sigaction`.
     - The `semantics::command::run_external_utility_in_subshell` function now
-      additionally requires the trait bound
-      `S: system::concurrency::WaitForSignals + trap::SignalSystem`.
+      additionally requires the trait bounds
+      `S: subshell::BlockSignals + job::RunBlocking + job::RunUnblocking + system::concurrency::WaitForSignals + trap::SignalSystem`
+      and no longer requires `S: system::Sigaction + system::Sigmask`.
     - The implementation of `input::Input` for `input::Echo` now requires the
       trait bound `S: system::concurrency::WriteAll` instead of
       `S: system::Fcntl + system::Write`.
@@ -162,6 +163,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `job::tcsetpgrp_without_block` function now requires the trait bound
   `S: job::RunUnblocking + system::TcSetPgrp` instead of
   `S: system::Sigmask + system::Sigaction + system::TcSetPgrp`.
+- The `Env::ensure_foreground` method now additionally requires the trait bounds
+  `S: job::RunBlocking + job::RunUnblocking` and no longer requires
+  `S: system::Sigmask + system::Sigaction`.
 - The `semantics::exit_or_raise` function now requires the trait bound
   `S: job::RunUnblocking + system::SendSignal + system::resource::SetRlimit + system::Exit`
   instead of
