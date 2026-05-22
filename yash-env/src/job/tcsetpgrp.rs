@@ -29,15 +29,15 @@ use crate::system::{
 ///
 /// This trait represents the capability required by [`tcsetpgrp_with_block`] to
 /// run a function with a signal blocked. It is automatically implemented for
-/// any type that implements [`Sigmask`]. Additionally, [`Concurrent`]
-/// implements this trait by delegating to the inner type while not implementing
-/// [`Sigmask`] itself, which allows `Concurrent` to maintain internal
-/// consistency about signal masks while still providing this capability.
+/// any type that implements [`Sigmask`].
 ///
 /// This trait defines a higher-level interface to temporarily modify the signal
 /// mask. Typical implementations of this trait will internally depend on
 /// [`Sigmask`] to perform the actual signal mask modification, but the trait
-/// itself does not require this as a supertrait.
+/// itself does not require this as a supertrait. Using this trait as the public
+/// capability leaves room for types such as [`Concurrent`] to stop exposing
+/// `Sigmask` directly in a future release while still providing the behavior
+/// required by callers.
 pub trait RunBlocking: Signals {
     /// Runs the given function with the specified signal blocked.
     ///
@@ -111,17 +111,15 @@ where
 /// This trait represents the capability required by [`tcsetpgrp_without_block`]
 /// to run a function with a signal unblocked and the default disposition. It is
 /// automatically implemented for any type that implements [`Sigmask`] and
-/// [`Sigaction`]. Additionally, [`Concurrent`] implements this trait by
-/// delegating to the inner type while not implementing [`Sigmask`] or
-/// [`Sigaction`] itself, which allows `Concurrent` to maintain internal
-/// consistency about signal masks and dispositions while still providing this
-/// capability.
+/// [`Sigaction`].
 ///
 /// This trait defines a higher-level interface to temporarily modify the signal
 /// mask and disposition. Typical implementations of this trait will internally
 /// depend on [`Sigmask`] and [`Sigaction`] to perform the actual signal mask
 /// and disposition modification, but the trait itself does not require them as
-/// supertraits.
+/// supertraits. Using this trait as the public capability leaves room for types
+/// such as [`Concurrent`] to stop exposing `Sigmask` directly in a future
+/// release while still providing the behavior required by callers.
 pub trait RunUnblocking: Signals {
     /// Runs the given function with the specified signal unblocked and the
     /// default disposition.

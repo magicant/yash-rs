@@ -245,14 +245,15 @@ where
 /// temporarily block SIGINT and SIGQUIT while starting a subshell. Any type
 /// that implements [`Sigmask`] automatically implements this trait.
 /// Additionally, [`Concurrent`] implements this trait by delegating to the
-/// inner system while not implementing `Sigmask` itself, which allows
-/// `Concurrent` to maintain internal invariants about signal masks while still
-/// providing this capability to its users.
+/// inner system.
 ///
 /// This trait defines a higher-level interface to temporarily modify the signal
 /// mask. Typically, implementors of this trait will internally depend on
 /// `Sigmask` to perform the actual signal mask modification, but the details
-/// are abstracted away.
+/// are abstracted away. In particular, using this trait as the public
+/// capability leaves room for types such as [`Concurrent`] to stop exposing
+/// `Sigmask` directly in a future release while still providing the behavior
+/// required by callers.
 ///
 /// [`Concurrent`]: crate::system::concurrency::Concurrent
 pub trait BlockSignals: Signals {
