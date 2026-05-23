@@ -1,6 +1,6 @@
 [package]
 name = "yash-cli"
-version = "3.0.8"
+version = "3.0.9+attest.0"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2024"
 rust-version = "1.87.0"
