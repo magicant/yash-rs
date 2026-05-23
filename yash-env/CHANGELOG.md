@@ -9,6 +9,8 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.15.0] - Unreleased
+
 ## [0.14.0] - 2026-05-23
 
 ### Added
@@ -1294,6 +1296,7 @@ This version has been yanked due to an issue that prevents the crate from buildi
 
 - Initial implementation of the `yash-env` crate
 
+[0.15.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.15.0
 [0.14.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.14.0
 [0.13.2]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.13.2
 [0.13.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.13.1
