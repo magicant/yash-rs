@@ -128,12 +128,22 @@ where
 {
     type SavedMask = S::SavedMask;
 
+    /// Blocks SIGINT and SIGQUIT, returning the previous signal mask.
+    ///
+    /// Between `block_sigint_sigquit` and
+    /// [`restore_sigmask`](Self::restore_sigmask), the disposition of any
+    /// signal must not be changed with the
+    /// [`set_disposition`](SignalSystem::set_disposition) method, or the
+    /// `restore_sigmask` method will leave the signal mask in an inconsistent
+    /// state. You must not call the [`select`](crate::system::Select::select)
+    /// method either, since it does not take the effect of
+    /// `block_sigint_sigquit` into account.
     async fn block_sigint_sigquit(&self) -> Result<Self::SavedMask, Errno> {
-        self.inner.block_sigint_sigquit().await
+        (self as &Concurrent<S>).block_sigint_sigquit().await
     }
 
     async fn restore_sigmask(&self, mask: Self::SavedMask) -> Result<(), Errno> {
-        self.inner.restore_sigmask(mask).await
+        (self as &Concurrent<S>).restore_sigmask(mask).await
     }
 }
 
@@ -153,11 +163,18 @@ impl<S> RunBlocking for Rc<Concurrent<S>>
 where
     S: Sigmask + RunBlocking,
 {
+    /// Runs the given function with the specified signal blocked.
+    ///
+    /// The disposition of any signal must not be changed with inside the
+    /// function, or the signal mask will be left in an inconsistent state after
+    /// the function returns. The function must not call the
+    /// [`select`](crate::system::Select::select) method either, since it does
+    /// not take the effect of `run_blocking` into account.
     async fn run_blocking<F, T>(&self, signal: Number, f: F) -> Result<T, Errno>
     where
         F: AsyncFnOnce() -> Result<T, Errno>,
     {
-        self.inner.run_blocking(signal, f).await
+        (self as &Concurrent<S>).run_blocking(signal, f).await
     }
 }
 
@@ -177,11 +194,18 @@ impl<S> RunUnblocking for Rc<Concurrent<S>>
 where
     S: Sigmask + RunUnblocking,
 {
+    /// Runs the given function with the specified signal unblocked.
+    ///
+    /// The disposition of any signal must not be changed with inside the
+    /// function, or the signal mask will be left in an inconsistent state after
+    /// the function returns. The function must not call the
+    /// [`select`](crate::system::Select::select) method either, since it does
+    /// not take the effect of `run_unblocking` into account.
     async fn run_unblocking<F, T>(&self, signal: Number, f: F) -> Result<T, Errno>
     where
         F: AsyncFnOnce() -> Result<T, Errno>,
     {
-        self.inner.run_unblocking(signal, f).await
+        (self as &Concurrent<S>).run_unblocking(signal, f).await
     }
 }
 
