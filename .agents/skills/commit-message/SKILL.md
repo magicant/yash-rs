@@ -43,12 +43,15 @@ Produce:
    Do not start the subject with a marker prefix such as `fix:`, `feat:`, or `fix(scope):`. Unless the user explicitly requests that convention, write a plain sentence-style subject (for example, `Preserve redirection order in subshell execution`).
 
 6. Write the body if needed.
-   Explain the motivation, notable implementation detail, and observable impact in short paragraphs or flat bullets. Wrap every body line at 72 characters. Mention tests only when they add meaning.
+   Explain the motivation, notable implementation detail, and observable impact in short paragraphs or flat bullets. Mention tests only when they add meaning.
 
 7. Validate against the diff.
    Check that every claim is supported by the changes. Remove filler words, avoid generic verbs like "add", "fix", "update" or "improve", and make sure unrelated edits are not bundled into the description.
    If the provided diff is incomplete or irrelevant, inform the user and request clarification or a valid diff.
    Confirm the subject does not match marker patterns like `^[a-z]+(\([^\)]*\))?!?:`.
+
+8. Wrap the message.
+   Always use an external tool like `fmt -w 72` or `par w72` to wrap lines at 72 characters. If and only if no such tool is available, wrap lines manually at 72 characters.
 
 ## Decision Points
 
