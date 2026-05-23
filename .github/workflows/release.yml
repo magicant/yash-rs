@@ -38,11 +38,18 @@ jobs:
           - target: x86_64-apple-darwin
             os: macos-latest
     runs-on: ${{ matrix.os }}
+    permissions:
+      attestations: write
+      id-token: write
     steps:
       - uses: actions/checkout@v6
-      - name: Build and upload Rust binary to GitHub Release
+      - id: build
+        name: Build and upload Rust binary to GitHub Release
         uses: taiki-e/upload-rust-binary-action@v1
         with:
           bin: yash3
           target: ${{ matrix.target }}
           token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/attest@v4
+        with:
+          subject-path: ${{ github.workspace }}/${{ steps.build.outputs.archive }}.*
