@@ -47,14 +47,17 @@ use crate::common::report::report_error;
 use enumset::EnumSet;
 use enumset::EnumSetType;
 use yash_env::Env;
+use yash_env::job::RunBlocking;
+use yash_env::job::RunUnblocking;
 use yash_env::semantics::Field;
+use yash_env::subshell::BlockSignals;
 use yash_env::system::concurrency::{WaitForSignals, WriteAll};
 #[cfg(all(doc, unix))]
 use yash_env::system::real::RealSystem;
 use yash_env::system::resource::SetRlimit;
 use yash_env::system::{
     Close, Dup, Exec, Exit, Fork, Fstat, GetCwd, GetPid, IsExecutableFile, Isatty, Open,
-    SendSignal, SetPgid, ShellPath, Sigaction, Sigmask, Sysconf, TcSetPgrp, Wait,
+    SendSignal, SetPgid, ShellPath, Sysconf, TcSetPgrp, Wait,
 };
 use yash_env::trap::SignalSystem;
 
@@ -174,7 +177,8 @@ impl Command {
     /// Executes the `command` built-in with the specified environment.
     pub async fn execute<S>(self, env: &mut Env<S>) -> crate::Result
     where
-        S: Close
+        S: BlockSignals
+            + Close
             + Dup
             + Exec
             + Exit
@@ -185,12 +189,12 @@ impl Command {
             + IsExecutableFile
             + Isatty
             + Open
+            + RunBlocking
+            + RunUnblocking
             + SendSignal
             + SetPgid
             + SetRlimit
             + ShellPath
-            + Sigaction
-            + Sigmask
             + SignalSystem
             + Sysconf
             + TcSetPgrp
@@ -216,7 +220,8 @@ pub mod syntax;
 /// This function parses the arguments into [`Command`] and executes it.
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
-    S: Close
+    S: BlockSignals
+        + Close
         + Dup
         + Exec
         + Exit
@@ -227,12 +232,12 @@ where
         + IsExecutableFile
         + Isatty
         + Open
+        + RunBlocking
+        + RunUnblocking
         + SendSignal
         + SetPgid
         + SetRlimit
         + ShellPath
-        + Sigaction
-        + Sigmask
         + SignalSystem
         + Sysconf
         + TcSetPgrp

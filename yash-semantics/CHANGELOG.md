@@ -15,15 +15,19 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - The `Runtime` trait now requires the `yash_env::system::concurrency::ReadAll`,
   `yash_env::system::concurrency::Select`,
+  `yash_env::job::RunBlocking`,
+  `yash_env::job::RunUnblocking`,
+  `yash_env::subshell::BlockSignals`,
   `yash_env::system::concurrency::WaitForSignals`,
   `yash_env::system::concurrency::WriteAll`, and
   `yash_env::trap::SignalSystem`
   traits as supertraits, and no longer requires the
   `yash_env::system::CaughtSignals`, `yash_env::system::Select`, and
-  `yash_env::system::Write` traits. The blanket implementation of `Runtime` has
-  been adjusted accordingly.
+  `yash_env::system::Write`, `yash_env::system::Sigaction`, and
+  `yash_env::system::Sigmask` traits. The blanket implementation of `Runtime`
+  has been adjusted accordingly.
 - The type parameter bound
-  `S: yash_env::system::concurrency::WaitForSignals + yash_env::system::concurrency::WriteAll + yash_env::trap::SignalSystem`
+  `S: yash_env::subshell::BlockSignals + yash_env::job::RunBlocking + yash_env::job::RunUnblocking + yash_env::system::concurrency::WaitForSignals + yash_env::system::concurrency::WriteAll + yash_env::trap::SignalSystem`
   has been added to `command::simple_command::start_external_utility_in_subshell_and_wait`.
 - The implementation of the `Handle` trait for `yash_syntax::parser::Error`,
   `expansion::Error`, and `redir::Error` now requires the trait bounds

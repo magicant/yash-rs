@@ -29,17 +29,20 @@ use std::ops::ControlFlow::Continue;
 use yash_env::Env;
 use yash_env::io::print_error;
 use yash_env::io::print_report;
+use yash_env::job::RunBlocking;
+use yash_env::job::RunUnblocking;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::semantics::command::ReplaceCurrentProcessError;
 use yash_env::semantics::command::run_external_utility_in_subshell;
+use yash_env::subshell::BlockSignals;
 use yash_env::system::concurrency::WaitForSignals;
 use yash_env::system::concurrency::WriteAll;
 use yash_env::system::resource::SetRlimit;
 use yash_env::system::{
-    Close, Dup, Exec, Exit, Fork, GetPid, Isatty, Open, SendSignal, SetPgid, ShellPath, Sigaction,
-    Sigmask, TcSetPgrp, Wait,
+    Close, Dup, Exec, Exit, Fork, GetPid, Isatty, Open, SendSignal, SetPgid, ShellPath, TcSetPgrp,
+    Wait,
 };
 use yash_env::trap::SignalSystem;
 use yash_env::variable::Context;
@@ -107,7 +110,8 @@ pub async fn start_external_utility_in_subshell_and_wait<S>(
     fields: Vec<Field>,
 ) -> Result<ExitStatus>
 where
-    S: Close
+    S: BlockSignals
+        + Close
         + Dup
         + Exec
         + Exit
@@ -115,12 +119,12 @@ where
         + GetPid
         + Isatty
         + Open
+        + RunBlocking
+        + RunUnblocking
         + SendSignal
         + SetPgid
         + SetRlimit
         + ShellPath
-        + Sigaction
-        + Sigmask
         + SignalSystem
         + TcSetPgrp
         + Wait

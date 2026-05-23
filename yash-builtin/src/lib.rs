@@ -96,14 +96,16 @@ use yash_env::Env;
 use yash_env::builtin::Type::{Elective, Mandatory, Special, Substitutive};
 #[doc(no_inline)]
 pub use yash_env::builtin::*;
+use yash_env::job::{RunBlocking, RunUnblocking};
 #[cfg(doc)]
 use yash_env::stack::{Frame, Stack};
+use yash_env::subshell::BlockSignals;
 use yash_env::system::concurrency::{WaitForSignals, WriteAll};
 use yash_env::system::resource::{GetRlimit, SetRlimit};
 use yash_env::system::{
     Chdir, Clock, Close, Dup, Exec, Exit, Fcntl, Fork, Fstat, GetCwd, GetPid, GetPw, GetUid,
-    IsExecutableFile, Isatty, Open, Pipe, Read, Seek, SendSignal, SetPgid, ShellPath, Sigaction,
-    Sigmask, Sysconf, TcGetPgrp, TcSetPgrp, Times, Umask, Wait, Write,
+    IsExecutableFile, Isatty, Open, Pipe, Read, Seek, SendSignal, SetPgid, ShellPath, Sysconf,
+    TcGetPgrp, TcSetPgrp, Times, Umask, Wait, Write,
 };
 use yash_env::trap::SignalSystem;
 
@@ -116,7 +118,8 @@ pub fn iter<S>() -> impl Iterator<Item = (&'static str, Builtin<S>)>
 where
     // Some of these traits are not used in any built-in, but we include them
     // here for future extensibility.
-    S: Chdir
+    S: BlockSignals
+        + Chdir
         + Clock
         + Clone
         + Close
@@ -136,13 +139,13 @@ where
         + Open
         + Pipe
         + Read
+        + RunBlocking
+        + RunUnblocking
         + Seek
         + SendSignal
         + SetPgid
         + SetRlimit
         + ShellPath
-        + Sigaction
-        + Sigmask
         + SignalSystem
         + Sysconf
         + TcGetPgrp
