@@ -11,12 +11,27 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.15.0] - Unreleased
 
+### Added
+
+- The following trait implementations have been added:
+    - `impl<S> job::RunBlocking for Concurrent<S>`
+    - `impl<S> job::RunBlocking for Rc<Concurrent<S>>`
+    - `impl<S> job::RunUnblocking for Concurrent<S>`
+    - `impl<S> job::RunUnblocking for Rc<Concurrent<S>>`
+    - `impl<S> subshell::BlockSignals for Concurrent<S>`
+    - `impl<S> subshell::BlockSignals for Rc<Concurrent<S>>`
+
 ### Removed
 
 - The following deprecated items have been removed:
     - `system::Fork::new_child_process`
     - `system::ChildProcessStarter`
     - `system::ChildProcessTask`
+- The `system::Sigmask`, `system::GetSigaction`, and `system::Sigaction` trait
+  are no longer implemented for `system::concurrency::Concurrent<S>`. The
+  functionality provided by these traits should now be accessed through the
+  higher-level traits `subshell::BlockSignals`, `job::RunBlocking`, and
+  `job::RunUnblocking`.
 
 ## [0.14.0] - 2026-05-23
 

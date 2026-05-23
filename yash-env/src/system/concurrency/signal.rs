@@ -17,7 +17,9 @@
 //! Implementation of `Concurrent` related to signals
 
 use super::Concurrent;
+use crate::job::{RunBlocking, RunUnblocking};
 use crate::signal::Number;
+use crate::subshell::BlockSignals;
 use crate::system::signal::Sigset as _;
 use crate::system::{Disposition, Errno, Sigaction, Sigmask, SigmaskOp};
 use crate::trap::SignalSystem;
@@ -102,6 +104,84 @@ where
             .select_mask
             .get_or_insert(old_mask)
             .remove(signal)
+    }
+}
+
+impl<S> BlockSignals for Concurrent<S>
+where
+    S: Sigmask + BlockSignals,
+{
+    type SavedMask = S::SavedMask;
+
+    async fn block_sigint_sigquit(&self) -> Result<Self::SavedMask, Errno> {
+        self.inner.block_sigint_sigquit().await
+    }
+
+    async fn restore_sigmask(&self, mask: Self::SavedMask) -> Result<(), Errno> {
+        self.inner.restore_sigmask(mask).await
+    }
+}
+
+impl<S> BlockSignals for Rc<Concurrent<S>>
+where
+    S: Sigmask + BlockSignals,
+{
+    type SavedMask = S::SavedMask;
+
+    async fn block_sigint_sigquit(&self) -> Result<Self::SavedMask, Errno> {
+        self.inner.block_sigint_sigquit().await
+    }
+
+    async fn restore_sigmask(&self, mask: Self::SavedMask) -> Result<(), Errno> {
+        self.inner.restore_sigmask(mask).await
+    }
+}
+
+impl<S> RunBlocking for Concurrent<S>
+where
+    S: Sigmask + RunBlocking,
+{
+    async fn run_blocking<F, T>(&self, signal: Number, f: F) -> Result<T, Errno>
+    where
+        F: AsyncFnOnce() -> Result<T, Errno>,
+    {
+        self.inner.run_blocking(signal, f).await
+    }
+}
+
+impl<S> RunBlocking for Rc<Concurrent<S>>
+where
+    S: Sigmask + RunBlocking,
+{
+    async fn run_blocking<F, T>(&self, signal: Number, f: F) -> Result<T, Errno>
+    where
+        F: AsyncFnOnce() -> Result<T, Errno>,
+    {
+        self.inner.run_blocking(signal, f).await
+    }
+}
+
+impl<S> RunUnblocking for Concurrent<S>
+where
+    S: Sigmask + RunUnblocking,
+{
+    async fn run_unblocking<F, T>(&self, signal: Number, f: F) -> Result<T, Errno>
+    where
+        F: AsyncFnOnce() -> Result<T, Errno>,
+    {
+        self.inner.run_unblocking(signal, f).await
+    }
+}
+
+impl<S> RunUnblocking for Rc<Concurrent<S>>
+where
+    S: Sigmask + RunUnblocking,
+{
+    async fn run_unblocking<F, T>(&self, signal: Number, f: F) -> Result<T, Errno>
+    where
+        F: AsyncFnOnce() -> Result<T, Errno>,
+    {
+        self.inner.run_unblocking(signal, f).await
     }
 }
 
