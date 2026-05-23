@@ -143,7 +143,7 @@ pub enum SyntaxError {
     /// The pattern is not a valid word token.
     InvalidPattern,
     /// The first pattern of a case item is `esac`.
-    #[deprecated = "this error no longer occurs"]
+    #[deprecated(since = "0.12.1", note = "this error no longer occurs")]
     EsacAsPattern,
     /// An `esac` or `;;` appears outside a case command.
     UnopenedCase,
