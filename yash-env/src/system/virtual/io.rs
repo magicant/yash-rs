@@ -35,7 +35,7 @@ use std::task::Waker;
 #[derive(Clone, Debug)]
 pub struct OpenFileDescription {
     /// File content and metadata
-    file: Rc<RefCell<Inode>>,
+    inode: Rc<RefCell<Inode>>,
     /// Position in bytes to perform next I/O operation at
     offset: usize,
     /// Whether this file is opened for reading
@@ -50,25 +50,25 @@ pub struct OpenFileDescription {
 
 impl Drop for OpenFileDescription {
     fn drop(&mut self) {
-        let mut file = self.file.borrow_mut();
-        file.body.close(self.is_readable, self.is_writable);
+        let mut inode = self.inode.borrow_mut();
+        inode.body.close(self.is_readable, self.is_writable);
     }
 }
 
 impl OpenFileDescription {
     /// Creates a new open file description.
     pub(crate) fn new(
-        file: Rc<RefCell<Inode>>,
+        inode: Rc<RefCell<Inode>>,
         offset: usize,
         is_readable: bool,
         is_writable: bool,
         is_appending: bool,
         is_nonblocking: bool,
     ) -> Self {
-        file.borrow_mut().body.open(is_readable, is_writable);
+        inode.borrow_mut().body.open(is_readable, is_writable);
 
         Self {
-            file,
+            inode,
             offset,
             is_readable,
             is_writable,
@@ -79,8 +79,8 @@ impl OpenFileDescription {
 
     /// Returns the i-node this open file description is operating on.
     #[must_use]
-    pub(crate) fn file(&self) -> &Rc<RefCell<Inode>> {
-        &self.file
+    pub fn inode(&self) -> &Rc<RefCell<Inode>> {
+        &self.inode
     }
 
     /// Returns true if you can read from this open file description.
@@ -114,7 +114,7 @@ impl OpenFileDescription {
     pub fn is_ready_for_reading(&self) -> bool {
         // If this file is not readable, it is considered ready for reading
         // because any read operation on it would immediately fail.
-        !self.is_readable || self.file.borrow().body.is_ready_for_reading()
+        !self.is_readable || self.inode.borrow().body.is_ready_for_reading()
     }
 
     /// Returns true if a write operation on this open file description would
@@ -123,7 +123,7 @@ impl OpenFileDescription {
     pub fn is_ready_for_writing(&self) -> bool {
         // If this file is not writable, it is considered ready for writing
         // because any write operation on it would immediately fail.
-        !self.is_writable || self.file.borrow().body.is_ready_for_writing()
+        !self.is_writable || self.inode.borrow().body.is_ready_for_writing()
     }
 
     /// Registers a waker to be woken up when this open file description becomes
@@ -133,7 +133,7 @@ impl OpenFileDescription {
     /// [ready for reading](Self::is_ready_for_reading) when calling this
     /// method, otherwise the waker may never be woken up.
     pub(super) fn register_reader_waker(&mut self, waker: Weak<Cell<Option<Waker>>>) {
-        self.file.borrow_mut().body.register_reader_waker(waker);
+        self.inode.borrow_mut().body.register_reader_waker(waker);
     }
 
     /// Registers a waker to be woken up when this open file description becomes
@@ -143,7 +143,7 @@ impl OpenFileDescription {
     /// [ready for writing](Self::is_ready_for_writing) when calling this
     /// method, otherwise the waker may never be woken up.
     pub(super) fn register_writer_waker(&mut self, waker: Weak<Cell<Option<Waker>>>) {
-        self.file.borrow_mut().body.register_writer_waker(waker);
+        self.inode.borrow_mut().body.register_writer_waker(waker);
     }
 
     /// Reads from this open file description.
@@ -193,7 +193,7 @@ impl OpenFileDescription {
             return Poll::Ready(Err(Errno::EBADF));
         }
 
-        let file = self.file.borrow_mut();
+        let file = self.inode.borrow_mut();
         let is_nonblocking = self.is_nonblocking;
         let maybe_get_waker = move || {
             if is_nonblocking {
@@ -256,7 +256,7 @@ impl OpenFileDescription {
             return Poll::Ready(Err(Errno::EBADF));
         }
 
-        let file = self.file.borrow_mut();
+        let file = self.inode.borrow_mut();
         let offset = if self.is_appending {
             file.body.size()
         } else {
@@ -319,7 +319,7 @@ impl OpenFileDescription {
         // blocking FIFO requires looping; everything else returns after the
         // first successful poll_write call.
         let loop_on_success =
-            !self.is_nonblocking && self.file.borrow().body.r#type() == FileType::Fifo;
+            !self.is_nonblocking && self.inode.borrow().body.r#type() == FileType::Fifo;
         loop {
             let remaining = &buffer[*bytes_written..];
             if remaining.is_empty() {
@@ -347,7 +347,7 @@ impl OpenFileDescription {
 
     /// Moves the file offset and returns the new offset.
     pub fn seek(&mut self, position: SeekFrom) -> Result<usize, Errno> {
-        let len = match &self.file.borrow().body {
+        let len = match &self.inode.borrow().body {
             FileBody::Regular { content, .. } => content.len(),
             FileBody::Directory { files, .. } => files.len(),
             FileBody::Fifo { .. } => return Err(Errno::ESPIPE),
@@ -369,12 +369,6 @@ impl OpenFileDescription {
         let new_offset = new_offset.ok_or(Errno::EINVAL)?;
         self.offset = new_offset;
         Ok(new_offset)
-    }
-
-    /// Returns the i-node this open file description is operating on.
-    #[must_use]
-    pub fn inode(&self) -> &Rc<RefCell<Inode>> {
-        &self.file
     }
 }
 
@@ -406,7 +400,7 @@ mod tests {
     #[test]
     fn regular_file_read_unreadable() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode::new([]))),
+            inode: Rc::new(RefCell::new(Inode::new([]))),
             offset: 0,
             is_readable: false,
             is_writable: false,
@@ -422,7 +416,7 @@ mod tests {
     #[test]
     fn regular_file_read_more_than_content() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode::new([1, 2, 3]))),
+            inode: Rc::new(RefCell::new(Inode::new([1, 2, 3]))),
             offset: 1,
             is_readable: true,
             is_writable: false,
@@ -487,7 +481,7 @@ mod tests {
     #[test]
     fn regular_file_write_unwritable() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode::new([]))),
+            inode: Rc::new(RefCell::new(Inode::new([]))),
             offset: 0,
             is_readable: false,
             is_writable: false,
@@ -502,7 +496,7 @@ mod tests {
     #[test]
     fn regular_file_write_more_than_content() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode::new([1, 2, 3]))),
+            inode: Rc::new(RefCell::new(Inode::new([1, 2, 3]))),
             offset: 1,
             is_readable: false,
             is_writable: true,
@@ -514,7 +508,7 @@ mod tests {
         assert_eq!(result, Ok(4));
         assert_eq!(open_file.offset, 5);
         assert_matches!(
-            &open_file.file.borrow().body,
+            &open_file.inode.borrow().body,
             FileBody::Regular { content, .. } => {
                 assert_eq!(content[..], [1, 9, 8, 7, 6]);
             }
@@ -524,7 +518,7 @@ mod tests {
     #[test]
     fn regular_file_write_appending() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode::new([1, 2, 3]))),
+            inode: Rc::new(RefCell::new(Inode::new([1, 2, 3]))),
             offset: 1,
             is_readable: false,
             is_writable: true,
@@ -536,7 +530,7 @@ mod tests {
         assert_eq!(result, Ok(2));
         assert_eq!(open_file.offset, 5);
         assert_matches!(
-            &open_file.file.borrow().body,
+            &open_file.inode.borrow().body,
             FileBody::Regular { content, .. } => {
                 assert_eq!(content[..], [1, 2, 3, 4, 5]);
             }
@@ -593,7 +587,7 @@ mod tests {
         // FileBody::Regular always writes the whole buffer in one call, the
         // helper must not branch on FIFO-specific logic.
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode::new([]))),
+            inode: Rc::new(RefCell::new(Inode::new([]))),
             offset: 0,
             is_readable: false,
             is_writable: true,
@@ -606,7 +600,7 @@ mod tests {
         assert_eq!(result, Poll::Ready(Ok(5)));
         assert_eq!(bytes_written, 5);
         assert_matches!(
-            &open_file.file.borrow().body,
+            &open_file.inode.borrow().body,
             FileBody::Regular { content, .. } => {
                 assert_eq!(content[..], [1, 2, 3, 4, 5]);
             }
@@ -677,7 +671,7 @@ mod tests {
     #[test]
     fn regular_file_seek_from_start() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode::new([]))),
+            inode: Rc::new(RefCell::new(Inode::new([]))),
             offset: 3,
             is_readable: true,
             is_writable: true,
@@ -701,7 +695,7 @@ mod tests {
     #[test]
     fn regular_file_seek_from_current() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode::new([]))),
+            inode: Rc::new(RefCell::new(Inode::new([]))),
             offset: 5,
             is_readable: true,
             is_writable: true,
@@ -729,7 +723,7 @@ mod tests {
     #[test]
     fn regular_file_seek_from_end() {
         let mut open_file = OpenFileDescription {
-            file: Rc::new(RefCell::new(Inode::new([1, 2, 3]))),
+            inode: Rc::new(RefCell::new(Inode::new([1, 2, 3]))),
             offset: 2,
             is_readable: true,
             is_writable: true,
@@ -768,7 +762,7 @@ mod tests {
             permissions: Mode::default(),
         }));
         let open_file = OpenFileDescription {
-            file: Rc::clone(&file),
+            inode: Rc::clone(&file),
             offset: 0,
             is_readable: true,
             is_writable: false,
@@ -797,7 +791,7 @@ mod tests {
             permissions: Mode::default(),
         }));
         let open_file = OpenFileDescription {
-            file: Rc::clone(&file),
+            inode: Rc::clone(&file),
             offset: 0,
             is_readable: false,
             is_writable: true,

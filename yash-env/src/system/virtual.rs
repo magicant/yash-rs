@@ -481,7 +481,7 @@ impl VirtualSystem {
         // If the file is a FIFO, block until the other end is opened.
         let waker: LazyCell<Rc<Cell<Option<Waker>>>> = LazyCell::default();
         poll_fn(|context| {
-            let mut file = open_file_description.file().borrow_mut();
+            let mut file = open_file_description.inode().borrow_mut();
             let FileBody::Fifo {
                 readers,
                 writers,
@@ -516,7 +516,7 @@ impl Fstat for VirtualSystem {
     type Stat = Stat;
 
     fn fstat(&self, fd: Fd) -> Result<Stat> {
-        self.with_open_file_description(fd, |ofd| Ok(ofd.file().borrow().stat()))
+        self.with_open_file_description(fd, |ofd| Ok(ofd.inode().borrow().stat()))
     }
 
     fn fstatat(&self, dir_fd: Fd, path: &CStr, follow_symlinks: bool) -> Result<Stat> {
@@ -1169,7 +1169,7 @@ impl Isatty for VirtualSystem {
     fn isatty(&self, fd: Fd) -> bool {
         self.with_open_file_description(fd, |ofd| {
             Ok(matches!(
-                &ofd.file().borrow().body,
+                &ofd.inode().borrow().body,
                 FileBody::Terminal { .. }
             ))
         })
