@@ -124,8 +124,6 @@ use super::Write;
 use super::resource::INFINITY;
 use super::resource::LimitPair;
 use super::resource::Resource;
-#[cfg(doc)]
-use crate::System;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessState;

@@ -34,7 +34,7 @@ pub type RawErrno = i32;
 /// advantage of using this type is that it is more type-safe than using the
 /// raw error value directly. Compared to [`std::io::Error`], this type is
 /// more lightweight and implements the `Copy` trait, so it is more suitable
-/// for use in low-level [system](super::System) functions.
+/// for use in low-level system functions.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[repr(transparent)]
 pub struct Errno(pub RawErrno);

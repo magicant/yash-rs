@@ -27,6 +27,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `system::Fork::new_child_process`
     - `system::ChildProcessStarter`
     - `system::ChildProcessTask`
+    - `system::System` (`System`)
+    - `system::SystemEx`
 - The `system::Sigmask`, `system::GetSigaction`, and `system::Sigaction` trait
   are no longer implemented for `system::concurrency::Concurrent<S>`. The
   functionality provided by these traits should now be accessed through the

@@ -75,8 +75,6 @@ use self::system::OfdAccess;
 use self::system::Open;
 use self::system::OpenFlag;
 use self::system::SignalList;
-#[allow(deprecated, reason = "for backward compatible API")]
-pub use self::system::System;
 use self::system::TcSetPgrp;
 use self::system::Wait;
 use self::system::concurrency::Select;
