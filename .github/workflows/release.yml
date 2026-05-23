@@ -40,6 +40,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       attestations: write
+      contents: write
       id-token: write
     steps:
       - uses: actions/checkout@v6
