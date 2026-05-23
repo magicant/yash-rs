@@ -159,7 +159,7 @@ mod tests {
                 .await
                 .unwrap()
                 .0;
-            let index = env.jobs.add(Job::new(pid));
+            let index = env.jobs.insert(Job::new(pid));
 
             // The job is finished, so the function returns immediately.
             let result = wait_for_any_job_or_trap(&mut env).await;
@@ -183,7 +183,7 @@ mod tests {
                 .await
                 .unwrap()
                 .0;
-            let index = env.jobs.add(Job::new(pid));
+            let index = env.jobs.insert(Job::new(pid));
             // Suspend the child process.
             env.system.kill(pid, Some(SIGSTOP)).await.unwrap();
 

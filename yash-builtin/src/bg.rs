@@ -228,8 +228,8 @@ mod tests {
         let mut orphan = Job::new(orphan_id);
         job.job_controlled = true;
         orphan.job_controlled = true;
-        let index = env.jobs.add(job);
-        let _ = env.jobs.add(orphan);
+        let index = env.jobs.insert(job);
+        let _ = env.jobs.insert(orphan);
         let mut leader = Process::with_parent_and_group(system.process_id, pgid);
         let mut child = Process::fork_from(pgid, &leader);
         let mut orphan = Process::with_parent_and_group(system.process_id, orphan_id);
@@ -267,7 +267,7 @@ mod tests {
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.name = "echo my job".into();
-        let index = env.jobs.add(job);
+        let index = env.jobs.insert(job);
 
         _ = resume_job_by_index(&mut env, index).now_or_never().unwrap();
 
@@ -284,7 +284,7 @@ mod tests {
         let pid = Pid(123);
         let mut job = Job::new(pid);
         job.job_controlled = true;
-        let index = env.jobs.add(job);
+        let index = env.jobs.insert(job);
         let mut process = Process::with_parent_and_group(system.process_id, pid);
         _ = process.set_state(ProcessState::stopped(SIGSTOP));
         {
@@ -307,8 +307,8 @@ mod tests {
         let mut orphan = Job::new(orphan_id);
         job.job_controlled = true;
         orphan.job_controlled = true;
-        let index = env.jobs.add(job);
-        let orphan_index = env.jobs.add(orphan);
+        let index = env.jobs.insert(job);
+        let orphan_index = env.jobs.insert(orphan);
         env.jobs.set_current_job(orphan_index).unwrap();
         let mut leader = Process::with_parent_and_group(system.process_id, pgid);
         let mut orphan = Process::with_parent_and_group(system.process_id, orphan_id);
@@ -336,7 +336,7 @@ mod tests {
         let mut job = Job::new(pid);
         job.job_controlled = true;
         job.state = ProcessState::exited(ExitStatus::SUCCESS);
-        let index = env.jobs.add(job);
+        let index = env.jobs.insert(job);
         // This process (irrelevant to the job) happens to have the same PID as the job.
         let mut process = Process::with_parent_and_group(system.process_id, pid);
         _ = process.set_state(ProcessState::stopped(SIGSTOP));
@@ -365,7 +365,7 @@ mod tests {
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.state = ProcessState::exited(ExitStatus::SUCCESS);
-        let index = env.jobs.add(job);
+        let index = env.jobs.insert(job);
 
         _ = resume_job_by_index(&mut env, index).now_or_never().unwrap();
 
@@ -378,7 +378,7 @@ mod tests {
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.is_owned = false;
-        let index = env.jobs.add(job);
+        let index = env.jobs.insert(job);
 
         let result = resume_job_by_index(&mut env, index).now_or_never().unwrap();
         assert_eq!(result, Err(ResumeError::Unowned));
@@ -387,7 +387,7 @@ mod tests {
     #[test]
     fn resume_job_by_index_rejects_unmonitored_job() {
         let mut env = Env::new_virtual();
-        let index = env.jobs.add(Job::new(Pid(123)));
+        let index = env.jobs.insert(Job::new(Pid(123)));
 
         let result = resume_job_by_index(&mut env, index).now_or_never().unwrap();
         assert_eq!(result, Err(ResumeError::Unmonitored));
@@ -404,8 +404,8 @@ mod tests {
         let mut orphan = Job::new(orphan_id);
         job.job_controlled = true;
         orphan.job_controlled = true;
-        let _ = env.jobs.add(orphan);
-        let index = env.jobs.add(job);
+        let _ = env.jobs.insert(orphan);
+        let index = env.jobs.insert(job);
         env.jobs.set_current_job(index).unwrap();
         let mut leader = Process::with_parent_and_group(system.process_id, pgid);
         let mut orphan = Process::with_parent_and_group(system.process_id, orphan_id);
@@ -460,9 +460,9 @@ mod tests {
         job1.job_controlled = true;
         job2.job_controlled = true;
         job3.job_controlled = true;
-        let _ = env.jobs.add(job1);
-        let _ = env.jobs.add(job2);
-        let _ = env.jobs.add(job3);
+        let _ = env.jobs.insert(job1);
+        let _ = env.jobs.insert(job2);
+        let _ = env.jobs.insert(job3);
         let mut process1 = Process::with_parent_and_group(system.process_id, pgid1);
         let mut process2 = Process::with_parent_and_group(system.process_id, pgid2);
         let mut process3 = Process::with_parent_and_group(system.process_id, pgid3);
@@ -505,7 +505,7 @@ mod tests {
         let pgid = Pid(100);
         let mut job = Job::new(pgid);
         job.job_controlled = true;
-        let index = env.jobs.add(job);
+        let index = env.jobs.insert(job);
         env.jobs.set_current_job(index).unwrap();
         let mut leader = Process::with_parent_and_group(system.process_id, pgid);
         _ = leader.set_state(ProcessState::stopped(SIGSTOP));

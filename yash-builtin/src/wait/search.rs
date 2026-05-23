@@ -83,8 +83,8 @@ mod tests {
     #[test]
     fn process_id_unique_match() {
         let mut jobs = JobList::new();
-        let job1 = jobs.add(Job::new(Pid(123)));
-        let job2 = jobs.add(Job::new(Pid(456)));
+        let job1 = jobs.insert(Job::new(Pid(123)));
+        let job2 = jobs.insert(Job::new(Pid(456)));
 
         let result1 = resolve(&jobs, JobSpec::ProcessId(Pid(123)));
         assert_eq!(result1, Ok(Some(job1)));
@@ -95,8 +95,8 @@ mod tests {
     #[test]
     fn job_id_unique_match() {
         let mut jobs = JobList::new();
-        let job1 = jobs.add(Job::new(Pid(123)));
-        let job2 = jobs.add(Job::new(Pid(456)));
+        let job1 = jobs.insert(Job::new(Pid(123)));
+        let job2 = jobs.insert(Job::new(Pid(456)));
 
         let result1 = resolve(&jobs, JobSpec::JobId(Field::dummy("%1")));
         assert_eq!(result1, Ok(Some(job1)));
@@ -129,10 +129,10 @@ mod tests {
         let mut jobs = JobList::new();
         let mut job1 = Job::new(Pid(123));
         job1.name = "sleep 1".into();
-        jobs.add(job1);
+        jobs.insert(job1);
         let mut job2 = Job::new(Pid(456));
         job2.name = "sleep 2".into();
-        jobs.add(job2);
+        jobs.insert(job2);
 
         let result = resolve(&jobs, JobSpec::JobId(Field::dummy("%sleep")));
         assert_eq!(result, Err(AmbiguousJobId(Field::dummy("%sleep"))));

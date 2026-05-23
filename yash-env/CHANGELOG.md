@@ -20,6 +20,12 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `impl<S> job::RunUnblocking for Rc<Concurrent<S>>`
     - `impl<S> subshell::BlockSignals for Concurrent<S>`
     - `impl<S> subshell::BlockSignals for Rc<Concurrent<S>>`
+- The `JobList::insert` method has been added as a new name for the existing
+  `add` method.
+
+### Deprecated
+
+- The `JobList::add` method has been deprecated in favor of `JobList::insert`.
 
 ### Removed
 

@@ -169,7 +169,7 @@ mod tests {
         let mut job = Job::new(pid);
         job.job_controlled = true;
         job.state = subshell_result.into();
-        env.jobs.add(job);
+        env.jobs.insert(job);
     }
 
     #[test]

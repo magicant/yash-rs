@@ -123,7 +123,7 @@ mod tests {
         let system = VirtualSystem::new();
         let state = system.state.clone();
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
-        env.jobs.add({
+        env.jobs.insert({
             let mut job = Job::new(Pid(10));
             job.state_changed = true;
             job.name = "echo hello".to_string();
@@ -159,19 +159,19 @@ mod tests {
         let system = VirtualSystem::new();
         let state = system.state.clone();
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
-        env.jobs.add({
+        env.jobs.insert({
             let mut job = Job::new(Pid(10));
             job.state_changed = true;
             job.name = "echo hello".to_string();
             job
         });
-        env.jobs.add({
+        env.jobs.insert({
             let mut job = Job::new(Pid(20));
             job.state_changed = false;
             job.name = "sleep 1".to_string();
             job
         });
-        env.jobs.add({
+        env.jobs.insert({
             let mut job = Job::new(Pid(30));
             job.state = ProcessState::exited(0);
             job.state_changed = true;
@@ -206,7 +206,7 @@ mod tests {
     #[test]
     fn reporter_clears_state_changed_flag() {
         let mut env = Env::new_virtual();
-        let index = env.jobs.add({
+        let index = env.jobs.insert({
             let mut job = Job::new(Pid(10));
             job.state_changed = true;
             job.name = "echo hello".to_string();
@@ -231,7 +231,7 @@ mod tests {
         let system = VirtualSystem::new();
         let state = system.state.clone();
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
-        env.jobs.add({
+        env.jobs.insert({
             let mut job = Job::new(Pid(10));
             job.state_changed = true;
             job.name = "echo hello".to_string();
@@ -255,7 +255,7 @@ mod tests {
         let system = VirtualSystem::new();
         let state = system.state.clone();
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
-        env.jobs.add({
+        env.jobs.insert({
             let mut job = Job::new(Pid(10));
             job.state_changed = true;
             job.name = "echo hello".to_string();

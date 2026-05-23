@@ -929,7 +929,7 @@ mod tests {
                 .unwrap();
             let mut job = Job::new(pid);
             job.name = "my job".to_string();
-            let job_index = env.jobs.add(job.clone());
+            let job_index = env.jobs.insert(job.clone());
             let result = env.wait_for_subshell(pid).await;
             assert_eq!(result, Ok((pid, ProcessState::exited(42))));
             job.state = ProcessState::exited(42);
@@ -997,9 +997,9 @@ mod tests {
                 .unwrap();
 
             // Create jobs.
-            let job_1 = env.jobs.add(Job::new(pid_1));
-            let job_2 = env.jobs.add(Job::new(pid_2));
-            let job_3 = env.jobs.add(Job::new(pid_3));
+            let job_1 = env.jobs.insert(Job::new(pid_1));
+            let job_2 = env.jobs.insert(Job::new(pid_2));
+            let job_3 = env.jobs.insert(Job::new(pid_3));
             [job_1, job_2, job_3]
         });
 

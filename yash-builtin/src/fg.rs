@@ -248,7 +248,7 @@ mod tests {
             let mut job = Job::new(pid);
             job.job_controlled = true;
             job.state = subshell_result.into();
-            let index = env.jobs.add(job);
+            let index = env.jobs.insert(job);
 
             resume_job_by_index(&mut env, index).await.unwrap();
 
@@ -273,7 +273,7 @@ mod tests {
             let mut job = Job::new(pid);
             job.job_controlled = true;
             job.state = subshell_result.into();
-            let index = env.jobs.add(job);
+            let index = env.jobs.insert(job);
 
             resume_job_by_index(&mut env, index).await.unwrap();
 
@@ -294,7 +294,7 @@ mod tests {
             job.job_controlled = true;
             job.state = subshell_result.into();
             "my job name".clone_into(&mut job.name);
-            let index = env.jobs.add(job);
+            let index = env.jobs.insert(job);
 
             resume_job_by_index(&mut env, index).await.unwrap();
 
@@ -317,7 +317,7 @@ mod tests {
             let mut job = Job::new(pid);
             job.job_controlled = true;
             job.state = subshell_result.into();
-            let index = env.jobs.add(job);
+            let index = env.jobs.insert(job);
 
             let result = resume_job_by_index(&mut env, index).await.unwrap();
 
@@ -345,7 +345,7 @@ mod tests {
             let mut job = Job::new(pid);
             job.job_controlled = true;
             job.state = subshell_result.into();
-            let index = env.jobs.add(job);
+            let index = env.jobs.insert(job);
 
             let result = resume_job_by_index(&mut env, index).await.unwrap();
 
@@ -370,7 +370,7 @@ mod tests {
             let mut job = Job::new(pid);
             job.job_controlled = true;
             job.state = subshell_result.into();
-            let index = env.jobs.add(job);
+            let index = env.jobs.insert(job);
 
             _ = resume_job_by_index(&mut env, index).await.unwrap();
 
@@ -388,7 +388,7 @@ mod tests {
         let mut job = Job::new(pid);
         job.job_controlled = true;
         job.state = ProcessState::exited(12);
-        let index = env.jobs.add(job);
+        let index = env.jobs.insert(job);
         // This process (irrelevant to the job) happens to have the same PID as the job.
         let mut process = Process::with_parent_and_group(system.process_id, pid);
         _ = process.set_state(ProcessState::stopped(SIGSTOP));
@@ -418,7 +418,7 @@ mod tests {
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.is_owned = false;
-        let index = env.jobs.add(job);
+        let index = env.jobs.insert(job);
 
         let result = resume_job_by_index(&mut env, index).now_or_never().unwrap();
         assert_eq!(result, Err(ResumeError::Unowned));
@@ -428,7 +428,7 @@ mod tests {
     fn resume_job_by_index_rejects_unmonitored_job() {
         let mut env = Env::new_virtual();
         env.options.set(Monitor, On);
-        let index = env.jobs.add(Job::new(Pid(123)));
+        let index = env.jobs.insert(Job::new(Pid(123)));
 
         let result = resume_job_by_index(&mut env, index).now_or_never().unwrap();
         assert_eq!(result, Err(ResumeError::Unmonitored));
@@ -451,7 +451,7 @@ mod tests {
             let mut job = Job::new(pid1);
             job.job_controlled = true;
             job.state = subshell_result_1.into();
-            env.jobs.add(job);
+            env.jobs.insert(job);
             // current job
             let (pid2, subshell_result_2) = Config::foreground()
                 .start_and_wait(&mut env, async |env, _| suspend(env).await)
@@ -461,7 +461,7 @@ mod tests {
             let mut job = Job::new(pid2);
             job.job_controlled = true;
             job.state = subshell_result_2.into();
-            let index2 = env.jobs.add(job);
+            let index2 = env.jobs.insert(job);
             env.jobs.set_current_job(index2).unwrap();
 
             let result = main(&mut env, vec![]).await;
@@ -503,7 +503,7 @@ mod tests {
             job.job_controlled = true;
             job.state = subshell_result_1.into();
             job.name = "previous job".to_string();
-            let index1 = env.jobs.add(job);
+            let index1 = env.jobs.insert(job);
             // current job
             let (pid2, subshell_result_2) = Config::foreground()
                 .start_and_wait(&mut env, async |env, _| {
@@ -516,7 +516,7 @@ mod tests {
             let mut job = Job::new(pid2);
             job.job_controlled = true;
             job.state = subshell_result_2.into();
-            let index2 = env.jobs.add(job);
+            let index2 = env.jobs.insert(job);
             env.jobs.set_current_job(index2).unwrap();
 
             let result = main(&mut env, Field::dummies(["%prev"])).await;
@@ -538,7 +538,7 @@ mod tests {
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.name = "foo".to_string();
-        env.jobs.add(job);
+        env.jobs.insert(job);
 
         let result = main(&mut env, Field::dummies(["%bar"]))
             .now_or_never()
@@ -567,7 +567,7 @@ mod tests {
             let mut job = Job::new(pid);
             job.job_controlled = true;
             job.state = subshell_result.into();
-            let index = env.jobs.add(job);
+            let index = env.jobs.insert(job);
             env.jobs.set_current_job(index).unwrap();
 
             let result = main(&mut env, vec![]).await;
@@ -593,7 +593,7 @@ mod tests {
             let mut job = Job::new(pid);
             job.job_controlled = true;
             job.state = subshell_result.into();
-            let index = env.jobs.add(job);
+            let index = env.jobs.insert(job);
             env.jobs.set_current_job(index).unwrap();
 
             let result = main(&mut env, vec![]).await;

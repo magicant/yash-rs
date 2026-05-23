@@ -373,7 +373,7 @@ mod tests {
     #[test]
     fn jobs_disowned_in_subshell() {
         in_virtual_system(|mut env, _state| async move {
-            let index = env.jobs.add(Job::new(Pid(123)));
+            let index = env.jobs.insert(Job::new(Pid(123)));
             let pid = Config::new()
                 .start(
                     &mut env,

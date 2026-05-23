@@ -218,7 +218,7 @@ mod tests {
         job.is_owned = true;
         job.state = ProcessState::Running;
         job.name = "my job".into();
-        jobs.add(job);
+        jobs.insert(job);
 
         let result = resolve_target(&jobs, "%my");
         assert_eq!(result, Ok(Pid(-123)));
@@ -239,7 +239,7 @@ mod tests {
         job.is_owned = false;
         job.state = ProcessState::Running;
         job.name = "my job".into();
-        jobs.add(job);
+        jobs.insert(job);
 
         let result = resolve_target(&jobs, "%my");
         assert_eq!(result, Err(Error::Unowned));
@@ -253,7 +253,7 @@ mod tests {
         job.is_owned = true;
         job.state = ProcessState::Running;
         job.name = "my job".into();
-        jobs.add(job);
+        jobs.insert(job);
 
         let result = resolve_target(&jobs, "%my");
         assert_eq!(result, Err(Error::Unmonitored));
@@ -267,7 +267,7 @@ mod tests {
         job.is_owned = true;
         job.state = ProcessState::exited(0);
         job.name = "my job".into();
-        jobs.add(job);
+        jobs.insert(job);
 
         let result = resolve_target(&jobs, "%my");
         assert_eq!(result, Err(Error::Finished));

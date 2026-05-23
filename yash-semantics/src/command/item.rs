@@ -87,7 +87,7 @@ async fn execute_async<S: Runtime + 'static>(
                 debug_assert_eq!(job_control, JobControl::Background);
                 job.job_controlled = true;
             }
-            let job_index = env.jobs.add(job);
+            let job_index = env.jobs.insert(job);
             env.jobs.set_last_async_pid(pid);
 
             if env.is_interactive() {

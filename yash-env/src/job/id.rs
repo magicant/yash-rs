@@ -222,15 +222,15 @@ mod tests {
 
         let mut job = Job::new(Pid(10));
         job.name = "first job".to_string();
-        list.add(job);
+        list.insert(job);
 
         let mut job = Job::new(Pid(11));
         job.name = "job 2".to_string();
-        list.add(job);
+        list.insert(job);
 
         let mut job = Job::new(Pid(12));
         job.name = "last one".to_string();
-        list.add(job);
+        list.insert(job);
 
         list
     }
@@ -328,7 +328,7 @@ mod tests {
 
         let mut job = Job::new(Pid(20));
         job.name = "job 3".to_string();
-        list.add(job);
+        list.insert(job);
 
         let job_id = JobId::NamePrefix("job");
         assert_eq!(job_id.find(&list), Err(FindError::Ambiguous));

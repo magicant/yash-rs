@@ -602,7 +602,7 @@ where
 impl<F> FusedIterator for ExtractIf<'_, F> where F: FnMut(usize, JobRefMut) -> bool {}
 
 impl JobList {
-    /// Adds a job to this job list.
+    /// Inserts a job to this job list.
     ///
     /// This function returns a unique index assigned to the job.
     ///
@@ -613,7 +613,7 @@ impl JobList {
     /// not, the new job becomes the current job. If the new job and the current
     /// job are suspended but the [previous job](Self::previous_job) is not, the
     /// new job becomes the previous job.
-    pub fn add(&mut self, job: Job) -> usize {
+    pub fn insert(&mut self, job: Job) -> usize {
         let new_job_is_suspended = job.is_suspended();
         let ex_current_job_is_suspended =
             self.current_job().map(|index| self[index].is_suspended());
@@ -648,6 +648,15 @@ impl JobList {
         }
 
         index
+    }
+
+    /// Adds a job to this job list.
+    ///
+    /// This function is an alias for [`insert`](Self::insert).
+    #[deprecated(since = "0.15.0", note = "use `insert` instead")]
+    #[inline(always)]
+    pub fn add(&mut self, job: Job) -> usize {
+        self.insert(job)
     }
 
     /// Removes a job from this job list.
@@ -956,7 +965,7 @@ where
         job.job_controlled = true;
         job.state = result.into();
         job.name = name();
-        env.jobs.add(job);
+        env.jobs.insert(job);
 
         if env.is_interactive() {
             return Break(Divert::Interrupt(Some(exit_status)));
@@ -986,9 +995,9 @@ mod tests {
         let mut list = JobList::default();
         assert_eq!(list.find_by_pid(Pid(10)), None);
 
-        let i10 = list.add(Job::new(Pid(10)));
-        let i20 = list.add(Job::new(Pid(20)));
-        let i30 = list.add(Job::new(Pid(30)));
+        let i10 = list.insert(Job::new(Pid(10)));
+        let i20 = list.insert(Job::new(Pid(20)));
+        let i30 = list.insert(Job::new(Pid(30)));
         assert_eq!(list.find_by_pid(Pid(10)), Some(i10));
         assert_eq!(list.find_by_pid(Pid(20)), Some(i20));
         assert_eq!(list.find_by_pid(Pid(30)), Some(i30));
@@ -1003,24 +1012,24 @@ mod tests {
         // This test case depends on how Slab reuses the index of removed items.
         let mut list = JobList::default();
 
-        assert_eq!(list.add(Job::new(Pid(10))), 0);
-        assert_eq!(list.add(Job::new(Pid(11))), 1);
-        assert_eq!(list.add(Job::new(Pid(12))), 2);
+        assert_eq!(list.insert(Job::new(Pid(10))), 0);
+        assert_eq!(list.insert(Job::new(Pid(11))), 1);
+        assert_eq!(list.insert(Job::new(Pid(12))), 2);
 
         assert_eq!(list.remove(0).unwrap().pid, Pid(10));
         assert_eq!(list.remove(1).unwrap().pid, Pid(11));
 
         // Indices are reused in the reverse order of removals.
-        assert_eq!(list.add(Job::new(Pid(13))), 1);
-        assert_eq!(list.add(Job::new(Pid(14))), 0);
+        assert_eq!(list.insert(Job::new(Pid(13))), 1);
+        assert_eq!(list.insert(Job::new(Pid(14))), 0);
 
         assert_eq!(list.remove(0).unwrap().pid, Pid(14));
         assert_eq!(list.remove(1).unwrap().pid, Pid(13));
         assert_eq!(list.remove(2).unwrap().pid, Pid(12));
 
         // Once the job list is empty, indices start from 0 again.
-        assert_eq!(list.add(Job::new(Pid(13))), 0);
-        assert_eq!(list.add(Job::new(Pid(14))), 1);
+        assert_eq!(list.insert(Job::new(Pid(13))), 0);
+        assert_eq!(list.insert(Job::new(Pid(14))), 1);
     }
 
     #[test]
@@ -1029,11 +1038,11 @@ mod tests {
 
         let mut job = Job::new(Pid(10));
         job.name = "first job".to_string();
-        let i_first = list.add(job);
+        let i_first = list.insert(job);
 
         let mut job = Job::new(Pid(10));
         job.name = "second job".to_string();
-        let i_second = list.add(job);
+        let i_second = list.insert(job);
 
         let job = &list[i_second];
         assert_eq!(job.pid, Pid(10));
@@ -1048,12 +1057,12 @@ mod tests {
     #[test]
     fn job_list_extract_if() {
         let mut list = JobList::default();
-        let i21 = list.add(Job::new(Pid(21)));
-        let i22 = list.add(Job::new(Pid(22)));
-        let i23 = list.add(Job::new(Pid(23)));
-        let i24 = list.add(Job::new(Pid(24)));
-        let i25 = list.add(Job::new(Pid(25)));
-        let i26 = list.add(Job::new(Pid(26)));
+        let i21 = list.insert(Job::new(Pid(21)));
+        let i22 = list.insert(Job::new(Pid(22)));
+        let i23 = list.insert(Job::new(Pid(23)));
+        let i24 = list.insert(Job::new(Pid(24)));
+        let i25 = list.insert(Job::new(Pid(25)));
+        let i26 = list.insert(Job::new(Pid(26)));
         list.remove(i23).unwrap();
 
         let mut i = list.extract_if(|index, mut job| {
@@ -1088,9 +1097,9 @@ mod tests {
         let state = ProcessState::exited(15);
         assert_eq!(list.update_status(Pid(20), state), None);
 
-        let i10 = list.add(Job::new(Pid(10)));
-        let i20 = list.add(Job::new(Pid(20)));
-        let i30 = list.add(Job::new(Pid(30)));
+        let i10 = list.insert(Job::new(Pid(10)));
+        let i20 = list.insert(Job::new(Pid(20)));
+        let i30 = list.insert(Job::new(Pid(30)));
         assert_eq!(list[i20].state, ProcessState::Running);
 
         list.get_mut(i20).unwrap().state_reported();
@@ -1115,7 +1124,7 @@ mod tests {
         let mut job = Job::new(pid);
         job.expected_state = Some(ProcessState::Running);
         job.state_changed = false;
-        let i20 = list.add(job);
+        let i20 = list.insert(job);
 
         assert_eq!(list.update_status(pid, ProcessState::Running), Some(i20));
 
@@ -1136,7 +1145,7 @@ mod tests {
         let mut job = Job::new(pid);
         job.expected_state = Some(ProcessState::Running);
         job.state_changed = false;
-        let i20 = list.add(job);
+        let i20 = list.insert(job);
 
         let result = list.update_status(pid, ProcessState::exited(0));
         assert_eq!(result, Some(i20));
@@ -1154,9 +1163,9 @@ mod tests {
     )]
     fn disowning_jobs() {
         let mut list = JobList::default();
-        let i10 = list.add(Job::new(Pid(10)));
-        let i20 = list.add(Job::new(Pid(20)));
-        let i30 = list.add(Job::new(Pid(30)));
+        let i10 = list.insert(Job::new(Pid(10)));
+        let i20 = list.insert(Job::new(Pid(20)));
+        let i30 = list.insert(Job::new(Pid(30)));
 
         list.disown_all();
 
@@ -1175,7 +1184,7 @@ mod tests {
     #[test]
     fn current_and_previous_job_in_job_list_with_one_job() {
         let mut list = JobList::default();
-        let i10 = list.add(Job::new(Pid(10)));
+        let i10 = list.insert(Job::new(Pid(10)));
         assert_eq!(list.current_job(), Some(i10));
         assert_eq!(list.previous_job(), None);
     }
@@ -1188,15 +1197,15 @@ mod tests {
         let mut suspended = Job::new(Pid(10));
         suspended.state = ProcessState::stopped(SIGSTOP);
         let running = Job::new(Pid(20));
-        let i10 = list.add(suspended.clone());
-        let i20 = list.add(running.clone());
+        let i10 = list.insert(suspended.clone());
+        let i20 = list.insert(running.clone());
         assert_eq!(list.current_job(), Some(i10));
         assert_eq!(list.previous_job(), Some(i20));
 
         // The order of adding jobs does not matter in this case.
         list = JobList::default();
-        let i20 = list.add(running);
-        let i10 = list.add(suspended);
+        let i20 = list.insert(running);
+        let i10 = list.insert(suspended);
         assert_eq!(list.current_job(), Some(i10));
         assert_eq!(list.previous_job(), Some(i20));
     }
@@ -1206,15 +1215,15 @@ mod tests {
         let mut list = JobList::default();
         let running_1 = Job::new(Pid(11));
         let running_2 = Job::new(Pid(12));
-        list.add(running_1);
-        list.add(running_2);
+        list.insert(running_1);
+        list.insert(running_2);
         let ex_current_job_index = list.current_job().unwrap();
         let ex_previous_job_index = list.previous_job().unwrap();
         assert_ne!(ex_current_job_index, ex_previous_job_index);
 
         let mut suspended = Job::new(Pid(20));
         suspended.state = ProcessState::stopped(SIGSTOP);
-        let i20 = list.add(suspended);
+        let i20 = list.insert(suspended);
         let now_current_job_index = list.current_job().unwrap();
         let now_previous_job_index = list.previous_job().unwrap();
         assert_eq!(now_current_job_index, i20);
@@ -1226,11 +1235,11 @@ mod tests {
         let mut list = JobList::default();
 
         let running = Job::new(Pid(18));
-        let i18 = list.add(running);
+        let i18 = list.insert(running);
 
         let mut suspended_1 = Job::new(Pid(19));
         suspended_1.state = ProcessState::stopped(SIGSTOP);
-        let i19 = list.add(suspended_1);
+        let i19 = list.insert(suspended_1);
 
         let ex_current_job_index = list.current_job().unwrap();
         let ex_previous_job_index = list.previous_job().unwrap();
@@ -1239,7 +1248,7 @@ mod tests {
 
         let mut suspended_2 = Job::new(Pid(20));
         suspended_2.state = ProcessState::stopped(SIGSTOP);
-        let i20 = list.add(suspended_2);
+        let i20 = list.insert(suspended_2);
 
         let now_current_job_index = list.current_job().unwrap();
         let now_previous_job_index = list.previous_job().unwrap();
@@ -1252,7 +1261,7 @@ mod tests {
         let mut list = JobList::default();
 
         let running = Job::new(Pid(10));
-        let i10 = list.add(running);
+        let i10 = list.insert(running);
 
         let mut suspended_1 = Job::new(Pid(11));
         let mut suspended_2 = Job::new(Pid(12));
@@ -1260,9 +1269,9 @@ mod tests {
         suspended_1.state = ProcessState::stopped(SIGSTOP);
         suspended_2.state = ProcessState::stopped(SIGSTOP);
         suspended_3.state = ProcessState::stopped(SIGSTOP);
-        list.add(suspended_1);
-        list.add(suspended_2);
-        list.add(suspended_3);
+        list.insert(suspended_1);
+        list.insert(suspended_2);
+        list.insert(suspended_3);
 
         let current_job_index_1 = list.current_job().unwrap();
         let previous_job_index_1 = list.previous_job().unwrap();
@@ -1300,7 +1309,7 @@ mod tests {
         let mut list = JobList::default();
 
         let running = Job::new(Pid(10));
-        let i10 = list.add(running);
+        let i10 = list.insert(running);
 
         let mut suspended_1 = Job::new(Pid(11));
         let mut suspended_2 = Job::new(Pid(12));
@@ -1308,9 +1317,9 @@ mod tests {
         suspended_1.state = ProcessState::stopped(SIGSTOP);
         suspended_2.state = ProcessState::stopped(SIGSTOP);
         suspended_3.state = ProcessState::stopped(SIGSTOP);
-        list.add(suspended_1);
-        list.add(suspended_2);
-        list.add(suspended_3);
+        list.insert(suspended_1);
+        list.insert(suspended_2);
+        list.insert(suspended_3);
 
         let ex_current_job_index = list.current_job().unwrap();
         let ex_previous_job_index = list.previous_job().unwrap();
@@ -1335,14 +1344,14 @@ mod tests {
         let mut list = JobList::default();
 
         let running = Job::new(Pid(10));
-        let i10 = list.add(running);
+        let i10 = list.insert(running);
 
         let mut suspended_1 = Job::new(Pid(11));
         let mut suspended_2 = Job::new(Pid(12));
         suspended_1.state = ProcessState::stopped(SIGSTOP);
         suspended_2.state = ProcessState::stopped(SIGSTOP);
-        list.add(suspended_1);
-        list.add(suspended_2);
+        list.insert(suspended_1);
+        list.insert(suspended_2);
 
         let ex_current_job_index = list.current_job().unwrap();
         let ex_previous_job_index = list.previous_job().unwrap();
@@ -1361,8 +1370,8 @@ mod tests {
     #[test]
     fn set_current_job_with_running_jobs_only() {
         let mut list = JobList::default();
-        let i21 = list.add(Job::new(Pid(21)));
-        let i22 = list.add(Job::new(Pid(22)));
+        let i21 = list.insert(Job::new(Pid(21)));
+        let i22 = list.insert(Job::new(Pid(22)));
 
         assert_eq!(list.set_current_job(i21), Ok(()));
         assert_eq!(list.current_job(), Some(i21));
@@ -1374,14 +1383,14 @@ mod tests {
     #[test]
     fn set_current_job_to_suspended_job() {
         let mut list = JobList::default();
-        list.add(Job::new(Pid(20)));
+        list.insert(Job::new(Pid(20)));
 
         let mut suspended_1 = Job::new(Pid(21));
         let mut suspended_2 = Job::new(Pid(22));
         suspended_1.state = ProcessState::stopped(SIGSTOP);
         suspended_2.state = ProcessState::stopped(SIGSTOP);
-        let i21 = list.add(suspended_1);
-        let i22 = list.add(suspended_2);
+        let i21 = list.insert(suspended_1);
+        let i22 = list.insert(suspended_2);
 
         assert_eq!(list.set_current_job(i21), Ok(()));
         assert_eq!(list.current_job(), Some(i21));
@@ -1404,8 +1413,8 @@ mod tests {
         let mut suspended = Job::new(Pid(10));
         suspended.state = ProcessState::stopped(SIGTSTP);
         let running = Job::new(Pid(20));
-        let i10 = list.add(suspended);
-        let i20 = list.add(running);
+        let i10 = list.insert(suspended);
+        let i20 = list.insert(running);
         assert_eq!(
             list.set_current_job(i20),
             Err(SetCurrentJobError::NotSuspended)
@@ -1416,8 +1425,8 @@ mod tests {
     #[test]
     fn set_current_job_no_change() {
         let mut list = JobList::default();
-        list.add(Job::new(Pid(5)));
-        list.add(Job::new(Pid(6)));
+        list.insert(Job::new(Pid(5)));
+        list.insert(Job::new(Pid(6)));
         let old_current_job_index = list.current_job().unwrap();
         let old_previous_job_index = list.previous_job().unwrap();
         list.set_current_job(old_current_job_index).unwrap();
@@ -1433,8 +1442,8 @@ mod tests {
         let mut suspended = Job::new(Pid(10));
         suspended.state = ProcessState::stopped(SIGTSTP);
         let running = Job::new(Pid(20));
-        let i10 = list.add(suspended);
-        let i20 = list.add(running);
+        let i10 = list.insert(suspended);
+        let i20 = list.insert(running);
         list.update_status(Pid(10), ProcessState::Running);
         assert_eq!(list.current_job(), Some(i10));
         assert_eq!(list.previous_job(), Some(i20));
@@ -1447,8 +1456,8 @@ mod tests {
         let mut suspended_2 = Job::new(Pid(20));
         suspended_1.state = ProcessState::stopped(SIGTSTP);
         suspended_2.state = ProcessState::stopped(SIGTSTP);
-        let i10 = list.add(suspended_1);
-        let i20 = list.add(suspended_2);
+        let i10 = list.insert(suspended_1);
+        let i20 = list.insert(suspended_2);
         list.set_current_job(i10).unwrap();
         list.update_status(Pid(10), ProcessState::Running);
         // The current job must be a suspended job, if any.
@@ -1465,9 +1474,9 @@ mod tests {
         suspended_1.state = ProcessState::stopped(SIGTSTP);
         suspended_2.state = ProcessState::stopped(SIGTSTP);
         suspended_3.state = ProcessState::stopped(SIGTSTP);
-        list.add(suspended_1);
-        list.add(suspended_2);
-        list.add(suspended_3);
+        list.insert(suspended_1);
+        list.insert(suspended_2);
+        list.insert(suspended_3);
         let ex_current_job_pid = list[list.current_job().unwrap()].pid;
         let ex_previous_job_index = list.previous_job().unwrap();
 
@@ -1493,9 +1502,9 @@ mod tests {
         suspended_1.state = ProcessState::stopped(SIGTSTP);
         suspended_2.state = ProcessState::stopped(SIGTSTP);
         suspended_3.state = ProcessState::stopped(SIGTSTP);
-        list.add(suspended_1);
-        list.add(suspended_2);
-        list.add(suspended_3);
+        list.insert(suspended_1);
+        list.insert(suspended_2);
+        list.insert(suspended_3);
         let ex_current_job_index = list.current_job().unwrap();
         let ex_previous_job_pid = list[list.previous_job().unwrap()].pid;
 
@@ -1521,9 +1530,9 @@ mod tests {
         suspended_1.state = ProcessState::stopped(SIGTSTP);
         suspended_2.state = ProcessState::stopped(SIGTSTP);
         suspended_3.state = ProcessState::stopped(SIGTSTP);
-        let i10 = list.add(suspended_1);
-        let i20 = list.add(suspended_2);
-        let _i30 = list.add(suspended_3);
+        let i10 = list.insert(suspended_1);
+        let i20 = list.insert(suspended_2);
+        let _i30 = list.insert(suspended_3);
         list.set_current_job(i20).unwrap();
         list.set_current_job(i10).unwrap();
         list.update_status(Pid(30), ProcessState::Running);
@@ -1534,8 +1543,8 @@ mod tests {
     #[test]
     fn suspending_current_job() {
         let mut list = JobList::default();
-        let i11 = list.add(Job::new(Pid(11)));
-        let i12 = list.add(Job::new(Pid(12)));
+        let i11 = list.insert(Job::new(Pid(11)));
+        let i12 = list.insert(Job::new(Pid(12)));
         list.set_current_job(i11).unwrap();
         list.update_status(Pid(11), ProcessState::stopped(SIGTTOU));
         assert_eq!(list.current_job(), Some(i11));
@@ -1545,8 +1554,8 @@ mod tests {
     #[test]
     fn suspending_previous_job() {
         let mut list = JobList::default();
-        let i11 = list.add(Job::new(Pid(11)));
-        let i12 = list.add(Job::new(Pid(12)));
+        let i11 = list.insert(Job::new(Pid(11)));
+        let i12 = list.insert(Job::new(Pid(12)));
         list.set_current_job(i11).unwrap();
         list.update_status(Pid(12), ProcessState::stopped(SIGTTOU));
         assert_eq!(list.current_job(), Some(i12));
@@ -1556,9 +1565,9 @@ mod tests {
     #[test]
     fn suspending_job_with_running_current_job() {
         let mut list = JobList::default();
-        let i10 = list.add(Job::new(Pid(10)));
-        let _i11 = list.add(Job::new(Pid(11)));
-        let i12 = list.add(Job::new(Pid(12)));
+        let i10 = list.insert(Job::new(Pid(10)));
+        let _i11 = list.insert(Job::new(Pid(11)));
+        let i12 = list.insert(Job::new(Pid(12)));
         list.set_current_job(i10).unwrap();
         list.update_status(Pid(12), ProcessState::stopped(SIGTTIN));
         assert_eq!(list.current_job(), Some(i12));
@@ -1568,11 +1577,11 @@ mod tests {
     #[test]
     fn suspending_job_with_running_previous_job() {
         let mut list = JobList::default();
-        let i11 = list.add(Job::new(Pid(11)));
-        let i12 = list.add(Job::new(Pid(12)));
+        let i11 = list.insert(Job::new(Pid(11)));
+        let i12 = list.insert(Job::new(Pid(12)));
         let mut suspended = Job::new(Pid(10));
         suspended.state = ProcessState::stopped(SIGTTIN);
-        let i10 = list.add(suspended);
+        let i10 = list.insert(suspended);
         assert_eq!(list.current_job(), Some(i10));
         assert_eq!(list.previous_job(), Some(i11));
 
