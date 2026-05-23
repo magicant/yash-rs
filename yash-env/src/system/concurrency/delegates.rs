@@ -18,11 +18,10 @@
 
 use super::super::resource::{LimitPair, Resource};
 use super::super::{
-    Chdir, ChildProcessStarter, Clock, Close, CpuTimes, Dir, Dup, Exec, Exit, Fcntl, FdFlag, Fork,
-    Fstat, GetCwd, GetPid, GetPw, GetRlimit, GetSigaction, GetUid, Gid, IsExecutableFile, Isatty,
-    Mode, OfdAccess, Open, OpenFlag, Pipe, Result, Seek, SendSignal, SetPgid, SetRlimit, ShellPath,
-    Sigaction, Sigmask, SigmaskOp, Signals, Sysconf, TcGetPgrp, TcSetPgrp, Times, Uid, Umask, Wait,
-    signal,
+    Chdir, Clock, Close, CpuTimes, Dir, Dup, Exec, Exit, Fcntl, FdFlag, Fstat, GetCwd, GetPid,
+    GetPw, GetRlimit, GetSigaction, GetUid, Gid, IsExecutableFile, Isatty, Mode, OfdAccess, Open,
+    OpenFlag, Pipe, Result, Seek, SendSignal, SetPgid, SetRlimit, ShellPath, Sigaction, Sigmask,
+    SigmaskOp, Signals, Sysconf, TcGetPgrp, TcSetPgrp, Times, Uid, Umask, Wait, signal,
 };
 use super::Concurrent;
 use crate::io::Fd;
@@ -468,27 +467,6 @@ where
     #[inline]
     fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> + use<S> {
         self.inner.tcsetpgrp(fd, pgid)
-    }
-}
-
-impl<S> Concurrent<S>
-where
-    S: Fork + Sigmask,
-{
-    /// Creates a new child process.
-    ///
-    /// Returns the `ChildProcessStarter<S>` returned by the inner system's
-    /// [`Fork::new_child_process`] method. This method is an inherent method of
-    /// `Concurrent<S>` instead of an implementation of the `Fork` trait because
-    /// the return type does not match with that of the inner system `S`.
-    #[deprecated(
-        since = "0.14.0",
-        note = "use the `Fork::run_in_child_process` method instead"
-    )]
-    #[inline]
-    pub fn new_child_process(&self) -> Result<ChildProcessStarter<S>> {
-        #[allow(deprecated, reason = "the caller and callee are both deprecated")]
-        self.inner.new_child_process()
     }
 }
 

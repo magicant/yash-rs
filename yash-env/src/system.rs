@@ -130,9 +130,7 @@ pub use self::file_system::{
 #[allow(deprecated, reason = "for backward compatible API")]
 pub use self::future::FlexFuture;
 pub use self::io::{Close, Dup, Fcntl, FdFlag, Pipe, Read, Write};
-pub use self::process::{
-    ChildProcessStarter, ChildProcessTask, Exec, Exit, Fork, GetPid, SetPgid, Wait,
-};
+pub use self::process::{Exec, Exit, Fork, GetPid, SetPgid, Wait};
 #[cfg(all(doc, unix))]
 use self::real::RealSystem;
 use self::resource::{GetRlimit, SetRlimit};

@@ -11,6 +11,13 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.15.0] - Unreleased
 
+### Removed
+
+- The following deprecated items have been removed:
+    - `system::Fork::new_child_process`
+    - `system::ChildProcessStarter`
+    - `system::ChildProcessTask`
+
 ## [0.14.0] - 2026-05-23
 
 ### Added

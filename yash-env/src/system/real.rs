@@ -31,7 +31,6 @@ mod signal;
 use super::AT_FDCWD;
 use super::CaughtSignals;
 use super::Chdir;
-use super::ChildProcessStarter;
 use super::Clock;
 use super::Close;
 use super::CpuTimes;
@@ -114,7 +113,6 @@ use std::os::unix::ffi::OsStrExt as _;
 use std::os::unix::io::IntoRawFd as _;
 use std::pin::pin;
 use std::ptr::NonNull;
-use std::rc::Rc;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering;
 use std::sync::atomic::compiler_fence;
@@ -941,27 +939,6 @@ impl Fork for RealSystem {
         let mut context = Context::from_waker(Waker::noop());
         _ = child_task.poll(&mut context);
         panic!("child task running in RealSystem should not return");
-    }
-
-    /// Creates a new child process.
-    ///
-    /// This implementation calls the `fork` system call and returns both in the
-    /// parent and child process. In the parent, the returned
-    /// `ChildProcessStarter` ignores any arguments and returns the child
-    /// process ID. In the child, the starter runs the task and exits the
-    /// process.
-    fn new_child_process(&self) -> Result<ChildProcessStarter<Self>> {
-        let raw_pid = unsafe { libc::fork() }.errno_if_m1()?;
-        if raw_pid != 0 {
-            // Parent process
-            return Ok(Box::new(move |_env, _task| Pid(raw_pid)));
-        }
-
-        // Child process
-        Ok(Box::new(|env, task| {
-            let system = Rc::clone(&env.system);
-            match system.run_real(task(env)) {}
-        }))
     }
 }
 
