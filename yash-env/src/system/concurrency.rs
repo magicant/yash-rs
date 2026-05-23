@@ -20,10 +20,7 @@
 //! systems that enables concurrent execution of multiple possibly blocking I/O
 //! tasks on a single thread.
 
-use super::{
-    CaughtSignals, ChildProcessStarter, Clock, Errno, Fcntl, FdSet, Fork, Read, Result, Sigmask,
-    Write,
-};
+use super::{CaughtSignals, Clock, Errno, Fcntl, FdSet, Fork, Read, Result, Sigmask, Write};
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::waker::{ScheduledWakerQueue, WakerSet};
@@ -669,20 +666,6 @@ where
                 let child_task = child_task(child_concurrent, shared_data);
                 RunLoop::run_loop(&runner, child_task).await;
             })
-    }
-
-    /// This method is not implemented for `Rc<Concurrent<_>>`.
-    ///
-    /// If called, this method will panic with an "unimplemented" message. We
-    /// cannot implement this method because the return type of this method does
-    /// not match with that of the inner system `S`.
-    ///
-    /// The [`run_in_child_process`](Self::run_in_child_process) method should
-    /// be used instead to create child processes in the context of `Concurrent`
-    /// systems. The inherent method [`Concurrent::new_child_process`] can also
-    /// be used but it will be deprecated/removed soon.
-    fn new_child_process(&self) -> Result<ChildProcessStarter<Self>> {
-        unimplemented!("use `run_in_child_process` instead")
     }
 }
 

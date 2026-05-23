@@ -134,8 +134,6 @@ use crate::path::PathBuf;
 use crate::semantics::ExitStatus;
 use crate::str::UnixStr;
 use crate::str::UnixString;
-use crate::system::ChildProcessStarter;
-use crate::system::Concurrent;
 use crate::waker::ScheduledWakerQueue;
 use crate::waker::WakerSet;
 use enumset::EnumSet;
@@ -1277,49 +1275,6 @@ impl Fork for VirtualSystem {
 
         (Ok(child_process_id), shared_data)
     }
-
-    /// Creates a new child process.
-    ///
-    /// This implementation does not create any real child process. Instead,
-    /// it returns a child process starter that runs its task concurrently in
-    /// the same process.
-    ///
-    /// To run the concurrent task, this function needs an executor that has
-    /// been set in the [`SystemState`]. If the system state does not have an
-    /// executor, this function fails with `Errno::ENOSYS`.
-    ///
-    /// The process ID of the child will be the maximum of existing process IDs
-    /// plus 1. If there are no other processes, it will be 2.
-    fn new_child_process(&self) -> Result<ChildProcessStarter<Self>> {
-        let mut state = self.state.borrow_mut();
-        let executor = state.executor.clone().ok_or(Errno::ENOSYS)?;
-        let process_id = state
-            .processes
-            .keys()
-            .max()
-            .map_or(Pid(2), |pid| Pid(pid.0 + 1));
-        let parent_process = &state.processes[&self.process_id];
-        let child_process = Process::fork_from(self.process_id, parent_process);
-        state.processes.insert(process_id, child_process);
-        drop(state);
-
-        let state = Rc::clone(&self.state);
-        Ok(Box::new(move |parent_env, task| {
-            let system = VirtualSystem { state, process_id };
-            let mut child_env = parent_env.clone_with_system(Rc::new(Concurrent::new(system)));
-            let concurrent = Rc::clone(&child_env.system);
-
-            let task_runner = async move {
-                let task = async move { match task(&mut child_env).await {} };
-                concurrent.run_virtual(task).await
-            };
-            executor
-                .spawn(Box::pin(task_runner))
-                .expect("the executor failed to start the child process task");
-
-            process_id
-        }))
-    }
 }
 
 impl Wait for VirtualSystem {
@@ -1549,7 +1504,8 @@ pub struct SystemState {
     /// Task manager that can execute asynchronous tasks
     ///
     /// The virtual system uses this executor to run (virtual) child processes.
-    /// If `executor` is `None`, [`VirtualSystem::new_child_process`] will fail.
+    /// If `executor` is `None`, [`VirtualSystem::run_in_child_process`] will
+    /// fail.
     pub executor: Option<Rc<dyn Executor>>,
 
     /// Processes running in the system
@@ -3151,37 +3107,6 @@ mod tests {
             })
             .0;
         assert_eq!(result, Err(Errno::ENOSYS));
-    }
-
-    #[test]
-    fn new_child_process_without_executor() {
-        let system = VirtualSystem::new();
-        #[allow(deprecated, reason = "it's what we want to test")]
-        let result = system.new_child_process();
-        match result {
-            Ok(_) => panic!("unexpected Ok value"),
-            Err(e) => assert_eq!(e, Errno::ENOSYS),
-        }
-    }
-
-    #[test]
-    fn new_child_process_with_executor() {
-        let (system, _executor) = virtual_system_with_executor();
-
-        #[allow(deprecated, reason = "it's what we want to test")]
-        let result = system.new_child_process();
-
-        let state = system.state.borrow();
-        assert_eq!(state.processes.len(), 2);
-        drop(state);
-
-        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
-        let child_process = result.unwrap();
-        let pid = child_process(
-            &mut env,
-            Box::new(|env| Box::pin(async move { env.system.exit(env.exit_status).await })),
-        );
-        assert_eq!(pid, Pid(3));
     }
 
     #[test]

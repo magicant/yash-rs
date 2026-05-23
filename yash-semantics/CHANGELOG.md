@@ -9,6 +9,14 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.17.0] - Unreleased
+
+### Changed
+
+- Public dependency versions:
+    - yash-env 0.14.0 → 0.15.0
+    - yash-syntax 0.21.0 → 0.22.0
+
 ## [0.16.0] - 2026-05-23
 
 ### Changed
@@ -482,6 +490,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Initial implementation of the `yash-semantics` crate
 
+[0.17.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.17.0
 [0.16.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.16.0
 [0.15.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.15.0
 [0.14.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.14.0

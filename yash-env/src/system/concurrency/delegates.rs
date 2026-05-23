@@ -18,11 +18,10 @@
 
 use super::super::resource::{LimitPair, Resource};
 use super::super::{
-    Chdir, ChildProcessStarter, Clock, Close, CpuTimes, Dir, Dup, Exec, Exit, Fcntl, FdFlag, Fork,
-    Fstat, GetCwd, GetPid, GetPw, GetRlimit, GetSigaction, GetUid, Gid, IsExecutableFile, Isatty,
-    Mode, OfdAccess, Open, OpenFlag, Pipe, Result, Seek, SendSignal, SetPgid, SetRlimit, ShellPath,
-    Sigaction, Sigmask, SigmaskOp, Signals, Sysconf, TcGetPgrp, TcSetPgrp, Times, Uid, Umask, Wait,
-    signal,
+    Chdir, Clock, Close, CpuTimes, Dir, Dup, Exec, Exit, Fcntl, FdFlag, Fstat, GetCwd, GetPid,
+    GetPw, GetRlimit, GetUid, Gid, IsExecutableFile, Isatty, Mode, OfdAccess, Open, OpenFlag, Pipe,
+    Result, Seek, SendSignal, SetPgid, SetRlimit, ShellPath, Sigmask, Signals, Sysconf, TcGetPgrp,
+    TcSetPgrp, Times, Uid, Umask, Wait, signal,
 };
 use super::Concurrent;
 use crate::io::Fd;
@@ -338,90 +337,13 @@ where
     }
 }
 
-/// Exposes the inner system's `sigmask` method.
-///
-/// This implementation of `Sigmask` simply delegates to the inner system's
-/// `sigmask` method, which bypasses the internal state of `Concurrent` and may
-/// prevent the [`peek`](super::Select::peek) and
-/// [`select`](super::Select::select) methods from responding to received
-/// signals without race conditions. To ensure that the signal mask is
-/// configured in a way that allows `Concurrent` to respond to signals
-/// correctly, direct calls to `sigmask` should be avoided, and, if necessary,
-/// only used to temporarily change the signal mask for specific operations
-/// while ensuring that the original mask is restored afterward before a next
-/// call to `peek`, `select`, or `set_disposition`.
-impl<S> Sigmask for Concurrent<S>
-where
-    S: Sigmask,
-{
-    type Sigset = S::Sigset;
-
-    #[inline]
-    fn sigmask(
-        &self,
-        op_and_signals: Option<(SigmaskOp, &Self::Sigset)>,
-        old_mask: Option<&mut Self::Sigset>,
-    ) -> impl Future<Output = Result<()>> + use<S> {
-        self.inner.sigmask(op_and_signals, old_mask)
-    }
-}
-
-impl<S> GetSigaction for Concurrent<S>
-where
-    S: GetSigaction + Sigmask,
-{
-    #[inline]
-    fn get_sigaction(&self, signal: signal::Number) -> Result<signal::Disposition> {
-        self.inner.get_sigaction(signal)
-    }
-}
-
-/// Exposes the inner system's `sigaction` method.
-///
-/// This implementation of `Sigaction` simply delegates to the inner system's
-/// `sigaction` method, which bypasses the internal state of `Concurrent` and
-/// may prevent the [`peek`](super::Select::peek) and
-/// [`select`](super::Select::select) methods from responding to received
-/// signals without race conditions. To ensure that signal dispositions are
-/// configured in a way that allows `Concurrent` to respond to signals
-/// correctly, direct calls to `sigaction` should be avoided, and, if necessary,
-/// only used to temporarily change the signal disposition for specific
-/// operations while ensuring that the original disposition is restored
-/// afterward before a next call to `peek`, `select`, or `set_disposition`.
-///
-/// The standard way to set a signal disposition to `Concurrent` is to use the
-/// `set_disposition` method provided by the [`SignalSystem`] trait, which
-/// ensures that the signal disposition and the signal mask are updated
-/// consistently.
-///
-/// [`SignalSystem`]: crate::trap::SignalSystem
-impl<S> Sigaction for Concurrent<S>
-where
-    S: Sigaction + Sigmask,
-{
-    #[inline]
-    fn sigaction(
-        &self,
-        signal: signal::Number,
-        disposition: signal::Disposition,
-    ) -> Result<signal::Disposition> {
-        self.inner.sigaction(signal, disposition)
-    }
-}
-
-// CaughtSignals is not implemented for Concurrent<S> because Concurrent needs to
-// control the signal dispositions and the signal mask itself to ensure that the
-// select method can respond to received signals without race conditions. Instead,
-// Concurrent<S> implements the SignalSystem trait, which provides the necessary
-// methods for configuring signal dispositions and masks in a controlled manner.
-//
-// Note: Sigmask, GetSigaction, and Sigaction are implemented above as delegating
-// implementations. However, direct calls to sigmask() and sigaction() bypass
-// Concurrent's internal state and may prevent peek() and select() from responding
-// to received signals without race conditions. To ensure correct behavior, use the
-// set_disposition method from the SignalSystem trait instead. If direct sigmask or
-// sigaction calls are necessary, temporarily change the mask/disposition and restore
-// it afterward before calling peek(), select(), or set_disposition().
+// Sigmask, GetSigaction, Sigaction, and CaughtSignals are not implemented for
+// Concurrent<S> because Concurrent needs to control the signal dispositions and
+// the signal mask itself to ensure that its internal invariants hold
+// consistently and that the select method can respond to received signals as
+// expected. Concurrent<S> instead implements the SignalSystem, BlockSignals,
+// RunBlocking, and RunUnblocking traits, which provide the necessary methods
+// for configuring signal dispositions and masks in a controlled manner.
 
 impl<S> SendSignal for Concurrent<S>
 where
@@ -468,27 +390,6 @@ where
     #[inline]
     fn tcsetpgrp(&self, fd: Fd, pgid: Pid) -> impl Future<Output = Result<()>> + use<S> {
         self.inner.tcsetpgrp(fd, pgid)
-    }
-}
-
-impl<S> Concurrent<S>
-where
-    S: Fork + Sigmask,
-{
-    /// Creates a new child process.
-    ///
-    /// Returns the `ChildProcessStarter<S>` returned by the inner system's
-    /// [`Fork::new_child_process`] method. This method is an inherent method of
-    /// `Concurrent<S>` instead of an implementation of the `Fork` trait because
-    /// the return type does not match with that of the inner system `S`.
-    #[deprecated(
-        since = "0.14.0",
-        note = "use the `Fork::run_in_child_process` method instead"
-    )]
-    #[inline]
-    pub fn new_child_process(&self) -> Result<ChildProcessStarter<S>> {
-        #[allow(deprecated, reason = "the caller and callee are both deprecated")]
-        self.inner.new_child_process()
     }
 }
 
