@@ -371,8 +371,10 @@ where
 /// [`Exec::execve`]: super::Exec::execve
 #[expect(private_bounds, reason = "this trait is sealed")]
 pub trait IntoCStrArray: Sealed {
+    /// The type that `self` can be converted into, which must implement `AsCStrArray`.
     type CStrArray: AsCStrArray;
 
+    /// Converts `self` into a type that implements `AsCStrArray`.
     fn into_c_str_array(self) -> Self::CStrArray;
 }
 
