@@ -17,6 +17,7 @@
 //! Utilities for working with C-style strings ([`CStr`] and [`CString`]) in Rust
 
 use std::ffi::{CStr, CString, c_char};
+use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
 /// Creates an iterator that yields a single null pointer, for terminating
@@ -51,15 +52,20 @@ trait Sealed {}
 /// `AsCStrArray`.
 ///
 /// [`Exec::execve`]: super::Exec::execve
+#[allow(
+    clippy::missing_safety_doc,
+    reason = "users cannot implement sealed traits"
+)]
 #[expect(private_bounds, reason = "this trait is sealed")]
-pub trait AsCStrArray: Sealed {
+pub unsafe trait AsCStrArray: Sealed {
     /// Returns a pointer to the array of C-style strings.
     ///
     /// The array must be null-terminated, i.e., the last pointer in the array
     /// must be a null pointer. Each pointer in the array must point to a valid
     /// C-style string (i.e., a null-terminated sequence of bytes). The array
-    /// and strings must remain valid until `self` is mutated or dropped. The
-    /// caller must not mutate the array or strings through this pointer.
+    /// and strings must remain valid and unmodified until `self` is mutated or
+    /// dropped. The caller must not mutate the array or strings through this
+    /// pointer.
     fn as_ptr(&self) -> *const *const c_char;
 
     /// Returns a pointer to the array of C-style strings.
@@ -69,8 +75,8 @@ pub trait AsCStrArray: Sealed {
     /// only for matching the expected type signature of [`execve`] and does not
     /// imply that the strings can actually be mutated through this pointer.
     /// The caller must not mutate the array or strings through this pointer.
-    /// The array and strings must remain valid until `self` is mutated or
-    /// dropped.
+    /// The array and strings must remain valid and unmodified until `self` is
+    /// mutated or dropped.
     ///
     /// [`execve`]: super::Exec::execve
     #[inline(always)]
@@ -78,6 +84,28 @@ pub trait AsCStrArray: Sealed {
         self.as_ptr().cast()
     }
     // TODO: to_vec
+}
+
+impl<T> Sealed for &T where T: Sealed + ?Sized {}
+unsafe impl<T> AsCStrArray for &T
+where
+    T: AsCStrArray + ?Sized,
+{
+    #[inline(always)]
+    fn as_ptr(&self) -> *const *const c_char {
+        (self as &T).as_ptr()
+    }
+}
+
+impl<T> Sealed for &mut T where T: Sealed + ?Sized {}
+unsafe impl<T> AsCStrArray for &mut T
+where
+    T: AsCStrArray + ?Sized,
+{
+    #[inline(always)]
+    fn as_ptr(&self) -> *const *const c_char {
+        (self as &T).as_ptr()
+    }
 }
 
 /// Simple wrapper to treat a raw pointer to an array of C-style strings as a [`AsCStrArray`]
@@ -105,7 +133,7 @@ impl CStrPtr {
     ///
     /// The caller must ensure that `ptr` points to a valid null-terminated
     /// array of pointers to valid C-style strings. The array and strings must
-    /// remain valid until the `CStrPtr` is dropped.
+    /// remain valid and unmodified until the `CStrPtr` is dropped.
     #[must_use]
     pub unsafe fn new(ptr: *const *const c_char) -> Self {
         Self(ptr)
@@ -113,7 +141,7 @@ impl CStrPtr {
 }
 
 impl Sealed for CStrPtr {}
-impl AsCStrArray for CStrPtr {
+unsafe impl AsCStrArray for CStrPtr {
     #[inline(always)]
     fn as_ptr(&self) -> *const *const c_char {
         self.0
@@ -127,6 +155,10 @@ impl AsCStrArray for CStrPtr {
 /// elsewhere. It is useful if you already have a collection of `&CStr`s (or
 /// `CString`s) you can borrow and want to pass them to a function that expects
 /// an `AsCStrArray`.
+///
+/// This struct implements `FromIterator`, which can be used to create a
+/// `CStrVec` from existing C-style strings. The implementation can also be used
+/// via the [`IntoCStrArray`] trait.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct CStrVec<'a> {
     pointers: Vec<*const c_char>,
@@ -134,7 +166,7 @@ pub struct CStrVec<'a> {
 }
 
 impl<'a> Sealed for CStrVec<'a> {}
-impl<'a> AsCStrArray for CStrVec<'a> {
+unsafe impl<'a> AsCStrArray for CStrVec<'a> {
     #[inline(always)]
     fn as_ptr(&self) -> *const *const c_char {
         self.pointers.as_ptr()
@@ -202,14 +234,12 @@ pub struct CStringVec {
 }
 
 impl Sealed for CStringVec {}
-impl AsCStrArray for CStringVec {
+unsafe impl AsCStrArray for CStringVec {
     #[inline(always)]
     fn as_ptr(&self) -> *const *const c_char {
         self.pointers.as_ptr()
     }
 }
-
-// TODO impl Clone, Eq, Hash, Ord, PartialEq, PartialOrd for CStringVec
 
 impl CStringVec {
     /// Creates a new `CStringVec` from a vector of `CString`s.
@@ -232,6 +262,59 @@ impl CStringVec {
     #[must_use]
     pub fn into_c_strings(self) -> Vec<CString> {
         self.strings
+    }
+}
+
+impl Clone for CStringVec {
+    fn clone(&self) -> Self {
+        let strings = self.strings.clone();
+        // The new pointers must point to the new strings, so we create a new
+        // `CStringVec` from the cloned strings instead of just cloning the
+        // pointers.
+        Self::new(strings)
+    }
+
+    fn clone_from(&mut self, source: &Self) {
+        self.strings.clone_from(&source.strings);
+        // The new pointers must point to the new strings, so we need to
+        // reinitialize the content of the pointers array.
+        self.pointers.clear();
+        self.pointers
+            .extend(self.strings.iter().map(|s| s.as_ptr()).chain(one_null()));
+    }
+}
+
+/// Compares the contained `CString`s for equality.
+impl PartialEq for CStringVec {
+    #[inline(always)]
+    fn eq(&self, other: &Self) -> bool {
+        self.strings == other.strings
+    }
+}
+
+impl Eq for CStringVec {}
+
+/// Hashes the contained `CString`s.
+impl Hash for CStringVec {
+    #[inline(always)]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.strings.hash(state);
+    }
+}
+
+/// Compares the contained `CString`s for ordering.
+impl PartialOrd for CStringVec {
+    #[inline(always)]
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// Compares the contained `CString`s for ordering.
+impl Ord for CStringVec {
+    #[inline(always)]
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.strings.cmp(&other.strings)
     }
 }
 
