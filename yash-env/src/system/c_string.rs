@@ -57,6 +57,12 @@ trait Sealed {}
     reason = "users cannot implement sealed traits"
 )]
 #[expect(private_bounds, reason = "this trait is sealed")]
+// SAFETY: This trait is unsafe because improper implementations can lead to
+// undefined behavior when the pointers returned by `as_ptr` or `as_mut_ptr` are
+// used. The implementation of the `execve` function assumes that the array and
+// strings pointed to by these pointers are valid and remain unmodified while
+// they are in use. Interior mutability may break these assumptions, so the
+// implementor must ensure that no such mutations can occur.
 pub unsafe trait AsCStrArray: Sealed {
     /// Returns a pointer to the array of C-style strings.
     ///
@@ -148,15 +154,15 @@ unsafe impl AsCStrArray for CStrPtr {
     }
 }
 
-/// An [`AsCStrArray`] backed by a [`Vec`] of [`&CStr`](CStr)s
+/// An [`AsCStrArray`] backed by a [`Vec`] of borrowed [`CStr`]s
 ///
-/// A `CStrVec` works as if it owns a `Vec<&'a CStr>`: it owns the allocation
-/// for the array of pointers, but the `&CStr`s themselves are borrowed from
-/// elsewhere. It is useful if you already have a collection of `&CStr`s (or
-/// `CString`s) you can borrow and want to pass them to a function that expects
-/// an `AsCStrArray`.
+/// A `CStrVec<'a>` works as if it owns a `Vec<&'a CStr>`: it owns the
+/// allocation for the array of pointers, but the `&CStr`s themselves are
+/// borrowed from elsewhere. It is useful if you already have a collection of
+/// `&CStr`s (or `CString`s) you can borrow and want to pass them to a function
+/// that expects an `AsCStrArray`.
 ///
-/// This struct implements `FromIterator`, which can be used to create a
+/// This struct implements [`FromIterator`], which can be used to create a
 /// `CStrVec` from existing C-style strings. The implementation can also be used
 /// via the [`IntoCStrArray`] trait.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -173,27 +179,22 @@ unsafe impl<'a> AsCStrArray for CStrVec<'a> {
     }
 }
 
-// TODO: Consider merging these two `FromIterator` impls into a single one that accepts an iterator of `impl AsRef<CStr>`, which would allow both `&CStr` and `CString
-/// Creates a `CStrVec` from an iterator of `&CStr`s
-impl<'a> FromIterator<&'a CStr> for CStrVec<'a> {
-    #[inline]
-    fn from_iter<T: IntoIterator<Item = &'a CStr>>(iter: T) -> Self {
-        fn inner<'b, I: Iterator<Item = &'b CStr>>(iter: I) -> CStrVec<'b> {
+impl<'a, T> FromIterator<&'a T> for CStrVec<'a>
+where
+    T: AsRef<CStr> + ?Sized,
+{
+    #[inline(always)]
+    fn from_iter<I: IntoIterator<Item = &'a T>>(iter: I) -> Self {
+        fn inner<'a, T: AsRef<CStr> + ?Sized + 'a, I: Iterator<Item = &'a T>>(
+            iter: I,
+        ) -> CStrVec<'a> {
             CStrVec {
-                pointers: iter.map(CStr::as_ptr).chain(one_null()).collect(),
+                pointers: iter
+                    .map(|s| s.as_ref().as_ptr())
+                    .chain(one_null())
+                    .collect(),
                 phantom: PhantomData,
             }
-        }
-        inner(iter.into_iter())
-    }
-}
-
-/// Creates a `CStrVec` from an iterator of `&CString`s
-impl<'a> FromIterator<&'a CString> for CStrVec<'a> {
-    #[inline]
-    fn from_iter<T: IntoIterator<Item = &'a CString>>(iter: T) -> Self {
-        fn inner<'b, I: Iterator<Item = &'b CString>>(iter: I) -> CStrVec<'b> {
-            iter.map(CString::as_c_str).collect()
         }
         inner(iter.into_iter())
     }
@@ -259,6 +260,7 @@ impl CStringVec {
     }
 
     /// Consumes the `CStringVec` and returns the owned `CString`s.
+    #[inline(always)]
     #[must_use]
     pub fn into_c_strings(self) -> Vec<CString> {
         self.strings
@@ -375,6 +377,7 @@ pub trait IntoCStrArray: Sealed {
     type CStrArray: AsCStrArray;
 
     /// Converts `self` into a type that implements `AsCStrArray`.
+    #[must_use]
     fn into_c_str_array(self) -> Self::CStrArray;
 }
 
@@ -383,31 +386,38 @@ pub trait IntoCStrArray: Sealed {
 impl<T: AsCStrArray> IntoCStrArray for T {
     type CStrArray = Self;
 
+    #[inline(always)]
     fn into_c_str_array(self) -> Self::CStrArray {
         self
     }
 }
 
-impl<'a> Sealed for &'a [&'a CStr] {}
-// TODO: Consider merging these two `IntoCStrArray` impls into a single one that accepts a slice of `impl AsRef<CStr>`, which would allow both `&CStr` and `CString`
-/// Converts a slice of `&CStr`s into a `CStrVec`
-impl<'a> IntoCStrArray for &'a [&'a CStr] {
+impl<T> Sealed for &[T] where T: AsRef<CStr> {}
+/// Converts a slice of `&CStr`s into a `CStrVec`. (See [`CStrVec::from_iter`].)
+impl<'a, T> IntoCStrArray for &'a [T]
+where
+    T: AsRef<CStr>,
+{
     type CStrArray = CStrVec<'a>;
 
+    #[inline(always)]
     fn into_c_str_array(self) -> CStrVec<'a> {
-        self.iter().cloned().collect()
+        CStrVec::from_iter(self)
     }
 }
 
-impl Sealed for &[CString] {}
-/// Converts a slice of `&CString`s into a `CStrVec`
-impl<'a> IntoCStrArray for &'a [CString] {
-    type CStrArray = CStrVec<'a>;
+// /// Converts a vector of `&CStr`s into a `CStrVec`. (See [`CStrVec::from_iter`].)
+// impl<'a, T> IntoCStrArray for &'a Vec<T>
+// where
+//     T: AsRef<CStr>,
+// {
+//     type CStrArray = CStrVec<'a>;
 
-    fn into_c_str_array(self) -> CStrVec<'a> {
-        self.iter().map(CString::as_c_str).collect()
-    }
-}
+//     #[inline(always)]
+//     fn into_c_str_array(self) -> CStrVec<'a> {
+//         CStrVec::from_iter(self)
+//     }
+// }
 
 impl Sealed for Vec<CString> {}
 /// Converts a `Vec<CString>` into a `CStringVec`. (See [`CStringVec::new`].)
