@@ -16,7 +16,9 @@
 
 //! Utilities for working with C-style strings ([`CStr`] and [`CString`]) in Rust
 
-use std::ffi::{CStr, CString, c_char};
+#[cfg(doc)]
+use std::ffi::CString;
+use std::ffi::{CStr, c_char};
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
@@ -123,8 +125,8 @@ where
 /// array and strings remain valid for the required lifetime. This wrapper does
 /// not take ownership of the array or strings.
 ///
-/// You should prefer [`CStrVec`] or [`CStringVec`] over this type when
-/// possible, as they provide ownership and lifetime guarantees for the strings.
+/// You should prefer [`CStrVec`] or [`PtrVec`] over this type when possible, as
+/// they provide ownership and lifetime guarantees for the strings.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(transparent)]
 pub struct CStrPtr(*const *const c_char);
@@ -159,8 +161,8 @@ unsafe impl AsCStrArray for CStrPtr {
 /// A `CStrVec<'a>` works as if it owns a `Vec<&'a CStr>`: it owns the
 /// allocation for the array of pointers, but the `&CStr`s themselves are
 /// borrowed from elsewhere. It is useful if you already have a collection of
-/// `&CStr`s (or `CString`s) you can borrow and want to pass them to a function
-/// that expects an `AsCStrArray`.
+/// `&CStr`s (or [`CString`]s) you can borrow and want to pass them to a
+/// function that expects an `AsCStrArray`.
 ///
 /// This struct implements [`FromIterator`], which can be used to create a
 /// `CStrVec` from existing C-style strings. The implementation can also be used
@@ -201,6 +203,8 @@ where
 }
 
 impl CStrVec<'_> {
+    // TODO from_vec
+
     /// Consumes the `CStrVec` and returns the owned array of pointers as a
     /// `Vec<*const c_char>`.
     ///
@@ -223,130 +227,151 @@ impl From<CStrVec<'_>> for Vec<*const c_char> {
     }
 }
 
-/// A [`AsCStrArray`] backed by a [`Vec`] of [`CString`]s
+/// A [`AsCStrArray`] backed by a [`Vec`] of owned C-style strings
 ///
-/// A `CStringVec` owns a `Vec<CString>` and the allocation for the array of
-/// pointers. It is useful if you want to create an `AsCStrArray` from scratch
-/// and need to own the `CString`s themselves.
+/// A `PtrVec<T>` owns a `Vec<T>` and the allocation for the array of pointers.
+/// In the most typical case, `T` will be [`CString`], but it can be any type
+/// that implements `AsRef<CStr>`. `PtrVec` is useful when you want to create an
+/// `AsCStrArray` from scratch and need to own the strings themselves. The
+/// implementation of `FromIterator` allows you to create a `PtrVec` from an
+/// iterator of any `AsRef<CStr>` type.
 #[derive(Debug)]
-pub struct CStringVec {
+pub struct PtrVec<T> {
     pointers: Vec<*const c_char>,
-    strings: Vec<CString>,
+    values: Vec<T>,
 }
 
-impl Sealed for CStringVec {}
-unsafe impl AsCStrArray for CStringVec {
+impl<T> Sealed for PtrVec<T> {}
+unsafe impl<T> AsCStrArray for PtrVec<T> {
     #[inline(always)]
     fn as_ptr(&self) -> *const *const c_char {
         self.pointers.as_ptr()
     }
 }
 
-impl CStringVec {
-    /// Creates a new `CStringVec` from a vector of `CString`s.
+impl<T> PtrVec<T> {
+    /// Creates a new `PtrVec<T>` from a `Vec<T>`.
     ///
-    /// The given `CString`s are stored in the `CStringVec` to ensure that they
-    /// remain valid for the required lifetime. The `CStringVec` also allocates
-    /// a null-terminated array of pointers to the `CString`s, which is returned
-    /// by the [`as_ptr`](Self::as_ptr) method.
+    /// The given values are stored in the `PtrVec` to ensure that they remain
+    /// valid for the required lifetime. The `PtrVec` also allocates a
+    /// null-terminated array of pointers to the C-style strings, which is
+    /// returned by the [`as_ptr`](Self::as_ptr) method.
     #[must_use]
-    pub fn new(strings: Vec<CString>) -> Self {
-        let pointers = strings
+    pub fn new(values: Vec<T>) -> Self
+    where
+        T: AsRef<CStr>,
+    {
+        let pointers = values
             .iter()
-            .map(|s| s.as_ptr())
+            .map(|s| s.as_ref().as_ptr())
             .chain(one_null())
             .collect();
-        Self { pointers, strings }
+        Self { pointers, values }
     }
 
-    /// Consumes the `CStringVec` and returns the owned `CString`s.
+    // TODO: from_pointers_and_values and into_pointers_and_values
+
+    // TODO Remove this method
+    /// Consumes the `PtrVec` and returns the
     #[inline(always)]
     #[must_use]
-    pub fn into_c_strings(self) -> Vec<CString> {
-        self.strings
+    pub fn into_inner(self) -> Vec<T> {
+        self.values
     }
 }
 
-impl Clone for CStringVec {
+impl<T> Clone for PtrVec<T>
+where
+    T: Clone + AsRef<CStr>,
+{
     fn clone(&self) -> Self {
-        let strings = self.strings.clone();
+        let strings = self.values.clone();
         // The new pointers must point to the new strings, so we create a new
-        // `CStringVec` from the cloned strings instead of just cloning the
+        // `PtrVec` from the cloned strings instead of just cloning the
         // pointers.
         Self::new(strings)
     }
 
     fn clone_from(&mut self, source: &Self) {
-        self.strings.clone_from(&source.strings);
+        self.values.clone_from(&source.values);
         // The new pointers must point to the new strings, so we need to
         // reinitialize the content of the pointers array.
         self.pointers.clear();
-        self.pointers
-            .extend(self.strings.iter().map(|s| s.as_ptr()).chain(one_null()));
+        self.pointers.extend(
+            self.values
+                .iter()
+                .map(|s| s.as_ref().as_ptr())
+                .chain(one_null()),
+        );
     }
 }
 
-/// Compares the contained `CString`s for equality.
-impl PartialEq for CStringVec {
+/// Compares the contained values for equality.
+impl<T> PartialEq for PtrVec<T>
+where
+    T: PartialEq,
+{
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
-        self.strings == other.strings
+        self.values == other.values
     }
 }
 
-impl Eq for CStringVec {}
+/// Compares the contained values for equality.
+impl<T> Eq for PtrVec<T> where T: Eq {}
 
-/// Hashes the contained `CString`s.
-impl Hash for CStringVec {
+/// Hashes the contained values.
+impl<T> Hash for PtrVec<T>
+where
+    T: Hash,
+{
     #[inline(always)]
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.strings.hash(state);
+        self.values.hash(state);
     }
 }
 
-/// Compares the contained `CString`s for ordering.
-impl PartialOrd for CStringVec {
+/// Compares the contained values for ordering.
+impl<T> PartialOrd for PtrVec<T>
+where
+    T: PartialOrd,
+{
     #[inline(always)]
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
+        self.values.partial_cmp(&other.values)
     }
 }
 
-/// Compares the contained `CString`s for ordering.
-impl Ord for CStringVec {
+/// Compares the contained values for ordering.
+impl<T> Ord for PtrVec<T>
+where
+    T: Ord,
+{
     #[inline(always)]
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.strings.cmp(&other.strings)
+        self.values.cmp(&other.values)
     }
 }
 
-/// Converts a `Vec<CString>` into a `CStringVec`. (See [`CStringVec::new`].)
-impl From<Vec<CString>> for CStringVec {
-    #[inline(always)]
-    fn from(strings: Vec<CString>) -> Self {
-        Self::new(strings)
-    }
-}
-
-/// Consumes a `CStringVec` and extracts the owned `CString`s as a `Vec<CString>`
-impl From<CStringVec> for Vec<CString> {
-    #[inline(always)]
-    fn from(c_string_vec: CStringVec) -> Self {
-        c_string_vec.into_c_strings()
-    }
-}
-
-/// Creates a `CStringVec` from an iterator of `CString`s
-impl<T> FromIterator<T> for CStringVec
+/// Converts a `Vec<T>` into a `PtrVec<T>`. (See [`PtrVec::new`].)
+impl<T> From<Vec<T>> for PtrVec<T>
 where
-    T: Into<CString>,
+    T: AsRef<CStr>,
+{
+    #[inline(always)]
+    fn from(values: Vec<T>) -> Self {
+        Self::new(values)
+    }
+}
+
+/// Creates a `PtrVec` from an iterator of values that can be borrowed as `CStr`s.
+impl<T> FromIterator<T> for PtrVec<T>
+where
+    T: AsRef<CStr>,
 {
     #[inline(always)]
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        fn inner<T: Into<CString>, I: Iterator<Item = T>>(iter: I) -> CStringVec {
-            CStringVec::new(iter.map(Into::into).collect())
-        }
-        inner(iter.into_iter())
+        Self::new(Vec::from_iter(iter))
     }
 }
 
@@ -406,26 +431,16 @@ where
     }
 }
 
-// /// Converts a vector of `&CStr`s into a `CStrVec`. (See [`CStrVec::from_iter`].)
-// impl<'a, T> IntoCStrArray for &'a Vec<T>
-// where
-//     T: AsRef<CStr>,
-// {
-//     type CStrArray = CStrVec<'a>;
-
-//     #[inline(always)]
-//     fn into_c_str_array(self) -> CStrVec<'a> {
-//         CStrVec::from_iter(self)
-//     }
-// }
-
-impl Sealed for Vec<CString> {}
-/// Converts a `Vec<CString>` into a `CStringVec`. (See [`CStringVec::new`].)
-impl IntoCStrArray for Vec<CString> {
-    type CStrArray = CStringVec;
+impl<T> Sealed for Vec<T> where T: AsRef<CStr> {}
+/// Converts a `Vec<T>` into a `PtrVec<T>`. (See [`PtrVec::new`].)
+impl<T> IntoCStrArray for Vec<T>
+where
+    T: AsRef<CStr>,
+{
+    type CStrArray = PtrVec<T>;
 
     #[inline(always)]
-    fn into_c_str_array(self) -> CStringVec {
+    fn into_c_str_array(self) -> PtrVec<T> {
         self.into()
     }
 }
