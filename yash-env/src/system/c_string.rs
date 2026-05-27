@@ -22,11 +22,16 @@ use std::ffi::{CStr, c_char};
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
-/// Creates an iterator that yields a single null pointer, for terminating
-/// arrays of C-style strings.
-#[inline]
-fn one_null() -> impl Iterator<Item = *const c_char> {
-    std::iter::once(std::ptr::null())
+/// Converts an iterator of `AsRef<CStr>` items into an iterator of pointers to
+/// C-style strings, with a null pointer appended at the end.
+fn null_terminated_pointers<I>(iter: I) -> impl Iterator<Item = *const c_char>
+where
+    I: IntoIterator,
+    I::Item: AsRef<CStr>,
+{
+    iter.into_iter()
+        .map(|s| s.as_ref().as_ptr())
+        .chain(std::iter::once(std::ptr::null()))
 }
 
 /// Dummy trait to prevent external implementations of `AsCStrArray` and
@@ -187,23 +192,41 @@ where
 {
     #[inline(always)]
     fn from_iter<I: IntoIterator<Item = &'a T>>(iter: I) -> Self {
-        fn inner<'a, T: AsRef<CStr> + ?Sized + 'a, I: Iterator<Item = &'a T>>(
-            iter: I,
-        ) -> CStrVec<'a> {
-            CStrVec {
-                pointers: iter
-                    .map(|s| s.as_ref().as_ptr())
-                    .chain(one_null())
-                    .collect(),
-                phantom: PhantomData,
-            }
-        }
-        inner(iter.into_iter())
+        let pointers = null_terminated_pointers(iter).collect();
+
+        // SAFETY: The `null_terminated_pointers` function creates a
+        // null-terminated array of pointers, and the pointers in the array
+        // point to C-style strings borrowed from the input iterator. The
+        // strings remain valid and unmodified for the lifetime of the `CStrVec`
+        // because they are borrowed immutably through the `PhantomData`.
+        unsafe { Self::from_vec(pointers) }
     }
 }
 
 impl CStrVec<'_> {
-    // TODO from_vec
+    /// Creates a new `CStrVec` from a `Vec<*const c_char>`.
+    ///
+    /// This function directly uses the given pointers as the content of the
+    /// `CStrVec`. The given pointers are returned by the
+    /// [`as_ptr`](Self::as_ptr) method.
+    ///
+    /// This function takes ownership of the given `Vec`, but not the strings
+    /// pointed to by the pointers.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the pointers in the given `Vec` point to
+    /// valid C-style strings, and that the `Vec` is null-terminated (i.e., the
+    /// last pointer is a null pointer). The array and strings must remain valid
+    /// and unmodified for the required lifetime of the `CStrVec`.
+    #[inline(always)]
+    #[must_use]
+    pub unsafe fn from_vec(pointers: Vec<*const c_char>) -> Self {
+        Self {
+            pointers,
+            phantom: PhantomData,
+        }
+    }
 
     /// Consumes the `CStrVec` and returns the owned array of pointers as a
     /// `Vec<*const c_char>`.
@@ -261,22 +284,48 @@ impl<T> PtrVec<T> {
     where
         T: AsRef<CStr>,
     {
-        let pointers = values
-            .iter()
-            .map(|s| s.as_ref().as_ptr())
-            .chain(one_null())
-            .collect();
+        let pointers = null_terminated_pointers(&values).collect();
+
+        // SAFETY: `null_terminated_pointers` creates a null-terminated array,
+        // and the pointers in the array point to C-style strings borrowed from
+        // the `values`. The strings remain valid and unmodified for the
+        // lifetime of the `PtrVec` because they are owned by it and not mutated
+        // through the pointers.
+        unsafe { Self::from_pointers_and_values(pointers, values) }
+    }
+
+    /// Creates a new `PtrVec<T>` from its inner components.
+    ///
+    /// This function directly uses the given pointers as the content of the
+    /// `PtrVec`. The `pointers` is a null-terminated array of pointers to
+    /// C-style strings that is returned by the [`as_ptr`](Self::as_ptr) method.
+    /// The `values` is an array of objects that is stored in the `PtrVec` for
+    /// the lifetime of it. Typically, `values` will be a `Vec<CString>`, and
+    /// the `pointers` will point to the C-style strings contained in the
+    /// `CString`s.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the pointers in the given `Vec` point to
+    /// valid C-style strings, and that the `Vec` is null-terminated (i.e., the
+    /// last pointer is a null pointer). The strings must remain valid and
+    /// unmodified for the lifetime of the `PtrVec`.
+    #[must_use]
+    pub unsafe fn from_pointers_and_values(pointers: Vec<*const c_char>, values: Vec<T>) -> Self {
         Self { pointers, values }
     }
 
-    // TODO: from_pointers_and_values and into_pointers_and_values
-
-    // TODO Remove this method
-    /// Consumes the `PtrVec` and returns the
+    /// Consumes the `PtrVec` and returns the owned array of pointers and values.
+    ///
+    /// This function just returns its inner components. The caller is
+    /// responsible for ensuring the validity of the returned pointers if they
+    /// intend to use them. The C-style strings pointed to by the returned
+    /// pointers will be valid until the returned `values` are mutated or
+    /// dropped.
     #[inline(always)]
     #[must_use]
-    pub fn into_inner(self) -> Vec<T> {
-        self.values
+    pub fn into_pointers_and_values(self) -> (Vec<*const c_char>, Vec<T>) {
+        (self.pointers, self.values)
     }
 }
 
@@ -297,12 +346,7 @@ where
         // The new pointers must point to the new strings, so we need to
         // reinitialize the content of the pointers array.
         self.pointers.clear();
-        self.pointers.extend(
-            self.values
-                .iter()
-                .map(|s| s.as_ref().as_ptr())
-                .chain(one_null()),
-        );
+        self.pointers.extend(null_terminated_pointers(&self.values));
     }
 }
 
