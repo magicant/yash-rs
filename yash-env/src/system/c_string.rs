@@ -16,9 +16,7 @@
 
 //! Utilities for working with C-style strings ([`CStr`] and [`CString`]) in Rust
 
-#[cfg(doc)]
-use std::ffi::CString;
-use std::ffi::{CStr, c_char};
+use std::ffi::{CStr, CString, c_char};
 use std::marker::PhantomData;
 
 /// Converts an iterator of `AsRef<CStr>` items into an iterator of pointers to
@@ -129,8 +127,8 @@ where
 /// array and strings remain valid for the required lifetime. This wrapper does
 /// not take ownership of the array or strings.
 ///
-/// You should prefer [`CStrVec`] or [`PtrVec`] over this type when possible, as
-/// they provide ownership and lifetime guarantees for the strings.
+/// You should prefer [`BorrowedCStrs`] or [`PtrVec`] over this type when
+/// possible, as they provide ownership and lifetime guarantees for the strings.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(transparent)]
 pub struct CStrPtr(*const *const c_char);
@@ -162,30 +160,30 @@ unsafe impl AsCStrArray for CStrPtr {
 
 /// An [`AsCStrArray`] backed by a [`Vec`] of borrowed [`CStr`]s
 ///
-/// A `CStrVec<'a>` works as if it owns a `Vec<&'a CStr>`: it owns the
+/// A `BorrowedCStrs<'a>` works as if it owns a `Vec<&'a CStr>`: it owns the
 /// allocation for the array of pointers, but the `&CStr`s themselves are
 /// borrowed from elsewhere. It is useful if you already have a collection of
 /// `&CStr`s (or [`CString`]s) you can borrow and want to pass them to a
 /// function that expects an `AsCStrArray`.
 ///
 /// This struct implements [`FromIterator`], which can be used to create a
-/// `CStrVec` from existing C-style strings. The implementation can also be used
-/// via the [`IntoCStrArray`] trait.
+/// `BorrowedCStrs` from existing C-style strings. The implementation can also
+/// be used via the [`IntoCStrArray`] trait.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct CStrVec<'a> {
+pub struct BorrowedCStrs<'a> {
     pointers: Vec<*const c_char>,
     phantom: PhantomData<Vec<&'a CStr>>,
 }
 
-impl<'a> Sealed for CStrVec<'a> {}
-unsafe impl<'a> AsCStrArray for CStrVec<'a> {
+impl<'a> Sealed for BorrowedCStrs<'a> {}
+unsafe impl<'a> AsCStrArray for BorrowedCStrs<'a> {
     #[inline(always)]
     fn as_ptr(&self) -> *const *const c_char {
         self.pointers.as_ptr()
     }
 }
 
-impl<'a, T> FromIterator<&'a T> for CStrVec<'a>
+impl<'a, T> FromIterator<&'a T> for BorrowedCStrs<'a>
 where
     T: AsRef<CStr> + ?Sized,
 {
@@ -196,17 +194,18 @@ where
         // SAFETY: The `null_terminated_pointers` function creates a
         // null-terminated array of pointers, and the pointers in the array
         // point to C-style strings borrowed from the input iterator. The
-        // strings remain valid and unmodified for the lifetime of the `CStrVec`
-        // because they are borrowed immutably through the `PhantomData`.
+        // strings remain valid and unmodified for the lifetime of the
+        // `BorrowedCStrs` because they are borrowed immutably through the
+        // `PhantomData`.
         unsafe { Self::from_vec(pointers) }
     }
 }
 
-impl CStrVec<'_> {
-    /// Creates a new `CStrVec` from a `Vec<*const c_char>`.
+impl BorrowedCStrs<'_> {
+    /// Creates a new `BorrowedCStrs` from a `Vec<*const c_char>`.
     ///
     /// This function directly uses the given pointers as the content of the
-    /// `CStrVec`. The given pointers are returned by the
+    /// `BorrowedCStrs`. The given pointers are returned by the
     /// [`as_ptr`](Self::as_ptr) method.
     ///
     /// This function takes ownership of the given `Vec`, but not the strings
@@ -217,7 +216,7 @@ impl CStrVec<'_> {
     /// The caller must ensure that the pointers in the given `Vec` point to
     /// valid C-style strings, and that the `Vec` is null-terminated (i.e., the
     /// last pointer is a null pointer). The array and strings must remain valid
-    /// and unmodified for the required lifetime of the `CStrVec`.
+    /// and unmodified for the required lifetime of the `BorrowedCStrs`.
     #[inline(always)]
     #[must_use]
     pub unsafe fn from_vec(pointers: Vec<*const c_char>) -> Self {
@@ -227,8 +226,8 @@ impl CStrVec<'_> {
         }
     }
 
-    /// Consumes the `CStrVec` and returns the owned array of pointers as a
-    /// `Vec<*const c_char>`.
+    /// Consumes the `BorrowedCStrs` and returns the owned array of pointers as
+    /// a `Vec<*const c_char>`.
     ///
     /// This function just returns the null-terminated array of pointers without
     /// any ownership or lifetime guarantees for the strings. The caller must
@@ -240,29 +239,29 @@ impl CStrVec<'_> {
     }
 }
 
-/// Consumes a `CStrVec` and extracts the owned array of pointers as a
-/// `Vec<*const c_char>`. (See [`CStrVec::into_vec`].)
-impl From<CStrVec<'_>> for Vec<*const c_char> {
+/// Consumes a `BorrowedCStrs` and extracts the owned array of pointers as a
+/// `Vec<*const c_char>`. (See [`BorrowedCStrs::into_vec`].)
+impl From<BorrowedCStrs<'_>> for Vec<*const c_char> {
     #[inline(always)]
-    fn from(c_str_vec: CStrVec) -> Self {
+    fn from(c_str_vec: BorrowedCStrs) -> Self {
         c_str_vec.into_vec()
     }
 }
 
 /// A [`AsCStrArray`] backed by a collection of owned strings
 ///
-/// This struct is a counterpart to [`CStrVec`] that owns the strings themselves
-/// instead of borrowing them. The type parameter `T` represents the collection
-/// of owned strings, which is typically `Vec<CString>`. The `PtrVec` owns both
-/// the allocation for the array of pointers and the collection of owned
-/// strings, ensuring that the pointers remain valid for the lifetime of the
-/// `PtrVec`. The implementation of `FromIterator` allows you to create a
-/// `PtrVec` from an iterator of any `AsRef<CStr>` type, which can be useful
-/// when you want to create an `AsCStrArray` from scratch and need to own the
-/// strings themselves.
+/// This struct is a counterpart to [`BorrowedCStrs`] that owns the strings
+/// themselves instead of borrowing them. The type parameter `T` represents the
+/// collection of owned strings, which defaults to `Vec<CString>`. The `PtrVec`
+/// owns both the allocation for the array of pointers and the collection of
+/// owned strings, ensuring that the pointers remain valid for the lifetime of
+/// the `PtrVec`.
+///
+/// The implementation of [`FromIterator`] allows you to create a `PtrVec` from
+/// an iterator of any `AsRef<CStr>` type, which can be useful when you want to
+/// create an `AsCStrArray` from scratch and need to own the strings themselves.
 #[derive(Debug, Eq, PartialEq)]
-// TODO Rename
-pub struct PtrVec<T> {
+pub struct PtrVec<T = Vec<CString>> {
     pointers: Vec<*const c_char>,
     values: T,
 }
@@ -325,8 +324,8 @@ impl<T> PtrVec<T> {
     /// are modified or dropped through other means while the `PtrVec` is alive,
     /// it may lead to undefined behavior when the pointers are used. If the
     /// strings pointed to by `pointers` are not contained in `values`, you
-    /// should consider using [`CStrVec`] instead, as it supports lifetime-based
-    /// safety guarantees for the strings.
+    /// should consider using [`BorrowedCStrs`] instead, as it supports
+    /// lifetime-based safety guarantees for the strings.
     #[inline(always)]
     #[must_use]
     pub unsafe fn from_pointers_and_values(pointers: Vec<*const c_char>, values: T) -> Self {
@@ -398,7 +397,7 @@ where
 /// function. By using this trait instead of [`AsCStrArray`] directly, `execve`
 /// can accept types that either implement `AsCStrArray` directly or can be
 /// converted into one, such as `Vec<CString>`. This reduces the need for users
-/// to manually convert their string collections into `CStrVec`s or other
+/// to manually convert their string collections into `BorrowedCStrs`s or other
 /// `AsCStrArray` implementors before passing them to `execve`.
 ///
 /// Note that implementations of this trait may perform conversions that involve
@@ -435,16 +434,17 @@ impl<T: AsCStrArray> IntoCStrArray for T {
 }
 
 impl<T> Sealed for &[T] where T: AsRef<CStr> {}
-/// Converts a slice of `&CStr`s into a `CStrVec`. (See [`CStrVec::from_iter`].)
+/// Converts a slice of `&CStr`s into a `BorrowedCStrs`. (See
+/// [`BorrowedCStrs::from_iter`].)
 impl<'a, T> IntoCStrArray for &'a [T]
 where
     T: AsRef<CStr>,
 {
-    type CStrArray = CStrVec<'a>;
+    type CStrArray = BorrowedCStrs<'a>;
 
     #[inline(always)]
-    fn into_c_str_array(self) -> CStrVec<'a> {
-        CStrVec::from_iter(self)
+    fn into_c_str_array(self) -> BorrowedCStrs<'a> {
+        BorrowedCStrs::from_iter(self)
     }
 }
 
