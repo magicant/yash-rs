@@ -127,7 +127,7 @@ where
 /// array and strings remain valid for the required lifetime. This wrapper does
 /// not take ownership of the array or strings.
 ///
-/// You should prefer [`BorrowedCStrs`] or [`PtrVec`] over this type when
+/// You should prefer [`BorrowedCStrs`] or [`OwnedCStrs`] over this type when
 /// possible, as they provide ownership and lifetime guarantees for the strings.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(transparent)]
@@ -252,37 +252,38 @@ impl From<BorrowedCStrs<'_>> for Vec<*const c_char> {
 ///
 /// This struct is a counterpart to [`BorrowedCStrs`] that owns the strings
 /// themselves instead of borrowing them. The type parameter `T` represents the
-/// collection of owned strings, which defaults to `Vec<CString>`. The `PtrVec`
-/// owns both the allocation for the array of pointers and the collection of
-/// owned strings, ensuring that the pointers remain valid for the lifetime of
-/// the `PtrVec`.
+/// collection of owned strings, which defaults to `Vec<CString>`. The
+/// `OwnedCStrs` owns both the allocation for the array of pointers and the
+/// collection of owned strings, ensuring that the pointers remain valid for the
+/// lifetime of the `OwnedCStrs`.
 ///
-/// The implementation of [`FromIterator`] allows you to create a `PtrVec` from
-/// an iterator of any `AsRef<CStr>` type, which can be useful when you want to
-/// create an `AsCStrArray` from scratch and need to own the strings themselves.
+/// The implementation of [`FromIterator`] allows you to create a `OwnedCStrs`
+/// from an iterator of any `AsRef<CStr>` type, which can be useful when you
+/// want to create an `AsCStrArray` from scratch and need to own the strings
+/// themselves.
 #[derive(Debug, Eq, PartialEq)]
-pub struct PtrVec<T = Vec<CString>> {
+pub struct OwnedCStrs<T = Vec<CString>> {
     pointers: Vec<*const c_char>,
     values: T,
 }
 
-impl<T> Sealed for PtrVec<T> {}
-unsafe impl<T> AsCStrArray for PtrVec<T> {
+impl<T> Sealed for OwnedCStrs<T> {}
+unsafe impl<T> AsCStrArray for OwnedCStrs<T> {
     #[inline(always)]
     fn as_ptr(&self) -> *const *const c_char {
         self.pointers.as_ptr()
     }
 }
 
-impl<T> PtrVec<T> {
-    /// Creates a new `PtrVec<T>` from a collection of values that can be
+impl<T> OwnedCStrs<T> {
+    /// Creates a new `OwnedCStrs<T>` from a collection of values that can be
     /// borrowed as `CStr`s.
     ///
     /// A reference to the given `values` must be convertible into an iterator
     /// of items that can be borrowed as `CStr`s, which are used to create the
     /// null-terminated array of pointers that will be returned by the
     /// [`as_ptr`](Self::as_ptr) method. The given `values` is stored in the
-    /// `PtrVec` for the lifetime of it to keep the strings valid and
+    /// `OwnedCStrs` for the lifetime of it to keep the strings valid and
     /// unmodified.
     ///
     /// Typically, `values` will be a `Vec<CString>`.
@@ -297,17 +298,17 @@ impl<T> PtrVec<T> {
         // SAFETY: `null_terminated_pointers` creates a null-terminated array,
         // and the pointers in the array point to C-style strings borrowed from
         // the `values`. The strings remain valid and unmodified for the
-        // lifetime of the `PtrVec` because they are owned by it and not mutated
-        // through the pointers.
+        // lifetime of the `OwnedCStrs` because they are owned by it and not
+        // mutated through the pointers.
         unsafe { Self::from_pointers_and_values(pointers, values) }
     }
 
-    /// Creates a new `PtrVec<T>` from its inner components.
+    /// Creates a new `OwnedCStrs<T>` from its inner components.
     ///
     /// This function directly uses the given `pointers` as the content of the
-    /// `PtrVec`. The `pointers` is a null-terminated array of pointers to
+    /// `OwnedCStrs`. The `pointers` is a null-terminated array of pointers to
     /// C-style strings that is returned by the [`as_ptr`](Self::as_ptr) method.
-    /// The `values` is an object that is stored in the `PtrVec` for the
+    /// The `values` is an object that is stored in the `OwnedCStrs` for the
     /// lifetime of it. Typically, `values` will be a `Vec<CString>`, and the
     /// `pointers` will point to the C-style strings contained in the
     /// `CString`s.
@@ -317,13 +318,13 @@ impl<T> PtrVec<T> {
     /// The caller must ensure that the pointers in the given `Vec` point to
     /// valid C-style strings, and that the `Vec` is null-terminated (i.e., the
     /// last pointer is a null pointer). The strings must remain valid and
-    /// unmodified for the lifetime of the `PtrVec`.
+    /// unmodified for the lifetime of the `OwnedCStrs`.
     ///
     /// This function does not require that the `pointers` point to strings
     /// contained in `values`. However, if the strings pointed to by `pointers`
-    /// are modified or dropped through other means while the `PtrVec` is alive,
-    /// it may lead to undefined behavior when the pointers are used. If the
-    /// strings pointed to by `pointers` are not contained in `values`, you
+    /// are modified or dropped through other means while the `OwnedCStrs` is
+    /// alive, it may lead to undefined behavior when the pointers are used. If
+    /// the strings pointed to by `pointers` are not contained in `values`, you
     /// should consider using [`BorrowedCStrs`] instead, as it supports
     /// lifetime-based safety guarantees for the strings.
     #[inline(always)]
@@ -332,11 +333,11 @@ impl<T> PtrVec<T> {
         Self { pointers, values }
     }
 
-    /// Consumes the `PtrVec` and returns the owned array of pointers and values.
+    /// Consumes the `OwnedCStrs` and returns the owned array of pointers and values.
     ///
     /// This function just returns its inner components. The caller is
     /// responsible for ensuring the validity of the returned pointers if they
-    /// intend to use them. If `self` was created by [`PtrVec::new`], the
+    /// intend to use them. If `self` was created by [`OwnedCStrs::new`], the
     /// C-style strings pointed to by the returned pointers will be valid until
     /// the returned `values` are mutated or dropped.
     #[inline(always)]
@@ -346,7 +347,7 @@ impl<T> PtrVec<T> {
     }
 }
 
-impl<T> Clone for PtrVec<T>
+impl<T> Clone for OwnedCStrs<T>
 where
     T: Clone,
     for<'a> &'a T: IntoIterator,
@@ -355,7 +356,7 @@ where
     fn clone(&self) -> Self {
         let strings = self.values.clone();
         // The new pointers must point to the new strings, so we create a new
-        // `PtrVec` from the cloned strings instead of just cloning the
+        // `OwnedCStrs` from the cloned strings instead of just cloning the
         // pointers.
         Self::new(strings)
     }
@@ -369,8 +370,8 @@ where
     }
 }
 
-/// Converts a `Vec<T>` into a `PtrVec<Vec<T>>`. (See [`PtrVec::new`].)
-impl<T> From<Vec<T>> for PtrVec<Vec<T>>
+/// Converts a `Vec<T>` into a `OwnedCStrs<Vec<T>>`. (See [`OwnedCStrs::new`].)
+impl<T> From<Vec<T>> for OwnedCStrs<Vec<T>>
 where
     T: AsRef<CStr>,
 {
@@ -380,8 +381,8 @@ where
     }
 }
 
-/// Creates a `PtrVec` from an iterator of values that can be borrowed as `CStr`s.
-impl<T> FromIterator<T> for PtrVec<Vec<T>>
+/// Creates a `OwnedCStrs` from an iterator of values that can be borrowed as `CStr`s.
+impl<T> FromIterator<T> for OwnedCStrs<Vec<T>>
 where
     T: AsRef<CStr>,
 {
@@ -449,15 +450,15 @@ where
 }
 
 impl<T> Sealed for Vec<T> where T: AsRef<CStr> {}
-/// Converts a `Vec<T>` into a `PtrVec<Vec<T>>`. (See [`PtrVec::new`].)
+/// Converts a `Vec<T>` into a `OwnedCStrs<Vec<T>>`. (See [`OwnedCStrs::new`].)
 impl<T> IntoCStrArray for Vec<T>
 where
     T: AsRef<CStr>,
 {
-    type CStrArray = PtrVec<Vec<T>>;
+    type CStrArray = OwnedCStrs<Vec<T>>;
 
     #[inline(always)]
-    fn into_c_str_array(self) -> PtrVec<Vec<T>> {
+    fn into_c_str_array(self) -> OwnedCStrs<Vec<T>> {
         self.into()
     }
 }
