@@ -382,13 +382,20 @@ where
 }
 
 /// Creates a `OwnedCStrs` from an iterator of values that can be borrowed as `CStr`s.
-impl<T> FromIterator<T> for OwnedCStrs<Vec<T>>
+impl<A, T> FromIterator<A> for OwnedCStrs<T>
 where
-    T: AsRef<CStr>,
+    A: AsRef<CStr>,
+    T: FromIterator<A>,
 {
     #[inline(always)]
-    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        Self::new(Vec::from_iter(iter))
+    fn from_iter<I: IntoIterator<Item = A>>(iter: I) -> Self {
+        let mut pointers = Vec::new();
+        let values = iter
+            .into_iter()
+            .inspect(|s| pointers.push(s.as_ref().as_ptr()))
+            .collect();
+        pointers.push(std::ptr::null());
+        unsafe { Self::from_pointers_and_values(pointers, values) }
     }
 }
 
