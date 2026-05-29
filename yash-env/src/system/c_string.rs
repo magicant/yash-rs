@@ -15,6 +15,28 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! Utilities for working with C-style strings ([`CStr`] and [`CString`]) in Rust
+//!
+//! This module provides abstractions for building and passing null-terminated
+//! arrays of pointers to C-style strings, primarily for [`Exec::execve`].
+//!
+//! Public items in this module:
+//!
+//! - [`AsCStrArray`]: unsafe low-level contract for types that can expose
+//!   a pointer to a null-terminated array of pointers to C-style strings.
+//! - [`IntoCStrArray`]: ergonomic conversion trait used by [`Exec::execve`];
+//!   accepts both native `AsCStrArray` implementors and convertible container
+//!   types.
+//! - [`CStrPtr`]: transparent wrapper for a raw pointer to an existing
+//!   null-terminated C-string-pointer array.
+//! - [`BorrowedCStrs`]: owning pointer-array wrapper over borrowed string data,
+//!   suitable when you already have `&CStr`/`&CString` values.
+//! - [`OwnedCStrs`]: owning wrapper that keeps both the strings and the pointer
+//!   array alive together.
+//!
+//! In short, use [`BorrowedCStrs`] for borrowed inputs, [`OwnedCStrs`] for
+//! owned inputs, and [`CStrPtr`] only when interoperating with raw FFI data.
+//!
+//! [`Exec::execve`]: super::Exec::execve
 
 use std::ffi::{CStr, CString, c_char};
 use std::marker::PhantomData;
