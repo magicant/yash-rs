@@ -19,7 +19,6 @@
 #[cfg(doc)]
 use std::ffi::CString;
 use std::ffi::{CStr, c_char};
-use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
 /// Converts an iterator of `AsRef<CStr>` items into an iterator of pointers to
@@ -250,18 +249,22 @@ impl From<CStrVec<'_>> for Vec<*const c_char> {
     }
 }
 
-/// A [`AsCStrArray`] backed by a [`Vec`] of owned C-style strings
+/// A [`AsCStrArray`] backed by a collection of owned strings
 ///
-/// A `PtrVec<T>` owns a `Vec<T>` and the allocation for the array of pointers.
-/// In the most typical case, `T` will be [`CString`], but it can be any type
-/// that implements `AsRef<CStr>`. `PtrVec` is useful when you want to create an
-/// `AsCStrArray` from scratch and need to own the strings themselves. The
-/// implementation of `FromIterator` allows you to create a `PtrVec` from an
-/// iterator of any `AsRef<CStr>` type.
-#[derive(Debug)]
+/// This struct is a counterpart to [`CStrVec`] that owns the strings themselves
+/// instead of borrowing them. The type parameter `T` represents the collection
+/// of owned strings, which is typically `Vec<CString>`. The `PtrVec` owns both
+/// the allocation for the array of pointers and the collection of owned
+/// strings, ensuring that the pointers remain valid for the lifetime of the
+/// `PtrVec`. The implementation of `FromIterator` allows you to create a
+/// `PtrVec` from an iterator of any `AsRef<CStr>` type, which can be useful
+/// when you want to create an `AsCStrArray` from scratch and need to own the
+/// strings themselves.
+#[derive(Debug, Eq, PartialEq)]
+// TODO Rename
 pub struct PtrVec<T> {
     pointers: Vec<*const c_char>,
-    values: Vec<T>,
+    values: T,
 }
 
 impl<T> Sealed for PtrVec<T> {}
@@ -273,16 +276,22 @@ unsafe impl<T> AsCStrArray for PtrVec<T> {
 }
 
 impl<T> PtrVec<T> {
-    /// Creates a new `PtrVec<T>` from a `Vec<T>`.
+    /// Creates a new `PtrVec<T>` from a collection of values that can be
+    /// borrowed as `CStr`s.
     ///
-    /// The given values are stored in the `PtrVec` to ensure that they remain
-    /// valid for the required lifetime. The `PtrVec` also allocates a
-    /// null-terminated array of pointers to the C-style strings, which is
-    /// returned by the [`as_ptr`](Self::as_ptr) method.
+    /// A reference to the given `values` must be convertible into an iterator
+    /// of items that can be borrowed as `CStr`s, which are used to create the
+    /// null-terminated array of pointers that will be returned by the
+    /// [`as_ptr`](Self::as_ptr) method. The given `values` is stored in the
+    /// `PtrVec` for the lifetime of it to keep the strings valid and
+    /// unmodified.
+    ///
+    /// Typically, `values` will be a `Vec<CString>`.
     #[must_use]
-    pub fn new(values: Vec<T>) -> Self
+    pub fn new(values: T) -> Self
     where
-        T: AsRef<CStr>,
+        for<'a> &'a T: IntoIterator,
+        for<'a> <&'a T as IntoIterator>::Item: AsRef<CStr>,
     {
         let pointers = null_terminated_pointers(&values).collect();
 
@@ -296,12 +305,12 @@ impl<T> PtrVec<T> {
 
     /// Creates a new `PtrVec<T>` from its inner components.
     ///
-    /// This function directly uses the given pointers as the content of the
+    /// This function directly uses the given `pointers` as the content of the
     /// `PtrVec`. The `pointers` is a null-terminated array of pointers to
     /// C-style strings that is returned by the [`as_ptr`](Self::as_ptr) method.
-    /// The `values` is an array of objects that is stored in the `PtrVec` for
-    /// the lifetime of it. Typically, `values` will be a `Vec<CString>`, and
-    /// the `pointers` will point to the C-style strings contained in the
+    /// The `values` is an object that is stored in the `PtrVec` for the
+    /// lifetime of it. Typically, `values` will be a `Vec<CString>`, and the
+    /// `pointers` will point to the C-style strings contained in the
     /// `CString`s.
     ///
     /// # Safety
@@ -310,8 +319,17 @@ impl<T> PtrVec<T> {
     /// valid C-style strings, and that the `Vec` is null-terminated (i.e., the
     /// last pointer is a null pointer). The strings must remain valid and
     /// unmodified for the lifetime of the `PtrVec`.
+    ///
+    /// This function does not require that the `pointers` point to strings
+    /// contained in `values`. However, if the strings pointed to by `pointers`
+    /// are modified or dropped through other means while the `PtrVec` is alive,
+    /// it may lead to undefined behavior when the pointers are used. If the
+    /// strings pointed to by `pointers` are not contained in `values`, you
+    /// should consider using [`CStrVec`] instead, as it supports lifetime-based
+    /// safety guarantees for the strings.
+    #[inline(always)]
     #[must_use]
-    pub unsafe fn from_pointers_and_values(pointers: Vec<*const c_char>, values: Vec<T>) -> Self {
+    pub unsafe fn from_pointers_and_values(pointers: Vec<*const c_char>, values: T) -> Self {
         Self { pointers, values }
     }
 
@@ -319,19 +337,21 @@ impl<T> PtrVec<T> {
     ///
     /// This function just returns its inner components. The caller is
     /// responsible for ensuring the validity of the returned pointers if they
-    /// intend to use them. The C-style strings pointed to by the returned
-    /// pointers will be valid until the returned `values` are mutated or
-    /// dropped.
+    /// intend to use them. If `self` was created by [`PtrVec::new`], the
+    /// C-style strings pointed to by the returned pointers will be valid until
+    /// the returned `values` are mutated or dropped.
     #[inline(always)]
     #[must_use]
-    pub fn into_pointers_and_values(self) -> (Vec<*const c_char>, Vec<T>) {
+    pub fn into_pointers_and_values(self) -> (Vec<*const c_char>, T) {
         (self.pointers, self.values)
     }
 }
 
 impl<T> Clone for PtrVec<T>
 where
-    T: Clone + AsRef<CStr>,
+    T: Clone,
+    for<'a> &'a T: IntoIterator,
+    for<'a> <&'a T as IntoIterator>::Item: AsRef<CStr>,
 {
     fn clone(&self) -> Self {
         let strings = self.values.clone();
@@ -350,55 +370,8 @@ where
     }
 }
 
-/// Compares the contained values for equality.
-impl<T> PartialEq for PtrVec<T>
-where
-    T: PartialEq,
-{
-    #[inline(always)]
-    fn eq(&self, other: &Self) -> bool {
-        self.values == other.values
-    }
-}
-
-/// Compares the contained values for equality.
-impl<T> Eq for PtrVec<T> where T: Eq {}
-
-/// Hashes the contained values.
-impl<T> Hash for PtrVec<T>
-where
-    T: Hash,
-{
-    #[inline(always)]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.values.hash(state);
-    }
-}
-
-/// Compares the contained values for ordering.
-impl<T> PartialOrd for PtrVec<T>
-where
-    T: PartialOrd,
-{
-    #[inline(always)]
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.values.partial_cmp(&other.values)
-    }
-}
-
-/// Compares the contained values for ordering.
-impl<T> Ord for PtrVec<T>
-where
-    T: Ord,
-{
-    #[inline(always)]
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.values.cmp(&other.values)
-    }
-}
-
-/// Converts a `Vec<T>` into a `PtrVec<T>`. (See [`PtrVec::new`].)
-impl<T> From<Vec<T>> for PtrVec<T>
+/// Converts a `Vec<T>` into a `PtrVec<Vec<T>>`. (See [`PtrVec::new`].)
+impl<T> From<Vec<T>> for PtrVec<Vec<T>>
 where
     T: AsRef<CStr>,
 {
@@ -409,7 +382,7 @@ where
 }
 
 /// Creates a `PtrVec` from an iterator of values that can be borrowed as `CStr`s.
-impl<T> FromIterator<T> for PtrVec<T>
+impl<T> FromIterator<T> for PtrVec<Vec<T>>
 where
     T: AsRef<CStr>,
 {
@@ -476,15 +449,15 @@ where
 }
 
 impl<T> Sealed for Vec<T> where T: AsRef<CStr> {}
-/// Converts a `Vec<T>` into a `PtrVec<T>`. (See [`PtrVec::new`].)
+/// Converts a `Vec<T>` into a `PtrVec<Vec<T>>`. (See [`PtrVec::new`].)
 impl<T> IntoCStrArray for Vec<T>
 where
     T: AsRef<CStr>,
 {
-    type CStrArray = PtrVec<T>;
+    type CStrArray = PtrVec<Vec<T>>;
 
     #[inline(always)]
-    fn into_c_str_array(self) -> PtrVec<T> {
+    fn into_c_str_array(self) -> PtrVec<Vec<T>> {
         self.into()
     }
 }
