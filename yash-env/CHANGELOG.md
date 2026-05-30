@@ -22,6 +22,18 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `impl<S> subshell::BlockSignals for Rc<Concurrent<S>>`
 - The `JobList::insert` method has been added as a new name for the existing
   `add` method.
+- The `system::c_string` module has been added, providing abstractions for
+  building and passing null-terminated arrays of pointers to C-style strings to
+  the `system::Exec::execve` method. It contains the following items:
+    - `AsCStrArray`: A sealed trait for types that can expose a pointer to a
+      null-terminated array of pointers to C-style strings.
+    - `IntoCStrArray`: A sealed trait for types that can be converted into an
+      `AsCStrArray`. This is the bound required by `system::Exec::execve`.
+    - `CStrPtr`: A transparent wrapper for a raw pointer to an existing
+      null-terminated C-string-pointer array.
+    - `BorrowedCStrs`: An owning pointer-array wrapper over borrowed string data.
+    - `OwnedCStrs`: An owning wrapper that keeps both the strings and the
+      pointer array alive together.
 
 ### Deprecated
 
