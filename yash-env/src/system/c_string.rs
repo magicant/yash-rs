@@ -522,3 +522,117 @@ where
         self.into()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_c_strings(words: &[&str]) -> Vec<CString> {
+        words.iter().map(|s| CString::new(*s).unwrap()).collect()
+    }
+
+    #[test]
+    fn as_c_str_array_to_vec() {
+        let strings = make_c_strings(&["foo", "bar", "baz"]);
+        let owned = OwnedCStrs::<Vec<CString>>::new(strings.clone());
+        assert_eq!(owned.to_vec(), strings);
+
+        // Empty array should round-trip to an empty Vec
+        let empty = OwnedCStrs::<Vec<CString>>::new(vec![]);
+        assert_eq!(empty.to_vec(), Vec::<CString>::new());
+    }
+
+    #[test]
+    fn borrowed_c_strs_from_iterator() {
+        let strings = make_c_strings(&["alpha", "beta"]);
+
+        // Collect borrows into BorrowedCStrs
+        let borrowed: BorrowedCStrs = strings.iter().collect();
+
+        // Content round-trips correctly
+        assert_eq!(borrowed.to_vec(), strings);
+
+        // The pointers in the array must actually borrow from `strings`
+        let ptr = borrowed.as_ptr();
+        unsafe {
+            assert_eq!(*ptr, strings[0].as_ptr());
+            assert_eq!(*ptr.add(1), strings[1].as_ptr());
+            // Array is null-terminated
+            assert!((*ptr.add(2)).is_null());
+        }
+    }
+
+    #[test]
+    fn owned_c_strs_new() {
+        let strings = make_c_strings(&["hello", "world"]);
+
+        let owned = OwnedCStrs::<Vec<CString>>::new(strings.clone());
+
+        // Content is preserved
+        assert_eq!(owned.to_vec(), strings);
+
+        // Pointers must be self-consistent (point into the owned values)
+        let (pointers, values) = owned.into_pointers_and_values();
+        for (i, value) in values.iter().enumerate() {
+            assert_eq!(pointers[i], value.as_ptr());
+        }
+        assert!(pointers[values.len()].is_null());
+    }
+
+    #[test]
+    fn owned_c_strs_clone() {
+        let strings = make_c_strings(&["foo", "bar"]);
+        let owned = OwnedCStrs::<Vec<CString>>::new(strings.clone());
+
+        let cloned = owned.clone();
+
+        // Cloned content matches the original
+        assert_eq!(cloned.to_vec(), strings);
+
+        // The clone must own its own copy of the strings, so the pointers
+        // must point to different memory than the original's pointers.
+        let orig_ptr = owned.as_ptr();
+        let clone_ptr = cloned.as_ptr();
+        unsafe {
+            assert_ne!(orig_ptr, clone_ptr);
+            assert_ne!(*orig_ptr, *clone_ptr);
+            assert_ne!(*orig_ptr.add(1), *clone_ptr.add(1));
+        }
+    }
+
+    #[test]
+    fn owned_c_strs_clone_from() {
+        let strings1 = make_c_strings(&["one"]);
+        let strings2 = make_c_strings(&["two", "three"]);
+        let source = OwnedCStrs::<Vec<CString>>::new(strings2.clone());
+        let mut dest = OwnedCStrs::<Vec<CString>>::new(strings1);
+
+        dest.clone_from(&source);
+
+        assert_eq!(dest.to_vec(), strings2);
+
+        // dest's pointers must be self-consistent (point into dest's own values)
+        let (pointers, values) = dest.into_pointers_and_values();
+        for (i, value) in values.iter().enumerate() {
+            assert_eq!(pointers[i], value.as_ptr());
+        }
+        assert!(pointers[values.len()].is_null());
+    }
+
+    #[test]
+    fn owned_c_strs_from_iterator() {
+        let strings = make_c_strings(&["x", "y", "z"]);
+
+        // Collect owned CStrings via the FromIterator impl
+        let owned: OwnedCStrs = strings.iter().cloned().collect();
+
+        assert_eq!(owned.to_vec(), strings);
+
+        // The pointers in the array must be self-consistent (point into the owned values)
+        let (pointers, values) = owned.into_pointers_and_values();
+        for (i, value) in values.iter().enumerate() {
+            assert_eq!(pointers[i], value.as_ptr());
+        }
+        assert!(pointers[values.len()].is_null());
+    }
+}
