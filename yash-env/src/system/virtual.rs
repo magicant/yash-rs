@@ -83,6 +83,7 @@ use super::Disposition;
 use super::Dup;
 use super::Errno;
 use super::Exec;
+use super::c_string::{AsCStrArray as _, IntoCStrArray};
 use super::Exit;
 use super::Fcntl;
 use super::FdFlag;
@@ -1302,12 +1303,16 @@ impl Exec for VirtualSystem {
     /// The `execve` system call cannot be simulated in the userland. This
     /// function returns `ENOSYS` if the file at `path` is a native executable,
     /// `ENOEXEC` if a non-executable file, and `ENOENT` otherwise.
-    fn execve(
+    fn execve<A, E>(
         &self,
         path: &CStr,
-        args: &[CString],
-        envs: &[CString],
-    ) -> impl Future<Output = Result<Infallible>> + use<> {
+        args: A,
+        envs: E,
+    ) -> impl Future<Output = Result<Infallible>> + use<A, E>
+    where
+        A: IntoCStrArray,
+        E: IntoCStrArray,
+    {
         let os_path = UnixStr::from_bytes(path.to_bytes());
         let mut state = self.state.borrow_mut();
         let fs = &state.file_system;
@@ -1327,8 +1332,8 @@ impl Exec for VirtualSystem {
             // Save arguments in the Process
             let process = state.processes.get_mut(&self.process_id).unwrap();
             let path = path.to_owned();
-            let args = args.to_owned();
-            let envs = envs.to_owned();
+            let args = args.into_c_str_array().to_vec();
+            let envs = envs.into_c_str_array().to_vec();
             process.last_exec = Some((path, args, envs));
 
             // TODO: We should abort the currently running task and start the new one.
@@ -2960,7 +2965,11 @@ mod tests {
         let pid = env
             .run_in_child_process((), move |child_env: Env<VirtualSystem>, ()| async move {
                 let path = CString::new(path).unwrap();
-                child_env.system.execve(&path, &[], &[]).await.ok();
+                child_env
+                    .system
+                    .execve(&path, &[] as &[CString], &[] as &[CString])
+                    .await
+                    .ok();
                 child_env.system.exit(child_env.exit_status).await;
             })
             .0
@@ -3249,7 +3258,10 @@ mod tests {
         state.file_system.save(path, content).unwrap();
         drop(state);
         let path = CString::new(path).unwrap();
-        let result = system.execve(&path, &[], &[]).now_or_never().unwrap();
+        let result = system
+            .execve(&path, &[] as &[CString], &[] as &[CString])
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Err(Errno::ENOSYS));
     }
 
@@ -3270,7 +3282,38 @@ mod tests {
         let path = CString::new(path).unwrap();
         let args = [c"file".to_owned(), c"bar".to_owned()];
         let envs = [c"foo=FOO".to_owned(), c"baz".to_owned()];
-        system.execve(&path, &args, &envs).now_or_never();
+        system
+            .execve(&path, args.as_slice(), envs.as_slice())
+            .now_or_never();
+
+        let process = system.current_process();
+        let arguments = process.last_exec.as_ref().unwrap();
+        assert_eq!(arguments.0, path);
+        assert_eq!(arguments.1, args);
+        assert_eq!(arguments.2, envs);
+    }
+
+    #[test]
+    fn execve_saves_arguments_from_owned_arrays() {
+        let system = VirtualSystem::new();
+        let path = "/some/file";
+        let mut content = Inode::default();
+        content.body = FileBody::Regular {
+            content: vec![],
+            is_native_executable: true,
+        };
+        content.permissions.set(Mode::USER_EXEC, true);
+        let content = Rc::new(RefCell::new(content));
+        let mut state = system.state.borrow_mut();
+        state.file_system.save(path, content).unwrap();
+        drop(state);
+        let path = CString::new(path).unwrap();
+        let args = vec![c"file".to_owned(), c"bar".to_owned()];
+        let envs = vec![c"foo=FOO".to_owned(), c"baz".to_owned()];
+        // `execve` accepts owned `Vec<CString>` through the `IntoCStrArray` trait.
+        system
+            .execve(&path, args.clone(), envs.clone())
+            .now_or_never();
 
         let process = system.current_process();
         let arguments = process.last_exec.as_ref().unwrap();
@@ -3290,7 +3333,10 @@ mod tests {
         state.file_system.save(path, content).unwrap();
         drop(state);
         let path = CString::new(path).unwrap();
-        let result = system.execve(&path, &[], &[]).now_or_never().unwrap();
+        let result = system
+            .execve(&path, &[] as &[CString], &[] as &[CString])
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Err(Errno::ENOEXEC));
     }
 
@@ -3298,7 +3344,7 @@ mod tests {
     fn execve_returns_enoent_on_file_not_found() {
         let system = VirtualSystem::new();
         let result = system
-            .execve(c"/no/such/file", &[], &[])
+            .execve(c"/no/such/file", &[] as &[CString], &[] as &[CString])
             .now_or_never()
             .unwrap();
         assert_eq!(result, Err(Errno::ENOENT));
