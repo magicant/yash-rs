@@ -115,7 +115,38 @@ pub unsafe trait AsCStrArray: Sealed {
     fn as_mut_ptr(&mut self) -> *const *mut c_char {
         self.as_ptr().cast()
     }
-    // TODO: to_vec
+
+    /// Constructs a `Vec<CString>` from the array of C-style strings.
+    ///
+    /// This method is a convenience for converting the array of C-style strings
+    /// into a more Rust-friendly format. It iterates over the pointers in the
+    /// array, converts each C-style string into a `CString`, and collects them
+    /// into a `Vec<CString>`. The returned `Vec<CString>` owns the new
+    /// allocations for the array and strings, so it is safe to use and modify
+    /// independently of `self`.
+    #[must_use]
+    fn to_vec(&self) -> Vec<CString> {
+        let mut vec = Vec::new();
+        let mut ptr = self.as_ptr();
+        loop {
+            // SAFETY: The `as_ptr` method guarantees that the returned pointer
+            // points to a null-terminated array of pointers to valid C-style
+            // strings, so it's safe to read from the pointer.
+            let c_str_ptr = unsafe { *ptr };
+            if c_str_ptr.is_null() {
+                break;
+            }
+            // SAFETY: Likewise, `c_str_ptr` points to a valid C-style string,
+            // so it's safe to create a `CStr` from it.
+            let c_str = unsafe { CStr::from_ptr(c_str_ptr) };
+            vec.push(c_str.to_owned());
+            // SAFETY: The `as_ptr` method guarantees that the array is
+            // null-terminated, so it's safe to advance the pointer until we
+            // reach the null pointer.
+            ptr = unsafe { ptr.add(1) };
+        }
+        vec
+    }
 }
 
 impl<T> Sealed for &T where T: Sealed + ?Sized {}
