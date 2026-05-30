@@ -19,13 +19,16 @@
 //! This module provides abstractions for building and passing null-terminated
 //! arrays of pointers to C-style strings, primarily for [`Exec::execve`].
 //!
-//! Public items in this module:
+//! This module defines two main traits:
 //!
 //! - [`AsCStrArray`]: unsafe low-level contract for types that can expose
 //!   a pointer to a null-terminated array of pointers to C-style strings.
 //! - [`IntoCStrArray`]: ergonomic conversion trait used by [`Exec::execve`];
 //!   accepts both native `AsCStrArray` implementors and convertible container
 //!   types.
+//!
+//! And provides several struct implementations for different use cases:
+//!
 //! - [`CStrPtr`]: transparent wrapper for a raw pointer to an existing
 //!   null-terminated C-string-pointer array.
 //! - [`BorrowedCStrs`]: owning pointer-array wrapper over borrowed string data,
@@ -61,14 +64,15 @@ trait Sealed {}
 ///
 /// The native `execve` system call expects two arrays of C-style strings, which
 /// must be passed as pointers to null-terminated arrays of pointers to
-/// null-terminated byte strings. This trait abstracts over the details of how
-/// these arrays are represented in Rust, allowing different types to be used as
-/// long as they can provide the required pointer to the array of C-style
-/// strings. The main requirement is that the array must be null-terminated and
-/// that the pointers in the array must point to valid C-style strings.
-/// Implementations of `Exec::execve` can then use this trait to accept
-/// different types of string arrays and convert them into the required format
-/// for the system call.
+/// null-terminated byte strings. This trait abstracts over how ownership and
+/// lifetime of these arrays and strings are managed in Rust, allowing
+/// different types to be used as long as they can provide the required pointer
+/// to the array of C-style strings. The main requirement is that the array must
+/// be null-terminated and that the pointers in the array must point to valid
+/// C-style strings. Implementations of `Exec::execve` can then use this trait
+/// to accept different types of string arrays and to obtain the required
+/// pointers for the system call without needing to know the details of how the
+/// strings are stored or managed in Rust.
 ///
 /// This trait is sealed to prevent external implementations, as the safety
 /// guarantees of the methods depend on the implementor upholding certain
@@ -310,7 +314,7 @@ impl From<BorrowedCStrs<'_>> for Vec<*const c_char> {
 /// collection of owned strings, ensuring that the pointers remain valid for the
 /// lifetime of the `OwnedCStrs`.
 ///
-/// The implementation of [`FromIterator`] allows you to create a `OwnedCStrs`
+/// The implementation of [`FromIterator`] allows you to create an `OwnedCStrs`
 /// from an iterator of any `AsRef<CStr>` type, which can be useful when you
 /// want to create an `AsCStrArray` from scratch and need to own the strings
 /// themselves.
