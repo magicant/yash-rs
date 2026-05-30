@@ -993,10 +993,10 @@ impl Exec for RealSystem {
         let args = args.into_c_str_array();
         let envs = envs.into_c_str_array();
         loop {
-            // SAFETY: `as_ptr` returns a pointer to a null-terminated array of
-            // pointers to valid C-style strings, which is exactly what `execve`
-            // expects. The strings remain valid because `args` and `envs` are
-            // kept alive for the duration of the call.
+            // SAFETY: `AsCStrArray::as_ptr` returns a pointer to a
+            // null-terminated array of pointers to valid C-style strings, which
+            // is exactly what `execve` expects. The strings remain valid because
+            // `args` and `envs` are kept alive for the duration of the call.
             let _ = unsafe { libc::execve(path.as_ptr(), args.as_ptr(), envs.as_ptr()) };
             // TODO Uncomment when upgrading to libc 1.0
             // // `execve` requires mutable pointers in libc 1.0.

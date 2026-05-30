@@ -3310,7 +3310,8 @@ mod tests {
         let path = CString::new(path).unwrap();
         let args = vec![c"file".to_owned(), c"bar".to_owned()];
         let envs = vec![c"foo=FOO".to_owned(), c"baz".to_owned()];
-        // `execve` accepts owned `Vec<CString>` through the `IntoCStrArray` trait.
+        // `execve` accepts owned `Vec<CString>` directly through the
+        // `IntoCStrArray` trait, without converting them to slices.
         system
             .execve(&path, args.clone(), envs.clone())
             .now_or_never();
