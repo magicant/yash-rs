@@ -30,20 +30,21 @@ use std::ops::RangeInclusive;
 /// an empty range.
 #[must_use]
 pub fn rt_range() -> RangeInclusive<RawNumber> {
-    #[cfg(target_os = "aix")]
-    return libc::SIGRTMIN..=libc::SIGRTMAX;
+    cfg_select! {
+        target_os = "aix" => libc::SIGRTMIN..=libc::SIGRTMAX,
 
-    #[cfg(any(
-        target_os = "android",
-        target_os = "emscripten",
-        target_os = "l4re",
-        target_os = "linux",
-    ))]
-    return libc::SIGRTMIN()..=libc::SIGRTMAX();
+        any(
+            target_os = "android",
+            target_os = "emscripten",
+            target_os = "l4re",
+            target_os = "linux",
+        ) => libc::SIGRTMIN()..=libc::SIGRTMAX(),
 
-    #[allow(unreachable_code, reason = "for readability")] // TODO: use cfg_select
-    #[allow(clippy::reversed_empty_ranges, reason = "false positive")]
-    return 0..=-1;
+        _ => {
+            #[allow(clippy::reversed_empty_ranges, reason = "false positive")]
+            { 0..=-1 }
+        }
+    }
 }
 
 /// Signal set for the real system, wrapping the `sigset_t` type from libc
@@ -132,20 +133,23 @@ impl Disposition {
             (&raw mut (*sa_ptr).sa_flags).write(0);
             libc::sigemptyset(&raw mut (*sa_ptr).sa_mask);
 
-            // TODO: use cfg_select
-            #[cfg(not(target_os = "aix"))]
-            #[allow(
-                clippy::useless_transmute,
-                reason = "the type of sa_sigaction may vary across platforms"
-            )]
-            (&raw mut (*sa_ptr).sa_sigaction).write(std::mem::transmute(handler));
+            cfg_select! {
+                target_os = "aix" => {
+                    #[allow(
+                        clippy::useless_transmute,
+                        reason = "the type of __su_sigaction may vary across platforms"
+                    )]
+                    (&raw mut (*sa_ptr).sa_union.__su_sigaction).write(std::mem::transmute(handler));
+                }
 
-            #[cfg(target_os = "aix")]
-            #[allow(
-                clippy::useless_transmute,
-                reason = "the type of __su_sigaction may vary across platforms"
-            )]
-            (&raw mut (*sa_ptr).sa_union.__su_sigaction).write(std::mem::transmute(handler));
+                _ => {
+                    #[allow(
+                        clippy::useless_transmute,
+                        reason = "the type of sa_sigaction may vary across platforms"
+                    )]
+                    (&raw mut (*sa_ptr).sa_sigaction).write(std::mem::transmute(handler));
+                }
+            }
         }
         sa
     }
@@ -153,12 +157,10 @@ impl Disposition {
     /// Converts the `sigaction` to the signal disposition for the real system.
     pub(super) unsafe fn from_sigaction(sa: &MaybeUninit<libc::sigaction>) -> Self {
         unsafe {
-            // TODO: use cfg_select
-            #[cfg(not(target_os = "aix"))]
-            let handler = (*sa.as_ptr()).sa_sigaction;
-
-            #[cfg(target_os = "aix")]
-            let handler = (*sa.as_ptr()).sa_union.__su_sigaction;
+            let handler = cfg_select! {
+                target_os = "aix" => (*sa.as_ptr()).sa_union.__su_sigaction,
+                _ => (*sa.as_ptr()).sa_sigaction,
+            };
 
             #[allow(
                 clippy::useless_transmute,

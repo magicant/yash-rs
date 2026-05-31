@@ -1056,32 +1056,35 @@ impl GetPw for RealSystem {
 impl Sysconf for RealSystem {
     fn confstr_path(&self) -> Result<UnixString> {
         // TODO Support other platforms
-        #[cfg(any(
-            target_os = "linux",
-            target_os = "macos",
-            target_os = "ios",
-            target_os = "tvos",
-            target_os = "watchos"
-        ))]
-        unsafe {
-            let size = libc::confstr(libc::_CS_PATH, std::ptr::null_mut(), 0);
-            if size == 0 {
-                return Err(Errno::last());
+        cfg_select! {
+            any(
+                target_os = "linux",
+                target_os = "macos",
+                target_os = "ios",
+                target_os = "tvos",
+                target_os = "watchos"
+            ) => {
+                unsafe {
+                    let size = libc::confstr(libc::_CS_PATH, std::ptr::null_mut(), 0);
+                    if size == 0 {
+                        return Err(Errno::last());
+                    }
+                    let mut buffer = Vec::<u8>::with_capacity(size);
+                    let final_size =
+                        libc::confstr(libc::_CS_PATH, buffer.as_mut_ptr() as *mut _, size);
+                    if final_size == 0 {
+                        return Err(Errno::last());
+                    }
+                    if final_size > size {
+                        return Err(Errno::ERANGE);
+                    }
+                    buffer.set_len(final_size - 1); // The last byte is a null terminator.
+                    Ok(UnixString::from_vec(buffer))
+                }
             }
-            let mut buffer = Vec::<u8>::with_capacity(size);
-            let final_size = libc::confstr(libc::_CS_PATH, buffer.as_mut_ptr() as *mut _, size);
-            if final_size == 0 {
-                return Err(Errno::last());
-            }
-            if final_size > size {
-                return Err(Errno::ERANGE);
-            }
-            buffer.set_len(final_size - 1); // The last byte is a null terminator.
-            return Ok(UnixString::from_vec(buffer));
-        }
 
-        #[allow(unreachable_code, reason = "for readability")] // TODO: use cfg_select
-        Err(Errno::ENOSYS)
+            _ => Err(Errno::ENOSYS),
+        }
     }
 }
 
