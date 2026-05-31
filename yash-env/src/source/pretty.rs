@@ -246,9 +246,7 @@ pub fn snippet_for_code<'a, 'b>(
     if let Some(i) = snippets.iter().position(|s| std::ptr::eq(s.code, code)) {
         &mut snippets[i]
     } else {
-        // TODO Use Vec::push_mut when stabilized
-        snippets.push(Snippet::with_code(code));
-        snippets.last_mut().unwrap()
+        snippets.push_mut(Snippet::with_code(code))
     }
 }
 
