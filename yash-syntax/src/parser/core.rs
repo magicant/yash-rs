@@ -287,22 +287,17 @@ impl<'a, 'b> Parser<'a, 'b> {
     /// [taken](Self::take_token_raw).
     fn substitute_alias(&mut self, token: Token, is_command_name: bool) -> Rec<Token> {
         // TODO Only POSIXly-valid alias name should be recognized in POSIXly-correct mode.
-        if !self.aliases.is_empty() {
-            if let Token(_) = token.id {
-                if let Some(name) = token.word.to_string_if_literal() {
-                    if !token.word.location.code.source.is_alias_for(&name) {
-                        if let Some(alias) = self.aliases.look_up(&name) {
-                            if is_command_name
-                                || alias.global
-                                || self.lexer.is_after_blank_ending_alias(token.index)
-                            {
-                                self.lexer.substitute_alias(token.index, &alias);
-                                return Rec::AliasSubstituted;
-                            }
-                        }
-                    }
-                }
-            }
+        if !self.aliases.is_empty()
+            && let Token(_) = token.id
+            && let Some(name) = token.word.to_string_if_literal()
+            && !token.word.location.code.source.is_alias_for(&name)
+            && let Some(alias) = self.aliases.look_up(&name)
+            && (is_command_name
+                || alias.global
+                || self.lexer.is_after_blank_ending_alias(token.index))
+        {
+            self.lexer.substitute_alias(token.index, &alias);
+            return Rec::AliasSubstituted;
         }
 
         Rec::Parsed(token)
@@ -352,10 +347,10 @@ impl<'a, 'b> Parser<'a, 'b> {
     pub async fn take_token_auto(&mut self, keywords: &[Keyword]) -> Result<Token> {
         loop {
             let token = self.take_token_raw().await?;
-            if let Token(Some(keyword)) = token.id {
-                if keywords.contains(&keyword) {
-                    return Ok(token);
-                }
+            if let Token(Some(keyword)) = token.id
+                && keywords.contains(&keyword)
+            {
+                return Ok(token);
             }
             if let Rec::Parsed(token) = self.substitute_alias(token, false) {
                 return Ok(token);

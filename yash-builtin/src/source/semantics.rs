@@ -103,10 +103,10 @@ where
         let path = PathBuf::from_iter([dir, filename])
             .into_unix_string()
             .into_vec();
-        if let Ok(c_path) = CString::new(path) {
-            if let Ok(fd) = open_file(&env.system, &c_path).await {
-                return Ok(fd);
-            }
+        if let Ok(c_path) = CString::new(path)
+            && let Ok(fd) = open_file(&env.system, &c_path).await
+        {
+            return Ok(fd);
         }
     }
     Err(Errno::ENOENT)

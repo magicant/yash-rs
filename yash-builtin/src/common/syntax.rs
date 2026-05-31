@@ -206,14 +206,14 @@ enum LongMatch {
 
 impl OptionSpec<'_> {
     fn long_match(&self, name: &str) -> LongMatch {
-        if let Some(long) = self.long {
-            if long.starts_with(name) {
-                return if long.len() == name.len() {
-                    LongMatch::Exact
-                } else {
-                    LongMatch::Partial
-                };
-            }
+        if let Some(long) = self.long
+            && long.starts_with(name)
+        {
+            return if long.len() == name.len() {
+                LongMatch::Exact
+            } else {
+                LongMatch::Partial
+            };
         }
         LongMatch::None
     }

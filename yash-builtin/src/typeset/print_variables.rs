@@ -130,12 +130,11 @@ struct AttributeOption<'a> {
 impl std::fmt::Display for AttributeOption<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for option in self.options_allowed {
-            if let Some(attr) = option.attr {
-                if let Ok(attr) = VariableAttr::try_from(attr) {
-                    if attr.test(self.var).into() {
-                        write!(f, "-{} ", option.short)?;
-                    }
-                }
+            if let Some(attr) = option.attr
+                && let Ok(attr) = VariableAttr::try_from(attr)
+                && attr.test(self.var).into()
+            {
+                write!(f, "-{} ", option.short)?;
             }
         }
         Ok(())

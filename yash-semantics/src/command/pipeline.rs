@@ -313,11 +313,11 @@ impl PipeSet {
                 env.system.close(writer)?;
             }
         }
-        if let Some(reader) = self.read_previous {
-            if reader != Fd::STDIN {
-                env.system.dup2(reader, Fd::STDIN)?;
-                env.system.close(reader)?;
-            }
+        if let Some(reader) = self.read_previous
+            && reader != Fd::STDIN
+        {
+            env.system.dup2(reader, Fd::STDIN)?;
+            env.system.close(reader)?;
         }
         Ok(())
     }

@@ -172,15 +172,15 @@ impl Config {
         let child_task = move |mut child_env: Env<S>, ()| async move {
             let env = &mut *child_env.push_frame(Frame::Subshell);
 
-            if let Some(job_control) = job_control {
-                if let Ok(()) = env.system.setpgid(ME, ME) {
-                    match job_control {
-                        JobControl::Background => (),
-                        JobControl::Foreground => {
-                            if let Some(tty) = tty {
-                                let pgid = env.system.getpgrp();
-                                tcsetpgrp_with_block(&env.system, tty, pgid).await.ok();
-                            }
+            if let Some(job_control) = job_control
+                && let Ok(()) = env.system.setpgid(ME, ME)
+            {
+                match job_control {
+                    JobControl::Background => (),
+                    JobControl::Foreground => {
+                        if let Some(tty) = tty {
+                            let pgid = env.system.getpgrp();
+                            tcsetpgrp_with_block(&env.system, tty, pgid).await.ok();
                         }
                     }
                 }
@@ -278,12 +278,12 @@ impl Config {
             }
         };
 
-        if job_control == Some(JobControl::Foreground) {
-            if let Some(tty) = env.tty {
-                tcsetpgrp_with_block(&env.system, tty, env.main_pgid)
-                    .await
-                    .ok();
-            }
+        if job_control == Some(JobControl::Foreground)
+            && let Some(tty) = env.tty
+        {
+            tcsetpgrp_with_block(&env.system, tty, env.main_pgid)
+                .await
+                .ok();
         }
 
         Ok((pid, result))

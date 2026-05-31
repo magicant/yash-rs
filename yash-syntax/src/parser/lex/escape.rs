@@ -25,11 +25,11 @@ use crate::syntax::EscapedString;
 impl Lexer<'_> {
     /// Parses a hexadecimal digit.
     async fn hex_digit(&mut self) -> Result<Option<u32>> {
-        if let Some(c) = self.peek_char().await? {
-            if let Some(digit) = c.to_digit(16) {
-                self.consume_char();
-                return Ok(Some(digit));
-            }
+        if let Some(c) = self.peek_char().await?
+            && let Some(digit) = c.to_digit(16)
+        {
+            self.consume_char();
+            return Ok(Some(digit));
         }
         Ok(None)
     }

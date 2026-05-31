@@ -131,12 +131,13 @@ impl WordLexer<'_, '_> {
             }
             _ => {
                 let unit = self.text_unit(is_delimiter, is_escapable).await?;
-                if allow_single_quote && unit == Some(TextUnit::Literal('$')) {
-                    if let Some(result) = self.single_quoted_escaped_string().await? {
-                        return Ok(Some(DollarSingleQuote(result)));
-                    }
-                    // TODO Maybe reject any other characters after `$`?
+                if allow_single_quote
+                    && unit == Some(TextUnit::Literal('$'))
+                    && let Some(result) = self.single_quoted_escaped_string().await?
+                {
+                    return Ok(Some(DollarSingleQuote(result)));
                 }
+                // TODO Maybe reject any other characters after `$`?
                 Ok(unit.map(Unquoted))
             }
         }

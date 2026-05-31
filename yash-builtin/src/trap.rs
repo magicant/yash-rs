@@ -128,10 +128,10 @@ pub fn display_all_traps<S: SignalSystem>(
 ) -> String {
     let mut output = String::new();
     for cond in Condition::iter(system) {
-        if let Condition::Signal(number) = cond {
-            if number == S::SIGKILL || number == S::SIGSTOP {
-                continue;
-            }
+        if let Condition::Signal(number) = cond
+            && (number == S::SIGKILL || number == S::SIGSTOP)
+        {
+            continue;
         }
         display_trap(traps, system, cond, include_default, &mut output).unwrap()
     }

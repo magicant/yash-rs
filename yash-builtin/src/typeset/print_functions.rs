@@ -78,12 +78,11 @@ fn print_one<S>(
     // Print a command to set the function attributes.
     let mut options_to_print = String::new();
     for option in context.options_allowed {
-        if let Some(attr) = option.attr {
-            if let Ok(attr) = FunctionAttr::try_from(attr) {
-                if attr.test(function).into() {
-                    options_to_print.push(option.short);
-                }
-            }
+        if let Some(attr) = option.attr
+            && let Ok(attr) = FunctionAttr::try_from(attr)
+            && attr.test(function).into()
+        {
+            options_to_print.push(option.short);
         }
     }
     if !options_to_print.is_empty() || context.builtin_is_significant {

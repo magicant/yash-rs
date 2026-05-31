@@ -67,14 +67,14 @@ fn make_range(items: &mut Vec<BracketItem>) {
     if let Some(i1) = items.pop() {
         if let Atom(end) = i1 {
             if let Some(i2) = items.pop() {
-                if let Atom(Char('-')) = i2 {
-                    if let Some(i3) = items.pop() {
-                        if let Atom(start) = i3 {
-                            items.push(Range(start..=end));
-                            return;
-                        }
-                        items.push(i3);
+                if let Atom(Char('-')) = i2
+                    && let Some(i3) = items.pop()
+                {
+                    if let Atom(start) = i3 {
+                        items.push(Range(start..=end));
+                        return;
                     }
+                    items.push(i3);
                 }
                 items.push(i2);
             }

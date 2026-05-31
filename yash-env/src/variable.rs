@@ -735,10 +735,10 @@ impl<'a> Iterator for Iter<'a> {
     fn next(&mut self) -> Option<(&'a str, &'a Variable)> {
         loop {
             let next = self.inner.next()?;
-            if let Some(variable) = next.1.last() {
-                if variable.context_index >= self.min_context_index {
-                    return Some((next.0, &variable.variable));
-                }
+            if let Some(variable) = next.1.last()
+                && variable.context_index >= self.min_context_index
+            {
+                return Some((next.0, &variable.variable));
             }
         }
     }

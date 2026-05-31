@@ -1099,17 +1099,16 @@ impl ShellPath for RealSystem {
         // TODO Add optimization for other targets
 
         // Find an executable "sh" from the default PATH
-        if let Ok(path) = self.confstr_path() {
-            if let Some(full_path) = path
+        if let Ok(path) = self.confstr_path()
+            && let Some(full_path) = path
                 .as_bytes()
                 .split(|b| *b == b':')
                 .map(|dir| Path::new(UnixStr::from_bytes(dir)).join("sh"))
                 .filter(|full_path| full_path.is_absolute())
                 .filter_map(|full_path| CString::new(full_path.into_unix_string().into_vec()).ok())
                 .find(|full_path| self.is_executable_file(full_path))
-            {
-                return full_path;
-            }
+        {
+            return full_path;
         }
 
         // The last resort

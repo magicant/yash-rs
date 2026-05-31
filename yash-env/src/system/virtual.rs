@@ -421,11 +421,11 @@ impl VirtualSystem {
                 {
                     return Err(Errno::ENOTDIR);
                 }
-                if flags.contains(OpenFlag::Truncate) {
-                    if let FileBody::Regular { content, .. } = &mut inode.borrow_mut().body {
-                        content.clear();
-                    };
-                }
+                if flags.contains(OpenFlag::Truncate)
+                    && let FileBody::Regular { content, .. } = &mut inode.borrow_mut().body
+                {
+                    content.clear();
+                };
                 inode
             }
             Err(Errno::ENOENT) if flags.contains(OpenFlag::Create) => {

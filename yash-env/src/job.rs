@@ -787,16 +787,17 @@ impl JobList {
             if index != self.current_job_index {
                 self.previous_job_index = std::mem::replace(&mut self.current_job_index, index);
             }
-        } else if was_suspended && !job.is_suspended() {
-            if let Some(prev_index) = self.previous_job() {
-                let previous_job_becomes_current_job =
-                    index == self.current_job_index && self[prev_index].is_suspended();
-                if previous_job_becomes_current_job {
-                    self.current_job_index = prev_index;
-                }
-                if previous_job_becomes_current_job || index == prev_index {
-                    self.previous_job_index = self.any_suspended_job_but_current().unwrap_or(index);
-                }
+        } else if was_suspended
+            && !job.is_suspended()
+            && let Some(prev_index) = self.previous_job()
+        {
+            let previous_job_becomes_current_job =
+                index == self.current_job_index && self[prev_index].is_suspended();
+            if previous_job_becomes_current_job {
+                self.current_job_index = prev_index;
+            }
+            if previous_job_becomes_current_job || index == prev_index {
+                self.previous_job_index = self.any_suspended_job_but_current().unwrap_or(index);
             }
         }
 

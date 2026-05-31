@@ -330,10 +330,10 @@ impl<'a> LexerCore<'a> {
     /// Returns a location for a given range of the source code.
     #[must_use]
     fn location_range(&self, range: Range<usize>) -> Location {
-        if range.start == self.source.len() {
-            if let InputState::EndOfInput(ref location) = self.state {
-                return location.clone();
-            }
+        if range.start == self.source.len()
+            && let InputState::EndOfInput(ref location) = self.state
+        {
+            return location.clone();
         }
         let start = &self.peek_char_at(range.start).location;
         let code = start.code.clone();
@@ -412,12 +412,11 @@ impl<'a> LexerCore<'a> {
                 return false;
             }
 
-            if let Source::Alias { ref alias, .. } = *sc.value.location.code.source {
-                if ends_with_blank(&alias.replacement)
-                    && !is_same_alias(alias, self.source.get(index + 1))
-                {
-                    return true;
-                }
+            if let Source::Alias { ref alias, .. } = *sc.value.location.code.source
+                && ends_with_blank(&alias.replacement)
+                && !is_same_alias(alias, self.source.get(index + 1))
+            {
+                return true;
             }
         }
 

@@ -290,11 +290,11 @@ pub fn classify<S, E: ClassifyEnv<S>>(env: &E, name: &str) -> Target<S> {
     }
 
     let builtin = env.builtin(name);
-    if let Some(builtin) = builtin {
-        if builtin.r#type == Special {
-            let path = CString::default();
-            return Target::Builtin { builtin, path };
-        }
+    if let Some(builtin) = builtin
+        && builtin.r#type == Special
+    {
+        let path = CString::default();
+        return Target::Builtin { builtin, path };
     }
 
     if let Some(function) = env.function(name) {

@@ -366,10 +366,10 @@ impl GrandState {
             EnterSubshellOption::ClearInternalDisposition => new_setting,
             EnterSubshellOption::Ignore => Disposition::Ignore,
         };
-        if old_disposition != new_disposition {
-            if let Condition::Signal(signal) = cond {
-                system.set_disposition(signal, new_disposition).await?;
-            }
+        if old_disposition != new_disposition
+            && let Condition::Signal(signal) = cond
+        {
+            system.set_disposition(signal, new_disposition).await?;
         }
         self.internal_disposition = match option {
             EnterSubshellOption::KeepInternalDisposition => self.internal_disposition,

@@ -43,14 +43,13 @@ use crate::syntax::Word;
 /// `ExpansionMode::Multiple`, and the word is returned as is.
 fn determine_expansion_mode(word: Word) -> (Word, ExpansionMode) {
     use crate::syntax::{TextUnit::Literal, WordUnit::Unquoted};
-    if let Some(eq) = word.units.iter().position(|u| *u == Unquoted(Literal('='))) {
-        if let Some(name) = word.units[..eq].to_string_if_literal() {
-            if !name.is_empty() {
-                let mut word = word;
-                word.parse_tilde_everywhere_after(eq + 1);
-                return (word, ExpansionMode::Single);
-            }
-        }
+    if let Some(eq) = word.units.iter().position(|u| *u == Unquoted(Literal('=')))
+        && let Some(name) = word.units[..eq].to_string_if_literal()
+        && !name.is_empty()
+    {
+        let mut word = word;
+        word.parse_tilde_everywhere_after(eq + 1);
+        return (word, ExpansionMode::Single);
     }
     (word, ExpansionMode::Multiple)
 }
@@ -189,10 +188,11 @@ impl Parser<'_, '_> {
 
             // Tell array assignment from scalar assignment
             // TODO no array assignment in POSIXly-correct mode
-            if units.is_empty() && !self.has_blank().await? {
-                if let Some(words) = self.array_values().await? {
-                    assign.value = Array(words);
-                }
+            if units.is_empty()
+                && !self.has_blank().await?
+                && let Some(words) = self.array_values().await?
+            {
+                assign.value = Array(words);
             }
 
             result.assigns.push(assign);

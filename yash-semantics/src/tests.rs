@@ -146,13 +146,12 @@ where
                 }
             } else {
                 let name = value;
-                if let Some(var) = env.variables.get(&name) {
-                    if let Some(value) = &var.value {
-                        let line = format!("{name}={}\n", value.quote());
-                        if let Err(errno) = env.system.write_all(Fd::STDOUT, line.as_bytes()).await
-                        {
-                            unimplemented!("write error: {:?}", errno);
-                        }
+                if let Some(var) = env.variables.get(&name)
+                    && let Some(value) = &var.value
+                {
+                    let line = format!("{name}={}\n", value.quote());
+                    if let Err(errno) = env.system.write_all(Fd::STDOUT, line.as_bytes()).await {
+                        unimplemented!("write error: {:?}", errno);
                     }
                 }
             }

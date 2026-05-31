@@ -34,10 +34,10 @@ pub fn resolve<'a, S>(env: &'a Env<S>, param: &Param, location: &Location) -> Ex
     fn options<S>(env: &Env<S>) -> Expansion<'_> {
         let mut value = String::new();
         for option in yash_env::option::Option::iter() {
-            if let Some((name, state)) = option.short_name() {
-                if state == env.options.get(option) {
-                    value.push(name);
-                }
+            if let Some((name, state)) = option.short_name()
+                && state == env.options.get(option)
+            {
+                value.push(name);
             }
         }
         value.into()

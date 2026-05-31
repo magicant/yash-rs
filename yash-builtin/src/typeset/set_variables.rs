@@ -44,16 +44,16 @@ impl SetVariables {
             let mut variable = env.get_or_create_variable(&field.value, self.scope.into());
 
             // Assign the value to the variable.
-            if let Some(value) = value_to_assign {
-                if let Err(error) = variable.assign(value, field.origin.clone()) {
-                    errors.push(ExecuteError::AssignReadOnlyVariable(AssignReadOnlyError {
-                        name: field.value,
-                        new_value: error.new_value,
-                        assigned_location: error.assigned_location.unwrap(),
-                        read_only_location: error.read_only_location,
-                    }));
-                    continue;
-                }
+            if let Some(value) = value_to_assign
+                && let Err(error) = variable.assign(value, field.origin.clone())
+            {
+                errors.push(ExecuteError::AssignReadOnlyVariable(AssignReadOnlyError {
+                    name: field.value,
+                    new_value: error.new_value,
+                    assigned_location: error.assigned_location.unwrap(),
+                    read_only_location: error.read_only_location,
+                }));
+                continue;
             }
 
             // Apply the attributes to the variable.
