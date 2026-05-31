@@ -152,7 +152,10 @@ pub async fn replace_current_process<S: Exec + ShellPath + SignalSystem>(
 
     let args = to_c_strings(args);
     let envs = env.variables.env_c_strings();
-    let Err(errno) = env.system.execve(path.as_c_str(), &args, &envs).await;
+    let Err(errno) = env
+        .system
+        .execve(path.as_c_str(), args.as_slice(), envs.as_slice())
+        .await;
     env.exit_status = match errno {
         Errno::ENOEXEC => {
             fall_back_on_sh(&env.system, path.clone(), args, envs).await;
@@ -196,7 +199,7 @@ async fn fall_back_on_sh<S: ShellPath + Exec>(
     c"sh".clone_into(&mut args[0]);
 
     let sh_path = system.shell_path();
-    system.execve(&sh_path, &args, &envs).await.ok();
+    system.execve(&sh_path, args, envs).await.ok();
 }
 
 /// Error returned when starting a subshell fails in [`run_external_utility_in_subshell`]

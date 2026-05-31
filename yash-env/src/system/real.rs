@@ -80,6 +80,7 @@ use super::Uid;
 use super::Umask;
 use super::Wait;
 use super::Write;
+use super::c_string::{AsCStrArray as _, IntoCStrArray};
 use super::resource::LimitPair;
 use super::resource::Resource;
 #[cfg(doc)]
@@ -979,32 +980,29 @@ impl Wait for RealSystem {
 }
 
 impl Exec for RealSystem {
-    fn execve(
+    fn execve<A, E>(
         &self,
         path: &CStr,
-        args: &[CString],
-        envs: &[CString],
-    ) -> impl Future<Output = Result<Infallible>> + use<> {
-        fn to_pointer_array<S: AsRef<CStr>>(strs: &[S]) -> Vec<*const libc::c_char> {
-            strs.iter()
-                .map(|s| s.as_ref().as_ptr())
-                .chain(std::iter::once(std::ptr::null()))
-                .collect()
-        }
-        // TODO Uncomment when upgrading to libc 1.0
-        // // This function makes mutable char pointers from immutable string
-        // // slices since `execve` requires mutable pointers.
-        // fn to_pointer_array<S: AsRef<CStr>>(strs: &[S]) -> Vec<*mut libc::c_char> {
-        //     strs.iter()
-        //         .map(|s| s.as_ref().as_ptr().cast_mut())
-        //         .chain(std::iter::once(std::ptr::null_mut()))
-        //         .collect()
-        // }
-
-        let args = to_pointer_array(args);
-        let envs = to_pointer_array(envs);
+        args: A,
+        envs: E,
+    ) -> impl Future<Output = Result<Infallible>> + use<A, E>
+    where
+        A: IntoCStrArray,
+        E: IntoCStrArray,
+    {
+        let args = args.into_c_str_array();
+        let envs = envs.into_c_str_array();
         loop {
+            // SAFETY: `AsCStrArray::as_ptr` returns a pointer to a
+            // null-terminated array of pointers to valid C-style strings, which
+            // is exactly what `execve` expects. The strings remain valid because
+            // `args` and `envs` are kept alive for the duration of the call.
             let _ = unsafe { libc::execve(path.as_ptr(), args.as_ptr(), envs.as_ptr()) };
+            // TODO Uncomment when upgrading to libc 1.0
+            // // `execve` requires mutable pointers in libc 1.0.
+            // let _ = unsafe {
+            //     libc::execve(path.as_ptr(), args.as_mut_ptr(), envs.as_mut_ptr())
+            // };
             let errno = Errno::last();
             if errno != Errno::EINTR {
                 return ready(Err(errno));
