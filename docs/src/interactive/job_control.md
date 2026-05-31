@@ -263,11 +263,20 @@ The current job is usually the most recently suspended job, or another job if no
 
 [Built-in utilities](../builtins/index.html) that operate on jobs use job IDs to specify them. A job ID matches one of these formats:
 
-- **`%`**, **`%%`**, or **`%+`**: the current job.
-- **`%-`**: the previous job.
-- **`%n`**: job number `n`.
-- **`%foo`**: job with a command string starting with `foo`.
-- **`%?foo`**: job with a command string containing `foo`.
+**`%`**, **`%%`**, or **`%+`**
+: the current job.
+
+**`%-`**
+: the previous job.
+
+**`%n`**
+: job number `n`.
+
+**`%foo`**
+: job with a command string starting with `foo`.
+
+**`%?foo`**
+: job with a command string containing `foo`.
 
 ### Job status change notifications
 
