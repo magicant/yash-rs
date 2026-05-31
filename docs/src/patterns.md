@@ -27,10 +27,17 @@ a\*b
 
 The following characters have special meanings in patterns:
 
-- `?` – Matches any single character.
-- `*` – Matches any number of characters, including none.
-- `[…]` – Matches any single character from the set of characters inside the brackets. For example, `[abc]` matches `a`, `b`, or `c`. Ranges can be specified with a hyphen, like `[a-z]` for lowercase letters.
-- `[!…]` and `[^…]` – Matches any single character not in the set of characters inside the brackets. For example, `[!abc]` matches any character except `a`, `b`, or `c`.
+`?`
+: Matches any single character.
+
+`*`
+: Matches any number of characters, including none.
+
+`[…]`
+: Matches any single character from the set of characters inside the brackets. For example, `[abc]` matches `a`, `b`, or `c`. Ranges can be specified with a hyphen, like `[a-z]` for lowercase letters.
+
+`[!…]` and `[^…]`
+: Matches any single character not in the set of characters inside the brackets. For example, `[!abc]` matches any character except `a`, `b`, or `c`.
 
 The `[^…]` form is not supported in all shells; prefer using `[!…]` for compatibility.
 
@@ -49,7 +56,9 @@ foo.bak.1 foo.bak.2 bar.bak.3
 
 Bracket expressions `[…]` can include special elements:
 
-- **Character classes**: `[:class:]` matches any character in the specified class. Available classes:
+**Character classes**
+: `[:class:]` matches any character in the specified class. Available classes:
+
     - `[:alnum:]` – Alphanumeric characters (letters and digits)
     - `[:alpha:]` – Alphabetic characters (letters)
     - `[:blank:]` – Space and tab characters
@@ -70,9 +79,11 @@ Bracket expressions `[…]` can include special elements:
     foo.bak.1 foo.bak.2 bar.bak.3 baz~
     ```
 
-- **Collating elements**: `[.char.]` matches the collating element `char`. A collating element is a character or sequence of characters treated as a single unit in pattern matching. Collating elements depend on the current locale and are not yet implemented in yash-rs.
+**Collating elements**
+: `[.char.]` matches the collating element `char`. A collating element is a character or sequence of characters treated as a single unit in pattern matching. Collating elements depend on the current locale and are not yet implemented in yash-rs.
 
-- **Equivalence classes**: `[=char=]` matches the equivalence class of `char`. An equivalence class is a set of characters considered equivalent for matching purposes (e.g., `a` and `A` in some locales). This feature is not yet implemented in yash-rs.
+**Equivalence classes**
+: `[=char=]` matches the equivalence class of `char`. An equivalence class is a set of characters considered equivalent for matching purposes (e.g., `a` and `A` in some locales). This feature is not yet implemented in yash-rs.
 
 <p class="warning">
 Locale support is not yet implemented in yash-rs. Currently, all patterns match the same characters regardless of locale. Collating elements and equivalence classes simply match the characters as they are, without any special treatment.
