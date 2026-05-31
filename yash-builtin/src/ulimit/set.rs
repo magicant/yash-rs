@@ -74,7 +74,7 @@ pub fn set<E: GetRlimit + SetRlimit>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
+    use std::assert_matches;
     use yash_env::VirtualSystem;
     use yash_env::system::resource::Limit;
 

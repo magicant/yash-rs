@@ -449,7 +449,6 @@ mod tests {
         SIGKILL, SIGPIPE, SIGPROF, SIGQUIT, SIGSEGV, SIGSTOP, SIGSYS, SIGTERM, SIGTRAP, SIGTSTP,
         SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU, SIGXFSZ,
     };
-    use assert_matches::assert_matches;
     use futures_util::FutureExt as _;
     use std::borrow::Cow;
     use std::{collections::BTreeMap, ops::RangeInclusive};
@@ -1265,7 +1264,9 @@ mod tests {
         let mut map = BTreeMap::new();
         let cond = SIGQUIT.into();
         let entry = map.entry(cond);
-        let vacant = assert_matches!(entry, Entry::Vacant(vacant) => vacant);
+        let Entry::Vacant(vacant) = entry else {
+            panic!("expected vacant entry: {entry:?}");
+        };
 
         let result = GrandState::ignore(&system, vacant).now_or_never().unwrap();
         assert_eq!(result, Ok(()));
@@ -1296,7 +1297,9 @@ mod tests {
         let mut map = BTreeMap::new();
         let cond = SIGQUIT.into();
         let entry = map.entry(cond);
-        let vacant = assert_matches!(entry, Entry::Vacant(vacant) => vacant);
+        let Entry::Vacant(vacant) = entry else {
+            panic!("expected vacant entry: {entry:?}");
+        };
 
         let result = GrandState::ignore(&system, vacant).now_or_never().unwrap();
         assert_eq!(result, Ok(()));

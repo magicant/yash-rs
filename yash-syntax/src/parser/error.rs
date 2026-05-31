@@ -534,7 +534,7 @@ mod tests {
     use super::*;
     use crate::source::Code;
     use crate::source::Source;
-    use assert_matches::assert_matches;
+    use std::assert_matches;
     use std::num::NonZeroU64;
     use std::rc::Rc;
 

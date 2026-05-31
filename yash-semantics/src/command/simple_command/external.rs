@@ -175,12 +175,11 @@ pub fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
 mod tests {
     use super::*;
     use crate::command::Command as _;
-    use assert_matches::assert_matches;
     use futures_util::FutureExt as _;
+    use std::assert_matches;
     use std::cell::RefCell;
     use std::ops::ControlFlow::Continue;
     use std::rc::Rc;
-    use std::str::from_utf8;
     use yash_env::option::State::On;
     use yash_env::system::Mode;
     use yash_env::system::r#virtual::FileBody;
@@ -355,9 +354,7 @@ mod tests {
 
             let stdout = state.borrow().file_system.get("/tmp/file").unwrap();
             let stdout = stdout.borrow();
-            assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-                assert_eq!(from_utf8(content), Ok(""));
-            });
+            assert_matches!(&stdout.body, FileBody::Regular { content, .. } if content.is_empty());
         });
     }
 

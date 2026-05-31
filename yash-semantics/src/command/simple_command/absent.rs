@@ -98,10 +98,9 @@ mod tests {
     use super::*;
     use crate::command::Command as _;
     use crate::tests::return_builtin;
-    use assert_matches::assert_matches;
     use futures_util::FutureExt as _;
+    use std::assert_matches;
     use std::rc::Rc;
-    use std::str::from_utf8;
     use yash_env::VirtualSystem;
     use yash_env::option::State::On;
     use yash_env::system::Concurrent;
@@ -122,9 +121,7 @@ mod tests {
             assert_eq!(env.exit_status, ExitStatus::SUCCESS);
             let file = state.borrow().file_system.get("/tmp/foo").unwrap();
             let file = file.borrow();
-            assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-                assert_eq!(from_utf8(content), Ok(""));
-            });
+            assert_matches!(&file.body, FileBody::Regular { content, .. } if content.is_empty());
         });
     }
 

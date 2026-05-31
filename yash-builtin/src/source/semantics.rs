@@ -164,9 +164,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
     use enumset::EnumSet;
     use futures_util::FutureExt as _;
+    use std::assert_matches;
     use std::cell::RefCell;
     use std::rc::Rc;
     use yash_env::VirtualSystem;

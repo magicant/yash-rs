@@ -154,12 +154,11 @@ mod tests {
     use super::*;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use assert_matches::assert_matches;
     use futures_util::FutureExt as _;
+    use std::assert_matches;
     use std::ops::ControlFlow::{Break, Continue};
     use std::pin::Pin;
     use std::rc::Rc;
-    use std::str::from_utf8;
     use yash_env::VirtualSystem;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
@@ -212,9 +211,10 @@ mod tests {
 
         let file = state.borrow().file_system.get("/file").unwrap();
         let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content).unwrap(), "1\n2\n");
-        });
+        assert_matches!(
+            &file.body,
+            FileBody::Regular { content, .. } if content == b"1\n2\n"
+        );
     }
 
     #[test]

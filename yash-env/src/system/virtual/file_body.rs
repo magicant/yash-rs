@@ -451,7 +451,7 @@ impl FileBody {
 mod tests {
     use super::*;
     use crate::test_helper::WakeFlag;
-    use assert_matches::assert_matches;
+    use std::assert_matches;
     use std::sync::Arc;
 
     #[test]

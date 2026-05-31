@@ -260,7 +260,7 @@ impl model::Result {
 mod tests {
     use super::super::verify::Origin;
     use super::*;
-    use assert_matches::assert_matches;
+    use std::assert_matches;
     use std::num::NonZeroUsize;
     use yash_env::source::Location;
     use yash_env::stack::Builtin;

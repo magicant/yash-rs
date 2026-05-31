@@ -188,7 +188,7 @@ impl Ast {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
+    use std::assert_matches;
 
     #[test]
     fn empty_pattern() {

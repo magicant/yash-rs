@@ -448,8 +448,8 @@ mod tests {
     use crate::alias::AliasSet;
     use crate::alias::HashEntry;
     use crate::source::Location;
-    use assert_matches::assert_matches;
     use futures_util::FutureExt as _;
+    use std::assert_matches;
     use std::cell::OnceCell;
 
     #[test]
