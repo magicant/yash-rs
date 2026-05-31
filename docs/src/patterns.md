@@ -85,9 +85,8 @@ Bracket expressions `[…]` can include special elements:
 **Equivalence classes**
 : `[=char=]` matches the equivalence class of `char`. An equivalence class is a set of characters considered equivalent for matching purposes (e.g., `a` and `A` in some locales). This feature is not yet implemented in yash-rs.
 
-<p class="warning">
-Locale support is not yet implemented in yash-rs. Currently, all patterns match the same characters regardless of locale. Collating elements and equivalence classes simply match the characters as they are, without any special treatment.
-</p>
+> [!WARNING]
+> Locale support is not yet implemented in yash-rs. Currently, all patterns match the same characters regardless of locale. Collating elements and equivalence classes simply match the characters as they are, without any special treatment.
 
 <!-- TODO caseglob -->
 

@@ -186,11 +186,8 @@ For each function, a [function definition command](../language/functions.md#defi
 
 Note: Evaluating the printed commands in the current shell environment may fail if functions are read-only, since read-only functions cannot be redefined.
 
-<!-- markdownlint-disable MD033 -->
-<p class="warning">
-Currently, yash-rs does not print the contents of <a href="../language/redirections/here_documents.md">here-documents</a>. Functions containing here-documents are not correctly recreated when the output is evaluated.
-</p>
-<!-- markdownlint-enable MD033 -->
+> [!WARNING]
+> Currently, yash-rs does not print the contents of [here-documents](../language/redirections/here_documents.md). Functions containing here-documents are not correctly recreated when the output is evaluated.
 
 ### Examples
 
