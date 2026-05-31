@@ -14,13 +14,19 @@ The `ulimit` built-in allows you to view or change resource limits imposed by th
 
 Each resource has two limits:
 
-- **Soft limit**: The value enforced by the kernel for the process. It can be increased up to the hard limit.
-- **Hard limit**: The maximum value to which the soft limit can be set. Any process can lower its hard limit, but only privileged processes can raise it.
+Soft limit
+: The value enforced by the kernel for the process. It can be increased up to the hard limit.
+
+Hard limit
+: The maximum value to which the soft limit can be set. Any process can lower its hard limit, but only privileged processes can raise it.
 
 ## Options
 
-- **`-S`** (**`--soft`**): Set or display the soft limit.
-- **`-H`** (**`--hard`**): Set or display the hard limit.
+**`-S`** (**`--soft`**)
+: Set or display the soft limit.
+
+**`-H`** (**`--hard`**)
+: Set or display the hard limit.
 
 If neither `-S` nor `-H` is specified:
 
@@ -33,25 +39,62 @@ Specifying both `-S` and `-H` together sets both limits. However, when displayin
 
 Specify a resource to set or display using one of the following options. Supported resources may vary by platform, so not all options are available everywhere:
 
-- **`-b`** (**`--sbsize`**): maximum size of the socket buffer (bytes)
-- **`-c`** (**`--core`**): maximum size of a core file created by a terminated process (512-byte blocks)
-- **`-d`** (**`--data`**): maximum size of a data segment of the process (kilobytes)
-- **`-e`** (**`--nice`**): maximum process priority (see below)
-- **`-f`** (**`--fsize`**): maximum size of a file the process can create (512-byte blocks)
-- **`-i`** (**`--sigpending`**): maximum number of signals that can be queued to the process
-- **`-k`** (**`--kqueues`**): maximum number of kernel event queues
-- **`-l`** (**`--memlock`**): maximum size of memory locked into RAM (kilobytes)
-- **`-m`** (**`--rss`**): maximum physical memory size of the process (kilobytes)
-- **`-n`** (**`--nofile`**): maximum number of open files in the process
-- **`-q`** (**`--msgqueue`**): maximum total size of POSIX message queues
-- **`-R`** (**`--rttime`**): maximum amount of CPU time the process can consume in real-time scheduling mode without a blocking system call (microseconds)
-- **`-r`** (**`--rtprio`**): maximum real-time priority
-- **`-s`** (**`--stack`**): maximum size of the process's stack (kilobytes)
-- **`-t`** (**`--cpu`**): maximum amount of CPU time the process can consume (seconds)
-- **`-u`** (**`--nproc`**): maximum number of processes the user can run
-- **`-v`** (**`--as`**): maximum total memory size of the process (kilobytes)
-- **`-w`** (**`--swap`**): maximum size of the swap space the user can occupy (kilobytes)
-- **`-x`** (**`--locks`**): maximum number of file locks the process can hold
+**`-b`** (**`--sbsize`**)
+: maximum size of the socket buffer (bytes)
+
+**`-c`** (**`--core`**)
+: maximum size of a core file created by a terminated process (512-byte blocks)
+
+**`-d`** (**`--data`**)
+: maximum size of a data segment of the process (kilobytes)
+
+**`-e`** (**`--nice`**)
+: maximum process priority (see below)
+
+**`-f`** (**`--fsize`**)
+: maximum size of a file the process can create (512-byte blocks)
+
+**`-i`** (**`--sigpending`**)
+: maximum number of signals that can be queued to the process
+
+**`-k`** (**`--kqueues`**)
+: maximum number of kernel event queues
+
+**`-l`** (**`--memlock`**)
+: maximum size of memory locked into RAM (kilobytes)
+
+**`-m`** (**`--rss`**)
+: maximum physical memory size of the process (kilobytes)
+
+**`-n`** (**`--nofile`**)
+: maximum number of open files in the process
+
+**`-q`** (**`--msgqueue`**)
+: maximum total size of POSIX message queues
+
+**`-R`** (**`--rttime`**)
+: maximum amount of CPU time the process can consume in real-time scheduling mode without a blocking system call (microseconds)
+
+**`-r`** (**`--rtprio`**)
+: maximum real-time priority
+
+**`-s`** (**`--stack`**)
+: maximum size of the process's stack (kilobytes)
+
+**`-t`** (**`--cpu`**)
+: maximum amount of CPU time the process can consume (seconds)
+
+**`-u`** (**`--nproc`**)
+: maximum number of processes the user can run
+
+**`-v`** (**`--as`**)
+: maximum total memory size of the process (kilobytes)
+
+**`-w`** (**`--swap`**)
+: maximum size of the swap space the user can occupy (kilobytes)
+
+**`-x`** (**`--locks`**)
+: maximum number of file locks the process can hold
 
 The *limit* operand and output values use the units shown in parentheses above.
 
