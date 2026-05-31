@@ -152,41 +152,62 @@ Undefined variables by default expand to an empty string. Use the `-u` [shell op
 
 Some variable names are reserved for special purposes. These variables may affect or be affected by the shell's behavior.
 
-- **`CDPATH`**: A colon-separated list of directories to search in the [`cd` built-in]
+**`CDPATH`**
+: A colon-separated list of directories to search in the [`cd` built-in]
 
-- **`ENV`**: The name of a file to be sourced when [starting](../../startup.md) an [interactive shell](../../interactive/index.html)
+**`ENV`**
+: The name of a file to be sourced when [starting](../../startup.md) an [interactive shell](../../interactive/index.html)
 
-- **`HOME`**: The user's home directory, used in [tilde expansion](../words/tilde.md)
+**`HOME`**
+: The user's home directory, used in [tilde expansion](../words/tilde.md)
 
-- **`IFS`**: A list of delimiters used in [field splitting](../words/field_splitting.md)
+**`IFS`**
+: A list of delimiters used in [field splitting](../words/field_splitting.md)
+
     - The default value is a space, tab, and newline.
 
-- **`LINENO`**: The current line number in the shell script
+**`LINENO`**
+: The current line number in the shell script
+
     - This variable is automatically updated as the shell executes commands.
     - Currently, yash-rs does not support exporting this variable.
 
-- **`OLDPWD`**: The previous [working directory], updated by the [`cd` built-in]
+**`OLDPWD`**
+: The previous [working directory], updated by the [`cd` built-in]
 
-- **`OPTARG`**: The value of the last option argument processed by the [`getopts` built-in]
+**`OPTARG`**
+: The value of the last option argument processed by the [`getopts` built-in]
 
-- **`OPTIND`**: The index of the next option to be processed by the [`getopts` built-in]
+**`OPTIND`**
+: The index of the next option to be processed by the [`getopts` built-in]
 
-- **`PATH`**: A colon-separated list of directories to search for executable files in [command search](../commands/simple.md#command-search)
+**`PATH`**
+: A colon-separated list of directories to search for executable files in [command search](../commands/simple.md#command-search)
 
-- **`PPID`**: The process ID of the parent process of the shell
+**`PPID`**
+: The process ID of the parent process of the shell
+
     - This variable is initialized when the shell starts.
 
-- **`PS1`**: The primary [prompt] string, displayed before each command in [interactive](../../interactive/index.html) mode
+**`PS1`**
+: The primary [prompt] string, displayed before each command in [interactive](../../interactive/index.html) mode
+
     - The default value is `$ ` (a dollar sign followed by a space). <!-- TODO: The default value should be `# ` for the root user. --> <!-- markdownlint-disable-line MD038 -->
     - Many shells set the default value to `# ` (a hash sign followed by a space) for the root user. This is not yet implemented in yash-rs. <!-- markdownlint-disable-line MD038 -->
 
-- **`PS2`**: The secondary [prompt] string, displayed when a command is continued on the next line
+**`PS2`**
+: The secondary [prompt] string, displayed when a command is continued on the next line
+
     - The default value is `> ` (a greater-than sign followed by a space). <!-- markdownlint-disable-line MD038 -->
 
-- **`PS4`**: The pseudo-prompt string, used for [command execution tracing](../../debugging.md#tracing-command-execution)
+**`PS4`**
+: The pseudo-prompt string, used for [command execution tracing](../../debugging.md#tracing-command-execution)
+
     - The default value is `+ ` (a plus sign followed by a space). <!-- markdownlint-disable-line MD038 -->
 
-- **`PWD`**: The current [working directory]
+**`PWD`**
+: The current [working directory]
+
     - This variable is initialized to the [working directory] when the shell starts and updated by the [`cd` built-in] when changing directories.
 
 ## Arrays
