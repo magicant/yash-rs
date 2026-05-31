@@ -35,6 +35,15 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `OwnedCStrs`: An owning wrapper that keeps both the strings and the
       pointer array alive together.
 
+### Changed
+
+- The `system::Exec::execve` method now accepts the `args` and `envs` arguments
+  as generic types implementing the new `system::c_string::IntoCStrArray` trait
+  instead of `&[CString]`. This allows callers to pass string arrays without
+  unnecessary allocations. Existing callers passing `&[CString]` slices continue
+  to work; callers passing fixed-size array references should now pass slices
+  instead.
+
 ### Deprecated
 
 - The `JobList::add` method has been deprecated in favor of `JobList::insert`.

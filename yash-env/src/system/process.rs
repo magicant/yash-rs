@@ -16,6 +16,7 @@
 
 //! Items related to process management
 
+use super::c_string::IntoCStrArray;
 use super::{ExitStatus, Result, Signals};
 #[cfg(all(doc, unix))]
 use crate::RealSystem;
@@ -24,7 +25,7 @@ use crate::VirtualSystem;
 use crate::job::Pid;
 use crate::job::ProcessState;
 use std::convert::Infallible;
-use std::ffi::{CStr, CString};
+use std::ffi::CStr;
 use std::rc::Rc;
 
 /// Trait for getting the current process ID and other process-related information
@@ -170,27 +171,40 @@ impl<S: Wait> Wait for Rc<S> {
 
 /// Trait for executing a new program in the current process
 pub trait Exec {
-    // TODO Consider passing raw pointers for optimization
     /// Replaces the current process with an external utility.
     ///
     /// This is a thin wrapper around the `execve` system call.
-    fn execve(
+    ///
+    /// The `args` and `envs` arguments are the argument and environment string
+    /// arrays passed to the new program. They accept any type that implements
+    /// [`IntoCStrArray`], including `&[CString]`, `Vec<CString>`, and the
+    /// dedicated array types in the [`c_string`](super::c_string) module. This
+    /// allows callers to avoid unnecessary allocations when they already hold a
+    /// suitable representation of the string arrays.
+    fn execve<A, E>(
         &self,
         path: &CStr,
-        args: &[CString],
-        envs: &[CString],
-    ) -> impl Future<Output = Result<Infallible>> + use<Self>;
+        args: A,
+        envs: E,
+    ) -> impl Future<Output = Result<Infallible>> + use<Self, A, E>
+    where
+        A: IntoCStrArray,
+        E: IntoCStrArray;
 }
 
 /// Delegates the `Exec` trait to the contained instance of `S`
 impl<S: Exec> Exec for Rc<S> {
     #[inline]
-    fn execve(
+    fn execve<A, E>(
         &self,
         path: &CStr,
-        args: &[CString],
-        envs: &[CString],
-    ) -> impl Future<Output = Result<Infallible>> + use<S> {
+        args: A,
+        envs: E,
+    ) -> impl Future<Output = Result<Infallible>> + use<S, A, E>
+    where
+        A: IntoCStrArray,
+        E: IntoCStrArray,
+    {
         (self as &S).execve(path, args, envs)
     }
 }

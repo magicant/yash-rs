@@ -16,6 +16,7 @@
 
 //! Trait implementations for `Concurrent<S>` that delegate to the inner system `S`
 
+use super::super::c_string::IntoCStrArray;
 use super::super::resource::{LimitPair, Resource};
 use super::super::{
     Chdir, Clock, Close, CpuTimes, Dir, Dup, Exec, Exit, Fcntl, FdFlag, Fstat, GetCwd, GetPid,
@@ -408,12 +409,16 @@ where
     S: Exec + Sigmask,
 {
     #[inline]
-    fn execve(
+    fn execve<A, E>(
         &self,
         path: &CStr,
-        args: &[CString],
-        envs: &[CString],
-    ) -> impl Future<Output = Result<Infallible>> + use<S> {
+        args: A,
+        envs: E,
+    ) -> impl Future<Output = Result<Infallible>> + use<S, A, E>
+    where
+        A: IntoCStrArray,
+        E: IntoCStrArray,
+    {
         self.inner.execve(path, args, envs)
     }
 }
