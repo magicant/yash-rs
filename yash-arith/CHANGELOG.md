@@ -9,6 +9,13 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.2.4] - Unreleased
+
+### Changed
+
+- Public dependency versions
+    - Rust 1.87.0 → 1.96.0
+
 ## [0.2.3] - 2026-04-29
 
 ### Changed
@@ -59,6 +66,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Fundamental items for performing arithmetic expansion
 
+[0.2.4]: https://github.com/magicant/yash-rs/releases/tag/yash-arith-0.2.4
 [0.2.3]: https://github.com/magicant/yash-rs/releases/tag/yash-arith-0.2.3
 [0.2.2]: https://github.com/magicant/yash-rs/releases/tag/yash-arith-0.2.2
 [0.2.1]: https://github.com/magicant/yash-rs/releases/tag/yash-arith-0.2.1

@@ -43,6 +43,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   unnecessary allocations. Existing callers passing `&[CString]` slices continue
   to work; callers passing fixed-size array references should now pass slices
   instead.
+- Public dependency versions
+    - Rust 1.87.0 → 1.96.0
 
 ### Deprecated
 
