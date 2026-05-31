@@ -25,8 +25,11 @@ By default, the built-in creates or updates variables [locally within the curren
 
 The following options set variable attributes:
 
-- **`-r`** (**`--readonly`**): Makes the variables [read-only](../language/parameters/variables.md#read-only-variables).
-- **`-x`** (**`--export`**): [Exports](../language/parameters/variables.md#environment-variables) the variables to the environment.
+**`-r`** (**`--readonly`**)
+: Makes the variables [read-only](../language/parameters/variables.md#read-only-variables).
+
+**`-x`** (**`--export`**)
+: [Exports](../language/parameters/variables.md#environment-variables) the variables to the environment.
 
 To remove these attributes, use the corresponding option with a plus sign (`+`) instead of a minus sign (`-`). For example, the following commands stop exporting the variable `foo`:
 
@@ -87,8 +90,11 @@ By default, the built-in prints variables in the current context. If the **`-g`*
 
 The following options filter which variables are printed. Variables that do not match the criteria are ignored.
 
-- **`-r`** (**`--readonly`**): Prints only [read-only variables](../language/parameters/variables.md#read-only-variables).
-- **`-x`** (**`--export`**): Prints only [exported variables](../language/parameters/variables.md#environment-variables).
+**`-r`** (**`--readonly`**)
+: Prints only [read-only variables](../language/parameters/variables.md#read-only-variables).
+
+**`-x`** (**`--export`**)
+: Prints only [exported variables](../language/parameters/variables.md#environment-variables).
 
 If these options are negated by using a plus sign (`+`) instead of a minus sign (`-`), the built-in prints variables that do not have the corresponding attribute. For example, the following command shows all non-exported variables:
 
