@@ -46,9 +46,11 @@ Read: Three
 
 Yash-rs supports these redirection operators:
 
-- **`<`** (file): Redirects standard input from a file.
+**`<`** (file)
+: Redirects standard input from a file.
 
-- **`>`** (file): Redirects standard output to a file.
+**`>`** (file)
+: Redirects standard output to a file.
     - If the `clobber` [shell option](../../environment/options.md) is set (default), `>` behaves like `>|`.
     - If `clobber` is not set, `>` fails if the file exists and is a regular file or a symlink to a non-existent file. Otherwise, it creates a new regular file or opens the existing non-regular one. This is useful for preventing accidental overwriting of files.
 
@@ -66,7 +68,8 @@ Yash-rs supports these redirection operators:
       |                              ^^^^^^^^ file.txt: File exists (os error 17)
     ```
 
-- **`>|`** (file): Redirects standard output to a file, overwriting it if it exists.
+**`>|`** (file)
+: Redirects standard output to a file, overwriting it if it exists.
     - Always overwrites existing files, regardless of the `clobber` option.
     - Truncates the file if it exists, or creates it if not.
 
@@ -80,7 +83,8 @@ Yash-rs supports these redirection operators:
     Another redirection
     ```
 
-- **`>>`** (file): Redirects standard output to a file, appending to it if it exists.
+**`>>`** (file)
+: Redirects standard output to a file, appending to it if it exists.
     - Appends to the file if it exists, or creates it if not.
 
     ```shell,hidelines=#
@@ -94,15 +98,18 @@ Yash-rs supports these redirection operators:
     Another line
     ```
 
-- **`<>`** (file): Opens a file for both reading and writing.
+**`<>`** (file)
+: Opens a file for both reading and writing.
     - Opens the file if it exists, or creates it if not.
 
-- **`<&`**: Duplicates or closes standard input, depending on the target word:
+**`<&`**
+: Duplicates or closes standard input, depending on the target word:
     - If the word is a file descriptor number, standard input becomes a copy of that descriptor (which must be open for reading).
     - If the word is `-`, standard input is closed. No error is reported if it is already closed.
         - If standard input is closed, commands that read from it will fail. To provide empty input, use `< /dev/null` instead.
 
-- **`>&`**: Duplicates or closes standard output, depending on the target word:
+**`>&`**
+: Duplicates or closes standard output, depending on the target word:
     - If the word is a file descriptor number, standard output becomes a copy of that descriptor (which must be open for writing).
     - If the word is `-`, standard output is closed. No error is reported if it is already closed.
         - If standard output is closed, commands that write to it will fail. To discard output, use `> /dev/null` instead.
@@ -113,17 +120,23 @@ Yash-rs supports these redirection operators:
       error: please specify a user
       ```
 
-- **`>>|`**: This operator is reserved for future use, but is not currently implemented in yash-rs.
+**`>>|`**
+: This operator is reserved for future use, but is not currently implemented in yash-rs.
 
-- **`<(`**: This operator is reserved for future use, but is not currently implemented in yash-rs.
+**`<(`**
+: This operator is reserved for future use, but is not currently implemented in yash-rs.
 
-- **`>(`**: This operator is reserved for future use, but is not currently implemented in yash-rs.
+**`>(`**
+: This operator is reserved for future use, but is not currently implemented in yash-rs.
 
-- **`<<`** (delimiter): Opens a [here-document](here_documents.md).
+**`<<`** (delimiter)
+: Opens a [here-document](here_documents.md).
 
-- **`<<-`** (delimiter): Opens a [here-document](here_documents.md) with automatic removal of leading tabs.
+**`<<-`** (delimiter)
+: Opens a [here-document](here_documents.md) with automatic removal of leading tabs.
 
-- **`<<<`** (string): This operator is reserved for future use, but is not currently implemented in yash-rs.
+**`<<<`** (string)
+: This operator is reserved for future use, but is not currently implemented in yash-rs.
 
 ## Specifying file descriptors
 

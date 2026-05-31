@@ -129,9 +129,8 @@ $ for value in $values; do echo "[$value]"; done
 [f]
 ```
 
-<p class="warning">
-Currently, yash-rs only supports UTF-8 encoded text. This does not fully conform to POSIX, which requires handling arbitrary byte sequences.
-</p>
+> [!WARNING]
+> Currently, yash-rs only supports UTF-8 encoded text. This does not fully conform to POSIX, which requires handling arbitrary byte sequences.
 
 ## Empty field removal
 
