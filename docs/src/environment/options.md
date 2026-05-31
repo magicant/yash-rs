@@ -177,7 +177,6 @@ Below is a list of all shell options in yash-rs, with their long and short names
 
 **`exec`** (**`+n`**)
 : If set (default), the shell executes commands. If unset, it only parses commands (useful for [syntax checking](../debugging.md#checking-syntax)).
-
     - Once unset, it cannot be set again in the same session.
     - In [interactive shells], this option is ignored and commands are always executed.
 
@@ -186,18 +185,15 @@ Below is a list of all shell options in yash-rs, with their long and short names
 
 **`hashondefinition`** (**`-h`**)
 : Deprecated and has no effect. Remains for compatibility.
-
     - The short name `-h` is currently a synonym for `--hashondefinition`, but this may change.
     - Many shells implement `-h` differently, so behavior may vary.
 
 **`ignoreeof`**
 : If set, the shell ignores end-of-file (usually `Ctrl+D`) and does not exit. See [Preventing accidental exits](../termination.md#preventing-accidental-exits).
-
     - Only takes effect if the shell is [interactive] and input is a terminal.
 
 **`interactive`** (**`-i`**)
 : If set, the shell is [interactive].
-
     - Enabled on startup if `stdin` is enabled and [standard input and error](../language/redirections/index.html#what-are-file-descriptors) are terminals.
 
 **`log`**
@@ -205,17 +201,14 @@ Below is a list of all shell options in yash-rs, with their long and short names
 
 **`login`** (**`-l`**)
 : If set, the shell behaves as a login shell. Only settable at [startup](../startup.md).
-
     - ⚠️ Currently has no effect in yash-rs. In the future, login shells will read extra initialization files.
 
 **`monitor`** (**`-m`**)
 : If set, the shell performs [job control] (allows managing background and foreground jobs).
-
     - Enabled by default in [interactive shells].
 
 **`notify`** (**`-b`**)
 : If set, the shell notifies you of background job completions and suspensions as soon as they occur. If unset, notifications are delayed until the next prompt. See [Job status change notifications](../interactive/job_control.md#job-status-change-notifications) for details.
-
     - ⚠️ Currently has no effect in yash-rs. In the future, it will enable immediate notifications for background jobs.
     - Only takes effect if `interactive` and `monitor` are enabled.
 
@@ -224,13 +217,11 @@ Below is a list of all shell options in yash-rs, with their long and short names
 
 **`posixlycorrect`**
 : If set, the shell behaves as POSIX-compliant as possible. Useful for portable scripts. <!-- TODO: link to POSIX compliance -->
-
     - Enabled on startup if the shell is started as `sh`.
     - When unset, yash-rs may deviate from POSIX in some areas.
 
 **`stdin`** (**`-s`**)
 : If set, the shell reads commands from [standard input](../language/redirections/index.html#what-are-file-descriptors). Mutually exclusive with `cmdline`, and only settable at [startup](../startup.md).
-
     - Enabled if `cmdline` is not set and the shell is started with no operands.
 
 **`unset`** (**`+u`**)
@@ -241,7 +232,6 @@ Below is a list of all shell options in yash-rs, with their long and short names
 
 **`vi`**
 : If set, the shell uses vi-style keybindings for command line editing. <!-- TODO: link to interactive shell and command line editing -->
-
     - ⚠️ Currently has no effect in yash-rs. In the future, it will enable vi-style editing in [interactive shells].
 
 **`xtrace`** (**`-x`**)

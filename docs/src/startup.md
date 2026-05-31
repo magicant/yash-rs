@@ -46,13 +46,13 @@ The shell accepts [shell options] to control its behavior. The following options
 
 The shell has three modes:
 
-**File mode**
+File mode
 : If neither `-c` nor `-s` is specified, the first operand is treated as the path to a script file to execute. Any following operands become [positional parameters] for the script.
 
-**Command string mode**
+Command string mode
 : With `-c`, the shell executes the command string given as the first operand. If `command_name` is specified, it sets the [special parameter] `0`. Remaining operands become [positional parameters].
 
-**Standard input mode**
+Standard input mode
 : With `-s`, the shell reads commands from [standard input]. Any operands are set as positional parameters.
 
 If no operands are given and `-c` is not specified, the shell assumes `-s`.

@@ -163,12 +163,10 @@ Some variable names are reserved for special purposes. These variables may affec
 
 **`IFS`**
 : A list of delimiters used in [field splitting](../words/field_splitting.md)
-
     - The default value is a space, tab, and newline.
 
 **`LINENO`**
 : The current line number in the shell script
-
     - This variable is automatically updated as the shell executes commands.
     - Currently, yash-rs does not support exporting this variable.
 
@@ -186,28 +184,23 @@ Some variable names are reserved for special purposes. These variables may affec
 
 **`PPID`**
 : The process ID of the parent process of the shell
-
     - This variable is initialized when the shell starts.
 
 **`PS1`**
 : The primary [prompt] string, displayed before each command in [interactive](../../interactive/index.html) mode
-
     - The default value is `$ ` (a dollar sign followed by a space). <!-- TODO: The default value should be `# ` for the root user. --> <!-- markdownlint-disable-line MD038 -->
     - Many shells set the default value to `# ` (a hash sign followed by a space) for the root user. This is not yet implemented in yash-rs. <!-- markdownlint-disable-line MD038 -->
 
 **`PS2`**
 : The secondary [prompt] string, displayed when a command is continued on the next line
-
     - The default value is `> ` (a greater-than sign followed by a space). <!-- markdownlint-disable-line MD038 -->
 
 **`PS4`**
 : The pseudo-prompt string, used for [command execution tracing](../../debugging.md#tracing-command-execution)
-
     - The default value is `+ ` (a plus sign followed by a space). <!-- markdownlint-disable-line MD038 -->
 
 **`PWD`**
 : The current [working directory]
-
     - This variable is initialized to the [working directory] when the shell starts and updated by the [`cd` built-in] when changing directories.
 
 ## Arrays
