@@ -29,22 +29,19 @@ fn expand_body<'n: 'r, 'e: 'r, 'r, T: GetPw>(name: &'n str, env: &'e Env<T>) -> 
     if name.is_empty() {
         return Cow::Borrowed(env.variables.get_scalar(HOME).unwrap_or("~"));
     }
-    if let Ok(name) = CString::new(name) {
-        if let Ok(Some(path)) = env.system.getpwnam_dir(&name) {
-            if let Ok(path) = path.into_unix_string().into_string() {
-                return Cow::Owned(path);
-            }
-        }
+    if let Ok(name) = CString::new(name)
+        && let Ok(Some(path)) = env.system.getpwnam_dir(&name)
+        && let Ok(path) = path.into_unix_string().into_string()
+    {
+        return Cow::Owned(path);
     }
     Cow::Owned(format!("~{name}"))
 }
 
 /// Produces the final result of tilde expansion.
 fn finish(mut chars: &str, followed_by_slash: bool) -> Vec<AttrChar> {
-    if followed_by_slash {
-        if let Some(stripped) = chars.strip_suffix('/') {
-            chars = stripped;
-        }
+    if followed_by_slash && let Some(stripped) = chars.strip_suffix('/') {
+        chars = stripped;
     }
 
     let mut attr_chars: Vec<AttrChar> = chars

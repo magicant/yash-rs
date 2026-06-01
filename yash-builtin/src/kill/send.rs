@@ -189,8 +189,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
     use futures_util::FutureExt as _;
+    use std::assert_matches;
     use std::rc::Rc;
     use yash_env::job::Job;
     use yash_env::job::ProcessState;

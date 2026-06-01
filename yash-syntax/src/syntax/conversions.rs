@@ -498,21 +498,20 @@ impl TryFrom<Word> for Assign {
     /// `=` is an unquoted equal sign, and `value` is a word. If the input word
     /// does not match this syntax, it is returned intact in `Err`.
     fn try_from(mut word: Word) -> Result<Assign, Word> {
-        if let Some(eq) = word.units.iter().position(|u| u == &Unquoted(Literal('='))) {
-            if eq > 0 {
-                if let Some(name) = word.units[..eq].to_string_if_literal() {
-                    assert!(!name.is_empty());
-                    word.units.drain(..=eq);
-                    word.parse_tilde_everywhere();
-                    let location = word.location.clone();
-                    let value = Scalar(word);
-                    return Ok(Assign {
-                        name,
-                        value,
-                        location,
-                    });
-                }
-            }
+        if let Some(eq) = word.units.iter().position(|u| u == &Unquoted(Literal('=')))
+            && eq > 0
+            && let Some(name) = word.units[..eq].to_string_if_literal()
+        {
+            assert!(!name.is_empty());
+            word.units.drain(..=eq);
+            word.parse_tilde_everywhere();
+            let location = word.location.clone();
+            let value = Scalar(word);
+            return Ok(Assign {
+                name,
+                value,
+                location,
+            });
         }
 
         Err(word)

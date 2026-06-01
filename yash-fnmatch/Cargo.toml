@@ -1,9 +1,9 @@
 [package]
 name = "yash-fnmatch"
-version = "1.1.2"
+version = "1.1.3"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2024"
-rust-version = "1.87.0"
+rust-version = "1.96.0"
 description = "POSIX-compatible pattern matching for globbing"
 # documentation = "https://yash.osdn.jp/doc/"
 readme = "README.md"
@@ -21,9 +21,6 @@ all-features = true
 regex = { workspace = true }
 regex-syntax = { workspace = true }
 thiserror = { workspace = true }
-
-[dev-dependencies]
-assert_matches = { workspace = true }
 
 [lints]
 workspace = true

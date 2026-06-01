@@ -1056,32 +1056,35 @@ impl GetPw for RealSystem {
 impl Sysconf for RealSystem {
     fn confstr_path(&self) -> Result<UnixString> {
         // TODO Support other platforms
-        #[cfg(any(
-            target_os = "linux",
-            target_os = "macos",
-            target_os = "ios",
-            target_os = "tvos",
-            target_os = "watchos"
-        ))]
-        unsafe {
-            let size = libc::confstr(libc::_CS_PATH, std::ptr::null_mut(), 0);
-            if size == 0 {
-                return Err(Errno::last());
+        cfg_select! {
+            any(
+                target_os = "linux",
+                target_os = "macos",
+                target_os = "ios",
+                target_os = "tvos",
+                target_os = "watchos"
+            ) => {
+                unsafe {
+                    let size = libc::confstr(libc::_CS_PATH, std::ptr::null_mut(), 0);
+                    if size == 0 {
+                        return Err(Errno::last());
+                    }
+                    let mut buffer = Vec::<u8>::with_capacity(size);
+                    let final_size =
+                        libc::confstr(libc::_CS_PATH, buffer.as_mut_ptr() as *mut _, size);
+                    if final_size == 0 {
+                        return Err(Errno::last());
+                    }
+                    if final_size > size {
+                        return Err(Errno::ERANGE);
+                    }
+                    buffer.set_len(final_size - 1); // The last byte is a null terminator.
+                    Ok(UnixString::from_vec(buffer))
+                }
             }
-            let mut buffer = Vec::<u8>::with_capacity(size);
-            let final_size = libc::confstr(libc::_CS_PATH, buffer.as_mut_ptr() as *mut _, size);
-            if final_size == 0 {
-                return Err(Errno::last());
-            }
-            if final_size > size {
-                return Err(Errno::ERANGE);
-            }
-            buffer.set_len(final_size - 1); // The last byte is a null terminator.
-            return Ok(UnixString::from_vec(buffer));
-        }
 
-        #[allow(unreachable_code, reason = "for readability")] // TODO: use cfg_select
-        Err(Errno::ENOSYS)
+            _ => Err(Errno::ENOSYS),
+        }
     }
 }
 
@@ -1099,17 +1102,16 @@ impl ShellPath for RealSystem {
         // TODO Add optimization for other targets
 
         // Find an executable "sh" from the default PATH
-        if let Ok(path) = self.confstr_path() {
-            if let Some(full_path) = path
+        if let Ok(path) = self.confstr_path()
+            && let Some(full_path) = path
                 .as_bytes()
                 .split(|b| *b == b':')
                 .map(|dir| Path::new(UnixStr::from_bytes(dir)).join("sh"))
                 .filter(|full_path| full_path.is_absolute())
                 .filter_map(|full_path| CString::new(full_path.into_unix_string().into_vec()).ok())
                 .find(|full_path| self.is_executable_file(full_path))
-            {
-                return full_path;
-            }
+        {
+            return full_path;
         }
 
         // The last resort

@@ -18,8 +18,8 @@
 
 use super::tests::virtual_system_with_executor;
 use super::*;
-use assert_matches::assert_matches;
 use futures_util::FutureExt as _;
+use std::assert_matches;
 
 fn create_fifo(system: &VirtualSystem) {
     system

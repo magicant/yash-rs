@@ -104,12 +104,12 @@ impl Select for VirtualSystem {
                     .expect("the current process should be in the system state");
 
                 // If the process is currently suspended, do nothing until resumed
-                if let ProcessState::Halted(reason) = proc.state() {
-                    if reason.is_stopped() {
-                        waker.set(Some(context.waker().clone()));
-                        proc.wake_on_resumption(Rc::downgrade(&waker));
-                        return Poll::Pending;
-                    }
+                if let ProcessState::Halted(reason) = proc.state()
+                    && reason.is_stopped()
+                {
+                    waker.set(Some(context.waker().clone()));
+                    proc.wake_on_resumption(Rc::downgrade(&waker));
+                    return Poll::Pending;
                 }
 
                 // Check for delivered signals

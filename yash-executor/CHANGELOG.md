@@ -9,6 +9,13 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [1.0.2] - Unreleased
+
+### Changed
+
+- Public dependency versions
+    - Rust 1.87.0 → 1.96.0
+
 ## [1.0.1] - 2026-04-29
 
 ### Changed
@@ -21,5 +28,6 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 This is the initial release.
 
+[1.0.2]: https://github.com/magicant/yash-rs/releases/tag/yash-executor-1.0.2
 [1.0.1]: https://github.com/magicant/yash-rs/releases/tag/yash-executor-1.0.1
 [1.0.0]: https://github.com/magicant/yash-rs/releases/tag/yash-executor-1.0.0

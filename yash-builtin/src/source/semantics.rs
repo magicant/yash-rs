@@ -103,10 +103,10 @@ where
         let path = PathBuf::from_iter([dir, filename])
             .into_unix_string()
             .into_vec();
-        if let Ok(c_path) = CString::new(path) {
-            if let Ok(fd) = open_file(&env.system, &c_path).await {
-                return Ok(fd);
-            }
+        if let Ok(c_path) = CString::new(path)
+            && let Ok(fd) = open_file(&env.system, &c_path).await
+        {
+            return Ok(fd);
         }
     }
     Err(Errno::ENOENT)
@@ -164,9 +164,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
     use enumset::EnumSet;
     use futures_util::FutureExt as _;
+    use std::assert_matches;
     use std::cell::RefCell;
     use std::rc::Rc;
     use yash_env::VirtualSystem;

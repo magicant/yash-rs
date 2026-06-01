@@ -191,12 +191,12 @@ impl<S: Fstat + Open> SearchEnv<'_, S> {
 
                 if let Ok(mut dir) = self.env.system.opendir(&dir_path) {
                     while let Ok(Some(entry)) = dir.next() {
-                        if let Some(name) = entry.name.to_str() {
-                            if name != "." && name != ".." && pattern.is_match(name) {
-                                self.push_component(new_suffix, true, |prefix| {
-                                    prefix.push_str(name)
-                                });
-                            }
+                        if let Some(name) = entry.name.to_str()
+                            && name != "."
+                            && name != ".."
+                            && pattern.is_match(name)
+                        {
+                            self.push_component(new_suffix, true, |prefix| prefix.push_str(name));
                         }
                     }
                 }

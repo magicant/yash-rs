@@ -102,7 +102,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
+    use std::assert_matches;
     use yash_env::system::Errno;
 
     #[test]

@@ -219,10 +219,10 @@ where
         }
     }
 
-    if env.params.categories.contains(Category::Alias) {
-        if let Some(alias) = env.env.aliases.get(name.value.as_str()) {
-            return Ok((&alias.0).into());
-        }
+    if env.params.categories.contains(Category::Alias)
+        && let Some(alias) = env.env.aliases.get(name.value.as_str())
+    {
+        return Ok((&alias.0).into());
     }
 
     let mut target = search(env, &name.value).ok_or(NotFound { name })?;

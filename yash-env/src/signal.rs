@@ -350,19 +350,17 @@ impl FromStr for Name {
             "RTMIN" => Ok(Self::Rtmin(0)),
             "RTMAX" => Ok(Self::Rtmax(0)),
             _ => {
-                if let Some(tail) = s.strip_prefix("RTMIN") {
-                    if tail.starts_with(['+', '-']) {
-                        if let Ok(n) = tail.parse() {
-                            return Ok(Self::Rtmin(n));
-                        }
-                    }
+                if let Some(tail) = s.strip_prefix("RTMIN")
+                    && tail.starts_with(['+', '-'])
+                    && let Ok(n) = tail.parse()
+                {
+                    return Ok(Self::Rtmin(n));
                 }
-                if let Some(tail) = s.strip_prefix("RTMAX") {
-                    if tail.starts_with(['+', '-']) {
-                        if let Ok(n) = tail.parse() {
-                            return Ok(Self::Rtmax(n));
-                        }
-                    }
+                if let Some(tail) = s.strip_prefix("RTMAX")
+                    && tail.starts_with(['+', '-'])
+                    && let Ok(n) = tail.parse()
+                {
+                    return Ok(Self::Rtmax(n));
                 }
                 Err(UnknownNameError)
             }

@@ -225,8 +225,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
     use futures_util::FutureExt as _;
+    use std::assert_matches;
     use yash_env::VirtualSystem;
     use yash_env::option::State::On;
     use yash_env::system::{Concurrent, Gid, Uid};

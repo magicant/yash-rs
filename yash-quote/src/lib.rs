@@ -70,10 +70,10 @@ fn str_needs_quoting(s: &str) -> bool {
     }
 
     // `#` or `~` occurring at the beginning of the string
-    if let Some(c) = s.chars().next() {
-        if c == '#' || c == '~' {
-            return true;
-        }
+    if let Some(c) = s.chars().next()
+        && (c == '#' || c == '~')
+    {
+        return true;
     }
 
     // characters that require quoting regardless of the position
@@ -87,17 +87,17 @@ fn str_needs_quoting(s: &str) -> bool {
     }
 
     // `{` preceding `}`
-    if let Some(i) = s.find('{') {
-        if s[i + 1..].contains('}') {
-            return true;
-        }
+    if let Some(i) = s.find('{')
+        && s[i + 1..].contains('}')
+    {
+        return true;
     }
 
     // `[` preceding `]`
-    if let Some(i) = s.find('[') {
-        if s[i + 1..].contains(']') {
-            return true;
-        }
+    if let Some(i) = s.find('[')
+        && s[i + 1..].contains(']')
+    {
+        return true;
     }
 
     false
