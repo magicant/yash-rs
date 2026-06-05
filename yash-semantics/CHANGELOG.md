@@ -13,6 +13,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- The `trap::run_traps_for_caught_signals` function now checks for a caught
+  SIGINT signal and interrupts the current command with SIGINT if the signal is
+  caught and the disposition of SIGINT is default. This behavior is not
+  specified in POSIX, but it is a common behavior of interactive shells.
 - Public dependency versions:
     - Rust 1.87.0 → 1.96.0
     - yash-env 0.14.0 → 0.15.0

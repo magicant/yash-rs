@@ -49,6 +49,7 @@ When the shell is interactive:
 - The `ignoreeof` [shell option](../environment/options.md) is honored.
 - [Starting an asynchronous command prints its job number and process ID](../language/commands/lists.md#asynchronous-commands).
 - The shell does not exit immediately on most [shell errors](../termination.md#shell-errors).
+- [Commands can be interrupted](../environment/traps.md#interruption-in-interactive-shells).
 - [Some signals are automatically ignored](../environment/traps.md#auto-ignored-signals).
 - [Signals ignored on entry can be trapped](../environment/traps.md#restrictions).
 - [Command prompts](prompt.md) are displayed when reading input.
