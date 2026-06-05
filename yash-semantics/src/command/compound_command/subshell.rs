@@ -23,7 +23,7 @@ use std::ops::ControlFlow::Break;
 use std::rc::Rc;
 use yash_env::Env;
 use yash_env::io::print_error;
-use yash_env::job::add_job_if_suspended;
+use yash_env::job::handle_job_status;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
@@ -43,7 +43,7 @@ pub async fn execute<S: Runtime + 'static>(
     });
     match subshell.await {
         Ok((pid, result)) => {
-            env.exit_status = add_job_if_suspended(env, pid, result, || body.to_string())?;
+            env.exit_status = handle_job_status(env, pid, result, || body.to_string())?;
             env.apply_errexit()
         }
         Err(errno) => {

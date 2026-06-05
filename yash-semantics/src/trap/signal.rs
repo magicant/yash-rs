@@ -124,6 +124,7 @@ pub async fn run_traps_for_caught_signals<S: Runtime + 'static>(env: &mut Env<S>
     Continue(())
 }
 
+// XXX This function is identical to yash_env::job::sigint_is_defaulted
 fn sigint_is_defaulted<S: Signals>(env: &Env<S>) -> bool {
     let state = env.traps.get_state(S::SIGINT).0;
     state.is_none_or(|state| state.action == Action::Default)

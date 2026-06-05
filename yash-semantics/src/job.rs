@@ -16,5 +16,6 @@
 
 //! Utilities for job control
 
+#[allow(deprecated, reason = "for backward compatible re-exports")]
 #[doc(no_inline)]
 pub use yash_env::job::add_job_if_suspended;

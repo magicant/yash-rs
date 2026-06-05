@@ -22,7 +22,7 @@ pub mod search;
 
 use crate::Env;
 use crate::function::Function;
-use crate::job::{RunBlocking, RunUnblocking, add_job_if_suspended};
+use crate::job::{RunBlocking, RunUnblocking, handle_job_status};
 use crate::semantics::{ExitStatus, Field, Result};
 use crate::source::Location;
 use crate::source::pretty::{Report, ReportType, Snippet};
@@ -294,7 +294,7 @@ where
         });
 
     match subshell_result.await {
-        Ok((pid, result)) => add_job_if_suspended(env, pid, result, || job_name),
+        Ok((pid, result)) => handle_job_status(env, pid, result, || job_name),
         Err(errno) => {
             handle_start_subshell_error(env, StartSubshellError { utility, errno }).await;
             Continue(ExitStatus::NOEXEC)

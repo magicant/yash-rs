@@ -244,6 +244,8 @@ impl Config {
     ///
     /// When a job-controlled subshell suspends, this function does not add it
     /// to `env.jobs`. You have to do it for yourself if necessary.
+    /// [`handle_job_status`](crate::job::handle_job_status) is a convenient
+    /// helper for doing so.
     pub async fn start_and_wait<S, F>(
         // Why take `self` by value? See the comment in `start`.
         self,

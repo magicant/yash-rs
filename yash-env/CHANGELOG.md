@@ -13,6 +13,11 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Added
 
+- The `job::handle_job_status` function has been added as a replacement for the
+  deprecated `job::add_job_if_suspended`. In addition to the behavior of
+  `add_job_if_suspended`, `handle_job_status` returns
+  `Break(Divert::Interrupt(...))` when the process was terminated by `SIGINT`
+  and the interactive shell's trap action for `SIGINT` is the default.
 - The following trait implementations have been added:
     - `impl<S> job::RunBlocking for Concurrent<S>`
     - `impl<S> job::RunBlocking for Rc<Concurrent<S>>`
@@ -37,6 +42,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- `semantics::command::run_external_utility_in_subshell` now returns
+  `Break(Divert::Interrupt(...))` when the external utility is killed by
+  `SIGINT` in an interactive shell with the default `SIGINT` disposition.
 - The `system::Exec::execve` method now accepts the `args` and `envs` arguments
   as generic types implementing the new `system::c_string::IntoCStrArray` trait
   instead of `&[CString]`. This allows callers to pass string arrays without
@@ -48,6 +56,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Deprecated
 
+- The `job::add_job_if_suspended` function has been deprecated in favor of
+  `job::handle_job_status`.
 - The `JobList::add` method has been deprecated in favor of `JobList::insert`.
 
 ### Removed
