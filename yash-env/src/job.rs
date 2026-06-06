@@ -1039,8 +1039,9 @@ where
     Continue(exit_status)
 }
 
-// XXX This function is identical to yash_semantics::trap::signal::sigint_is_defaulted.
-// We should unify them, but this function does not seem useful enough to be exposed in this module.
+// XXX This function is identical to yash_semantics::trap::signal::sigint_is_defaulted and
+// yash_builtin::fg::sigint_is_defaulted. We should unify them, but this function does not
+// seem useful enough to be exposed as a public API.
 fn sigint_is_defaulted<S: Signals>(env: &Env<S>) -> bool {
     let state = env.traps.get_state(S::SIGINT).0;
     state.is_none_or(|state| state.action == Action::Default)

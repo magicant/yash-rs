@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The interactive shell now allows interrupting command execution with the
   `SIGINT` signal.
 
+### Fixed
+
+- Previously, the `fg` built-in always returned an interrupt when invoked in an
+  interactive shell (unless there was an error). This was undesirable because
+  any commands that followed `fg` would unconditionally be ignored. Now, `fg`
+  only returns an interrupt in the following cases:
+    - The job was suspended, or
+    - The job was terminated by `SIGINT` and the `SIGINT` trap is not set.
+
 ## [3.0.8] - 2026-05-23
 
 ### Fixed

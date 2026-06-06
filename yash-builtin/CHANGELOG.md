@@ -18,6 +18,15 @@ A _private dependency_ is used internally and not visible to downstream users.
     - yash-env 0.14.0 → 0.15.0
     - yash-semantics (optional) 0.16.0 → 0.17.0
 
+### Fixed
+
+- Previously, the `fg` built-in always returned an interrupt when invoked in an
+  interactive shell (unless there was an error). This was undesirable because
+  any commands that followed `fg` would unconditionally be ignored. Now, `fg`
+  only returns an interrupt in the following cases:
+    - The job was suspended, or
+    - The job was terminated by `SIGINT` and the `SIGINT` trap is not set.
+
 ## [0.17.0] - 2026-05-23
 
 ### Changed

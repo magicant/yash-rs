@@ -26,6 +26,15 @@
 //! running. The signal is not sent to jobs that have already terminated, to
 //! prevent unrelated processes that happen to have the same process IDs as the
 //! jobs from receiving the signal.
+//!
+//! The [`main`] function returns `Break(Interrupt(Some(...)))` if the shell is
+//! interactive and one of the following conditions is met:
+//!
+//! - The job is suspended, or
+//! - The job is terminated by `SIGINT` and the `SIGINT` trap is set to the default action.
+//!
+//! This return value should be propagated to the top-level loop, which should
+//! interrupt the shell and return to the prompt.
 
 use crate::bg::OperandErrorKind;
 use crate::bg::ResumeError;
@@ -47,8 +56,10 @@ use yash_env::option::State::Off;
 use yash_env::semantics::Divert::Interrupt;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
+use yash_env::system::Signals;
 use yash_env::system::concurrency::{WaitForSignals, WriteAll};
 use yash_env::system::{Close, Dup, Isatty, Open, SendSignal, TcSetPgrp, Wait};
+use yash_env::trap::Action;
 use yash_env::trap::SignalSystem;
 
 /// Resumes the job at the specified index.
@@ -150,6 +161,33 @@ where
     Ok(resume_job_by_index(env, index).await?)
 }
 
+// XXX This function is identical to yash_env::job::sigint_is_defaulted
+fn sigint_is_defaulted<S: Signals>(env: &Env<S>) -> bool {
+    let state = env.traps.get_state(S::SIGINT).0;
+    state.is_none_or(|state| state.action == Action::Default)
+}
+
+/// Returns whether the `fg` built-in should return an interrupt.
+///
+/// Interactive shells get interrupted and return to the prompt when a
+/// foreground job is suspended or terminated by SIGINT. This function
+/// determines whether the built-in should return an interrupt based on the
+/// shell's options and the result of the job.
+fn should_interrupt<S: Signals>(env: &Env<S>, result: &ProcessResult) -> bool {
+    if !env.is_interactive() {
+        return false;
+    }
+    if result.is_stopped() {
+        return true;
+    }
+    if let ProcessResult::Signaled { signal, .. } = result
+        && *signal == S::SIGINT
+    {
+        return sigint_is_defaulted(env);
+    }
+    false
+}
+
 /// Entry point of the `fg` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
@@ -189,7 +227,7 @@ where
     };
 
     match result {
-        Ok(result) if env.is_interactive() => {
+        Ok(result) if should_interrupt(env, &result) => {
             let divert = Break(Interrupt(Some(ExitStatus::from(result))));
             crate::Result::with_exit_status_and_divert(env.exit_status, divert)
         }
@@ -210,16 +248,20 @@ mod tests {
     use yash_env::job::ProcessResult;
     use yash_env::option::Option::Interactive;
     use yash_env::option::State::On;
+    use yash_env::source::Location;
     use yash_env::subshell::Config;
     use yash_env::system::Concurrent;
     use yash_env::system::GetPid as _;
     use yash_env::system::TcGetPgrp as _;
     use yash_env::system::r#virtual::Process;
+    use yash_env::system::r#virtual::SIGHUP;
+    use yash_env::system::r#virtual::SIGINT;
     use yash_env::system::r#virtual::SIGSTOP;
     use yash_env::test_helper::assert_stderr;
     use yash_env::test_helper::assert_stdout;
     use yash_env::test_helper::in_virtual_system;
     use yash_env::test_helper::stub_tty;
+    use yash_env::trap::Action;
 
     async fn suspend(env: &mut Env<Rc<Concurrent<VirtualSystem>>>) {
         let target = env.system.getpid();
@@ -432,6 +474,87 @@ mod tests {
 
         let result = resume_job_by_index(&mut env, index).now_or_never().unwrap();
         assert_eq!(result, Err(ResumeError::Unmonitored));
+    }
+
+    #[test]
+    fn should_interrupt_if_interactive_and_suspended() {
+        let mut env = Env::new_virtual();
+        env.options.set(Interactive, On);
+        let result = ProcessResult::Stopped(SIGSTOP);
+        assert!(should_interrupt(&env, &result));
+    }
+
+    #[test]
+    fn should_interrupt_if_interactive_and_terminated_by_sigint_and_sigint_trap_is_default() {
+        let mut env = Env::new_virtual();
+        env.options.set(Interactive, On);
+        let result = ProcessResult::Signaled {
+            signal: SIGINT,
+            core_dump: false,
+        };
+        assert!(should_interrupt(&env, &result));
+    }
+
+    #[test]
+    fn should_not_interrupt_if_interactive_and_terminated_by_sigint_but_sigint_is_ignored() {
+        let mut env = Env::new_virtual();
+        env.options.set(Interactive, On);
+        env.traps
+            .set_action(
+                &env.system,
+                SIGINT,
+                Action::Ignore,
+                Location::dummy(""),
+                false,
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        let result = ProcessResult::Signaled {
+            signal: SIGINT,
+            core_dump: false,
+        };
+        assert!(!should_interrupt(&env, &result));
+    }
+
+    #[test]
+    fn should_not_interrupt_if_interactive_and_terminated_by_sigint_but_sigint_trap_is_custom() {
+        let mut env = Env::new_virtual();
+        env.options.set(Interactive, On);
+        env.traps
+            .set_action(
+                &env.system,
+                SIGINT,
+                Action::Command("echo foo".into()),
+                Location::dummy(""),
+                false,
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        let result = ProcessResult::Signaled {
+            signal: SIGINT,
+            core_dump: false,
+        };
+        assert!(!should_interrupt(&env, &result));
+    }
+
+    #[test]
+    fn should_not_interrupt_if_interactive_and_terminated_by_other_than_sigint() {
+        let mut env = Env::new_virtual();
+        env.options.set(Interactive, On);
+        let result = ProcessResult::Signaled {
+            signal: SIGHUP,
+            core_dump: false,
+        };
+        assert!(!should_interrupt(&env, &result));
+    }
+
+    #[test]
+    fn should_not_interrupt_if_non_interactive() {
+        let env = Env::new_virtual();
+        let result = ProcessResult::Stopped(SIGSTOP);
+        assert!(!should_interrupt(&env, &result));
     }
 
     #[test]
