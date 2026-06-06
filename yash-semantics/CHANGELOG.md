@@ -11,20 +11,31 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.17.0] - Unreleased
 
+### Added
+
+- `expansion::ErrorCause::Interrupted` is a new variant that represents a
+  command substitution being interrupted by `SIGINT`. When this error is
+  handled (via the `Handle` trait), it returns
+  `Break(Divert::Interrupt(Some(exit_status)))` without printing an error
+  message.
+
 ### Changed
 
 - The `trap::run_traps_for_caught_signals` function now checks for a caught
   SIGINT signal and interrupts the current command with SIGINT if the signal is
   caught and the disposition of SIGINT is default. This behavior is not
   specified in POSIX, but it is a common behavior of interactive shells.
-- Executing an external utility, subshell, pipeline, or redirection in an
-  interactive shell with the default `SIGINT` disposition now interrupts the
-  shell (returns `Break(Divert::Interrupt(...))`) when the child process is
-  killed by `SIGINT`. This complements the behavior of
+- Executing an external utility, subshell, pipeline, redirection, or command
+  substitution in an interactive shell with the default `SIGINT` disposition
+  now interrupts the shell (returns `Break(Divert::Interrupt(...))`) when the
+  child process is killed by `SIGINT`. This complements the behavior of
   `trap::run_traps_for_caught_signals`. This affects the following items:
     - `impl command::Command for yash_syntax::syntax::SimpleCommand`
     - `impl command::Command for yash_syntax::syntax::Pipeline`
     - `impl command::Command for yash_syntax::syntax::CompoundCommand`
+    - `impl expansion::initial::Expand for yash_syntax::syntax::TextUnit` (as
+      well as for other syntax types that contain `TextUnit` such as `WordUnit`)
+- The `expansion::ErrorCause` enum is now `non_exhaustive`.
 - Public dependency versions:
     - Rust 1.87.0 → 1.96.0
     - yash-env 0.14.0 → 0.15.0

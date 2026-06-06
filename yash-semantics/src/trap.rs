@@ -106,6 +106,7 @@ async fn run_trap<S: Runtime + 'static>(
 mod signal;
 pub use signal::run_trap_if_caught;
 pub use signal::run_traps_for_caught_signals;
+pub(crate) use signal::sigint_is_defaulted;
 
 mod exit;
 pub use exit::run_exit_trap;

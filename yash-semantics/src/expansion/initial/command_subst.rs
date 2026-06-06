@@ -26,9 +26,12 @@ use crate::Runtime;
 use crate::expansion::ErrorCause;
 use crate::read_eval_loop;
 use crate::trap::run_exit_trap;
+use crate::trap::sigint_is_defaulted;
 use std::cell::RefCell;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
+use yash_env::job::ProcessResult;
+use yash_env::semantics::ExitStatus;
 use yash_env::subshell::Config;
 use yash_env::subshell::JobControl;
 use yash_env::system::concurrency::ReadAll;
@@ -139,15 +142,34 @@ where
     env.inner.system.read_all_to(reader, &mut result).await.ok();
     env.inner.system.close(reader).ok();
 
-    // Wait for the subshell
-    match env.inner.wait_for_subshell_to_finish(pid).await {
-        Ok((_pid, exit_status)) => env.last_command_subst_exit_status = Some(exit_status),
-        Err(errno) => {
-            return Err(Error {
-                cause: ErrorCause::CommandSubstError(errno),
-                location,
-            });
+    // Wait for the subshell to terminate (ignoring intermediate stopped states)
+    let process_result = loop {
+        match env.inner.wait_for_subshell_to_halt(pid).await {
+            Ok((_pid, result)) if result.is_stopped() => continue,
+            Ok((_pid, result)) => break result,
+            Err(errno) => {
+                return Err(Error {
+                    cause: ErrorCause::CommandSubstError(errno),
+                    location,
+                });
+            }
         }
+    };
+
+    let exit_status = ExitStatus::from(process_result);
+    env.last_command_subst_exit_status = Some(exit_status);
+
+    // If the subshell was killed by SIGINT in an interactive shell with the
+    // default SIGINT disposition, propagate the interrupt.
+    if let ProcessResult::Signaled { signal, .. } = process_result
+        && signal == S::SIGINT
+        && env.inner.is_interactive()
+        && sigint_is_defaulted(env.inner)
+    {
+        return Err(Error {
+            cause: ErrorCause::Interrupted(exit_status),
+            location,
+        });
     }
 
     // TODO Reject invalid UTF-8 sequence if strict POSIX mode is on
@@ -176,8 +198,16 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use futures_util::FutureExt as _;
+    use std::pin::Pin;
+    use yash_env::builtin::Builtin;
+    use yash_env::option::Option::Interactive;
+    use yash_env::option::State::On;
     use yash_env::semantics::ExitStatus;
+    use yash_env::semantics::Field;
+    use yash_env::system::r#virtual::SIGINT;
+    use yash_env::system::{GetPid, SendSignal};
     use yash_env::test_helper::in_virtual_system;
+    use yash_env::trap::Action;
 
     #[test]
     fn empty_substitution() {
@@ -255,5 +285,104 @@ mod tests {
             .unwrap();
         let cause = ErrorCause::CommandSubstError(Errno::ENOSYS);
         assert_eq!(result, Err(Error { cause, location }));
+    }
+
+    fn kill_self_with_sigint_main<S: GetPid + SendSignal>(
+        env: &mut yash_env::Env<S>,
+        _args: Vec<Field>,
+    ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
+        Box::pin(async move {
+            let pid = env.system.getpid();
+            env.system.kill(pid, Some(SIGINT)).await.ok();
+            yash_env::builtin::Result::default()
+        })
+    }
+
+    #[test]
+    fn interrupt_interactive_shell_when_command_subst_killed_by_sigint() {
+        in_virtual_system(|mut env, _state| async move {
+            env.builtins.insert(
+                "kill_self",
+                Builtin::new(
+                    yash_env::builtin::Type::Mandatory,
+                    kill_self_with_sigint_main,
+                ),
+            );
+            env.options.set(Interactive, On);
+            // SIGINT trap action is Action::Default by default
+
+            let command = "kill_self".to_string();
+            let location = Location::dummy("loc");
+            let mut expansion_env = Env::new(&mut env);
+            let result = expand(command, location.clone(), &mut expansion_env).await;
+
+            assert_eq!(
+                result,
+                Err(Error {
+                    cause: ErrorCause::Interrupted(ExitStatus::from(SIGINT)),
+                    location,
+                })
+            );
+        })
+    }
+
+    #[test]
+    fn no_interrupt_for_non_interactive_shell_when_command_subst_killed_by_sigint() {
+        in_virtual_system(|mut env, _state| async move {
+            env.builtins.insert(
+                "kill_self",
+                Builtin::new(
+                    yash_env::builtin::Type::Mandatory,
+                    kill_self_with_sigint_main,
+                ),
+            );
+            // Not setting Interactive option
+
+            let command = "kill_self".to_string();
+            let location = Location::dummy("loc");
+            let mut expansion_env = Env::new(&mut env);
+            let result = expand(command, location, &mut expansion_env).await;
+
+            assert_eq!(result, Ok(Phrase::one_empty_field()));
+            assert_eq!(
+                expansion_env.last_command_subst_exit_status,
+                Some(ExitStatus::from(SIGINT))
+            );
+        })
+    }
+
+    #[test]
+    fn no_interrupt_when_sigint_trapped_and_command_subst_killed_by_sigint() {
+        in_virtual_system(|mut env, _state| async move {
+            env.builtins.insert(
+                "kill_self",
+                Builtin::new(
+                    yash_env::builtin::Type::Mandatory,
+                    kill_self_with_sigint_main,
+                ),
+            );
+            env.options.set(Interactive, On);
+            env.traps
+                .set_action(
+                    &env.system,
+                    SIGINT,
+                    Action::Command("echo trapped".into()),
+                    Location::dummy(""),
+                    false,
+                )
+                .await
+                .unwrap();
+
+            let command = "kill_self".to_string();
+            let location = Location::dummy("loc");
+            let mut expansion_env = Env::new(&mut env);
+            let result = expand(command, location, &mut expansion_env).await;
+
+            assert_eq!(result, Ok(Phrase::one_empty_field()));
+            assert_eq!(
+                expansion_env.last_command_subst_exit_status,
+                Some(ExitStatus::from(SIGINT))
+            );
+        })
     }
 }

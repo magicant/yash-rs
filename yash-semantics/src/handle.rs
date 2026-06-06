@@ -17,6 +17,7 @@
 //! Error handlers.
 
 use crate::ExitStatus;
+use crate::expansion::ErrorCause;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
 use yash_env::io::print_report;
@@ -64,9 +65,14 @@ where
 /// Prints an error message and returns a divert result indicating a non-zero
 /// exit status.
 ///
-/// This implementation handles the error by printing an error message to the
-/// standard error and returning `Divert::Interrupt(Some(ExitStatus::ERROR))`.
-/// If the [`ErrExit`] option is set, `Divert::Exit(Some(ExitStatus::ERROR))` is
+/// If the error cause is [`ErrorCause::Interrupted`], this implementation
+/// returns `Break(Divert::Interrupt(Some(exit_status)))` without printing an
+/// error message, where `exit_status` is the exit status contained in the
+/// error cause.
+///
+/// Otherwise, this implementation prints an error message to the standard
+/// error and returns `Divert::Interrupt(Some(ExitStatus::ERROR))`. If the
+/// [`ErrExit`] option is set, `Divert::Exit(Some(ExitStatus::ERROR))` is
 /// returned instead.
 ///
 /// Note that other POSIX-compliant implementations may use different non-zero
@@ -78,6 +84,10 @@ where
     S: Isatty + WriteAll,
 {
     async fn handle(&self, env: &mut Env<S>) -> super::Result {
+        if let ErrorCause::Interrupted(exit_status) = &self.cause {
+            return Break(Divert::Interrupt(Some(*exit_status)));
+        }
+
         print_report(env, &self.to_report()).await;
 
         if env.errexit_is_applicable() {

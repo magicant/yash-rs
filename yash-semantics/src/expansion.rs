@@ -135,6 +135,7 @@ pub struct AssignReadOnlyError {
 
 /// Types of errors that may occur in the word expansion.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[non_exhaustive]
 pub enum ErrorCause {
     /// System error while performing a command substitution.
     #[error("error in command substitution: {0}")]
@@ -159,6 +160,14 @@ pub enum ErrorCause {
     /// Assignment to a nonassignable parameter
     #[error(transparent)]
     NonassignableParameter(#[from] NonassignableError),
+
+    /// Command substitution process was killed by SIGINT.
+    ///
+    /// This variant is used to propagate a SIGINT interruption that occurred
+    /// in a command substitution process. The exit status is the exit status
+    /// derived from the SIGINT signal.
+    #[error("command substitution interrupted by SIGINT")]
+    Interrupted(ExitStatus),
 }
 
 impl ErrorCause {
@@ -174,6 +183,7 @@ impl ErrorCause {
             UnsetParameter { .. } => "cannot expand unset parameter",
             VacantExpansion(error) => error.message_or_default(),
             NonassignableParameter(_) => "cannot assign to parameter",
+            Interrupted(_) => "command substitution interrupted",
         }
     }
 
@@ -196,6 +206,7 @@ impl ErrorCause {
                 }
             },
             NonassignableParameter(e) => e.to_string(),
+            Interrupted(_) => "killed by SIGINT".to_owned(),
         }
         .into()
     }
@@ -216,6 +227,7 @@ impl ErrorCause {
             UnsetParameter { .. } => None,
             VacantExpansion(_) => None,
             NonassignableParameter(_) => None,
+            Interrupted(_) => None,
         }
     }
 
@@ -228,7 +240,8 @@ impl ErrorCause {
             | ArithError(_)
             | AssignReadOnly(_)
             | VacantExpansion(_)
-            | NonassignableParameter(_) => None,
+            | NonassignableParameter(_)
+            | Interrupted(_) => None,
 
             UnsetParameter { .. } => Some("unset parameters are disallowed by the nounset option"),
         }
@@ -276,6 +289,7 @@ impl Error {
             ErrorCause::UnsetParameter { .. } => None,
             ErrorCause::VacantExpansion(_) => None,
             ErrorCause::NonassignableParameter(e) => Some(e.vacancy),
+            ErrorCause::Interrupted(_) => None,
         };
         if let Some(vacancy) = vacancy {
             let message = match vacancy {
