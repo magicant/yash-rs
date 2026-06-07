@@ -11,6 +11,11 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.18.0] - Unreleased
 
+### Added
+
+- The `wait` built-in now interrupts the interactive shell when `SIGINT` is
+  caught with the default action while waiting for jobs.
+
 ### Changed
 
 - Public dependency versions:

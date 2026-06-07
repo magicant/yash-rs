@@ -20,13 +20,15 @@
 //! trap action. The [`Error`](enum@Error) type represents errors that may occur
 //! in the function.
 
+use std::ops::ControlFlow::Break;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::job::Pid;
+use yash_env::semantics::{Divert, ExitStatus};
 use yash_env::signal;
 use yash_env::system::concurrency::WaitForSignals;
-use yash_env::system::{Errno, Wait};
-use yash_env::trap::{RunSignalTrapIfCaught, SignalSystem};
+use yash_env::system::{Errno, Signals, Wait};
+use yash_env::trap::{Action, RunSignalTrapIfCaught, SignalSystem};
 
 /// Errors that may occur while waiting for a job
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
@@ -41,6 +43,13 @@ pub enum Error {
     /// An unexpected error occurred in the underlying system.
     #[error("system error: {0}")]
     SystemError(#[from] Errno),
+}
+
+// XXX This function is identical to yash_env::job::sigint_is_defaulted and
+// yash_builtin::fg::sigint_is_defaulted. We should unify them.
+fn sigint_is_defaulted<S: Signals>(env: &Env<S>) -> bool {
+    let state = env.traps.get_state(S::SIGINT).0;
+    state.is_none_or(|state| state.action == Action::Default)
 }
 
 /// Waits for a job status change or trap.
@@ -89,6 +98,12 @@ where
                     if let Some(result) = run_trap_if_caught(env, signal).await {
                         return Err(Error::Trapped(signal, result));
                     }
+                    if signal == S::SIGINT && sigint_is_defaulted(env) {
+                        return Err(Error::Trapped(
+                            S::SIGINT,
+                            Break(Divert::Interrupt(Some(ExitStatus::from(S::SIGINT)))),
+                        ));
+                    }
                 }
             }
 
@@ -114,19 +129,19 @@ mod tests {
     use futures_util::FutureExt as _;
     use futures_util::poll;
     use std::future::{pending, ready};
-    use std::ops::ControlFlow::Continue;
+    use std::ops::ControlFlow::{Break, Continue};
     use std::pin::pin;
     use std::rc::Rc;
     use std::task::Poll;
     use yash_env::VirtualSystem;
     use yash_env::job::Job;
     use yash_env::job::ProcessState;
-    use yash_env::semantics::ExitStatus;
+    use yash_env::semantics::{Divert, ExitStatus};
     use yash_env::source::Location;
     use yash_env::subshell::Config;
     use yash_env::system::Concurrent;
     use yash_env::system::SendSignal as _;
-    use yash_env::system::r#virtual::{SIGSTOP, SIGTERM};
+    use yash_env::system::r#virtual::{SIGINT, SIGSTOP, SIGTERM};
     use yash_env::test_helper::in_virtual_system;
     use yash_env::trap::Action;
     use yash_env::variable::Value;
@@ -248,6 +263,56 @@ mod tests {
                 env.variables.get("foo").unwrap().value,
                 Some(Value::scalar("bar")),
             );
+        });
+    }
+
+    #[test]
+    fn sigint_with_default_action() {
+        in_virtual_system(|mut env, state| async move {
+            type TestSystem = Rc<Concurrent<VirtualSystem>>;
+            env.any.insert(Box::new(RunSignalTrapIfCaught::<TestSystem>(
+                |env, signal| {
+                    Box::pin(
+                        async move { yash_semantics::trap::run_trap_if_caught(env, signal).await },
+                    )
+                },
+            )));
+
+            let system = VirtualSystem {
+                state,
+                process_id: env.main_pid,
+            };
+
+            // Enable internal dispositions so SIGINT is caught with default action.
+            env.traps
+                .enable_internal_dispositions_for_terminators(&env.system)
+                .await
+                .unwrap();
+
+            // Start a child process that never exits.
+            Config::new()
+                .start(&mut env, async |_, _| pending().await)
+                .await
+                .unwrap();
+
+            {
+                // The job is not finished, so the function keeps waiting.
+                let mut future = pin!(wait_for_any_job_or_trap(&mut env));
+                assert_eq!(poll!(&mut future), Poll::Pending);
+
+                // Send SIGINT to the current process.
+                _ = system.current_process_mut().raise_signal(SIGINT);
+
+                // The function should return with an interrupt.
+                let result = future.await;
+                assert_eq!(
+                    result,
+                    Err(Error::Trapped(
+                        SIGINT,
+                        Break(Divert::Interrupt(Some(ExitStatus::from(SIGINT)))),
+                    )),
+                );
+            }
         });
     }
 
