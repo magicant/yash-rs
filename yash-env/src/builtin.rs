@@ -269,6 +269,23 @@ pub struct Builtin<S> {
     ///
     /// [method description]: crate::decl_util::Glossary::is_declaration_utility
     pub is_declaration_utility: Option<bool>,
+
+    /// Whether the built-in handles signals internally
+    ///
+    /// If `true`, the built-in is responsible for all signal handling during
+    /// its execution, including checking for caught signals and returning
+    /// `Break(Divert::Interrupt(...))` if appropriate. The caller must not
+    /// perform any additional signal checks while the built-in is executing.
+    ///
+    /// If `false` (the default), the built-in does not check for signals at
+    /// all. The caller then checks for a caught SIGINT concurrently with the
+    /// built-in's execution and interrupts the shell if needed. This allows the
+    /// shell to respond to SIGINT even for built-ins that never look at signals
+    /// themselves.
+    ///
+    /// Set this field to `true` for built-ins that handle signals themselves
+    /// (like `fg`, `wait`, `eval`, and `source`), to prevent double-processing.
+    pub handles_signals_internally: bool,
 }
 
 // Not derived automatically because S may not implement Clone or Copy.
@@ -286,6 +303,10 @@ impl<S> Debug for Builtin<S> {
             .field("type", &self.r#type)
             .field("execute", &self.execute)
             .field("is_declaration_utility", &self.is_declaration_utility)
+            .field(
+                "handles_signals_internally",
+                &self.handles_signals_internally,
+            )
             .finish()
     }
 }
@@ -296,6 +317,7 @@ impl<S> PartialEq for Builtin<S> {
         self.r#type == other.r#type
             && std::ptr::fn_addr_eq(self.execute, other.execute)
             && self.is_declaration_utility == other.is_declaration_utility
+            && self.handles_signals_internally == other.handles_signals_internally
     }
 }
 
@@ -306,6 +328,7 @@ impl<S> std::hash::Hash for Builtin<S> {
         self.r#type.hash(state);
         self.execute.hash(state);
         self.is_declaration_utility.hash(state);
+        self.handles_signals_internally.hash(state);
     }
 }
 
@@ -314,12 +337,15 @@ impl<S> Builtin<S> {
     ///
     /// The `type` and `execute` fields are set to the given arguments.
     /// The `is_declaration_utility` field is set to `Some(false)`, indicating
-    /// that the built-in is not a declaration utility.
+    /// that the built-in is not a declaration utility. The
+    /// `handles_signals_internally` field is set to `false`, meaning that
+    /// the built-in does not handle signals internally by default.
     pub const fn new(r#type: Type, execute: Main<S>) -> Self {
         Self {
             r#type,
             execute,
             is_declaration_utility: Some(false),
+            handles_signals_internally: false,
         }
     }
 }

@@ -21,11 +21,14 @@ use crate::Handle as _;
 use crate::Runtime;
 use crate::command::search::search_path;
 use crate::redir::RedirGuard;
+use crate::trap::sigint_is_defaulted;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;
 use crate::xtrace::trace_fields;
 use either::Either;
+use futures_util::future::{Either as SelectResult, select};
 use std::ops::ControlFlow::{Break, Continue};
+use std::pin::pin;
 use yash_env::Env;
 use yash_env::builtin::Builtin;
 use yash_env::io::print_error;
@@ -90,7 +93,51 @@ pub async fn execute_builtin<S: Runtime + 'static>(
 
         let env = &mut env.push_frame(FrameBuiltin { name, is_special }.into());
 
-        (builtin.execute)(env, fields).await
+        let interruptible =
+            !builtin.handles_signals_internally && env.is_interactive() && sigint_is_defaulted(env);
+        if !interruptible {
+            break 'result (builtin.execute)(env, fields).await;
+        }
+
+        // If the built-in is interruptible, we need to wait for either the built-in to finish or
+        // SIGINT to be received. To do so, we run two futures concurrently, one for the built-in
+        // and one for waiting for SIGINT, and wait for either of them to complete.
+        // Waiting for SIGINT is effectively equivalent to `env.wait_for_signal(S::SIGINT).await`,
+        // but it's not possible because `env` is borrowed by the future for the built-in. Instead,
+        // we mock the behavior by calling `system.wait_for_signals().await` and
+        // `env.traps.catch_signal()` manually. Note that we need to call `env.traps.catch_signal()`
+        // for all signals received while waiting, not just SIGINT, because otherwise they would be
+        // lost and never handled.
+        let mut caught = Vec::new();
+        let system = env.system.clone();
+        let result = {
+            let builtin_fut = (builtin.execute)(env, fields);
+            let sigint_fut = pin!(async {
+                loop {
+                    let signals = system.wait_for_signals().await;
+                    caught.extend(signals.iter().copied());
+                    if signals.contains(&S::SIGINT) {
+                        return;
+                    }
+                }
+            });
+
+            // These futures live only in this inner scope so that the borrow
+            // of `caught` and `env` ends before they are used again below.
+            match select(builtin_fut, sigint_fut).await {
+                SelectResult::Left((result, _sigint_fut)) => Some(result),
+                SelectResult::Right(((), _builtin_fut)) => None,
+            }
+        };
+
+        for signal in caught {
+            env.traps.catch_signal(signal);
+        }
+
+        match result {
+            Some(result) => result,
+            None => return Break(Divert::Interrupt(Some(ExitStatus::from(S::SIGINT)))),
+        }
     };
 
     if result.should_retain_redirs() {
@@ -109,22 +156,28 @@ mod tests {
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt as _;
+    use futures_util::poll;
     use std::cell::RefCell;
     use std::pin::Pin;
     use std::rc::Rc;
     use std::str::from_utf8;
     use yash_env::VirtualSystem;
     use yash_env::builtin::Type::{Elective, Extension, Mandatory, Special, Substitutive};
+    use yash_env::option::Interactive;
     use yash_env::option::State::On;
     use yash_env::semantics::ExitStatus;
     use yash_env::stack::Frame;
     use yash_env::system::Concurrent;
     use yash_env::system::Errno;
     use yash_env::system::Mode;
+    use yash_env::system::SendSignal as _;
+    use yash_env::system::Signals as _;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::Inode;
+    use yash_env::system::r#virtual::SIGINT;
     use yash_env::test_helper::assert_stderr;
     use yash_env::test_helper::assert_stdout;
+    use yash_env::test_helper::in_virtual_system;
     use yash_env::variable::Scope::Global;
     use yash_env::variable::Value;
     use yash_syntax::syntax;
@@ -365,6 +418,64 @@ mod tests {
         let command: syntax::SimpleCommand = "special".parse().unwrap();
         _ = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(env.stack[..], []);
+    }
+
+    #[test]
+    fn sigint_interrupts_builtin_by_default_if_interactive() {
+        in_virtual_system(|mut env, state| async move {
+            let system = VirtualSystem {
+                process_id: env.main_pid,
+                state,
+            };
+
+            env.options.set(Interactive, On);
+            env.traps
+                .enable_internal_dispositions_for_terminators(&env.system)
+                .await
+                .unwrap();
+            env.builtins.insert(
+                "foo",
+                Builtin::new(Mandatory, |_env, _args| Box::pin(std::future::pending())),
+            );
+
+            let command: syntax::SimpleCommand = "foo".parse().unwrap();
+            let mut execute_fut = pin!(command.execute(&mut env));
+            assert_eq!(poll!(execute_fut.as_mut()), std::task::Poll::Pending);
+
+            system.raise(VirtualSystem::SIGINT).await.unwrap();
+            let result = execute_fut.await;
+            assert_eq!(
+                result,
+                Break(Divert::Interrupt(Some(ExitStatus::from(SIGINT))))
+            );
+        })
+    }
+
+    #[test]
+    fn sigint_not_checked_when_handles_signals_internally_is_true() {
+        in_virtual_system(|mut env, state| async move {
+            let system = VirtualSystem {
+                process_id: env.main_pid,
+                state,
+            };
+
+            env.options.set(Interactive, On);
+            env.traps
+                .enable_internal_dispositions_for_terminators(&env.system)
+                .await
+                .unwrap();
+            let mut builtin =
+                Builtin::new(Mandatory, |_env, _args| Box::pin(std::future::pending()));
+            builtin.handles_signals_internally = true;
+            env.builtins.insert("foo", builtin);
+
+            let command: syntax::SimpleCommand = "foo".parse().unwrap();
+            let mut execute_fut = pin!(command.execute(&mut env));
+            assert_eq!(poll!(execute_fut.as_mut()), std::task::Poll::Pending);
+
+            system.raise(VirtualSystem::SIGINT).await.unwrap();
+            assert_eq!(poll!(execute_fut.as_mut()), std::task::Poll::Pending);
+        });
     }
 
     #[test]

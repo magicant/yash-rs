@@ -13,6 +13,13 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Added
 
+- The `Builtin<S>` struct has a new `handles_signals_internally` field. When
+  `true`, the built-in is responsible for all signal handling during its
+  execution and the caller must not perform additional signal checks. When
+  `false` (the default), the simple command execution code checks for a caught
+  SIGINT signal and interrupts the shell if needed. Built-ins that handle
+  signals themselves (such as `wait`, `fg`, and `eval`) should set this field to
+  `true`.
 - The `job::handle_job_status` function has been added as a replacement for the
   deprecated `job::add_job_if_suspended`. In addition to the behavior of
   `add_job_if_suspended`, `handle_job_status` returns

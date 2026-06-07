@@ -18,6 +18,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- The `eval`, `.`/`source`, `fg`, and `wait` built-ins returned from `iter()`
+  now have `handles_signals_internally` set to `true`, indicating that these
+  built-ins handle signals themselves and the caller must not perform additional
+  signal checks while they are executing.
 - Public dependency versions:
     - Rust 1.87.0 → 1.96.0
     - yash-env 0.14.0 → 0.15.0

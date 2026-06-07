@@ -44,6 +44,13 @@ __IN__
 INT
 __OUT__
 
+test_o -e 0 'interrupting a built-in in interactive mode' -im --norcfile
+kill -INT $$
+kill -l $?
+__IN__
+INT
+__OUT__
+
 # There is no test for interrupting the wait built-in because there is no
 # reliable way to send SIGINT to the shell after the wait built-in has started
 # waiting but before it finishes. The unit test in yash-builtin covers this.

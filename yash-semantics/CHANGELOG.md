@@ -18,6 +18,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   handled (via the `Handle` trait), it returns
   `Break(Divert::Interrupt(Some(exit_status)))` without printing an error
   message.
+- Private dependency:
+    - futures-util 0.3.31
 
 ### Changed
 
@@ -35,6 +37,13 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `impl command::Command for yash_syntax::syntax::CompoundCommand`
     - `impl expansion::initial::Expand for yash_syntax::syntax::TextUnit` (as
       well as for other syntax types that contain `TextUnit` such as `WordUnit`)
+- Executing a built-in utility in an interactive shell now interrupts the shell
+  (returns `Break(Divert::Interrupt(...))`) when SIGINT is caught while the
+  built-in is running and the built-in's `handles_signals_internally` field is
+  `false`. SIGINT is detected concurrently with the built-in's execution: the
+  built-in's future is dropped if SIGINT arrives before the built-in finishes.
+  This affects `impl command::Command for yash_syntax::syntax::SimpleCommand`.
+- The `Runtime` trait now requires `Clone` as a supertrait.
 - The `expansion::ErrorCause` enum is now `non_exhaustive`.
 - Public dependency versions:
     - Rust 1.87.0 → 1.96.0
