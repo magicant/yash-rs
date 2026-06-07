@@ -77,7 +77,7 @@ impl From<Field> for Inner {
     }
 }
 
-/// Iterator that provides results of parameter expansion
+/// Iterator that provides results of pathname expansion
 ///
 /// This iterator is created with the [`glob`] function.
 #[derive(Debug)]
@@ -248,7 +248,7 @@ impl<S: Fstat + Open> SearchEnv<'_, S> {
     }
 }
 
-/// Performs parameter expansion.
+/// Performs pathname expansion.
 ///
 /// This function returns an iterator that yields fields resulting from the
 /// expansion.
