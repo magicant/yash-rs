@@ -14,10 +14,15 @@ A _private dependency_ is used internally and not visible to downstream users.
 ### Added
 
 - `expansion::ErrorCause::Interrupted` is a new variant that represents a
-  command substitution being interrupted by `SIGINT`. When this error is
-  handled (via the `Handle` trait), it returns
+  command substitution or pathname expansion being interrupted by `SIGINT`.
+  When this error is handled (via the `Handle` trait), it returns
   `Break(Divert::Interrupt(Some(exit_status)))` without printing an error
   message.
+- `expansion::glob::Interrupted` is a new type indicating that pathname
+  expansion was interrupted by `SIGINT`. It is yielded as `Err(Interrupted)`
+  by the `expansion::glob::Glob` iterator when a SIGINT signal is received
+  while scanning directories in an interactive shell with the default `SIGINT`
+  disposition.
 - Private dependency:
     - futures-util 0.3.31
 
@@ -45,6 +50,13 @@ A _private dependency_ is used internally and not visible to downstream users.
   This affects `impl command::Command for yash_syntax::syntax::SimpleCommand`.
 - The `Runtime` trait now requires `Clone` as a supertrait.
 - The `expansion::ErrorCause` enum is now `non_exhaustive`.
+- `expansion::glob::glob` now additionally requires
+  `S: yash_env::system::concurrency::WaitForSignals + yash_env::system::concurrency::Select + yash_env::system::Signals`,
+  and `expansion::glob::Glob<'_, S>` now implements
+  `Iterator<Item = Result<expansion::glob::Field, expansion::glob::Interrupted>>`
+  instead of `Iterator<Item = expansion::glob::Field>`.
+  The iterator yields `Err(Interrupted)` when a SIGINT is caught during
+  directory scanning in an interactive shell with the default SIGINT disposition.
 - Public dependency versions:
     - Rust 1.87.0 → 1.96.0
     - yash-env 0.14.0 → 0.15.0

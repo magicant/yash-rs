@@ -161,12 +161,12 @@ pub enum ErrorCause {
     #[error(transparent)]
     NonassignableParameter(#[from] NonassignableError),
 
-    /// Command substitution process was killed by SIGINT.
+    /// Expansion interrupted by SIGINT in an interactive shell
     ///
     /// This variant is used to propagate a SIGINT interruption that occurred
-    /// in a command substitution process. The exit status is the exit status
-    /// derived from the SIGINT signal.
-    #[error("command substitution interrupted by SIGINT")]
+    /// during word expansion (e.g., in a command substitution or pathname
+    /// expansion). The exit status is derived from the SIGINT signal.
+    #[error("expansion interrupted by SIGINT")]
     Interrupted(ExitStatus),
 }
 
@@ -430,7 +430,19 @@ where
 
     // pathname expansion (including quote removal and attribute stripping) //
     for field in split_fields {
-        results.extend(glob(env.inner, field));
+        let glob = glob(env.inner, field);
+        match glob.try_into_vec_iter() {
+            Ok(fields) => results.extend(fields),
+            Err(once) => match { once }.next().unwrap() {
+                Ok(field) => results.extend(std::iter::once(field)),
+                Err(interrupted) => {
+                    return Err(Error {
+                        cause: ErrorCause::Interrupted(interrupted.into()),
+                        location: word.location.clone(),
+                    });
+                }
+            },
+        }
     }
 
     Ok(env.last_command_subst_exit_status)
