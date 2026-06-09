@@ -26,7 +26,6 @@ use crate::Runtime;
 use crate::expansion::ErrorCause;
 use crate::read_eval_loop;
 use crate::trap::run_exit_trap;
-use crate::trap::sigint_is_defaulted;
 use std::cell::RefCell;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
@@ -164,7 +163,7 @@ where
     if let ProcessResult::Signaled { signal, .. } = process_result
         && signal == S::SIGINT
         && env.inner.is_interactive()
-        && sigint_is_defaulted(env.inner)
+        && env.inner.sigint_has_default_action()
     {
         return Err(Error {
             cause: ErrorCause::Interrupted(exit_status),

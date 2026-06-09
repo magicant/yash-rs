@@ -26,7 +26,6 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::signal;
 use yash_env::stack::Frame;
-use yash_env::system::Signals;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
 use yash_env::trap::Origin;
@@ -96,7 +95,9 @@ fn in_trap<S>(env: &Env<S>) -> bool {
 pub async fn run_traps_for_caught_signals<S: Runtime + 'static>(env: &mut Env<S>) -> Result {
     let signals = env.poll_signals();
 
-    if signals.is_some_and(|signals| signals.contains(&S::SIGINT)) && sigint_is_defaulted(env) {
+    if signals.is_some_and(|signals| signals.contains(&S::SIGINT))
+        && env.sigint_has_default_action()
+    {
         // If SIGINT is caught and defaulted, interrupt the current command with SIGINT.
         // We don't have to check if the shell is interactive here, because a
         // defaulted SIGINT would have killed the shell immediately.
@@ -122,12 +123,6 @@ pub async fn run_traps_for_caught_signals<S: Runtime + 'static>(env: &mut Env<S>
     }
 
     Continue(())
-}
-
-// XXX This function is identical to yash_env::job::sigint_is_defaulted
-pub(crate) fn sigint_is_defaulted<S: Signals>(env: &Env<S>) -> bool {
-    let state = env.traps.get_state(S::SIGINT).0;
-    state.is_none_or(|state| state.action == Action::Default)
 }
 
 #[cfg(test)]

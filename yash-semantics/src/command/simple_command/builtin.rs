@@ -21,7 +21,6 @@ use crate::Handle as _;
 use crate::Runtime;
 use crate::command::search::search_path;
 use crate::redir::RedirGuard;
-use crate::trap::sigint_is_defaulted;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;
 use crate::xtrace::trace_fields;
@@ -93,8 +92,9 @@ pub async fn execute_builtin<S: Runtime + 'static>(
 
         let env = &mut env.push_frame(FrameBuiltin { name, is_special }.into());
 
-        let interruptible =
-            !builtin.handles_signals_internally && env.is_interactive() && sigint_is_defaulted(env);
+        let interruptible = !builtin.handles_signals_internally
+            && env.is_interactive()
+            && env.sigint_has_default_action();
         if !interruptible {
             break 'result (builtin.execute)(env, fields).await;
         }

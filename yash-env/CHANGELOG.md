@@ -13,6 +13,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Added
 
+- The `Env::sigint_has_default_action` method has been added, which tests
+  whether the SIGINT trap action is the default (i.e., no custom trap has been
+  set for SIGINT).
 - The `Builtin<S>` struct has a new `handles_signals_internally` field. When
   `true`, the built-in is responsible for all signal handling during its
   execution and the caller must not perform additional signal checks. When

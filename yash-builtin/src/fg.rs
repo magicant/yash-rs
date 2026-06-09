@@ -59,7 +59,6 @@ use yash_env::semantics::Field;
 use yash_env::system::Signals;
 use yash_env::system::concurrency::{WaitForSignals, WriteAll};
 use yash_env::system::{Close, Dup, Isatty, Open, SendSignal, TcSetPgrp, Wait};
-use yash_env::trap::Action;
 use yash_env::trap::SignalSystem;
 
 /// Resumes the job at the specified index.
@@ -161,12 +160,6 @@ where
     Ok(resume_job_by_index(env, index).await?)
 }
 
-// XXX This function is identical to yash_env::job::sigint_is_defaulted
-fn sigint_is_defaulted<S: Signals>(env: &Env<S>) -> bool {
-    let state = env.traps.get_state(S::SIGINT).0;
-    state.is_none_or(|state| state.action == Action::Default)
-}
-
 /// Returns whether the `fg` built-in should return an interrupt.
 ///
 /// Interactive shells get interrupted and return to the prompt when a
@@ -183,7 +176,7 @@ fn should_interrupt<S: Signals>(env: &Env<S>, result: &ProcessResult) -> bool {
     if let ProcessResult::Signaled { signal, .. } = result
         && *signal == S::SIGINT
     {
-        return sigint_is_defaulted(env);
+        return env.sigint_has_default_action();
     }
     false
 }

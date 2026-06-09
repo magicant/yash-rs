@@ -53,7 +53,6 @@
 use super::attr::AttrChar;
 use super::attr::AttrField;
 use super::attr::Origin;
-use crate::trap::sigint_is_defaulted;
 use std::ffi::CString;
 use std::iter::Once;
 use std::marker::PhantomData;
@@ -329,7 +328,7 @@ pub fn glob<S: Fstat + Open + Select + Signals + WaitForSignals>(
 
     // TODO Quick check for *, ?, [ containment
 
-    let interruptible = env.is_interactive() && sigint_is_defaulted(env);
+    let interruptible = env.is_interactive() && env.sigint_has_default_action();
     let mut search_env = SearchEnv {
         env,
         interruptible,

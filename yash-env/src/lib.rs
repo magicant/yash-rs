@@ -75,6 +75,7 @@ use self::system::OfdAccess;
 use self::system::Open;
 use self::system::OpenFlag;
 use self::system::SignalList;
+use self::system::Signals;
 use self::system::TcSetPgrp;
 use self::system::Wait;
 use self::system::concurrency::Select;
@@ -82,6 +83,7 @@ use self::system::concurrency::WaitForSignals;
 #[cfg(unix)]
 pub use self::system::real::RealSystem;
 pub use self::system::r#virtual::VirtualSystem;
+use self::trap::Action;
 use self::trap::SignalSystem;
 use self::trap::TrapSet;
 use self::variable::PPID;
@@ -605,6 +607,27 @@ impl<S> Env<S> {
     #[must_use]
     pub fn controls_jobs(&self) -> bool {
         self.options.get(Monitor) == On && !self.stack.contains(&Frame::Subshell)
+    }
+
+    /// Tests whether the SIGINT trap action is the default.
+    ///
+    /// Returns `true` if and only if SIGINT has not been set to a non-default
+    /// trap action.
+    ///
+    /// This method is useful when deciding whether a caught SIGINT should
+    /// immediately interrupt the current operation by returning
+    /// [`Divert::Interrupt`] in an [interactive](Self::is_interactive) shell.
+    /// If this method returns `true`, there is no user-defined trap for SIGINT,
+    /// so the shell can treat the signal as an immediate interrupt. If it
+    /// returns `false`, the shell should instead defer to the user-defined trap
+    /// action.
+    #[must_use]
+    pub fn sigint_has_default_action(&self) -> bool
+    where
+        S: Signals,
+    {
+        let state = self.traps.get_state(S::SIGINT).0;
+        state.is_none_or(|state| state.action == Action::Default)
     }
 
     /// Get an existing variable or create a new one.

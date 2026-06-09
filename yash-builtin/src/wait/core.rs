@@ -27,8 +27,8 @@ use yash_env::job::Pid;
 use yash_env::semantics::{Divert, ExitStatus};
 use yash_env::signal;
 use yash_env::system::concurrency::WaitForSignals;
-use yash_env::system::{Errno, Signals, Wait};
-use yash_env::trap::{Action, RunSignalTrapIfCaught, SignalSystem};
+use yash_env::system::{Errno, Wait};
+use yash_env::trap::{RunSignalTrapIfCaught, SignalSystem};
 
 /// Errors that may occur while waiting for a job
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
@@ -43,13 +43,6 @@ pub enum Error {
     /// An unexpected error occurred in the underlying system.
     #[error("system error: {0}")]
     SystemError(#[from] Errno),
-}
-
-// XXX This function is identical to yash_env::job::sigint_is_defaulted and
-// yash_builtin::fg::sigint_is_defaulted. We should unify them.
-fn sigint_is_defaulted<S: Signals>(env: &Env<S>) -> bool {
-    let state = env.traps.get_state(S::SIGINT).0;
-    state.is_none_or(|state| state.action == Action::Default)
 }
 
 /// Waits for a job status change or trap.
@@ -98,7 +91,7 @@ where
                     if let Some(result) = run_trap_if_caught(env, signal).await {
                         return Err(Error::Trapped(signal, result));
                     }
-                    if signal == S::SIGINT && sigint_is_defaulted(env) {
+                    if signal == S::SIGINT && env.sigint_has_default_action() {
                         return Err(Error::Trapped(
                             S::SIGINT,
                             Break(Divert::Interrupt(Some(ExitStatus::from(S::SIGINT)))),
