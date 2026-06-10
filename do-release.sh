@@ -50,8 +50,7 @@ while read -r dependency version; do
     version=${version#^}
     
     ## Check if the dependency is already released
-    if curl --fail --location --silent --show-error \
-        "https://crates.io/api/v1/crates/$dependency/$version" >/dev/null; then
+    if cargo info --quiet "$dependency@$version" >/dev/null; then
         continue
     fi
 
