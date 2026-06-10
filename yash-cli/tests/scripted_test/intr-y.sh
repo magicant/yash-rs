@@ -51,6 +51,32 @@ __IN__
 INT
 __OUT__
 
+test_o -e 0 'interrupting the fg built-in in interactive mode' -im --norcfile
+sh -c 'kill -STOP $$; kill -INT $$; echo "This should not be printed."'
+fg %1 >/dev/null
+kill -l $?
+__IN__
+INT
+__OUT__
+
+test_o -e 0 'interrupting the eval built-in in interactive mode' -im --norcfile
+eval 'kill -INT $$; echo "This should not be printed."'
+kill -l $?
+__IN__
+INT
+__OUT__
+
+test_o -e 0 'interrupting the source built-in in interactive mode' -im --norcfile
+cat > source.sh <<'EOF'
+kill -INT $$
+echo 'This should not be printed.'
+EOF
+source ./source.sh
+kill -l $?
+__IN__
+INT
+__OUT__
+
 # There is no test for interrupting the wait built-in because there is no
 # reliable way to send SIGINT to the shell after the wait built-in has started
 # waiting but before it finishes. The unit test in yash-builtin covers this.
