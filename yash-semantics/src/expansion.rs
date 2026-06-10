@@ -183,7 +183,7 @@ impl ErrorCause {
             UnsetParameter { .. } => "cannot expand unset parameter",
             VacantExpansion(error) => error.message_or_default(),
             NonassignableParameter(_) => "cannot assign to parameter",
-            Interrupted(_) => "command substitution interrupted",
+            Interrupted(_) => "word expansion interrupted",
         }
     }
 
