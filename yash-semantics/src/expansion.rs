@@ -135,6 +135,7 @@ pub struct AssignReadOnlyError {
 
 /// Types of errors that may occur in the word expansion.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[non_exhaustive]
 pub enum ErrorCause {
     /// System error while performing a command substitution.
     #[error("error in command substitution: {0}")]
@@ -159,6 +160,14 @@ pub enum ErrorCause {
     /// Assignment to a nonassignable parameter
     #[error(transparent)]
     NonassignableParameter(#[from] NonassignableError),
+
+    /// Expansion interrupted by SIGINT in an interactive shell
+    ///
+    /// This variant is used to propagate a SIGINT interruption that occurred
+    /// during word expansion (e.g., in a command substitution or pathname
+    /// expansion). The exit status is derived from the SIGINT signal.
+    #[error("expansion interrupted by SIGINT")]
+    Interrupted(ExitStatus),
 }
 
 impl ErrorCause {
@@ -174,6 +183,7 @@ impl ErrorCause {
             UnsetParameter { .. } => "cannot expand unset parameter",
             VacantExpansion(error) => error.message_or_default(),
             NonassignableParameter(_) => "cannot assign to parameter",
+            Interrupted(_) => "word expansion interrupted",
         }
     }
 
@@ -196,6 +206,7 @@ impl ErrorCause {
                 }
             },
             NonassignableParameter(e) => e.to_string(),
+            Interrupted(_) => "killed by SIGINT".to_owned(),
         }
         .into()
     }
@@ -216,6 +227,7 @@ impl ErrorCause {
             UnsetParameter { .. } => None,
             VacantExpansion(_) => None,
             NonassignableParameter(_) => None,
+            Interrupted(_) => None,
         }
     }
 
@@ -228,7 +240,8 @@ impl ErrorCause {
             | ArithError(_)
             | AssignReadOnly(_)
             | VacantExpansion(_)
-            | NonassignableParameter(_) => None,
+            | NonassignableParameter(_)
+            | Interrupted(_) => None,
 
             UnsetParameter { .. } => Some("unset parameters are disallowed by the nounset option"),
         }
@@ -276,6 +289,7 @@ impl Error {
             ErrorCause::UnsetParameter { .. } => None,
             ErrorCause::VacantExpansion(_) => None,
             ErrorCause::NonassignableParameter(e) => Some(e.vacancy),
+            ErrorCause::Interrupted(_) => None,
         };
         if let Some(vacancy) = vacancy {
             let message = match vacancy {
@@ -416,7 +430,19 @@ where
 
     // pathname expansion (including quote removal and attribute stripping) //
     for field in split_fields {
-        results.extend(glob(env.inner, field));
+        let glob = glob(env.inner, field);
+        match glob.try_into_vec_iter() {
+            Ok(fields) => results.extend(fields),
+            Err(once) => match { once }.next().unwrap() {
+                Ok(field) => results.extend(std::iter::once(field)),
+                Err(interrupted) => {
+                    return Err(Error {
+                        cause: ErrorCause::Interrupted(interrupted.into()),
+                        location: word.location.clone(),
+                    });
+                }
+            },
+        }
     }
 
     Ok(env.last_command_subst_exit_status)

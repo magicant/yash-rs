@@ -76,6 +76,7 @@
 - [`ignoreeof` shell option](environment/options.md#ignoreeof)
 - [interactive shell](interactive/index.html)
 - [`interactive` shell option](environment/options.md#interactive--i)
+- [interruption](environment/traps.md#interruption-in-interactive-shells)
 - [job](interactive/job_control.md#job-control-concepts)
 - [job control](interactive/job_control.md)
 - [job ID](interactive/job_control.md#job-ids)

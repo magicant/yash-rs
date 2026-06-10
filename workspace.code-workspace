@@ -59,6 +59,7 @@
 			"hasher",
 			"idempotence",
 			"ignoreeof",
+			"interruptible",
 			"isatty",
 			"itertools",
 			"libc",

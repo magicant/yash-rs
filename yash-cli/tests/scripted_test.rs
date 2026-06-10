@@ -292,6 +292,11 @@ fn input() {
 }
 
 #[test]
+fn intr() {
+    run_with_pty("intr-y.sh")
+}
+
+#[test]
 fn job_control() {
     run_with_pty("job-p.sh")
 }

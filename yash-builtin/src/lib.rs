@@ -159,10 +159,11 @@ where
         + 'static,
 {
     [
-        (
-            ".",
-            Builtin::new(Special, |env, args| Box::pin(source::main(env, args))),
-        ),
+        (".", {
+            let mut builtin = Builtin::new(Special, |env, args| Box::pin(source::main(env, args)));
+            builtin.handles_signals_internally = true;
+            builtin
+        }),
         (
             ":",
             Builtin::new(Special, |env, args| Box::pin(ready(colon::main(env, args)))),
@@ -193,10 +194,11 @@ where
             "continue",
             Builtin::new(Special, |env, args| Box::pin(r#continue::main(env, args))),
         ),
-        (
-            "eval",
-            Builtin::new(Special, |env, args| Box::pin(eval::main(env, args))),
-        ),
+        ("eval", {
+            let mut builtin = Builtin::new(Special, |env, args| Box::pin(eval::main(env, args)));
+            builtin.handles_signals_internally = true;
+            builtin
+        }),
         (
             "exec",
             Builtin::new(Special, |env, args| Box::pin(exec::main(env, args))),
@@ -214,10 +216,11 @@ where
             "false",
             Builtin::new(Substitutive, |env, args| Box::pin(r#false::main(env, args))),
         ),
-        (
-            "fg",
-            Builtin::new(Mandatory, |env, args| Box::pin(fg::main(env, args))),
-        ),
+        ("fg", {
+            let mut builtin = Builtin::new(Mandatory, |env, args| Box::pin(fg::main(env, args)));
+            builtin.handles_signals_internally = true;
+            builtin
+        }),
         (
             "getopts",
             Builtin::new(Mandatory, |env, args| Box::pin(getopts::main(env, args))),
@@ -256,10 +259,11 @@ where
             "shift",
             Builtin::new(Special, |env, args| Box::pin(shift::main(env, args))),
         ),
-        (
-            "source",
-            Builtin::new(Special, |env, args| Box::pin(source::main(env, args))),
-        ),
+        ("source", {
+            let mut builtin = Builtin::new(Special, |env, args| Box::pin(source::main(env, args)));
+            builtin.handles_signals_internally = true;
+            builtin
+        }),
         (
             "times",
             Builtin::new(Special, |env, args| Box::pin(times::main(env, args))),
@@ -298,10 +302,11 @@ where
             "unset",
             Builtin::new(Special, |env, args| Box::pin(unset::main(env, args))),
         ),
-        (
-            "wait",
-            Builtin::new(Mandatory, |env, args| Box::pin(wait::main(env, args))),
-        ),
+        ("wait", {
+            let mut builtin = Builtin::new(Mandatory, |env, args| Box::pin(wait::main(env, args)));
+            builtin.handles_signals_internally = true;
+            builtin
+        }),
     ]
     .into_iter()
 }

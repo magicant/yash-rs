@@ -77,3 +77,7 @@ In an [interactive shell](../interactive/index.html), certain signals are automa
 - If [job control](../interactive/job_control.md) is enabled, `SIGTSTP`, `SIGTTIN`, and `SIGTTOU` are also ignored.
 
 This ensures the shell remains responsive and in control, even if these signals are sent. You can still set traps for these signals if needed. In [subshells](index.html#subshells), which are non-interactive, this automatic ignoring does not apply.
+
+## Interruption in interactive shells
+
+(Since 3.1.0) In an [interactive shell](../interactive/index.html) with the default `SIGINT` trap, pressing `Ctrl+C` (or otherwise sending `SIGINT`) interrupts command execution: the shell discards any pending commands and returns to the prompt.

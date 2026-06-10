@@ -18,9 +18,11 @@
 
 use super::run_trap;
 use crate::Runtime;
-use std::ops::ControlFlow::Continue;
+use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::Env;
+use yash_env::semantics::Divert;
+use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::signal;
 use yash_env::stack::Frame;
@@ -81,8 +83,27 @@ fn in_trap<S>(env: &Env<S>) -> bool {
 /// not care for the reentrance of trap actions, so we should not assume they
 /// are reentrant. As an exception, this function does run traps in a subshell
 /// executed in a trap.
+///
+/// If a SIGINT signal has been caught and the trap action for SIGINT is
+/// [`Action::Default`], then this function returns
+/// `Result::Break(Divert::Interrupt(Some(ExitStatus::from(SIGINT))))`
+/// immediately without running any trap actions. This behavior is not specified
+/// in POSIX, but it is a common behavior of interactive shells to allow users
+/// to interrupt a long-running command. Note that the
+/// [internal dispositions for SIGINT](TrapSet::enable_internal_dispositions_for_terminators)
+/// must be enabled for this behavior to work.
 pub async fn run_traps_for_caught_signals<S: Runtime + 'static>(env: &mut Env<S>) -> Result {
-    env.poll_signals();
+    let signals = env.poll_signals();
+
+    if signals.is_some_and(|signals| signals.contains(&S::SIGINT))
+        && env.sigint_has_default_action()
+    {
+        // If SIGINT is caught and defaulted, interrupt the current command with SIGINT.
+        // We don't have to check if the shell is interactive here, because a
+        // defaulted SIGINT would have killed the shell immediately.
+        // We do this before the below `in_trap` check to allow interrupting trap actions.
+        return Break(Divert::Interrupt(Some(ExitStatus::from(S::SIGINT))));
+    }
 
     if in_trap(env) {
         // Do not run a trap action while running another
@@ -114,6 +135,8 @@ mod tests {
     use std::ops::ControlFlow::Break;
     use std::pin::Pin;
     use yash_env::builtin::Builtin;
+    use yash_env::option::Option::Interactive;
+    use yash_env::option::State::On;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
@@ -125,10 +148,15 @@ mod tests {
     use yash_env::trap::Action;
     use yash_syntax::source::Location;
 
-    fn signal_env() -> (Env<Rc<Concurrent<VirtualSystem>>>, VirtualSystem) {
+    fn env_with_echo() -> (Env<Rc<Concurrent<VirtualSystem>>>, VirtualSystem) {
         let system = VirtualSystem::default();
         let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
         env.builtins.insert("echo", echo_builtin());
+        (env, system)
+    }
+
+    fn env_with_sigint_trap() -> (Env<Rc<Concurrent<VirtualSystem>>>, VirtualSystem) {
+        let (mut env, system) = env_with_echo();
         env.traps
             .set_action(
                 &env.system,
@@ -143,6 +171,15 @@ mod tests {
         (env, system)
     }
 
+    fn make_interactive(env: &mut Env<Rc<Concurrent<VirtualSystem>>>) {
+        env.options.set(Interactive, On);
+        env.traps
+            .enable_internal_dispositions_for_terminators(&env.system)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+    }
+
     fn raise_signal(system: &VirtualSystem, signal: signal::Number) {
         let _ = system
             .state
@@ -155,7 +192,7 @@ mod tests {
 
     #[test]
     fn nothing_to_do_without_signals_caught() {
-        let (mut env, system) = signal_env();
+        let (mut env, system) = env_with_sigint_trap();
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()
             .unwrap();
@@ -165,7 +202,7 @@ mod tests {
 
     #[test]
     fn running_trap() {
-        let (mut env, system) = signal_env();
+        let (mut env, system) = env_with_sigint_trap();
         raise_signal(&system, SIGINT);
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()
@@ -176,7 +213,7 @@ mod tests {
 
     #[test]
     fn no_reentrance() {
-        let (mut env, system) = signal_env();
+        let (mut env, system) = env_with_sigint_trap();
         raise_signal(&system, SIGINT);
         let mut env = env.push_frame(Frame::Trap(Condition::Signal(SIGTERM)));
         let result = run_traps_for_caught_signals(&mut env)
@@ -188,7 +225,7 @@ mod tests {
 
     #[test]
     fn allow_reentrance_in_exit_trap() {
-        let (mut env, system) = signal_env();
+        let (mut env, system) = env_with_sigint_trap();
         raise_signal(&system, SIGINT);
         let mut env = env.push_frame(Frame::Trap(Condition::Exit));
         let result = run_traps_for_caught_signals(&mut env)
@@ -200,7 +237,7 @@ mod tests {
 
     #[test]
     fn allow_reentrance_in_subshell() {
-        let (mut env, system) = signal_env();
+        let (mut env, system) = env_with_sigint_trap();
         raise_signal(&system, SIGINT);
         let mut env = env.push_frame(Frame::Trap(Condition::Signal(SIGTERM)));
         let mut env = env.push_frame(Frame::Subshell);
@@ -247,7 +284,7 @@ mod tests {
 
     #[test]
     fn exit_status_is_restored_after_running_trap() {
-        let (mut env, system) = signal_env();
+        let (mut env, system) = env_with_sigint_trap();
         env.exit_status = ExitStatus(42);
         raise_signal(&system, SIGINT);
         let _ = run_traps_for_caught_signals(&mut env)
@@ -258,7 +295,7 @@ mod tests {
 
     #[test]
     fn exit_status_inside_trap() {
-        let (mut env, system) = signal_env();
+        let (mut env, system) = env_with_sigint_trap();
         for signal in [SIGUSR1, SIGUSR2] {
             env.traps
                 .set_action(
@@ -285,7 +322,7 @@ mod tests {
 
     #[test]
     fn exit_from_trap_with_specified_exit_status() {
-        let (mut env, system) = signal_env();
+        let (mut env, system) = env_with_sigint_trap();
         env.builtins.insert("exit", exit_builtin());
         env.traps
             .set_action(
@@ -309,7 +346,7 @@ mod tests {
 
     #[test]
     fn exit_from_trap_without_specified_exit_status() {
-        let (mut env, system) = signal_env();
+        let (mut env, system) = env_with_sigint_trap();
         env.builtins.insert("exit", exit_builtin());
         env.traps
             .set_action(
@@ -329,5 +366,127 @@ mod tests {
             .unwrap();
         assert_eq!(result, Break(Divert::Exit(None)));
         assert_eq!(env.exit_status, ExitStatus(42));
+    }
+
+    #[test]
+    fn no_trap_actions_performed_if_interrupted_by_sigint() {
+        let (mut env, system) = env_with_echo();
+        env.builtins.insert("exit", exit_builtin());
+        make_interactive(&mut env);
+        env.traps
+            .set_action(
+                &env.system,
+                SIGUSR1,
+                Action::Command("exit 56".into()),
+                Location::dummy(""),
+                false,
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        raise_signal(&system, SIGUSR1);
+        raise_signal(&system, SIGINT);
+
+        let result = run_traps_for_caught_signals(&mut env)
+            .now_or_never()
+            .unwrap();
+        assert_eq!(
+            result,
+            Break(Divert::Interrupt(Some(ExitStatus::from(SIGINT))))
+        );
+        assert_stdout(&system.state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
+    fn no_interruption_if_sigint_is_ignored() {
+        let (mut env, system) = env_with_echo();
+        env.builtins.insert("exit", exit_builtin());
+        make_interactive(&mut env);
+        env.traps
+            .set_action(
+                &env.system,
+                SIGINT,
+                Action::Ignore,
+                Location::dummy(""),
+                false,
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        env.traps
+            .set_action(
+                &env.system,
+                SIGUSR1,
+                Action::Command("echo USR1".into()),
+                Location::dummy(""),
+                false,
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        raise_signal(&system, SIGUSR1);
+        raise_signal(&system, SIGINT);
+
+        let result = run_traps_for_caught_signals(&mut env)
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, Continue(()));
+        assert_stdout(&system.state, |stdout| assert_eq!(stdout, "USR1\n"));
+    }
+
+    #[test]
+    fn no_interruption_if_sigint_is_trapped() {
+        let (mut env, system) = env_with_sigint_trap();
+        env.builtins.insert("exit", exit_builtin());
+        make_interactive(&mut env);
+        env.traps
+            .set_action(
+                &env.system,
+                SIGUSR1,
+                Action::Command("echo USR1".into()),
+                Location::dummy(""),
+                false,
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        raise_signal(&system, SIGUSR1);
+        raise_signal(&system, SIGINT);
+
+        let result = run_traps_for_caught_signals(&mut env)
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, Continue(()));
+        assert_stdout(&system.state, |stdout| {
+            assert!(
+                stdout == "USR1\ntrapped\n" || stdout == "trapped\nUSR1\n",
+                "unexpected stdout: {stdout}"
+            );
+        });
+    }
+
+    #[test]
+    fn no_interruption_with_signal_other_than_sigint() {
+        let (mut env, system) = env_with_echo();
+        env.builtins.insert("exit", exit_builtin());
+        make_interactive(&mut env);
+        env.traps
+            .set_action(
+                &env.system,
+                SIGUSR1,
+                Action::Command("echo USR1; exit 56".into()),
+                Location::dummy(""),
+                false,
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        raise_signal(&system, SIGUSR1);
+        raise_signal(&system, SIGTERM);
+
+        let result = run_traps_for_caught_signals(&mut env)
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, Break(Divert::Exit(Some(ExitStatus(56)))));
     }
 }

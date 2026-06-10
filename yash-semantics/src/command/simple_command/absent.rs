@@ -27,7 +27,7 @@ use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::Env;
 use yash_env::io::print_error;
-use yash_env::job::add_job_if_suspended;
+use yash_env::job::handle_job_status;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
@@ -64,7 +64,7 @@ pub async fn execute_absent_target<S: Runtime + 'static>(
             env.exit_status = redir_exit_status.unwrap_or(exit_status);
         });
         match subshell.await {
-            Ok((pid, result)) => add_job_if_suspended(env, pid, result, || {
+            Ok((pid, result)) => handle_job_status(env, pid, result, || {
                 redirs
                     .iter()
                     .format_with(" ", |redir, f| f(&format_args!("{redir}")))

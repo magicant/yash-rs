@@ -56,28 +56,57 @@ use super::attr::Origin;
 use std::ffi::CString;
 use std::iter::Once;
 use std::marker::PhantomData;
+use std::ops::ControlFlow::{self, Break, Continue};
 use yash_env::Env;
 use yash_env::option::State::Off;
+use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::system::{AT_FDCWD, Dir as _, Fstat, Open};
+use yash_env::system::concurrency::{Select, WaitForSignals};
+use yash_env::system::{AT_FDCWD, Dir as _, Fstat, Open, Signals};
 use yash_fnmatch::Config;
 use yash_fnmatch::Pattern;
 use yash_fnmatch::PatternChar;
 use yash_syntax::source::Location;
 
+/// Error value indicating that pathname expansion was interrupted
+///
+/// This error is returned when a SIGINT signal is received while scanning
+/// directories in an interactive shell with SIGINT defaulted. The contained
+/// [`ExitStatus`] is derived from the SIGINT signal.
+#[derive(Debug, Eq, PartialEq)]
+pub struct Interrupted(pub ExitStatus);
+
+impl From<Interrupted> for ExitStatus {
+    fn from(intr: Interrupted) -> ExitStatus {
+        intr.0
+    }
+}
+
 #[derive(Debug)]
 enum Inner {
-    One(Once<Field>),
+    One(Once<Result<Field, Interrupted>>),
     Many(std::vec::IntoIter<Field>),
 }
 
 impl From<Field> for Inner {
     fn from(field: Field) -> Self {
-        Inner::One(std::iter::once(field))
+        Inner::One(std::iter::once(Ok(field)))
     }
 }
 
-/// Iterator that provides results of parameter expansion
+impl From<Interrupted> for Inner {
+    fn from(intr: Interrupted) -> Self {
+        Inner::One(std::iter::once(Err(intr)))
+    }
+}
+
+impl From<Result<Field, Interrupted>> for Inner {
+    fn from(result: Result<Field, Interrupted>) -> Self {
+        Inner::One(std::iter::once(result))
+    }
+}
+
+/// Iterator that provides results of pathname expansion
 ///
 /// This iterator is created with the [`glob`] function.
 #[derive(Debug)]
@@ -103,12 +132,27 @@ impl<S> From<Inner> for Glob<'_, S> {
     }
 }
 
-impl<S: Fstat + Open> Iterator for Glob<'_, S> {
-    type Item = Field;
-    fn next(&mut self) -> Option<Field> {
+impl<S: Fstat + Open + Select + Signals + WaitForSignals> Iterator for Glob<'_, S> {
+    type Item = Result<Field, Interrupted>;
+    fn next(&mut self) -> Option<Result<Field, Interrupted>> {
         match &mut self.inner {
             Inner::One(once) => once.next(),
-            Inner::Many(many) => many.next(),
+            Inner::Many(many) => many.next().map(Ok),
+        }
+    }
+}
+
+impl<S> Glob<'_, S> {
+    /// An escape hatch to decompose the `Glob` iterator.
+    ///
+    /// This method will be removed when `Glob` is re-implemented with a
+    /// generator.
+    pub(super) fn try_into_vec_iter(
+        self,
+    ) -> Result<std::vec::IntoIter<Field>, Once<Result<Field, Interrupted>>> {
+        match self.inner {
+            Inner::One(once) => Err(once),
+            Inner::Many(many) => Ok(many),
         }
     }
 }
@@ -158,14 +202,15 @@ fn remove_quotes_and_strip(chars: &[AttrChar]) -> impl Iterator<Item = char> + '
 #[derive(Debug)]
 struct SearchEnv<'e, S> {
     env: &'e mut Env<S>,
+    interruptible: bool,
     prefix: String,
     origin: Location,
     results: Vec<Field>,
 }
 
-impl<S: Fstat + Open> SearchEnv<'_, S> {
+impl<S: Fstat + Open + Select + Signals + WaitForSignals> SearchEnv<'_, S> {
     /// Recursively searches directories for matching pathnames.
-    fn search_dir(&mut self, suffix: &[AttrChar]) {
+    fn search_dir(&mut self, suffix: &[AttrChar]) -> ControlFlow<Interrupted> {
         let (this, new_suffix) = match suffix.iter().position(|c| c.value == '/') {
             None => (suffix, None),
             Some(index) => (&suffix[..index], Some(&suffix[index + 1..])),
@@ -175,10 +220,10 @@ impl<S: Fstat + Open> SearchEnv<'_, S> {
             None => {
                 self.push_component(new_suffix, false, |prefix| {
                     prefix.extend(remove_quotes_and_strip(this))
-                });
+                })?;
             }
             Some(Ok(literal)) => {
-                self.push_component(new_suffix, false, |prefix| prefix.push_str(&literal));
+                self.push_component(new_suffix, false, |prefix| prefix.push_str(&literal))?;
             }
             Some(Err(pattern)) => {
                 let dir_path = if self.prefix.is_empty() {
@@ -186,22 +231,31 @@ impl<S: Fstat + Open> SearchEnv<'_, S> {
                 } else if let Ok(dir_path) = CString::new(self.prefix.as_str()) {
                     dir_path
                 } else {
-                    return;
+                    return Continue(());
                 };
 
                 if let Ok(mut dir) = self.env.system.opendir(&dir_path) {
                     while let Ok(Some(entry)) = dir.next() {
+                        if self.interruptible
+                            && self
+                                .env
+                                .poll_signals()
+                                .is_some_and(|sigs| sigs.contains(&S::SIGINT))
+                        {
+                            return Break(Interrupted(ExitStatus::from(S::SIGINT)));
+                        }
                         if let Some(name) = entry.name.to_str()
                             && name != "."
                             && name != ".."
                             && pattern.is_match(name)
                         {
-                            self.push_component(new_suffix, true, |prefix| prefix.push_str(name));
+                            self.push_component(new_suffix, true, |prefix| prefix.push_str(name))?;
                         }
                     }
                 }
             }
         }
+        Continue(())
     }
 
     fn file_exists(&mut self) -> bool {
@@ -222,14 +276,19 @@ impl<S: Fstat + Open> SearchEnv<'_, S> {
     /// assumed to exist.
     ///
     /// `push` is a closure that appends the suffix to the prefix.
-    fn push_component<F>(&mut self, suffix: Option<&[AttrChar]>, file_exists: bool, push: F)
+    fn push_component<F>(
+        &mut self,
+        suffix: Option<&[AttrChar]>,
+        file_exists: bool,
+        push: F,
+    ) -> ControlFlow<Interrupted>
     where
         F: FnOnce(&mut String),
     {
         let old_prefix_len = self.prefix.len();
         push(&mut self.prefix);
 
-        match suffix {
+        let result = match suffix {
             None => {
                 if file_exists || self.file_exists() {
                     self.results.push(Field {
@@ -237,40 +296,52 @@ impl<S: Fstat + Open> SearchEnv<'_, S> {
                         origin: self.origin.clone(),
                     });
                 }
+                Continue(())
             }
             Some(suffix) => {
                 self.prefix.push('/');
-                self.search_dir(suffix);
+                self.search_dir(suffix)
             }
-        }
+        };
 
         self.prefix.truncate(old_prefix_len);
+        result
     }
 }
 
-/// Performs parameter expansion.
+/// Performs pathname expansion.
 ///
-/// This function returns an iterator that yields fields resulting from the
-/// expansion.
+/// This function returns a [`Glob`] iterator yielding the expanded fields.
+/// If a SIGINT signal is received while scanning directories in an interactive
+/// shell with SIGINT defaulted, the iterator yields `Err(interrupted)` where
+/// `interrupted` carries the exit status representing the signal. After
+/// interruption, the iterator may or may not yield more results.
 ///
 /// If the `Glob` option is `Off` in `env.options`, the expansion is skipped.
-pub fn glob<S: Fstat + Open>(env: &mut Env<S>, field: AttrField) -> Glob<'_, S> {
+pub fn glob<S: Fstat + Open + Select + Signals + WaitForSignals>(
+    env: &mut Env<S>,
+    field: AttrField,
+) -> Glob<'_, S> {
     if env.options.get(yash_env::option::Option::Glob) == Off {
         return Glob::from(Inner::from(field.remove_quotes_and_strip()));
     }
 
     // TODO Quick check for *, ?, [ containment
 
+    let interruptible = env.is_interactive() && env.sigint_has_default_action();
     let mut search_env = SearchEnv {
         env,
+        interruptible,
         prefix: String::with_capacity(1024 /*nix::libc::PATH_MAX*/),
         origin: field.origin,
         results: Vec::new(),
     };
-    search_env.search_dir(&field.chars);
+    if let Break(interrupted) = search_env.search_dir(&field.chars) {
+        return Glob::from(Inner::from(interrupted));
+    }
 
     let mut results = search_env.results;
-    Glob::from(if results.is_empty() {
+    let inner = if results.is_empty() {
         let field = AttrField {
             chars: field.chars,
             origin: search_env.origin,
@@ -279,7 +350,8 @@ pub fn glob<S: Fstat + Open>(env: &mut Env<S>, field: AttrField) -> Glob<'_, S> 
     } else {
         results.sort_unstable_by(|a, b| a.value.cmp(&b.value));
         Inner::Many(results.into_iter())
-    })
+    };
+    Glob::from(inner)
 }
 
 #[cfg(test)]
@@ -291,7 +363,10 @@ mod tests {
     use yash_env::VirtualSystem;
     use yash_env::path::Path;
     use yash_env::str::UnixStr;
+    use yash_env::system::Concurrent;
     use yash_env::system::Mode;
+    use yash_env::system::r#virtual::SIGINT;
+    use yash_env::trap::Action;
     use yash_syntax::source::Location;
 
     fn dummy_attr_field(s: &str) -> AttrField {
@@ -308,7 +383,7 @@ mod tests {
         AttrField { chars, origin }
     }
 
-    fn env_with_dummy_files<I, P>(paths: I) -> Env<VirtualSystem>
+    fn env_with_dummy_files<I, P>(paths: I) -> Env<Rc<Concurrent<VirtualSystem>>>
     where
         I: IntoIterator<Item = P>,
         P: AsRef<Path>,
@@ -319,7 +394,7 @@ mod tests {
             state.file_system.save(path, Rc::default()).unwrap();
         }
         drop(state);
-        Env::with_system(system)
+        Env::with_system(Rc::new(Concurrent::new(system)))
     }
 
     #[test]
@@ -327,7 +402,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let f = dummy_attr_field("abc");
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, "abc");
+        assert_eq!(i.next().unwrap().unwrap().value, "abc");
         assert_eq!(i.next(), None);
     }
 
@@ -337,7 +412,7 @@ mod tests {
         // The backslash escapes the '?', so this is not a pattern.
         let f = dummy_attr_field(r"\?");
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, r"\?");
+        assert_eq!(i.next().unwrap().unwrap().value, r"\?");
         assert_eq!(i.next(), None);
     }
 
@@ -348,7 +423,7 @@ mod tests {
         f.chars[1].is_quoting = true;
         f.chars[4].is_quoting = true;
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, "abcde");
+        assert_eq!(i.next().unwrap().unwrap().value, "abcde");
         assert_eq!(i.next(), None);
     }
 
@@ -358,7 +433,7 @@ mod tests {
         let mut f = dummy_attr_field("foo.*");
         f.chars[4].is_quoted = true;
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, "foo.*");
+        assert_eq!(i.next().unwrap().unwrap().value, "foo.*");
         assert_eq!(i.next(), None);
     }
 
@@ -368,7 +443,7 @@ mod tests {
         let mut f = dummy_attr_field("foo.*");
         f.chars[4].origin = Origin::HardExpansion;
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, "foo.*");
+        assert_eq!(i.next().unwrap().unwrap().value, "foo.*");
         assert_eq!(i.next(), None);
     }
 
@@ -377,7 +452,7 @@ mod tests {
         let mut env = env_with_dummy_files(["foo.exe"]);
         let f = dummy_attr_field("*.txt");
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, "*.txt");
+        assert_eq!(i.next().unwrap().unwrap().value, "*.txt");
         assert_eq!(i.next(), None);
     }
 
@@ -386,7 +461,7 @@ mod tests {
         let mut env = env_with_dummy_files(["foo.exe", "foo.txt"]);
         let f = dummy_attr_field("*.txt");
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, "foo.txt");
+        assert_eq!(i.next().unwrap().unwrap().value, "foo.txt");
         assert_eq!(i.next(), None);
     }
 
@@ -395,8 +470,8 @@ mod tests {
         let mut env = env_with_dummy_files(["foo.exe", "foo.txt"]);
         let f = dummy_attr_field("foo.*");
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, "foo.exe");
-        assert_eq!(i.next().unwrap().value, "foo.txt");
+        assert_eq!(i.next().unwrap().unwrap().value, "foo.exe");
+        assert_eq!(i.next().unwrap().unwrap().value, "foo.txt");
         assert_eq!(i.next(), None);
     }
 
@@ -405,7 +480,7 @@ mod tests {
         let mut env = env_with_dummy_files([".foo"]);
         let f = dummy_attr_field(".*");
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, ".foo");
+        assert_eq!(i.next().unwrap().unwrap().value, ".foo");
         assert_eq!(i.next(), None);
     }
 
@@ -414,8 +489,8 @@ mod tests {
         let mut env = env_with_dummy_files(["/foo.exe", "/foo.txt"]);
         let f = dummy_attr_field("/foo.*");
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, "/foo.exe");
-        assert_eq!(i.next().unwrap().value, "/foo.txt");
+        assert_eq!(i.next().unwrap().unwrap().value, "/foo.exe");
+        assert_eq!(i.next().unwrap().unwrap().value, "/foo.txt");
         assert_eq!(i.next(), None);
     }
 
@@ -427,10 +502,10 @@ mod tests {
         ]);
         let f = dummy_attr_field("a/?/a/?");
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, "a/a/a/a");
-        assert_eq!(i.next().unwrap().value, "a/a/a/b");
-        assert_eq!(i.next().unwrap().value, "a/b/a/a");
-        assert_eq!(i.next().unwrap().value, "a/b/a/b");
+        assert_eq!(i.next().unwrap().unwrap().value, "a/a/a/a");
+        assert_eq!(i.next().unwrap().unwrap().value, "a/a/a/b");
+        assert_eq!(i.next().unwrap().unwrap().value, "a/b/a/a");
+        assert_eq!(i.next().unwrap().unwrap().value, "a/b/a/b");
         assert_eq!(i.next(), None);
     }
 
@@ -451,9 +526,9 @@ mod tests {
         ]);
         let f = dummy_attr_field("/?/a/?/a");
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, "/a/a/a/a");
-        assert_eq!(i.next().unwrap().value, "/a/a/b/a");
-        assert_eq!(i.next().unwrap().value, "/b/a/a/a");
+        assert_eq!(i.next().unwrap().unwrap().value, "/a/a/a/a");
+        assert_eq!(i.next().unwrap().unwrap().value, "/a/a/b/a");
+        assert_eq!(i.next().unwrap().unwrap().value, "/b/a/a/a");
         assert_eq!(i.next(), None);
     }
 
@@ -462,8 +537,8 @@ mod tests {
         let mut env = env_with_dummy_files(["a/a/_", "a/b/_", "a/c"]);
         let f = dummy_attr_field("a/*/");
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, "a/a/");
-        assert_eq!(i.next().unwrap().value, "a/b/");
+        assert_eq!(i.next().unwrap().unwrap().value, "a/a/");
+        assert_eq!(i.next().unwrap().unwrap().value, "a/b/");
         assert_eq!(i.next(), None);
     }
 
@@ -472,8 +547,8 @@ mod tests {
         let mut env = env_with_dummy_files(["a/b", "b/a"]);
         let f = dummy_attr_field("?//?");
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, "a//b");
-        assert_eq!(i.next().unwrap().value, "b//a");
+        assert_eq!(i.next().unwrap().unwrap().value, "a//b");
+        assert_eq!(i.next().unwrap().unwrap().value, "b//a");
         assert_eq!(i.next(), None);
     }
 
@@ -489,10 +564,10 @@ mod tests {
             let dir = state.file_system.get("foo").unwrap();
             dir.borrow_mut().permissions = Mode::ALL_READ | Mode::ALL_WRITE;
         }
-        let mut env = Env::with_system(system);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         let f = dummy_attr_field("foo/*");
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, "foo/bar");
+        assert_eq!(i.next().unwrap().unwrap().value, "foo/bar");
         assert_eq!(i.next(), None);
     }
 
@@ -501,7 +576,7 @@ mod tests {
         let mut env = env_with_dummy_files(["foo.txt"]);
         let f = dummy_attr_field("*[[:wrong:]]*");
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, "*[[:wrong:]]*");
+        assert_eq!(i.next().unwrap().unwrap().value, "*[[:wrong:]]*");
         assert_eq!(i.next(), None);
     }
 
@@ -510,7 +585,7 @@ mod tests {
         let mut env = env_with_dummy_files(["abd", "a/d"]);
         let f = dummy_attr_field("a[b/c]d");
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, "a[b/c]d");
+        assert_eq!(i.next().unwrap().unwrap().value, "a[b/c]d");
         assert_eq!(i.next(), None);
     }
 
@@ -519,7 +594,7 @@ mod tests {
         let mut env = env_with_dummy_files(["x", "y/y"]);
         let f = dummy_attr_field("\0/*");
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, "\0/*");
+        assert_eq!(i.next().unwrap().unwrap().value, "\0/*");
         assert_eq!(i.next(), None);
     }
 
@@ -528,7 +603,7 @@ mod tests {
         let mut env = env_with_dummy_files([UnixStr::from_bytes(b"foo/\xFF")]);
         let f = dummy_attr_field("foo/*");
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, "foo/*");
+        assert_eq!(i.next().unwrap().unwrap().value, "foo/*");
         assert_eq!(i.next(), None);
     }
 
@@ -538,7 +613,94 @@ mod tests {
         env.options.set(yash_env::option::Option::Glob, Off);
         let f = dummy_attr_field("foo.*");
         let mut i = glob(&mut env, f);
-        assert_eq!(i.next().unwrap().value, "foo.*");
+        assert_eq!(i.next().unwrap().unwrap().value, "foo.*");
+        assert_eq!(i.next(), None);
+    }
+
+    fn raise_sigint(system: &VirtualSystem) {
+        let _ = system.current_process_mut().raise_signal(SIGINT);
+    }
+
+    #[test]
+    fn sigint_interrupts_glob_in_interactive_shell() {
+        use futures_util::FutureExt as _;
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
+        env.options.set(
+            yash_env::option::Option::Interactive,
+            yash_env::option::State::On,
+        );
+        env.traps
+            .enable_internal_dispositions_for_terminators(&env.system)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        {
+            let mut state = system.state.borrow_mut();
+            state.file_system.save("foo", Rc::default()).unwrap();
+        }
+        raise_sigint(&system);
+
+        let f = dummy_attr_field("*");
+        let mut i = glob(&mut env, f);
+        let Err(interrupted) = i.next().unwrap() else {
+            panic!("expected Err(Interrupted)");
+        };
+        assert_eq!(interrupted.0, ExitStatus::from(SIGINT));
+        assert_eq!(i.next(), None);
+    }
+
+    #[test]
+    fn sigint_does_not_interrupt_glob_in_non_interactive_shell() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
+        {
+            let mut state = system.state.borrow_mut();
+            state
+                .file_system
+                .save("testdir/foo", Rc::default())
+                .unwrap();
+        }
+        raise_sigint(&system);
+
+        let f = dummy_attr_field("testdir/*");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().unwrap().value, "testdir/foo");
+        assert_eq!(i.next(), None);
+    }
+
+    #[test]
+    fn sigint_does_not_interrupt_glob_when_sigint_is_trapped() {
+        use futures_util::FutureExt as _;
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
+        env.options.set(
+            yash_env::option::Option::Interactive,
+            yash_env::option::State::On,
+        );
+        env.traps
+            .set_action(
+                &env.system,
+                SIGINT,
+                Action::Command("echo trapped".into()),
+                Location::dummy(""),
+                false,
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        {
+            let mut state = system.state.borrow_mut();
+            state
+                .file_system
+                .save("testdir/foo", Rc::default())
+                .unwrap();
+        }
+        raise_sigint(&system);
+
+        let f = dummy_attr_field("testdir/*");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().unwrap().value, "testdir/foo");
         assert_eq!(i.next(), None);
     }
 }

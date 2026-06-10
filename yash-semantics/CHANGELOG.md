@@ -11,12 +11,62 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.17.0] - Unreleased
 
+### Added
+
+- `expansion::ErrorCause::Interrupted` is a new variant that represents a
+  command substitution or pathname expansion being interrupted by `SIGINT`.
+  When this error is handled (via the `Handle` trait), it returns
+  `Break(Divert::Interrupt(Some(exit_status)))` without printing an error
+  message.
+- `expansion::glob::Interrupted` is a new type indicating that pathname
+  expansion was interrupted by `SIGINT`. It is yielded as `Err(Interrupted)`
+  by the `expansion::glob::Glob` iterator when a SIGINT signal is received
+  while scanning directories in an interactive shell with the default `SIGINT`
+  disposition.
+- Private dependency:
+    - futures-util 0.3.31
+
 ### Changed
 
+- The `trap::run_traps_for_caught_signals` function now checks for a caught
+  SIGINT signal and interrupts the current command with SIGINT if the signal is
+  caught and the disposition of SIGINT is default. This behavior is not
+  specified in POSIX, but it is a common behavior of interactive shells.
+- Executing an external utility, subshell, pipeline, redirection, or command
+  substitution in an interactive shell with the default `SIGINT` disposition
+  now interrupts the shell (returns `Break(Divert::Interrupt(...))`) when the
+  child process is killed by `SIGINT`. This complements the behavior of
+  `trap::run_traps_for_caught_signals`. This affects the following items:
+    - `impl command::Command for yash_syntax::syntax::SimpleCommand`
+    - `impl command::Command for yash_syntax::syntax::Pipeline`
+    - `impl command::Command for yash_syntax::syntax::CompoundCommand`
+    - `impl expansion::initial::Expand for yash_syntax::syntax::TextUnit` (as
+      well as for other syntax types that contain `TextUnit` such as `WordUnit`)
+- Executing a built-in utility in an interactive shell now interrupts the shell
+  (returns `Break(Divert::Interrupt(...))`) when SIGINT is caught while the
+  built-in is running and the built-in's `handles_signals_internally` field is
+  `false`. SIGINT is detected concurrently with the built-in's execution: the
+  built-in's future is dropped if SIGINT arrives before the built-in finishes.
+  This affects `impl command::Command for yash_syntax::syntax::SimpleCommand`.
+- The `Runtime` trait now requires `Clone` as a supertrait.
+- The `expansion::ErrorCause` enum is now `non_exhaustive`.
+- `expansion::glob::glob` now additionally requires
+  `S: yash_env::system::concurrency::WaitForSignals + yash_env::system::concurrency::Select + yash_env::system::Signals`,
+  and `expansion::glob::Glob<'_, S>` now implements
+  `Iterator<Item = Result<expansion::glob::Field, expansion::glob::Interrupted>>`
+  instead of `Iterator<Item = expansion::glob::Field>`.
+  The iterator yields `Err(Interrupted)` when a SIGINT is caught during
+  directory scanning in an interactive shell with the default SIGINT disposition.
 - Public dependency versions:
     - Rust 1.87.0 → 1.96.0
     - yash-env 0.14.0 → 0.15.0
     - yash-syntax 0.21.0 → 0.22.0
+
+### Deprecated
+
+- The `job::add_job_if_suspended` re-export has been deprecated following the
+  deprecation of `yash_env::job::add_job_if_suspended`. Use
+  `yash_env::job::handle_job_status` instead.
 
 ## [0.16.0] - 2026-05-23
 

@@ -25,8 +25,7 @@ use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::Env;
 use yash_env::io::Fd;
-use yash_env::job::Pid;
-use yash_env::job::add_job_if_suspended;
+use yash_env::job::{Pid, handle_job_status};
 use yash_env::option::Option::{Exec, Interactive, PipeFail};
 use yash_env::option::State::{Off, On};
 use yash_env::semantics::Divert;
@@ -132,7 +131,7 @@ async fn execute_job_controlled_pipeline<S: Runtime + 'static>(
     });
     match subshell.await {
         Ok((pid, result)) => {
-            env.exit_status = add_job_if_suspended(env, pid, result, || to_job_name(commands))?;
+            env.exit_status = handle_job_status(env, pid, result, || to_job_name(commands))?;
             Continue(())
         }
         Err(errno) => {

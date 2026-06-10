@@ -38,6 +38,7 @@ use yash_env::trap::SignalSystem;
 pub trait Runtime:
     BlockSignals
     + Clock
+    + Clone
     + Close
     + Debug
     + Dup
@@ -75,6 +76,7 @@ pub trait Runtime:
 impl<S> Runtime for S where
     S: BlockSignals
         + Clock
+        + Clone
         + Close
         + Debug
         + Dup
