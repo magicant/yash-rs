@@ -87,15 +87,22 @@ where
                 // The current process has child processes, but none of them has
                 // changed its state. Wait for a signal.
                 let signals = env.wait_for_signals().await;
+
+                // If SIGINT is caught and defaulted, interrupt the built-in
+                // with SIGINT. We don't have to check if the shell is
+                // interactive here, because a defaulted SIGINT would have
+                // killed the shell immediately.
+                if signals.contains(&S::SIGINT) && env.sigint_has_default_action() {
+                    return Err(Error::Trapped(
+                        S::SIGINT,
+                        Break(Divert::Interrupt(Some(ExitStatus::from(S::SIGINT)))),
+                    ));
+                }
+
+                // For other caught signals, run the corresponding trap actions if any.
                 for signal in signals.iter().cloned() {
                     if let Some(result) = run_trap_if_caught(env, signal).await {
                         return Err(Error::Trapped(signal, result));
-                    }
-                    if signal == S::SIGINT && env.sigint_has_default_action() {
-                        return Err(Error::Trapped(
-                            S::SIGINT,
-                            Break(Divert::Interrupt(Some(ExitStatus::from(S::SIGINT)))),
-                        ));
                     }
                 }
             }
@@ -129,6 +136,8 @@ mod tests {
     use yash_env::VirtualSystem;
     use yash_env::job::Job;
     use yash_env::job::ProcessState;
+    use yash_env::option::Option::Interactive;
+    use yash_env::option::State::On;
     use yash_env::semantics::{Divert, ExitStatus};
     use yash_env::source::Location;
     use yash_env::subshell::Config;
@@ -260,7 +269,7 @@ mod tests {
     }
 
     #[test]
-    fn sigint_with_default_action() {
+    fn sigint_with_default_action_in_interactive_mode() {
         in_virtual_system(|mut env, state| async move {
             type TestSystem = Rc<Concurrent<VirtualSystem>>;
             env.any.insert(Box::new(RunSignalTrapIfCaught::<TestSystem>(
@@ -270,6 +279,7 @@ mod tests {
                     )
                 },
             )));
+            env.options.set(Interactive, On);
 
             let system = VirtualSystem {
                 state,
@@ -288,24 +298,22 @@ mod tests {
                 .await
                 .unwrap();
 
-            {
-                // The job is not finished, so the function keeps waiting.
-                let mut future = pin!(wait_for_any_job_or_trap(&mut env));
-                assert_eq!(poll!(&mut future), Poll::Pending);
+            // The job is not finished, so the function keeps waiting.
+            let mut future = pin!(wait_for_any_job_or_trap(&mut env));
+            assert_eq!(poll!(&mut future), Poll::Pending);
 
-                // Send SIGINT to the current process.
-                _ = system.current_process_mut().raise_signal(SIGINT);
+            // Send SIGINT to the current process.
+            _ = system.current_process_mut().raise_signal(SIGINT);
 
-                // The function should return with an interrupt.
-                let result = future.await;
-                assert_eq!(
-                    result,
-                    Err(Error::Trapped(
-                        SIGINT,
-                        Break(Divert::Interrupt(Some(ExitStatus::from(SIGINT)))),
-                    )),
-                );
-            }
+            // The function should return with an interrupt.
+            let result = future.await;
+            assert_eq!(
+                result,
+                Err(Error::Trapped(
+                    SIGINT,
+                    Break(Divert::Interrupt(Some(ExitStatus::from(SIGINT)))),
+                )),
+            );
         });
     }
 
