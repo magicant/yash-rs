@@ -308,7 +308,7 @@ impl Job {
 
     /// Whether the job is suspended
     #[must_use]
-    fn is_suspended(&self) -> bool {
+    pub fn is_suspended(&self) -> bool {
         self.state.is_stopped()
     }
 }

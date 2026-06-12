@@ -129,3 +129,6 @@ pub use ignore_eof::IgnoreEof;
 
 mod reporter;
 pub use reporter::Reporter;
+
+mod eof_guard;
+pub use eof_guard::EofGuard;

@@ -30,8 +30,8 @@ use std::ffi::CString;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::input::Echo;
+use yash_env::input::EofGuard;
 use yash_env::input::FdReader2;
-use yash_env::input::IgnoreEof;
 use yash_env::input::Reporter;
 use yash_env::io::Fd;
 use yash_env::io::move_fd_internal;
@@ -176,6 +176,6 @@ where
         let reporter = Reporter::new(prompter, ref_env);
         let message =
             "# Type `exit` to leave the shell when the ignore-eof option is on.\n".to_string();
-        Box::new(IgnoreEof::new(reporter, fd, ref_env, message))
+        Box::new(EofGuard::new(reporter, fd, ref_env, message))
     }
 }
