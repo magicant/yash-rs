@@ -9,15 +9,18 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
-## [0.16.0] - Unreleased
+## [0.15.1] - Unreleased
 
 ### Added
 
-- The `input::EofGuard` input decorator has been added. It replaces
-  `input::IgnoreEof` for use in interactive shells and adds the behavior of
-  warning the user when there are suspended jobs and ignoring the resulting EOF,
-  in addition to the existing `ignore-eof` option behavior.
-- `job::Job::is_suspended` is now public.
+- `input::EofGuard` input decorator has been added. It replaces
+  `input::IgnoreEof` for use in interactive shells, combining the
+  `ignore-eof` option behavior with protection against accidental exit when
+  there are suspended jobs.
+- `input::EofGuardConfig` has been added. Store it in `env.any` to configure
+  the messages used by `EofGuard` and the `exit` built-in, and to enable the
+  suspended-job protection feature. If absent, both `EofGuard` and the `exit`
+  built-in skip the suspended-job check.
 
 ## [0.15.0] - 2026-06-11
 
@@ -1379,7 +1382,7 @@ This version has been yanked due to an issue that prevents the crate from buildi
 
 - Initial implementation of the `yash-env` crate
 
-[0.16.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.16.0
+[0.15.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.15.1
 [0.15.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.15.0
 [0.14.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.14.0
 [0.13.2]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.13.2
