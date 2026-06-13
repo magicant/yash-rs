@@ -10,11 +10,22 @@ A shell session terminates in the following cases:
 
 ## Preventing accidental exits
 
+### Ignoring EOF
+
+When the input to the shell is a terminal, you can signal an end-of-file with the `eof` sequence (usually `Ctrl+D`). However, you might not want the shell to exit immediately when this happens, especially if you often hit the sequence by mistake. Enable the `ignoreeof` [shell option] to prevent the shell from exiting on end-of-file and let it wait for more input.
+
+```shell,no_run
+$ set -o ignoreeof
+$ 
+# Type `exit` to leave the shell when the ignore-eof option is on.
+$ exit
+```
+
+This option is only effective in [interactive shells](interactive/index.html) and only when the input is a terminal. As a safeguard against an input that repeatedly delivers EOF, entering 50 `eof` sequences in a row will still cause the shell to exit.
+
 ### Suspended jobs
 
-(Since 3.2.0) When the input to the shell is a terminal, pressing `Ctrl+D` (end-of-file)
-exits the shell. However, if there are [suspended jobs](interactive/job_control.md),
-the shell will warn you instead of exiting immediately:
+(Since 3.2.0) The shell refuses to exit if there are [suspended jobs](interactive/job_control.md) to prevent them from being killed by the `SIGHUP` signal sent by the operating system.
 
 ```shell,no_run
 $ sleep 100
@@ -27,22 +38,9 @@ $ exit
 $ exit -f
 ```
 
-The same warning is shown when you use the [`exit` built-in](builtins/exit.md)
-while suspended jobs exist. Use `exit -f` (or `exit --force`) to bypass the
-check and exit immediately.
+This applies not only when end-of-file is reached but also when you use the [`exit` built-in](builtins/exit.md). Use `exit -f` (or `exit --force`) to bypass the check and exit immediately.
 
-### Ignoring EOF
-
-You might not want the shell to exit immediately on end-of-file, especially if you often hit the sequence by mistake. Enable the `ignoreeof` [shell option] to prevent the shell from exiting on end-of-file and let it wait for more input.
-
-```shell,no_run
-$ set -o ignoreeof
-$ 
-# Type `exit` to leave the shell when the ignore-eof option is on.
-$ exit
-```
-
-This option is only effective in [interactive shells](interactive/index.html) and only when the input is a terminal. As an escape, entering 50 eof sequences in a row will still cause the shell to exit, regardless of the `ignoreeof` option.
+This behavior is only effective in [interactive shells](interactive/index.html) and only when the input is a terminal. As a safeguard against an input that repeatedly delivers EOF, entering 50 `eof` sequences in a row will still cause the shell to exit.
 
 ## Exiting subshells
 
