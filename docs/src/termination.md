@@ -12,9 +12,9 @@ A shell session terminates in the following cases:
 
 ### Suspended jobs
 
-When the input to the shell is a terminal, pressing `Ctrl+D` (end-of-file)
+(Since 3.2.0) When the input to the shell is a terminal, pressing `Ctrl+D` (end-of-file)
 exits the shell. However, if there are [suspended jobs](interactive/job_control.md),
-the shell will warn you instead of exiting immediately (since yash-rs 3.2.0):
+the shell will warn you instead of exiting immediately:
 
 ```shell,no_run
 $ sleep 100

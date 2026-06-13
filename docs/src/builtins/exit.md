@@ -15,10 +15,10 @@ environment with the specified exit status.
 
 The shell executes the [EXIT trap](../termination.md#exit-trap), if any, before exiting, except when the built-in is invoked in the trap itself.
 
-In an [interactive shell](../interactive/index.html), if there are
+(Since 3.2.0) In an [interactive shell](../interactive/index.html), if there are
 [suspended jobs](../interactive/job_control.md), the built-in prints a warning
-and refuses to exit (since yash-rs 3.2.0). Use the `-f` option to override
-this protection and exit immediately.
+and refuses to exit. Use the `-f` option to override this protection and exit
+immediately.
 
 ## Options
 
