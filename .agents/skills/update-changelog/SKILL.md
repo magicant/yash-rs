@@ -58,6 +58,15 @@ Produce changelog updates that:
    avoid implementation details aimed at crate developers.
    Order bullets by importance first, then by relatedness within a category.
 
+   **Represent net release state, not commit history.**
+   Before adding a new bullet, scan the existing Unreleased section for bullets that
+   cover the same feature or area. If a prior bullet already describes behavior that
+   the current change replaces or refines, update or replace that bullet to reflect
+   the final outcome. The Unreleased section must read as if describing the next
+   release in full, not as a running log of intermediate commits. For example, if
+   "feature A was added" is already in Unreleased and the current change renames A to
+   B, replace the bullet with "Added B" rather than appending "Renamed A to B".
+
 6. Handle cross-crate behavior.
    If shell-observable behavior changed, also update `yash-cli/CHANGELOG.md` even when implementation lives in another crate.
 
@@ -78,6 +87,11 @@ Produce changelog updates that:
 - If `Cargo.toml` version does not appear semver-appropriate for the pending changes:
    ask the user whether to adjust the version, scope, or changelog framing.
 
+- If the current change modifies behavior already documented in the Unreleased section
+  (i.e., something added or changed since the last release):
+  update or replace the existing bullet to describe the final outcome.
+  Do not append a second bullet that contradicts or supersedes an earlier one.
+
 - If a change could fit multiple categories:
   choose the category users will search first, then keep the bullet focused.
 
@@ -94,6 +108,9 @@ Produce changelog updates that:
 - No duplicate bullets across categories.
 - `yash-cli` changelog is updated when user-visible shell behavior changed.
 - No contradiction between changelog text and code changes.
+- No bullet in the Unreleased section is superseded or contradicted by another bullet
+  in the same section. Each feature or fix appears exactly once, described as it will
+  exist in the next release rather than as a sequence of intermediate steps.
 
 ## Output Format
 
