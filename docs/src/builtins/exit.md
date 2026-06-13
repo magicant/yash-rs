@@ -5,7 +5,7 @@ The **`exit`** built-in causes the currently executing shell to exit.
 ## Synopsis
 
 ```sh
-exit [exit_status]
+exit [-f] [exit_status]
 ```
 
 ## Description
@@ -15,9 +15,17 @@ environment with the specified exit status.
 
 The shell executes the [EXIT trap](../termination.md#exit-trap), if any, before exiting, except when the built-in is invoked in the trap itself.
 
+In an [interactive shell](../interactive/index.html), if there are
+[suspended jobs](../interactive/job_control.md), the built-in prints a warning
+and refuses to exit (since yash-rs 3.2.0). Use the `-f` option to override
+this protection and exit immediately.
+
 ## Options
 
-None. (TBD: non-portable extensions)
+`-f`, `--force`
+: Force exit even when there are suspended jobs. Without this option, the
+  built-in prints a warning and returns a non-zero exit status if there are
+  any suspended jobs in an interactive shell.
 
 ## Operands
 
@@ -31,6 +39,10 @@ it is a syntax error.
 
 This implementation treats an *exit_status* value greater than 2147483647 as
 a syntax error.
+
+If there are suspended jobs in an interactive shell and `-f` is not given,
+the built-in prints a warning to standard error and returns exit status 2
+without exiting.
 
 ## Exit status
 
@@ -54,9 +66,23 @@ $ exit 42
 ```
 <!-- markdownlint-enable MD014 -->
 
+To force exit when there are suspended jobs:
+
+```shell,no_run
+$ sleep 100
+^Z
+[1] + Stopped                 sleep 100
+$ exit
+# There are stopped jobs. Type `exit -f` to exit anyway.
+$ exit -f
+```
+
 ## Compatibility
 
 The `exit` built-in is specified by POSIX.1-2024.
+
+The `-f`/`--force` option and the suspended-jobs protection are
+non-portable extensions introduced in yash-rs 3.2.0.
 
 In some shells, the `exit` built-in lacks support for the [`--` separator](index.html#separators).
 

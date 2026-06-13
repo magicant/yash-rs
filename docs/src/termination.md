@@ -10,7 +10,30 @@ A shell session terminates in the following cases:
 
 ## Preventing accidental exits
 
-When the input to the shell is a terminal, you can signal an end-of-file with the `eof` sequence (usually `Ctrl+D`). However, you might not want the shell to exit immediately when this happens, especially if you often hit the sequence by mistake. Enable the `ignoreeof` [shell option] to prevent the shell from exiting on end-of-file and let it wait for more input.
+### Suspended jobs
+
+When the input to the shell is a terminal, pressing `Ctrl+D` (end-of-file)
+exits the shell. However, if there are [suspended jobs](interactive/job_control.md),
+the shell will warn you instead of exiting immediately (since yash-rs 3.2.0):
+
+```shell,no_run
+$ sleep 100
+^Z
+[1] + Stopped                 sleep 100
+$ 
+# There are stopped jobs. Type `exit -f` to exit anyway.
+$ exit
+# There are stopped jobs. Type `exit -f` to exit anyway.
+$ exit -f
+```
+
+The same warning is shown when you use the [`exit` built-in](builtins/exit.md)
+while suspended jobs exist. Use `exit -f` (or `exit --force`) to bypass the
+check and exit immediately.
+
+### Ignoring EOF
+
+You might not want the shell to exit immediately on end-of-file, especially if you often hit the sequence by mistake. Enable the `ignoreeof` [shell option] to prevent the shell from exiting on end-of-file and let it wait for more input.
 
 ```shell,no_run
 $ set -o ignoreeof
