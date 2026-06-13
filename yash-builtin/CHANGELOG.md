@@ -16,8 +16,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `exit` built-in now refuses to exit when there are suspended jobs in an
   interactive shell (non-POSIX extension). It prints a warning to standard
   error and returns a non-zero exit status instead of exiting. The warning
-  message is read from [`EofGuardConfig`] in `env.any`; if absent, the check
-  is skipped.
+  message is read from [`SuspendedJobsGuardConfig`] in `env.any`; if absent,
+  the check is skipped.
 - The `exit` built-in has a new `-f`/`--force` option that forces the shell to
   exit even when there are suspended jobs.
 
@@ -26,7 +26,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 - Private dependency versions:
     - yash-env 0.15.0 → 0.15.1
 
-[`EofGuardConfig`]: https://docs.rs/yash-env/0.15.1/yash_env/input/struct.EofGuardConfig.html
+[`SuspendedJobsGuardConfig`]: https://docs.rs/yash-env/0.15.1/yash_env/input/struct.SuspendedJobsGuardConfig.html
 
 ## [0.18.0] - 2026-06-11
 

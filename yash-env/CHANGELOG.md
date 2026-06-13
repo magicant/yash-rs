@@ -17,10 +17,12 @@ A _private dependency_ is used internally and not visible to downstream users.
   `input::IgnoreEof` for use in interactive shells, combining the
   `ignore-eof` option behavior with protection against accidental exit when
   there are suspended jobs.
-- `input::EofGuardConfig` has been added. Store it in `env.any` to configure
-  the messages used by `EofGuard` and the `exit` built-in, and to enable the
-  suspended-job protection feature. If absent, both `EofGuard` and the `exit`
-  built-in skip the suspended-job check.
+- `input::SuspendedJobsGuardConfig` has been added. Store it in `env.any` to
+  enable the suspended-job protection in `EofGuard` and the `exit` built-in.
+  If absent, both skip the suspended-job check.
+- `input::IgnoreEofConfig` has been added. Store it in `env.any` to enable the
+  `ignore-eof` EOF retry behavior in `EofGuard`. If absent, `EofGuard` does
+  not retry on EOF when the `ignore-eof` option is set.
 
 ## [0.15.0] - 2026-06-11
 
