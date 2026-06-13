@@ -19,6 +19,7 @@
 use self::args::{Run, Source, Work};
 use std::str::FromStr as _;
 use yash_env::Env;
+use yash_env::input::EofGuardConfig;
 use yash_env::io::Fd;
 use yash_env::option::Option::{Interactive, Monitor, Stdin};
 use yash_env::option::State::On;
@@ -132,6 +133,13 @@ where
 
 /// Inject dependencies into the environment.
 fn inject_dependencies<S: Runtime + 'static>(env: &mut Env<S>) {
+    env.any.insert(Box::new(EofGuardConfig {
+        ignore_eof_message: "# Type `exit` to leave the shell when the ignore-eof option is on.\n"
+            .to_string(),
+        suspended_jobs_message: "# There are stopped jobs. Type `exit -f` to exit anyway.\n"
+            .to_string(),
+    }));
+
     env.any.insert(Box::new(IsKeyword::<S>(|_env, word| {
         yash_syntax::parser::lex::Keyword::from_str(word).is_ok()
     })));

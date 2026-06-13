@@ -49,6 +49,7 @@ use std::num::ParseIntError;
 use std::ops::ControlFlow::Break;
 use yash_env::Env;
 use yash_env::builtin::Result;
+use yash_env::input::EofGuardConfig;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -94,8 +95,12 @@ where
         },
     };
     // TODO: skip this check in PosixlyCorrect mode
-    if !force && env.is_interactive() && env.jobs.iter().any(|(_, job)| job.is_suspended()) {
-        env.system.print_error("There are stopped jobs.\n").await;
+    if !force
+        && env.is_interactive()
+        && let Some(config) = env.any.get::<EofGuardConfig>()
+        && env.jobs.iter().any(|(_, job)| job.state.is_stopped())
+    {
+        env.system.print_error(&config.suspended_jobs_message).await;
         return Result::with_exit_status_and_divert(
             ExitStatus::ERROR,
             Break(Divert::Interrupt(None)),
@@ -111,9 +116,13 @@ mod tests {
     use futures_util::FutureExt as _;
     use std::rc::Rc;
     use yash_env::VirtualSystem;
+    use yash_env::job::{Job, Pid, ProcessState};
+    use yash_env::option::On;
+    use yash_env::option::Option::Interactive;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::system::Concurrent;
+    use yash_env::system::r#virtual::SIGTSTP;
     use yash_env::test_helper::assert_stderr;
 
     #[test]
@@ -232,12 +241,18 @@ mod tests {
 
     // TODO exit_with_invalid_option
 
-    fn interactive_env_with_suspended_job() -> (Env<Rc<Concurrent<VirtualSystem>>>, Rc<std::cell::RefCell<yash_env::system::r#virtual::SystemState>>) {
-        use yash_env::job::{Job, Pid, ProcessState};
-        use yash_env::option::Option::Interactive;
-        use yash_env::option::On;
-        use yash_env::system::r#virtual::SIGTSTP;
+    fn make_config() -> EofGuardConfig {
+        EofGuardConfig {
+            ignore_eof_message: String::new(),
+            suspended_jobs_message: "# There are stopped jobs. Type `exit -f` to exit anyway.\n"
+                .to_string(),
+        }
+    }
 
+    fn interactive_env_with_suspended_job() -> (
+        Env<Rc<Concurrent<VirtualSystem>>>,
+        Rc<std::cell::RefCell<yash_env::system::r#virtual::SystemState>>,
+    ) {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
@@ -245,17 +260,16 @@ mod tests {
         let mut job = Job::new(Pid(42));
         job.state = ProcessState::stopped(SIGTSTP);
         env.jobs.insert(job);
+        env.any.insert(Box::new(make_config()));
         (env, state)
     }
 
     #[test]
     fn exit_from_interactive_shell_without_suspended_job() {
-        use yash_env::option::Option::Interactive;
-        use yash_env::option::On;
-
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
+        env.any.insert(Box::new(make_config()));
 
         let actual_result = main(&mut env, vec![]).now_or_never().unwrap();
         let expected_result =
@@ -284,6 +298,24 @@ mod tests {
         let args = Field::dummies(["-f"]);
 
         let actual_result = main(&mut env, args).now_or_never().unwrap();
+        let expected_result =
+            Result::with_exit_status_and_divert(ExitStatus::SUCCESS, Break(Divert::Exit(None)));
+        assert_eq!(actual_result, expected_result);
+        assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
+    }
+
+    #[test]
+    fn exit_from_interactive_shell_with_suspended_job_without_config() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Interactive, On);
+        let mut job = Job::new(Pid(42));
+        job.state = ProcessState::stopped(SIGTSTP);
+        env.jobs.insert(job);
+        // No EofGuardConfig in env.any — feature is disabled
+
+        let actual_result = main(&mut env, vec![]).now_or_never().unwrap();
         let expected_result =
             Result::with_exit_status_and_divert(ExitStatus::SUCCESS, Break(Divert::Exit(None)));
         assert_eq!(actual_result, expected_result);
