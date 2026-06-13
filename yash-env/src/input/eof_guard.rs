@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Defines the [`EofGuard`] input decorator and [`EofGuardConfig`].
+//! Defines the [`EofGuard`] input decorator, [`SuspendedJobsGuardConfig`], and
+//! [`IgnoreEofConfig`].
 
 use super::{Context, Input, Result};
 use crate::Env;
@@ -24,27 +25,66 @@ use crate::system::Isatty;
 use crate::system::concurrency::WriteAll;
 use std::cell::RefCell;
 
-/// Configuration for the [`EofGuard`] decorator and the `exit` built-in
+/// Configuration for the suspended-jobs exit guard.
 ///
-/// This struct is stored in [`Env::any`](crate::Env::any) to configure the
-/// behavior of [`EofGuard`] and the `exit` built-in. Both read the messages
-/// from this struct when they need to warn the user about suspended jobs or
-/// ignored EOF.
+/// When present in [`Env::any`](crate::Env::any), both [`EofGuard`] and the
+/// `exit` built-in refuse to exit when there are suspended jobs, printing
+/// [`message`](Self::message) to warn the user.
 ///
-/// If this struct is absent from `env.any`, both `EofGuard` and the `exit`
-/// built-in disable their suspended-job protection behavior and allow exiting
-/// normally.
+/// If absent from `env.any`, suspended-job protection is disabled in both
+/// [`EofGuard`] and the `exit` built-in.
 ///
-/// Use [`EofGuardConfig::insert`] to store this config in the environment.
-#[derive(Clone, Debug)]
-pub struct EofGuardConfig {
-    /// Text displayed when EOF is ignored due to the `ignore-eof` option
-    pub ignore_eof_message: String,
-    /// Text displayed when there are suspended jobs (used by [`EofGuard`] and the `exit` built-in)
-    pub suspended_jobs_message: String,
+/// Use [`SuspendedJobsGuardConfig::insert`] to store this config in the
+/// environment.
+#[derive(Clone, Debug, Default)]
+#[non_exhaustive]
+pub struct SuspendedJobsGuardConfig {
+    /// Text displayed when exit is prevented because there are suspended jobs
+    pub message: String,
 }
 
-impl EofGuardConfig {
+impl SuspendedJobsGuardConfig {
+    /// Creates a new `SuspendedJobsGuardConfig` with the given message.
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+
+    /// Inserts this configuration into the environment's [`DataSet`](crate::any::DataSet).
+    ///
+    /// This is a convenience method equivalent to
+    /// `env.any.insert(Box::new(self))`.
+    pub fn insert(self, env: &mut Env<impl Clone + 'static>) {
+        env.any.insert(Box::new(self));
+    }
+}
+
+/// Configuration for the [`EofGuard`]'s `ignore-eof` behavior.
+///
+/// When present in [`Env::any`](crate::Env::any), [`EofGuard`] retries reading
+/// on EOF when the [`ignore-eof` option](crate::option::IgnoreEof) is enabled,
+/// printing [`message`](Self::message) to remind the user.
+///
+/// If absent from `env.any`, the `ignore-eof` EOF protection in [`EofGuard`]
+/// is disabled.
+///
+/// Use [`IgnoreEofConfig::insert`] to store this config in the environment.
+#[derive(Clone, Debug, Default)]
+#[non_exhaustive]
+pub struct IgnoreEofConfig {
+    /// Text displayed when EOF is ignored due to the `ignore-eof` option
+    pub message: String,
+}
+
+impl IgnoreEofConfig {
+    /// Creates a new `IgnoreEofConfig` with the given message.
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+
     /// Inserts this configuration into the environment's [`DataSet`](crate::any::DataSet).
     ///
     /// This is a convenience method equivalent to
@@ -62,18 +102,19 @@ impl EofGuardConfig {
 ///
 /// On EOF (empty line), the decorator retries reading if any of the following
 /// conditions is met (provided the shell is interactive, the input is a
-/// terminal, the retry limit has not been reached, and [`EofGuardConfig`] is
-/// present in `env.any`):
+/// terminal, and the retry limit has not been reached):
 ///
-/// 1. There are suspended jobs — prints [`suspended_jobs_message`](EofGuardConfig::suspended_jobs_message).
-/// 2. The `ignore-eof` option is enabled — prints [`ignore_eof_message`](EofGuardConfig::ignore_eof_message).
+/// 1. There are suspended jobs and [`SuspendedJobsGuardConfig`] is present in
+///    `env.any` — prints [`SuspendedJobsGuardConfig::message`].
+/// 2. The `ignore-eof` option is enabled and [`IgnoreEofConfig`] is present in
+///    `env.any` — prints [`IgnoreEofConfig::message`].
 ///
 /// The retry limit is 50 consecutive EOFs per [`next_line`](Input::next_line)
 /// call. Once the limit is reached the empty string is returned, allowing the
 /// shell to exit.
 ///
-/// If [`EofGuardConfig`] is not present in `env.any`, the decorator passes
-/// through all input unchanged (no retries).
+/// If neither [`SuspendedJobsGuardConfig`] nor [`IgnoreEofConfig`] is present
+/// in `env.any`, the decorator passes through all input unchanged (no retries).
 ///
 /// Unlike [`IgnoreEof`](crate::input::IgnoreEof), this decorator also checks
 /// for suspended jobs, so it should be used instead of `IgnoreEof` in the
@@ -93,7 +134,7 @@ impl<'a, 'b, S, T> EofGuard<'a, 'b, S, T> {
     ///
     /// The arguments match those of [`IgnoreEof::new`](crate::input::IgnoreEof::new)
     /// except that there is no `message` argument — the messages are read from
-    /// [`EofGuardConfig`] stored in `env.any`.
+    /// [`SuspendedJobsGuardConfig`] and [`IgnoreEofConfig`] stored in `env.any`.
     ///
     /// `inner` is the wrapped input, `fd` is the terminal file descriptor to
     /// check, and `env` is the shared environment.
@@ -134,17 +175,19 @@ impl<S: Isatty + WriteAll, T: Input> Input for EofGuard<'_, '_, S, T> {
                 return Ok(line);
             }
 
-            let Some(config) = env.any.get::<EofGuardConfig>() else {
-                return Ok(line);
-            };
-
             // TODO: skip the suspended-jobs check in PosixlyCorrect mode
             let has_suspended = env.jobs.iter().any(|(_, job)| job.state.is_stopped());
 
             if has_suspended {
-                env.system.print_error(&config.suspended_jobs_message).await;
+                let Some(config) = env.any.get::<SuspendedJobsGuardConfig>() else {
+                    return Ok(line);
+                };
+                env.system.print_error(&config.message).await;
             } else if env.options.get(IgnoreEofOption) == On {
-                env.system.print_error(&config.ignore_eof_message).await;
+                let Some(config) = env.any.get::<IgnoreEofConfig>() else {
+                    return Ok(line);
+                };
+                env.system.print_error(&config.message).await;
             } else {
                 return Ok(line);
             }
@@ -216,11 +259,13 @@ mod tests {
             .unwrap();
     }
 
-    fn make_config() -> EofGuardConfig {
-        EofGuardConfig {
-            ignore_eof_message: "EOF ignored\n".to_string(),
-            suspended_jobs_message: "There are stopped jobs.\n".to_string(),
-        }
+    fn insert_both_configs(env: &mut Env<impl Clone + 'static>) {
+        env.any.insert(Box::new(IgnoreEofConfig {
+            message: "EOF ignored\n".to_string(),
+        }));
+        env.any.insert(Box::new(SuspendedJobsGuardConfig {
+            message: "There are stopped jobs.\n".to_string(),
+        }));
     }
 
     /// `Input` decorator that returns EOF for the first `count` calls
@@ -248,7 +293,7 @@ mod tests {
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         env.options.set(IgnoreEofOption, On);
-        env.any.insert(Box::new(make_config()));
+        insert_both_configs(&mut env);
         let ref_env = RefCell::new(&mut env);
         let mut decorator = EofGuard::new(Memory::new("echo foo\n"), Fd::STDIN, &ref_env);
 
@@ -267,7 +312,9 @@ mod tests {
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         env.options.set(IgnoreEofOption, On);
-        env.any.insert(Box::new(make_config()));
+        env.any.insert(Box::new(IgnoreEofConfig {
+            message: "EOF ignored\n".to_string(),
+        }));
         let ref_env = RefCell::new(&mut env);
         let mut decorator = EofGuard::new(
             EofStub {
@@ -294,7 +341,9 @@ mod tests {
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         env.options.set(IgnoreEofOption, On);
-        env.any.insert(Box::new(make_config()));
+        env.any.insert(Box::new(IgnoreEofConfig {
+            message: "EOF ignored\n".to_string(),
+        }));
         let ref_env = RefCell::new(&mut env);
         let mut decorator = EofGuard::new(
             EofStub {
@@ -323,7 +372,9 @@ mod tests {
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         env.options.set(IgnoreEofOption, On);
-        env.any.insert(Box::new(make_config()));
+        env.any.insert(Box::new(IgnoreEofConfig {
+            message: "EOF ignored\n".to_string(),
+        }));
         let ref_env = RefCell::new(&mut env);
         let mut decorator = EofGuard::new(
             EofStub {
@@ -352,7 +403,7 @@ mod tests {
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         // Interactive is Off (default)
         env.options.set(IgnoreEofOption, On);
-        env.any.insert(Box::new(make_config()));
+        insert_both_configs(&mut env);
         let ref_env = RefCell::new(&mut env);
         let mut decorator = EofGuard::new(
             EofStub {
@@ -379,7 +430,7 @@ mod tests {
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         // IgnoreEof is Off (default), no jobs
-        env.any.insert(Box::new(make_config()));
+        insert_both_configs(&mut env);
         let ref_env = RefCell::new(&mut env);
         let mut decorator = EofGuard::new(
             EofStub {
@@ -406,7 +457,7 @@ mod tests {
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         env.options.set(IgnoreEofOption, On);
-        env.any.insert(Box::new(make_config()));
+        insert_both_configs(&mut env);
         let ref_env = RefCell::new(&mut env);
         let mut decorator = EofGuard::new(
             EofStub {
@@ -433,7 +484,7 @@ mod tests {
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         env.options.set(IgnoreEofOption, On);
-        // No EofGuardConfig inserted — feature is disabled
+        // No configs inserted — feature is disabled
         let ref_env = RefCell::new(&mut env);
         let mut decorator = EofGuard::new(
             EofStub {
@@ -463,7 +514,9 @@ mod tests {
         let mut job = Job::new(Pid(42));
         job.state = ProcessState::stopped(crate::system::r#virtual::SIGTSTP);
         env.jobs.insert(job);
-        env.any.insert(Box::new(make_config()));
+        env.any.insert(Box::new(SuspendedJobsGuardConfig {
+            message: "There are stopped jobs.\n".to_string(),
+        }));
         let ref_env = RefCell::new(&mut env);
         let mut decorator = EofGuard::new(
             EofStub {
@@ -495,7 +548,7 @@ mod tests {
         let mut job = Job::new(Pid(42));
         job.state = ProcessState::stopped(crate::system::r#virtual::SIGTSTP);
         env.jobs.insert(job);
-        env.any.insert(Box::new(make_config()));
+        insert_both_configs(&mut env);
         let ref_env = RefCell::new(&mut env);
         let mut decorator = EofGuard::new(
             EofStub {

@@ -131,4 +131,4 @@ mod reporter;
 pub use reporter::Reporter;
 
 mod eof_guard;
-pub use eof_guard::{EofGuard, EofGuardConfig};
+pub use eof_guard::{EofGuard, IgnoreEofConfig, SuspendedJobsGuardConfig};

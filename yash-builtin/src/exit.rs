@@ -49,7 +49,7 @@ use std::num::ParseIntError;
 use std::ops::ControlFlow::Break;
 use yash_env::Env;
 use yash_env::builtin::Result;
-use yash_env::input::EofGuardConfig;
+use yash_env::input::SuspendedJobsGuardConfig;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -97,10 +97,10 @@ where
     // TODO: skip this check in PosixlyCorrect mode
     if !force
         && env.is_interactive()
-        && let Some(config) = env.any.get::<EofGuardConfig>()
+        && let Some(config) = env.any.get::<SuspendedJobsGuardConfig>()
         && env.jobs.iter().any(|(_, job)| job.state.is_stopped())
     {
-        env.system.print_error(&config.suspended_jobs_message).await;
+        env.system.print_error(&config.message).await;
         return Result::with_exit_status_and_divert(
             ExitStatus::ERROR,
             Break(Divert::Interrupt(None)),
@@ -241,12 +241,8 @@ mod tests {
 
     // TODO exit_with_invalid_option
 
-    fn make_config() -> EofGuardConfig {
-        EofGuardConfig {
-            ignore_eof_message: String::new(),
-            suspended_jobs_message: "# There are stopped jobs. Type `exit -f` to exit anyway.\n"
-                .to_string(),
-        }
+    fn make_config() -> SuspendedJobsGuardConfig {
+        SuspendedJobsGuardConfig::new("# There are stopped jobs. Type `exit -f` to exit anyway.\n")
     }
 
     fn interactive_env_with_suspended_job() -> (
@@ -313,7 +309,7 @@ mod tests {
         let mut job = Job::new(Pid(42));
         job.state = ProcessState::stopped(SIGTSTP);
         env.jobs.insert(job);
-        // No EofGuardConfig in env.any — feature is disabled
+        // No SuspendedJobsGuardConfig in env.any — feature is disabled
 
         let actual_result = main(&mut env, vec![]).now_or_never().unwrap();
         let expected_result =
