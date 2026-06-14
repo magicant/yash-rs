@@ -40,7 +40,7 @@ $ exit -f
 
 This applies not only when end-of-file is reached but also when you use the [`exit` built-in](builtins/exit.md). Use `exit -f` (or `exit --force`) to bypass the check and exit immediately.
 
-This behavior is only effective in [interactive shells](interactive/index.html) and only when the input is a terminal. As a safeguard against an input that repeatedly delivers EOF, entering 50 `eof` sequences in a row will still cause the shell to exit.
+This protection is only effective in [interactive shells](interactive/index.html). When it is triggered by end-of-file, the input must additionally be a terminal, and—as a safeguard against an input that repeatedly delivers EOF—entering 50 `eof` sequences in a row will still cause the shell to exit. The `exit` built-in, by contrast, refuses to exit whenever the shell is interactive, regardless of the input type.
 
 ## Exiting subshells
 
