@@ -14,9 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - The interactive shell now warns and refuses to exit when Ctrl+D (EOF) is
-  received while suspended jobs exist, similar to other major shells. The
-  warning message begins with `#` and guides the user to use `exit -f` to
-  force exit.
+  received while suspended jobs exist, similar to other major shells.
 - The `exit` built-in now refuses to exit with the same warning when there are
   suspended jobs in an interactive shell.
 - The `exit` built-in has a new `-f`/`--force` option that forces the shell to
