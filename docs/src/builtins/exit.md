@@ -23,7 +23,7 @@ immediately.
 ## Options
 
 `-f`, `--force`
-: Force exit even when there are suspended jobs. Without this option, the
+: (Since 3.2.0) Force exit even when there are suspended jobs. Without this option, the
   built-in prints a warning and returns a non-zero exit status if there are
   any suspended jobs in an interactive shell.
 
@@ -41,7 +41,7 @@ This implementation treats an *exit_status* value greater than 2147483647 as
 a syntax error.
 
 If there are suspended jobs in an interactive shell and `-f` is not given,
-the built-in prints a warning to standard error and returns exit status 2
+the built-in prints a warning to standard error and returns exit status 1
 without exiting.
 
 ## Exit status
@@ -81,11 +81,11 @@ $ exit -f
 
 The `exit` built-in is specified by POSIX.1-2024.
 
-The `-f`/`--force` option and the suspended-jobs protection are
-non-portable extensions introduced in yash-rs 3.2.0.
-
 In some shells, the `exit` built-in lacks support for the [`--` separator](index.html#separators).
 
 The behavior is undefined in POSIX if *exit_status* is greater than 255.
 The current implementation passes such a value as is in the result, but this
 behavior may change in the future.
+
+The `-f`/`--force` option and the suspended-jobs protection are
+non-portable extensions.
