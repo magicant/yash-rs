@@ -271,12 +271,9 @@ mod tests {
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         env.options.set(IgnoreEofOption, On);
-        env.any.insert(Box::new(IgnoreEofConfig {
-            message: "EOF ignored\n".to_string(),
-        }));
-        env.any.insert(Box::new(SuspendedJobsGuardConfig {
-            message: "There are stopped jobs.\n".to_string(),
-        }));
+        env.any.insert(Box::new(IgnoreEofConfig::default()));
+        env.any
+            .insert(Box::new(SuspendedJobsGuardConfig::default()));
         let ref_env = RefCell::new(&mut env);
         let mut decorator = EofGuard::new(Memory::new("echo foo\n"), Fd::STDIN, &ref_env);
 
@@ -386,12 +383,9 @@ mod tests {
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         // Interactive is Off (default)
         env.options.set(IgnoreEofOption, On);
-        env.any.insert(Box::new(IgnoreEofConfig {
-            message: "EOF ignored\n".to_string(),
-        }));
-        env.any.insert(Box::new(SuspendedJobsGuardConfig {
-            message: "There are stopped jobs.\n".to_string(),
-        }));
+        env.any.insert(Box::new(IgnoreEofConfig::default()));
+        env.any
+            .insert(Box::new(SuspendedJobsGuardConfig::default()));
         let ref_env = RefCell::new(&mut env);
         let mut decorator = EofGuard::new(
             EofStub {
@@ -418,12 +412,9 @@ mod tests {
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         // IgnoreEof is Off (default), no jobs
-        env.any.insert(Box::new(IgnoreEofConfig {
-            message: "EOF ignored\n".to_string(),
-        }));
-        env.any.insert(Box::new(SuspendedJobsGuardConfig {
-            message: "There are stopped jobs.\n".to_string(),
-        }));
+        env.any.insert(Box::new(IgnoreEofConfig::default()));
+        env.any
+            .insert(Box::new(SuspendedJobsGuardConfig::default()));
         let ref_env = RefCell::new(&mut env);
         let mut decorator = EofGuard::new(
             EofStub {
@@ -450,12 +441,9 @@ mod tests {
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         env.options.set(IgnoreEofOption, On);
-        env.any.insert(Box::new(IgnoreEofConfig {
-            message: "EOF ignored\n".to_string(),
-        }));
-        env.any.insert(Box::new(SuspendedJobsGuardConfig {
-            message: "There are stopped jobs.\n".to_string(),
-        }));
+        env.any.insert(Box::new(IgnoreEofConfig::default()));
+        env.any
+            .insert(Box::new(SuspendedJobsGuardConfig::default()));
         let ref_env = RefCell::new(&mut env);
         let mut decorator = EofGuard::new(
             EofStub {
