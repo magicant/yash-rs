@@ -42,6 +42,20 @@
 //!
 //! In case of an error, the result will have a [`Divert::Interrupt`] value
 //! instead, in which case the shell will not exit if it is interactive.
+//!
+//! ## Suspended-jobs protection
+//!
+//! When [`yash_env::input::SuspendedJobsGuardConfig`] is present in `env.any`,
+//! the built-in refuses to exit if there are suspended jobs and the `-f` option
+//! is not given. It prints the configured message and returns
+//! [`Divert::Interrupt`] with exit status 1.
+//!
+//! If `SuspendedJobsGuardConfig` is absent from `env.any`, the check is
+//! skipped and the built-in exits normally.
+//!
+//! Note: [`yash_env::input::IgnoreEofConfig`] is used by
+//! [`yash_env::input::EofGuard`] for the `ignore-eof` option behavior and is
+//! not consulted by this built-in.
 
 use crate::common::report::{report_error, syntax_error};
 use crate::common::syntax::{Mode, OptionSpec, parse_arguments};
