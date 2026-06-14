@@ -242,7 +242,9 @@ mod tests {
     // TODO exit_with_invalid_option
 
     fn make_config() -> SuspendedJobsGuardConfig {
-        SuspendedJobsGuardConfig::new("# There are stopped jobs. Type `exit -f` to exit anyway.\n")
+        SuspendedJobsGuardConfig::with_message(
+            "# There are stopped jobs. Type `exit -f` to exit anyway.\n",
+        )
     }
 
     fn interactive_env_with_suspended_job() -> (

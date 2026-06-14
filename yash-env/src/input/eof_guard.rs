@@ -27,15 +27,14 @@ use std::cell::RefCell;
 
 /// Configuration for the suspended-jobs exit guard.
 ///
-/// When present in [`Env::any`](crate::Env::any), both [`EofGuard`] and the
-/// `exit` built-in refuse to exit when there are suspended jobs, printing
-/// [`message`](Self::message) to warn the user.
+/// When present in [`Env::any`](crate::Env::any), [`EofGuard`] and other
+/// components that guard against accidental exit refuse to exit when there are
+/// suspended jobs, printing [`message`](Self::message) to warn the user.
 ///
-/// If absent from `env.any`, suspended-job protection is disabled in both
-/// [`EofGuard`] and the `exit` built-in.
+/// If absent from `env.any`, the suspended-job protection is disabled.
 ///
-/// Use [`SuspendedJobsGuardConfig::insert`] to store this config in the
-/// environment.
+/// Store this config in the environment with
+/// `env.any.insert(Box::new(config))`.
 #[derive(Clone, Debug, Default)]
 #[non_exhaustive]
 pub struct SuspendedJobsGuardConfig {
@@ -45,18 +44,11 @@ pub struct SuspendedJobsGuardConfig {
 
 impl SuspendedJobsGuardConfig {
     /// Creates a new `SuspendedJobsGuardConfig` with the given message.
-    pub fn new(message: impl Into<String>) -> Self {
+    #[must_use]
+    pub fn with_message<M: Into<String>>(message: M) -> Self {
         Self {
             message: message.into(),
         }
-    }
-
-    /// Inserts this configuration into the environment's [`DataSet`](crate::any::DataSet).
-    ///
-    /// This is a convenience method equivalent to
-    /// `env.any.insert(Box::new(self))`.
-    pub fn insert(self, env: &mut Env<impl Clone + 'static>) {
-        env.any.insert(Box::new(self));
     }
 }
 
@@ -69,7 +61,8 @@ impl SuspendedJobsGuardConfig {
 /// If absent from `env.any`, the `ignore-eof` EOF protection in [`EofGuard`]
 /// is disabled.
 ///
-/// Use [`IgnoreEofConfig::insert`] to store this config in the environment.
+/// Store this config in the environment with
+/// `env.any.insert(Box::new(config))`.
 #[derive(Clone, Debug, Default)]
 #[non_exhaustive]
 pub struct IgnoreEofConfig {
@@ -79,18 +72,11 @@ pub struct IgnoreEofConfig {
 
 impl IgnoreEofConfig {
     /// Creates a new `IgnoreEofConfig` with the given message.
-    pub fn new(message: impl Into<String>) -> Self {
+    #[must_use]
+    pub fn with_message<M: Into<String>>(message: M) -> Self {
         Self {
             message: message.into(),
         }
-    }
-
-    /// Inserts this configuration into the environment's [`DataSet`](crate::any::DataSet).
-    ///
-    /// This is a convenience method equivalent to
-    /// `env.any.insert(Box::new(self))`.
-    pub fn insert(self, env: &mut Env<impl Clone + 'static>) {
-        env.any.insert(Box::new(self));
     }
 }
 

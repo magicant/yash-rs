@@ -134,10 +134,11 @@ where
 
 /// Inject dependencies into the environment.
 fn inject_dependencies<S: Runtime + 'static>(env: &mut Env<S>) {
-    env.any.insert(Box::new(SuspendedJobsGuardConfig::new(
-        "# There are stopped jobs. Type `exit -f` to exit anyway.\n",
-    )));
-    env.any.insert(Box::new(IgnoreEofConfig::new(
+    env.any
+        .insert(Box::new(SuspendedJobsGuardConfig::with_message(
+            "# There are stopped jobs. Type `exit -f` to exit anyway.\n",
+        )));
+    env.any.insert(Box::new(IgnoreEofConfig::with_message(
         "# Type `exit` to leave the shell when the ignore-eof option is on.\n",
     )));
 
