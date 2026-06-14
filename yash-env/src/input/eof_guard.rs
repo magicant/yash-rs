@@ -462,15 +462,18 @@ mod tests {
         assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
     }
 
+    // Counterpart to `decorator_reads_input_again_on_eof_with_ignore_eof_option`:
+    // without `IgnoreEofConfig` in `env.any`, the ignore-eof retry is disabled,
+    // so the decorator returns the EOF immediately.
     #[test]
-    fn decorator_returns_immediately_if_no_config_in_env_any() {
+    fn decorator_returns_immediately_if_no_ignore_eof_config() {
         let mut system = VirtualSystem::new();
         set_stdin_to_tty(&mut system);
         let state = system.state.clone();
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
         env.options.set(IgnoreEofOption, On);
-        // No configs inserted — feature is disabled
+        // No IgnoreEofConfig in env.any
         let ref_env = RefCell::new(&mut env);
         let mut decorator = EofGuard::new(
             EofStub {
@@ -521,6 +524,39 @@ mod tests {
         assert_stderr(&state, |stderr| {
             assert_eq!(stderr, "There are stopped jobs.\n")
         });
+    }
+
+    // Counterpart to `decorator_ignores_eof_when_there_are_suspended_jobs`:
+    // without `SuspendedJobsGuardConfig` in `env.any`, the suspended-jobs guard
+    // is disabled, so the decorator returns the EOF immediately.
+    #[test]
+    fn decorator_returns_immediately_if_no_suspended_jobs_config() {
+        let mut system = VirtualSystem::new();
+        set_stdin_to_tty(&mut system);
+        let state = system.state.clone();
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Interactive, On);
+        // IgnoreEof is Off, but there is a suspended job
+        let mut job = Job::new(Pid(42));
+        job.state = ProcessState::stopped(crate::system::r#virtual::SIGTSTP);
+        env.jobs.insert(job);
+        // No SuspendedJobsGuardConfig in env.any
+        let ref_env = RefCell::new(&mut env);
+        let mut decorator = EofGuard::new(
+            EofStub {
+                inner: Memory::new("echo foo\n"),
+                count: 1,
+            },
+            Fd::STDIN,
+            &ref_env,
+        );
+
+        let result = decorator
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result.unwrap(), "");
+        assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
     }
 
     #[test]
