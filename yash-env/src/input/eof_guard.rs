@@ -537,9 +537,10 @@ mod tests {
 
     #[test]
     fn suspended_jobs_message_takes_priority_over_ignore_eof_message() {
-        // When there are suspended jobs, the suspended-jobs message is shown
-        // instead of the ignore-eof message, so the user learns they should
-        // use `exit -f` to exit.
+        // The ignore-eof message typically tells the user to type `exit` to
+        // leave the shell, but a plain `exit` does not work when there are
+        // suspended jobs. The suspended-jobs message must take priority so the
+        // user is correctly directed to use `exit -f` instead.
         let mut system = VirtualSystem::new();
         set_stdin_to_tty(&mut system);
         let state = system.state.clone();
