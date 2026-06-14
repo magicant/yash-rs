@@ -17,19 +17,24 @@
 //! Methods about passing [source](crate::source) code to the
 //! [parser](crate::parser).
 //!
-//! # Input decorators
+//! # Input sources
 //!
 //! The [`Input`] trait is the core abstraction for reading source code lines.
+//! These types are leaf inputs that produce lines from a concrete source:
+//!
+//! - [`Memory`]: In-memory input from a pre-loaded string
+//! - [`FdReader2`]: Reads from a file descriptor asynchronously
+//!
+//! # Input decorators
+//!
 //! Several decorators wrap an inner [`Input`] to add behavior:
 //!
-//! | Type | Purpose |
-//! |------|---------|
-//! | [`Memory`] | In-memory input from a pre-loaded string |
-//! | [`FdReader2`] | Reads from a file descriptor asynchronously |
-//! | [`Echo`] | Echoes each line read to stderr (for the `verbose` option) |
-//! | [`IgnoreEof`] | Retries on EOF when the `ignore-eof` option is on (simple interactive use) |
-//! | [`Reporter`] | Reports job status changes before each prompt |
-//! | [`EofGuard`] | Combines suspended-jobs protection with `ignore-eof` retry; prefer over [`IgnoreEof`] for the interactive read loop |
+//! - [`Echo`]: Echoes each line read to stderr (for the `verbose` option)
+//! - [`IgnoreEof`]: Retries on EOF when the `ignore-eof` option is on (simple
+//!   interactive use)
+//! - [`Reporter`]: Reports job status changes before each prompt
+//! - [`EofGuard`]: Combines suspended-jobs protection with `ignore-eof` retry;
+//!   prefer over [`IgnoreEof`] for the interactive read loop
 //!
 //! ## Configuration stored in `env.any`
 //!
