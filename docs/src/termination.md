@@ -10,6 +10,8 @@ A shell session terminates in the following cases:
 
 ## Preventing accidental exits
 
+### Ignoring EOF
+
 When the input to the shell is a terminal, you can signal an end-of-file with the `eof` sequence (usually `Ctrl+D`). However, you might not want the shell to exit immediately when this happens, especially if you often hit the sequence by mistake. Enable the `ignoreeof` [shell option] to prevent the shell from exiting on end-of-file and let it wait for more input.
 
 ```shell,no_run
@@ -19,7 +21,26 @@ $
 $ exit
 ```
 
-This option is only effective in [interactive shells](interactive/index.html) and only when the input is a terminal. As an escape, entering 50 eof sequences in a row will still cause the shell to exit, regardless of the `ignoreeof` option.
+This option is only effective in [interactive shells](interactive/index.html) and only when the input is a terminal. As a safeguard against an input that repeatedly delivers EOF, entering 50 `eof` sequences in a row will still cause the shell to exit.
+
+### Suspended jobs
+
+(Since 3.2.0) The shell refuses to exit if there are [suspended jobs](interactive/job_control.md) to prevent them from being killed by the `SIGHUP` signal sent by the operating system.
+
+```shell,no_run
+$ sleep 100
+^Z
+[1] + Stopped                 sleep 100
+$ 
+# There are stopped jobs. Type `exit -f` to exit anyway.
+$ exit
+# There are stopped jobs. Type `exit -f` to exit anyway.
+$ exit -f
+```
+
+This applies not only when end-of-file is reached but also when you use the [`exit` built-in](builtins/exit.md). Use `exit -f` (or `exit --force`) to bypass the check and exit immediately.
+
+This protection is only effective in [interactive shells](interactive/index.html). When it is triggered by end-of-file, the input must additionally be a terminal, and—as a safeguard against an input that repeatedly delivers EOF—entering 50 `eof` sequences in a row will still cause the shell to exit. The `exit` built-in, by contrast, refuses to exit whenever the shell is interactive, regardless of the input type.
 
 ## Exiting subshells
 

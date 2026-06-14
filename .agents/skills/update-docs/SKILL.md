@@ -58,6 +58,13 @@ When the shell gains a new feature or option, begin the relevant paragraph with 
 - [docs/src/environment/traps.md](../../../docs/src/environment/traps.md) — `(Since 3.1.0) In an interactive shell …`
 - [docs/src/environment/options.md](../../../docs/src/environment/options.md) — `(Since 3.0.0) If set, the shell returns …`
 
+Common mistakes to avoid:
+
+- **Wrong position**: do NOT embed the tag in the middle or end of a sentence. It must be
+  the very first thing on the first line of the paragraph.
+- **Wrong format**: do NOT write `(since yash-rs x.y.z)`. The correct form is `(Since x.y.z)`:
+  capital S, no "yash-rs" prefix.
+
 ### Naming and indexing keywords
 
 - When a feature has a distinctive name, introduce it in **bold** the first time it appears

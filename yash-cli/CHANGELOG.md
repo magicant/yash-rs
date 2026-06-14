@@ -9,6 +9,17 @@ used by other programs.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - Unreleased
+
+### Added
+
+- The interactive shell now warns and refuses to exit when Ctrl+D (EOF) is
+  received while suspended jobs exist, similar to other major shells.
+- The `exit` built-in now refuses to exit with the same warning when there are
+  suspended jobs in an interactive shell.
+- The `exit` built-in has a new `-f`/`--force` option that forces the shell to
+  exit even when there are suspended jobs.
+
 ## [3.1.0] - 2026-06-11
 
 ### Added
@@ -342,6 +353,7 @@ later.
 
 - Initial release of the shell
 
+[3.2.0]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.2.0
 [3.1.0]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.1.0
 [3.0.8]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.0.8
 [3.0.7]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.0.7

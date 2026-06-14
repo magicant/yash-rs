@@ -77,7 +77,15 @@ Use repository-specific review criteria in
 
 ## Safe change workflow (recommended)
 
+Before writing any code for a task that will produce git commits, invoke the
+`commit` skill via the `Skill` tool. The skill drives the work as an
+incremental loop — one logical step at a time, each passing `./check.sh`
+before being committed. Do not write all the code first and commit at the end.
+
+Per-step loop:
+
 1. Read relevant crate README and docs section.
-2. Implement minimal changes in affected crate(s).
-3. Run targeted tests, then `./check.sh`.
-4. If versions or public behavior changed, update changelog/docs and run semver/release checks.
+2. Implement minimal changes for this step.
+3. Run `cargo fmt`, then `./check.sh` (must exit 0 with no warnings).
+4. Stage and commit the step.
+5. If versions or public behavior changed, update changelog/docs and run semver/release checks.

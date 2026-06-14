@@ -30,8 +30,8 @@ use std::ffi::CString;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::input::Echo;
+use yash_env::input::EofGuard;
 use yash_env::input::FdReader2;
-use yash_env::input::IgnoreEof;
 use yash_env::input::Reporter;
 use yash_env::io::Fd;
 use yash_env::io::move_fd_internal;
@@ -72,8 +72,9 @@ pub struct PrepareInputError<'a> {
 ///   applied to the input to show changes in job status before prompting for
 ///   the next command.
 /// - If the [`Interactive`] option is enabled and the source is read with a
-///   file descriptor, the [`IgnoreEof`] decorator is applied to the input to
-///   implement the [`IgnoreEof`](yash_env::option::IgnoreEof) shell option.
+///   file descriptor, the [`EofGuard`] decorator is applied to the input to
+///   implement the [`IgnoreEof`](yash_env::option::IgnoreEof) shell option
+///   and to protect against accidental exit when there are suspended jobs.
 ///
 /// The `RefCell` passed as the first argument should be shared with (and only
 /// with) the [`read_eval_loop`](yash_semantics::read_eval_loop) function that
@@ -156,7 +157,7 @@ where
 ///
 /// This function creates an [`FdReader2`] object from the given file descriptor
 /// and wraps it with the [`Echo`] decorator. If the [`Interactive`] option is
-/// enabled, the [`Prompter`], [`Reporter`], and [`IgnoreEof`] decorators are
+/// enabled, the [`Prompter`], [`Reporter`], and [`EofGuard`] decorators are
 /// applied to the input object.
 fn prepare_fd_input<'i, S>(fd: Fd, ref_env: &'i RefCell<&mut Env<S>>) -> Box<dyn InputObject + 'i>
 where
@@ -174,8 +175,6 @@ where
         // the job status is reported, and both should be shown again if an EOF is ignored.
         let prompter = Prompter::new(basic_input, ref_env);
         let reporter = Reporter::new(prompter, ref_env);
-        let message =
-            "# Type `exit` to leave the shell when the ignore-eof option is on.\n".to_string();
-        Box::new(IgnoreEof::new(reporter, fd, ref_env, message))
+        Box::new(EofGuard::new(reporter, fd, ref_env))
     }
 }
