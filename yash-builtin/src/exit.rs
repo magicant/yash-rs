@@ -102,7 +102,7 @@ where
     {
         env.system.print_error(&config.message).await;
         return Result::with_exit_status_and_divert(
-            ExitStatus::ERROR,
+            ExitStatus::FAILURE,
             Break(Divert::Interrupt(None)),
         );
     }
@@ -241,33 +241,15 @@ mod tests {
 
     // TODO exit_with_invalid_option
 
-    fn make_config() -> SuspendedJobsGuardConfig {
-        SuspendedJobsGuardConfig::with_message(
-            "# There are stopped jobs. Type `exit -f` to exit anyway.\n",
-        )
-    }
-
-    fn interactive_env_with_suspended_job() -> (
-        Env<Rc<Concurrent<VirtualSystem>>>,
-        Rc<std::cell::RefCell<yash_env::system::r#virtual::SystemState>>,
-    ) {
-        let system = VirtualSystem::new();
-        let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
-        env.options.set(Interactive, On);
-        let mut job = Job::new(Pid(42));
-        job.state = ProcessState::stopped(SIGTSTP);
-        env.jobs.insert(job);
-        env.any.insert(Box::new(make_config()));
-        (env, state)
-    }
-
     #[test]
     fn exit_from_interactive_shell_without_suspended_job() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
         env.options.set(Interactive, On);
-        env.any.insert(Box::new(make_config()));
+        env.any
+            .insert(Box::new(SuspendedJobsGuardConfig::with_message(
+                "stopped\n",
+            )));
 
         let actual_result = main(&mut env, vec![]).now_or_never().unwrap();
         let expected_result =
@@ -277,22 +259,42 @@ mod tests {
 
     #[test]
     fn exit_from_interactive_shell_with_suspended_job_not_in_posix_mode() {
-        let (mut env, state) = interactive_env_with_suspended_job();
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Interactive, On);
+        let mut job = Job::new(Pid(42));
+        job.state = ProcessState::stopped(SIGTSTP);
+        env.jobs.insert(job);
+        env.any
+            .insert(Box::new(SuspendedJobsGuardConfig::with_message(
+                "stopped\n",
+            )));
 
         let actual_result = main(&mut env, vec![]).now_or_never().unwrap();
-        let expected_result =
-            Result::with_exit_status_and_divert(ExitStatus::ERROR, Break(Divert::Interrupt(None)));
+        let expected_result = Result::with_exit_status_and_divert(
+            ExitStatus::FAILURE,
+            Break(Divert::Interrupt(None)),
+        );
         assert_eq!(actual_result, expected_result);
-        assert_stderr(&state, |stderr| {
-            assert!(stderr.contains("stopped jobs"), "stderr = {stderr:?}")
-        });
+        assert_stderr(&state, |stderr| assert_eq!(stderr, "stopped\n"));
     }
 
     // TODO exit_from_interactive_shell_with_suspended_job_in_posix_mode
 
     #[test]
     fn force_exit_from_interactive_shell_with_suspended_job() {
-        let (mut env, state) = interactive_env_with_suspended_job();
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Interactive, On);
+        let mut job = Job::new(Pid(42));
+        job.state = ProcessState::stopped(SIGTSTP);
+        env.jobs.insert(job);
+        env.any
+            .insert(Box::new(SuspendedJobsGuardConfig::with_message(
+                "stopped\n",
+            )));
         let args = Field::dummies(["-f"]);
 
         let actual_result = main(&mut env, args).now_or_never().unwrap();
