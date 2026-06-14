@@ -42,6 +42,12 @@ use std::cell::RefCell;
 /// is obtained, an error occurs, or this process is repeated 50 times.
 ///
 /// [`Interactive`]: crate::option::Interactive
+///
+/// For the top-level interactive read loop, prefer [`EofGuard`] over this
+/// decorator. [`EofGuard`] also handles the case where there are suspended
+/// jobs, which this decorator does not.
+///
+/// [`EofGuard`]: crate::input::EofGuard
 #[derive(Debug)]
 pub struct IgnoreEof<'a, 'b, S, T> {
     /// Inner input to read from

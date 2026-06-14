@@ -101,6 +101,11 @@ For each step, in order:
    straightforward. Avoid `git add -A`/`git add .` only if unrelated changes
    somehow remain in the tree.
 
+   **Always include `Cargo.lock`** in any commit that bumps a crate version
+   in `Cargo.toml`. Cargo updates `Cargo.lock` automatically when you run
+   `cargo test` or `cargo build`, and forgetting to stage it leaves the lock
+   file inconsistent with the manifests.
+
 5. **Write the commit message.**
    Follow the project convention — see
    [commit-message skill](../commit-message/SKILL.md):

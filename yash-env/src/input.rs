@@ -16,6 +16,33 @@
 
 //! Methods about passing [source](crate::source) code to the
 //! [parser](crate::parser).
+//!
+//! # Input decorators
+//!
+//! The [`Input`] trait is the core abstraction for reading source code lines.
+//! Several decorators wrap an inner [`Input`] to add behavior:
+//!
+//! | Type | Purpose |
+//! |------|---------|
+//! | [`Memory`] | In-memory input from a pre-loaded string |
+//! | [`FdReader2`] | Reads from a file descriptor asynchronously |
+//! | [`Echo`] | Echoes each line read to stderr (for the `verbose` option) |
+//! | [`IgnoreEof`] | Retries on EOF when the `ignore-eof` option is on (simple interactive use) |
+//! | [`Reporter`] | Reports job status changes before each prompt |
+//! | [`EofGuard`] | Combines suspended-jobs protection with `ignore-eof` retry; prefer over [`IgnoreEof`] for the interactive read loop |
+//!
+//! ## Configuration stored in `env.any`
+//!
+//! [`EofGuard`] reads its behavior configuration from
+//! [`SuspendedJobsGuardConfig`] and [`IgnoreEofConfig`] stored in
+//! [`Env::any`](crate::Env::any):
+//!
+//! - [`SuspendedJobsGuardConfig`]: enables the suspended-jobs protection in
+//!   [`EofGuard`] (and any other component that opts in). If absent, the
+//!   protection is disabled.
+//! - [`IgnoreEofConfig`]: enables the `ignore-eof` retry behavior in
+//!   [`EofGuard`]. If absent, EOF is not retried even when the `ignore-eof`
+//!   option is on.
 
 use std::ops::DerefMut;
 use std::pin::Pin;
@@ -129,3 +156,6 @@ pub use ignore_eof::IgnoreEof;
 
 mod reporter;
 pub use reporter::Reporter;
+
+mod eof_guard;
+pub use eof_guard::{EofGuard, IgnoreEofConfig, SuspendedJobsGuardConfig};
