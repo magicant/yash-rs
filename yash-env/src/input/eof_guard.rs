@@ -27,11 +27,10 @@ use std::cell::RefCell;
 
 /// Configuration for the suspended-jobs exit guard.
 ///
-/// When present in [`Env::any`](crate::Env::any), [`EofGuard`] and other
-/// components that guard against accidental exit refuse to exit when there are
-/// suspended jobs, printing [`message`](Self::message) to warn the user.
-///
-/// If absent from `env.any`, the suspended-job protection is disabled.
+/// When present in [`Env::any`](crate::Env::any), [`EofGuard`] refuses to exit
+/// when there are suspended jobs, printing [`message`](Self::message) to warn
+/// the user. Other components may also opt in to this protection by checking
+/// for this config.
 ///
 /// Store this config in the environment with
 /// `env.any.insert(Box::new(config))`.
@@ -63,6 +62,8 @@ impl SuspendedJobsGuardConfig {
 ///
 /// Store this config in the environment with
 /// `env.any.insert(Box::new(config))`.
+///
+/// Note that [`IgnoreEof`](crate::input::IgnoreEof) is not affected by this config.
 #[derive(Clone, Debug, Default)]
 #[non_exhaustive]
 pub struct IgnoreEofConfig {
