@@ -163,17 +163,13 @@ impl<S: Isatty + WriteAll, T: Input> Input for EofGuard<'_, '_, S, T> {
             }
 
             // TODO: skip the suspended-jobs check in PosixlyCorrect mode
-            let has_suspended = env.jobs.iter().any(|(_, job)| job.state.is_stopped());
-
-            if has_suspended {
-                let Some(config) = env.any.get::<SuspendedJobsGuardConfig>() else {
-                    return Ok(line);
-                };
+            if let Some(config) = env.any.get::<SuspendedJobsGuardConfig>()
+                && env.jobs.iter().any(|(_, job)| job.state.is_stopped())
+            {
                 env.system.print_error(&config.message).await;
-            } else if env.options.get(IgnoreEofOption) == On {
-                let Some(config) = env.any.get::<IgnoreEofConfig>() else {
-                    return Ok(line);
-                };
+            } else if env.options.get(IgnoreEofOption) == On
+                && let Some(config) = env.any.get::<IgnoreEofConfig>()
+            {
                 env.system.print_error(&config.message).await;
             } else {
                 return Ok(line);
@@ -557,6 +553,42 @@ mod tests {
             .unwrap();
         assert_eq!(result.unwrap(), "");
         assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
+    }
+
+    // The two guards are independent: even when a suspended job exists, if the
+    // suspended-jobs guard is not configured, the ignore-eof guard still applies
+    // when the `ignore-eof` option is on and `IgnoreEofConfig` is present.
+    #[test]
+    fn decorator_falls_back_to_ignore_eof_when_no_suspended_jobs_config() {
+        let mut system = VirtualSystem::new();
+        set_stdin_to_tty(&mut system);
+        let state = system.state.clone();
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Interactive, On);
+        env.options.set(IgnoreEofOption, On);
+        let mut job = Job::new(Pid(42));
+        job.state = ProcessState::stopped(crate::system::r#virtual::SIGTSTP);
+        env.jobs.insert(job);
+        // Only IgnoreEofConfig is present; SuspendedJobsGuardConfig is absent
+        env.any.insert(Box::new(IgnoreEofConfig {
+            message: "EOF ignored\n".to_string(),
+        }));
+        let ref_env = RefCell::new(&mut env);
+        let mut decorator = EofGuard::new(
+            EofStub {
+                inner: Memory::new("echo foo\n"),
+                count: 1,
+            },
+            Fd::STDIN,
+            &ref_env,
+        );
+
+        let result = decorator
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result.unwrap(), "echo foo\n");
+        assert_stderr(&state, |stderr| assert_eq!(stderr, "EOF ignored\n"));
     }
 
     #[test]
