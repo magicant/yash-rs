@@ -64,6 +64,7 @@
 			"itertools",
 			"libc",
 			"lseek",
+			"MSRV",
 			"multibyte",
 			"noclobber",
 			"nonblocking",
