@@ -49,13 +49,16 @@ This workspace contains `yash-*` crates. See root [Cargo.toml](Cargo.toml) for c
 
 ## Versioning and changelog rules
 
-For behavior/API changes, follow the PR checklist in
-[.github/pull_request_template.md](.github/pull_request_template.md):
+For behavior/API changes, use the `bump-versions` skill
+([.agents/skills/bump-versions/SKILL.md](.agents/skills/bump-versions/SKILL.md)),
+which is the canonical procedure for the workspace's versioning and changelog
+rules:
 
 - Bump affected crate versions in each crate `Cargo.toml`.
 - Sync workspace dependency versions in root [Cargo.toml](Cargo.toml).
 - Update affected crate changelogs (`[x.y.z] - Unreleased`, categorized entries).
-- If behavior changes are user-visible, update docs in [docs/src](docs/src/).
+- If behavior changes are user-visible, update docs in [docs/src](docs/src/)
+  (handled by the `update-docs` skill, which `bump-versions` defers to).
 
 ## Review focus for code changes
 

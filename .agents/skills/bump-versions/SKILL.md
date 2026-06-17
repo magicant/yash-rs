@@ -6,10 +6,11 @@ argument-hint: 'Which crates/behavior changed in this PR?'
 
 # Bump Versions and Sync Release Metadata
 
-This skill encodes the version- and changelog-related rules from
-[.github/pull_request_template.md](../../../.github/pull_request_template.md),
-plus a few finer-grained conventions agreed with the maintainer that the
-template does not yet spell out.
+This skill is the **canonical procedure** for the workspace's version- and
+changelog-related rules. The
+[PR template](../../../.github/pull_request_template.md) deliberately omits these
+details so contributors are not burdened with them; the maintainer applies them
+at review time using this skill.
 
 Use this skill after the code for a PR is written, to make the repository's
 release metadata consistent with the changes: crate version numbers, the root
