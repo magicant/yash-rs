@@ -13,6 +13,13 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.18.2] - Unreleased
+
+### Changed
+
+- The `exit` built-in no longer refuses to exit when there are suspended jobs
+  if the `posixlycorrect` option is on.
+
 ## [0.18.1] - 2026-06-15
 
 ### Added
@@ -830,6 +837,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
+[0.18.2]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.18.2
 [0.18.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.18.1
 [0.18.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.18.0
 [0.17.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.17.0

@@ -133,7 +133,7 @@
 - [`pipefail` shell option](environment/options.md#pipefail)
 - [pipeline](language/commands/pipelines.md)
 - [positional parameter](language/parameters/positional.md)
-- [POSIX](versioning.md#posix-conformance)
+- [POSIX](posix.md)
 - [`posixlycorrect` shell option](environment/options.md#posixlycorrect)
 - [`PPID` variable](language/parameters/variables.md#ppid)
 - [previous job](interactive/job_control.md#current-and-previous-jobs)

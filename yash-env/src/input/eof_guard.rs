@@ -20,7 +20,7 @@
 use super::{Context, Input, Result};
 use crate::Env;
 use crate::io::Fd;
-use crate::option::{IgnoreEof as IgnoreEofOption, Interactive, Off, On};
+use crate::option::{IgnoreEof as IgnoreEofOption, Interactive, Off, On, PosixlyCorrect};
 use crate::system::Isatty;
 use crate::system::concurrency::WriteAll;
 use std::cell::RefCell;
@@ -91,8 +91,9 @@ impl IgnoreEofConfig {
 /// conditions is met (provided the shell is interactive, the input is a
 /// terminal, and the retry limit has not been reached):
 ///
-/// 1. There are suspended jobs and [`SuspendedJobsGuardConfig`] is present in
-///    `env.any` — prints [`SuspendedJobsGuardConfig::message`].
+/// 1. [`SuspendedJobsGuardConfig`] is present in `env.any`, the
+///    [`PosixlyCorrect`] option is off, and there are suspended jobs —
+///    prints [`SuspendedJobsGuardConfig::message`].
 /// 2. The `ignore-eof` option is enabled and [`IgnoreEofConfig`] is present in
 ///    `env.any` — prints [`IgnoreEofConfig::message`].
 ///
@@ -162,8 +163,8 @@ impl<S: Isatty + WriteAll, T: Input> Input for EofGuard<'_, '_, S, T> {
                 return Ok(line);
             }
 
-            // TODO: skip the suspended-jobs check in PosixlyCorrect mode
-            if let Some(config) = env.any.get::<SuspendedJobsGuardConfig>()
+            if env.options.get(PosixlyCorrect) == Off
+                && let Some(config) = env.any.get::<SuspendedJobsGuardConfig>()
                 && env.jobs.iter().any(|(_, job)| job.state.is_stopped())
             {
                 env.system.print_error(&config.message).await;
@@ -520,6 +521,38 @@ mod tests {
         assert_stderr(&state, |stderr| {
             assert_eq!(stderr, "There are stopped jobs.\n")
         });
+    }
+
+    #[test]
+    fn decorator_returns_immediately_if_posixly_correct_with_suspended_jobs() {
+        let mut system = VirtualSystem::new();
+        set_stdin_to_tty(&mut system);
+        let state = system.state.clone();
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Interactive, On);
+        env.options.set(PosixlyCorrect, On);
+        let mut job = Job::new(Pid(42));
+        job.state = ProcessState::stopped(crate::system::r#virtual::SIGTSTP);
+        env.jobs.insert(job);
+        env.any.insert(Box::new(SuspendedJobsGuardConfig {
+            message: "There are stopped jobs.\n".to_string(),
+        }));
+        let ref_env = RefCell::new(&mut env);
+        let mut decorator = EofGuard::new(
+            EofStub {
+                inner: Memory::new("echo foo\n"),
+                count: 1,
+            },
+            Fd::STDIN,
+            &ref_env,
+        );
+
+        let result = decorator
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result.unwrap(), "");
+        assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
     }
 
     // Counterpart to `decorator_ignores_eof_when_there_are_suspended_jobs`:

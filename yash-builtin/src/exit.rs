@@ -45,13 +45,14 @@
 //!
 //! ## Suspended-jobs protection
 //!
-//! When [`yash_env::input::SuspendedJobsGuardConfig`] is present in `env.any`,
-//! the built-in refuses to exit if there are suspended jobs and the `-f` option
-//! is not given. It prints the configured message and returns
-//! [`Divert::Interrupt`] with exit status 1.
+//! When [`SuspendedJobsGuardConfig`] is present in `env.any` and the
+//! [`PosixlyCorrect`] option is off, the built-in refuses to exit if there are
+//! suspended jobs and the `-f` option is not given. It prints the configured
+//! message and returns [`Divert::Interrupt`] with exit status 1.
 //!
-//! If `SuspendedJobsGuardConfig` is absent from `env.any`, the check is
-//! skipped and the built-in exits normally.
+//! If `SuspendedJobsGuardConfig` is absent from `env.any`, or the
+//! `PosixlyCorrect` option is on, the check is skipped and the built-in exits
+//! normally.
 //!
 //! Note: [`yash_env::input::IgnoreEofConfig`] is used by
 //! [`yash_env::input::EofGuard`] for the `ignore-eof` option behavior and is
@@ -64,6 +65,8 @@ use std::ops::ControlFlow::Break;
 use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::input::SuspendedJobsGuardConfig;
+use yash_env::option::Off;
+use yash_env::option::Option::PosixlyCorrect;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -108,9 +111,9 @@ where
             Err(e) => return operand_parse_error(env, &arg.origin, e).await,
         },
     };
-    // TODO: skip this check in PosixlyCorrect mode
     if !force
         && env.is_interactive()
+        && env.options.get(PosixlyCorrect) == Off
         && let Some(config) = env.any.get::<SuspendedJobsGuardConfig>()
         && env.jobs.iter().any(|(_, job)| job.state.is_stopped())
     {
@@ -294,7 +297,27 @@ mod tests {
         assert_stderr(&state, |stderr| assert_eq!(stderr, "stopped\n"));
     }
 
-    // TODO exit_from_interactive_shell_with_suspended_job_in_posix_mode
+    #[test]
+    fn exit_from_interactive_shell_with_suspended_job_in_posix_mode() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Interactive, On);
+        env.options.set(PosixlyCorrect, On);
+        let mut job = Job::new(Pid(42));
+        job.state = ProcessState::stopped(SIGTSTP);
+        env.jobs.insert(job);
+        env.any
+            .insert(Box::new(SuspendedJobsGuardConfig::with_message(
+                "stopped\n",
+            )));
+
+        let actual_result = main(&mut env, vec![]).now_or_never().unwrap();
+        let expected_result =
+            Result::with_exit_status_and_divert(ExitStatus::SUCCESS, Break(Divert::Exit(None)));
+        assert_eq!(actual_result, expected_result);
+        assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
+    }
 
     #[test]
     fn force_exit_from_interactive_shell_with_suspended_job() {
