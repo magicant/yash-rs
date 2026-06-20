@@ -72,6 +72,16 @@ In yash-rs, the following elective built-in is implemented:
 
 More may be added in the future.
 
+### Extension built-ins
+
+**Extension built-ins** are non-conforming extensions to the POSIX shell that are not permitted by POSIX Command Search and Execution.
+
+Like [elective built-ins](#elective-built-ins), they can be found in [command search](../language/commands/simple.md#command-search) without a corresponding executable in `PATH`, and they can be overridden by [functions].
+
+When the [`posixlycorrect` option](../environment/options.md#posixlycorrect) is set, extension built-ins are **ignored**: they are treated as non-existing during command search, so the shell falls through to searching for an external utility with the same name.
+
+No extension built-ins are implemented in yash-rs yet.
+
 ### Substitutive built-ins
 
 **Substitutive built-ins** replace external utilities to avoid process creation overhead for common tasks.

@@ -13,3 +13,6 @@ Many features of yash-rs are still under development, and some may not yet be fu
 Some behaviors of yash-rs prioritize convenience over POSIX compliance. The [`posixlycorrect` option](environment/options.md#posixlycorrect) disables such features. When this option is set:
 
 - The shell no longer refuses to exit because of suspended jobs when the [`exit` built-in](builtins/exit.md) is executed or end-of-file is reached in an interactive shell. (See [Suspended jobs](termination.md#suspended-jobs).)
+- [Extension built-ins](builtins/index.html#extension-built-ins) are ignored (treated as non-existing), so the shell falls through to searching for an external utility with the same name.
+
+This list may be expanded in the future as more features are added to the shell.

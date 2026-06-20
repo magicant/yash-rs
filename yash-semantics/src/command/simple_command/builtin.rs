@@ -62,7 +62,7 @@ pub async fn execute_builtin<S: Runtime + 'static>(
     };
 
     let result = 'result: {
-        // TODO Reject elective and extension built-ins in POSIX mode
+        // TODO Reject elective and extension built-ins in portable mode
 
         let is_special = builtin.r#type == Special;
         let (mut env, export) = if is_special {

@@ -81,13 +81,15 @@ pub enum Type {
     /// Extension built-ins are non-conformant extensions to the POSIX shell.
     /// Like elective built-ins, they can be executed without `$PATH` search
     /// finding a corresponding external utility. However, since this behavior
-    /// does not conform to [Command
-    /// Search and Execution](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_09_01_04)
-    /// in POSIX XCU section 2.9.1.4, they cannot be used when the (TODO TBD)
-    /// option is set. <!-- An option that disables non-conforming behavior
-    /// would make extension built-ins regarded as non-existing utilities. An
-    /// option that disables non-portable behavior would make extension
-    /// built-ins unusable even if found. -->
+    /// does not conform to [Command Search and
+    /// Execution](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_09_01_04)
+    /// in POSIX XCU section 2.9.1.4:
+    ///
+    /// - When the [`PosixlyCorrect`](crate::option::PosixlyCorrect) option is
+    ///   on, they are ignored: they are regarded as non-existing utilities so
+    ///   that the command search falls through to external utilities.
+    /// - When the (TODO TBD) option is on, they cannot be used even if found
+    ///   in command search.
     Extension,
 
     /// Built-in that works like a standalone utility

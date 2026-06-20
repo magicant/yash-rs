@@ -119,7 +119,7 @@ Redirections are canceled unless the target was the [`exec` special built-in](..
 1. If the command name contains a slash (`/`), it is treated as a pathname to an executable file target, regardless of whether the file exists or is executable.
 2. If the command name is a [special built-in] (like [`exec`](../../builtins/exec.md) or [`exit`](../../builtins/exit.md)), it is used as the target.
 3. If the command name is a [function], it is used as the target.
-4. If the command name is a [built-in] other than a [substitutive built-in], it is used as the target. <!-- TODO: reject elective and extension built-ins in POSIX mode -->
+4. If the command name is a [built-in] other than a [substitutive built-in], it is used as the target. [Extension built-ins] are excluded from this step when the [`posixlycorrect` option](../../environment/options.md#posixlycorrect) is on. <!-- TODO: reject elective and extension built-ins in portable mode -->
 5. The shell searches for the command name in the directories listed in the `PATH` [variable](../parameters/variables.md). The first matching executable regular file is a candidate target.
     - The value of `PATH` is treated as a sequence of pathnames separated by colons (`:`). An empty pathname in `PATH` refers to the current [working directory](../../environment/working_directory.md). For example, in the simple command `PATH=/bin:/usr/bin: ls`, the shell searches for `ls` in `/bin`, then `/usr/bin`, and finally the current directory.
     - If `PATH` is an array, each element is a pathname to search.
@@ -141,6 +141,7 @@ POSIX allows caching pathnames found during command search, but yash-rs does not
     - 126 if the target was identified but could not be executed (e.g., unsupported file type or permission denied)
 
 [built-in]: ../../builtins/index.html
+[Extension built-ins]: ../../builtins/index.html#extension-built-ins
 [function]: ../functions.md
 [shell environment]: ../../environment/index.html
 [special built-in]: ../../builtins/index.html#special-built-ins

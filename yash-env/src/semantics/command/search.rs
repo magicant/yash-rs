@@ -33,13 +33,18 @@
 //! as a target, a corresponding executable file must be present in a directory
 //! specified in the `PATH` variable.
 //!
+//! [Extension] built-ins are ignored (treated
+//! as non-existing) when the [`PosixlyCorrect`] option is on, so the search
+//! falls through to external utilities in that case.
+//!
 //! [command search]: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_09_01_04
 //! [simple command]: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_09_01
 
 use crate::Env;
 use crate::builtin::Builtin;
-use crate::builtin::Type::{Special, Substitutive};
+use crate::builtin::Type::{Extension, Special, Substitutive};
 use crate::function::Function;
+use crate::option::{On, PosixlyCorrect};
 use crate::path::PathBuf;
 use crate::system::IsExecutableFile;
 use crate::variable::Expansion;
@@ -214,7 +219,9 @@ impl<S: IsExecutableFile> PathEnv for Env<S> {
 
 impl<S> ClassifyEnv<S> for Env<S> {
     fn builtin(&self, name: &str) -> Option<Builtin<S>> {
-        self.builtins.get(name).copied()
+        let builtin = self.builtins.get(name).copied()?;
+        let available = builtin.r#type != Extension || self.options.get(PosixlyCorrect) != On;
+        available.then_some(builtin)
     }
 
     #[inline]
@@ -339,11 +346,64 @@ mod tests {
     use super::*;
     use crate::builtin::Type::{Elective, Extension, Mandatory};
     use crate::function::{FunctionBody, FunctionBodyObject, FunctionSet};
+    use crate::option::Off;
     use crate::source::Location;
     use crate::variable::Value;
     use assert_matches::assert_matches;
     use std::collections::HashMap;
     use std::collections::HashSet;
+
+    #[test]
+    fn env_builtin_returns_special_builtin() {
+        let mut env = Env::new_virtual();
+        let builtin = Builtin::new(Special, |_, _| unreachable!());
+        env.builtins.insert("foo", builtin);
+        assert_eq!(env.builtin("foo"), Some(builtin));
+    }
+
+    #[test]
+    fn env_builtin_returns_mandatory_builtin() {
+        let mut env = Env::new_virtual();
+        let builtin = Builtin::new(Mandatory, |_, _| unreachable!());
+        env.builtins.insert("foo", builtin);
+        assert_eq!(env.builtin("foo"), Some(builtin));
+    }
+
+    #[test]
+    fn env_builtin_returns_elective_builtin() {
+        let mut env = Env::new_virtual();
+        let builtin = Builtin::new(Elective, |_, _| unreachable!());
+        env.builtins.insert("foo", builtin);
+        assert_eq!(env.builtin("foo"), Some(builtin));
+    }
+
+    #[test]
+    fn env_builtin_returns_extension_builtin_if_not_posixly_correct() {
+        let mut env = Env::new_virtual();
+        let builtin = Builtin::new(Extension, |_, _| unreachable!());
+        env.builtins.insert("foo", builtin);
+        assert_eq!(env.options.get(PosixlyCorrect), Off);
+        assert_eq!(env.builtin("foo"), Some(builtin));
+    }
+
+    #[test]
+    fn env_builtin_does_not_return_extension_builtin_if_posixly_correct() {
+        let mut env = Env::new_virtual();
+        env.options.set(PosixlyCorrect, On);
+        let builtin = Builtin::new(Extension, |_, _| unreachable!());
+        env.builtins.insert("foo", builtin);
+        assert_eq!(env.builtin("foo"), None);
+    }
+
+    #[test]
+    fn env_builtin_returns_substitutive_builtin() {
+        // The `$PATH` check for substitutive built-ins is part of `search`, not
+        // `builtin`, so `builtin` returns the built-in regardless of `$PATH`.
+        let mut env = Env::new_virtual();
+        let builtin = Builtin::new(Substitutive, |_, _| unreachable!());
+        env.builtins.insert("foo", builtin);
+        assert_eq!(env.builtin("foo"), Some(builtin));
+    }
 
     #[derive(Default)]
     struct DummyEnv {
