@@ -33,13 +33,18 @@
 //! as a target, a corresponding executable file must be present in a directory
 //! specified in the `PATH` variable.
 //!
+//! [Extension] built-ins are ignored (treated
+//! as non-existing) when the [`PosixlyCorrect`] option is on, so the search
+//! falls through to external utilities in that case.
+//!
 //! [command search]: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_09_01_04
 //! [simple command]: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_09_01
 
 use crate::Env;
 use crate::builtin::Builtin;
-use crate::builtin::Type::{Special, Substitutive};
+use crate::builtin::Type::{Extension, Special, Substitutive};
 use crate::function::Function;
+use crate::option::{On, PosixlyCorrect};
 use crate::path::PathBuf;
 use crate::system::IsExecutableFile;
 use crate::variable::Expansion;
@@ -214,7 +219,9 @@ impl<S: IsExecutableFile> PathEnv for Env<S> {
 
 impl<S> ClassifyEnv<S> for Env<S> {
     fn builtin(&self, name: &str) -> Option<Builtin<S>> {
-        self.builtins.get(name).copied()
+        let builtin = self.builtins.get(name).copied()?;
+        let available = builtin.r#type != Extension || self.options.get(PosixlyCorrect) != On;
+        available.then_some(builtin)
     }
 
     #[inline]
@@ -767,5 +774,17 @@ mod tests {
         assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
             assert_eq!(*path, *c"foo");
         });
+    }
+
+    #[test]
+    fn extension_builtin_is_ignored_when_posixly_correct() {
+        let mut env = Env::new_virtual();
+        env.options.set(PosixlyCorrect, On);
+        env.builtins
+            .insert("foo", Builtin::new(Extension, |_, _| unreachable!()));
+
+        let target = search(&mut env, "foo");
+        assert!(target.is_none(), "target = {target:?}");
+        assert_matches!(classify(&env, "foo"), Target::External { .. });
     }
 }
