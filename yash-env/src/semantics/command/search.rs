@@ -346,11 +346,64 @@ mod tests {
     use super::*;
     use crate::builtin::Type::{Elective, Extension, Mandatory};
     use crate::function::{FunctionBody, FunctionBodyObject, FunctionSet};
+    use crate::option::Off;
     use crate::source::Location;
     use crate::variable::Value;
     use assert_matches::assert_matches;
     use std::collections::HashMap;
     use std::collections::HashSet;
+
+    #[test]
+    fn env_builtin_returns_special_builtin() {
+        let mut env = Env::new_virtual();
+        let builtin = Builtin::new(Special, |_, _| unreachable!());
+        env.builtins.insert("foo", builtin);
+        assert_eq!(env.builtin("foo"), Some(builtin));
+    }
+
+    #[test]
+    fn env_builtin_returns_mandatory_builtin() {
+        let mut env = Env::new_virtual();
+        let builtin = Builtin::new(Mandatory, |_, _| unreachable!());
+        env.builtins.insert("foo", builtin);
+        assert_eq!(env.builtin("foo"), Some(builtin));
+    }
+
+    #[test]
+    fn env_builtin_returns_elective_builtin() {
+        let mut env = Env::new_virtual();
+        let builtin = Builtin::new(Elective, |_, _| unreachable!());
+        env.builtins.insert("foo", builtin);
+        assert_eq!(env.builtin("foo"), Some(builtin));
+    }
+
+    #[test]
+    fn env_builtin_returns_extension_builtin_if_not_posixly_correct() {
+        let mut env = Env::new_virtual();
+        let builtin = Builtin::new(Extension, |_, _| unreachable!());
+        env.builtins.insert("foo", builtin);
+        assert_eq!(env.options.get(PosixlyCorrect), Off);
+        assert_eq!(env.builtin("foo"), Some(builtin));
+    }
+
+    #[test]
+    fn env_builtin_does_not_return_extension_builtin_if_posixly_correct() {
+        let mut env = Env::new_virtual();
+        env.options.set(PosixlyCorrect, On);
+        let builtin = Builtin::new(Extension, |_, _| unreachable!());
+        env.builtins.insert("foo", builtin);
+        assert_eq!(env.builtin("foo"), None);
+    }
+
+    #[test]
+    fn env_builtin_returns_substitutive_builtin() {
+        // The `$PATH` check for substitutive built-ins is part of `search`, not
+        // `builtin`, so `builtin` returns the built-in regardless of `$PATH`.
+        let mut env = Env::new_virtual();
+        let builtin = Builtin::new(Substitutive, |_, _| unreachable!());
+        env.builtins.insert("foo", builtin);
+        assert_eq!(env.builtin("foo"), Some(builtin));
+    }
 
     #[derive(Default)]
     struct DummyEnv {
@@ -774,17 +827,5 @@ mod tests {
         assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
             assert_eq!(*path, *c"foo");
         });
-    }
-
-    #[test]
-    fn extension_builtin_is_ignored_when_posixly_correct() {
-        let mut env = Env::new_virtual();
-        env.options.set(PosixlyCorrect, On);
-        env.builtins
-            .insert("foo", Builtin::new(Extension, |_, _| unreachable!()));
-
-        let target = search(&mut env, "foo");
-        assert!(target.is_none(), "target = {target:?}");
-        assert_matches!(classify(&env, "foo"), Target::External { .. });
     }
 }
