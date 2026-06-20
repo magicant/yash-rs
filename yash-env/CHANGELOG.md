@@ -17,11 +17,12 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
-- The `semantics::command::search` functions now ignore
-  `builtin::Type::Extension` built-ins when the `posixlycorrect` option is
-  on, treating them as non-existing and falling through to external utilities.
+- The `ClassifyEnv` implementation for `Env` now returns `None` from `builtin`
+  for `builtin::Type::Extension` built-ins when the `posixly-correct` option is
+  on. As a result, the `semantics::command::search` functions treat such
+  built-ins as non-existing and fall through to external utilities.
 - `input::EofGuard` no longer blocks exit on EOF when there are suspended jobs
-  if the `posixlycorrect` option is on.
+  if the `posixly-correct` option is on.
 
 ## [0.15.1] - 2026-06-15
 
