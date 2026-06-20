@@ -13,6 +13,13 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.15.2] - Unreleased
+
+### Changed
+
+- `input::EofGuard` no longer blocks exit on EOF when there are suspended jobs
+  if the `posixlycorrect` option is on.
+
 ## [0.15.1] - 2026-06-15
 
 ### Added
@@ -1388,6 +1395,7 @@ This version has been yanked due to an issue that prevents the crate from buildi
 
 - Initial implementation of the `yash-env` crate
 
+[0.15.2]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.15.2
 [0.15.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.15.1
 [0.15.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.15.0
 [0.14.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.14.0
