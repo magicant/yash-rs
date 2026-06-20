@@ -42,6 +42,8 @@ This applies not only when end-of-file is reached but also when you use the [`ex
 
 This protection is only effective in [interactive shells](interactive/index.html). When it is triggered by end-of-file, the input must additionally be a terminal, and—as a safeguard against an input that repeatedly delivers EOF—entering 50 `eof` sequences in a row will still cause the shell to exit. The `exit` built-in, by contrast, refuses to exit whenever the shell is interactive, regardless of the input type.
 
+(Since 3.2.1) This protection can be disabled by setting the [`posixlycorrect` option](environment/options.md#posixlycorrect).
+
 ## Exiting subshells
 
 When one of the above conditions occurs in a [subshell](environment/index.html#subshells), the subshell exits. It does not directly cause the parent shell to exit, but the [exit status] of the subshell may affect the parent shell's behavior, conditionally causing it to exit if the `errexit` option is set.

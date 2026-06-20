@@ -9,6 +9,7 @@
 
 - [Installation](installation.md)
 - [Getting started](getting_started.md)
+- [POSIX compliance](posix.md)
 - [Versioning and compatibility](versioning.md)
 - [Shell language](language/README.md)
     - [Words, tokens, and fields](language/words/README.md)

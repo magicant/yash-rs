@@ -126,7 +126,7 @@ pub enum Option {
     Notify,
     /// Makes a pipeline reflect the exit status of the last failed component.
     PipeFail,
-    /// Disables most non-POSIX extensions.
+    /// Disables POSIX-incompatible features.
     PosixlyCorrect,
     /// Reads commands from the standard input.
     Stdin,
