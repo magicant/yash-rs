@@ -17,8 +17,9 @@ fi
 for package do
     version=$(cargo metadata --format-version=1 --no-deps --all-features |
         jq -r '.packages[] | select(.name == "'"$package"'") | .version')
-    if curl --fail --location --silent \
-        "https://crates.io/api/v1/crates/$package/$version" >/dev/null; then
+    # (This cargo command must be run outside this workspace,
+    # otherwise it will always find the dependency in the workspace.)
+    if (cd / && cargo info --quiet "$package@$version" >/dev/null 2>&1); then
         printf 'error: %s %s is already released\n' "$package" "$version" >&2
         printf 'bump the version in Cargo.toml and try again\n' >&2
         exit 1
@@ -50,7 +51,9 @@ while read -r dependency version; do
     version=${version#^}
     
     ## Check if the dependency is already released
-    if cargo info --quiet "$dependency@$version" >/dev/null; then
+    ## (This cargo command must be run outside this workspace,
+    ## otherwise it will always find the dependency in the workspace.)
+    if (cd / && cargo info --quiet "$dependency@$version" >/dev/null); then
         continue
     fi
 
