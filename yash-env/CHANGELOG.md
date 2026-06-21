@@ -13,6 +13,14 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.15.3] - Unreleased
+
+### Added
+
+- `option::Option::Portable` has been added. This option is intended to disable
+  non-portable features of the shell. It currently has no effect; behavior will
+  be added in future releases.
+
 ## [0.15.2] - 2026-06-21
 
 ### Changed

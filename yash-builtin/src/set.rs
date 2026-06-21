@@ -287,6 +287,7 @@ login            off
 monitor          off
 notify           off
 pipefail         off
+portable         off
 posixlycorrect   off
 stdin            off
 unset            off
