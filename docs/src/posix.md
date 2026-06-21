@@ -16,3 +16,11 @@ Some behaviors of yash-rs prioritize convenience over POSIX compliance. The [`po
 - [Extension built-ins](builtins/index.html#extension-built-ins) are ignored (treated as non-existing), so the shell falls through to searching for an external utility with the same name.
 
 This list may be expanded in the future as more features are added to the shell.
+
+## Writing portable scripts
+
+Even when yash-rs conforms to POSIX, it also implements extensions that POSIX does not specify. Such extensions are convenient, but scripts that rely on them may not run on other shells. The [`portable` option](environment/options.md#portable) helps you catch this: when set, the shell rejects or ignores non-portable features so that you can verify a script uses only portable constructs.
+
+Unlike [`posixlycorrect`](environment/options.md#posixlycorrect), which changes how the shell behaves to maximize POSIX conformance, `portable` does not alter the behavior of POSIX-conformant constructs. It only restricts the shell to features that are portable across POSIX-conforming shells, reporting an error or ignoring a feature when a non-portable construct is used. The two options are independent and can be combined.
+
+⚠️ The `portable` option currently has no effect. The behaviors it will affect are being implemented incrementally and will be listed here as they are added.
