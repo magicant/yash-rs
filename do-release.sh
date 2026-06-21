@@ -160,9 +160,7 @@ for cargofile in $(grep -Flx 'publish = true' -- */Cargo.toml); do
     mv "$cargofile.tmp" "$cargofile"
     git add "$cargofile"
 done
-git status --short
-printf 'confirm and commit the changes to the above files:\n'
-printf 'git commit --message "Prevent accidental publishing"\n'
+git commit --message "Prevent accidental publishing"
 
 if [ "$released_cli" ]; then
     printf 'confirm and publish the release when a draft is ready:\n'
