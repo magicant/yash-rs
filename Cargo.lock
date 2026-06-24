@@ -867,7 +867,7 @@ version = "1.1.2"
 
 [[package]]
 name = "yash-semantics"
-version = "0.17.0"
+version = "0.17.1"
 dependencies = [
  "assert_matches",
  "either",
@@ -885,7 +885,7 @@ dependencies = [
 
 [[package]]
 name = "yash-syntax"
-version = "0.22.0"
+version = "0.22.1"
 dependencies = [
  "assert_matches",
  "futures-executor",

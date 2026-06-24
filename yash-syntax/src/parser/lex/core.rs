@@ -164,6 +164,7 @@ struct LexerCore<'a> {
     raw_code: Rc<Code>,
     source: Vec<SourceCharEx>,
     index: usize,
+    mode: yash_env::parser::Mode,
 }
 
 impl<'a> LexerCore<'a> {
@@ -184,6 +185,7 @@ impl<'a> LexerCore<'a> {
             state: InputState::Alive,
             source: Vec::new(),
             index: 0,
+            mode: yash_env::parser::Mode::default(),
         }
     }
 
@@ -554,8 +556,10 @@ impl<'a> From<yash_env::parser::Config<'a>> for Lexer<'a> {
         let input = config.input;
         let start_line_number = config.start_line_number;
         let source = config.source.unwrap_or_else(|| Rc::new(Source::Unknown));
+        let mut core = LexerCore::new(input, start_line_number, source);
+        core.mode = config.mode;
         Lexer {
-            core: LexerCore::new(input, start_line_number, source),
+            core,
             line_continuation_enabled: true,
         }
     }
@@ -622,6 +626,26 @@ impl<'a> Lexer<'a> {
             config.into()
         }
         inner(code, source.into())
+    }
+
+    /// Returns the parsing mode of this lexer.
+    ///
+    /// The mode reflects shell options that affect which syntax the parser
+    /// accepts (see [`yash_env::parser::Mode`]). Lexer and parser code consult
+    /// it to decide whether to accept or reject non-portable constructs. Lexers
+    /// created without an explicit mode permit all syntax.
+    #[must_use]
+    pub fn mode(&self) -> yash_env::parser::Mode {
+        self.core.mode
+    }
+
+    /// Sets the parsing mode of this lexer.
+    ///
+    /// A read-eval loop typically calls this before parsing each command line so
+    /// that changes to shell options (for example, via the `set` built-in) take
+    /// effect on subsequent parsing.
+    pub fn set_mode(&mut self, mode: yash_env::parser::Mode) {
+        self.core.mode = mode;
     }
 
     /// Disables line continuation recognition onward.
@@ -988,6 +1012,29 @@ mod tests {
     use crate::parser::error::SyntaxError;
     use assert_matches::assert_matches;
     use futures_util::FutureExt as _;
+
+    #[test]
+    fn lexer_mode_defaults_to_permissive() {
+        let lexer = Lexer::with_code("");
+        assert_eq!(lexer.mode(), yash_env::parser::Mode::default());
+    }
+
+    #[test]
+    fn lexer_mode_round_trips() {
+        let mut lexer = Lexer::with_code("");
+        let mut mode = yash_env::parser::Mode::default();
+        mode.portable = true;
+        lexer.set_mode(mode);
+        assert_eq!(lexer.mode(), mode);
+    }
+
+    #[test]
+    fn lexer_from_config_carries_mode() {
+        let mut config = yash_env::parser::Config::with_input(Box::new(Memory::new("")));
+        config.mode.portable = true;
+        let lexer = Lexer::from(config);
+        assert!(lexer.mode().portable);
+    }
 
     #[test]
     fn lexer_core_peek_char_empty_source() {

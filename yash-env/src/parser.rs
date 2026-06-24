@@ -29,10 +29,50 @@
 
 use crate::Env;
 use crate::input::InputObject;
+use crate::option::Option::Portable;
+use crate::option::OptionSet;
 use crate::source::Source;
 use derive_more::Debug;
 use std::num::NonZeroU64;
 use std::rc::Rc;
+
+/// Parsing mode derived from shell options
+///
+/// Some shell options change which syntax the parser accepts. This type conveys
+/// the relevant option states from the shell environment to the parser and
+/// lexer, so that the parser does not need to depend on the whole
+/// [`OptionSet`]. The standard parser ([`yash-syntax`](https://crates.io/crates/yash-syntax))
+/// reads it from the [lexer](crate::parser) and adjusts the syntax it accepts
+/// accordingly.
+///
+/// A `Mode` is typically created from the current option set by converting an
+/// [`OptionSet`] with the [`From`] implementation. The [default](Default) mode
+/// permits all syntax (every field is `false`), so the parser behaves as if no
+/// restricting option were set.
+///
+/// This struct is `#[non_exhaustive]` because more fields may be added as more
+/// parsing-affecting options are supported. You can still create one by starting
+/// from [`Default`] or a converted [`OptionSet`] and assigning to individual
+/// fields.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub struct Mode {
+    /// Whether the parser rejects non-portable syntax
+    ///
+    /// This reflects the [`Portable`] shell option. When `true`, the parser
+    /// reports an error on constructs that are valid in yash but not portable
+    /// across POSIX-conforming shells.
+    pub portable: bool,
+}
+
+/// Creates a `Mode` reflecting the given option set.
+impl From<&OptionSet> for Mode {
+    fn from(options: &OptionSet) -> Self {
+        Mode {
+            portable: options.get(Portable).into(),
+        }
+    }
+}
 
 /// Configuration for the parser
 ///
@@ -76,6 +116,12 @@ pub struct Config<'a> {
     ///
     /// [`Code`]: crate::source::Code
     pub source: Option<Rc<Source>>,
+
+    /// Parsing mode derived from shell options
+    ///
+    /// The parser uses this to decide which syntax to accept. The default value
+    /// is [`Mode::default`], which permits all syntax.
+    pub mode: Mode,
 }
 
 impl<'a> Config<'a> {
@@ -86,6 +132,7 @@ impl<'a> Config<'a> {
             input,
             start_line_number: NonZeroU64::new(1).unwrap(),
             source: None,
+            mode: Mode::default(),
         }
     }
 }
@@ -129,3 +176,37 @@ impl<S> Clone for IsName<S> {
 }
 
 impl<S> Copy for IsName<S> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::option::Option::PosixlyCorrect;
+    use crate::option::State::On;
+
+    #[test]
+    fn mode_default_permits_all_syntax() {
+        assert_eq!(Mode::default(), Mode { portable: false });
+    }
+
+    #[test]
+    fn mode_from_options_reflects_portable() {
+        let mut options = OptionSet::default();
+        assert!(!Mode::from(&options).portable);
+
+        options.set(Portable, On);
+        assert!(Mode::from(&options).portable);
+    }
+
+    #[test]
+    fn mode_from_options_ignores_unrelated_options() {
+        let mut options = OptionSet::default();
+        options.set(PosixlyCorrect, On);
+        assert!(!Mode::from(&options).portable);
+    }
+
+    #[test]
+    fn config_with_input_defaults_to_permissive_mode() {
+        let config = Config::with_input(Box::new(crate::input::Memory::new("")));
+        assert_eq!(config.mode, Mode::default());
+    }
+}
