@@ -16,6 +16,7 @@
 
 //! Definition of errors that happen in the parser
 
+use super::lex::Operator;
 use crate::source::Location;
 use crate::source::pretty::{
     Footnote, FootnoteType, Report, ReportType, Snippet, Span, SpanRole, add_span,
@@ -191,6 +192,11 @@ pub enum SyntaxError {
     UnsupportedDoubleBracketCommand,
     /// A process redirection (`>(...)` or `<(...)`) is used.
     UnsupportedProcessRedirection,
+    /// A `;;&` or `;|` case terminator is used while the `portable` option is on.
+    ///
+    /// The operator is the offending terminator (`SemicolonSemicolonAnd` or
+    /// `SemicolonBar`).
+    NonPortableCaseTerminator(Operator),
 }
 
 impl SyntaxError {
@@ -279,6 +285,7 @@ impl SyntaxError {
             UnsupportedFunctionDefinitionSyntax
             | UnsupportedDoubleBracketCommand
             | UnsupportedProcessRedirection => "unsupported syntax",
+            NonPortableCaseTerminator(_) => "the case terminator is not portable",
         }
     }
 
@@ -361,6 +368,13 @@ impl SyntaxError {
             UnsupportedFunctionDefinitionSyntax => "the `function` keyword is not yet supported",
             UnsupportedDoubleBracketCommand => "the `[[ ... ]]` command is not yet supported",
             UnsupportedProcessRedirection => "process redirection is not yet supported",
+            NonPortableCaseTerminator(Operator::SemicolonSemicolonAnd) => {
+                "`;;&` cannot be used in portable mode"
+            }
+            NonPortableCaseTerminator(Operator::SemicolonBar) => {
+                "`;|` cannot be used in portable mode"
+            }
+            NonPortableCaseTerminator(_) => "this terminator cannot be used in portable mode",
         }
     }
 

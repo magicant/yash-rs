@@ -18,12 +18,18 @@ A _private dependency_ is used internally and not visible to downstream users.
 ### Added
 
 - `parser::lex::Lexer::mode` and `parser::lex::Lexer::set_mode` for querying and
-  updating the parsing mode (`yash_env::parser::Mode`) of a lexer. The parser
-  and lexer will consult the mode to decide which syntax to accept; setting the
-  `portable` mode currently has no effect on parsing yet.
+  updating the parsing mode (`yash_env::parser::Mode`) of a lexer. The parser and
+  lexer consult the mode to decide which syntax to accept.
+- `parser::SyntaxError::NonPortableCaseTerminator`, a new error variant raised
+  when a `;;&` or `;|` case terminator is encountered while the lexer's parsing
+  mode has `portable` enabled.
 
 ### Changed
 
+- The case command parser now rejects the non-portable `;;&` and `;|`
+  terminators with `SyntaxError::NonPortableCaseTerminator` when the lexer's
+  parsing mode has `portable` enabled. Without the mode, the terminators are
+  accepted as before.
 - Public dependency versions:
     - yash-env 0.15.0 → 0.15.3
 

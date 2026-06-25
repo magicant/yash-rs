@@ -218,9 +218,9 @@ Below is a list of all shell options in yash-rs, with their long and short names
 : (Since 3.0.0) If set, the shell returns the [exit status](../language/commands/exit_status.md) of the last command in a [pipeline](../language/commands/pipelines.md) that failed, instead of the last command's exit status. See [Catching errors across pipeline components](../language/commands/pipelines.md#catching-errors-across-pipeline-components) for details.
 
 **`portable`**
-: If set, the shell rejects or ignores non-portable features so that scripts can be checked for portability. See [Writing portable scripts](../posix.md#writing-portable-scripts) for the list of behaviors affected.
-    - ⚠️ Currently has no effect in yash-rs. In the future, it will disable various non-portable extensions.
+: (Since 3.3.0) If set, the shell rejects or ignores non-portable features so that scripts can be checked for portability. See [Writing portable scripts](../posix.md#writing-portable-scripts) for the list of behaviors affected.
     - Unlike `posixlycorrect`, this option does not change how POSIX-conformant constructs behave; it only restricts the shell to portable constructs.
+    - Still under development: it currently affects only a few constructs, and more checks will be added.
 
 **`posixlycorrect`**
 : If set, the shell behaves as POSIX-compliant as possible. Useful for portable scripts. See [Maximizing POSIX compliance](../posix.md#maximizing-posix-compliance) for the list of behaviors affected.

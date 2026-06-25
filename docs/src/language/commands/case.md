@@ -121,7 +121,7 @@ Matched foo
 Matched any string starting with f
 ```
 
-The `;;&` and `;|` terminators are extensions to POSIX. yash-rs supports both, but other shells may support only one or neither.
+The `;;&` and `;|` terminators are extensions to POSIX. yash-rs supports both, but other shells may support only one or neither. (Since 3.3.0) The [`portable` option](../../environment/options.md#portable) disables these terminators.
 
 ## Miscellaneous
 

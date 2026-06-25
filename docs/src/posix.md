@@ -19,8 +19,12 @@ This list may be expanded in the future as more features are added to the shell.
 
 ## Writing portable scripts
 
-Even when yash-rs conforms to POSIX, it also implements extensions that POSIX does not specify. Such extensions are convenient, but scripts that rely on them may not run on other shells. The [`portable` option](environment/options.md#portable) helps you catch this: when set, the shell rejects or ignores non-portable features so that you can verify a script uses only portable constructs.
+Even when yash-rs conforms to POSIX, it also implements extensions that POSIX does not specify. Such extensions are convenient, but scripts that rely on them may not run on other shells. (Since 3.3.0) The [`portable` option](environment/options.md#portable) helps you catch this: when set, the shell rejects or ignores non-portable features so that you can verify a script uses only portable constructs.
 
 Unlike [`posixlycorrect`](environment/options.md#posixlycorrect), which changes how the shell behaves to maximize POSIX conformance, `portable` does not alter the behavior of POSIX-conformant constructs. It only restricts the shell to features that are portable across POSIX-conforming shells, reporting an error or ignoring a feature when a non-portable construct is used. The two options are independent and can be combined.
 
-⚠️ The `portable` option currently has no effect. The behaviors it will affect are being implemented incrementally and will be listed here as they are added.
+When the `portable` option is set, the shell rejects the following non-portable constructs:
+
+- The `;;&` and `;|` terminators in [case commands](language/commands/case.md).
+
+The `portable` option is still under development, so this list will be expanded as more checks are implemented.

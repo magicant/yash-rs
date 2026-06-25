@@ -262,6 +262,14 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 
+    /// Returns the parsing mode of the underlying lexer.
+    ///
+    /// The parser consults the mode to decide which syntax to accept. See
+    /// [`Lexer::mode`](crate::parser::lex::Lexer::mode).
+    pub(super) fn mode(&self) -> yash_env::parser::Mode {
+        self.lexer.mode()
+    }
+
     /// Returns a reference to the current token.
     ///
     /// If the current token is not yet read from the underlying lexer, it is read.
