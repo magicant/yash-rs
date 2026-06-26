@@ -403,6 +403,11 @@ fn redirection() {
 }
 
 #[test]
+fn redirection_ex() {
+    run("redir-y.sh")
+}
+
+#[test]
 fn return_builtin() {
     run("return-p.sh")
 }

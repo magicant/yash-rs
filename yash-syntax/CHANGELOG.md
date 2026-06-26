@@ -23,12 +23,22 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `parser::SyntaxError::NonPortableCaseTerminator`, a new error variant raised
   when a `;;&` or `;|` case terminator is encountered while the lexer's parsing
   mode has `portable` enabled.
+- `parser::SyntaxError::NonPortableRedirOperator` and
+  `parser::SyntaxError::NonPortableRedirOperand`, new error variants raised when
+  a non-portable redirection operator (`>>|` or `<<<`) or a non-portable
+  redirection operand (an `IO_NUMBER` or `IO_LOCATION` token) is encountered
+  while the lexer's parsing mode has `portable` enabled.
 
 ### Changed
 
 - The case command parser now rejects the non-portable `;;&` and `;|`
   terminators with `SyntaxError::NonPortableCaseTerminator` when the lexer's
   parsing mode has `portable` enabled. Without the mode, the terminators are
+  accepted as before.
+- The redirection parser now rejects the non-portable `>>|` and `<<<` operators
+  (`SyntaxError::NonPortableRedirOperator`) and `IO_NUMBER`/`IO_LOCATION` tokens
+  used as a redirection operand (`SyntaxError::NonPortableRedirOperand`) when the
+  lexer's parsing mode has `portable` enabled. Without the mode, they are
   accepted as before.
 - Public dependency versions:
     - yash-env 0.15.0 → 0.15.3

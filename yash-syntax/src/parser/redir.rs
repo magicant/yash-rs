@@ -39,15 +39,27 @@ impl Parser<'_, '_> {
         match operand.id {
             Token(_) => (),
             Operator(_) | EndOfInput => return Ok(Err(operand.word.location)),
-            IoNumber | IoLocation => (), // TODO reject if POSIXly-correct
+            IoNumber | IoLocation => {
+                if self.mode().portable {
+                    return Err(Error {
+                        cause: SyntaxError::NonPortableRedirOperand.into(),
+                        location: operand.word.location,
+                    });
+                }
+            }
         }
         Ok(Ok(operand.word))
     }
 
     /// Parses a normal redirection body.
     async fn normal_redirection_body(&mut self, operator: RedirOp) -> Result<RedirBody> {
-        // TODO reject >>| and <<< if POSIXly-correct
-        self.take_token_raw().await?;
+        let token = self.take_token_raw().await?;
+        if self.mode().portable && matches!(operator, RedirOp::Pipe | RedirOp::String) {
+            return Err(Error {
+                cause: SyntaxError::NonPortableRedirOperator(operator).into(),
+                location: token.word.location,
+            });
+        }
         let operand = self
             .redirection_operand()
             .await?
@@ -479,5 +491,93 @@ mod tests {
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 2..2);
+    }
+
+    fn portable_mode() -> yash_env::parser::Mode {
+        let mut mode = yash_env::parser::Mode::default();
+        mode.portable = true;
+        mode
+    }
+
+    #[test]
+    fn parser_redirection_pipe_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code(">>| 3\n");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.redirection().now_or_never().unwrap().unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::NonPortableRedirOperator(RedirOp::Pipe))
+        );
+        assert_eq!(e.location.range, 0..3);
+    }
+
+    #[test]
+    fn parser_redirection_here_string_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("<<< foo\n");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.redirection().now_or_never().unwrap().unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::NonPortableRedirOperator(RedirOp::String))
+        );
+        assert_eq!(e.location.range, 0..3);
+    }
+
+    #[test]
+    fn parser_redirection_portable_operators_allowed_in_portable_mode() {
+        // The standard operators must still be accepted in portable mode.
+        for code in [">| f\n", ">> f\n", "<> f\n", ">& 2\n", "<& 0\n"] {
+            let mut lexer = Lexer::with_code(code);
+            lexer.set_mode(portable_mode());
+            let mut parser = Parser::new(&mut lexer);
+
+            let result = parser.redirection().now_or_never().unwrap();
+            assert!(result.is_ok(), "code={code:?}, result={result:?}");
+        }
+    }
+
+    #[test]
+    fn parser_redirection_io_number_operand_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("< 1>");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.redirection().now_or_never().unwrap().unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::NonPortableRedirOperand)
+        );
+        assert_eq!(*e.location.code.value.borrow(), "< 1>");
+        assert_eq!(e.location.range, 2..3);
+    }
+
+    #[test]
+    fn parser_redirection_io_location_operand_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("< {n}>");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.redirection().now_or_never().unwrap().unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::NonPortableRedirOperand)
+        );
+        assert_eq!(e.location.range, 2..5);
+    }
+
+    #[test]
+    fn parser_redirection_io_number_operand_allowed_without_portable() {
+        let mut lexer = Lexer::with_code("< 1>");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.redirection().now_or_never().unwrap();
+        let redir = result.unwrap().unwrap();
+        assert_matches!(redir.body, RedirBody::Normal { operand, .. } => {
+            assert_eq!(operand.to_string(), "1");
+        });
     }
 }

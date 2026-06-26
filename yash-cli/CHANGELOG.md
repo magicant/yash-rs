@@ -15,8 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `portable` shell option, which restricts the shell to portable constructs
   so that scripts can be checked for portability. When it is set, the shell now
-  rejects the non-portable `;;&` and `;|` case terminators. More checks will be
-  added in future releases.
+  rejects the non-portable `;;&` and `;|` case terminators, the non-portable
+  `>>|` and `<<<` redirection operators, and `IO_NUMBER`/`IO_LOCATION` tokens
+  used as a redirection operand. More checks will be added in future releases.
 
 ## [3.2.1] - 2026-06-21
 

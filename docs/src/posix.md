@@ -26,5 +26,7 @@ Unlike [`posixlycorrect`](environment/options.md#posixlycorrect), which changes 
 When the `portable` option is set, the shell rejects the following non-portable constructs:
 
 - The `;;&` and `;|` terminators in [case commands](language/commands/case.md).
+- The non-portable [redirection](language/redirections/index.html) operators `>>|` and `<<<`.
+- A number or `{...}` token immediately followed by `<` or `>` used as a redirection operand (for example, the `1` in `< 1>file`). Separate it with a space or quote it instead.
 
 The `portable` option is still under development, so this list will be expanded as more checks are implemented.

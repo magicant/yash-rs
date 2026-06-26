@@ -22,6 +22,7 @@ use crate::source::pretty::{
     Footnote, FootnoteType, Report, ReportType, Snippet, Span, SpanRole, add_span,
 };
 use crate::syntax::AndOr;
+use crate::syntax::RedirOp;
 use std::borrow::Cow;
 use std::rc::Rc;
 use thiserror::Error;
@@ -197,6 +198,14 @@ pub enum SyntaxError {
     /// The operator is the offending terminator (`SemicolonSemicolonAnd` or
     /// `SemicolonBar`).
     NonPortableCaseTerminator(Operator),
+    /// A non-portable redirection operator (`>>|` or `<<<`) is used while the
+    /// `portable` option is on.
+    ///
+    /// The operator is the offending redirection operator (`Pipe` or `String`).
+    NonPortableRedirOperator(RedirOp),
+    /// An `IO_NUMBER` or `IO_LOCATION` token appears as a redirection operand
+    /// while the `portable` option is on.
+    NonPortableRedirOperand,
 }
 
 impl SyntaxError {
@@ -286,6 +295,10 @@ impl SyntaxError {
             | UnsupportedDoubleBracketCommand
             | UnsupportedProcessRedirection => "unsupported syntax",
             NonPortableCaseTerminator(_) => "the case terminator is not portable",
+            NonPortableRedirOperator(_) => "the redirection operator is not portable",
+            NonPortableRedirOperand => {
+                "a redirection operand immediately followed by a redirection operator is not portable"
+            }
         }
     }
 
@@ -375,6 +388,12 @@ impl SyntaxError {
                 "`;|` cannot be used in portable mode"
             }
             NonPortableCaseTerminator(_) => "this terminator cannot be used in portable mode",
+            NonPortableRedirOperator(RedirOp::Pipe) => "`>>|` cannot be used in portable mode",
+            NonPortableRedirOperator(RedirOp::String) => "`<<<` cannot be used in portable mode",
+            NonPortableRedirOperator(_) => {
+                "this redirection operator cannot be used in portable mode"
+            }
+            NonPortableRedirOperand => "add a space before the following redirection operator",
         }
     }
 
