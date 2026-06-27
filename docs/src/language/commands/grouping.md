@@ -23,7 +23,7 @@ Hello
 World
 ```
 
-Since `{` and `}` are [reserved words](../words/keywords.md), they must appear as separate words. See [examples in the Keywords section](../words/keywords.md#examples).
+Since `{` and `}` are [reserved words](../words/keywords.md), they must appear as separate words. See [examples in the Keywords section](../words/keywords.md#examples) and [where reserved words are recognized](../words/keywords.md#where-are-reserved-words-recognized).
 
 Braces are especially useful for treating several commands as a single unit in [pipelines](pipelines.md) or [and-or lists](exit_status.md#and-or-lists):
 

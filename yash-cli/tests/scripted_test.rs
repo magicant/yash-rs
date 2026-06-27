@@ -282,6 +282,11 @@ fn grouping() {
 }
 
 #[test]
+fn grouping_ex() {
+    run("grouping-y.sh")
+}
+
+#[test]
 fn if_command() {
     run("if-p.sh")
 }

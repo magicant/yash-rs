@@ -28,5 +28,6 @@ When the `portable` option is set, the shell rejects the following non-portable 
 - The `;;&` and `;|` terminators in [case commands](language/commands/case.md).
 - The non-portable [redirection](language/redirections/index.html) operators `>>|` and `<<<`.
 - A number or `{...}` token immediately followed by `<` or `>` used as a redirection operand (for example, the `1` in `< 1>file`). Separate it with a space or quote it instead.
+- A reserved word that immediately follows a subshell or a redirection without a separator (see [where reserved words are recognized](language/words/keywords.md#where-are-reserved-words-recognized)). POSIX recognizes a reserved word only when it begins a command or follows another reserved word; a subshell ends with `)` and a redirection ends with a word, so a clause-delimiting reserved word right after one is not recognized. Insert `;` or a newline before it. This affects `}`, `done`, `fi`, `then`, `elif`, `else`, `esac`, and `do` (for example, write `{ ( foo ); }` instead of `{ ( foo ) }`, and `for i in 1; do ( foo ); done` instead of `for i in 1; do ( foo ) done`).
 
 The `portable` option is still under development, so this list will be expanded as more checks are implemented.

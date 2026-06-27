@@ -206,6 +206,16 @@ pub enum SyntaxError {
     /// An `IO_NUMBER` or `IO_LOCATION` token appears as a redirection operand
     /// while the `portable` option is on.
     NonPortableRedirOperand,
+    /// A reserved word follows a subshell or a redirection without a separator
+    /// while the `portable` option is on (as in `{ ( : ) }` or
+    /// `for i in 1; do ( : ) done`).
+    ///
+    /// POSIX recognizes a reserved word only when it is the first word of a
+    /// command or follows another reserved word. A subshell ends with the `)`
+    /// operator and a redirection ends with a word, so a clause-delimiting
+    /// reserved word (such as `}`, `done`, or `fi`) that immediately follows one
+    /// is not portably recognized.
+    MissingSeparatorBeforeReservedWord,
 }
 
 impl SyntaxError {
@@ -298,6 +308,9 @@ impl SyntaxError {
             NonPortableRedirOperator(_) => "the redirection operator is not portable",
             NonPortableRedirOperand => {
                 "a redirection operand immediately followed by a redirection operator is not portable"
+            }
+            MissingSeparatorBeforeReservedWord => {
+                "the portable option does not allow a reserved word immediately after a subshell or redirection"
             }
         }
     }
@@ -394,6 +407,9 @@ impl SyntaxError {
                 "this redirection operator cannot be used in portable mode"
             }
             NonPortableRedirOperand => "add a space before the following redirection operator",
+            MissingSeparatorBeforeReservedWord => {
+                "insert `;` or a newline before this reserved word"
+            }
         }
     }
 

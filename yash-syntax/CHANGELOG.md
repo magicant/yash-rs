@@ -28,6 +28,11 @@ A _private dependency_ is used internally and not visible to downstream users.
   a non-portable redirection operator (`>>|` or `<<<`) or a non-portable
   redirection operand (an `IO_NUMBER` or `IO_LOCATION` token) is encountered
   while the lexer's parsing mode has `portable` enabled.
+- `parser::SyntaxError::MissingSeparatorBeforeReservedWord`, a new error variant
+  raised when a clause-delimiting reserved word (`}`, `done`, `fi`, `then`,
+  etc.) follows a subshell or a redirection without a separator (as in
+  `{ ( : ) }` or `for i in 1; do ( : ) done`) while the lexer's parsing mode has
+  `portable` enabled.
 
 ### Changed
 
@@ -40,6 +45,12 @@ A _private dependency_ is used internally and not visible to downstream users.
   used as a redirection operand (`SyntaxError::NonPortableRedirOperand`) when the
   lexer's parsing mode has `portable` enabled. Without the mode, they are
   accepted as before.
+- The compound command parser now rejects a clause-delimiting reserved word
+  (`}`, `done`, `fi`, `then`, etc.) that follows a subshell or a redirection
+  without a separator (`SyntaxError::MissingSeparatorBeforeReservedWord`) when
+  the lexer's parsing mode has `portable` enabled. A reserved word after another
+  reserved word (as in `{ { :; } }`) is still accepted. Without the mode, all of
+  these are accepted as before.
 - Public dependency versions:
     - yash-env 0.15.0 → 0.15.3
 
