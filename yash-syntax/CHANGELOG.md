@@ -33,6 +33,13 @@ A _private dependency_ is used internally and not visible to downstream users.
   etc.) follows a subshell or a redirection without a separator (as in
   `{ ( : ) }` or `for i in 1; do ( : ) done`) while the lexer's parsing mode has
   `portable` enabled.
+- `parser::SyntaxError::NonPortableEscape`, a new error variant raised when a
+  non-portable escape sequence in a dollar-single-quoted string (`\E`, `\?`,
+  `\u`, `\U`, or `\c@`) is encountered while the lexer's parsing mode has
+  `portable` enabled.
+- `parser::SyntaxError::TooLongHexEscape`, a new error variant raised when a `\x`
+  escape in a dollar-single-quoted string is followed by more than two
+  hexadecimal digits while the lexer's parsing mode has `portable` enabled.
 
 ### Changed
 
@@ -51,6 +58,11 @@ A _private dependency_ is used internally and not visible to downstream users.
   the lexer's parsing mode has `portable` enabled. A reserved word after another
   reserved word (as in `{ { :; } }`) is still accepted. Without the mode, all of
   these are accepted as before.
+- The dollar-single-quote parser now rejects non-portable escape sequences
+  (`\E`, `\?`, `\u`, `\U`, and `\c@`) with `SyntaxError::NonPortableEscape`, and a
+  `\x` escape followed by more than two hexadecimal digits with
+  `SyntaxError::TooLongHexEscape`, when the lexer's parsing mode has `portable`
+  enabled. Without the mode, they are accepted as before.
 - Public dependency versions:
     - yash-env 0.15.0 → 0.15.3
 

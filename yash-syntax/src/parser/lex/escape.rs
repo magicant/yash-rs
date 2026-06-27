@@ -54,6 +54,16 @@ impl Lexer<'_> {
         Ok(Some(value))
     }
 
+    /// Returns an error for a non-portable escape sequence that starts at the
+    /// given index and ends at the current position.
+    #[must_use]
+    fn non_portable_escape(&self, start_index: usize) -> Error {
+        Error {
+            cause: SyntaxError::NonPortableEscape.into(),
+            location: self.location_range(start_index..self.index()),
+        }
+    }
+
     /// Parses an escape unit.
     ///
     /// This function tests if the next character is an escape sequence and
@@ -81,14 +91,19 @@ impl Lexer<'_> {
             return Err(Error { cause, location });
         };
         self.consume_char();
+
+        let portable = self.mode().portable;
         match c2 {
             '"' => Ok(Some(DoubleQuote)),
             '\'' => Ok(Some(SingleQuote)),
             '\\' => Ok(Some(Backslash)),
+            '?' if portable => Err(self.non_portable_escape(start_index)),
             '?' => Ok(Some(Question)),
             'a' => Ok(Some(Alert)),
             'b' => Ok(Some(Backspace)),
-            'e' | 'E' => Ok(Some(Escape)),
+            'e' => Ok(Some(Escape)),
+            'E' if portable => Err(self.non_portable_escape(start_index)),
+            'E' => Ok(Some(Escape)),
             'f' => Ok(Some(FormFeed)),
             'n' => Ok(Some(Newline)),
             'r' => Ok(Some(CarriageReturn)),
@@ -114,7 +129,11 @@ impl Lexer<'_> {
                         Ok(Some(Control(0x1C)))
                     }
 
-                    // TODO Reject '\u{40}' in POSIX mode
+                    // POSIX's `^c` column does not include `@`, so `\c@` (which
+                    // would yield a NUL) is not portable.
+                    // https://pubs.opengroup.org/onlinepubs/9799919799/utilities/stty.html#tag_20_116_05_05
+                    '@' if portable => Err(self.non_portable_escape(start_index)),
+
                     c3 @ ('\u{3F}'..'\u{60}') => Ok(Some(Control(c3 as u8 ^ 0x40))),
 
                     _ => {
@@ -126,15 +145,24 @@ impl Lexer<'_> {
             }
 
             'x' => {
+                // POSIX leaves the result unspecified if more than two
+                // hexadecimal digits follow `\x`, so we only consume at most
+                // two digits.
                 let Some(value) = self.hex_digits(2).await? else {
                     let cause = SyntaxError::IncompleteHexEscape.into();
                     let location = self.location().await?.clone();
                     return Err(Error { cause, location });
                 };
-                // TODO Reject a third hexadecimal digit in POSIX mode
+                // If more digits follow, the escape sequence is non-portable.
+                if portable && self.hex_digits(usize::MAX).await?.is_some() {
+                    let cause = SyntaxError::TooLongHexEscape.into();
+                    let location = self.location_range(start_index..self.index());
+                    return Err(Error { cause, location });
+                }
                 Ok(Some(Hex(value as u8)))
             }
 
+            'u' if portable => Err(self.non_portable_escape(start_index)),
             'u' => {
                 let Some(value) = self.hex_digits(4).await? else {
                     let cause = SyntaxError::IncompleteShortUnicodeEscape.into();
@@ -150,6 +178,7 @@ impl Lexer<'_> {
                 }
             }
 
+            'U' if portable => Err(self.non_portable_escape(start_index)),
             'U' => {
                 let Some(value) = self.hex_digits(8).await? else {
                     let cause = SyntaxError::IncompleteLongUnicodeEscape.into();
@@ -334,7 +363,9 @@ mod tests {
 
     #[test]
     fn escape_unit_control_escapes() {
-        let mut lexer = Lexer::with_code(r"\cA\cz\c^\c?\c\\");
+        let mut lexer = Lexer::with_code(r"\c@\cA\cz\c^\c?\c\\");
+        let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Some(Control(0x00)));
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
         assert_eq!(result, Some(Control(0x01)));
         let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
@@ -542,7 +573,61 @@ mod tests {
         assert_eq!(error.location.range, 0..2);
     }
 
-    // TODO Reject non-portable escapes in POSIX mode
+    fn portable_mode() -> yash_env::parser::Mode {
+        let mut mode = yash_env::parser::Mode::default();
+        mode.portable = true;
+        mode
+    }
+
+    #[test]
+    fn escape_unit_non_portable_escapes_rejected_in_portable_mode() {
+        for (code, range) in [
+            (r"\E", 0..2),
+            (r"\?", 0..2),
+            (r"\u0041", 0..2),
+            (r"\U00000041", 0..2),
+            (r"\c@", 2..3),
+        ] {
+            let mut lexer = Lexer::with_code(code);
+            lexer.set_mode(portable_mode());
+            let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
+            assert_matches!(
+                error.cause,
+                ErrorCause::Syntax(SyntaxError::NonPortableEscape),
+                "code={code:?}"
+            );
+            assert_eq!(error.location.range, range, "code={code:?}");
+        }
+    }
+
+    #[test]
+    fn escape_unit_too_long_hex_escape_rejected_in_portable_mode() {
+        // A third hexadecimal digit is unspecified by POSIX.
+        let mut lexer = Lexer::with_code(r"\xABC");
+        lexer.set_mode(portable_mode());
+        let error = lexer.escape_unit().now_or_never().unwrap().unwrap_err();
+        assert_matches!(
+            error.cause,
+            ErrorCause::Syntax(SyntaxError::TooLongHexEscape)
+        );
+        assert_eq!(error.location.range, 0..5);
+    }
+
+    #[test]
+    fn escape_unit_portable_escapes_accepted_in_portable_mode() {
+        // The lowercase `\e`, two-digit `\x`, and other `\cX` are portable.
+        for (code, expected) in [
+            (r"\e", Escape),
+            (r"\xAB", Hex(0xAB)),
+            (r"\cA", Control(1)),
+            (r"\n", Newline),
+        ] {
+            let mut lexer = Lexer::with_code(code);
+            lexer.set_mode(portable_mode());
+            let result = lexer.escape_unit().now_or_never().unwrap().unwrap();
+            assert_eq!(result, Some(expected), "code={code:?}");
+        }
+    }
 
     #[test]
     fn escaped_string_literals() {

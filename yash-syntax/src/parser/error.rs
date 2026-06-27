@@ -216,6 +216,18 @@ pub enum SyntaxError {
     /// reserved word (such as `}`, `done`, or `fi`) that immediately follows one
     /// is not portably recognized.
     MissingSeparatorBeforeReservedWord,
+    /// A non-portable escape sequence is used in a dollar-single-quoted string
+    /// while the `portable` option is on.
+    ///
+    /// POSIX specifies a limited set of escape sequences for `$'...'`. This is
+    /// raised for yash extensions such as `\E`, `\?`, `\u`, `\U`, and `\c@`.
+    NonPortableEscape,
+    /// A `\x` escape in a dollar-single-quoted string is followed by more than
+    /// two hexadecimal digits while the `portable` option is on.
+    ///
+    /// POSIX leaves the result unspecified if more than two hexadecimal digits
+    /// follow `\x`, so such an escape is not portable.
+    TooLongHexEscape,
 }
 
 impl SyntaxError {
@@ -312,6 +324,8 @@ impl SyntaxError {
             MissingSeparatorBeforeReservedWord => {
                 "the portable option does not allow a reserved word immediately after a subshell or redirection"
             }
+            NonPortableEscape => "the escape sequence is not portable",
+            TooLongHexEscape => "more than two hexadecimal digits follow `\\x`",
         }
     }
 
@@ -410,6 +424,8 @@ impl SyntaxError {
             MissingSeparatorBeforeReservedWord => {
                 "insert `;` or a newline before this reserved word"
             }
+            NonPortableEscape => "this escape cannot be used in portable mode",
+            TooLongHexEscape => "use at most two hexadecimal digits in portable mode",
         }
     }
 

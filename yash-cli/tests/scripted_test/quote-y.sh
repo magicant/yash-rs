@@ -10,6 +10,32 @@ test_O -d -e 2 'too large octal escape in dollar-single-quotes'
 printf '%s\n' $'\777'
 __IN__
 
+test_O -d -e 2 'portable option rejects a non-portable escape (\?)' -o portable
+printf '%s\n' $'\?'
+__IN__
+
+test_oE 'without portable, a non-portable escape is accepted'
+printf '%s\n' $'\?'
+__IN__
+?
+__OUT__
+
+test_O -d -e 2 'portable option rejects the \c@ escape' -o portable
+printf '%s\n' $'\c@'
+__IN__
+
+test_O -d -e 2 'portable option rejects the \E escape' -o portable
+printf '%s\n' $'\E'
+__IN__
+
+test_O -d -e 2 'portable option rejects the \U escape' -o portable
+printf '%s\n' $'\U00000041'
+__IN__
+
+test_O -d -e 2 'portable option rejects \x with too many hex digits' -o portable
+printf '%s\n' $'\xABC'
+__IN__
+
 test_oE 'no dollar-single-quotes inside double quotes'
 null=
 printf '%s\n' "$'\x20$null'"
