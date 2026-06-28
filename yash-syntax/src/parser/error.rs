@@ -341,7 +341,7 @@ impl SyntaxError {
             NonPortableCaseTerminator(_) => "the case terminator is not portable",
             NonPortableRedirOperator(_) => "the redirection operator is not portable",
             IoTokenAsRedirOperand => {
-                "a redirection operand immediately followed by a redirection operator is not portable"
+                "the redirection operand is missing because the token belongs to the next redirection"
             }
             MissingSeparatorBeforeReservedWord => {
                 "the portable option does not allow a reserved word immediately after a subshell or redirection"
