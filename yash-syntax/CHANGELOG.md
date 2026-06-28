@@ -37,6 +37,10 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `UnsupportedArithmeticCommand` and `UnsupportedExtendedGlob` for `((`
       (which other shells parse as an arithmetic command) or `!(` (which other
       shells parse as an extended glob) used at the beginning of a command.
+- `parser::SyntaxError::footnotes` and `parser::ErrorCause::footnotes`, which
+  return supplementary footnotes (a `source::pretty::FootnoteType` and its text)
+  to render with the error, such as a note that the error is reported because
+  the `portable` option is enabled.
 
 ### Changed
 
@@ -61,6 +65,11 @@ A _private dependency_ is used internally and not visible to downstream users.
       (`SyntaxError::UnsupportedExtendedGlob`) at the beginning of a command.
       Without the mode, these are parsed as nested subshells and a negated
       subshell, respectively.
+- `parser::Error::to_report` now attaches a `note:` footnote to errors caused by
+  the `portable` option, clarifying that the construct is rejected only because
+  the option is enabled.
+- The `yash_env::source::pretty::Report` returned by `parser::Error::to_report`
+  now includes footnotes from `parser::ErrorCause::footnotes`.
 - Public dependency versions:
     - yash-env 0.15.0 → 0.15.3
 

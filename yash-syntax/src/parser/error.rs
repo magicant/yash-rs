@@ -457,6 +457,35 @@ impl SyntaxError {
         }
     }
 
+    /// Returns footnotes that supplement the error message.
+    ///
+    /// Each item pairs a [`FootnoteType`] with its text. The footnotes are to
+    /// be rendered after the error's source code snippet. The slice is empty
+    /// for errors that need no footnote.
+    #[must_use]
+    pub fn footnotes(&self) -> &'static [(FootnoteType, &'static str)] {
+        use SyntaxError::*;
+        match self {
+            BangAfterBar => &[(
+                FootnoteType::Suggestion,
+                // TODO Replace with a span-attached patch (SpanRole::Patch)
+                "surround the pipeline component in a grouping: `{ ! ...; }`",
+            )],
+            UnsupportedArithmeticCommand
+            | UnsupportedExtendedGlob
+            | NonPortableCaseTerminator(_)
+            | NonPortableRedirOperator(_)
+            | IoTokenAsRedirOperand
+            | MissingSeparatorBeforeReservedWord
+            | NonPortableEscape
+            | TooLongHexEscape => &[(
+                FootnoteType::Note,
+                "this error is reported because the `portable` shell option is enabled",
+            )],
+            _ => &[],
+        }
+    }
+
     /// Returns a location related with the error cause and a message describing
     /// the location.
     #[must_use]
@@ -558,6 +587,18 @@ impl ErrorCause {
         }
     }
 
+    /// Returns footnotes that supplement the error message.
+    ///
+    /// See [`SyntaxError::footnotes`] for details.
+    #[must_use]
+    pub fn footnotes(&self) -> &'static [(FootnoteType, &'static str)] {
+        use ErrorCause::*;
+        match self {
+            Io(_) => &[],
+            Syntax(e) => e.footnotes(),
+        }
+    }
+
     /// Returns a location related with the error cause and a message describing
     /// the location.
     #[must_use]
@@ -586,6 +627,11 @@ pub struct Error {
 
 impl Error {
     /// Returns a report for the error.
+    ///
+    /// This method constructs a [`Report`] from the error's cause and location.
+    /// The result includes information obtained from [`ErrorCause::message`],
+    /// [`ErrorCause::label`], [`ErrorCause::footnotes`], and
+    /// [`ErrorCause::related_location`].
     #[must_use]
     pub fn to_report(&self) -> Report<'_> {
         let mut report = Report::new();
@@ -602,13 +648,15 @@ impl Error {
             add_span(&location.code, span, &mut report.snippets);
         }
 
-        if let ErrorCause::Syntax(SyntaxError::BangAfterBar) = &self.cause {
-            // TODO Suggest the change with SpanRole::Patch
-            report.footnotes.push(Footnote {
-                r#type: FootnoteType::Suggestion,
-                label: "surround the pipeline component in a grouping: `{ ! ...; }`".into(),
-            });
-        }
+        report.footnotes.extend(
+            self.cause
+                .footnotes()
+                .iter()
+                .map(|&(r#type, label)| Footnote {
+                    r#type,
+                    label: label.into(),
+                }),
+        );
 
         report
     }
@@ -677,5 +725,53 @@ mod tests {
             SpanRole::Primary { label } if label == "expected a delimiter word"
         );
         assert_eq!(report.footnotes, []);
+    }
+
+    #[test]
+    fn footnotes_for_syntax_error() {
+        // Errors caused by the `portable` option have a note.
+        let note = (
+            FootnoteType::Note,
+            "this error is reported because the `portable` shell option is enabled",
+        );
+        assert_eq!(SyntaxError::IoTokenAsRedirOperand.footnotes(), [note]);
+        assert_eq!(
+            SyntaxError::UnsupportedArithmeticCommand.footnotes(),
+            [note]
+        );
+        // A suggestion is offered for `!` in the middle of a pipeline.
+        assert_eq!(
+            SyntaxError::BangAfterBar.footnotes(),
+            [(
+                FootnoteType::Suggestion,
+                "surround the pipeline component in a grouping: `{ ! ...; }`"
+            )]
+        );
+        // Errors unrelated to the `portable` option have no footnote.
+        assert_eq!(SyntaxError::MissingHereDocDelimiter.footnotes(), []);
+        // Unconditionally unsupported syntax is not caused by the option.
+        assert_eq!(SyntaxError::UnsupportedDoubleBracketCommand.footnotes(), []);
+    }
+
+    #[test]
+    fn report_has_footnote_for_portable_error() {
+        let code = Rc::new(Code {
+            value: "((:))".to_string().into(),
+            start_line_number: NonZeroU64::new(1).unwrap(),
+            source: Source::Unknown.into(),
+        });
+        let error = Error {
+            cause: SyntaxError::UnsupportedArithmeticCommand.into(),
+            location: Location { code, range: 0..2 },
+        };
+
+        let report = Report::from(&error);
+
+        assert_eq!(report.footnotes.len(), 1);
+        assert_eq!(report.footnotes[0].r#type, FootnoteType::Note);
+        assert_eq!(
+            report.footnotes[0].label,
+            "this error is reported because the `portable` shell option is enabled"
+        );
     }
 }
