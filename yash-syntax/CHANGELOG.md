@@ -20,49 +20,47 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `parser::lex::Lexer::mode` and `parser::lex::Lexer::set_mode` for querying and
   updating the parsing mode (`yash_env::parser::Mode`) of a lexer. The parser and
   lexer consult the mode to decide which syntax to accept.
-- `parser::SyntaxError::NonPortableCaseTerminator`, a new error variant raised
-  when a `;;&` or `;|` case terminator is encountered while the lexer's parsing
-  mode has `portable` enabled.
-- `parser::SyntaxError::NonPortableRedirOperator` and
-  `parser::SyntaxError::NonPortableRedirOperand`, new error variants raised when
-  a non-portable redirection operator (`>>|` or `<<<`) or a non-portable
-  redirection operand (an `IO_NUMBER` or `IO_LOCATION` token) is encountered
-  while the lexer's parsing mode has `portable` enabled.
-- `parser::SyntaxError::MissingSeparatorBeforeReservedWord`, a new error variant
-  raised when a clause-delimiting reserved word (`}`, `done`, `fi`, `then`,
-  etc.) follows a subshell or a redirection without a separator (as in
-  `{ ( : ) }` or `for i in 1; do ( : ) done`) while the lexer's parsing mode has
-  `portable` enabled.
-- `parser::SyntaxError::NonPortableEscape`, a new error variant raised when a
-  non-portable escape sequence in a dollar-single-quoted string (`\E`, `\?`,
-  `\u`, `\U`, or `\c@`) is encountered while the lexer's parsing mode has
-  `portable` enabled.
-- `parser::SyntaxError::TooLongHexEscape`, a new error variant raised when a `\x`
-  escape in a dollar-single-quoted string is followed by more than two
-  hexadecimal digits while the lexer's parsing mode has `portable` enabled.
+- New `parser::SyntaxError` variants that are raised when a non-portable
+  construct is encountered while the lexer's parsing mode has `portable` enabled:
+    - `NonPortableCaseTerminator` for a `;;&` or `;|` case terminator.
+    - `NonPortableRedirOperator` for a non-portable redirection operator (`>>|`
+      or `<<<`).
+    - `NonPortableRedirOperand` for a non-portable redirection operand (an
+      `IO_NUMBER` or `IO_LOCATION` token).
+    - `MissingSeparatorBeforeReservedWord` for a clause-delimiting reserved word
+      (`}`, `done`, `fi`, `then`, etc.) that follows a subshell or a redirection
+      without a separator (as in `{ ( : ) }` or `for i in 1; do ( : ) done`).
+    - `NonPortableEscape` for a non-portable escape sequence in a
+      dollar-single-quoted string (`\E`, `\?`, `\u`, `\U`, or `\c@`).
+    - `TooLongHexEscape` for a `\x` escape in a dollar-single-quoted string
+      followed by more than two hexadecimal digits.
+    - `UnsupportedArithmeticCommand` and `UnsupportedExtendedGlob` for `((`
+      (which other shells parse as an arithmetic command) or `!(` (which other
+      shells parse as an extended glob) used at the beginning of a command.
 
 ### Changed
 
-- The case command parser now rejects the non-portable `;;&` and `;|`
-  terminators with `SyntaxError::NonPortableCaseTerminator` when the lexer's
-  parsing mode has `portable` enabled. Without the mode, the terminators are
-  accepted as before.
-- The redirection parser now rejects the non-portable `>>|` and `<<<` operators
-  (`SyntaxError::NonPortableRedirOperator`) and `IO_NUMBER`/`IO_LOCATION` tokens
-  used as a redirection operand (`SyntaxError::NonPortableRedirOperand`) when the
-  lexer's parsing mode has `portable` enabled. Without the mode, they are
-  accepted as before.
-- The compound command parser now rejects a clause-delimiting reserved word
-  (`}`, `done`, `fi`, `then`, etc.) that follows a subshell or a redirection
-  without a separator (`SyntaxError::MissingSeparatorBeforeReservedWord`) when
-  the lexer's parsing mode has `portable` enabled. A reserved word after another
-  reserved word (as in `{ { :; } }`) is still accepted. Without the mode, all of
-  these are accepted as before.
-- The dollar-single-quote parser now rejects non-portable escape sequences
-  (`\E`, `\?`, `\u`, `\U`, and `\c@`) with `SyntaxError::NonPortableEscape`, and a
-  `\x` escape followed by more than two hexadecimal digits with
-  `SyntaxError::TooLongHexEscape`, when the lexer's parsing mode has `portable`
-  enabled. Without the mode, they are accepted as before.
+- The parser now rejects the following non-portable constructs when the lexer's
+  parsing mode has `portable` enabled. Without the mode, they are accepted as
+  before:
+    - The non-portable `;;&` and `;|` case terminators
+      (`SyntaxError::NonPortableCaseTerminator`).
+    - The non-portable `>>|` and `<<<` redirection operators
+      (`SyntaxError::NonPortableRedirOperator`) and `IO_NUMBER`/`IO_LOCATION`
+      tokens used as a redirection operand
+      (`SyntaxError::NonPortableRedirOperand`).
+    - A clause-delimiting reserved word (`}`, `done`, `fi`, `then`, etc.) that
+      follows a subshell or a redirection without a separator
+      (`SyntaxError::MissingSeparatorBeforeReservedWord`). A reserved word after
+      another reserved word (as in `{ { :; } }`) is still accepted.
+    - Non-portable escape sequences in a dollar-single-quoted string (`\E`, `\?`,
+      `\u`, `\U`, and `\c@`) (`SyntaxError::NonPortableEscape`), and a `\x`
+      escape followed by more than two hexadecimal digits
+      (`SyntaxError::TooLongHexEscape`).
+    - `((` (`SyntaxError::UnsupportedArithmeticCommand`) and `!(`
+      (`SyntaxError::UnsupportedExtendedGlob`) at the beginning of a command.
+      Without the mode, these are parsed as nested subshells and a negated
+      subshell, respectively.
 - Public dependency versions:
     - yash-env 0.15.0 → 0.15.3
 

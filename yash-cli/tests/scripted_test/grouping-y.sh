@@ -39,3 +39,37 @@ a
 b
 c
 __OUT__
+
+# Other shells parse `((` as an arithmetic command, so the portable option
+# rejects it at the beginning of a command. A space (`( (`) is portable.
+
+test_O -d -e 2 'portable option rejects (( at the beginning of a command' -o portable
+((echo hello))
+__IN__
+
+test_oE 'without portable, (( is parsed as nested subshells'
+((echo hello))
+__IN__
+hello
+__OUT__
+
+test_oE 'portable option allows ( ( with a space' -o portable
+( (echo hello))
+__IN__
+hello
+__OUT__
+
+# Other shells parse `!(` as an extended glob, so the portable option rejects
+# it at the beginning of a command. A space (`! (`) is portable.
+
+test_O -d -e 2 'portable option rejects !( at the beginning of a command' -o portable
+!(false)
+__IN__
+
+test_OE -e 0 'without portable, !( is parsed as a negated subshell'
+!(false)
+__IN__
+
+test_OE -e 0 'portable option allows ! ( with a space' -o portable
+! (false)
+__IN__

@@ -53,11 +53,13 @@ Since `(` and `)` are operators, they can be used without spaces.
 
 ## Compatibility
 
-Some shells treat two adjacent `(` characters specially. For best compatibility, separate open parentheses with a space to nest subshells:
+Some shells treat two adjacent `(` characters specially as an arithmetic command. For best compatibility, separate open parentheses with a space to nest subshells:
 
 ```shell
 $ ( (echo "Hello"))
 Hello
 ```
+
+(Since 3.3.0) The [`portable` option](../../environment/options.md#portable) rejects `((` at the beginning of a command for this reason.
 
 [shell environment]: ../../environment/index.html

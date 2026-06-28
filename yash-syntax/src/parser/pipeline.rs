@@ -22,7 +22,7 @@ use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
 use super::lex::Keyword::Bang;
-use super::lex::Operator::Bar;
+use super::lex::Operator::{Bar, OpenParen};
 use super::lex::TokenId::{Operator, Token};
 use crate::syntax::Pipeline;
 use std::rc::Rc;
@@ -42,9 +42,18 @@ impl Parser<'_, '_> {
                 if self.peek_token().await?.id != Token(Some(Bang)) {
                     return Ok(Rec::Parsed(None));
                 }
-                self.take_token_raw().await?;
-                // TODO Warn if `!` is immediately followed by `(`, which is
-                // not POSIXly portable.
+                let bang = self.take_token_raw().await?;
+
+                // In portable mode, reject `!(` (which other shells parse as an
+                // extended glob) at the beginning of a command.
+                if self.mode().portable {
+                    let next = self.peek_token().await?;
+                    if next.id == Operator(OpenParen) && next.index == bang.index + 1 {
+                        let location = next.word.location.clone();
+                        let cause = SyntaxError::UnsupportedExtendedGlob.into();
+                        return Err(Error { cause, location });
+                    }
+                }
 
                 // Parse the command after the `!`
                 loop {
@@ -258,5 +267,51 @@ mod tests {
         assert_eq!(p.commands.len(), 2);
         assert_eq!(p.commands[0].to_string(), "foo");
         assert_eq!(p.commands[1].to_string(), "bar");
+    }
+
+    fn portable_mode() -> yash_env::parser::Mode {
+        let mut mode = yash_env::parser::Mode::default();
+        mode.portable = true;
+        mode
+    }
+
+    #[test]
+    fn parser_pipeline_bang_open_paren_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("!(:)");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.pipeline().now_or_never().unwrap().unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::UnsupportedExtendedGlob)
+        );
+        // The error points at the `(`.
+        assert_eq!(e.location.range, 1..2);
+    }
+
+    #[test]
+    fn parser_pipeline_bang_spaced_open_paren_accepted_in_portable_mode() {
+        // A space after `!` makes it a portable negated subshell.
+        let mut lexer = Lexer::with_code("! (:)");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.pipeline().now_or_never().unwrap();
+        let p = result.unwrap().unwrap().unwrap();
+        assert_eq!(p.negation, true);
+        assert_eq!(p.commands[0].to_string(), "(:)");
+    }
+
+    #[test]
+    fn parser_pipeline_bang_open_paren_accepted_without_portable() {
+        // Without the portable option, `!(` is parsed as a negated subshell.
+        let mut lexer = Lexer::with_code("!(:)");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.pipeline().now_or_never().unwrap();
+        let p = result.unwrap().unwrap().unwrap();
+        assert_eq!(p.negation, true);
+        assert_eq!(p.commands[0].to_string(), "(:)");
     }
 }

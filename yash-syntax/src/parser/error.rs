@@ -193,6 +193,20 @@ pub enum SyntaxError {
     UnsupportedDoubleBracketCommand,
     /// A process redirection (`>(...)` or `<(...)`) is used.
     UnsupportedProcessRedirection,
+    /// A `((...))` arithmetic command is used at the beginning of a command
+    /// while the `portable` option is on.
+    ///
+    /// yash-rs parses `((` as nested subshells, but other shells parse it as an
+    /// arithmetic command, which yash-rs does not support. The `portable` option
+    /// rejects this ambiguous form; insert a space (`( (`) for nested subshells.
+    UnsupportedArithmeticCommand,
+    /// A `!(...)` extended glob is used at the beginning of a command while the
+    /// `portable` option is on.
+    ///
+    /// yash-rs parses `!(` as the `!` reserved word followed by a subshell, but
+    /// other shells parse it as an extended glob, which yash-rs does not support.
+    /// The `portable` option rejects this ambiguous form; insert a space (`! (`).
+    UnsupportedExtendedGlob,
     /// A `;;&` or `;|` case terminator is used while the `portable` option is on.
     ///
     /// The operator is the offending terminator (`SemicolonSemicolonAnd` or
@@ -315,7 +329,9 @@ impl SyntaxError {
             UnicodeEscapeOutOfRange => "the Unicode escape is out of range",
             UnsupportedFunctionDefinitionSyntax
             | UnsupportedDoubleBracketCommand
-            | UnsupportedProcessRedirection => "unsupported syntax",
+            | UnsupportedProcessRedirection
+            | UnsupportedArithmeticCommand
+            | UnsupportedExtendedGlob => "unsupported syntax",
             NonPortableCaseTerminator(_) => "the case terminator is not portable",
             NonPortableRedirOperator(_) => "the redirection operator is not portable",
             NonPortableRedirOperand => {
@@ -408,6 +424,12 @@ impl SyntaxError {
             UnsupportedFunctionDefinitionSyntax => "the `function` keyword is not yet supported",
             UnsupportedDoubleBracketCommand => "the `[[ ... ]]` command is not yet supported",
             UnsupportedProcessRedirection => "process redirection is not yet supported",
+            UnsupportedArithmeticCommand => {
+                "the `((` arithmetic command is not supported; insert a space for nested subshells"
+            }
+            UnsupportedExtendedGlob => {
+                "the `!(` extended glob is not supported; insert a space after `!` for a negated subshell"
+            }
             NonPortableCaseTerminator(Operator::SemicolonSemicolonAnd) => {
                 "`;;&` cannot be used in portable mode"
             }

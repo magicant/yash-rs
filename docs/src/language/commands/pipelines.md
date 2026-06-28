@@ -104,6 +104,6 @@ POSIX requires that a pipeline waits for the last command to finish before retur
 
 POSIX allows commands in a multi-command pipeline to be run in the current [shell environment](../../environment/index.html) rather than in subshells. Korn shell and zsh run the last command in the current shell environment, while yash-rs runs all commands in subshells.
 
-Some shells like Korn shell and mksh assign special meanings to the `!` reserved word immediately followed by the `(` operator. For maximum compatibility, `!` and `(` should be separated by a space.
+Some shells like Korn shell and mksh assign special meanings to the `!` reserved word immediately followed by the `(` operator. For maximum compatibility, `!` and `(` should be separated by a space. (Since 3.3.0) The [`portable` option](../../environment/options.md#portable) rejects `!(` at the beginning of a command for this reason.
 
 [reserved word]: ../words/keywords.md
