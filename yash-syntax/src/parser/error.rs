@@ -335,17 +335,15 @@ impl SyntaxError {
             UnicodeEscapeOutOfRange => "the Unicode escape is out of range",
             UnsupportedFunctionDefinitionSyntax
             | UnsupportedDoubleBracketCommand
-            | UnsupportedProcessRedirection
-            | UnsupportedArithmeticCommand
-            | UnsupportedExtendedGlob => "unsupported syntax",
+            | UnsupportedProcessRedirection => "unsupported syntax",
+            UnsupportedArithmeticCommand => "`((` is ambiguous at the start of a command",
+            UnsupportedExtendedGlob => "`!(` is ambiguous at the start of a command",
             NonPortableCaseTerminator(_) => "the case terminator is not portable",
             NonPortableRedirOperator(_) => "the redirection operator is not portable",
             IoTokenAsRedirOperand => {
                 "the redirection operand is missing because the token belongs to the next redirection"
             }
-            MissingSeparatorBeforeReservedWord => {
-                "the portable option does not allow a reserved word immediately after a subshell or redirection"
-            }
+            MissingSeparatorBeforeReservedWord => "a separator is missing before the reserved word",
             NonPortableEscape => "the escape sequence is not portable",
             TooLongHexEscape => "more than two hexadecimal digits follow `\\x`",
         }
@@ -431,29 +429,29 @@ impl SyntaxError {
             UnsupportedDoubleBracketCommand => "the `[[ ... ]]` command is not yet supported",
             UnsupportedProcessRedirection => "process redirection is not yet supported",
             UnsupportedArithmeticCommand => {
-                "the `((` arithmetic command is not supported; insert a space for nested subshells"
+                "other shells read this as an arithmetic command; insert a space for nested subshells"
             }
             UnsupportedExtendedGlob => {
-                "the `!(` extended glob is not supported; insert a space after `!` for a negated subshell"
+                "other shells read this as an extended glob; insert a space after `!` for a negated subshell"
             }
             NonPortableCaseTerminator(Operator::SemicolonSemicolonAnd) => {
-                "`;;&` cannot be used in portable mode"
+                "`;;&` is not a POSIX case terminator"
             }
             NonPortableCaseTerminator(Operator::SemicolonBar) => {
-                "`;|` cannot be used in portable mode"
+                "`;|` is not a POSIX case terminator"
             }
-            NonPortableCaseTerminator(_) => "this terminator cannot be used in portable mode",
-            NonPortableRedirOperator(RedirOp::Pipe) => "`>>|` cannot be used in portable mode",
-            NonPortableRedirOperator(RedirOp::String) => "`<<<` cannot be used in portable mode",
-            NonPortableRedirOperator(_) => {
-                "this redirection operator cannot be used in portable mode"
+            NonPortableCaseTerminator(_) => "not a POSIX case terminator",
+            NonPortableRedirOperator(RedirOp::Pipe) => "`>>|` is not a POSIX redirection operator",
+            NonPortableRedirOperator(RedirOp::String) => {
+                "`<<<` is not a POSIX redirection operator"
             }
+            NonPortableRedirOperator(_) => "not a POSIX redirection operator",
             IoTokenAsRedirOperand => "add a space before the following redirection operator",
             MissingSeparatorBeforeReservedWord => {
                 "insert `;` or a newline before this reserved word"
             }
-            NonPortableEscape => "this escape cannot be used in portable mode",
-            TooLongHexEscape => "use at most two hexadecimal digits in portable mode",
+            NonPortableEscape => "not a POSIX escape sequence",
+            TooLongHexEscape => "use at most two hexadecimal digits",
         }
     }
 
