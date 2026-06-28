@@ -42,7 +42,7 @@ impl Parser<'_, '_> {
             IoNumber | IoLocation => {
                 if self.mode().portable {
                     return Err(Error {
-                        cause: SyntaxError::NonPortableRedirOperand.into(),
+                        cause: SyntaxError::IoTokenAsRedirOperand.into(),
                         location: operand.word.location,
                     });
                 }
@@ -549,7 +549,7 @@ mod tests {
         let e = parser.redirection().now_or_never().unwrap().unwrap_err();
         assert_eq!(
             e.cause,
-            ErrorCause::Syntax(SyntaxError::NonPortableRedirOperand)
+            ErrorCause::Syntax(SyntaxError::IoTokenAsRedirOperand)
         );
         assert_eq!(*e.location.code.value.borrow(), "< 1>");
         assert_eq!(e.location.range, 2..3);
@@ -564,7 +564,7 @@ mod tests {
         let e = parser.redirection().now_or_never().unwrap().unwrap_err();
         assert_eq!(
             e.cause,
-            ErrorCause::Syntax(SyntaxError::NonPortableRedirOperand)
+            ErrorCause::Syntax(SyntaxError::IoTokenAsRedirOperand)
         );
         assert_eq!(e.location.range, 2..5);
     }

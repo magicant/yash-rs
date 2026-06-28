@@ -219,7 +219,13 @@ pub enum SyntaxError {
     NonPortableRedirOperator(RedirOp),
     /// An `IO_NUMBER` or `IO_LOCATION` token appears as a redirection operand
     /// while the `portable` option is on.
-    NonPortableRedirOperand,
+    ///
+    /// This happens when a token that should be a redirection operand is
+    /// immediately followed by a redirection operator without a separating
+    /// space, so yash-rs lexes it as an `IO_NUMBER` or `IO_LOCATION` token (as
+    /// in the `1` in `< 1>file`). POSIX does not recognize such a token as a
+    /// redirection operand, so this form is not portable.
+    IoTokenAsRedirOperand,
     /// A reserved word follows a subshell or a redirection without a separator
     /// while the `portable` option is on (as in `{ ( : ) }` or
     /// `for i in 1; do ( : ) done`).
@@ -334,7 +340,7 @@ impl SyntaxError {
             | UnsupportedExtendedGlob => "unsupported syntax",
             NonPortableCaseTerminator(_) => "the case terminator is not portable",
             NonPortableRedirOperator(_) => "the redirection operator is not portable",
-            NonPortableRedirOperand => {
+            IoTokenAsRedirOperand => {
                 "a redirection operand immediately followed by a redirection operator is not portable"
             }
             MissingSeparatorBeforeReservedWord => {
@@ -442,7 +448,7 @@ impl SyntaxError {
             NonPortableRedirOperator(_) => {
                 "this redirection operator cannot be used in portable mode"
             }
-            NonPortableRedirOperand => "add a space before the following redirection operator",
+            IoTokenAsRedirOperand => "add a space before the following redirection operator",
             MissingSeparatorBeforeReservedWord => {
                 "insert `;` or a newline before this reserved word"
             }

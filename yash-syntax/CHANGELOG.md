@@ -25,8 +25,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `NonPortableCaseTerminator` for a `;;&` or `;|` case terminator.
     - `NonPortableRedirOperator` for a non-portable redirection operator (`>>|`
       or `<<<`).
-    - `NonPortableRedirOperand` for a non-portable redirection operand (an
-      `IO_NUMBER` or `IO_LOCATION` token).
+    - `IoTokenAsRedirOperand` for an `IO_NUMBER` or `IO_LOCATION` token used as
+      a redirection operand.
     - `MissingSeparatorBeforeReservedWord` for a clause-delimiting reserved word
       (`}`, `done`, `fi`, `then`, etc.) that follows a subshell or a redirection
       without a separator (as in `{ ( : ) }` or `for i in 1; do ( : ) done`).
@@ -48,7 +48,7 @@ A _private dependency_ is used internally and not visible to downstream users.
     - The non-portable `>>|` and `<<<` redirection operators
       (`SyntaxError::NonPortableRedirOperator`) and `IO_NUMBER`/`IO_LOCATION`
       tokens used as a redirection operand
-      (`SyntaxError::NonPortableRedirOperand`).
+      (`SyntaxError::IoTokenAsRedirOperand`).
     - A clause-delimiting reserved word (`}`, `done`, `fi`, `then`, etc.) that
       follows a subshell or a redirection without a separator
       (`SyntaxError::MissingSeparatorBeforeReservedWord`). A reserved word after
