@@ -13,6 +13,19 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.15.3] - Unreleased
+
+### Added
+
+- `option::Option::Portable` has been added. This option is intended to disable
+  non-portable features of the shell. It currently has no effect; behavior will
+  be added in future releases.
+- `parser::Mode` is a new type that conveys parsing-affecting shell options to
+  the parser and lexer. It currently has a single `portable` field reflecting
+  the `Portable` option, and is created from an `OptionSet` via `From`.
+- `parser::Config` has a new `mode` field of type `parser::Mode` that specifies
+  the parsing mode for the lexer created from the configuration.
+
 ## [0.15.2] - 2026-06-21
 
 ### Changed

@@ -13,6 +13,66 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.22.1] - Unreleased
+
+### Added
+
+- `parser::lex::Lexer::mode` and `parser::lex::Lexer::set_mode` for querying and
+  updating the parsing mode (`yash_env::parser::Mode`) of a lexer. The parser and
+  lexer consult the mode to decide which syntax to accept.
+- New `parser::SyntaxError` variants that are raised when a non-portable
+  construct is encountered while the lexer's parsing mode has `portable` enabled:
+    - `NonPortableCaseTerminator` for a `;;&` or `;|` case terminator.
+    - `NonPortableRedirOperator` for a non-portable redirection operator (`>>|`
+      or `<<<`).
+    - `IoTokenAsRedirOperand` for an `IO_NUMBER` or `IO_LOCATION` token used as
+      a redirection operand.
+    - `MissingSeparatorBeforeReservedWord` for a clause-delimiting reserved word
+      (`}`, `done`, `fi`, `then`, etc.) that follows a subshell or a redirection
+      without a separator (as in `{ ( : ) }` or `for i in 1; do ( : ) done`).
+    - `NonPortableEscape` for a non-portable escape sequence in a
+      dollar-single-quoted string (`\E`, `\?`, `\u`, `\U`, or `\c@`).
+    - `TooLongHexEscape` for a `\x` escape in a dollar-single-quoted string
+      followed by more than two hexadecimal digits.
+    - `UnsupportedArithmeticCommand` and `UnsupportedExtendedGlob` for `((`
+      (which other shells parse as an arithmetic command) or `!(` (which other
+      shells parse as an extended glob) used at the beginning of a command.
+- `parser::SyntaxError::footnotes` and `parser::ErrorCause::footnotes`, which
+  return supplementary footnotes (a `source::pretty::FootnoteType` and its text)
+  to render with the error, such as a note that the error is reported because
+  the `portable` option is enabled.
+
+### Changed
+
+- The parser now rejects the following non-portable constructs when the lexer's
+  parsing mode has `portable` enabled. Without the mode, they are accepted as
+  before:
+    - The non-portable `;;&` and `;|` case terminators
+      (`SyntaxError::NonPortableCaseTerminator`).
+    - The non-portable `>>|` and `<<<` redirection operators
+      (`SyntaxError::NonPortableRedirOperator`) and `IO_NUMBER`/`IO_LOCATION`
+      tokens used as a redirection operand
+      (`SyntaxError::IoTokenAsRedirOperand`).
+    - A clause-delimiting reserved word (`}`, `done`, `fi`, `then`, etc.) that
+      follows a subshell or a redirection without a separator
+      (`SyntaxError::MissingSeparatorBeforeReservedWord`). A reserved word after
+      another reserved word (as in `{ { :; } }`) is still accepted.
+    - Non-portable escape sequences in a dollar-single-quoted string (`\E`, `\?`,
+      `\u`, `\U`, and `\c@`) (`SyntaxError::NonPortableEscape`), and a `\x`
+      escape followed by more than two hexadecimal digits
+      (`SyntaxError::TooLongHexEscape`).
+    - `((` (`SyntaxError::UnsupportedArithmeticCommand`) and `!(`
+      (`SyntaxError::UnsupportedExtendedGlob`) at the beginning of a command.
+      Without the mode, these are parsed as nested subshells and a negated
+      subshell, respectively.
+- `parser::Error::to_report` now attaches a `note:` footnote to errors caused by
+  the `portable` option, clarifying that the construct is rejected only because
+  the option is enabled.
+- The `yash_env::source::pretty::Report` returned by `parser::Error::to_report`
+  now includes footnotes from `parser::ErrorCause::footnotes`.
+- Public dependency versions:
+    - yash-env 0.15.0 → 0.15.3
+
 ## [0.22.0] - 2026-06-11
 
 ### Changed
@@ -670,6 +730,7 @@ command.
 - Functionalities to parse POSIX shell scripts
 - Alias substitution support
 
+[0.22.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.22.1
 [0.22.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.22.0
 [0.21.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.21.0
 [0.20.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.20.0

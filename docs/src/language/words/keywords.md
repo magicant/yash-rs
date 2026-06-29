@@ -42,6 +42,8 @@ Reserved words are recognized in these contexts:
 - `in` as the third word in a [for loop](../commands/loops.md#for-loops) or [case command](../commands/case.md)
 - `do` as the third word in a [for loop](../commands/loops.md#for-loops)
 
+As an extension, yash-rs additionally recognizes a reserved word immediately after a subshell or a redirection, which POSIX does not, so such scripts are not portable. (Since 3.3.0) The [`portable` option](../../environment/options.md#portable) rejects a reserved word in this position; insert `;` or a newline before it.
+
 ## Examples
 
 This example uses the reserved words `for`, `in`, `do`, and `done` in a [for loop](../commands/loops.md#for-loops):
@@ -77,3 +79,12 @@ To use `{` and `}` as reserved words, write them as separate words:
 $ { echo Hello; }
 Hello
 ```
+
+Per the extension described above, a reserved word is also recognized right after a subshell or a redirection. Here, the `}` closes the grouping even though it immediately follows the subshell `( … )`:
+
+```shell
+$ { ( echo Hello ) }
+Hello
+```
+
+This is not portable; inserting a separator, as in `{ ( echo Hello ); }`, makes it portable.

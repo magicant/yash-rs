@@ -126,6 +126,8 @@ pub enum Option {
     Notify,
     /// Makes a pipeline reflect the exit status of the last failed component.
     PipeFail,
+    /// Disables non-portable features.
+    Portable,
     /// Disables POSIX-incompatible features.
     PosixlyCorrect,
     /// Reads commands from the standard input.
@@ -175,6 +177,7 @@ impl Option {
             Monitor => Some(('m', On)),
             Notify => Some(('b', On)),
             PipeFail => None,
+            Portable => None,
             PosixlyCorrect => None,
             Stdin => Some(('s', On)),
             Unset => Some(('u', Off)),
@@ -205,6 +208,7 @@ impl Option {
             Monitor => "monitor",
             Notify => "notify",
             PipeFail => "pipefail",
+            Portable => "portable",
             PosixlyCorrect => "posixlycorrect",
             Stdin => "stdin",
             Unset => "unset",
@@ -270,6 +274,7 @@ impl FromStr for Option {
             ("monitor", Monitor),
             ("notify", Notify),
             ("pipefail", PipeFail),
+            ("portable", Portable),
             ("posixlycorrect", PosixlyCorrect),
             ("stdin", Stdin),
             ("unset", Unset),

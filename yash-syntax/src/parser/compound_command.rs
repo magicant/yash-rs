@@ -82,8 +82,29 @@ impl Parser<'_, '_> {
             None => return Ok(None),
         };
         let redirs = self.redirections().await?;
-        // TODO Reject `{ { :; } >foo }` and `{ ( : ) }` if POSIXly-correct
-        // (The last `}` is not regarded as a keyword in these cases.)
+
+        // POSIX recognizes a reserved word only when it is the first word of a
+        // command or follows another reserved word. This compound command ends
+        // with a reserved word (`}`, `done`, `fi`, `esac`) unless it is a
+        // subshell (which ends with the `)` operator) or has a redirection
+        // (which ends with a word). In those cases, a clause-delimiting reserved
+        // word that immediately follows (such as the `}` in `{ ( : ) }`) is not
+        // portably recognized, so reject it in portable mode.
+        let ends_with_reserved_word =
+            redirs.is_empty() && !matches!(command, CompoundCommand::Subshell { .. });
+        if self.mode().portable && !ends_with_reserved_word {
+            let next = self.peek_token().await?;
+            if let Token(Some(keyword)) = next.id
+                && keyword.is_clause_delimiter()
+            {
+                let location = next.word.location.clone();
+                return Err(Error {
+                    cause: SyntaxError::MissingSeparatorBeforeReservedWord.into(),
+                    location,
+                });
+            }
+        }
+
         Ok(Some(FullCompoundCommand { command, redirs }))
     }
 }
@@ -95,6 +116,7 @@ impl Parser<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::super::error::ErrorCause;
+    use super::super::lex::Keyword::CloseBrace;
     use super::super::lex::Lexer;
     use super::super::lex::Operator::Semicolon;
     use super::super::lex::TokenId::EndOfInput;
@@ -240,6 +262,144 @@ mod tests {
 
         let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, Operator(Semicolon));
+    }
+
+    fn portable_mode() -> yash_env::parser::Mode {
+        let mut mode = yash_env::parser::Mode::default();
+        mode.portable = true;
+        mode
+    }
+
+    #[test]
+    fn parser_full_compound_command_close_brace_after_subshell_rejected_in_portable_mode() {
+        // The `}` follows `)`, which is not a reserved word.
+        let mut lexer = Lexer::with_code("( : ) }");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser
+            .full_compound_command()
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::MissingSeparatorBeforeReservedWord)
+        );
+        assert_eq!(*e.location.code.value.borrow(), "( : ) }");
+        assert_eq!(e.location.range, 6..7);
+    }
+
+    #[test]
+    fn parser_full_compound_command_done_after_subshell_rejected_in_portable_mode() {
+        // The rule applies to any clause-delimiting reserved word, not just `}`.
+        let mut lexer = Lexer::with_code("( : ) done");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser
+            .full_compound_command()
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::MissingSeparatorBeforeReservedWord)
+        );
+        assert_eq!(e.location.range, 6..10);
+    }
+
+    #[test]
+    fn parser_full_compound_command_then_after_subshell_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("( : ) then");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser
+            .full_compound_command()
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::MissingSeparatorBeforeReservedWord)
+        );
+    }
+
+    #[test]
+    fn parser_full_compound_command_close_brace_after_redirection_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("{ :; } >foo }");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser
+            .full_compound_command()
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::MissingSeparatorBeforeReservedWord)
+        );
+    }
+
+    #[test]
+    fn parser_full_compound_command_close_brace_allowed_without_portable() {
+        let mut lexer = Lexer::with_code("( : ) }");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.full_compound_command().now_or_never().unwrap();
+        let FullCompoundCommand { command, .. } = result.unwrap().unwrap();
+        assert_eq!(command.to_string(), "(:)");
+
+        // The `}` is left unconsumed.
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
+        assert_eq!(next.id, Token(Some(CloseBrace)));
+    }
+
+    #[test]
+    fn parser_full_compound_command_separator_before_close_brace_allowed_in_portable_mode() {
+        let mut lexer = Lexer::with_code("( : ) ;");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.full_compound_command().now_or_never().unwrap();
+        let FullCompoundCommand { command, .. } = result.unwrap().unwrap();
+        assert_eq!(command.to_string(), "(:)");
+    }
+
+    #[test]
+    fn parser_full_compound_command_close_brace_after_grouping_allowed_in_portable_mode() {
+        // The `}` follows the inner grouping's `}`, which is a reserved word, so
+        // it is portable and must be accepted.
+        let mut lexer = Lexer::with_code("{ :; } }");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.full_compound_command().now_or_never().unwrap();
+        let FullCompoundCommand { command, redirs } = result.unwrap().unwrap();
+        assert_matches!(command, CompoundCommand::Grouping(_));
+        assert_eq!(redirs, []);
+
+        // The outer `}` is left unconsumed for the enclosing grouping.
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
+        assert_eq!(next.id, Token(Some(CloseBrace)));
+    }
+
+    #[test]
+    fn parser_full_compound_command_close_brace_after_if_allowed_in_portable_mode() {
+        // The `}` follows `fi`, which is a reserved word.
+        let mut lexer = Lexer::with_code("if true; then :; fi }");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.full_compound_command().now_or_never().unwrap();
+        let FullCompoundCommand { command, redirs } = result.unwrap().unwrap();
+        assert_matches!(command, CompoundCommand::If { .. });
+        assert_eq!(redirs, []);
+
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
+        assert_eq!(next.id, Token(Some(CloseBrace)));
     }
 
     #[test]

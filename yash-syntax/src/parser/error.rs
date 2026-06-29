@@ -16,11 +16,13 @@
 
 //! Definition of errors that happen in the parser
 
+use super::lex::Operator;
 use crate::source::Location;
 use crate::source::pretty::{
     Footnote, FootnoteType, Report, ReportType, Snippet, Span, SpanRole, add_span,
 };
 use crate::syntax::AndOr;
+use crate::syntax::RedirOp;
 use std::borrow::Cow;
 use std::rc::Rc;
 use thiserror::Error;
@@ -191,6 +193,61 @@ pub enum SyntaxError {
     UnsupportedDoubleBracketCommand,
     /// A process redirection (`>(...)` or `<(...)`) is used.
     UnsupportedProcessRedirection,
+    /// A `((...))` arithmetic command is used at the beginning of a command
+    /// while the `portable` option is on.
+    ///
+    /// yash-rs parses `((` as nested subshells, but other shells parse it as an
+    /// arithmetic command, which yash-rs does not support. The `portable` option
+    /// rejects this ambiguous form; insert a space (`( (`) for nested subshells.
+    UnsupportedArithmeticCommand,
+    /// A `!(...)` extended glob is used at the beginning of a command while the
+    /// `portable` option is on.
+    ///
+    /// yash-rs parses `!(` as the `!` reserved word followed by a subshell, but
+    /// other shells parse it as an extended glob, which yash-rs does not support.
+    /// The `portable` option rejects this ambiguous form; insert a space (`! (`).
+    UnsupportedExtendedGlob,
+    /// A `;;&` or `;|` case terminator is used while the `portable` option is on.
+    ///
+    /// The operator is the offending terminator (`SemicolonSemicolonAnd` or
+    /// `SemicolonBar`).
+    NonPortableCaseTerminator(Operator),
+    /// A non-portable redirection operator (`>>|` or `<<<`) is used while the
+    /// `portable` option is on.
+    ///
+    /// The operator is the offending redirection operator (`Pipe` or `String`).
+    NonPortableRedirOperator(RedirOp),
+    /// An `IO_NUMBER` or `IO_LOCATION` token appears as a redirection operand
+    /// while the `portable` option is on.
+    ///
+    /// This happens when a token that should be a redirection operand is
+    /// immediately followed by a redirection operator without a separating
+    /// space, so yash-rs lexes it as an `IO_NUMBER` or `IO_LOCATION` token (as
+    /// in the `1` in `< 1>file`). POSIX does not recognize such a token as a
+    /// redirection operand, so this form is not portable.
+    IoTokenAsRedirOperand,
+    /// A reserved word follows a subshell or a redirection without a separator
+    /// while the `portable` option is on (as in `{ ( : ) }` or
+    /// `for i in 1; do ( : ) done`).
+    ///
+    /// POSIX recognizes a reserved word only when it is the first word of a
+    /// command or follows another reserved word. A subshell ends with the `)`
+    /// operator and a redirection ends with a word, so a clause-delimiting
+    /// reserved word (such as `}`, `done`, or `fi`) that immediately follows one
+    /// is not portably recognized.
+    MissingSeparatorBeforeReservedWord,
+    /// A non-portable escape sequence is used in a dollar-single-quoted string
+    /// while the `portable` option is on.
+    ///
+    /// POSIX specifies a limited set of escape sequences for `$'...'`. This is
+    /// raised for yash extensions such as `\E`, `\?`, `\u`, `\U`, and `\c@`.
+    NonPortableEscape,
+    /// A `\x` escape in a dollar-single-quoted string is followed by more than
+    /// two hexadecimal digits while the `portable` option is on.
+    ///
+    /// POSIX leaves the result unspecified if more than two hexadecimal digits
+    /// follow `\x`, so such an escape is not portable.
+    TooLongHexEscape,
 }
 
 impl SyntaxError {
@@ -279,6 +336,16 @@ impl SyntaxError {
             UnsupportedFunctionDefinitionSyntax
             | UnsupportedDoubleBracketCommand
             | UnsupportedProcessRedirection => "unsupported syntax",
+            UnsupportedArithmeticCommand => "`((` is ambiguous at the start of a command",
+            UnsupportedExtendedGlob => "`!(` is ambiguous at the start of a command",
+            NonPortableCaseTerminator(_) => "the case terminator is not portable",
+            NonPortableRedirOperator(_) => "the redirection operator is not portable",
+            IoTokenAsRedirOperand => {
+                "the redirection operand is missing because the token belongs to the next redirection"
+            }
+            MissingSeparatorBeforeReservedWord => "a separator is missing before the reserved word",
+            NonPortableEscape => "the escape sequence is not portable",
+            TooLongHexEscape => "more than two hexadecimal digits follow `\\x`",
         }
     }
 
@@ -361,6 +428,59 @@ impl SyntaxError {
             UnsupportedFunctionDefinitionSyntax => "the `function` keyword is not yet supported",
             UnsupportedDoubleBracketCommand => "the `[[ ... ]]` command is not yet supported",
             UnsupportedProcessRedirection => "process redirection is not yet supported",
+            UnsupportedArithmeticCommand => {
+                "other shells read this as an arithmetic command; insert a space for nested subshells"
+            }
+            UnsupportedExtendedGlob => {
+                "other shells read this as an extended glob; insert a space after `!` for a negated subshell"
+            }
+            NonPortableCaseTerminator(Operator::SemicolonSemicolonAnd) => {
+                "`;;&` is not a POSIX case terminator"
+            }
+            NonPortableCaseTerminator(Operator::SemicolonBar) => {
+                "`;|` is not a POSIX case terminator"
+            }
+            NonPortableCaseTerminator(_) => "not a POSIX case terminator",
+            NonPortableRedirOperator(RedirOp::Pipe) => "`>>|` is not a POSIX redirection operator",
+            NonPortableRedirOperator(RedirOp::String) => {
+                "`<<<` is not a POSIX redirection operator"
+            }
+            NonPortableRedirOperator(_) => "not a POSIX redirection operator",
+            IoTokenAsRedirOperand => "add a space before the following redirection operator",
+            MissingSeparatorBeforeReservedWord => {
+                "insert `;` or a newline before this reserved word"
+            }
+            NonPortableEscape => "not a POSIX escape sequence",
+            TooLongHexEscape => "use at most two hexadecimal digits",
+        }
+    }
+
+    /// Returns footnotes that supplement the error message.
+    ///
+    /// Each item pairs a [`FootnoteType`] with its text. The footnotes are to
+    /// be rendered after the error's source code snippet. The slice is empty
+    /// for errors that need no footnote.
+    #[must_use]
+    pub fn footnotes(&self) -> &'static [(FootnoteType, &'static str)] {
+        use SyntaxError::*;
+        match self {
+            BangAfterBar => &[(
+                FootnoteType::Suggestion,
+                // TODO Replace with a span-attached patch (SpanRole::Patch)
+                "surround the pipeline component in a grouping: `{ ! ...; }`",
+            )],
+            UnsupportedArithmeticCommand
+            | UnsupportedExtendedGlob
+            | NonPortableCaseTerminator(_)
+            | NonPortableRedirOperator(_)
+            | IoTokenAsRedirOperand
+            | MissingSeparatorBeforeReservedWord
+            | NonPortableEscape
+            | TooLongHexEscape => &[(
+                FootnoteType::Note,
+                "this error is reported because the `portable` shell option is enabled",
+            )],
+            _ => &[],
         }
     }
 
@@ -465,6 +585,18 @@ impl ErrorCause {
         }
     }
 
+    /// Returns footnotes that supplement the error message.
+    ///
+    /// See [`SyntaxError::footnotes`] for details.
+    #[must_use]
+    pub fn footnotes(&self) -> &'static [(FootnoteType, &'static str)] {
+        use ErrorCause::*;
+        match self {
+            Io(_) => &[],
+            Syntax(e) => e.footnotes(),
+        }
+    }
+
     /// Returns a location related with the error cause and a message describing
     /// the location.
     #[must_use]
@@ -493,6 +625,11 @@ pub struct Error {
 
 impl Error {
     /// Returns a report for the error.
+    ///
+    /// This method constructs a [`Report`] from the error's cause and location.
+    /// The result includes information obtained from [`ErrorCause::message`],
+    /// [`ErrorCause::label`], [`ErrorCause::footnotes`], and
+    /// [`ErrorCause::related_location`].
     #[must_use]
     pub fn to_report(&self) -> Report<'_> {
         let mut report = Report::new();
@@ -509,13 +646,15 @@ impl Error {
             add_span(&location.code, span, &mut report.snippets);
         }
 
-        if let ErrorCause::Syntax(SyntaxError::BangAfterBar) = &self.cause {
-            // TODO Suggest the change with SpanRole::Patch
-            report.footnotes.push(Footnote {
-                r#type: FootnoteType::Suggestion,
-                label: "surround the pipeline component in a grouping: `{ ! ...; }`".into(),
-            });
-        }
+        report.footnotes.extend(
+            self.cause
+                .footnotes()
+                .iter()
+                .map(|&(r#type, label)| Footnote {
+                    r#type,
+                    label: label.into(),
+                }),
+        );
 
         report
     }
@@ -584,5 +723,53 @@ mod tests {
             SpanRole::Primary { label } if label == "expected a delimiter word"
         );
         assert_eq!(report.footnotes, []);
+    }
+
+    #[test]
+    fn footnotes_for_syntax_error() {
+        // Errors caused by the `portable` option have a note.
+        let note = (
+            FootnoteType::Note,
+            "this error is reported because the `portable` shell option is enabled",
+        );
+        assert_eq!(SyntaxError::IoTokenAsRedirOperand.footnotes(), [note]);
+        assert_eq!(
+            SyntaxError::UnsupportedArithmeticCommand.footnotes(),
+            [note]
+        );
+        // A suggestion is offered for `!` in the middle of a pipeline.
+        assert_eq!(
+            SyntaxError::BangAfterBar.footnotes(),
+            [(
+                FootnoteType::Suggestion,
+                "surround the pipeline component in a grouping: `{ ! ...; }`"
+            )]
+        );
+        // Errors unrelated to the `portable` option have no footnote.
+        assert_eq!(SyntaxError::MissingHereDocDelimiter.footnotes(), []);
+        // Unconditionally unsupported syntax is not caused by the option.
+        assert_eq!(SyntaxError::UnsupportedDoubleBracketCommand.footnotes(), []);
+    }
+
+    #[test]
+    fn report_has_footnote_for_portable_error() {
+        let code = Rc::new(Code {
+            value: "((:))".to_string().into(),
+            start_line_number: NonZeroU64::new(1).unwrap(),
+            source: Source::Unknown.into(),
+        });
+        let error = Error {
+            cause: SyntaxError::UnsupportedArithmeticCommand.into(),
+            location: Location { code, range: 0..2 },
+        };
+
+        let report = Report::from(&error);
+
+        assert_eq!(report.footnotes.len(), 1);
+        assert_eq!(report.footnotes[0].r#type, FootnoteType::Note);
+        assert_eq!(
+            report.footnotes[0].label,
+            "this error is reported because the `portable` shell option is enabled"
+        );
     }
 }

@@ -72,6 +72,23 @@ test_OE -e 0 'exit status of case command with subject containing command substi
 case $(echo 1; exit 42) in esac
 __IN__
 
+test_O -d -e 2 'portable option rejects ;;& terminator' -o portable
+case 1 in 1) echo not reached;;& esac
+__IN__
+
+test_O -d -e 2 'portable option rejects ;| terminator' -o portable
+case 1 in 1) echo not reached;| esac
+__IN__
+
+test_oE 'portable option allows the portable ;; and ;& terminators' -o portable
+case a in a) echo one;; esac
+case b in b) echo two;& c) echo three;; esac
+__IN__
+one
+two
+three
+__OUT__
+
 test_O -d -e 2 'in without case'
 in
 __IN__

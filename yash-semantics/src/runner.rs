@@ -22,6 +22,7 @@ use crate::{Handle as _, Runtime};
 use std::cell::RefCell;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
+use yash_env::parser::Mode;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
@@ -149,6 +150,11 @@ async fn read_eval_loop_impl<S: Runtime + 'static>(
         if !lexer.pending() {
             lexer.flush();
         }
+
+        // Refresh the parsing mode so that shell options changed by previously
+        // executed commands (e.g. via the `set` built-in) take effect on the
+        // command line parsed below.
+        lexer.set_mode(Mode::from(&env.borrow().options));
 
         let command = Parser::config()
             .aliases(env)

@@ -69,6 +69,17 @@ impl Parser<'_, '_> {
         let open = self.take_token_raw().await?;
         assert_eq!(open.id, Operator(OpenParen));
 
+        // In portable mode, reject `((` (which other shells parse as an
+        // arithmetic command) at the beginning of a command.
+        if self.mode().portable {
+            let next = self.peek_token().await?;
+            if next.id == Operator(OpenParen) && next.index == open.index + 1 {
+                let location = next.word.location.clone();
+                let cause = SyntaxError::UnsupportedArithmeticCommand.into();
+                return Err(Error { cause, location });
+            }
+        }
+
         let list = self.maybe_compound_list_boxed().await?;
 
         let close = self.take_token_raw().await?;
@@ -259,5 +270,57 @@ mod tests {
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 2..3);
+    }
+
+    fn portable_mode() -> yash_env::parser::Mode {
+        let mut mode = yash_env::parser::Mode::default();
+        mode.portable = true;
+        mode
+    }
+
+    #[test]
+    fn parser_subshell_double_open_paren_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("((:))");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser
+            .compound_command()
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::UnsupportedArithmeticCommand)
+        );
+        // The error points at the second `(`.
+        assert_eq!(e.location.range, 1..2);
+    }
+
+    #[test]
+    fn parser_subshell_spaced_open_parens_accepted_in_portable_mode() {
+        // A space between the parentheses makes it portable nested subshells.
+        let mut lexer = Lexer::with_code("( (:))");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::Subshell { body, .. } => {
+            assert_eq!(body.to_string(), "(:)");
+        });
+    }
+
+    #[test]
+    fn parser_subshell_double_open_paren_accepted_without_portable() {
+        // Without the portable option, `((` is parsed as nested subshells.
+        let mut lexer = Lexer::with_code("((:))");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::Subshell { body, .. } => {
+            assert_eq!(body.to_string(), "(:)");
+        });
     }
 }

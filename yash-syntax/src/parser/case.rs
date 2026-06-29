@@ -24,6 +24,7 @@ use super::error::SyntaxError;
 use super::lex::Keyword::{Case, Esac, In};
 use super::lex::Operator::{Bar, CloseParen, Newline, OpenParen};
 use super::lex::TokenId::{self, EndOfInput, Operator, Token};
+use crate::syntax::CaseContinuation;
 use crate::syntax::CaseItem;
 use crate::syntax::CompoundCommand;
 
@@ -109,8 +110,18 @@ impl Parser<'_, '_> {
         let continued = continuation.is_some();
         let continuation = continuation.unwrap_or_default();
         if continued {
-            self.take_token_raw().await?;
-            // TODO Reject Continue in strict POSIX mode
+            let token = self.take_token_raw().await?;
+            // The `;;&` and `;|` terminators (both parsed as `Continue`) are not
+            // portable, so reject them when the `portable` option is on.
+            if self.mode().portable && continuation == CaseContinuation::Continue {
+                let Operator(op) = token.id else {
+                    unreachable!("expected operator token, got {:?}", token.id);
+                };
+                return Err(Error {
+                    cause: SyntaxError::NonPortableCaseTerminator(op).into(),
+                    location: token.word.location,
+                });
+            }
         }
 
         Ok(Some((
@@ -190,6 +201,7 @@ impl Parser<'_, '_> {
 mod tests {
     use super::super::error::ErrorCause;
     use super::super::lex::Lexer;
+    use super::super::lex::Operator::{SemicolonBar, SemicolonSemicolonAnd};
     use super::*;
     use crate::alias::{AliasSet, HashEntry};
     use crate::source::Location;
@@ -340,6 +352,66 @@ mod tests {
 
         let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
+    }
+
+    fn portable_mode() -> yash_env::parser::Mode {
+        let mut mode = yash_env::parser::Mode::default();
+        mode.portable = true;
+        mode
+    }
+
+    #[test]
+    fn parser_case_item_double_semicolon_and_allowed_without_portable() {
+        let mut lexer = Lexer::with_code("foo);;&");
+        let mut parser = Parser::new(&mut lexer);
+
+        let (item, continued) = parser.case_item().now_or_never().unwrap().unwrap().unwrap();
+        assert_eq!(item.continuation, CaseContinuation::Continue);
+        assert!(continued);
+    }
+
+    #[test]
+    fn parser_case_item_double_semicolon_and_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("foo);;&");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.case_item().now_or_never().unwrap().unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::NonPortableCaseTerminator(
+                SemicolonSemicolonAnd
+            ))
+        );
+        assert_eq!(*e.location.code.value.borrow(), "foo);;&");
+        assert_eq!(e.location.range, 4..7);
+    }
+
+    #[test]
+    fn parser_case_item_semicolon_bar_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("foo);|");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.case_item().now_or_never().unwrap().unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::NonPortableCaseTerminator(SemicolonBar))
+        );
+        assert_eq!(e.location.range, 4..6);
+    }
+
+    #[test]
+    fn parser_case_item_portable_terminators_allowed_in_portable_mode() {
+        // `;;` (Break) and `;&` (FallThrough) are portable and must be accepted.
+        for code in ["foo);;", "foo);&"] {
+            let mut lexer = Lexer::with_code(code);
+            lexer.set_mode(portable_mode());
+            let mut parser = Parser::new(&mut lexer);
+
+            let result = parser.case_item().now_or_never().unwrap();
+            assert!(result.is_ok(), "code={code:?}, result={result:?}");
+        }
     }
 
     #[test]

@@ -23,7 +23,7 @@ Hello
 World
 ```
 
-Since `{` and `}` are [reserved words](../words/keywords.md), they must appear as separate words. See [examples in the Keywords section](../words/keywords.md#examples).
+Since `{` and `}` are [reserved words](../words/keywords.md), they must appear as separate words. See [examples in the Keywords section](../words/keywords.md#examples) and [where reserved words are recognized](../words/keywords.md#where-are-reserved-words-recognized).
 
 Braces are especially useful for treating several commands as a single unit in [pipelines](pipelines.md) or [and-or lists](exit_status.md#and-or-lists):
 
@@ -53,11 +53,13 @@ Since `(` and `)` are operators, they can be used without spaces.
 
 ## Compatibility
 
-Some shells treat two adjacent `(` characters specially. For best compatibility, separate open parentheses with a space to nest subshells:
+Some shells treat two adjacent `(` characters specially as an arithmetic command. For best compatibility, separate open parentheses with a space to nest subshells:
 
 ```shell
 $ ( (echo "Hello"))
 Hello
 ```
+
+(Since 3.3.0) The [`portable` option](../../environment/options.md#portable) rejects `((` at the beginning of a command for this reason.
 
 [shell environment]: ../../environment/index.html

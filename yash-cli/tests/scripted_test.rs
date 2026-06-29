@@ -282,6 +282,11 @@ fn grouping() {
 }
 
 #[test]
+fn grouping_ex() {
+    run("grouping-y.sh")
+}
+
+#[test]
 fn if_command() {
     run("if-p.sh")
 }
@@ -400,6 +405,11 @@ fn readonly_builtin() {
 #[test]
 fn redirection() {
     run("redir-p.sh")
+}
+
+#[test]
+fn redirection_ex() {
+    run("redir-y.sh")
 }
 
 #[test]

@@ -148,6 +148,8 @@ The following escape sequences are recognized inside dollar single quotes:
 
 Unrecognized or incomplete escape sequences cause an error.
 
+POSIX specifies only a subset of these escape sequences for `$'…'`. The `\E`, `\?`, `\u`, and `\U` escapes, the `\c@` control escape, and `\x` followed by more than two hexadecimal digits are yash extensions that are not portable. (Since 3.3.0) The [`portable` option](../../environment/options.md#portable) rejects them.
+
 A backslash followed by a newline is not treated as a [line continuation](#line-continuation) inside dollar single quotes; they are rejected as an error.
 
 Example with Unicode:
