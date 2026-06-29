@@ -580,4 +580,16 @@ mod tests {
             assert_eq!(operand.to_string(), "1");
         });
     }
+
+    #[test]
+    fn parser_redirection_io_location_operand_allowed_without_portable() {
+        let mut lexer = Lexer::with_code("< {n}>");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.redirection().now_or_never().unwrap();
+        let redir = result.unwrap().unwrap();
+        assert_matches!(redir.body, RedirBody::Normal { operand, .. } => {
+            assert_eq!(operand.to_string(), "{n}");
+        });
+    }
 }
