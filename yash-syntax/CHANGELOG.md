@@ -30,6 +30,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `MissingSeparatorBeforeReservedWord` for a clause-delimiting reserved word
       (`}`, `done`, `fi`, `then`, etc.) that follows a subshell or a redirection
       without a separator (as in `{ ( : ) }` or `for i in 1; do ( : ) done`).
+    - `ColonSuffixedCommandName` for a command name ending with a `:` (other than
+      the lone `:` built-in), which POSIX reserves for possible future use.
     - `NonPortableEscape` for a non-portable escape sequence in a
       dollar-single-quoted string (`\E`, `\?`, `\u`, `\U`, or `\c@`).
     - `TooLongHexEscape` for a `\x` escape in a dollar-single-quoted string
@@ -57,6 +59,8 @@ A _private dependency_ is used internally and not visible to downstream users.
       follows a subshell or a redirection without a separator
       (`SyntaxError::MissingSeparatorBeforeReservedWord`). A reserved word after
       another reserved word (as in `{ { :; } }`) is still accepted.
+    - A command name ending with a `:`
+      (`SyntaxError::ColonSuffixedCommandName`), except the lone `:` built-in.
     - Non-portable escape sequences in a dollar-single-quoted string (`\E`, `\?`,
       `\u`, `\U`, and `\c@`) (`SyntaxError::NonPortableEscape`), and a `\x`
       escape followed by more than two hexadecimal digits

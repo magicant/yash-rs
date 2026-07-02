@@ -30,7 +30,10 @@ use crate::syntax::MaybeLiteral as _;
 use crate::syntax::Redir;
 use crate::syntax::Scalar;
 use crate::syntax::SimpleCommand;
+use crate::syntax::TextUnit::Literal;
+use crate::syntax::Unquote as _;
 use crate::syntax::Word;
+use crate::syntax::WordUnit::Unquoted;
 
 /// Determines the expansion mode of a word.
 ///
@@ -42,7 +45,6 @@ use crate::syntax::Word;
 /// parsed after the equal sign. Otherwise, the expansion mode is
 /// `ExpansionMode::Multiple`, and the word is returned as is.
 fn determine_expansion_mode(word: Word) -> (Word, ExpansionMode) {
-    use crate::syntax::{TextUnit::Literal, WordUnit::Unquoted};
     if let Some(eq) = word.units.iter().position(|u| *u == Unquoted(Literal('=')))
         && let Some(name) = word.units[..eq].to_string_if_literal()
         && !name.is_empty()
@@ -52,6 +54,31 @@ fn determine_expansion_mode(word: Word) -> (Word, ExpansionMode) {
         return (word, ExpansionMode::Single);
     }
     (word, ExpansionMode::Multiple)
+}
+
+/// Tests if a word ends with a `:`, but is not equal to `:`.
+///
+/// This is used to determine if a word is a reserved word in the portable
+/// parsing mode. POSIX reserves words ending with a `:` for possible future
+/// use, so we reject one used as a command name.
+///
+/// Technically, a single `:` is reserved, but it is also a built-in utility,
+/// so we don't reject it as a command name.
+fn ends_with_colon(word: &Word) -> bool {
+    if word.units.len() <= 1 {
+        // Since we allow a single `:`, the word must have at least two units to end with a `:`.
+        return false;
+    }
+
+    if let Some(unit) = word.units.last()
+        && unit != &Unquoted(Literal(':'))
+    {
+        // The word does not end with a `:`.
+        return false;
+    }
+
+    // Quoted words are not reserved
+    !word.unquote().1
 }
 
 /// Simple command builder
@@ -172,6 +199,24 @@ impl Parser<'_, '_> {
                 Ok(assign) => assign,
                 Err(word) => {
                     debug_assert!(is_declaration_utility.is_none());
+
+                    // POSIX reserves words ending with a `:` for possible future
+                    // use, so reject one used as a command name (the first token
+                    // of the command, where a reserved word would be recognized)
+                    // in the portable parsing mode. Like the keyword check above,
+                    // `result.is_empty()` restricts this to that leading
+                    // position. Unlike keywords (which are known at the peek
+                    // above from the token ID), we test the word only here, after
+                    // `Assign::try_from`, to keep an assignment whose value ends
+                    // with `:` (such as `PATH=/bin:`) from being regarded as a
+                    // colon-suffixed command name.
+                    if self.mode().portable && result.is_empty() && ends_with_colon(&word) {
+                        return Err(Error {
+                            cause: SyntaxError::ColonSuffixedCommandName.into(),
+                            location: word.location,
+                        });
+                    }
+
                     is_declaration_utility = self.word_names_declaration_utility(&word);
                     result.words.push((word, ExpansionMode::Multiple));
                     continue;
@@ -750,6 +795,106 @@ mod tests {
         assert_eq!(sc.words[0].1, ExpansionMode::Multiple);
         assert_eq!(sc.words[1].0.to_string(), "a=b");
         assert_eq!(sc.words[1].1, ExpansionMode::Single);
+    }
+
+    fn portable_mode() -> yash_env::parser::Mode {
+        let mut mode = yash_env::parser::Mode::default();
+        mode.portable = true;
+        mode
+    }
+
+    #[test]
+    fn command_name_ending_with_colon_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("$foo:");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.simple_command().now_or_never().unwrap().unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::ColonSuffixedCommandName)
+        );
+        assert_eq!(*e.location.code.value.borrow(), "$foo:");
+        assert_eq!(e.location.range, 0..5);
+    }
+
+    #[test]
+    fn lone_colon_command_name_accepted_in_portable_mode() {
+        // The `:` built-in is not a word reserved by POSIX.
+        let mut lexer = Lexer::with_code(":");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.words.len(), 1);
+        assert_eq!(sc.words[0].0.to_string(), ":");
+    }
+
+    #[test]
+    fn command_name_ending_with_colon_accepted_without_portable_mode() {
+        let mut lexer = Lexer::with_code("$foo:");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.words.len(), 1);
+        assert_eq!(sc.words[0].0.to_string(), "$foo:");
+    }
+
+    #[test]
+    fn argument_ending_with_colon_accepted_in_portable_mode() {
+        // Only the command name is a reserved-word recognition position.
+        let mut lexer = Lexer::with_code("echo foo:");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.words.len(), 2);
+        assert_eq!(sc.words[0].0.to_string(), "echo");
+        assert_eq!(sc.words[1].0.to_string(), "foo:");
+    }
+
+    #[test]
+    fn command_name_ending_with_colon_after_assignment_accepted_in_portable_mode() {
+        // A word after an assignment is not a reserved-word recognition position.
+        let mut lexer = Lexer::with_code("a=b foo:");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns.len(), 1);
+        assert_eq!(sc.words.len(), 1);
+        assert_eq!(sc.words[0].0.to_string(), "foo:");
+    }
+
+    #[test]
+    fn quoted_colon_suffix_command_name_accepted_in_portable_mode() {
+        // A quoted trailing colon is not recognized as a reserved word.
+        let mut lexer = Lexer::with_code(r"foo\:");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.words.len(), 1);
+        assert_eq!(sc.words[0].0.to_string(), r"foo\:");
+    }
+
+    #[test]
+    fn assignment_value_ending_with_colon_accepted_in_portable_mode() {
+        // An assignment whose value ends with `:` is not a command name.
+        let mut lexer = Lexer::with_code("a=b:");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns.len(), 1);
+        assert_eq!(sc.assigns[0].name, "a");
+        assert_eq!(sc.assigns[0].value.to_string(), "b:");
     }
 
     #[test]

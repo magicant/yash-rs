@@ -433,6 +433,11 @@ fn simple_command() {
 }
 
 #[test]
+fn simple_command_ex() {
+    run("simple-y.sh")
+}
+
+#[test]
 fn source_builtin() {
     run("source-p.sh")
 }
