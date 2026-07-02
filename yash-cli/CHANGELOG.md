@@ -9,6 +9,16 @@ used by other programs.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.2] - Unreleased
+
+### Fixed
+
+- A here-document whose delimiter is quoted with double quotes or
+  `$'...'` (e.g. `<<"EOF"`) is now correctly treated as quoted. Previously,
+  such a delimiter consisting only of literal characters was misdetected as
+  unquoted, so the here-document body was incorrectly subject to parameter,
+  command, and arithmetic expansion.
+
 ## [3.2.1] - 2026-06-21
 
 ### Changed
@@ -361,6 +371,7 @@ later.
 
 - Initial release of the shell
 
+[3.2.2]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.2.2
 [3.2.1]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.2.1
 [3.2.0]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.2.0
 [3.1.0]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.1.0

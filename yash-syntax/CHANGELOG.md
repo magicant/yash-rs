@@ -13,6 +13,16 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.22.1] - Unreleased
+
+### Fixed
+
+- `Unquote` implementations for `WordUnit::DoubleQuote` and
+  `WordUnit::DollarSingleQuote` now always report the word as quoted,
+  regardless of its content. Previously, a double-quoted or
+  dollar-single-quoted word consisting only of literal characters (e.g.
+  `"EOF"`) was incorrectly treated as unquoted.
+
 ## [0.22.0] - 2026-06-11
 
 ### Changed
@@ -670,6 +680,7 @@ command.
 - Functionalities to parse POSIX shell scripts
 - Alias substitution support
 
+[0.22.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.22.1
 [0.22.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.22.0
 [0.21.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.21.0
 [0.20.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.20.0
