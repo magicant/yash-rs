@@ -77,6 +77,14 @@ A _private dependency_ is used internally and not visible to downstream users.
 - Public dependency versions:
     - yash-env 0.15.0 → 0.15.3
 
+### Fixed
+
+- `Unquote` implementations for `WordUnit::DoubleQuote` and
+  `WordUnit::DollarSingleQuote` now always report the word as quoted,
+  regardless of its content. Previously, a double-quoted or
+  dollar-single-quoted word consisting only of literal characters (e.g.
+  `"EOF"`) was incorrectly treated as unquoted.
+
 ## [0.22.0] - 2026-06-11
 
 ### Changed

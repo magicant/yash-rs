@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the manual for the constructs it rejects. More checks will be added in
   future releases.
 
+### Fixed
+
+- A here-document whose delimiter is quoted with double quotes or
+  `$'...'` (e.g. `<<"EOF"`) is now correctly treated as quoted. Previously,
+  such a delimiter consisting only of literal characters was misdetected as
+  unquoted, so the here-document body was incorrectly subject to parameter,
+  command, and arithmetic expansion.
+
 ## [3.2.1] - 2026-06-21
 
 ### Changed
