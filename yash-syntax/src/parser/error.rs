@@ -236,6 +236,13 @@ pub enum SyntaxError {
     /// reserved word (such as `}`, `done`, or `fi`) that immediately follows one
     /// is not portably recognized.
     MissingSeparatorBeforeReservedWord,
+    /// A command name ends with a `:` while the `portable` option is on.
+    ///
+    /// POSIX reserves words whose final character is a `:` for possible future
+    /// use, so such a word produces unspecified results when used where a
+    /// reserved word would be recognized (such as a command name). The lone
+    /// `:` (the colon built-in) is not affected.
+    ColonSuffixedCommandName,
     /// A non-portable escape sequence is used in a dollar-single-quoted string
     /// while the `portable` option is on.
     ///
@@ -344,6 +351,7 @@ impl SyntaxError {
                 "the redirection operand is missing because the token belongs to the next redirection"
             }
             MissingSeparatorBeforeReservedWord => "a separator is missing before the reserved word",
+            ColonSuffixedCommandName => "the command name is not portable",
             NonPortableEscape => "the escape sequence is not portable",
             TooLongHexEscape => "more than two hexadecimal digits follow `\\x`",
         }
@@ -450,6 +458,7 @@ impl SyntaxError {
             MissingSeparatorBeforeReservedWord => {
                 "insert `;` or a newline before this reserved word"
             }
+            ColonSuffixedCommandName => "a command name ending with `:` is reserved by POSIX",
             NonPortableEscape => "not a POSIX escape sequence",
             TooLongHexEscape => "use at most two hexadecimal digits",
         }
@@ -475,6 +484,7 @@ impl SyntaxError {
             | NonPortableRedirOperator(_)
             | IoTokenAsRedirOperand
             | MissingSeparatorBeforeReservedWord
+            | ColonSuffixedCommandName
             | NonPortableEscape
             | TooLongHexEscape => &[(
                 FootnoteType::Note,

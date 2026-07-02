@@ -31,7 +31,7 @@ Additionally, the POSIX standard allows for the following optional reserved word
 - `time` – Time command
 - Any words that end with a colon (`:`)
 
-These words are not reserved in yash-rs now, but may be in the future.
+These words are not reserved in yash-rs now, but may be in the future. (Since 3.3.0) The [`portable` option](../../environment/options.md#portable) rejects a command name ending with a `:` (the lone `:` [colon built-in](../../builtins/colon.md) is exempt).
 
 ## Where are reserved words recognized?
 
