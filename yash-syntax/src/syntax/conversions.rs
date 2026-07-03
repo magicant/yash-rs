@@ -455,8 +455,14 @@ impl Unquote for WordUnit {
                 w.write_str(inner)?;
                 Ok(true)
             }
-            DoubleQuote(inner) => inner.write_unquoted(w),
-            DollarSingleQuote(inner) => inner.write_unquoted(w),
+            DoubleQuote(inner) => {
+                inner.write_unquoted(w)?;
+                Ok(true)
+            }
+            DollarSingleQuote(inner) => {
+                inner.write_unquoted(w)?;
+                Ok(true)
+            }
             Tilde { name, .. } => {
                 write!(w, "~{name}")?;
                 Ok(false)
@@ -898,6 +904,30 @@ mod tests {
         word.parse_tilde_front();
         let (unquoted, is_quoted) = word.unquote();
         assert_eq!(unquoted, "~a/bcde");
+        assert_eq!(is_quoted, true);
+    }
+
+    #[test]
+    fn word_unquote_double_quote_with_only_literal_content() {
+        let word = Word::from_str(r#""EOF""#).unwrap();
+        let (unquoted, is_quoted) = word.unquote();
+        assert_eq!(unquoted, "EOF");
+        assert_eq!(is_quoted, true);
+    }
+
+    #[test]
+    fn word_unquote_double_quote_with_expansion() {
+        let word = Word::from_str(r#""$foo""#).unwrap();
+        let (unquoted, is_quoted) = word.unquote();
+        assert_eq!(unquoted, "$foo");
+        assert_eq!(is_quoted, true);
+    }
+
+    #[test]
+    fn word_unquote_dollar_single_quote() {
+        let word = Word::from_str(r"$'EOF'").unwrap();
+        let (unquoted, is_quoted) = word.unquote();
+        assert_eq!(unquoted, "EOF");
         assert_eq!(is_quoted, true);
     }
 
