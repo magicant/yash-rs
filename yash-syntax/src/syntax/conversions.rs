@@ -896,39 +896,107 @@ mod tests {
 
     #[test]
     fn word_unquote() {
-        let mut word = Word::from_str(r#"~a/b\c'd'"e""#).unwrap();
+        // A word's unquoted result is the concatenation of its units', and it
+        // is quoted if any of its units is quoted.
+        let word = Word::from_str(r#"a\b'c'"#).unwrap();
         let (unquoted, is_quoted) = word.unquote();
-        assert_eq!(unquoted, "~a/bcde");
+        assert_eq!(unquoted, "abc");
         assert_eq!(is_quoted, true);
 
-        word.parse_tilde_front();
+        let word = Word::from_str("abc").unwrap();
         let (unquoted, is_quoted) = word.unquote();
-        assert_eq!(unquoted, "~a/bcde");
+        assert_eq!(unquoted, "abc");
+        assert_eq!(is_quoted, false);
+    }
+
+    #[test]
+    fn word_unit_unquote_unquoted() {
+        // The result of an unquoted word unit is that of its content.
+        let unit = Unquoted(Literal('a'));
+        let (unquoted, is_quoted) = unit.unquote();
+        assert_eq!(unquoted, "a");
+        assert_eq!(is_quoted, false);
+
+        let unit = Unquoted(Backslashed('a'));
+        let (unquoted, is_quoted) = unit.unquote();
+        assert_eq!(unquoted, "a");
         assert_eq!(is_quoted, true);
     }
 
     #[test]
-    fn word_unquote_double_quote_with_only_literal_content() {
-        let word = Word::from_str(r#""EOF""#).unwrap();
-        let (unquoted, is_quoted) = word.unquote();
+    fn word_unit_unquote_single_quote() {
+        // A single-quoted word unit is always quoted, even if empty.
+        let unit = SingleQuote(String::new());
+        let (unquoted, is_quoted) = unit.unquote();
+        assert_eq!(unquoted, "");
+        assert_eq!(is_quoted, true);
+
+        let unit = SingleQuote(r#"a"b\c"#.to_string());
+        let (unquoted, is_quoted) = unit.unquote();
+        assert_eq!(unquoted, r#"a"b\c"#);
+        assert_eq!(is_quoted, true);
+    }
+
+    #[test]
+    fn word_unit_unquote_double_quote() {
+        // A double-quoted word unit is always quoted, even if its content
+        // consists only of literal characters.
+        let unit = DoubleQuote(Text(vec![Literal('E'), Literal('O'), Literal('F')]));
+        let (unquoted, is_quoted) = unit.unquote();
         assert_eq!(unquoted, "EOF");
         assert_eq!(is_quoted, true);
-    }
 
-    #[test]
-    fn word_unquote_double_quote_with_expansion() {
-        let word = Word::from_str(r#""$foo""#).unwrap();
-        let (unquoted, is_quoted) = word.unquote();
+        // The content of a double-quoted word unit is unquoted, so an
+        // expansion inside it is preserved.
+        let unit = DoubleQuote(Text(vec![RawParam {
+            param: Param::variable("foo"),
+            location: Location::dummy(""),
+        }]));
+        let (unquoted, is_quoted) = unit.unquote();
         assert_eq!(unquoted, "$foo");
         assert_eq!(is_quoted, true);
     }
 
     #[test]
-    fn word_unquote_dollar_single_quote() {
-        let word = Word::from_str(r"$'EOF'").unwrap();
-        let (unquoted, is_quoted) = word.unquote();
+    fn word_unit_unquote_dollar_single_quote() {
+        // A dollar-single-quoted word unit is always quoted, even if its
+        // content consists only of literal characters.
+        let unit = DollarSingleQuote(EscapedString(vec![
+            EscapeUnit::Literal('E'),
+            EscapeUnit::Literal('O'),
+            EscapeUnit::Literal('F'),
+        ]));
+        let (unquoted, is_quoted) = unit.unquote();
         assert_eq!(unquoted, "EOF");
         assert_eq!(is_quoted, true);
+
+        let unit = DollarSingleQuote(EscapedString(vec![
+            EscapeUnit::Literal('a'),
+            EscapeUnit::Backslash,
+        ]));
+        let (unquoted, is_quoted) = unit.unquote();
+        assert_eq!(unquoted, r"a\");
+        assert_eq!(is_quoted, true);
+    }
+
+    #[test]
+    fn word_unit_unquote_tilde() {
+        // A tilde word unit is not quoted.
+        let unit = Tilde {
+            name: String::new(),
+            followed_by_slash: false,
+        };
+        let (unquoted, is_quoted) = unit.unquote();
+        assert_eq!(unquoted, "~");
+        assert_eq!(is_quoted, false);
+
+        let unit = Tilde {
+            name: "foo".to_string(),
+            followed_by_slash: true,
+        };
+        let (unquoted, is_quoted) = unit.unquote();
+        assert_eq!(unquoted, "~foo");
+        assert_eq!(is_quoted, false);
     }
 
     #[test]
