@@ -6,6 +6,7 @@ Some words have special meaning in shell syntax. These **reserved words** must b
 - `{` – Start of a [grouping](../commands/grouping.md#braces)
 - `}` – End of a [grouping](../commands/grouping.md#braces)
 - `[[` – Start of a double bracket command
+- `]]` – End of a double bracket command (since 3.3.0)
 - `case` – [Case command](../commands/case.md)
 - `do` – Start of a loop or conditional block
 - `done` – End of a loop or conditional block
@@ -17,17 +18,16 @@ Some words have special meaning in shell syntax. These **reserved words** must b
 - `function` – [Function](../functions.md) definition
 - `if` – [If command](../commands/exit_status.md#if-commands)
 - `in` – Delimiter for a [for loop](../commands/loops.md#for-loops) and [case command](../commands/case.md)
+- `namespace` – Namespace declaration (since 3.3.0)
+- `select` – Select command (since 3.3.0)
 - `then` – Then clause
 - `until` – [Until loop](../commands/loops.md#while-and-until-loops)
 - `while` – [While loop](../commands/loops.md#while-and-until-loops)
 
-Currently, `[[` and `function` are only recognized as reserved words; their functionality is not yet implemented.
+The reserved words `[[`, `]]`, `function`, `namespace`, and `select` are recognized but not yet implemented. Using these reserved words will result in a syntax error.
 
 Additionally, the POSIX standard allows for the following optional reserved words:
 
-- `]]` – End of a double bracket command
-- `namespace` – Namespace declaration
-- `select` – Select command
 - `time` – Time command
 - Any words that end with a colon (`:`)
 
