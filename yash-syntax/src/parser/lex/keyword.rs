@@ -39,6 +39,8 @@ pub enum Keyword {
     Bang,
     /// `[[`
     OpenBracketBracket,
+    /// `]]`
+    CloseBracketBracket,
     Case,
     Do,
     Done,
@@ -67,6 +69,7 @@ impl Keyword {
         match self {
             Bang => "!",
             OpenBracketBracket => "[[",
+            CloseBracketBracket => "]]",
             Case => "case",
             Do => "do",
             Done => "done",
@@ -95,8 +98,8 @@ impl Keyword {
         use Keyword::*;
         match self {
             Do | Done | Elif | Else | Esac | Fi | Then | CloseBrace => true,
-            Bang | OpenBracketBracket | Case | For | Function | If | In | Until | While
-            | OpenBrace => false,
+            Bang | OpenBracketBracket | CloseBracketBracket | Case | For | Function | If | In
+            | Until | While | OpenBrace => false,
         }
     }
 }
@@ -114,6 +117,7 @@ impl FromStr for Keyword {
         match s {
             "!" => Ok(Bang),
             "[[" => Ok(OpenBracketBracket),
+            "]]" => Ok(CloseBracketBracket),
             "case" => Ok(Case),
             "do" => Ok(Do),
             "done" => Ok(Done),

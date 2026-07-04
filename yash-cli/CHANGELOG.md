@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the manual for the constructs it rejects. More checks will be added in
   future releases.
 
+### Changed
+
+- The shell now recognizes `]]` as a reserved word and reports a syntax error
+  when it is used as a command name, instead of running it as an ordinary
+  command.
+
 ### Fixed
 
 - A here-document whose delimiter is quoted with double quotes or

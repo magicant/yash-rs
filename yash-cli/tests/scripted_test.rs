@@ -137,6 +137,11 @@ fn bg_builtin() {
 }
 
 #[test]
+fn bracket_ex() {
+    run("bracket-y.sh")
+}
+
+#[test]
 fn break_builtin() {
     run("break-p.sh")
 }

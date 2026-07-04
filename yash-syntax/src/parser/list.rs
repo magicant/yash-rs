@@ -44,6 +44,7 @@ fn error_type_for_trailing_token_in_command_line(token_id: TokenId) -> Option<Sy
             Elif | Else | Fi | Then => Some(UnopenedIf),
             Esac => Some(UnopenedCase),
             In => Some(InAsCommandName),
+            CloseBracketBracket => Some(CloseBracketBracketAsCommandName),
             CloseBrace => Some(UnopenedGrouping),
         },
         Operator(operator) => match operator {
@@ -385,6 +386,22 @@ mod tests {
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 9..10);
+    }
+
+    #[test]
+    fn parser_command_line_close_bracket_bracket_as_command_name() {
+        let mut lexer = Lexer::with_code("]]");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.command_line().now_or_never().unwrap().unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::CloseBracketBracketAsCommandName)
+        );
+        assert_eq!(*e.location.code.value.borrow(), "]]");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(*e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.range, 0..2);
     }
 
     #[test]
