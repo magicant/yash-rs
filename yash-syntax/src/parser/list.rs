@@ -36,9 +36,8 @@ fn error_type_for_trailing_token_in_command_line(token_id: TokenId) -> Option<Sy
         EndOfInput => None,
         Token(None) | IoNumber | IoLocation => Some(MissingSeparator),
         Token(Some(keyword)) => match keyword {
-            Bang | OpenBracketBracket | Case | For | Function | If | Until | While | OpenBrace => {
-                Some(MissingSeparator)
-            }
+            Bang | OpenBracketBracket | Case | For | Function | If | Namespace | Select | Until
+            | While | OpenBrace => Some(MissingSeparator),
             Do => Some(UnopenedLoop),
             Done => Some(UnopenedDoClause),
             Elif | Else | Fi | Then => Some(UnopenedIf),

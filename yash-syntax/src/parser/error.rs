@@ -193,6 +193,10 @@ pub enum SyntaxError {
     UnsupportedFunctionDefinitionSyntax,
     /// A `[[ ... ]]` command is used.
     UnsupportedDoubleBracketCommand,
+    /// A `namespace` command is used.
+    UnsupportedNamespaceCommand,
+    /// A `select` command is used.
+    UnsupportedSelectCommand,
     /// A process redirection (`>(...)` or `<(...)`) is used.
     UnsupportedProcessRedirection,
     /// A `((...))` arithmetic command is used at the beginning of a command
@@ -350,6 +354,8 @@ impl SyntaxError {
             UnicodeEscapeOutOfRange => "the Unicode escape is out of range",
             UnsupportedFunctionDefinitionSyntax
             | UnsupportedDoubleBracketCommand
+            | UnsupportedNamespaceCommand
+            | UnsupportedSelectCommand
             | UnsupportedProcessRedirection => "unsupported syntax",
             UnsupportedArithmeticCommand => "`((` is ambiguous at the start of a command",
             UnsupportedExtendedGlob => "`!(` is ambiguous at the start of a command",
@@ -445,6 +451,8 @@ impl SyntaxError {
             UnicodeEscapeOutOfRange => "not a valid Unicode scalar value",
             UnsupportedFunctionDefinitionSyntax => "the `function` keyword is not yet supported",
             UnsupportedDoubleBracketCommand => "the `[[ ... ]]` command is not yet supported",
+            UnsupportedNamespaceCommand => "the `namespace` command is not yet supported",
+            UnsupportedSelectCommand => "the `select` command is not yet supported",
             UnsupportedProcessRedirection => "process redirection is not yet supported",
             UnsupportedArithmeticCommand => {
                 "other shells read this as an arithmetic command; insert a space for nested subshells"

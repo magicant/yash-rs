@@ -52,6 +52,8 @@ pub enum Keyword {
     Function,
     If,
     In,
+    Namespace,
+    Select,
     Then,
     Until,
     While,
@@ -81,6 +83,8 @@ impl Keyword {
             Function => "function",
             If => "if",
             In => "in",
+            Namespace => "namespace",
+            Select => "select",
             Then => "then",
             Until => "until",
             While => "while",
@@ -99,7 +103,7 @@ impl Keyword {
         match self {
             Do | Done | Elif | Else | Esac | Fi | Then | CloseBrace => true,
             Bang | OpenBracketBracket | CloseBracketBracket | Case | For | Function | If | In
-            | Until | While | OpenBrace => false,
+            | Namespace | Select | Until | While | OpenBrace => false,
         }
     }
 }
@@ -129,6 +133,8 @@ impl FromStr for Keyword {
             "function" => Ok(Function),
             "if" => Ok(If),
             "in" => Ok(In),
+            "namespace" => Ok(Namespace),
+            "select" => Ok(Select),
             "then" => Ok(Then),
             "until" => Ok(Until),
             "while" => Ok(While),

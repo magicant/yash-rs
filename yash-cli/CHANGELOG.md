@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The shell now recognizes `]]` as a reserved word and reports a syntax error
   when it is used as a command name, instead of running it as an ordinary
   command.
+- The shell now recognizes `namespace` and `select` as reserved words and
+  reports a syntax error for them (they are reserved for future use but not yet
+  implemented), instead of running them as ordinary commands.
 
 ### Fixed
 

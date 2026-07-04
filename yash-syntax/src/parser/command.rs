@@ -22,7 +22,7 @@
 use super::core::Parser;
 use super::core::Rec;
 use super::core::Result;
-use super::lex::Keyword::{Function, OpenBracketBracket};
+use super::lex::Keyword::{Function, Namespace, OpenBracketBracket, Select};
 use super::lex::TokenId::Token;
 use super::{Error, SyntaxError};
 use crate::syntax::Command;
@@ -50,6 +50,16 @@ impl Parser<'_, '_> {
                     }
                     Token(Some(OpenBracketBracket)) => {
                         let cause = SyntaxError::UnsupportedDoubleBracketCommand.into();
+                        let location = next.word.location.clone();
+                        Err(Error { cause, location })
+                    }
+                    Token(Some(Namespace)) => {
+                        let cause = SyntaxError::UnsupportedNamespaceCommand.into();
+                        let location = next.word.location.clone();
+                        Err(Error { cause, location })
+                    }
+                    Token(Some(Select)) => {
+                        let cause = SyntaxError::UnsupportedSelectCommand.into();
                         let location = next.word.location.clone();
                         Err(Error { cause, location })
                     }
@@ -150,6 +160,41 @@ mod tests {
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 1..3);
+    }
+
+    #[test]
+    fn parser_command_namespace() {
+        let mut lexer = Lexer::with_code(" namespace foo { echo; }");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.command().now_or_never().unwrap().unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::UnsupportedNamespaceCommand)
+        );
+        assert_eq!(*e.location.code.value.borrow(), " namespace foo { echo; }");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(*e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.range, 1..10);
+    }
+
+    #[test]
+    fn parser_command_select() {
+        let mut lexer = Lexer::with_code(" select i in a b; do echo; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.command().now_or_never().unwrap().unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::UnsupportedSelectCommand)
+        );
+        assert_eq!(
+            *e.location.code.value.borrow(),
+            " select i in a b; do echo; done"
+        );
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(*e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.range, 1..7);
     }
 
     #[test]
