@@ -267,6 +267,11 @@ fn for_loop() {
 }
 
 #[test]
+fn for_loop_ex() {
+    run("for-y.sh");
+}
+
+#[test]
 fn function() {
     run("function-p.sh")
 }
