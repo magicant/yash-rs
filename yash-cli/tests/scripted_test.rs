@@ -277,6 +277,11 @@ fn function() {
 }
 
 #[test]
+fn function_ex() {
+    run("function-y.sh");
+}
+
+#[test]
 fn getopts_builtin() {
     run("getopts-p.sh")
 }
