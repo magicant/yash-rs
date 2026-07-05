@@ -34,5 +34,6 @@ When the `portable` option is set, the shell rejects the following non-portable 
 - A command name ending with a `:` (for example, `foo:`). POSIX [reserves words](language/words/keywords.md) whose final character is a `:` for possible future use, so using one where a reserved word would be recognized produces unspecified results. The lone `:` ([colon built-in](builtins/colon.md)) is not affected.
 - A [`for` loop](language/commands/loops.md#for-loops) [variable name](language/parameters/variables.md#variable-names) that is quoted, contains an expansion, or starts with a digit. POSIX requires the name to be an unquoted word consisting solely of underscores, digits, and alphabetics from the portable character set, not starting with a digit.
 - A [function](language/functions.md) name that is quoted, contains an expansion, or starts with a digit. POSIX requires the name to be an unquoted word consisting solely of underscores, digits, and alphabetics from the portable character set, not starting with a digit.
+- An [assignment](language/commands/simple.md#syntax) name that contains a character other than underscores, digits, and alphabetics from the portable character set, or that starts with a digit.
 
 The `portable` option is still under development, so this list will be expanded as more checks are implemented.
