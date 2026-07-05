@@ -49,6 +49,8 @@ A _private dependency_ is used internally and not visible to downstream users.
       shells parse as an extended glob) used at the beginning of a command.
     - `NonPortableForName` for a `for` loop variable name that is quoted,
       contains an expansion, or starts with a digit.
+    - `NonPortableFunctionName` for a function name that is quoted, contains
+      an expansion, or starts with a digit.
 - `parser::SyntaxError::footnotes` and `parser::ErrorCause::footnotes`, which
   return supplementary footnotes (a `source::pretty::FootnoteType` and its text)
   to render with the error, such as a note that the error is reported because
@@ -92,6 +94,8 @@ A _private dependency_ is used internally and not visible to downstream users.
       requires the name to be an unquoted word consisting solely of
       underscores, digits, and alphabetics from the portable character set,
       not starting with a digit.
+    - A function name that is quoted, contains an expansion, or starts with a
+      digit (`SyntaxError::NonPortableFunctionName`), for the same reason.
 - `parser::Error::to_report` now attaches a `note:` footnote to errors caused by
   the `portable` option, clarifying that the construct is rejected only because
   the option is enabled.

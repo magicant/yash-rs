@@ -23,8 +23,10 @@ use super::error::Error;
 use super::error::SyntaxError;
 use super::lex::Operator::{CloseParen, OpenParen};
 use super::lex::TokenId::{Operator, Token};
+use super::lex::is_portable_name;
 use crate::syntax::Command;
 use crate::syntax::FunctionDefinition;
+use crate::syntax::MaybeLiteral as _;
 use crate::syntax::SimpleCommand;
 use std::rc::Rc;
 
@@ -56,7 +58,16 @@ impl Parser<'_, '_> {
 
         let name = intro.words.pop().unwrap().0;
         debug_assert!(intro.is_empty());
-        // TODO reject invalid name if POSIXly-correct
+
+        if self.mode().portable
+            && !name
+                .to_string_if_literal()
+                .is_some_and(|s| is_portable_name(&s))
+        {
+            let cause = SyntaxError::NonPortableFunctionName.into();
+            let location = name.location;
+            return Err(Error { cause, location });
+        }
 
         loop {
             while self.newline_and_here_doc_contents().await? {}
@@ -285,6 +296,104 @@ mod tests {
 
         let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
+    }
+
+    fn portable_mode() -> yash_env::parser::Mode {
+        let mut mode = yash_env::parser::Mode::default();
+        mode.portable = true;
+        mode
+    }
+
+    #[test]
+    fn parser_short_function_definition_name_starting_with_digit_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("()");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+        let c = SimpleCommand {
+            assigns: vec![],
+            words: vec![("1a".parse().unwrap(), ExpansionMode::Multiple)],
+            redirs: vec![].into(),
+        };
+
+        let result = parser.short_function_definition(c).now_or_never().unwrap();
+        let e = result.unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::NonPortableFunctionName)
+        );
+    }
+
+    #[test]
+    fn parser_short_function_definition_quoted_name_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("()");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+        let c = SimpleCommand {
+            assigns: vec![],
+            words: vec![("'a'".parse().unwrap(), ExpansionMode::Multiple)],
+            redirs: vec![].into(),
+        };
+
+        let result = parser.short_function_definition(c).now_or_never().unwrap();
+        let e = result.unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::NonPortableFunctionName)
+        );
+    }
+
+    #[test]
+    fn parser_short_function_definition_name_with_expansion_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("()");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+        let c = SimpleCommand {
+            assigns: vec![],
+            words: vec![("$a".parse().unwrap(), ExpansionMode::Multiple)],
+            redirs: vec![].into(),
+        };
+
+        let result = parser.short_function_definition(c).now_or_never().unwrap();
+        let e = result.unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::NonPortableFunctionName)
+        );
+    }
+
+    #[test]
+    fn parser_short_function_definition_portable_name_allowed_in_portable_mode() {
+        let mut lexer = Lexer::with_code("() { :; }");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+        let c = SimpleCommand {
+            assigns: vec![],
+            words: vec![("_Az9".parse().unwrap(), ExpansionMode::Multiple)],
+            redirs: vec![].into(),
+        };
+
+        let result = parser.short_function_definition(c).now_or_never().unwrap();
+        let command = result.unwrap();
+        assert_matches!(command, Command::Function(f) => {
+            assert_eq!(f.name.to_string(), "_Az9");
+        });
+    }
+
+    #[test]
+    fn parser_short_function_definition_non_portable_name_allowed_without_portable() {
+        let mut lexer = Lexer::with_code("() { :; }");
+        let mut parser = Parser::new(&mut lexer);
+        let c = SimpleCommand {
+            assigns: vec![],
+            words: vec![("1a".parse().unwrap(), ExpansionMode::Multiple)],
+            redirs: vec![].into(),
+        };
+
+        let result = parser.short_function_definition(c).now_or_never().unwrap();
+        let command = result.unwrap();
+        assert_matches!(command, Command::Function(f) => {
+            assert_eq!(f.name.to_string(), "1a");
+        });
     }
 
     #[test]
