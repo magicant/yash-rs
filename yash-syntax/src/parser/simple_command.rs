@@ -23,6 +23,7 @@ use super::error::Error;
 use super::error::SyntaxError;
 use super::lex::Operator::{CloseParen, Newline, OpenParen};
 use super::lex::TokenId::{Operator, Token};
+use super::lex::is_portable_name;
 use crate::syntax::Array;
 use crate::syntax::Assign;
 use crate::syntax::ExpansionMode;
@@ -222,6 +223,13 @@ impl Parser<'_, '_> {
                     continue;
                 }
             };
+
+            if self.mode().portable && !is_portable_name(&assign.name) {
+                return Err(Error {
+                    cause: SyntaxError::NonPortableAssignmentName.into(),
+                    location: assign.location,
+                });
+            }
 
             let units = match &assign.value {
                 Scalar(Word { units, .. }) => units,
@@ -895,6 +903,72 @@ mod tests {
         assert_eq!(sc.assigns.len(), 1);
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "b:");
+    }
+
+    #[test]
+    fn assignment_name_starting_with_digit_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("1a=b");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.simple_command().now_or_never().unwrap().unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::NonPortableAssignmentName)
+        );
+        assert_eq!(*e.location.code.value.borrow(), "1a=b");
+        assert_eq!(e.location.range, 0..4);
+    }
+
+    #[test]
+    fn assignment_name_with_non_portable_character_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("a.b=c");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.simple_command().now_or_never().unwrap().unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::NonPortableAssignmentName)
+        );
+    }
+
+    #[test]
+    fn array_assignment_name_starting_with_digit_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("1a=(b c)");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.simple_command().now_or_never().unwrap().unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::NonPortableAssignmentName)
+        );
+    }
+
+    #[test]
+    fn assignment_portable_name_allowed_in_portable_mode() {
+        let mut lexer = Lexer::with_code("_Az9=b");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns.len(), 1);
+        assert_eq!(sc.assigns[0].name, "_Az9");
+        assert_eq!(sc.assigns[0].value.to_string(), "b");
+    }
+
+    #[test]
+    fn assignment_non_portable_name_allowed_without_portable_mode() {
+        let mut lexer = Lexer::with_code("1a=b");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns.len(), 1);
+        assert_eq!(sc.assigns[0].name, "1a");
+        assert_eq!(sc.assigns[0].value.to_string(), "b");
     }
 
     #[test]

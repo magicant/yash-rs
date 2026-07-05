@@ -41,3 +41,27 @@ __OUT__
 test_O -d -e 127 'without portable, a command name ending with a colon is parsed'
 foo:
 __IN__
+
+# A portable name consists solely of underscores, digits, and alphabetics from
+# the portable character set, not starting with a digit. The portable option
+# rejects assignment names that do not meet this form, since other
+# POSIX-conforming shells may not support them.
+
+test_O -d -e 2 'portable option rejects an assignment name starting with a digit' -o portable
+1a=foo
+__IN__
+
+test_O -d -e 2 'portable option rejects an assignment name with a non-portable character' -o portable
+a.b=foo
+__IN__
+
+test_oE 'portable option allows a portable assignment name' -o portable
+_Az9=foo
+echo "$_Az9"
+__IN__
+foo
+__OUT__
+
+test_OE -e 0 'without portable, an assignment name starting with a digit is accepted'
+1a=foo
+__IN__

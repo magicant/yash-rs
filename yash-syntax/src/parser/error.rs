@@ -279,6 +279,14 @@ pub enum SyntaxError {
     /// is quoted, contains an expansion, or otherwise does not meet this
     /// requirement.
     NonPortableFunctionName,
+    /// An assignment name is not a portable name while the `portable` option
+    /// is on.
+    ///
+    /// A portable name consists solely of underscores, digits, and
+    /// alphabetics from the portable character set, not starting with a
+    /// digit. This is raised when the assignment name does not meet this
+    /// form, since other POSIX-conforming shells may not support it.
+    NonPortableAssignmentName,
 }
 
 impl SyntaxError {
@@ -388,6 +396,7 @@ impl SyntaxError {
             TooLongHexEscape => "more than two hexadecimal digits follow `\\x`",
             NonPortableForName => "the for loop variable name is not portable",
             NonPortableFunctionName => "the function name is not portable",
+            NonPortableAssignmentName => "the assignment name is not portable",
         }
     }
 
@@ -501,6 +510,7 @@ impl SyntaxError {
             TooLongHexEscape => "use at most two hexadecimal digits",
             NonPortableForName => "not a POSIX variable name",
             NonPortableFunctionName => "not a POSIX name",
+            NonPortableAssignmentName => "not a POSIX variable name",
         }
     }
 
@@ -528,7 +538,8 @@ impl SyntaxError {
             | NonPortableEscape
             | TooLongHexEscape
             | NonPortableForName
-            | NonPortableFunctionName => &[(
+            | NonPortableFunctionName
+            | NonPortableAssignmentName => &[(
                 FootnoteType::Note,
                 "this error is reported because the `portable` shell option is enabled",
             )],
