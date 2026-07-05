@@ -261,6 +261,15 @@ pub enum SyntaxError {
     /// POSIX leaves the result unspecified if more than two hexadecimal digits
     /// follow `\x`, so such an escape is not portable.
     TooLongHexEscape,
+    /// A `for` loop variable name is not a portable name while the `portable`
+    /// option is on.
+    ///
+    /// POSIX requires the name to be an unquoted `NAME` token consisting
+    /// solely of underscores, digits, and alphabetics from the portable
+    /// character set, not starting with a digit. This is raised when the name
+    /// is quoted, contains an expansion, or otherwise does not meet this
+    /// requirement.
+    NonPortableForName,
 }
 
 impl SyntaxError {
@@ -368,6 +377,7 @@ impl SyntaxError {
             ColonSuffixedCommandName => "the command name is not portable",
             NonPortableEscape => "the escape sequence is not portable",
             TooLongHexEscape => "more than two hexadecimal digits follow `\\x`",
+            NonPortableForName => "the for loop variable name is not portable",
         }
     }
 
@@ -479,6 +489,7 @@ impl SyntaxError {
             ColonSuffixedCommandName => "a command name ending with `:` is reserved by POSIX",
             NonPortableEscape => "not a POSIX escape sequence",
             TooLongHexEscape => "use at most two hexadecimal digits",
+            NonPortableForName => "not a POSIX variable name",
         }
     }
 
@@ -504,7 +515,8 @@ impl SyntaxError {
             | MissingSeparatorBeforeReservedWord
             | ColonSuffixedCommandName
             | NonPortableEscape
-            | TooLongHexEscape => &[(
+            | TooLongHexEscape
+            | NonPortableForName => &[(
                 FootnoteType::Note,
                 "this error is reported because the `portable` shell option is enabled",
             )],

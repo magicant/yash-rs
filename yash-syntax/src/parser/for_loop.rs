@@ -24,9 +24,11 @@ use super::error::SyntaxError;
 use super::lex::Keyword::{Do, For, In};
 use super::lex::Operator::{Newline, Semicolon};
 use super::lex::TokenId::{EndOfInput, IoLocation, IoNumber, Operator, Token};
+use super::lex::is_portable_name;
 use crate::source::Location;
 use crate::syntax::CompoundCommand;
 use crate::syntax::List;
+use crate::syntax::MaybeLiteral as _;
 use crate::syntax::Word;
 
 impl Parser<'_, '_> {
@@ -49,7 +51,16 @@ impl Parser<'_, '_> {
             Token(_) | IoNumber | IoLocation => (),
         }
 
-        // TODO reject non-portable names in POSIXly-correct mode
+        if self.mode().portable
+            && !name
+                .word
+                .to_string_if_literal()
+                .is_some_and(|s| is_portable_name(&s))
+        {
+            let cause = SyntaxError::NonPortableForName.into();
+            let location = name.word.location;
+            return Err(Error { cause, location });
+        }
 
         Ok(name.word)
     }
@@ -547,5 +558,75 @@ mod tests {
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(*e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 8..9);
+    }
+
+    fn portable_mode() -> yash_env::parser::Mode {
+        let mut mode = yash_env::parser::Mode::default();
+        mode.portable = true;
+        mode
+    }
+
+    #[test]
+    fn parser_for_loop_name_starting_with_digit_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("for 1a do :; done");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::NonPortableForName));
+        assert_eq!(*e.location.code.value.borrow(), "for 1a do :; done");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(*e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.range, 4..6);
+    }
+
+    #[test]
+    fn parser_for_loop_quoted_name_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("for 'A' do :; done");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::NonPortableForName));
+        assert_eq!(e.location.range, 4..7);
+    }
+
+    #[test]
+    fn parser_for_loop_name_with_expansion_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("for $A do :; done");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::NonPortableForName));
+        assert_eq!(e.location.range, 4..6);
+    }
+
+    #[test]
+    fn parser_for_loop_portable_name_allowed_in_portable_mode() {
+        let mut lexer = Lexer::with_code("for _Az9 do :; done");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::For { name, .. } => {
+            assert_eq!(name.to_string(), "_Az9");
+        });
+    }
+
+    #[test]
+    fn parser_for_loop_non_portable_name_allowed_without_portable() {
+        let mut lexer = Lexer::with_code("for 1a do :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::For { name, .. } => {
+            assert_eq!(name.to_string(), "1a");
+        });
     }
 }
