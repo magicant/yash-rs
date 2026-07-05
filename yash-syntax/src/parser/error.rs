@@ -287,6 +287,14 @@ pub enum SyntaxError {
     /// digit. This is raised when the assignment name does not meet this
     /// form, since other POSIX-conforming shells may not support it.
     NonPortableAssignmentName,
+    /// A function name is the same as a special built-in utility name while
+    /// the `portable` option is on.
+    ///
+    /// POSIX does not allow a function to have the same name as a special
+    /// built-in utility. See
+    /// [`POSIX_SPECIAL_BUILTIN_NAMES`](yash_env::builtin::POSIX_SPECIAL_BUILTIN_NAMES)
+    /// for the list of names this applies to.
+    SpecialBuiltinFunctionName,
 }
 
 impl SyntaxError {
@@ -397,6 +405,9 @@ impl SyntaxError {
             NonPortableForName => "the for loop variable name is not portable",
             NonPortableFunctionName => "the function name is not portable",
             NonPortableAssignmentName => "the assignment name is not portable",
+            SpecialBuiltinFunctionName => {
+                "the function name is the same as a special built-in utility"
+            }
         }
     }
 
@@ -511,6 +522,7 @@ impl SyntaxError {
             NonPortableForName => "not a POSIX variable name",
             NonPortableFunctionName => "not a POSIX name",
             NonPortableAssignmentName => "not a POSIX variable name",
+            SpecialBuiltinFunctionName => "conflicts with a special built-in utility",
         }
     }
 
@@ -539,7 +551,8 @@ impl SyntaxError {
             | TooLongHexEscape
             | NonPortableForName
             | NonPortableFunctionName
-            | NonPortableAssignmentName => &[(
+            | NonPortableAssignmentName
+            | SpecialBuiltinFunctionName => &[(
                 FootnoteType::Note,
                 "this error is reported because the `portable` shell option is enabled",
             )],

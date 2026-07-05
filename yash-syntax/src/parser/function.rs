@@ -29,6 +29,7 @@ use crate::syntax::FunctionDefinition;
 use crate::syntax::MaybeLiteral as _;
 use crate::syntax::SimpleCommand;
 use std::rc::Rc;
+use yash_env::builtin::is_posix_special_builtin_name;
 
 impl Parser<'_, '_> {
     /// Parses a function definition command that does not start with the
@@ -59,14 +60,20 @@ impl Parser<'_, '_> {
         let name = intro.words.pop().unwrap().0;
         debug_assert!(intro.is_empty());
 
-        if self.mode().portable
-            && !name
-                .to_string_if_literal()
-                .is_some_and(|s| is_portable_name(&s))
-        {
-            let cause = SyntaxError::NonPortableFunctionName.into();
-            let location = name.location;
-            return Err(Error { cause, location });
+        if self.mode().portable {
+            if let Some(s) = name.to_string_if_literal()
+                && is_portable_name(&s)
+            {
+                if is_posix_special_builtin_name(&s) {
+                    let cause = SyntaxError::SpecialBuiltinFunctionName.into();
+                    let location = name.location;
+                    return Err(Error { cause, location });
+                }
+            } else {
+                let cause = SyntaxError::NonPortableFunctionName.into();
+                let location = name.location;
+                return Err(Error { cause, location });
+            }
         }
 
         loop {
@@ -376,6 +383,60 @@ mod tests {
         let command = result.unwrap();
         assert_matches!(command, Command::Function(f) => {
             assert_eq!(f.name.to_string(), "_Az9");
+        });
+    }
+
+    #[test]
+    fn parser_short_function_definition_special_builtin_name_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("()");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+        let c = SimpleCommand {
+            assigns: vec![],
+            words: vec![("break".parse().unwrap(), ExpansionMode::Multiple)],
+            redirs: vec![].into(),
+        };
+
+        let result = parser.short_function_definition(c).now_or_never().unwrap();
+        let e = result.unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::SpecialBuiltinFunctionName)
+        );
+    }
+
+    #[test]
+    fn parser_short_function_definition_special_builtin_name_allowed_without_portable() {
+        let mut lexer = Lexer::with_code("() { :; }");
+        let mut parser = Parser::new(&mut lexer);
+        let c = SimpleCommand {
+            assigns: vec![],
+            words: vec![("break".parse().unwrap(), ExpansionMode::Multiple)],
+            redirs: vec![].into(),
+        };
+
+        let result = parser.short_function_definition(c).now_or_never().unwrap();
+        let command = result.unwrap();
+        assert_matches!(command, Command::Function(f) => {
+            assert_eq!(f.name.to_string(), "break");
+        });
+    }
+
+    #[test]
+    fn parser_short_function_definition_non_special_name_allowed_in_portable_mode() {
+        let mut lexer = Lexer::with_code("() { :; }");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+        let c = SimpleCommand {
+            assigns: vec![],
+            words: vec![("source".parse().unwrap(), ExpansionMode::Multiple)],
+            redirs: vec![].into(),
+        };
+
+        let result = parser.short_function_definition(c).now_or_never().unwrap();
+        let command = result.unwrap();
+        assert_matches!(command, Command::Function(f) => {
+            assert_eq!(f.name.to_string(), "source");
         });
     }
 

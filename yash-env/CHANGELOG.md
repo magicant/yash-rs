@@ -25,6 +25,11 @@ A _private dependency_ is used internally and not visible to downstream users.
   the `Portable` option, and is created from an `OptionSet` via `From`.
 - `parser::Config` has a new `mode` field of type `parser::Mode` that specifies
   the parsing mode for the lexer created from the configuration.
+- `builtin::POSIX_SPECIAL_BUILTIN_NAMES` and
+  `builtin::is_posix_special_builtin_name`, a fixed list of (and test for) the
+  special built-in utility names defined by POSIX XCU section 2.15. This lets
+  other crates check for a name conflicting with a special built-in without
+  depending on `yash-builtin`.
 
 ## [0.15.2] - 2026-06-21
 
