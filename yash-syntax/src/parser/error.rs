@@ -159,6 +159,8 @@ pub enum SyntaxError {
     InvalidFunctionBody,
     /// The keyword `in` is used as a command name.
     InAsCommandName,
+    /// The keyword `]]` is used as a command name.
+    CloseBracketBracketAsCommandName,
     /// A pipeline is missing after a `&&` or `||` token.
     MissingPipeline(AndOr),
     /// Two successive `!` tokens.
@@ -191,6 +193,10 @@ pub enum SyntaxError {
     UnsupportedFunctionDefinitionSyntax,
     /// A `[[ ... ]]` command is used.
     UnsupportedDoubleBracketCommand,
+    /// A `namespace` command is used.
+    UnsupportedNamespaceCommand,
+    /// A `select` command is used.
+    UnsupportedSelectCommand,
     /// A process redirection (`>(...)` or `<(...)`) is used.
     UnsupportedProcessRedirection,
     /// A `((...))` arithmetic command is used at the beginning of a command
@@ -288,8 +294,14 @@ impl SyntaxError {
                 "the delimiter to close the here-document content is missing"
             }
             UnclosedArrayValue { .. } => "the array assignment value is not closed",
-            UnopenedGrouping | UnopenedSubshell | UnopenedLoop | UnopenedDoClause | UnopenedIf
-            | UnopenedCase | InAsCommandName => "the compound command delimiter is unmatched",
+            UnopenedGrouping
+            | UnopenedSubshell
+            | UnopenedLoop
+            | UnopenedDoClause
+            | UnopenedIf
+            | UnopenedCase
+            | InAsCommandName
+            | CloseBracketBracketAsCommandName => "the compound command delimiter is unmatched",
             UnclosedGrouping { .. } => "the grouping is not closed",
             EmptyGrouping => "the grouping is missing its content",
             UnclosedSubshell { .. } => "the subshell is not closed",
@@ -342,6 +354,8 @@ impl SyntaxError {
             UnicodeEscapeOutOfRange => "the Unicode escape is out of range",
             UnsupportedFunctionDefinitionSyntax
             | UnsupportedDoubleBracketCommand
+            | UnsupportedNamespaceCommand
+            | UnsupportedSelectCommand
             | UnsupportedProcessRedirection => "unsupported syntax",
             UnsupportedArithmeticCommand => "`((` is ambiguous at the start of a command",
             UnsupportedExtendedGlob => "`!(` is ambiguous at the start of a command",
@@ -421,7 +435,9 @@ impl SyntaxError {
             UnopenedCase => "not in a `case` command",
             UnclosedCase { .. } => "expected `esac`",
             MissingFunctionBody | InvalidFunctionBody => "expected a compound command",
-            InAsCommandName => "cannot be used as a command name",
+            InAsCommandName | CloseBracketBracketAsCommandName => {
+                "cannot be used as a command name"
+            }
             DoubleNegation => "only one `!` allowed",
             BangAfterBar => "`!` not allowed here",
             RedundantToken => "unexpected token",
@@ -435,6 +451,8 @@ impl SyntaxError {
             UnicodeEscapeOutOfRange => "not a valid Unicode scalar value",
             UnsupportedFunctionDefinitionSyntax => "the `function` keyword is not yet supported",
             UnsupportedDoubleBracketCommand => "the `[[ ... ]]` command is not yet supported",
+            UnsupportedNamespaceCommand => "the `namespace` command is not yet supported",
+            UnsupportedSelectCommand => "the `select` command is not yet supported",
             UnsupportedProcessRedirection => "process redirection is not yet supported",
             UnsupportedArithmeticCommand => {
                 "other shells read this as an arithmetic command; insert a space for nested subshells"

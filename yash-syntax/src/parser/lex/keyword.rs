@@ -39,6 +39,8 @@ pub enum Keyword {
     Bang,
     /// `[[`
     OpenBracketBracket,
+    /// `]]`
+    CloseBracketBracket,
     Case,
     Do,
     Done,
@@ -50,6 +52,8 @@ pub enum Keyword {
     Function,
     If,
     In,
+    Namespace,
+    Select,
     Then,
     Until,
     While,
@@ -67,6 +71,7 @@ impl Keyword {
         match self {
             Bang => "!",
             OpenBracketBracket => "[[",
+            CloseBracketBracket => "]]",
             Case => "case",
             Do => "do",
             Done => "done",
@@ -78,6 +83,8 @@ impl Keyword {
             Function => "function",
             If => "if",
             In => "in",
+            Namespace => "namespace",
+            Select => "select",
             Then => "then",
             Until => "until",
             While => "while",
@@ -95,8 +102,8 @@ impl Keyword {
         use Keyword::*;
         match self {
             Do | Done | Elif | Else | Esac | Fi | Then | CloseBrace => true,
-            Bang | OpenBracketBracket | Case | For | Function | If | In | Until | While
-            | OpenBrace => false,
+            Bang | OpenBracketBracket | CloseBracketBracket | Case | For | Function | If | In
+            | Namespace | Select | Until | While | OpenBrace => false,
         }
     }
 }
@@ -114,6 +121,7 @@ impl FromStr for Keyword {
         match s {
             "!" => Ok(Bang),
             "[[" => Ok(OpenBracketBracket),
+            "]]" => Ok(CloseBracketBracket),
             "case" => Ok(Case),
             "do" => Ok(Do),
             "done" => Ok(Done),
@@ -125,6 +133,8 @@ impl FromStr for Keyword {
             "function" => Ok(Function),
             "if" => Ok(If),
             "in" => Ok(In),
+            "namespace" => Ok(Namespace),
+            "select" => Ok(Select),
             "then" => Ok(Then),
             "until" => Ok(Until),
             "while" => Ok(While),

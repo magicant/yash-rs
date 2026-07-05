@@ -1,0 +1,42 @@
+#!/bin/sh
+# commit-msg hook: enforce that every line of the commit message is wrapped at
+# 72 characters or fewer, matching the convention in
+# .agents/skills/commit-message/SKILL.md.
+#
+# Exception: a line may exceed the limit when it contains a single
+# whitespace-delimited token (such as a long URL) that is itself longer than
+# the limit, because there is then no place to break the line to make it fit.
+#
+# Bypass with "git commit --no-verify" when necessary.
+
+max=72
+
+awk -v max="$max" '
+    # Stop at the scissors line that "git commit --verbose" inserts; the diff
+    # below it is not part of the commit message.
+    /^#.*>8/ { exit }
+    # Skip comment lines; git strips them from the final message.
+    /^#/ { next }
+    {
+        if (length($0) > max) {
+            # Length of the longest whitespace-delimited word on this line.
+            longest = 0
+            for (i = 1; i <= NF; i++)
+                if (length($i) > longest) longest = length($i)
+            # Only flag the line when it could have been wrapped to fit, i.e.
+            # no single word by itself exceeds the limit.
+            if (longest <= max) {
+                printf "commit-msg: line %d is %d characters (limit %d):\n  %s\n", \
+                    NR, length($0), max, $0 > "/dev/stderr"
+                bad = 1
+            }
+        }
+    }
+    END { if (bad) exit 1 }
+' "$1" || {
+    echo "commit-msg: wrap the commit message at ${max} characters" >&2
+    echo "commit-msg: e.g. pipe the body through 'fmt -w ${max}'; use --no-verify to bypass" >&2
+    exit 1
+}
+
+exit 0

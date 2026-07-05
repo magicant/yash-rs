@@ -13,10 +13,18 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
-## [0.22.1] - Unreleased
+## [0.23.0] - Unreleased
 
 ### Added
 
+- New `parser::lex::Keyword` variants for reserved words that yash now
+  recognizes: `CloseBracketBracket`, `Namespace` and `Select` for `]]`,
+  `namespace` and `select`, respectively.
+- `parser::SyntaxError::CloseBracketBracketAsCommandName`, raised when `]]` is
+  used as a command name.
+- `parser::SyntaxError::UnsupportedNamespaceCommand` and
+  `parser::SyntaxError::UnsupportedSelectCommand`, raised when a `namespace` or
+  `select` command is used, since they are not yet implemented.
 - `parser::lex::Lexer::mode` and `parser::lex::Lexer::set_mode` for querying and
   updating the parsing mode (`yash_env::parser::Mode`) of a lexer. The parser and
   lexer consult the mode to decide which syntax to accept.
@@ -46,6 +54,14 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- The parser now recognizes `]]` as a reserved word and rejects it when used as
+  a command name (`SyntaxError::CloseBracketBracketAsCommandName`), rather than
+  treating it as an ordinary word.
+- The parser now recognizes `namespace` and `select` as reserved words and
+  rejects them as unsupported commands
+  (`SyntaxError::UnsupportedNamespaceCommand` and
+  `SyntaxError::UnsupportedSelectCommand`), rather than treating them as
+  ordinary words.
 - The parser now rejects the following non-portable constructs when the lexer's
   parsing mode has `portable` enabled. Without the mode, they are accepted as
   before:
@@ -742,7 +758,7 @@ command.
 - Functionalities to parse POSIX shell scripts
 - Alias substitution support
 
-[0.22.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.22.1
+[0.23.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.23.0
 [0.22.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.22.0
 [0.21.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.21.0
 [0.20.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.20.0

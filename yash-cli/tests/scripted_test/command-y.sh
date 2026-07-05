@@ -148,7 +148,7 @@ __OUT__
 
 test_oE -e 0 'describing reserved words (-V)'
 command -V if then else elif fi do done case esac while until for function \
-    { } ! in
+    { } ! in [[ ]] select namespace
 __IN__
 if: keyword
 then: keyword
@@ -167,6 +167,10 @@ function: keyword
 }: keyword
 !: keyword
 in: keyword
+[[: keyword
+]]: keyword
+select: keyword
+namespace: keyword
 __OUT__
 
 # TODO Option not yet implemented
