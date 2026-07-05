@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reports a syntax error for them (they are reserved for future use but not yet
   implemented), instead of running them as ordinary commands.
 
+## [3.2.2] - 2026-07-05
+
 ### Fixed
 
 - A here-document whose delimiter is quoted with double quotes or
@@ -389,6 +391,7 @@ later.
 - Initial release of the shell
 
 [3.3.0]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.3.0
+[3.2.2]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.2.2
 [3.2.1]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.2.1
 [3.2.0]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.2.0
 [3.1.0]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.1.0

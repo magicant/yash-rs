@@ -93,6 +93,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 - Public dependency versions:
     - yash-env 0.15.0 → 0.15.3
 
+## [0.22.1] - 2026-07-05
+
 ### Fixed
 
 - `Unquote` implementations for `WordUnit::DoubleQuote` and
@@ -759,6 +761,7 @@ command.
 - Alias substitution support
 
 [0.23.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.23.0
+[0.22.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.22.1
 [0.22.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.22.0
 [0.21.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.21.0
 [0.20.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.20.0
