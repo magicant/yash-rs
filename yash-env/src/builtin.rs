@@ -101,6 +101,30 @@ pub enum Type {
     Substitutive,
 }
 
+/// Names of the special built-in utilities defined by POSIX
+///
+/// This is the fixed list of utility names listed in [POSIX XCU section
+/// 2.15](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_15).
+/// The names are sorted in ASCII order.
+///
+/// Note that the `yash-builtin` crate also implements the `source` built-in and
+/// registers it with [`Type::Special`], but `source` is excluded from this list
+/// because it is not part of the POSIX-mandated set.
+pub const POSIX_SPECIAL_BUILTIN_NAMES: &[&str] = &[
+    ".", ":", "break", "continue", "eval", "exec", "exit", "export", "readonly", "return", "set",
+    "shift", "times", "trap", "unset",
+];
+
+/// Tests whether `name` is the name of a special built-in utility defined by
+/// POSIX.
+///
+/// See [`POSIX_SPECIAL_BUILTIN_NAMES`] for the list of names this function
+/// checks against.
+#[must_use]
+pub fn is_posix_special_builtin_name(name: &str) -> bool {
+    POSIX_SPECIAL_BUILTIN_NAMES.contains(&name)
+}
+
 /// Result of built-in utility execution
 ///
 /// The result type contains an exit status and optional flags that may affect
@@ -349,5 +373,29 @@ impl<S> Builtin<S> {
             is_declaration_utility: Some(false),
             handles_signals_internally: false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn special_builtin_names_are_sorted() {
+        assert!(POSIX_SPECIAL_BUILTIN_NAMES.is_sorted());
+    }
+
+    #[test]
+    fn is_posix_special_builtin_name_accepts_special_builtins() {
+        assert!(is_posix_special_builtin_name("break"));
+        assert!(is_posix_special_builtin_name(":"));
+        assert!(is_posix_special_builtin_name("."));
+    }
+
+    #[test]
+    fn is_posix_special_builtin_name_rejects_non_special_names() {
+        assert!(!is_posix_special_builtin_name("source"));
+        assert!(!is_posix_special_builtin_name("cd"));
+        assert!(!is_posix_special_builtin_name("foo"));
     }
 }

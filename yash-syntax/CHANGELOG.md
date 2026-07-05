@@ -54,6 +54,10 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `NonPortableAssignmentName` for an assignment name that contains a
       character other than underscores, digits, and alphabetics from the
       portable character set, or that starts with a digit.
+    - `SpecialBuiltinFunctionName` for a function name that is the same as a
+      special built-in utility name (see
+      `yash_env::builtin::is_posix_special_builtin_name`), since POSIX does
+      not allow a function to override a special built-in.
 - `parser::SyntaxError::footnotes` and `parser::ErrorCause::footnotes`, which
   return supplementary footnotes (a `source::pretty::FootnoteType` and its text)
   to render with the error, such as a note that the error is reported because
@@ -102,6 +106,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - An assignment name that contains a character other than underscores,
       digits, and alphabetics from the portable character set, or that starts
       with a digit (`SyntaxError::NonPortableAssignmentName`).
+    - A function name that is the same as a special built-in utility name
+      (`SyntaxError::SpecialBuiltinFunctionName`).
 - `parser::Error::to_report` now attaches a `note:` footnote to errors caused by
   the `portable` option, clarifying that the construct is rejected only because
   the option is enabled.

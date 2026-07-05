@@ -322,4 +322,25 @@ mod tests {
     fn iter_is_sorted() {
         assert!(iter::<Rc<Concurrent<VirtualSystem>>>().is_sorted_by_key(|pair| pair.0));
     }
+
+    /// `source` is the only non-POSIX name registered with [`Special`]; every
+    /// other special built-in registered here must match
+    /// [`yash_env::builtin::POSIX_SPECIAL_BUILTIN_NAMES`] exactly, or the
+    /// parser's portable-mode check (which uses that list) would drift from
+    /// this registry.
+    ///
+    /// This relies on `iter` yielding entries in ASCII order (see
+    /// `iter_is_sorted` above) and `POSIX_SPECIAL_BUILTIN_NAMES` being sorted
+    /// the same way, so neither side needs sorting here.
+    #[test]
+    fn special_builtin_names_match_posix_list() {
+        let registered_special_names: Vec<&str> = iter::<Rc<Concurrent<VirtualSystem>>>()
+            .filter(|(name, builtin)| builtin.r#type == Special && *name != "source")
+            .map(|(name, _)| name)
+            .collect();
+        assert_eq!(
+            registered_special_names,
+            yash_env::builtin::POSIX_SPECIAL_BUILTIN_NAMES
+        );
+    }
 }
