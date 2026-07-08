@@ -91,20 +91,15 @@ impl<S: Runtime + 'static> Expand<S> for ParamRef<'_> {
             }
         }
 
-        // TODO Reject POSIXly unspecified combinations of name and modifier
-
         // Other modifiers //
         match self.modifier {
             Modifier::None | Modifier::Switch(_) => (),
 
-            Modifier::Length => {
-                // TODO Reject ${#*} and ${#@} in POSIX mode
-                match &mut value {
-                    None => value = Some(Value::scalar("0")),
-                    Some(Value::Scalar(v)) => to_length(v),
-                    Some(Value::Array(vs)) => vs.iter_mut().for_each(to_length),
-                }
-            }
+            Modifier::Length => match &mut value {
+                None => value = Some(Value::scalar("0")),
+                Some(Value::Scalar(v)) => to_length(v),
+                Some(Value::Array(vs)) => vs.iter_mut().for_each(to_length),
+            },
 
             Modifier::Trim(trim) => {
                 if let Some(value) = &mut value {

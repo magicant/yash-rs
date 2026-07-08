@@ -76,6 +76,19 @@ fn type_of_id(id: &str) -> Option<ParamType> {
     Some(ParamType::Variable)
 }
 
+/// Tests if POSIX leaves the combination of parameter and modifier unspecified.
+#[must_use]
+fn has_non_portable_modifier(r#type: ParamType, modifier: &Modifier) -> bool {
+    use Modifier::*;
+    use ParamType::Special;
+    use SpecialParam::*;
+
+    matches!(
+        (r#type, modifier),
+        (Special(Asterisk | At), Length | Switch(_)) | (Special(Number | Asterisk | At), Trim(_))
+    )
+}
+
 impl WordLexer<'_, '_> {
     /// Tests if there is a length prefix (`#`).
     ///
@@ -189,6 +202,12 @@ impl WordLexer<'_, '_> {
             }
             (false, suffix) => suffix,
         };
+
+        if self.mode().portable && has_non_portable_modifier(param.r#type, &modifier) {
+            let cause = SyntaxError::NonPortableParamModifier.into();
+            let location = self.location_range(start_index..self.index());
+            return Err(Error { cause, location });
+        }
 
         Ok(Some(BracedParam {
             param,
@@ -864,5 +883,77 @@ mod tests {
         assert_eq!(param.location.range, 0..8);
 
         assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('z')));
+    }
+
+    fn portable_mode() -> yash_env::parser::Mode {
+        let mut mode = yash_env::parser::Mode::default();
+        mode.portable = true;
+        mode
+    }
+
+    #[test]
+    fn lexer_braced_param_non_portable_modifier_rejected_in_portable_mode() {
+        for code in [
+            "${#*}", "${#@}", "${*+x}", "${*-x}", "${*=x}", "${*?x}", "${@:+x}", "${@:-x}",
+            "${*#x}", "${*##x}", "${*%x}", "${@#x}", "${@%%x}", "${#%x}", "${##x}", "${###x}",
+        ] {
+            let mut lexer = Lexer::with_code(code);
+            lexer.set_mode(portable_mode());
+            lexer.peek_char().now_or_never().unwrap().unwrap();
+            lexer.consume_char();
+            let mut lexer = WordLexer {
+                lexer: &mut lexer,
+                context: WordContext::Word,
+            };
+
+            let e = lexer.braced_param(0).now_or_never().unwrap().unwrap_err();
+            assert_eq!(
+                e.cause,
+                ErrorCause::Syntax(SyntaxError::NonPortableParamModifier),
+                "code={code:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn lexer_braced_param_portable_modifier_accepted_in_portable_mode() {
+        // These combinations are portable (or are disambiguated as a length
+        // modifier or a switch applied to the special parameter `#`), so they
+        // are accepted even with the `portable` option on.
+        for code in [
+            "${#foo}", "${#1}", "${#?}", "${#-}", "${#$}", "${#!}", "${#0}", "${##}", "${#+x}",
+            "${#-x}", "${#?x}", "${#=x}", "${foo#x}", "${foo%x}", "${1#x}", "${?+x}",
+        ] {
+            let mut lexer = Lexer::with_code(code);
+            lexer.set_mode(portable_mode());
+            lexer.peek_char().now_or_never().unwrap().unwrap();
+            lexer.consume_char();
+            let mut lexer = WordLexer {
+                lexer: &mut lexer,
+                context: WordContext::Word,
+            };
+
+            let result = lexer.braced_param(0).now_or_never().unwrap();
+            assert_matches!(result, Ok(Some(_)), "code={code:?}");
+        }
+    }
+
+    #[test]
+    fn lexer_braced_param_non_portable_modifier_accepted_without_portable_mode() {
+        for code in [
+            "${#*}", "${#@}", "${*+x}", "${@:-x}", "${*#x}", "${@%%x}", "${#%x}", "${##x}",
+            "${###x}",
+        ] {
+            let mut lexer = Lexer::with_code(code);
+            lexer.peek_char().now_or_never().unwrap().unwrap();
+            lexer.consume_char();
+            let mut lexer = WordLexer {
+                lexer: &mut lexer,
+                context: WordContext::Word,
+            };
+
+            let result = lexer.braced_param(0).now_or_never().unwrap();
+            assert_matches!(result, Ok(Some(_)), "code={code:?}");
+        }
     }
 }

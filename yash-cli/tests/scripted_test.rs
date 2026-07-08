@@ -371,6 +371,11 @@ fn parameter_expansion() {
     run("param-p.sh")
 }
 
+#[test]
+fn parameter_expansion_ex() {
+    run("param-y.sh")
+}
+
 // a.k.a. globbing
 #[test]
 fn pathname_expansion() {

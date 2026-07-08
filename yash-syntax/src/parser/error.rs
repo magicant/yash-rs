@@ -295,6 +295,14 @@ pub enum SyntaxError {
     /// [`POSIX_SPECIAL_BUILTIN_NAMES`](yash_env::builtin::POSIX_SPECIAL_BUILTIN_NAMES)
     /// for the list of names this applies to.
     SpecialBuiltinFunctionName,
+    /// A parameter expansion combines a special parameter with a modifier whose
+    /// result POSIX leaves unspecified, while the `portable` option is on.
+    ///
+    /// POSIX leaves the result unspecified for a length or switch modifier
+    /// applied to the special parameter `*` or `@` (as in `${#*}` or
+    /// `${@:-x}`), and for a trim modifier applied to the special parameter
+    /// `#`, `*`, or `@` (as in `${#%x}` or `${*#x}`).
+    NonPortableParamModifier,
 }
 
 impl SyntaxError {
@@ -408,6 +416,7 @@ impl SyntaxError {
             SpecialBuiltinFunctionName => {
                 "the function name is the same as a special built-in utility"
             }
+            NonPortableParamModifier => "the parameter expansion is not portable",
         }
     }
 
@@ -523,6 +532,9 @@ impl SyntaxError {
             NonPortableFunctionName => "not a POSIX name",
             NonPortableAssignmentName => "not a POSIX variable name",
             SpecialBuiltinFunctionName => "conflicts with a special built-in utility",
+            NonPortableParamModifier => {
+                "POSIX leaves this parameter/modifier combination unspecified"
+            }
         }
     }
 
@@ -552,7 +564,8 @@ impl SyntaxError {
             | NonPortableForName
             | NonPortableFunctionName
             | NonPortableAssignmentName
-            | SpecialBuiltinFunctionName => &[(
+            | SpecialBuiltinFunctionName
+            | NonPortableParamModifier => &[(
                 FootnoteType::Note,
                 "this error is reported because the `portable` shell option is enabled",
             )],
