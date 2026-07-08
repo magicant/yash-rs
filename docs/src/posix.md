@@ -36,5 +36,6 @@ When the `portable` option is set, the shell rejects the following non-portable 
 - A [function](language/functions.md) name that is quoted, contains an expansion, or starts with a digit. POSIX requires the name to be an unquoted word consisting solely of underscores, digits, and alphabetics from the portable character set, not starting with a digit.
 - A [function](language/functions.md) name that is the same as a [special built-in](builtins/index.html#special-built-ins) utility name (for example, `break` or `export`). POSIX does not allow a function to have the same name as a special built-in. This does not apply to other built-ins, such as `cd`, or to `source`, which is not a POSIX-mandated special built-in.
 - An [assignment](language/commands/simple.md#syntax) name that contains a character other than underscores, digits, and alphabetics from the portable character set, or that starts with a digit.
+- A [parameter expansion](language/words/parameters.md) that uses a length or switch modifier with special parameter `*` or `@` (for example, `${#*}` or `${@:+word}`), or a trim modifier with special parameter `#`, `*`, or `@` (for example, `${#%word}` or `${*#word}`). POSIX leaves the results of these combinations unspecified.
 
 The `portable` option is still under development, so this list will be expanded as more checks are implemented.

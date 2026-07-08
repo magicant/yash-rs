@@ -203,4 +203,7 @@ The result is unspecified in POSIX for:
 - a length or switch modifier applied to special parameter `*` or `@`
 - a trim modifier applied to special parameter `#`, `*`, or `@`
 
+(Since 3.3.0) The [`portable` shell option] rejects these unspecified combinations.
+
 [special parameter]: ../parameters/special.md
+[`portable` shell option]: ../../environment/options.md#portable

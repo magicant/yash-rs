@@ -58,6 +58,9 @@ A _private dependency_ is used internally and not visible to downstream users.
       special built-in utility name (see
       `yash_env::builtin::is_posix_special_builtin_name`), since POSIX does
       not allow a function to override a special built-in.
+    - `NonPortableParamModifier` for parameter expansions where POSIX leaves
+      the result unspecified because a length or switch modifier is applied to
+      `*` or `@`, or a trim modifier is applied to `#`, `*`, or `@`.
 - `parser::SyntaxError::footnotes` and `parser::ErrorCause::footnotes`, which
   return supplementary footnotes (a `source::pretty::FootnoteType` and its text)
   to render with the error, such as a note that the error is reported because
@@ -108,6 +111,9 @@ A _private dependency_ is used internally and not visible to downstream users.
       with a digit (`SyntaxError::NonPortableAssignmentName`).
     - A function name that is the same as a special built-in utility name
       (`SyntaxError::SpecialBuiltinFunctionName`).
+    - A parameter expansion where POSIX leaves the result unspecified because a
+      length or switch modifier is applied to `*` or `@`, or a trim modifier is
+      applied to `#`, `*`, or `@` (`SyntaxError::NonPortableParamModifier`).
 - `parser::Error::to_report` now attaches a `note:` footnote to errors caused by
   the `portable` option, clarifying that the construct is rejected only because
   the option is enabled.
