@@ -14,8 +14,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     env:
-      RUSTFLAGS: -D warnings
-      RUSTDOCFLAGS: -D warnings
+      CARGO_BUILD_WARNINGS: deny
     permissions:
       contents: read
     steps:
@@ -51,7 +50,7 @@ jobs:
   extra:
     runs-on: ubuntu-latest
     env:
-      RUSTFLAGS: -D warnings
+      CARGO_BUILD_WARNINGS: deny
     permissions:
       contents: read
     steps:
@@ -63,7 +62,7 @@ jobs:
   release-build:
     runs-on: ubuntu-latest
     env:
-      RUSTFLAGS: -D warnings
+      CARGO_BUILD_WARNINGS: deny
     permissions:
       contents: read
     steps:
@@ -102,6 +101,8 @@ jobs:
       run: ./check-msrv.sh -v
   windows:
     runs-on: windows-latest
+    env:
+      CARGO_BUILD_WARNINGS: deny
     permissions:
       contents: read
     steps:
