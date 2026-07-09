@@ -653,13 +653,13 @@ impl<'a> ConflictingOptionError<'a> {
         report.title = self.to_string().into();
         report.snippets = Snippet::with_primary_span(
             &self.options[0].location,
-            format!("the {} option ...", &self.options[0].spec).into(),
+            format!("the {} option ...", self.options[0].spec).into(),
         );
         for option in &self.options[1..] {
             let span = Span {
                 range: option.location.byte_range(),
                 role: SpanRole::Primary {
-                    label: format!("... cannot be used with the {} option", &option.spec).into(),
+                    label: format!("... cannot be used with the {} option", option.spec).into(),
                 },
             };
             add_span(&option.location.code, span, &mut report.snippets);

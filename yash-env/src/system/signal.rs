@@ -297,6 +297,7 @@ pub trait Signals {
             Rtmin,
             Rtmax,
         }
+        #[allow(clippy::question_mark, reason = "keeps the if/else branches symmetric")]
         let (basename, suffix) = if let Some(suffix) = name.strip_prefix("RTMIN") {
             (BaseName::Rtmin, suffix)
         } else if let Some(suffix) = name.strip_prefix("RTMAX") {

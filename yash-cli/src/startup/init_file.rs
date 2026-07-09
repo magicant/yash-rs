@@ -179,7 +179,7 @@ where
             env.system
                 .print_error(&format!(
                     "{}: cannot open initialization file {path:?}: {errno}\n",
-                    &env.arg0
+                    env.arg0
                 ))
                 .await;
             return;
@@ -201,7 +201,7 @@ where
         env.system
             .print_error(&format!(
                 "{}: cannot close initialization file {path:?}: {errno}\n",
-                &env.arg0
+                env.arg0
             ))
             .await;
     }

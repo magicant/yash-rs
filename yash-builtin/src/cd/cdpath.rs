@@ -53,7 +53,7 @@ pub fn search<S: Fstat>(env: &Env<S>, path: &Path) -> Option<PathBuf> {
         // supports such a platform, notably Cygwin.
 
         if let Some(full_path) = ensure_directory(&env.system, full_path) {
-            return Some(full_path).filter(|_| !base.is_empty());
+            return (!base.is_empty()).then_some(full_path);
         }
     }
 

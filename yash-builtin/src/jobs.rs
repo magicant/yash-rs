@@ -53,7 +53,7 @@ fn find_error_report(error: FindError, operand: &Field) -> Report<'_> {
     report.title = "cannot report job status".into();
     report.snippets = Snippet::with_primary_span(
         &operand.origin,
-        format!("{:?}: {}", &operand.value, error).into(),
+        format!("{:?}: {}", operand.value, error).into(),
     );
     report
 }

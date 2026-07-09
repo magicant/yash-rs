@@ -268,11 +268,7 @@ pub fn search<S, E: ClassifyEnv<S> + PathEnv>(env: &mut E, name: &str) -> Option
             }
         };
 
-        if let Some(real_path) = search_path(env, name) {
-            *path = real_path;
-        } else {
-            return None;
-        }
+        *path = search_path(env, name)?;
     }
 
     Some(target)

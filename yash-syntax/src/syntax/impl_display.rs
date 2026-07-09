@@ -187,7 +187,7 @@ impl fmt::Display for Value {
 
 impl fmt::Display for Assign {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}={}", &self.name, &self.value)
+        write!(f, "{}={}", self.name, self.value)
     }
 }
 
