@@ -13,6 +13,13 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.19.1] - Unreleased
+
+### Changed
+
+- Private dependency versions:
+    - itertools 0.14.0 → 0.15.0
+
 ## [0.19.0] - 2026-07-09
 
 ### Changed
@@ -844,6 +851,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
+[0.19.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.19.1
 [0.19.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.19.0
 [0.18.2]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.18.2
 [0.18.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.18.1

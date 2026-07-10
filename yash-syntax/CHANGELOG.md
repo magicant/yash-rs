@@ -13,6 +13,13 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.23.1] - Unreleased
+
+### Changed
+
+- Private dependency versions:
+    - itertools 0.14.0 → 0.15.0
+
 ## [0.23.0] - 2026-07-09
 
 ### Added
@@ -789,6 +796,7 @@ command.
 - Functionalities to parse POSIX shell scripts
 - Alias substitution support
 
+[0.23.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.23.1
 [0.23.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.23.0
 [0.22.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.22.1
 [0.22.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.22.0

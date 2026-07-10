@@ -251,9 +251,9 @@ checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
 name = "itertools"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+checksum = "8b4baf93f58d4425749ca49a51c50ebab072c5df6994d08fed93541c331481dc"
 dependencies = [
  "either",
 ]
@@ -509,7 +509,7 @@ dependencies = [
 
 [[package]]
 name = "yash-builtin"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "assert_matches",
  "either",
@@ -543,7 +543,7 @@ dependencies = [
 
 [[package]]
 name = "yash-env"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "annotate-snippets",
  "assert_matches",
@@ -598,7 +598,7 @@ version = "1.1.2"
 
 [[package]]
 name = "yash-semantics"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "assert_matches",
  "either",
@@ -616,7 +616,7 @@ dependencies = [
 
 [[package]]
 name = "yash-syntax"
-version = "0.23.0"
+version = "0.23.1"
 dependencies = [
  "assert_matches",
  "futures-executor",

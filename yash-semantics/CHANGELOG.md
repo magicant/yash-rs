@@ -13,6 +13,13 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.18.1] - Unreleased
+
+### Changed
+
+- Private dependency versions:
+    - itertools 0.14.0 → 0.15.0
+
 ## [0.18.0] - 2026-07-09
 
 ### Changed
@@ -557,6 +564,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Initial implementation of the `yash-semantics` crate
 
+[0.18.1]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.18.1
 [0.18.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.18.0
 [0.17.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.17.0
 [0.16.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.16.0
