@@ -526,7 +526,7 @@ dependencies = [
 
 [[package]]
 name = "yash-cli"
-version = "3.3.0"
+version = "3.3.1"
 dependencies = [
  "assert_matches",
  "futures-util",
@@ -584,7 +584,7 @@ dependencies = [
 
 [[package]]
 name = "yash-prompt"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "futures-util",
  "yash-env",
