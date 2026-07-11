@@ -15,6 +15,12 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.15.4] - Unreleased
 
+### Added
+
+- `alias::is_portable_alias_name`, which tests whether a string is a
+  POSIXly-portable alias name (non-empty and consisting only of ASCII letters,
+  digits, and the characters `!`, `%`, `,`, `-`, `@`, and `_`).
+
 ### Changed
 
 - Private dependency versions:

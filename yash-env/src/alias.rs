@@ -197,3 +197,29 @@ impl<S: Debug> Glossary for Env<S> {
         self.aliases.is_empty()
     }
 }
+
+/// Tests if a string is a POSIXly-portable alias name.
+///
+/// A portable alias name is a non-empty string consisting only of ASCII
+/// letters, digits, and the characters `!`, `%`, `,`, `-`, `@`, and `_`.
+#[must_use]
+pub fn is_portable_alias_name(s: &str) -> bool {
+    !s.is_empty()
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '!' | '%' | ',' | '-' | '@' | '_'))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn portable_alias_name() {
+        assert!(is_portable_alias_name("aZ09!%,-@_"));
+        assert!(!is_portable_alias_name(""));
+        assert!(!is_portable_alias_name("a.b"));
+        assert!(!is_portable_alias_name("a/b"));
+        assert!(!is_portable_alias_name("a b"));
+        assert!(!is_portable_alias_name("a\u{e9}"));
+    }
+}
