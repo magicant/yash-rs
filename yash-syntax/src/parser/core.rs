@@ -26,6 +26,7 @@ use super::lex::Lexer;
 use super::lex::Token;
 use super::lex::TokenId::*;
 use crate::alias::Glossary;
+use crate::alias::is_portable_alias_name;
 use crate::parser::lex::is_blank;
 use crate::syntax::HereDoc;
 use crate::syntax::MaybeLiteral as _;
@@ -177,13 +178,6 @@ impl Default for Config<'_> {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// Tests if a string is a POSIXly-portable alias name.
-fn is_portable_alias_name(s: &str) -> bool {
-    !s.is_empty()
-        && s.chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '!' | '%' | ',' | '-' | '@' | '_'))
 }
 
 /// The shell syntax parser
@@ -467,16 +461,6 @@ mod tests {
     use std::assert_matches;
     use std::cell::OnceCell;
     use yash_env::parser::Mode;
-
-    #[test]
-    fn portable_alias_name() {
-        assert!(is_portable_alias_name("aZ09!%,-@_"));
-        assert!(!is_portable_alias_name(""));
-        assert!(!is_portable_alias_name("a.b"));
-        assert!(!is_portable_alias_name("a/b"));
-        assert!(!is_portable_alias_name("a b"));
-        assert!(!is_portable_alias_name("a\u{e9}"));
-    }
 
     #[test]
     fn parser_take_token_manual_successful_substitution() {
