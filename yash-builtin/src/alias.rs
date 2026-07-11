@@ -73,8 +73,14 @@ where
 mod tests {
     use super::*;
     use futures_util::FutureExt as _;
+    use std::rc::Rc;
+    use yash_env::VirtualSystem;
+    use yash_env::option::Option::Portable;
+    use yash_env::option::State::On;
     use yash_env::semantics::ExitStatus;
     use yash_env::source::Source;
+    use yash_env::system::Concurrent;
+    use yash_env::test_helper::assert_stderr;
 
     #[test]
     fn builtin_defines_alias() {
@@ -94,6 +100,42 @@ mod tests {
         assert_eq!(alias.origin.code.start_line_number.get(), 1);
         assert_eq!(*alias.origin.code.source, Source::Unknown);
         assert_eq!(alias.origin.range, 0..11);
+    }
+
+    #[test]
+    fn builtin_errors_on_non_portable_alias_name() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Portable, On);
+        let args = Field::dummies(["a.b=x"]);
+
+        let result = main(&mut env, args).now_or_never().unwrap();
+
+        assert_eq!(result, Result::new(ExitStatus::FAILURE));
+        assert!(!env.aliases.contains("a.b"));
+        assert_stderr(&state, |stderr| {
+            assert!(stderr.contains("not portable"), "stderr = {stderr:?}");
+            assert!(stderr.contains("a.b"), "stderr = {stderr:?}");
+        });
+    }
+
+    #[test]
+    fn builtin_mixed_non_portable_name_and_other_error() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Portable, On);
+        let args = Field::dummies(["a.b=x", "missing"]);
+
+        let result = main(&mut env, args).now_or_never().unwrap();
+
+        assert_eq!(result, Result::new(ExitStatus::FAILURE));
+        assert!(!env.aliases.contains("a.b"));
+        assert_stderr(&state, |stderr| {
+            assert!(stderr.contains("not portable"), "stderr = {stderr:?}");
+            assert!(stderr.contains("not found"), "stderr = {stderr:?}");
+        });
     }
 
     #[test]

@@ -26,6 +26,8 @@ Each operand must be of the form `name=value` or `name`. The first form defines 
 
 It is an error if an operand without `=` refers to an alias that does not exist.
 
+(Since 3.3.1) With the [`portable` option](../environment/options.md#portable) on, it is an error to define an alias whose name contains a character other than ASCII letters, digits, `!`, `%`, `,`, `-`, `@`, or `_`. The alias is not defined in that case.
+
 ## Exit status
 
 Zero unless an error occurs.

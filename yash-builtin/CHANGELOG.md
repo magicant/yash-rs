@@ -13,10 +13,20 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
-## [0.19.1] - Unreleased
+## [0.20.0] - Unreleased
+
+### Added
+
+- `alias::semantics::Error::NonPortableAliasName`, a new error variant that
+  `alias::semantics::Command::execute` now returns when an operand would
+  define an alias whose name is not POSIXly portable while the `portable`
+  shell option is on. The alias is not defined in that case.
+- The `alias` built-in (`alias::main`) now fails, reporting an error, in the
+  same situation.
 
 ### Changed
 
+- `alias::semantics::Error` is now `#[non_exhaustive]`.
 - Private dependency versions:
     - itertools 0.14.0 → 0.15.0
 
@@ -851,7 +861,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
-[0.19.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.19.1
+[0.20.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.20.0
 [0.19.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.19.0
 [0.18.2]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.18.2
 [0.18.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.18.1
