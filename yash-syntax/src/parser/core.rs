@@ -26,6 +26,7 @@ use super::lex::Lexer;
 use super::lex::Token;
 use super::lex::TokenId::*;
 use crate::alias::Glossary;
+use crate::alias::is_portable_alias_name;
 use crate::parser::lex::is_blank;
 use crate::syntax::HereDoc;
 use crate::syntax::MaybeLiteral as _;
@@ -294,10 +295,10 @@ impl<'a, 'b> Parser<'a, 'b> {
     /// Performs alias substitution on a token that has just been
     /// [taken](Self::take_token_raw).
     fn substitute_alias(&mut self, token: Token, is_command_name: bool) -> Rec<Token> {
-        // TODO Only POSIXly-valid alias name should be recognized in POSIXly-correct mode.
         if !self.aliases.is_empty()
             && let Token(_) = token.id
             && let Some(name) = token.word.to_string_if_literal()
+            && (!self.mode().portable || is_portable_alias_name(&name))
             && !token.word.location.code.source.is_alias_for(&name)
             && let Some(alias) = self.aliases.look_up(&name)
             && (is_command_name
@@ -459,6 +460,7 @@ mod tests {
     use futures_util::FutureExt as _;
     use std::assert_matches;
     use std::cell::OnceCell;
+    use yash_env::parser::Mode;
 
     #[test]
     fn parser_take_token_manual_successful_substitution() {
@@ -540,6 +542,48 @@ mod tests {
         let token = result.unwrap().unwrap();
         assert_eq!(token.id, Operator(super::super::lex::Operator::Semicolon));
         assert_eq!(token.word.to_string_if_literal().unwrap(), ";");
+    }
+
+    #[test]
+    fn parser_take_token_manual_non_portable_alias_in_portable_mode() {
+        let mut lexer = Lexer::with_code("a.b");
+        let mut mode = Mode::default();
+        mode.portable = true;
+        lexer.set_mode(mode);
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
+        let mut aliases = AliasSet::new();
+        aliases.insert(HashEntry::new(
+            "a.b".to_string(),
+            "replacement".to_string(),
+            false,
+            Location::dummy("?"),
+        ));
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
+
+        let result = parser.take_token_manual(true).now_or_never().unwrap();
+        let token = result.unwrap().unwrap();
+        assert_eq!(token.to_string(), "a.b");
+    }
+
+    #[test]
+    fn parser_take_token_manual_non_portable_alias_in_non_portable_mode() {
+        let mut lexer = Lexer::with_code("a.b");
+        #[allow(clippy::mutable_key_type, reason = "AliasSet is defined as such")]
+        let mut aliases = AliasSet::new();
+        aliases.insert(HashEntry::new(
+            "a.b".to_string(),
+            "replacement".to_string(),
+            false,
+            Location::dummy("?"),
+        ));
+        let mut parser = Parser::config().aliases(&aliases).input(&mut lexer);
+
+        let result = parser.take_token_manual(true).now_or_never().unwrap();
+        assert_matches!(result, Ok(Rec::AliasSubstituted));
+
+        let result = parser.take_token_manual(true).now_or_never().unwrap();
+        let token = result.unwrap().unwrap();
+        assert_eq!(token.to_string(), "replacement");
     }
 
     #[test]

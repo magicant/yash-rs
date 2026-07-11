@@ -117,6 +117,11 @@ fn alias() {
 }
 
 #[test]
+fn alias_ex() {
+    run("alias-y.sh")
+}
+
+#[test]
 fn and_or_list() {
     run("andor-p.sh")
 }

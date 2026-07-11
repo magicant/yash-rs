@@ -9,6 +9,14 @@ used by other programs.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.1] - Unreleased
+
+### Changed
+
+- With the `portable` shell option enabled, aliases with names containing
+  characters other than ASCII letters, digits, `!`, `%`, `,`, `-`, `@`, or `_`
+  are ignored during alias substitution.
+
 ## [3.3.0] - 2026-07-09
 
 ### Added
@@ -390,6 +398,7 @@ later.
 
 - Initial release of the shell
 
+[3.3.1]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.3.1
 [3.3.0]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.3.0
 [3.2.2]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.2.2
 [3.2.1]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.2.1

@@ -38,6 +38,8 @@ This expands to `test "$(date +%Y)" = 2001 && echo "Happy millennium!"`, printin
 
 By POSIX.1-2024, alias names can use ASCII letters, digits, and `!`, `%`, `,`, `-`, `@`, `_`. Yash-rs allows any literal word as an alias name (no [quotes](words/quoting.md) or [expansions](words/index.html#word-expansion)). Alias names are case-sensitive.
 
+(Since 3.3.1) When the [`portable` option](../environment/options.md#portable) is set, aliases with other characters in their names are ignored.
+
 ## Recursion
 
 Aliases can reference other aliases, creating a chain of substitutions. The shell expands aliases recursively until no more aliases are found. An alias is not substituted in the result of its own expansion, preventing infinite loops.
