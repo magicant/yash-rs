@@ -24,6 +24,7 @@ use yash_env::source::pretty::{Report, ReportType, Snippet};
 
 /// Errors that can occur while executing the `unalias` built-in
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[non_exhaustive]
 pub enum Error {
     /// The operand names a non-existent alias.
     #[error("no such alias `{0}`")]

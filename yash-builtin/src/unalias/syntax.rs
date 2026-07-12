@@ -31,6 +31,7 @@ pub const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('a')];
 
 /// Errors that can occur while parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[non_exhaustive]
 pub enum Error {
     /// An error occurred while parsing arguments.
     #[error(transparent)]

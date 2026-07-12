@@ -38,6 +38,7 @@ use yash_env::variable::Value;
 
 /// Error in reporting the result to the environment
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[non_exhaustive]
 pub enum Error {
     /// Variable name not acceptable
     #[error("invalid variable name")]

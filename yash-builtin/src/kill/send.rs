@@ -35,6 +35,7 @@ use yash_env::system::{Errno, Isatty, SendSignal, Signals};
 
 /// Error that may occur while [sending](send) a signal.
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// The specified process (group) ID was not a valid integer.
     #[error(transparent)]

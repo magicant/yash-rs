@@ -26,7 +26,24 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
-- `alias::semantics::Error` is now `#[non_exhaustive]`.
+- The following error enums are now `#[non_exhaustive]`:
+    - `alias::semantics::Error`
+    - `getopts::model::Error`
+    - `getopts::report::Error`
+    - `getopts::verify::Error`
+    - `kill::send::Error`
+    - `pwd::semantics::Error`
+    - `set::syntax::Error`
+    - `typeset::ExecuteError`
+    - `ulimit::Error`
+    - `umask::symbol::ParseActionError`
+    - `umask::symbol::ParseClauseError`
+    - `umask::symbol::ParseClausesError`
+    - `umask::symbol::ParsePermissionError`
+    - `unalias::semantics::Error`
+    - `unalias::syntax::Error`
+    - `wait::core::Error`
+    - `wait::syntax::Error`
 - Private dependency versions:
     - itertools 0.14.0 → 0.15.0
     - yash-env 0.15.3 → 0.15.4

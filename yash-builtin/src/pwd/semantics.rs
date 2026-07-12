@@ -24,6 +24,7 @@ use yash_env::system::{Errno, Fstat, GetCwd};
 
 /// Error in running the pwd built-in
 #[derive(Debug, Clone, Eq, Error, PartialEq)]
+#[non_exhaustive]
 pub enum Error {
     /// Error obtaining the current working directory path
     #[error(transparent)]

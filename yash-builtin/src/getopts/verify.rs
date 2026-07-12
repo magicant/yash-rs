@@ -25,6 +25,7 @@ use thiserror::Error;
 
 /// Type of error returned by [`GetoptsStateRef::verify`]
 #[derive(Clone, Copy, Debug, Eq, Error, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum Error {
     /// The built-in receives different arguments than the previous call.
     #[error("arguments are different from the previous call")]

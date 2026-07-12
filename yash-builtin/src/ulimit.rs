@@ -89,6 +89,7 @@ pub mod syntax;
 
 /// Error that may occur in [`Command::execute`]
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The specified resource is not supported on the current platform.
     #[error("specified resource not supported on this platform")]

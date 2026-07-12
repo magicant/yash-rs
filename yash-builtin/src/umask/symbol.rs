@@ -26,6 +26,7 @@ use thiserror::Error;
 
 /// Error [parsing clauses](parse_clauses)
 #[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum ParseClausesError {
     /// There is an invalid character in the input.
     #[error("invalid character: {0:?}")]
@@ -67,6 +68,7 @@ pub struct Clause {
 /// Error parsing a clause
 #[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
 #[error(transparent)]
+#[non_exhaustive]
 pub enum ParseClauseError {
     /// There is no valid action.
     BadAction(#[from] ParseActionError),
@@ -147,6 +149,7 @@ pub struct Action {
 /// Error parsing an action
 #[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
 #[error(transparent)]
+#[non_exhaustive]
 pub enum ParseActionError {
     /// There is no operator.
     NoOperator(#[from] ParseOperatorError),
@@ -253,6 +256,7 @@ impl std::fmt::Debug for Permission {
 
 /// Error parsing a permission
 #[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum ParsePermissionError {
     /// Invalid combination of permission symbols
     ///

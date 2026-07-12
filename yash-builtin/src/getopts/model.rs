@@ -124,6 +124,7 @@ impl Result {
 
 /// Error that may occur when parsing an option
 #[derive(Clone, Copy, Debug, Eq, Error, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum Error {
     /// The option is not listed in the option specification.
     #[error("invalid option")]

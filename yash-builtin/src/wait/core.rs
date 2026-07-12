@@ -32,6 +32,7 @@ use yash_env::trap::{RunSignalTrapIfCaught, SignalSystem};
 
 /// Errors that may occur while waiting for a job
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
+#[non_exhaustive]
 pub enum Error {
     /// There is no job to wait for.
     #[error("no job to wait for")]

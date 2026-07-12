@@ -28,6 +28,7 @@ use crate::common::syntax::{Mode, ParseError, parse_arguments};
 
 /// Errors that may occur while parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[non_exhaustive]
 pub enum Error {
     /// Error in generic argument parsing
     #[error(transparent)]

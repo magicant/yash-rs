@@ -340,6 +340,7 @@ pub struct UndoReadOnlyError {
 
 /// Error that can occur during the execution of the typeset built-in
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum ExecuteError {
     /// Assigning to a read-only variable
     AssignReadOnlyVariable(#[from] AssignReadOnlyError),

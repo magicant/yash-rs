@@ -30,6 +30,7 @@ use yash_env::source::pretty::{Report, ReportType};
 
 /// Error in command line parsing
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[non_exhaustive]
 pub enum Error {
     /// Short option that is not defined in the option specs
     #[error("unknown option {0:?}")]
