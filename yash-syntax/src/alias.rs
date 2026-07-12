@@ -21,25 +21,3 @@
 
 #[doc(no_inline)]
 pub use yash_env::alias::*;
-
-/// Tests if a string is a POSIXly-portable alias name.
-pub(crate) fn is_portable_alias_name(s: &str) -> bool {
-    !s.is_empty()
-        && s.chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '!' | '%' | ',' | '-' | '@' | '_'))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn portable_alias_name() {
-        assert!(is_portable_alias_name("aZ09!%,-@_"));
-        assert!(!is_portable_alias_name(""));
-        assert!(!is_portable_alias_name("a.b"));
-        assert!(!is_portable_alias_name("a/b"));
-        assert!(!is_portable_alias_name("a b"));
-        assert!(!is_portable_alias_name("a\u{e9}"));
-    }
-}

@@ -21,16 +21,26 @@ use thiserror::Error;
 use yash_env::Env;
 use yash_env::alias::Alias;
 use yash_env::alias::HashEntry;
+use yash_env::alias::is_portable_alias_name;
+use yash_env::option::Option::Portable;
+use yash_env::option::State::On;
 use yash_env::semantics::Field;
-use yash_env::source::pretty::{Report, ReportType, Snippet};
+use yash_env::source::Location;
+use yash_env::source::pretty::{Footnote, FootnoteType, Report, ReportType, Snippet};
 use yash_quote::quoted;
 
 /// Error in executing the alias built-in
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[non_exhaustive]
 pub enum Error {
     /// Printing a non-existent alias
     #[error("alias {name} not found")]
     NonExistentAlias { name: Field },
+
+    /// Defining an alias whose name is not POSIXly portable while the
+    /// [`Portable`] option is on
+    #[error("alias name `{name}` is not portable")]
+    NonPortableAliasName { name: Field },
 }
 
 impl Error {
@@ -39,12 +49,21 @@ impl Error {
     pub fn to_report(&self) -> Report<'_> {
         let mut report = Report::new();
         report.r#type = ReportType::Error;
-        report.title = "cannot print alias definition".into();
-        report.snippets = match self {
+        match self {
             Self::NonExistentAlias { name } => {
-                Snippet::with_primary_span(&name.origin, self.to_string().into())
+                report.title = "cannot print alias definition".into();
+                report.snippets = Snippet::with_primary_span(&name.origin, self.to_string().into());
             }
-        };
+            Self::NonPortableAliasName { name } => {
+                report.title = "cannot define alias with non-portable name".into();
+                report.snippets = Snippet::with_primary_span(&name.origin, self.to_string().into());
+                report.footnotes.push(Footnote {
+                    r#type: FootnoteType::Note,
+                    label: "this error is reported because the `portable` shell option is enabled"
+                        .into(),
+                });
+            }
+        }
         report
     }
 }
@@ -59,8 +78,13 @@ impl<'a> From<&'a Error> for Report<'a> {
 /// Defines an alias.
 ///
 /// If `name_value` is of the form `name=value`, defines an alias named `name`
-/// that expands to `value`. Otherwise, returns `Err(name_value)`.
-fn define<S>(env: &mut Env<S>, name_value: Field) -> Result<(), Field> {
+/// that expands to `value` and returns `Ok(Ok(()))`. Otherwise, returns
+/// `Err(name_value)`.
+///
+/// When the [`Portable`] option is on and the alias name is not POSIXly
+/// portable, the alias is not defined and
+/// `Ok(Err(Error::NonPortableAliasName { .. }))` is returned instead.
+fn define<S>(env: &mut Env<S>, name_value: Field) -> Result<Result<(), Error>, Field> {
     let Some(equal) = name_value.value.find('=') else {
         return Err(name_value);
     };
@@ -68,17 +92,31 @@ fn define<S>(env: &mut Env<S>, name_value: Field) -> Result<(), Field> {
     let name = {
         let mut name = name_value.value;
         name.truncate(equal);
-        // TODO Reject invalid name
         name.shrink_to_fit();
         name
     };
+
+    if env.options.get(Portable) == On && !is_portable_alias_name(&name) {
+        let name_len = name.chars().count();
+        let start = name_value.origin.range.start;
+        return Ok(Err(Error::NonPortableAliasName {
+            name: Field {
+                value: name,
+                origin: Location {
+                    range: start..start + name_len,
+                    code: name_value.origin.code.clone(),
+                },
+            },
+        }));
+    }
+
     // TODO Support global aliases
     let global = false;
 
     env.aliases
         .replace(HashEntry::new(name, replacement, global, name_value.origin));
 
-    Ok(())
+    Ok(Ok(()))
 }
 
 /// Prints the definition of an alias.
@@ -128,9 +166,13 @@ impl Command {
             }
         } else {
             for operand in self.operands {
-                if let Err(operand) = define(env, operand) {
-                    let result = find_and_print(env, operand, &mut output);
-                    errors.extend(result.err());
+                match define(env, operand) {
+                    Ok(Ok(())) => {}
+                    Ok(Err(error)) => errors.push(error),
+                    Err(operand) => {
+                        let result = find_and_print(env, operand, &mut output);
+                        errors.extend(result.err());
+                    }
                 }
             }
         }
@@ -158,7 +200,7 @@ mod tests {
             },
         );
 
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Ok(Ok(())));
         assert_eq!(
             *env.aliases.get("foo").unwrap().0,
             Alias {
@@ -177,6 +219,45 @@ mod tests {
         let result = define(&mut env, field.clone());
         assert_eq!(result, Err(field));
         assert_eq!(env.aliases.len(), 0);
+    }
+
+    #[test]
+    fn defining_non_portable_alias_name_with_portable_option() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, On);
+        let origin = Location::dummy("a.b=x");
+
+        let result = define(
+            &mut env,
+            Field {
+                value: "a.b=x".into(),
+                origin: origin.clone(),
+            },
+        );
+
+        assert_eq!(
+            result,
+            Ok(Err(Error::NonPortableAliasName {
+                name: Field {
+                    value: "a.b".into(),
+                    origin: Location {
+                        range: 0..3,
+                        code: origin.code.clone(),
+                    },
+                },
+            }))
+        );
+        assert!(!env.aliases.contains("a.b"));
+    }
+
+    #[test]
+    fn defining_non_portable_alias_name_without_portable_option() {
+        let mut env = Env::new_virtual();
+
+        let result = define(&mut env, Field::dummy("a.b=x"));
+
+        assert_eq!(result, Ok(Ok(())));
+        assert!(env.aliases.contains("a.b"));
     }
 
     #[test]
@@ -252,6 +333,38 @@ mod tests {
                 name: Field::dummy("bar")
             }]
         );
+    }
+
+    #[test]
+    fn executing_collects_non_portable_name_and_other_errors() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, On);
+        let operands = Field::dummies(["a.b=x", "missing", "good=1"]);
+        let a_b_code = operands[0].origin.code.clone();
+        let command = Command { operands };
+
+        let (output, errors) = command.execute(&mut env).now_or_never().unwrap();
+
+        assert_eq!(output, "");
+        assert_eq!(
+            errors,
+            [
+                Error::NonPortableAliasName {
+                    name: Field {
+                        value: "a.b".into(),
+                        origin: Location {
+                            range: 0..3,
+                            code: a_b_code,
+                        },
+                    }
+                },
+                Error::NonExistentAlias {
+                    name: Field::dummy("missing")
+                },
+            ]
+        );
+        assert!(!env.aliases.contains("a.b"));
+        assert!(env.aliases.contains("good"));
     }
 
     #[test]
