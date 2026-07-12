@@ -25,6 +25,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 ### Changed
 
 - Public dependency versions:
+    - yash-env 0.15.0 → 0.15.3
     - yash-syntax 0.22.0 → 0.23.0
 
 ## [0.13.0] - 2026-06-11
