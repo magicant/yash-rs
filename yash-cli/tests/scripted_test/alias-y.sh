@@ -1,10 +1,5 @@
 # alias-y.sh: yash-specific test of aliases
 
-test_O 'portable option ignores aliases with non-portable names' -o portable
-alias no.such.utility='echo substituted'
-no.such.utility
-__IN__
-
 test_oE 'alias built-in errors on non-portable alias names' -o portable
 alias a.b='echo substituted' 2>result
 echo $?

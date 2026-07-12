@@ -17,9 +17,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
-- When the parser's mode has `portable` enabled, aliases whose names contain
-  characters other than ASCII letters, digits, `!`, `%`, `,`, `-`, `@`, or `_`
-  are ignored during alias substitution.
+- Public dependency versions:
+    - yash-env 0.15.3 → 0.15.4
 - Private dependency versions:
     - itertools 0.14.0 → 0.15.0
 
