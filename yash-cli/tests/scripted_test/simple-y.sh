@@ -65,3 +65,22 @@ __OUT__
 test_OE -e 0 'without portable, an assignment name starting with a digit is accepted'
 1a=foo
 __IN__
+
+# Arrays are a non-POSIX extension, so the portable option rejects array
+# assignments.
+
+test_O -d -e 2 'portable option rejects an array assignment' -o portable
+a=(b c)
+__IN__
+
+test_O -d -e 2 'portable option rejects an empty array assignment' -o portable
+a=()
+__IN__
+
+test_oE 'without portable, an array assignment is accepted'
+a=(b c)
+for i in "$a"; do echo "$i"; done
+__IN__
+b
+c
+__OUT__

@@ -260,6 +260,12 @@ $ echo "${fruits[@]}"
 apple banana cherry date
 -->
 
+## Compatibility
+
+Arrays are a yash extension that POSIX does not specify, so scripts that use them may not run on other shells.
+
+(Since 3.3.1) The [`portable` option](../../environment/options.md#portable) rejects array assignment.
+
 [`cd` built-in]: ../../builtins/cd.md
 [`getopts` built-in]: ../../builtins/getopts.md
 [prompt]: ../../interactive/prompt.md

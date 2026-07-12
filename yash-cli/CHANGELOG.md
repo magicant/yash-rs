@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an error, instead of defining the alias, when an operand's alias name
   contains a character other than ASCII letters, digits, `!`, `%`, `,`, `-`,
   `@`, or `_`.
+- With the `portable` shell option enabled, the shell now rejects array
+  assignments (`name=(...)`) as a syntax error.
 
 ## [3.3.0] - 2026-07-09
 

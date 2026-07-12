@@ -240,11 +240,18 @@ impl Parser<'_, '_> {
             };
 
             // Tell array assignment from scalar assignment
-            // TODO no array assignment in POSIXly-correct mode
             if units.is_empty()
                 && !self.has_blank().await?
                 && let Some(words) = self.array_values().await?
             {
+                if self.mode().portable {
+                    let mut location = assign.location;
+                    location.range.end = self.location().await?.range.start;
+                    return Err(Error {
+                        cause: SyntaxError::ArrayAssignment.into(),
+                        location,
+                    });
+                }
                 assign.value = Array(words);
             }
 
@@ -969,6 +976,46 @@ mod tests {
         assert_eq!(sc.assigns.len(), 1);
         assert_eq!(sc.assigns[0].name, "1a");
         assert_eq!(sc.assigns[0].value.to_string(), "b");
+    }
+
+    #[test]
+    fn array_assignment_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("a=(b c)");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.simple_command().now_or_never().unwrap().unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::ArrayAssignment));
+        assert_eq!(*e.location.code.value.borrow(), "a=(b c)");
+        assert_eq!(e.location.range, 0..7);
+    }
+
+    #[test]
+    fn empty_array_assignment_rejected_in_portable_mode() {
+        let mut lexer = Lexer::with_code("a=()");
+        lexer.set_mode(portable_mode());
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = parser.simple_command().now_or_never().unwrap().unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::ArrayAssignment));
+        assert_eq!(*e.location.code.value.borrow(), "a=()");
+        assert_eq!(e.location.range, 0..4);
+    }
+
+    #[test]
+    fn array_assignment_allowed_without_portable_mode() {
+        let mut lexer = Lexer::with_code("a=(b c)");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns.len(), 1);
+        assert_eq!(sc.assigns[0].name, "a");
+        assert_matches!(&sc.assigns[0].value, Array(words) => {
+            assert_eq!(words.len(), 2);
+            assert_eq!(words[0].to_string(), "b");
+            assert_eq!(words[1].to_string(), "c");
+        });
     }
 
     #[test]
