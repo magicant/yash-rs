@@ -13,11 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- With the `portable` shell option enabled, aliases with names containing
-  characters other than ASCII letters, digits, `!`, `%`, `,`, `-`, `@`, or `_`
-  are ignored during alias substitution. The `alias` built-in also now reports
-  an error, instead of defining the alias, when such a name is given as an
-  operand.
+- With the `portable` shell option enabled, the `alias` built-in now reports
+  an error, instead of defining the alias, when an operand's alias name
+  contains a character other than ASCII letters, digits, `!`, `%`, `,`, `-`,
+  `@`, or `_`.
 
 ## [3.3.0] - 2026-07-09
 
