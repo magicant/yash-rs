@@ -29,6 +29,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `alias::semantics::Error` is now `#[non_exhaustive]`.
 - Private dependency versions:
     - itertools 0.14.0 → 0.15.0
+    - yash-env 0.15.3 → 0.15.4
 
 ## [0.19.0] - 2026-07-09
 

@@ -17,6 +17,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- Public dependency versions:
+    - yash-env 0.15.3 → 0.15.4
 - Private dependency versions:
     - itertools 0.14.0 → 0.15.0
 
