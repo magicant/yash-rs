@@ -287,6 +287,12 @@ pub enum SyntaxError {
     /// digit. This is raised when the assignment name does not meet this
     /// form, since other POSIX-conforming shells may not support it.
     NonPortableAssignmentName,
+    /// An array assignment (`name=(...)`) is used while the `portable` option
+    /// is on.
+    ///
+    /// Array assignment is a yash extension that POSIX does not specify, so
+    /// other POSIX-conforming shells may not support it.
+    ArrayAssignment,
     /// A function name is the same as a special built-in utility name while
     /// the `portable` option is on.
     ///
@@ -413,6 +419,7 @@ impl SyntaxError {
             NonPortableForName => "the for loop variable name is not portable",
             NonPortableFunctionName => "the function name is not portable",
             NonPortableAssignmentName => "the assignment name is not portable",
+            ArrayAssignment => "arrays are not portable",
             SpecialBuiltinFunctionName => {
                 "the function name is the same as a special built-in utility"
             }
@@ -531,6 +538,7 @@ impl SyntaxError {
             NonPortableForName => "not a POSIX variable name",
             NonPortableFunctionName => "not a POSIX name",
             NonPortableAssignmentName => "not a POSIX variable name",
+            ArrayAssignment => "arrays are not specified by POSIX",
             SpecialBuiltinFunctionName => "conflicts with a special built-in utility",
             NonPortableParamModifier => {
                 "POSIX leaves this parameter/modifier combination unspecified"
@@ -564,6 +572,7 @@ impl SyntaxError {
             | NonPortableForName
             | NonPortableFunctionName
             | NonPortableAssignmentName
+            | ArrayAssignment
             | SpecialBuiltinFunctionName
             | NonPortableParamModifier => &[(
                 FootnoteType::Note,

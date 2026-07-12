@@ -27,6 +27,7 @@ use super::lex::Token;
 use super::lex::TokenId::*;
 use crate::alias::Glossary;
 use crate::parser::lex::is_blank;
+use crate::source::Location;
 use crate::syntax::HereDoc;
 use crate::syntax::MaybeLiteral as _;
 use crate::syntax::Word;
@@ -386,6 +387,23 @@ impl<'a, 'b> Parser<'a, 'b> {
         Ok(c.is_some_and(is_blank))
     }
 
+    /// Returns the location of the current position.
+    ///
+    /// This function must be called after the previous token has been taken (by
+    /// one of [`take_token_raw`](Self::take_token_raw),
+    /// [`take_token_manual`](Self::take_token_manual) and
+    /// [`take_token_auto`](Self::take_token_auto)) and before the next token is
+    /// [peeked](Self::peek_token). Otherwise, this function would panic.
+    ///
+    /// # Panics
+    ///
+    /// If the previous token has not been taken or the next token has been
+    /// peeked.
+    pub(super) async fn location(&mut self) -> Result<&Location> {
+        assert!(self.token.is_none(), "There should be no pending token");
+        self.lexer.location().await
+    }
+
     /// Remembers the given partial here-document for later parsing of its content.
     ///
     /// The remembered here-document's content will be parsed when
@@ -454,7 +472,6 @@ mod tests {
     use super::*;
     use crate::alias::AliasSet;
     use crate::alias::HashEntry;
-    use crate::source::Location;
     use futures_util::FutureExt as _;
     use std::assert_matches;
     use std::cell::OnceCell;

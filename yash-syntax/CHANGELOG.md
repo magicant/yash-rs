@@ -15,6 +15,11 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.23.1] - Unreleased
 
+### Added
+
+- `parser::SyntaxError::ArrayAssignment`, raised when an array assignment
+  (`name=(...)`) is used while the `portable` option is on.
+
 ### Changed
 
 - Public dependency versions:
