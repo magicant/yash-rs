@@ -237,11 +237,15 @@ impl ErrorCause {
         use ErrorCause::*;
         match self {
             CommandSubstError(_)
-            | ArithError(_)
             | AssignReadOnly(_)
             | VacantExpansion(_)
             | NonassignableParameter(_)
             | Interrupted(_) => None,
+
+            ArithError(self::ArithError::NonPortableIncrementDecrement) => {
+                Some("this error is reported because the `portable` shell option is enabled")
+            }
+            ArithError(_) => None,
 
             UnsetParameter { .. } => Some("unset parameters are disallowed by the nounset option"),
         }

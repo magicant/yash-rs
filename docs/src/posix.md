@@ -38,6 +38,7 @@ When the `portable` option is set, the shell rejects the following non-portable 
 - (Since 3.3.0) An [assignment](language/commands/simple.md#syntax) name that contains a character other than underscores, digits, and alphabetics from the portable character set, or that starts with a digit.
 - (Since 3.3.1) An [array assignment](language/parameters/variables.md#arrays) (`name=(...)`). Array assignment is a yash extension that POSIX does not specify.
 - (Since 3.3.0) A [parameter expansion](language/words/parameters.md) that uses a length or switch modifier with special parameter `*` or `@` (for example, `${#*}` or `${@:+word}`), or a trim modifier with special parameter `#`, `*`, or `@` (for example, `${#%word}` or `${*#word}`). POSIX leaves the results of these combinations unspecified.
+- (Since 3.3.2) The increment and decrement operators (`++` and `--`) in an [arithmetic expansion](language/words/arithmetic.md). POSIX does not require these operators.
 - (Since 3.3.1) Defining an [alias](language/aliases.md) with the [`alias` built-in](builtins/alias.md) with a name that contains a character other than ASCII letters, digits, `!`, `%`, `,`, `-`, `@`, or `_`.
 
 The `portable` option is still under development, so this list will be expanded as more checks are implemented.

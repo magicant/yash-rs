@@ -13,7 +13,16 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
-## [0.2.4] - Unreleased
+## [0.3.0] - Unreleased
+
+### Added
+
+- `Config` and `eval_with_config`, which allow callers to reject non-portable
+  constructs before evaluating an arithmetic expression. The original `eval`
+  function remains available and uses the default configuration.
+- `PortabilityError` and the `ErrorCause::PortabilityError` variant for
+  reporting non-portable constructs. Currently, increment and decrement
+  operators can be reported as non-portable.
 
 ### Changed
 
@@ -70,7 +79,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Fundamental items for performing arithmetic expansion
 
-[0.2.4]: https://github.com/magicant/yash-rs/releases/tag/yash-arith-0.2.4
+[0.3.0]: https://github.com/magicant/yash-rs/releases/tag/yash-arith-0.3.0
 [0.2.3]: https://github.com/magicant/yash-rs/releases/tag/yash-arith-0.2.3
 [0.2.2]: https://github.com/magicant/yash-rs/releases/tag/yash-arith-0.2.2
 [0.2.1]: https://github.com/magicant/yash-rs/releases/tag/yash-arith-0.2.1

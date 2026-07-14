@@ -148,3 +148,5 @@ POSIX.1-2024 defines arithmetic expressions on the basis of C.
 POSIX requires support for `signed long` integers. This implementation uses signed 64-bit integers, which is at least as wide as `long` on all common platforms. Future versions may support wider integers. Other implementations may only support narrower integers.
 
 POSIX does not require support for the `++` and `--` operators. Dash 0.5.12 treats the `++` prefix operator as two `+` operators, effectively making it a no-op.
+
+(Since 3.3.2) The [`portable` shell option](environment/options.md#portable) rejects the use of the `++` and `--` operators.

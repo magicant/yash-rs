@@ -25,8 +25,9 @@ use crate::token::TokenValue;
 use std::ops::Range;
 use thiserror::Error;
 
-// TODO: POSIX does not require the increment/decrement operators. Maybe we
-// should provide an option to reject those non-portable operators.
+pub(crate) mod portability;
+
+pub use portability::PortabilityError;
 
 /// Prefix operator kind
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

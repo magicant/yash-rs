@@ -502,14 +502,14 @@ dependencies = [
 
 [[package]]
 name = "yash-arith"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "yash-builtin"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "assert_matches",
  "either",
@@ -526,7 +526,7 @@ dependencies = [
 
 [[package]]
 name = "yash-cli"
-version = "3.3.1"
+version = "3.3.2"
 dependencies = [
  "assert_matches",
  "futures-util",
@@ -598,7 +598,7 @@ version = "1.1.2"
 
 [[package]]
 name = "yash-semantics"
-version = "0.18.1"
+version = "0.19.0"
 dependencies = [
  "assert_matches",
  "either",
