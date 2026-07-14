@@ -27,8 +27,9 @@ use crate::expansion::AssignReadOnlyError;
 use crate::expansion::expand_text;
 use std::ops::Range;
 use std::rc::Rc;
-use yash_arith::eval;
-use yash_env::option::Option::Unset;
+use yash_arith::Config;
+use yash_arith::eval_with_config;
+use yash_env::option::Option::{Portable, Unset};
 use yash_env::option::State::{Off, On};
 use yash_env::variable::Scope::Global;
 use yash_syntax::source::Code;
@@ -82,6 +83,11 @@ pub enum ArithError {
     #[error("invalid use of operator")]
     InvalidOperator,
 
+    /// An increment or decrement operator is used while the `portable` option
+    /// is on.
+    #[error("the increment and decrement operators are not portable")]
+    NonPortableIncrementDecrement,
+
     /// A variable value that is not a valid number
     #[error("invalid variable value: {0:?}")]
     InvalidVariableValue(String),
@@ -120,6 +126,7 @@ impl ArithError {
             | MissingOperator
             | ColonWithoutQuestion
             | InvalidOperator
+            | NonPortableIncrementDecrement
             | InvalidVariableValue(_)
             | Overflow
             | DivisionByZero
@@ -182,6 +189,11 @@ fn convert_error_cause(
                 ErrorCause::ArithError(ColonWithoutQuestion)
             }
             yash_arith::SyntaxError::InvalidOperator => ErrorCause::ArithError(InvalidOperator),
+        },
+        yash_arith::ErrorCause::PortabilityError(e) => match e {
+            yash_arith::PortabilityError::IncrementDecrement => {
+                ErrorCause::ArithError(NonPortableIncrementDecrement)
+            }
         },
         yash_arith::ErrorCause::EvalError(e) => match e {
             yash_arith::EvalError::InvalidVariableValue(value) => {
@@ -263,13 +275,16 @@ pub async fn expand<S: Runtime + 'static>(
         env.last_command_subst_exit_status = exit_status;
     }
 
-    let result = eval(
+    let mut config = Config::new();
+    config.portable = env.inner.options.get(Portable) == On;
+    let result = eval_with_config(
         &expression,
         &mut VarEnv {
             env: env.inner,
             expression: &expression,
             expansion_location: location,
         },
+        config,
     );
 
     match result {
@@ -389,6 +404,38 @@ mod tests {
         };
         assert_eq!(result, Ok(Phrase::Char(c)));
         assert_eq!(env.last_command_subst_exit_status, None);
+    }
+
+    #[test]
+    fn increment_decrement_allowed_without_portable_option() {
+        let text = "foo++".parse().unwrap();
+        let location = Location::dummy("my location");
+        let mut env = yash_env::Env::new_virtual();
+        let mut env2 = Env::new(&mut env);
+
+        let result = expand(&text, &location, &mut env2).now_or_never().unwrap();
+
+        assert!(result.is_ok());
+        assert_eq!(env.variables.get_scalar("foo"), Some("1"));
+    }
+
+    #[test]
+    fn increment_decrement_rejected_with_portable_option() {
+        let text = "foo++".parse().unwrap();
+        let location = Location::dummy("my location");
+        let mut env = yash_env::Env::new_virtual();
+        env.options.set(Portable, On);
+        let mut env = Env::new(&mut env);
+
+        let result = expand(&text, &location, &mut env).now_or_never().unwrap();
+
+        let error = result.unwrap_err();
+        assert_eq!(
+            error.cause,
+            ErrorCause::ArithError(ArithError::NonPortableIncrementDecrement)
+        );
+        assert_eq!(*error.location.code.value.borrow(), "foo++");
+        assert_eq!(error.location.range, 3..5);
     }
 
     #[test]

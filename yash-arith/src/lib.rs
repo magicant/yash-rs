@@ -45,6 +45,7 @@ pub use token::Value;
 
 mod ast;
 
+pub use ast::PortabilityError;
 pub use ast::SyntaxError;
 
 mod env;
@@ -55,12 +56,35 @@ mod eval;
 
 pub use eval::EvalError;
 
+/// Configuration for arithmetic expansion
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub struct Config {
+    /// Restrict arithmetic expansion to portable constructs only.
+    ///
+    /// If this option is on, the increment and decrement operators (`++` and
+    /// `--`) are rejected with a [`PortabilityError::IncrementDecrement`]
+    /// error.
+    pub portable: bool,
+}
+
+impl Config {
+    /// Creates a new configuration with the default settings.
+    #[inline]
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 /// Cause of an arithmetic expansion error
 #[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
 #[error(transparent)]
 pub enum ErrorCause<E1, E2> {
     /// Syntax error parsing the expression
     SyntaxError(#[from] SyntaxError),
+    /// Error because the parsed expression contains a non-portable construct
+    PortabilityError(#[from] PortabilityError),
     /// Error evaluating the parsed expression
     EvalError(#[from] EvalError<E1, E2>),
 }
@@ -90,6 +114,15 @@ impl<E1, E2> From<ast::Error> for Error<E1, E2> {
     }
 }
 
+impl<E1, E2> From<ast::portability::Error> for Error<E1, E2> {
+    fn from(e: ast::portability::Error) -> Self {
+        Error {
+            cause: e.cause.into(),
+            location: e.location,
+        }
+    }
+}
+
 impl<E1, E2> From<eval::Error<E1, E2>> for Error<E1, E2> {
     fn from(e: eval::Error<E1, E2>) -> Self {
         Error {
@@ -99,22 +132,49 @@ impl<E1, E2> From<eval::Error<E1, E2>> for Error<E1, E2> {
     }
 }
 
+/// Performs arithmetic expansion with the specified configuration.
+pub fn eval_with_config<E: Env>(
+    expression: &str,
+    env: &mut E,
+    config: Config,
+) -> Result<Value, Error<E::GetVariableError, E::AssignVariableError>> {
+    let tokens = PeekableTokens::from(expression);
+    let ast = ast::parse(tokens)?;
+    if config.portable {
+        ast::portability::check(&ast)?;
+    }
+    let term = eval::eval(&ast, env)?;
+    let value = eval::into_value(term, env)?;
+    Ok(value)
+}
+
 /// Performs arithmetic expansion
 pub fn eval<E: Env>(
     expression: &str,
     env: &mut E,
 ) -> Result<Value, Error<E::GetVariableError, E::AssignVariableError>> {
-    let tokens = PeekableTokens::from(expression);
-    let ast = ast::parse(tokens)?;
-    let term = eval::eval(&ast, env)?;
-    let value = eval::into_value(term, env)?;
-    Ok(value)
+    eval_with_config(expression, env, Config::default())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::HashMap;
+
+    #[test]
+    fn eval_with_portable_config_rejects_before_evaluation() {
+        let mut env = HashMap::from([("foo".to_owned(), "41".to_owned())]);
+        let config = Config { portable: true };
+
+        assert_eq!(
+            eval_with_config("foo++", &mut env, config),
+            Err(Error {
+                cause: ErrorCause::PortabilityError(PortabilityError::IncrementDecrement),
+                location: 3..5,
+            })
+        );
+        assert_eq!(env["foo"], "41");
+    }
 
     #[test]
     fn decimal_integer_constants() {

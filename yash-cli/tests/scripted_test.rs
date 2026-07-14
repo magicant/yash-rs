@@ -132,6 +132,11 @@ fn arithmetic_expansion() {
 }
 
 #[test]
+fn arithmetic_expansion_ex() {
+    run("arith-y.sh")
+}
+
+#[test]
 fn asynchronous_list() {
     run("async-p.sh")
 }

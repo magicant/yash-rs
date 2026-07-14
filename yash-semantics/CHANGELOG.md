@@ -13,6 +13,19 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.19.0] - Unreleased
+
+### Added
+
+- `expansion::initial::arith::ArithError::NonPortableIncrementDecrement`,
+  which arithmetic expansion now returns when the `portable` shell option is
+  enabled and the expression contains an increment or decrement operator.
+
+### Changed
+
+- Public dependency versions:
+    - yash-arith 0.2.3 → 0.3.0
+
 ## [0.18.1] - 2026-07-12
 
 ### Changed
@@ -566,6 +579,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Initial implementation of the `yash-semantics` crate
 
+[0.19.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.19.0
 [0.18.1]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.18.1
 [0.18.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.18.0
 [0.17.0]: https://github.com/magicant/yash-rs/releases/tag/yash-semantics-0.17.0
