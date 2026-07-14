@@ -23,6 +23,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- `expansion::initial::ArithError` is now `non_exhaustive`.
 - Public dependency versions:
     - yash-arith 0.2.3 → 0.3.0
 

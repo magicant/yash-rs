@@ -49,6 +49,7 @@ use yash_syntax::syntax::Text;
 ///   produce an error message with annotated code while `ErrorCause` may just
 ///   specify a location as an index range.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[non_exhaustive]
 pub enum ArithError {
     /// A value token contains an invalid character.
     #[error("invalid numeric constant")]
