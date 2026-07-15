@@ -158,60 +158,51 @@ fn convert_error_cause(
     source: &Rc<Code>,
 ) -> ErrorCause {
     use ArithError::*;
+    use yash_arith::{
+        ErrorCause as EC, EvalError as EE, PortabilityError as PE, SyntaxError as SE,
+        TokenError as TE,
+    };
     match cause {
-        yash_arith::ErrorCause::SyntaxError(e) => match e {
-            yash_arith::SyntaxError::TokenError(e) => match e {
-                yash_arith::TokenError::InvalidNumericConstant => {
-                    ErrorCause::ArithError(InvalidNumericConstant)
-                }
-                yash_arith::TokenError::InvalidCharacter => {
-                    ErrorCause::ArithError(InvalidCharacter)
-                }
-            },
-            yash_arith::SyntaxError::IncompleteExpression => {
-                ErrorCause::ArithError(IncompleteExpression)
-            }
-            yash_arith::SyntaxError::MissingOperator => ErrorCause::ArithError(MissingOperator),
-            yash_arith::SyntaxError::UnclosedParenthesis { opening_location } => {
-                let opening_location = Location {
-                    code: Rc::clone(source),
-                    range: opening_location,
-                };
-                ErrorCause::ArithError(UnclosedParenthesis { opening_location })
-            }
-            yash_arith::SyntaxError::QuestionWithoutColon { question_location } => {
-                let question_location = Location {
-                    code: Rc::clone(source),
-                    range: question_location,
-                };
-                ErrorCause::ArithError(QuestionWithoutColon { question_location })
-            }
-            yash_arith::SyntaxError::ColonWithoutQuestion => {
-                ErrorCause::ArithError(ColonWithoutQuestion)
-            }
-            yash_arith::SyntaxError::InvalidOperator => ErrorCause::ArithError(InvalidOperator),
-        },
-        yash_arith::ErrorCause::PortabilityError(e) => match e {
-            yash_arith::PortabilityError::IncrementDecrement => {
-                ErrorCause::ArithError(NonPortableIncrementDecrement)
-            }
-        },
-        yash_arith::ErrorCause::EvalError(e) => match e {
-            yash_arith::EvalError::InvalidVariableValue(value) => {
-                ErrorCause::ArithError(InvalidVariableValue(value))
-            }
-            yash_arith::EvalError::Overflow => ErrorCause::ArithError(Overflow),
-            yash_arith::EvalError::DivisionByZero => ErrorCause::ArithError(DivisionByZero),
-            yash_arith::EvalError::LeftShiftingNegative => {
-                ErrorCause::ArithError(LeftShiftingNegative)
-            }
-            yash_arith::EvalError::ReverseShifting => ErrorCause::ArithError(ReverseShifting),
-            yash_arith::EvalError::AssignmentToValue => ErrorCause::ArithError(AssignmentToValue),
-            yash_arith::EvalError::GetVariableError(UnsetVariable { param }) => {
-                ErrorCause::UnsetParameter { param }
-            }
-            yash_arith::EvalError::AssignVariableError(e) => ErrorCause::AssignReadOnly(e),
-        },
+        EC::SyntaxError(SE::TokenError(TE::InvalidNumericConstant)) => {
+            ErrorCause::ArithError(InvalidNumericConstant)
+        }
+        EC::SyntaxError(SE::TokenError(TE::InvalidCharacter)) => {
+            ErrorCause::ArithError(InvalidCharacter)
+        }
+        EC::SyntaxError(SE::IncompleteExpression) => ErrorCause::ArithError(IncompleteExpression),
+        EC::SyntaxError(SE::MissingOperator) => ErrorCause::ArithError(MissingOperator),
+        EC::SyntaxError(SE::UnclosedParenthesis { opening_location }) => {
+            let opening_location = Location {
+                code: Rc::clone(source),
+                range: opening_location,
+            };
+            ErrorCause::ArithError(UnclosedParenthesis { opening_location })
+        }
+        EC::SyntaxError(SE::QuestionWithoutColon { question_location }) => {
+            let question_location = Location {
+                code: Rc::clone(source),
+                range: question_location,
+            };
+            ErrorCause::ArithError(QuestionWithoutColon { question_location })
+        }
+        EC::SyntaxError(SE::ColonWithoutQuestion) => ErrorCause::ArithError(ColonWithoutQuestion),
+        EC::SyntaxError(SE::InvalidOperator) => ErrorCause::ArithError(InvalidOperator),
+        EC::PortabilityError(PE::IncrementDecrement) => {
+            ErrorCause::ArithError(NonPortableIncrementDecrement)
+        }
+        EC::EvalError(EE::InvalidVariableValue(value)) => {
+            ErrorCause::ArithError(InvalidVariableValue(value))
+        }
+        EC::EvalError(EE::Overflow) => ErrorCause::ArithError(Overflow),
+        EC::EvalError(EE::DivisionByZero) => ErrorCause::ArithError(DivisionByZero),
+        EC::EvalError(EE::LeftShiftingNegative) => ErrorCause::ArithError(LeftShiftingNegative),
+        EC::EvalError(EE::ReverseShifting) => ErrorCause::ArithError(ReverseShifting),
+        EC::EvalError(EE::AssignmentToValue) => ErrorCause::ArithError(AssignmentToValue),
+        EC::EvalError(EE::GetVariableError(UnsetVariable { param })) => {
+            ErrorCause::UnsetParameter { param }
+        }
+        EC::EvalError(EE::AssignVariableError(e)) => ErrorCause::AssignReadOnly(e),
+        _ => todo!(),
     }
 }
 

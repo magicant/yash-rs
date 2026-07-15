@@ -264,6 +264,7 @@ pub enum Ast<'a> {
 
 /// Cause of a syntax error
 #[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum SyntaxError {
     /// Error in tokenization
     #[error(transparent)]

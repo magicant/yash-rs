@@ -153,6 +153,7 @@ pub struct Token<'a> {
 
 /// Cause of a tokenization error
 #[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum TokenError {
     /// A value token contains an invalid character.
     #[error("invalid numeric constant")]

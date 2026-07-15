@@ -31,6 +31,7 @@ use thiserror::Error;
 /// The type parameters `E1` and `E2` define the types of errors returned by the
 /// [`Env::get_variable`] and [`Env::assign_variable`] methods, respectively.
 #[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum EvalError<E1, E2> {
     /// A variable value that is not a valid number
     #[error("invalid variable value: {0:?}")]

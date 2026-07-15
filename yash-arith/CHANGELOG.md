@@ -26,6 +26,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- The `TokenError`, `SyntaxError`, `EvalError`, and `ErrorCause` enums are now
+  non-exhaustive. (Note that `PortabilityError`, which was added in this
+  version, is also non-exhaustive.)
 - Public dependency versions
     - Rust 1.87.0 → 1.96.0
 
