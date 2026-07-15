@@ -20,6 +20,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `expansion::initial::arith::ArithError::NonPortableIncrementDecrement`,
   which arithmetic expansion now returns when the `portable` shell option is
   enabled and the expression contains an increment or decrement operator.
+- `expansion::initial::arith::ArithError::Unrecognized`, which preserves the
+  message from an arithmetic error that `yash-semantics` does not recognize.
 
 ### Changed
 

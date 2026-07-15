@@ -80,6 +80,7 @@ impl Config {
 /// Cause of an arithmetic expansion error
 #[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
 #[error(transparent)]
+#[non_exhaustive]
 pub enum ErrorCause<E1, E2> {
     /// Syntax error parsing the expression
     SyntaxError(#[from] SyntaxError),

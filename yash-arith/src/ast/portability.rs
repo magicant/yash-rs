@@ -24,6 +24,7 @@ use thiserror::Error;
 
 /// Cause of an error because an expression contains a non-portable construct
 #[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum PortabilityError {
     /// An increment or decrement operator is used while the `portable` option
     /// is on.
