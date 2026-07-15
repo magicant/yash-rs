@@ -26,6 +26,7 @@ use thiserror::Error;
 /// TODO: The current implementation only supports integer arithmetic. A future
 /// version may also support floating-point numbers.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum Value {
     Integer(i64),
 }
