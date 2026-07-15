@@ -112,6 +112,14 @@ pub enum ArithError {
     /// Assignment with a left-hand-side operand not being a variable
     #[error("assignment to a non-variable")]
     AssignmentToValue,
+
+    /// An arithmetic error not recognized by this crate
+    ///
+    /// This variant is used to wrap an error cause that is returned by future
+    /// versions of `yash_arith` but not yet recognized by this crate. The
+    /// associated string is the `Display` representation of the error cause.
+    #[error("{0}")]
+    Unrecognized(String),
 }
 
 impl ArithError {
@@ -133,7 +141,8 @@ impl ArithError {
             | DivisionByZero
             | LeftShiftingNegative
             | ReverseShifting
-            | AssignmentToValue => None,
+            | AssignmentToValue
+            | Unrecognized(_) => None,
             UnclosedParenthesis { opening_location } => {
                 Some((opening_location, "the opening parenthesis was here"))
             }
@@ -143,7 +152,8 @@ impl ArithError {
 }
 
 /// Error expanding an unset variable
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[error("unset variable `{param}`")]
 struct UnsetVariable {
     param: Param,
 }
@@ -202,7 +212,7 @@ fn convert_error_cause(
             ErrorCause::UnsetParameter { param }
         }
         EC::EvalError(EE::AssignVariableError(e)) => ErrorCause::AssignReadOnly(e),
-        _ => todo!(),
+        cause => ErrorCause::ArithError(Unrecognized(cause.to_string())),
     }
 }
 
@@ -325,6 +335,14 @@ mod tests {
     use yash_env::test_helper::in_virtual_system;
     use yash_env::variable::Scope::Global;
     use yash_env::variable::Value::Scalar;
+
+    #[test]
+    fn unrecognized_error() {
+        let error = ArithError::Unrecognized("new arithmetic error".into());
+
+        assert_eq!(error.to_string(), "new arithmetic error");
+        assert_eq!(error.related_location(), None);
+    }
 
     #[test]
     fn var_env_get_variable_success() {
