@@ -347,7 +347,10 @@ impl NonPortableReadOnlyError {
         let mut report = Report::new();
         report.r#type = ReportType::Error;
         report.title = "cannot make variable read-only".into();
-        report.snippets = Snippet::with_primary_span(&self.name.origin, self.to_string().into());
+        report.snippets = Snippet::with_primary_span(
+            &self.name.origin,
+            format!("variable {} is reserved by the shell", self.name).into(),
+        );
         report.footnotes.push(Footnote {
             r#type: FootnoteType::Note,
             label: "this error is reported because the `portable` shell option is enabled".into(),
