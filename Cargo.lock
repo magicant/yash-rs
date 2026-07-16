@@ -509,7 +509,7 @@ dependencies = [
 
 [[package]]
 name = "yash-builtin"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "assert_matches",
  "either",
@@ -526,7 +526,7 @@ dependencies = [
 
 [[package]]
 name = "yash-cli"
-version = "3.3.2"
+version = "3.3.3"
 dependencies = [
  "assert_matches",
  "futures-util",
@@ -543,7 +543,7 @@ dependencies = [
 
 [[package]]
 name = "yash-env"
-version = "0.15.4"
+version = "0.15.5"
 dependencies = [
  "annotate-snippets",
  "assert_matches",
