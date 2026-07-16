@@ -30,6 +30,7 @@ impl SetVariables {
     /// Executes the command.
     pub fn execute<S>(self, env: &mut Env<S>) -> Result<String, Vec<ExecuteError>> {
         let mut errors = Vec::new();
+        let portable = env.options.get(Portable) == State::On;
 
         'field: for mut field in self.variables {
             // Split the field into the name and the value.
@@ -60,6 +61,14 @@ impl SetVariables {
             for &(attr, state) in &self.attrs {
                 match (attr, state) {
                     (VariableAttr::ReadOnly, State::On) => {
+                        if portable
+                            && !yash_env::variable::is_portable_readonly_variable_name(&field.value)
+                        {
+                            errors.push(ExecuteError::NonPortableReadOnlyVariable(
+                                NonPortableReadOnlyError { name: field },
+                            ));
+                            continue 'field;
+                        }
                         variable.make_read_only(field.origin.clone())
                     }
                     (VariableAttr::ReadOnly, State::Off) => {
@@ -90,6 +99,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use yash_env::option::Option::AllExport;
+    use yash_env::option::Option::Portable;
     use yash_env::source::Location;
     use yash_env::variable::{Context, Variable};
 
@@ -190,6 +200,83 @@ mod tests {
         assert_eq!(bar.value, Some(Value::scalar("BAR")));
         assert_eq!(bar.last_assigned_location.as_ref(), Some(&bar_location));
         assert_eq!(bar.read_only_location.as_ref(), Some(&bar_location));
+    }
+
+    #[test]
+    fn setting_non_portable_readonly_variable_with_portable_option() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let sv = SetVariables {
+            variables: Field::dummies(["PWD"]),
+            attrs: vec![(VariableAttr::ReadOnly, State::On)],
+            scope: Scope::Global,
+        };
+        let pwd_location = sv.variables[0].origin.clone();
+
+        let errors = sv.execute(&mut env).unwrap_err();
+
+        assert_matches!(&errors[..], [ExecuteError::NonPortableReadOnlyVariable(error)] => {
+            assert_eq!(error.name.value, "PWD");
+            assert_eq!(error.name.origin, pwd_location);
+        });
+        let pwd = env.variables.get("PWD").unwrap();
+        assert_eq!(pwd.read_only_location, None);
+    }
+
+    #[test]
+    fn setting_non_portable_readonly_variable_with_value_and_portable_option() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let sv = SetVariables {
+            variables: Field::dummies(["LINENO=1"]),
+            attrs: vec![(VariableAttr::ReadOnly, State::On)],
+            scope: Scope::Global,
+        };
+
+        let errors = sv.execute(&mut env).unwrap_err();
+
+        assert_matches!(&errors[..], [ExecuteError::NonPortableReadOnlyVariable(error)] => {
+            assert_eq!(error.name.value, "LINENO");
+        });
+        // The value is assigned even though making the variable read-only failed.
+        let lineno = env.variables.get("LINENO").unwrap();
+        assert_eq!(lineno.value, Some(Value::scalar("1")));
+        assert_eq!(lineno.read_only_location, None);
+    }
+
+    #[test]
+    fn setting_other_readonly_variable_with_portable_option() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let sv = SetVariables {
+            variables: Field::dummies(["foo"]),
+            attrs: vec![(VariableAttr::ReadOnly, State::On)],
+            scope: Scope::Global,
+        };
+        let foo_location = sv.variables[0].origin.clone();
+
+        let result = sv.execute(&mut env);
+
+        assert_eq!(result, Ok("".to_string()));
+        let foo = env.variables.get("foo").unwrap();
+        assert_eq!(foo.read_only_location.as_ref(), Some(&foo_location));
+    }
+
+    #[test]
+    fn setting_non_portable_readonly_variable_without_portable_option() {
+        let mut env = Env::new_virtual();
+        let sv = SetVariables {
+            variables: Field::dummies(["PWD"]),
+            attrs: vec![(VariableAttr::ReadOnly, State::On)],
+            scope: Scope::Global,
+        };
+        let pwd_location = sv.variables[0].origin.clone();
+
+        let result = sv.execute(&mut env);
+
+        assert_eq!(result, Ok("".to_string()));
+        let pwd = env.variables.get("PWD").unwrap();
+        assert_eq!(pwd.read_only_location.as_ref(), Some(&pwd_location));
     }
 
     #[test]

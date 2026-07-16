@@ -37,10 +37,13 @@ use crate::common::report::{merge_reports, report_error, report_failure};
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::function::Function;
+use yash_env::option::Option::Portable;
 use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
-use yash_env::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
+use yash_env::source::pretty::{
+    Footnote, FootnoteType, Report, ReportType, Snippet, Span, SpanRole, add_span,
+};
 use yash_env::system::Isatty;
 use yash_env::system::concurrency::WriteAll;
 use yash_env::variable::{Value, Variable};
@@ -327,6 +330,39 @@ impl<'a> From<&'a AssignReadOnlyError> for Report<'a> {
     }
 }
 
+/// Error that occurs when trying to make a variable read-only whose name
+/// POSIX requires the shell to keep assignable, while the [`Portable`]
+/// option is on
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[error("cannot make variable {name} read-only")]
+pub struct NonPortableReadOnlyError {
+    /// Name of the variable
+    pub name: Field,
+}
+
+impl NonPortableReadOnlyError {
+    /// Converts the error to a report.
+    #[must_use]
+    pub fn to_report(&self) -> Report<'_> {
+        let mut report = Report::new();
+        report.r#type = ReportType::Error;
+        report.title = "cannot make variable read-only".into();
+        report.snippets = Snippet::with_primary_span(&self.name.origin, self.to_string().into());
+        report.footnotes.push(Footnote {
+            r#type: FootnoteType::Note,
+            label: "this error is reported because the `portable` shell option is enabled".into(),
+        });
+        report
+    }
+}
+
+impl<'a> From<&'a NonPortableReadOnlyError> for Report<'a> {
+    #[inline]
+    fn from(error: &'a NonPortableReadOnlyError) -> Self {
+        error.to_report()
+    }
+}
+
 /// Error that occurs when trying to cancel the read-only attribute of a
 /// variable or function
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
@@ -344,6 +380,9 @@ pub struct UndoReadOnlyError {
 pub enum ExecuteError {
     /// Assigning to a read-only variable
     AssignReadOnlyVariable(#[from] AssignReadOnlyError),
+    /// Making a variable read-only whose name is not portable to make
+    /// read-only
+    NonPortableReadOnlyVariable(#[from] NonPortableReadOnlyError),
     /// Cancelling the read-only attribute of a variable
     UndoReadOnlyVariable(UndoReadOnlyError),
     /// Cancelling the read-only attribute of a function
@@ -360,6 +399,7 @@ impl std::fmt::Display for ExecuteError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::AssignReadOnlyVariable(e) => e.fmt(f),
+            Self::NonPortableReadOnlyVariable(e) => e.fmt(f),
             Self::UndoReadOnlyVariable(e) => {
                 write!(f, "cannot cancel read-only-ness of variable `{}`", e.name)
             }
@@ -385,6 +425,7 @@ impl ExecuteError {
     pub fn to_report(&self) -> Report<'_> {
         let (title, location, label) = match self {
             Self::AssignReadOnlyVariable(error) => return error.to_report(),
+            Self::NonPortableReadOnlyVariable(error) => return error.to_report(),
             Self::UndoReadOnlyVariable(error) => (
                 "cannot cancel read-only-ness of variable",
                 &error.name.origin,
