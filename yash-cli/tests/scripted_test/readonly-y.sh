@@ -1,7 +1,27 @@
 # readonly-y.sh: yash-specific test of the readonly built-in
 
-test_O -d -e n 'making PWD OLDPWD OPTIND OPTARG LINENO read-only is rejected' -o portable
-readonly PWD OLDPWD OPTIND OPTARG LINENO
+test_O -d -e n 'making PWD read-only is rejected' -o portable
+readonly PWD
+echo not reached
+__IN__
+
+test_O -d -e n 'making OLDPWD read-only is rejected' -o portable
+readonly OLDPWD
+echo not reached
+__IN__
+
+test_O -d -e n 'making OPTIND read-only is rejected' -o portable
+readonly OPTIND
+echo not reached
+__IN__
+
+test_O -d -e n 'making OPTARG read-only is rejected' -o portable
+readonly OPTARG
+echo not reached
+__IN__
+
+test_O -d -e n 'making LINENO read-only is rejected' -o portable
+readonly LINENO
 echo not reached
 __IN__
 
