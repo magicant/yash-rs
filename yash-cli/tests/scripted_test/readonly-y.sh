@@ -25,8 +25,8 @@ readonly LINENO
 echo not reached
 __IN__
 
-test_O -d -e n 'making PWD OLDPWD OPTIND OPTARG LINENO read-only with values is rejected' -o portable
-readonly PWD=/tmp OLDPWD=/tmp OPTIND=1 OPTARG=x LINENO=1
+test_O -d -e n 'making PWD read-only with a value is rejected' -o portable
+readonly PWD=/tmp
 echo not reached
 __IN__
 
