@@ -80,8 +80,9 @@ crate's current major version.
 - **`yash-cli` (binary):** classify by **observable shell behavior**.
   - Behavior change or new feature → *compatible*; bug fix → *patch-level*.
   - `yash-cli` re-exports nothing, so only observable behavior drives its
-    version. A dependency bump alone never bumps `yash-cli` (though it is still
-    recorded in its changelog per Step 5).
+    version. A dependency bump alone never bumps `yash-cli`, and unlike every
+    other crate, its changelog never records dependency version changes either
+    — see the exception in Step 5.
 
 **Version mapping.** Every crate in this workspace follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Because most crates
@@ -244,6 +245,11 @@ Rules specific to this workflow:
 - **Dependency changes are mentioned.** If a `Cargo.toml` dependency was added,
   removed, or updated, note it in the changelog. List **private and public**
   dependency changes separately.
+- **Exception: `yash-cli` never gets a dependency-change entry.** Its
+  changelog header states it documents only observable shell behavior, not the
+  implementing library crates' versions — so even though `yash-cli` counts as
+  "affected" by a dependency's bump (Step 1), skip it here unless the same
+  change also has user-visible behavior to record under the rule above.
 
 > **Documentation is out of scope here.** If the change is user-visible, the
 > `docs/src` pages (and the "introduced in `yash-cli` x.y.z" version mention)
