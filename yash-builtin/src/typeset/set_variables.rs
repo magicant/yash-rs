@@ -64,9 +64,7 @@ impl SetVariables {
                         if portable
                             && !yash_env::variable::is_portable_readonly_variable_name(&field.value)
                         {
-                            errors.push(ExecuteError::NonPortableReadOnlyVariable(
-                                NonPortableReadOnlyError { name: field },
-                            ));
+                            errors.push(ExecuteError::NonPortableReadOnlyVariable(field));
                             continue 'field;
                         }
                         variable.make_read_only(field.origin.clone())
@@ -215,9 +213,9 @@ mod tests {
 
         let errors = sv.execute(&mut env).unwrap_err();
 
-        assert_matches!(&errors[..], [ExecuteError::NonPortableReadOnlyVariable(error)] => {
-            assert_eq!(error.name.value, "PWD");
-            assert_eq!(error.name.origin, pwd_location);
+        assert_matches!(&errors[..], [ExecuteError::NonPortableReadOnlyVariable(field)] => {
+            assert_eq!(field.value, "PWD");
+            assert_eq!(field.origin, pwd_location);
         });
         let pwd = env.variables.get("PWD").unwrap();
         assert_eq!(pwd.read_only_location, None);
@@ -235,8 +233,8 @@ mod tests {
 
         let errors = sv.execute(&mut env).unwrap_err();
 
-        assert_matches!(&errors[..], [ExecuteError::NonPortableReadOnlyVariable(error)] => {
-            assert_eq!(error.name.value, "LINENO");
+        assert_matches!(&errors[..], [ExecuteError::NonPortableReadOnlyVariable(field)] => {
+            assert_eq!(field.value, "LINENO");
         });
         // The value is assigned even though making the variable read-only failed.
         let lineno = env.variables.get("LINENO").unwrap();

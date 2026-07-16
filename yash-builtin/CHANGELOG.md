@@ -17,8 +17,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Added
 
-- `typeset::NonPortableReadOnlyError`, a new error type, and
-  `typeset::ExecuteError::NonPortableReadOnlyVariable`, a new error variant
+- `typeset::ExecuteError::NonPortableReadOnlyVariable`, a new error variant
   that `typeset::SetVariables::execute` now returns when an operand would
   make the `PWD`, `OLDPWD`, `OPTIND`, `OPTARG`, or `LINENO` variable
   read-only while the `portable` shell option is on. The variable is not
