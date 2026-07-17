@@ -8,10 +8,6 @@ Variable names can contain letters, digits, and underscores, but cannot start wi
 
 It is common to use uppercase letters for [environment variables](#environment-variables) and lowercase for local variables. This avoids accidentally overwriting environment variables.
 
-According to POSIX.1-2024, only ASCII letters, digits, and underscores are portably accepted in variable names. Many shells allow additional characters. Yash-rs currently accepts Unicode letters and digits in variable names, but this may change in the future.
-
-(Since 3.3.3) The [`portable` option](../../environment/options.md#portable) rejects creating or updating a variable with the [`export` built-in](../../builtins/export.md), the [`readonly` built-in](../../builtins/readonly.md), the [`typeset` built-in](../../builtins/typeset.md), the [`read` built-in](../../builtins/read.md), or the [`getopts` built-in](../../builtins/getopts.md) if the variable name contains a character other than ASCII letters, digits, and underscores, or starts with a digit.
-
 ## Defining variables
 
 To define a variable, use the assignment syntax:
@@ -264,11 +260,11 @@ apple banana cherry date
 
 ## Compatibility
 
+According to POSIX.1-2024, only ASCII letters, digits, and underscores are portably accepted in variable names. Many shells allow additional characters. Yash-rs currently accepts Unicode letters and digits in assignments (but not in expansions), but this may change in the future.
+
 Arrays are a yash extension that POSIX does not specify, so scripts that use them may not run on other shells.
 
-(Since 3.3.1) The [`portable` option](../../environment/options.md#portable) rejects array assignment.
-
-(Since 3.3.3) The [`portable` option](../../environment/options.md#portable) rejects making the [`PWD`](#pwd), [`OLDPWD`](#oldpwd), [`OPTIND`](#optind), [`OPTARG`](#optarg), or [`LINENO`](#lineno) variable [read-only](#read-only-variables) with the [`readonly` built-in](../../builtins/readonly.md) or the [`typeset` built-in](../../builtins/typeset.md)'s `-r` option, since POSIX requires the shell to be able to update these variables.
+The [`portable` option](../../environment/options.md#portable) rejects such non-portable extensions.
 
 [`cd` built-in]: ../../builtins/cd.md
 [`getopts` built-in]: ../../builtins/getopts.md
