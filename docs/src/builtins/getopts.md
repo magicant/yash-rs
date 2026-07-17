@@ -78,6 +78,7 @@ The following conditions are considered errors of the built-in:
 
 - The built-in is invoked with less than two operands.
 - The second operand is not a valid variable name.
+- (Since 3.3.3) The [`portable` option](../environment/options.md#portable) is set and the second operand contains a character other than ASCII letters, digits, and underscores, is empty, or starts with a digit.
 - `OPTIND`, `OPTARG`, or the specified variable is read-only.
 - The built-in is re-invoked with different arguments or a different value
   of `OPTIND` than the previous invocation (except when `OPTIND` is reset

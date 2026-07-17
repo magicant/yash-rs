@@ -38,6 +38,12 @@ A _private dependency_ is used internally and not visible to downstream users.
   variable name while the `portable` shell option is on.
 - The `read` built-in (`read::main`) now fails, reporting an error, in the
   same situation.
+- `getopts::report::Error::NonPortableVariableName`, a new error variant
+  that `getopts::model::Result::report` now returns when the variable name
+  operand is not a POSIXly-portable variable name while the `portable` shell
+  option is on.
+- The `getopts` built-in (`getopts::main`) now fails, reporting an error, in
+  the same situation.
 
 ### Changed
 
