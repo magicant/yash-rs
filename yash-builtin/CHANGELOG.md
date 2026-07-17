@@ -50,6 +50,12 @@ A _private dependency_ is used internally and not visible to downstream users.
 - Private dependency versions:
     - yash-env 0.15.4 → 0.15.5
 
+### Fixed
+
+- The error message the `read` built-in (`read::main`) prints for an invalid
+  variable name now annotates the operand with just the variable name
+  instead of the internal debug representation of the whole operand field.
+
 ## [0.21.0] - 2026-07-16
 
 ### Changed

@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not portable, that is, when it is empty, starts with a digit, or contains
   a character other than ASCII letters, digits, and underscores.
 
+### Fixed
+
+- The error message the `read` built-in prints for an invalid variable name
+  now annotates the operand with just the variable name instead of the
+  internal debug representation of the whole operand field.
+
 ## [3.3.2] - 2026-07-16
 
 ### Changed

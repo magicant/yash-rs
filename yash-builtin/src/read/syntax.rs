@@ -77,12 +77,12 @@ impl Error {
 
             Self::InvalidVariableName { name } => Snippet::with_primary_span(
                 &name.origin,
-                format!("variable name {name:?} is not valid").into(),
+                format!("variable name {:?} is not valid", name.value).into(),
             ),
 
             Self::NonPortableVariableName { name } => Snippet::with_primary_span(
                 &name.origin,
-                format!("variable name {name:?} is not portable").into(),
+                format!("variable name {:?} is not portable", name.value).into(),
             ),
         };
 
