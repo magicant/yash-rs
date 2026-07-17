@@ -24,6 +24,15 @@ A _private dependency_ is used internally and not visible to downstream users.
   made read-only in that case.
 - The `readonly` built-in (`readonly::main`) and the typeset built-in's `-r`
   option now fail, reporting an error, in the same situation.
+- `typeset::ExecuteError::NonPortableVariableName`, a new error variant that
+  `typeset::SetVariables::execute` now returns when the variable name in an
+  operand is not POSIXly portable (a non-empty word of ASCII letters, digits,
+  and underscores that does not start with a digit) while the `portable`
+  shell option is on. The variable is not created, and no value is assigned
+  to it, in that case.
+- The `export` built-in (`export::main`), the `readonly` built-in
+  (`readonly::main`), and the typeset built-in (`typeset::main`) now fail,
+  reporting an error, in the same situation.
 
 ### Changed
 

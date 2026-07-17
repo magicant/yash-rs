@@ -16,6 +16,7 @@
 
 use super::*;
 use yash_env::variable::Value;
+use yash_env::variable::is_portable_variable_name;
 
 impl From<Scope> for yash_env::variable::Scope {
     fn from(value: Scope) -> Self {
@@ -40,6 +41,12 @@ impl SetVariables {
 
                 // Modify the field value so that it contains only the name.
                 field.value.truncate(name.len());
+            }
+
+            // Reject non-portable names in portable mode.
+            if portable && !is_portable_variable_name(&field.value) {
+                errors.push(ExecuteError::NonPortableVariableName(field));
+                continue;
             }
 
             let mut variable = env.get_or_create_variable(&field.value, self.scope.into());
@@ -275,6 +282,103 @@ mod tests {
         assert_eq!(result, Ok("".to_string()));
         let pwd = env.variables.get("PWD").unwrap();
         assert_eq!(pwd.read_only_location.as_ref(), Some(&pwd_location));
+    }
+
+    #[test]
+    fn creating_variable_with_non_portable_name_with_portable_option() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let sv = SetVariables {
+            variables: Field::dummies(["foo-bar"]),
+            attrs: vec![],
+            scope: Scope::Global,
+        };
+        let location = sv.variables[0].origin.clone();
+
+        let errors = sv.execute(&mut env).unwrap_err();
+
+        assert_matches!(&errors[..], [ExecuteError::NonPortableVariableName(field)] => {
+            assert_eq!(field.value, "foo-bar");
+            assert_eq!(field.origin, location);
+        });
+        assert_eq!(env.variables.get("foo-bar"), None);
+    }
+
+    #[test]
+    fn assigning_to_variable_with_non_portable_name_with_portable_option() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let sv = SetVariables {
+            variables: Field::dummies(["1abc=x"]),
+            attrs: vec![(VariableAttr::ReadOnly, State::On)],
+            scope: Scope::Global,
+        };
+
+        let errors = sv.execute(&mut env).unwrap_err();
+
+        assert_matches!(&errors[..], [ExecuteError::NonPortableVariableName(field)] => {
+            assert_eq!(field.value, "1abc");
+        });
+        // The variable is not created, and no value is assigned.
+        assert_eq!(env.variables.get("1abc"), None);
+    }
+
+    #[test]
+    fn creating_variable_with_empty_name_with_portable_option() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let sv = SetVariables {
+            variables: Field::dummies(["=x"]),
+            attrs: vec![],
+            scope: Scope::Global,
+        };
+
+        let errors = sv.execute(&mut env).unwrap_err();
+
+        assert_matches!(&errors[..], [ExecuteError::NonPortableVariableName(field)] => {
+            assert_eq!(field.value, "");
+        });
+        assert_eq!(env.variables.get(""), None);
+    }
+
+    #[test]
+    fn creating_variable_with_portable_name_among_non_portable_names() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let sv = SetVariables {
+            variables: Field::dummies(["foo-bar=1", "ok=2", "café"]),
+            attrs: vec![],
+            scope: Scope::Global,
+        };
+
+        let errors = sv.execute(&mut env).unwrap_err();
+
+        assert_matches!(&errors[..], [
+            ExecuteError::NonPortableVariableName(field1),
+            ExecuteError::NonPortableVariableName(field2),
+        ] => {
+            assert_eq!(field1.value, "foo-bar");
+            assert_eq!(field2.value, "café");
+        });
+        // The operand with a portable name is still processed.
+        let ok = env.variables.get("ok").unwrap();
+        assert_eq!(ok.value, Some(Value::scalar("2")));
+    }
+
+    #[test]
+    fn creating_variable_with_non_portable_name_without_portable_option() {
+        let mut env = Env::new_virtual();
+        let sv = SetVariables {
+            variables: Field::dummies(["foo-bar=1"]),
+            attrs: vec![],
+            scope: Scope::Global,
+        };
+
+        let result = sv.execute(&mut env);
+
+        assert_eq!(result, Ok("".to_string()));
+        let var = env.variables.get("foo-bar").unwrap();
+        assert_eq!(var.value, Some(Value::scalar("1")));
     }
 
     #[test]

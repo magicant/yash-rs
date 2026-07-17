@@ -122,6 +122,8 @@ When making a variable read-only with a value, it is an error if the variable is
 
 (Since 3.3.3) When the [`portable` option](../environment/options.md#portable) is set, it is an error to make the `PWD`, `OLDPWD`, `OPTIND`, `OPTARG`, or `LINENO` [variable][variables] read-only, since POSIX requires the shell to be able to update these variables.
 
+(Since 3.3.3) When the [`portable` option](../environment/options.md#portable) is set, it is an error to make a variable read-only if its name contains a character other than ASCII letters, digits, and underscores, or starts with a digit.
+
 <!-- TODO: It is an error to specify a non-existing function for making it read-only. -->
 
 When printing variables<!-- TODO: or functions -->, it is an error if an operand names a non-existing variable<!-- TODO: or function -->.

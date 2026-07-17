@@ -197,6 +197,8 @@ See [Showing function definitions](../language/functions.md#showing-function-def
 
 The read-only attribute cannot be removed from a variable or function. If a variable is already read-only, you cannot assign a value to it.
 
+(Since 3.3.3) When the [`portable` option](../environment/options.md#portable) is set, it is an error to create or update a variable whose name contains a character other than ASCII letters, digits, and underscores, or starts with a digit.
+
 It is an error to modify a non-existent function.
 
 When printing variables or functions, it is an error if an operand names a non-existent variable or function.

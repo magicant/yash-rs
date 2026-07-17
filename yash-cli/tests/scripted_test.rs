@@ -252,6 +252,11 @@ fn export_builtin() {
 }
 
 #[test]
+fn export_builtin_ex() {
+    run("export-y.sh")
+}
+
+#[test]
 fn false_builtin() {
     run("false-p.sh")
 }

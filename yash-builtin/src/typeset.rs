@@ -347,6 +347,8 @@ pub struct UndoReadOnlyError {
 pub enum ExecuteError {
     /// Assigning to a read-only variable
     AssignReadOnlyVariable(#[from] AssignReadOnlyError),
+    /// Creating or updating a variable whose name is not portable
+    NonPortableVariableName(Field),
     /// Making a variable read-only whose name is not portable to make
     /// read-only
     NonPortableReadOnlyVariable(Field),
@@ -366,6 +368,9 @@ impl std::fmt::Display for ExecuteError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::AssignReadOnlyVariable(e) => e.fmt(f),
+            Self::NonPortableVariableName(field) => {
+                write!(f, "non-portable variable name `{field}`")
+            }
             Self::NonPortableReadOnlyVariable(field) => {
                 write!(f, "cannot make variable {field} read-only")
             }
@@ -394,6 +399,11 @@ impl ExecuteError {
     pub fn to_report(&self) -> Report<'_> {
         let (title, location, label) = match self {
             Self::AssignReadOnlyVariable(error) => return error.to_report(),
+            Self::NonPortableVariableName(field) => (
+                "non-portable variable name",
+                &field.origin,
+                format!("variable name `{field}` is not portable").into(),
+            ),
             Self::NonPortableReadOnlyVariable(field) => (
                 "cannot make variable read-only",
                 &field.origin,
@@ -451,11 +461,13 @@ impl ExecuteError {
                 },
                 &mut report.snippets,
             ),
-            Self::NonPortableReadOnlyVariable(_) => report.footnotes.push(Footnote {
-                r#type: FootnoteType::Note,
-                label: "this error is reported because the `portable` shell option is enabled"
-                    .into(),
-            }),
+            Self::NonPortableVariableName(_) | Self::NonPortableReadOnlyVariable(_) => {
+                report.footnotes.push(Footnote {
+                    r#type: FootnoteType::Note,
+                    label: "this error is reported because the `portable` shell option is enabled"
+                        .into(),
+                })
+            }
             _ => { /* No additional spans */ }
         }
         report

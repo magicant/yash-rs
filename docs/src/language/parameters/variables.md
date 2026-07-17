@@ -10,6 +10,8 @@ It is common to use uppercase letters for [environment variables](#environment-v
 
 According to POSIX.1-2024, only ASCII letters, digits, and underscores are portably accepted in variable names. Many shells allow additional characters. Yash-rs currently accepts Unicode letters and digits in variable names, but this may change in the future.
 
+(Since 3.3.3) The [`portable` option](../../environment/options.md#portable) rejects creating or updating a variable with the [`export` built-in](../../builtins/export.md), the [`readonly` built-in](../../builtins/readonly.md), or the [`typeset` built-in](../../builtins/typeset.md) if the variable name contains a character other than ASCII letters, digits, and underscores, or starts with a digit.
+
 ## Defining variables
 
 To define a variable, use the assignment syntax:
