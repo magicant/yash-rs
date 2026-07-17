@@ -33,6 +33,11 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `export` built-in (`export::main`), the `readonly` built-in
   (`readonly::main`), and the typeset built-in (`typeset::main`) now fail,
   reporting an error, in the same situation.
+- `read::syntax::Error::NonPortableVariableName`, a new error variant that
+  `read::syntax::parse` now returns when an operand is not a POSIXly-portable
+  variable name while the `portable` shell option is on.
+- The `read` built-in (`read::main`) now fails, reporting an error, in the
+  same situation.
 
 ### Changed
 

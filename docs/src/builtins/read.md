@@ -51,6 +51,7 @@ This built-in fails if:
 - The delimiter is not a single-byte character.
 - The delimiter is not a nul byte and the input contains a nul byte.
 - A variable name is not valid.
+- (Since 3.3.3) The [`portable` option](../environment/options.md#portable) is set and a variable name contains a character other than ASCII letters, digits, and underscores, is empty, or starts with a digit.
 - A variable to be assigned is [read-only](../language/parameters/variables.md#read-only-variables).
 
 ## Exit status

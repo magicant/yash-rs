@@ -23,9 +23,12 @@ use crate::common::syntax::OptionSpec;
 use crate::common::syntax::parse_arguments;
 use thiserror::Error;
 use yash_env::Env;
+use yash_env::option::Option::Portable;
+use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::Snippet;
-use yash_env::source::pretty::{Report, ReportType};
+use yash_env::source::pretty::{Footnote, FootnoteType, Report, ReportType};
+use yash_env::variable::is_portable_variable_name;
 
 /// Error in parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -46,6 +49,11 @@ pub enum Error {
     /// An operand is not a valid variable name.
     #[error("invalid variable name")]
     InvalidVariableName { name: Field },
+
+    /// An operand is not a portable variable name while the `portable` shell
+    /// option is on.
+    #[error("non-portable variable name")]
+    NonPortableVariableName { name: Field },
 }
 
 impl Error {
@@ -71,12 +79,24 @@ impl Error {
                 &name.origin,
                 format!("variable name {name:?} is not valid").into(),
             ),
+
+            Self::NonPortableVariableName { name } => Snippet::with_primary_span(
+                &name.origin,
+                format!("variable name {name:?} is not portable").into(),
+            ),
         };
 
         let mut report = Report::new();
         report.r#type = ReportType::Error;
         report.title = self.to_string().into();
         report.snippets = snippets;
+        if let Self::NonPortableVariableName { .. } = self {
+            report.footnotes.push(Footnote {
+                r#type: FootnoteType::Note,
+                label: "this error is reported because the `portable` shell option is enabled"
+                    .into(),
+            });
+        }
         report
     }
 }
@@ -120,7 +140,8 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
     }
 
     // Parse operands
-    let mut variables = validate_names(operands)?;
+    let portable = env.options.get(Portable) == State::On;
+    let mut variables = validate_names(operands, portable)?;
     let last_variable = variables.pop().ok_or(Error::MissingOperand)?;
 
     Ok(Command {
@@ -135,13 +156,24 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
 ///
 /// If all the variable names are valid, this function returns `names` as is.
 /// Otherwise, this function returns an `Error::InvalidVariableName`.
-fn validate_names(names: Vec<Field>) -> Result<Vec<Field>, Error> {
-    match names.iter().position(|name| name.value.contains('=')) {
-        None => Ok(names),
-        Some(i) => Err(Error::InvalidVariableName {
+/// If `portable` is `true`, names that are not portable variable names are
+/// also rejected with an `Error::NonPortableVariableName`.
+fn validate_names(names: Vec<Field>, portable: bool) -> Result<Vec<Field>, Error> {
+    if let Some(i) = names.iter().position(|name| name.value.contains('=')) {
+        return Err(Error::InvalidVariableName {
             name: { names }.swap_remove(i),
-        }),
+        });
     }
+    if portable
+        && let Some(i) = names
+            .iter()
+            .position(|name| !is_portable_variable_name(&name.value))
+    {
+        return Err(Error::NonPortableVariableName {
+            name: { names }.swap_remove(i),
+        });
+    }
+    Ok(names)
 }
 
 #[cfg(test)]
@@ -265,6 +297,71 @@ mod tests {
             parse(&env, Field::dummies(["foo", "bar=bar", "baz"])),
             Err(Error::InvalidVariableName {
                 name: Field::dummy("bar=bar")
+            })
+        );
+    }
+
+    #[test]
+    fn non_portable_variable_name_with_portable_option() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        assert_eq!(
+            parse(&env, Field::dummies(["foo-bar"])),
+            Err(Error::NonPortableVariableName {
+                name: Field::dummy("foo-bar")
+            })
+        );
+        assert_eq!(
+            parse(&env, Field::dummies(["ok", "1abc", "baz"])),
+            Err(Error::NonPortableVariableName {
+                name: Field::dummy("1abc")
+            })
+        );
+        assert_eq!(
+            parse(&env, Field::dummies([""])),
+            Err(Error::NonPortableVariableName {
+                name: Field::dummy("")
+            })
+        );
+    }
+
+    #[test]
+    fn operand_containing_equal_with_portable_option() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        assert_eq!(
+            parse(&env, Field::dummies(["bar=bar"])),
+            Err(Error::InvalidVariableName {
+                name: Field::dummy("bar=bar")
+            })
+        );
+    }
+
+    #[test]
+    fn portable_variable_name_with_portable_option() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        assert_eq!(
+            parse(&env, Field::dummies(["foo", "_bar123"])),
+            Ok(Command {
+                delimiter: b'\n',
+                is_raw: false,
+                variables: Field::dummies(["foo"]),
+                last_variable: Field::dummy("_bar123"),
+            })
+        );
+    }
+
+    #[test]
+    fn non_portable_variable_name_without_portable_option() {
+        let env = Env::new_virtual();
+        assert_eq!(
+            parse(&env, Field::dummies(["foo-bar"])),
+            Ok(Command {
+                delimiter: b'\n',
+                is_raw: false,
+                variables: vec![],
+                last_variable: Field::dummy("foo-bar"),
             })
         );
     }

@@ -17,11 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   typeset built-in's `-r` option now report an error, instead of making the
   variable read-only, when the operand names the `PWD`, `OLDPWD`, `OPTIND`,
   `OPTARG`, or `LINENO` variable.
-- With the `portable` shell option enabled, the `export`, `readonly`, and
-  typeset built-ins now report an error, instead of creating or updating the
-  variable, when the variable name in an operand is not portable, that is,
-  when it is empty, starts with a digit, or contains a character other than
-  ASCII letters, digits, and underscores.
+- With the `portable` shell option enabled, the `export`, `readonly`,
+  typeset, and `read` built-ins now report an error, instead of creating or
+  updating the variable, when the variable name in an operand is not
+  portable, that is, when it is empty, starts with a digit, or contains a
+  character other than ASCII letters, digits, and underscores.
 
 ## [3.3.2] - 2026-07-16
 
