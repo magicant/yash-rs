@@ -17,6 +17,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Added
 
+- `variable::is_portable_variable_name`, which tests whether a string is a
+  POSIXly-portable variable name (a non-empty word of ASCII letters, digits,
+  and underscores that does not start with a digit).
 - `variable::is_portable_readonly_variable_name`, which tests whether a
   variable of the given name may be made read-only in a POSIXly-portable way.
   It returns `false` for `PWD`, `OLDPWD`, `OPTIND`, `OPTARG`, and `LINENO`,

@@ -115,6 +115,23 @@ pub const PS4_INITIAL_VALUE: &str = "+ ";
 /// The `PWD` variable stores the current working directory.
 pub const PWD: &str = "PWD";
 
+/// Tests if a string is a variable name usable in a POSIXly-portable way.
+///
+/// POSIX defines a _name_ as a word consisting solely of underscores, digits,
+/// and alphabetics from the portable character set, the first character of
+/// which is not a digit. This function returns `true` if the string is a
+/// non-empty word of ASCII alphanumerics and underscores that does not start
+/// with a digit.
+///
+/// Note that this function only checks the syntax of the name. Variables with
+/// a portable name may still be non-portable to modify in a specific way; see
+/// [`is_portable_readonly_variable_name`].
+#[must_use]
+pub fn is_portable_variable_name(name: &str) -> bool {
+    name.starts_with(|c: char| !c.is_ascii_digit())
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
 /// Tests if a variable may be made read-only in a POSIXly-portable way.
 ///
 /// POSIX requires the shell to be able to update the `PWD`, `OLDPWD`,
@@ -129,6 +146,23 @@ pub fn is_portable_readonly_variable_name(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn portable_variable_name() {
+        assert!(is_portable_variable_name("foo"));
+        assert!(is_portable_variable_name("foo_bar"));
+        assert!(is_portable_variable_name("_foo"));
+        assert!(is_portable_variable_name("FOO123"));
+        assert!(is_portable_variable_name("_123"));
+
+        assert!(!is_portable_variable_name(""));
+        assert!(!is_portable_variable_name("123foo"));
+        assert!(!is_portable_variable_name("foo-bar"));
+        assert!(!is_portable_variable_name("foo.bar"));
+        assert!(!is_portable_variable_name("foo=bar"));
+        assert!(!is_portable_variable_name("café"));
+        assert!(!is_portable_variable_name("変数"));
+    }
 
     #[test]
     fn portable_readonly_variable_name() {
