@@ -35,6 +35,8 @@ For [array variables](../language/parameters/variables.md#arrays), the `export` 
 
 When exporting a variable with a value, it is an error if the variable is [read-only].
 
+(Since 3.3.3) When the [`portable` option](../environment/options.md#portable) is set, it is an error to export a variable whose name contains a character other than ASCII letters, digits, and underscores, or starts with a digit.
+
 When printing variables, it is an error if an operand names a non-existing variable.
 
 ## Exit status

@@ -51,9 +51,27 @@ __IN__
 /somewhere
 __OUT__
 
-test_oE 'readonly can make PWD read-only without the portable option'
+test_OE -e 0 'readonly can make PWD read-only without the portable option'
 readonly PWD
-echo ok
 __IN__
-ok
+
+test_O -d -e n 'readonly rejects non-portable variable name' -o portable
+readonly foo-bar
+echo not reached
+__IN__
+
+test_O -d -e n 'readonly rejects non-portable variable name with a value' -o portable
+readonly foo-bar=1
+echo not reached
+__IN__
+
+test_oE 'readonly error message names the non-portable variable name' -o portable
+(readonly foo-bar) 2>result
+grep -Fq 'foo-bar' result && echo shown
+__IN__
+shown
 __OUT__
+
+test_OE -e 0 'readonly accepts non-portable variable name without the portable option'
+readonly foo-bar=1
+__IN__

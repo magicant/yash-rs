@@ -24,6 +24,8 @@ use super::model;
 use super::verify::GetoptsState;
 use thiserror::Error;
 use yash_env::Env;
+use yash_env::option::Option::Portable;
+use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
 use yash_env::source::pretty::{
@@ -35,6 +37,7 @@ use yash_env::variable::OPTIND;
 use yash_env::variable::Scope;
 use yash_env::variable::UnsetError;
 use yash_env::variable::Value;
+use yash_env::variable::is_portable_variable_name;
 
 /// Error in reporting the result to the environment
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -43,6 +46,10 @@ pub enum Error {
     /// Variable name not acceptable
     #[error("invalid variable name")]
     InvalidVariableName { name: Field },
+
+    /// Variable name not portable while the `portable` shell option is on
+    #[error("non-portable variable name")]
+    NonPortableVariableName { name: Field },
 
     /// Error in assigning to a read-only variable
     #[error("cannot update read-only variable `{name}`")]
@@ -100,6 +107,18 @@ impl Error {
                     &name.origin,
                     format!("variable name {:?} is not valid", name.value).into(),
                 );
+            }
+
+            Self::NonPortableVariableName { name } => {
+                report.snippets = Snippet::with_primary_span(
+                    &name.origin,
+                    format!("variable name {:?} is not portable", name.value).into(),
+                );
+                report.footnotes.push(Footnote {
+                    r#type: FootnoteType::Note,
+                    label: "this error is reported because the `portable` shell option is enabled"
+                        .into(),
+                });
             }
 
             Self::AssignReadOnlyError {
@@ -194,6 +213,9 @@ impl model::Result {
     ) -> Result<Option<String>, Error> {
         if var_name.value.contains('=') {
             return Err(Error::InvalidVariableName { name: var_name });
+        }
+        if env.options.get(Portable) == State::On && !is_portable_variable_name(&var_name.value) {
+            return Err(Error::NonPortableVariableName { name: var_name });
         }
 
         let location = env.stack.current_builtin().map(|b| b.name.origin.clone());
@@ -568,6 +590,46 @@ mod tests {
         let report = result.report(&mut env, false, name.clone());
 
         assert_eq!(report, Err(Error::InvalidVariableName { name }));
+    }
+
+    #[test]
+    fn report_with_non_portable_variable_name_with_portable_option() {
+        let mut env = env_with_dummy_arg0_and_optarg();
+        env.options.set(Portable, State::On);
+        let result = model::Result {
+            option: Some(model::OptionOccurrence {
+                option: 'a',
+                argument: None,
+                error: None,
+            }),
+            next_arg_index: non_zero(2),
+            next_char_index: non_zero(1),
+        };
+
+        let name = Field::dummy("opt-var");
+        let report = result.report(&mut env, false, name.clone());
+
+        assert_eq!(report, Err(Error::NonPortableVariableName { name }));
+        assert_variable_none(&env, "opt-var");
+    }
+
+    #[test]
+    fn report_with_non_portable_variable_name_without_portable_option() {
+        let mut env = env_with_dummy_arg0_and_optarg();
+        let result = model::Result {
+            option: Some(model::OptionOccurrence {
+                option: 'a',
+                argument: None,
+                error: None,
+            }),
+            next_arg_index: non_zero(2),
+            next_char_index: non_zero(1),
+        };
+
+        let report = result.report(&mut env, false, Field::dummy("opt-var"));
+
+        assert_eq!(report, Ok(Some(String::new())));
+        assert_variable_scalar(&env, "opt-var", "a");
     }
 
     #[test]

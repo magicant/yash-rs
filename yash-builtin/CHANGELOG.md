@@ -24,11 +24,37 @@ A _private dependency_ is used internally and not visible to downstream users.
   made read-only in that case.
 - The `readonly` built-in (`readonly::main`) and the typeset built-in's `-r`
   option now fail, reporting an error, in the same situation.
+- `typeset::ExecuteError::NonPortableVariableName`, a new error variant that
+  `typeset::SetVariables::execute` now returns when the variable name in an
+  operand is not POSIXly portable (a non-empty word of ASCII letters, digits,
+  and underscores that does not start with a digit) while the `portable`
+  shell option is on. The variable is not created, and no value is assigned
+  to it, in that case.
+- The `export` built-in (`export::main`), the `readonly` built-in
+  (`readonly::main`), and the typeset built-in (`typeset::main`) now fail,
+  reporting an error, in the same situation.
+- `read::syntax::Error::NonPortableVariableName`, a new error variant that
+  `read::syntax::parse` now returns when an operand is not a POSIXly-portable
+  variable name while the `portable` shell option is on.
+- The `read` built-in (`read::main`) now fails, reporting an error, in the
+  same situation.
+- `getopts::report::Error::NonPortableVariableName`, a new error variant
+  that `getopts::model::Result::report` now returns when the variable name
+  operand is not a POSIXly-portable variable name while the `portable` shell
+  option is on.
+- The `getopts` built-in (`getopts::main`) now fails, reporting an error, in
+  the same situation.
 
 ### Changed
 
 - Private dependency versions:
     - yash-env 0.15.4 → 0.15.5
+
+### Fixed
+
+- The error message the `read` built-in (`read::main`) prints for an invalid
+  variable name now annotates the operand with just the variable name
+  instead of the internal debug representation of the whole operand field.
 
 ## [0.21.0] - 2026-07-16
 

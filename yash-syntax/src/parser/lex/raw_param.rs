@@ -41,8 +41,10 @@ pub const fn is_portable_name_char(c: char) -> bool {
 /// and all characters are ASCII alphanumeric or underscore.
 ///
 /// Use [`is_portable_name_char`] to check each character.
+#[inline(always)]
+#[must_use]
 pub fn is_portable_name(s: &str) -> bool {
-    s.starts_with(|c: char| !c.is_ascii_digit()) && s.chars().all(is_portable_name_char)
+    yash_env::variable::is_portable_variable_name(s)
 }
 
 /// Tests if a character names a special parameter.

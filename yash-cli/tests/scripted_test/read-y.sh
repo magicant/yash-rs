@@ -242,6 +242,22 @@ __IN__
 readonly ''=foo
 __OUT__
 
+test_O -d -e 4 'read rejects non-portable variable name' -o portable
+read foo-bar
+__IN__
+
+test_O -d -e 4 'read rejects variable name starting with a digit' -o portable
+read 1abc
+__IN__
+
+test_O -d -e 4 'read rejects empty variable name' -o portable
+read ''
+__IN__
+
+test_OE -e 0 'read accepts non-portable variable name without the portable option'
+echo value | read foo-bar
+__IN__
+
 test_O -d -e 4 'invalid option'
 read --no-such-option foo
 __IN__
