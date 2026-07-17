@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for AI coding agents working in this repository.
+This repository contains the yash-rs project, a POSIX-compliant shell written in Rust.
 
 ## Scope and priorities
 
@@ -16,60 +16,58 @@ Run from repository root.
 - Extra checks (TOML/lints/features): `./check-extra.sh`
 - SemVer checks for workspace crates: `./check-semver.sh`
 - Release feature-matrix checks: `./check-release-build.sh`
-- Per-crate release readiness: `./check-release-readiness.sh <crate>`
 - Per-crate MSRV checks: `./check-msrv.sh <crate>`
-
-Common direct commands:
-
-- `cargo fmt -- --check`
-- `cargo test`
-- `cargo clippy --all-targets`
-- `cargo doc --no-deps`
+- Build and check the user manual: `./check-docs.sh`
 
 ## Workspace map
 
-This workspace contains `yash-*` crates. See root [Cargo.toml](Cargo.toml) for current members/versions.
+This workspace contains `yash-*` crates.
 
 - [yash-cli](yash-cli/README.md): shell binary (`yash3`) and CLI integration.
-- [yash-syntax](yash-syntax/README.md): parser and alias substitution.
+- [yash-syntax](yash-syntax/README.md): shell language syntax and parser.
 - [yash-semantics](yash-semantics/README.md): shell language semantics.
 - [yash-builtin](yash-builtin/README.md): built-in utilities.
 - [yash-env](yash-env/README.md): shell execution environment/state.
-- [yash-arith](yash-arith/README.md): POSIX arithmetic expansion.
-- [yash-prompt](yash-prompt/README.md): prompt rendering.
-- [yash-executor](yash-executor/README.md): single-threaded futures executor (dual licensed).
-- [yash-fnmatch](yash-fnmatch/README.md): POSIX-style glob matching (dual licensed).
-- [yash-quote](yash-quote/README.md): shell quoting utility (dual licensed).
+- [yash-arith](yash-arith/README.md): arithmetic expansion.
+- [yash-prompt](yash-prompt/README.md): command-line prompt rendering.
+- [yash-executor](yash-executor/README.md): single-threaded futures executor.
+- [yash-fnmatch](yash-fnmatch/README.md): POSIX-style glob matching.
+- [yash-quote](yash-quote/README.md): shell quoting utility.
 
 ## Testing expectations
 
-- Put unit tests near changed code when practical.
+- Follow Kent Beck's Canon TDD when implementing a feature or fixing a bug.
+- Put unit tests in the same file as the code they test, using `#[cfg(test)] mod tests { ... }`.
 - If shell-observable behavior changes, add/update scripted tests under [yash-cli/tests/scripted_test](yash-cli/tests/scripted_test/).
 - The scripted test harness entry point is [yash-cli/tests/scripted_test.rs](yash-cli/tests/scripted_test.rs).
 
 ## Versioning and changelog rules
 
-For behavior/API changes, use the `bump-versions` skill
-([.agents/skills/bump-versions/SKILL.md](.agents/skills/bump-versions/SKILL.md)),
-which is the canonical procedure for the workspace's versioning and changelog
-rules:
+For behavior/API changes, use the [`bump-versions` skill](.agents/skills/bump-versions/SKILL.md), which is the canonical procedure for the workspace's versioning rules. Also use the [`update-changelog` skill](.agents/skills/update-changelog/SKILL.md) to update the changelog for the affected crate(s).
 
-- Bump affected crate versions in each crate `Cargo.toml`.
-- Sync workspace dependency versions in root [Cargo.toml](Cargo.toml).
-- Update affected crate changelogs (`[x.y.z] - Unreleased`, categorized entries).
-- If behavior changes are user-visible, update docs in [docs/src](docs/src/)
-  (handled by the `update-docs` skill, which `bump-versions` defers to).
+If behavior changes are user-visible, update docs in [docs/src](docs/src/) (handled by the [`update-docs` skill](.agents/skills/update-docs/SKILL.md)).
+
+## Commit history arrangement
+
+Every commit should be clean and self-contained. Run `cargo fmt`, `./check.sh`, and optionally other relevant checks before committing. Tests, documentation, changelog, and version bumps should be included in the **same commit** as the code change.
+
+Commits should be arranged so that each commit focuses on a single logical concern.
+
+Desired commit history example:
+
+- Commit 1: Introduce a new API in crate A, add tests, and update docs/changelog/version for crate A.
+- Commit 2: Modify crate B to call the new API in crate A, add tests, and update docs/changelog/version for crate B.
+- Commit 3: Refactor crate B implementation without modifying existing tests to ensure the refactor is behavior-preserving.
+
+Unwanted commit history example:
+
+- Commit 1: Introduce a new API in crate A and modify crate B to call it, but do not add tests or update docs/changelog/version for either crate.
+- Commit 2: Add tests for crates A and B, but do not update docs/changelog/version for either crate.
+- Commit 3: Update docs/changelog for crates A and B, but do not update versions for either crate.
 
 ## Review focus for code changes
 
-Use repository-specific review criteria in
-[.github/instructions/code-review.instructions.md](.github/instructions/code-review.instructions.md), especially:
-
-- POSIX compliance and shell semantics correctness.
-- Edge cases and error handling quality.
-- Signal/job-control correctness.
-- Trait-bound minimization in `yash-builtin` and `yash-semantics`.
-- License compatibility (GPL crates vs dual-licensed utility crates).
+Use repository-specific review criteria in [.github/instructions/code-review.instructions.md](.github/instructions/code-review.instructions.md).
 
 ## Useful references
 
@@ -77,18 +75,3 @@ Use repository-specific review criteria in
 - User/developer docs index: [docs/src/README.md](docs/src/README.md)
 - Versioning policy docs: [docs/src/versioning.md](docs/src/versioning.md)
 - Release automation script: [do-release.sh](do-release.sh)
-
-## Safe change workflow (recommended)
-
-Before writing any code for a task that will produce git commits, invoke the
-`commit` skill via the `Skill` tool. The skill drives the work as an
-incremental loop — one logical step at a time, each passing `./check.sh`
-before being committed. Do not write all the code first and commit at the end.
-
-Per-step loop:
-
-1. Read relevant crate README and docs section.
-2. Implement minimal changes for this step.
-3. Run `cargo fmt`, then `./check.sh` (must exit 0 with no warnings).
-4. Stage and commit the step.
-5. If versions or public behavior changed, update changelog/docs and run semver/release checks.

@@ -1,7 +1,7 @@
 ---
 name: bump-versions
 description: 'Apply the yash-rs versioning rules: bump affected crate versions, sync the root Cargo.toml, and add Unreleased changelog headings, per the PR template. Documentation updates are out of scope (see the update-docs skill).'
-argument-hint: 'Which crates/behavior changed in this PR?'
+argument-hint: 'Which crates/behavior changed in this commit?'
 ---
 
 # Bump Versions and Sync Release Metadata
@@ -9,12 +9,16 @@ argument-hint: 'Which crates/behavior changed in this PR?'
 This skill is the **canonical procedure** for the workspace's version- and
 changelog-related rules. The
 [PR template](../../../.github/pull_request_template.md) deliberately omits these
-details so contributors are not burdened with them; the maintainer applies them
-at review time using this skill.
+details so external contributors are not burdened with them; for such
+contributions, the maintainer applies them at review time using this skill.
 
-Use this skill after the code for a PR is written, to make the repository's
-release metadata consistent with the changes: crate version numbers, the root
-`Cargo.toml` dependency versions, and each affected `CHANGELOG.md`.
+Use this skill for each code change **before it is committed**, so that the
+release metadata affected by the change — crate version numbers, the root
+`Cargo.toml` dependency versions, and each affected `CHANGELOG.md` — lands in
+the **same commit** as the code change (see the commit-history rules in
+[AGENTS.md](../../../AGENTS.md)). Do not defer the metadata to a single
+catch-up pass after all of a PR's code changes are done; apply the skill once
+per commit, to that commit's change.
 
 **Scope.** This skill owns the version-number and changelog-heading rules and the
 root `Cargo.toml` sync. Related concerns are delegated:
@@ -24,20 +28,20 @@ root `Cargo.toml` sync. Related concerns are delegated:
 - **Documentation under `docs/src` is out of scope.** When a user-visible change
   also needs documentation, handle that separately with the
   [update-docs skill](../update-docs/SKILL.md). This skill does not edit docs.
-- For staging and committing the resulting changes, hand off to the
-  [commit skill](../commit/SKILL.md).
 
 ## When to Use
 
-- A PR's code changes are complete and the version/changelog metadata must catch
-  up.
+- A code change is about to be committed and its version/changelog metadata
+  must be included in the same commit.
 - The user asks to bump versions, sync `Cargo.toml`, or add changelog entries
-  for a PR.
+  for a change.
 - A behavior or public-API change needs version + changelog updates.
 
 ## Inputs to gather first
 
-1. **The diff.** `git diff` (and the merge base) to see every changed file.
+1. **The diff of the change going into the commit at hand** (`git diff`,
+   staged or working-tree as appropriate). Only when explicitly asked to catch
+   up a whole branch at once, use the diff against the merge base instead.
 2. **Which crates are touched**, directly or transitively.
 3. **The kind of change per crate** (patch / minor / major — see classification).
 
@@ -114,8 +118,8 @@ Compute it like this:
 1. Find the **latest published release** version — the newest `[x.y.z]` release
    heading in `<crate>/CHANGELOG.md` (ignore any `Unreleased` heading).
 2. Determine the **highest-severity category among all unreleased changes** so
-   far, including this PR's change. Severity order: *breaking* > *compatible* >
-   *patch-level*.
+   far, including the current change. Severity order: *breaking* > *compatible*
+   > *patch-level*.
 3. Apply that single bump to the latest release using the Step 2 mapping.
 
 The `[x.y.z] - Unreleased` heading is an **output** of this computation, not an
@@ -123,15 +127,15 @@ input: always (re)derive the forecast from latest-release + highest-accumulated
 severity, then make the heading and `Cargo.toml` match it. Two consequences:
 
 - **No double bump for the same severity.** If the Unreleased version already
-  reflects a bump of the same or higher severity than this PR's change, the
+  reflects a bump of the same or higher severity than the current change, the
   recomputation yields the same value — leave it as is. Example: latest release
-  `1.2.3`, Unreleased already `1.3.0` (minor), and this PR adds another
-  backward-compatible change → still `1.3.0`.
-- **Raise the forecast when this PR is more severe.** If this PR outranks the
-  bump the Unreleased version currently reflects, the recomputation yields a
+  `1.2.3`, Unreleased already `1.3.0` (minor), and the current change is another
+  backward-compatible one → still `1.3.0`.
+- **Raise the forecast when the current change is more severe.** If it outranks
+  the bump the Unreleased version currently reflects, the recomputation yields a
   higher value — rewrite both the forecast and the `[x.y.z] - Unreleased`
-  heading. Example: latest release `1.2.3`, Unreleased `1.3.0` (minor), and this
-  PR adds a **breaking** change → rewrite to `2.0.0`. (In 0.x, the analogous
+  heading. Example: latest release `1.2.3`, Unreleased `1.3.0` (minor), and the
+  current change is **breaking** → rewrite to `2.0.0`. (In 0.x, the analogous
   case is `0.2.3` → Unreleased `0.2.4` (patch) + breaking change → `0.3.0`.)
 
 ### Step 4 — Sync the root `Cargo.toml`
@@ -267,8 +271,8 @@ Rules specific to this workflow:
   "fix" that gap (e.g. `yash-arith` crate `0.2.4` with root requirement `0.2.3`
   is correct under Step 4 case 2).
 - `Cargo.lock` is regenerated (run `cargo build` / `cargo test`) so it is
-  consistent with the manifests; include it with the version bumps when the
-  changes are committed (via the [commit skill](../commit/SKILL.md)).
+  consistent with the manifests; include it in the same commit as the code
+  change and its version bumps.
 - `./check.sh` passes.
 - **Always run `./check-semver.sh`.** It runs `cargo semver-checks` over every
   library crate and confirms each crate's version bump is consistent with its
