@@ -114,3 +114,30 @@ pub const PS4_INITIAL_VALUE: &str = "+ ";
 ///
 /// The `PWD` variable stores the current working directory.
 pub const PWD: &str = "PWD";
+
+/// Tests if a variable may be made read-only in a POSIXly-portable way.
+///
+/// POSIX requires the shell to be able to update the `PWD`, `OLDPWD`,
+/// `OPTIND`, `OPTARG`, and `LINENO` variables during normal operation, so
+/// making any of them read-only is not portable. This function returns
+/// `false` for these five variable names and `true` for any other name.
+#[must_use]
+pub fn is_portable_readonly_variable_name(name: &str) -> bool {
+    !matches!(name, PWD | OLDPWD | OPTIND | OPTARG | LINENO)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn portable_readonly_variable_name() {
+        assert!(!is_portable_readonly_variable_name(PWD));
+        assert!(!is_portable_readonly_variable_name(OLDPWD));
+        assert!(!is_portable_readonly_variable_name(OPTIND));
+        assert!(!is_portable_readonly_variable_name(OPTARG));
+        assert!(!is_portable_readonly_variable_name(LINENO));
+        assert!(is_portable_readonly_variable_name("foo"));
+        assert!(is_portable_readonly_variable_name("HOME"));
+    }
+}

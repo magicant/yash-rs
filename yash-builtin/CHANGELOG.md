@@ -13,6 +13,23 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.21.1] - Unreleased
+
+### Added
+
+- `typeset::ExecuteError::NonPortableReadOnlyVariable`, a new error variant
+  that `typeset::SetVariables::execute` now returns when an operand would
+  make the `PWD`, `OLDPWD`, `OPTIND`, `OPTARG`, or `LINENO` variable
+  read-only while the `portable` shell option is on. The variable is not
+  made read-only in that case.
+- The `readonly` built-in (`readonly::main`) and the typeset built-in's `-r`
+  option now fail, reporting an error, in the same situation.
+
+### Changed
+
+- Private dependency versions:
+    - yash-env 0.15.4 → 0.15.5
+
 ## [0.21.0] - 2026-07-16
 
 ### Changed
@@ -890,6 +907,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
+[0.21.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.21.1
 [0.21.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.21.0
 [0.20.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.20.0
 [0.19.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.19.0

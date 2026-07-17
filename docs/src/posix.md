@@ -40,5 +40,6 @@ When the `portable` option is set, the shell rejects the following non-portable 
 - (Since 3.3.0) A [parameter expansion](language/words/parameters.md) that uses a length or switch modifier with special parameter `*` or `@` (for example, `${#*}` or `${@:+word}`), or a trim modifier with special parameter `#`, `*`, or `@` (for example, `${#%word}` or `${*#word}`). POSIX leaves the results of these combinations unspecified.
 - (Since 3.3.2) The increment and decrement operators (`++` and `--`) in an [arithmetic expansion](language/words/arithmetic.md). POSIX does not require these operators.
 - (Since 3.3.1) Defining an [alias](language/aliases.md) with the [`alias` built-in](builtins/alias.md) with a name that contains a character other than ASCII letters, digits, `!`, `%`, `,`, `-`, `@`, or `_`.
+- (Since 3.3.3) Making the `PWD`, `OLDPWD`, `OPTIND`, `OPTARG`, or `LINENO` [variable](language/parameters/variables.md#reserved-variable-names) [read-only](language/parameters/variables.md#read-only-variables) with the [`readonly` built-in](builtins/readonly.md) or the [`typeset` built-in](builtins/typeset.md)'s `-r` option. POSIX requires the shell to be able to update these variables.
 
 The `portable` option is still under development, so this list will be expanded as more checks are implemented.

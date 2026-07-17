@@ -266,6 +266,8 @@ Arrays are a yash extension that POSIX does not specify, so scripts that use the
 
 (Since 3.3.1) The [`portable` option](../../environment/options.md#portable) rejects array assignment.
 
+(Since 3.3.3) The [`portable` option](../../environment/options.md#portable) rejects making the [`PWD`](#pwd), [`OLDPWD`](#oldpwd), [`OPTIND`](#optind), [`OPTARG`](#optarg), or [`LINENO`](#lineno) variable [read-only](#read-only-variables) with the [`readonly` built-in](../../builtins/readonly.md) or the [`typeset` built-in](../../builtins/typeset.md)'s `-r` option, since POSIX requires the shell to be able to update these variables.
+
 [`cd` built-in]: ../../builtins/cd.md
 [`getopts` built-in]: ../../builtins/getopts.md
 [prompt]: ../../interactive/prompt.md

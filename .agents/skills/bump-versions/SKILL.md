@@ -49,12 +49,24 @@ From the diff, list every crate that needs a metadata update. A crate is
 "affected" if any of the following holds:
 
 - its own source/manifest changed, **or**
-- any of its workspace dependencies' required versions changed — **public or
-  private** (a private-dependency bump needs a changelog mention even though it
-  forces no version bump; see Step 4 and Step 5).
+- it directly depends (in `[dependencies]`; also check `[dev-dependencies]` for
+  completeness, though those don't affect published-crate compatibility) on
+  another workspace crate whose version changed in this cycle — **public or
+  private** dependency alike.
 
-Decide later (Step 2 / Step 4) whether each affected crate also needs a *version*
-bump; "affected" only means it needs attention here.
+**Find these dependents explicitly; do not rely on the initiating diff to
+surface them.** A version bump of `yash-env`, say, potentially affects *every*
+crate with `yash-env = { workspace = true }`, not just the one crate whose
+source you were asked to change. Run `grep -l '^<crate> = ' */Cargo.toml` for
+each crate bumped in Step 3 and add every hit (that isn't the crate itself) to
+the affected list — this is the step most easily skipped, because the code
+diff usually only touches one dependent directly.
+
+Decide later (Step 2 / Step 4) the version-bump *severity* for each affected
+crate; "affected" only means it needs attention here. But do not assume a
+dependency bump alone skips the version bump — see the note in Step 4's
+cross-crate propagation about public vs. private only changing *severity* and
+*root-requirement* handling, never whether a bump happens at all.
 
 ### Step 2 — Classify the change for each crate
 
@@ -68,8 +80,9 @@ crate's current major version.
 - **`yash-cli` (binary):** classify by **observable shell behavior**.
   - Behavior change or new feature → *compatible*; bug fix → *patch-level*.
   - `yash-cli` re-exports nothing, so only observable behavior drives its
-    version. A dependency bump alone never bumps `yash-cli` (though it is still
-    recorded in its changelog per Step 5).
+    version. A dependency bump alone never bumps `yash-cli`, and unlike every
+    other crate, its changelog never records dependency version changes either
+    — see the exception in Step 5.
 
 **Version mapping.** Every crate in this workspace follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Because most crates
@@ -168,14 +181,35 @@ whether to raise its root requirement using these three cases:
 When you do raise a requirement (cases 1 and 3-confirmed), set the root table
 entry to X's new version.
 
-**Cross-crate propagation:** when raising X's root requirement, for every crate
-that depends on X:
+**Cross-crate propagation:** for every crate that depends on X (found in Step
+1), recording X's new version is itself a changelog-worthy change and — per
+the Step 2 version-mapping table, where *compatible* and *patch-level* both
+bump `z` by exactly the same amount in 0.x — **normally earns the dependent
+its own patch-level (`z`) version bump, regardless of whether the dependency is
+public or private.** This holds even when X's bump was itself only
+patch-level, and even when nothing else about the dependent changed (real
+precedent: `yash-fnmatch` 1.1.1 → 1.1.2 solely for a *private* `thiserror`
+patch bump; `yash-syntax`, `yash-semantics`, and `yash-prompt` have each
+released solely for a *public* `yash-env` bump). Public vs. private changes
+two things only:
 
-- If the dependency is **public** (its items are re-exported) and X's bump was
-  breaking (case 1, i.e. a minor bump in 0.x), the dependent's own version must
-  bump too — loop back to Step 2 for that crate.
-- If the dependency is **private** (not re-exported), no version bump of the
-  dependent crate is required, but the changelog still mentions it (Step 5).
+- **Which changelog list the entry goes in** — "Public dependency versions" vs
+  "Private dependency versions" (Step 5; see "How to tell public from private"
+  below).
+- **Whether a *breaking* upstream bump propagates as breaking.** If the
+  dependency is **public** (its items are re-exported) and X's bump was
+  breaking (case 1, i.e. a minor bump in 0.x), the propagated severity is
+  breaking too — loop back to Step 2 for that crate instead of defaulting to
+  patch-level. If the dependency is **private**, the propagated severity stays
+  capped at patch-level even when X's own bump was breaking, since nothing in
+  the dependent's own public API changed.
+
+Whether the *root* requirement for X itself gets raised is the separate
+question decided just above (cases 1–3) — do not conflate "does the root
+requirement rise" with "does this dependent get a changelog entry and version
+bump." The two are independent: a crate can (and often does) get a patch bump
+purely to record a dependency note even while the root requirement for that
+dependency stays put (case 2).
 
 **How to tell public from private — trust the changelog history.**
 Do **not** try to re-derive a dependency's public/private status from the source
@@ -211,6 +245,11 @@ Rules specific to this workflow:
 - **Dependency changes are mentioned.** If a `Cargo.toml` dependency was added,
   removed, or updated, note it in the changelog. List **private and public**
   dependency changes separately.
+- **Exception: `yash-cli` never gets a dependency-change entry.** Its
+  changelog header states it documents only observable shell behavior, not the
+  implementing library crates' versions — so even though `yash-cli` counts as
+  "affected" by a dependency's bump (Step 1), skip it here unless the same
+  change also has user-visible behavior to record under the rule above.
 
 > **Documentation is out of scope here.** If the change is user-visible, the
 > `docs/src` pages (and the "introduced in `yash-cli` x.y.z" version mention)

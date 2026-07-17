@@ -433,6 +433,11 @@ fn readonly_builtin() {
 }
 
 #[test]
+fn readonly_builtin_ex() {
+    run("readonly-y.sh");
+}
+
+#[test]
 fn redirection() {
     run("redir-p.sh")
 }
