@@ -1,5 +1,25 @@
 # startup-y.sh: yash-specific test of shell startup
 
+test_oE 'startup: portable option ignores environment variable with non-portable name'
+env 'non-portable=value' "$TESTEE" -o portable -c 'command env' |
+    grep '^non-portable=value$' || echo ignored
+__IN__
+ignored
+__OUT__
+
+test_oE 'startup: portable option imports environment variable with portable name'
+env portable_name=value "$TESTEE" -o portable -c 'echo "$portable_name"'
+__IN__
+value
+__OUT__
+
+test_oE 'startup: disabled portable option imports environment variable with non-portable name'
+env 'non-portable=value' "$TESTEE" -o portable +o portable -c 'command env' |
+    grep '^non-portable=value$'
+__IN__
+non-portable=value
+__OUT__
+
 # TODO not working as expected
 test_oE -e 0 -f 'negating -c and enabling -s' -c +c -s
 echo ok

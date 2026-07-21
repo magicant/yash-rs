@@ -23,7 +23,7 @@ Even when yash-rs conforms to POSIX, it also implements extensions that POSIX do
 
 Unlike [`posixlycorrect`](environment/options.md#posixlycorrect), which changes how the shell behaves to maximize POSIX conformance, `portable` does not alter the behavior of POSIX-conformant constructs. It only restricts the shell to features that are portable across POSIX-conforming shells, reporting an error or ignoring a feature when a non-portable construct is used. The two options are independent and can be combined.
 
-When the `portable` option is set, the shell rejects the following non-portable constructs:
+When the `portable` option is set, the shell rejects or ignores the following non-portable features:
 
 - (Since 3.3.0) The `;;&` and `;|` terminators in [case commands](language/commands/case.md).
 - (Since 3.3.0) The non-portable [redirection](language/redirections/index.html) operators `>>|` and `<<<`.
@@ -35,6 +35,7 @@ When the `portable` option is set, the shell rejects the following non-portable 
 - (Since 3.3.0) A [`for` loop](language/commands/loops.md#for-loops) [variable name](language/parameters/variables.md#variable-names) that is quoted, contains an expansion, or starts with a digit. POSIX requires the name to be an unquoted word consisting solely of underscores, digits, and alphabetics from the portable character set, not starting with a digit.
 - (Since 3.3.0) A [function](language/functions.md) name that is quoted, contains an expansion, or starts with a digit. POSIX requires the name to be an unquoted word consisting solely of underscores, digits, and alphabetics from the portable character set, not starting with a digit.
 - (Since 3.3.0) A [function](language/functions.md) name that is the same as a [special built-in](builtins/index.html#special-built-ins) utility name (for example, `break` or `export`). POSIX does not allow a function to have the same name as a special built-in. This does not apply to other built-ins, such as `cd`, or to `source`, which is not a POSIX-mandated special built-in.
+- (Since 3.3.3) At shell startup, inherited [environment variables](language/parameters/variables.md#environment-variables) whose names start with a digit or contain a character other than ASCII letters, digits, and underscores.
 - (Since 3.3.0) An [assignment](language/commands/simple.md#syntax) name that contains a character other than underscores, digits, and alphabetics from the portable character set, or that starts with a digit.
 - (Since 3.3.3) An operand of the [`export` built-in](builtins/export.md), the [`readonly` built-in](builtins/readonly.md), the [`typeset` built-in](builtins/typeset.md), the [`read` built-in](builtins/read.md), or the [`getopts` built-in](builtins/getopts.md) specifying a [variable name](language/parameters/variables.md#variable-names) that contains a character other than underscores, digits, and alphabetics from the portable character set, or that starts with a digit.
 - (Since 3.3.1) An [array assignment](language/parameters/variables.md#arrays) (`name=(...)`). Array assignment is a yash extension that POSIX does not specify.
