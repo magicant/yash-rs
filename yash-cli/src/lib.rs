@@ -33,7 +33,7 @@ use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::Env;
 use yash_env::RealSystem;
-use yash_env::option::{Interactive, On};
+use yash_env::option::{Interactive, On, Portable};
 use yash_env::semantics::{Divert, ExitStatus, exit_or_raise};
 use yash_env::system::concurrency::WriteAll;
 use yash_env::system::resource::GetRlimit;
@@ -86,7 +86,16 @@ where
     };
 
     // Import environment variables
-    env.variables.extend_env(std::env::vars());
+    let portable = run
+        .options
+        .iter()
+        .rev()
+        .find_map(|&(option, state)| (option == Portable).then_some(state))
+        == Some(On);
+    env.variables.extend_env(
+        std::env::vars()
+            .filter(|(name, _)| !portable || yash_env::variable::is_portable_variable_name(name)),
+    );
 
     let work = self::startup::configure_environment(env, run).await;
 

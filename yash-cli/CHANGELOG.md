@@ -13,15 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- With the `portable` shell option enabled, the `readonly` built-in and the
-  typeset built-in's `-r` option now report an error, instead of making the
-  variable read-only, when the operand names the `PWD`, `OLDPWD`, `OPTIND`,
-  `OPTARG`, or `LINENO` variable.
-- With the `portable` shell option enabled, the `export`, `readonly`,
-  typeset, `read`, and `getopts` built-ins now report an error, instead of
-  creating or updating the variable, when the variable name in an operand is
-  not portable, that is, when it is empty, starts with a digit, or contains
-  a character other than ASCII letters, digits, and underscores.
+- With `portable` enabled:
+    - At startup, ignore environment variables with non-portable names.
+    - Reject attempts to:
+        - Make `PWD`, `OLDPWD`, `OPTIND`, `OPTARG`, or `LINENO` read-only via `readonly` or `typeset -r`.
+        - Create or update variables with non-portable names via `export`, `readonly`, `typeset`, `read`, or `getopts`.
+
+A portable variable name is non-empty, does not start with a digit, and contains only ASCII letters, digits, and underscores.
 
 ### Fixed
 
