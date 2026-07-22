@@ -43,5 +43,6 @@ When the `portable` option is set, the shell rejects or ignores the following no
 - (Since 3.3.2) The increment and decrement operators (`++` and `--`) in an [arithmetic expansion](language/words/arithmetic.md). POSIX does not require these operators.
 - (Since 3.3.1) Defining an [alias](language/aliases.md) with the [`alias` built-in](builtins/alias.md) with a name that contains a character other than ASCII letters, digits, `!`, `%`, `,`, `-`, `@`, or `_`.
 - (Since 3.3.3) Making the `PWD`, `OLDPWD`, `OPTIND`, `OPTARG`, or `LINENO` [variable](language/parameters/variables.md#reserved-variable-names) [read-only](language/parameters/variables.md#read-only-variables) with the [`readonly` built-in](builtins/readonly.md) or the [`typeset` built-in](builtins/typeset.md)'s `-r` option. POSIX requires the shell to be able to update these variables.
+- (Since 3.3.4) Executing an [elective or extension built-in](builtins/index.html#elective-built-ins) (for example, [`typeset`](builtins/typeset.md)). Such a built-in is still found in [command search](language/commands/simple.md#command-search), but running it is rejected with an error.
 
 The `portable` option is still under development, so this list will be expanded as more checks are implemented.

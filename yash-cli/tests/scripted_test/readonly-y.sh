@@ -37,19 +37,9 @@ __IN__
 shown
 __OUT__
 
-test_oE 'typeset -r rejects PWD under the portable option' -o portable
-typeset -r PWD 2>/dev/null
-echo $?
+test_O -e 1 'readonly rejects PWD under the portable option' -o portable
+readonly PWD
 __IN__
-1
-__OUT__
-
-test_oE 'value is still assigned when making PWD read-only fails' -o portable
-typeset -r PWD=/somewhere 2>/dev/null
-echo "$PWD"
-__IN__
-/somewhere
-__OUT__
 
 test_OE -e 0 'readonly can make PWD read-only without the portable option'
 readonly PWD

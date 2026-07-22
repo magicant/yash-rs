@@ -31,6 +31,8 @@ use std::pin::pin;
 use yash_env::Env;
 use yash_env::builtin::Builtin;
 use yash_env::io::print_error;
+use yash_env::option::Option::Portable;
+use yash_env::option::State::On;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -62,8 +64,6 @@ pub async fn execute_builtin<S: Runtime + 'static>(
     };
 
     let result = 'result: {
-        // TODO Reject elective and extension built-ins in portable mode
-
         let is_special = builtin.r#type == Special;
         let (mut env, export) = if is_special {
             (Either::Left(&mut *env), false)
@@ -79,15 +79,30 @@ pub async fn execute_builtin<S: Runtime + 'static>(
         print(env, xtrace).await;
 
         let name = fields.remove(0);
-        if builtin.r#type == Substitutive && search_path(env, &name.value).is_none() {
-            print_error(
-                env,
-                format!("cannot execute built-in utility {:?}", name.value).into(),
-                "utility not found in $PATH, so the built-in is ignored".into(),
-                &name.origin,
-            )
-            .await;
-            break 'result ExitStatus::NOT_FOUND.into();
+        match builtin.r#type {
+            Elective | Extension if env.options.get(Portable) == On => {
+                print_error(
+                    env,
+                    format!("cannot execute built-in utility {:?}", name.value).into(),
+                    "this built-in is not POSIX, so it cannot be used when the `portable` option \
+                     is on"
+                        .into(),
+                    &name.origin,
+                )
+                .await;
+                break 'result ExitStatus::NOEXEC.into();
+            }
+            Substitutive if search_path(env, &name.value).is_none() => {
+                print_error(
+                    env,
+                    format!("cannot execute built-in utility {:?}", name.value).into(),
+                    "utility not found in $PATH, so the built-in is ignored".into(),
+                    &name.origin,
+                )
+                .await;
+                break 'result ExitStatus::NOT_FOUND.into();
+            }
+            _ => {}
         }
 
         let env = &mut env.push_frame(FrameBuiltin { name, is_special }.into());
@@ -366,6 +381,45 @@ mod tests {
             let command: syntax::SimpleCommand = "echo hello".parse().unwrap();
             _ = command.execute(&mut env).now_or_never().unwrap();
             assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        }
+    }
+
+    #[test]
+    fn elective_and_extension_builtins_are_rejected_under_portable_option() {
+        for r#type in [Elective, Extension] {
+            let system = VirtualSystem::new();
+            let state = Rc::clone(&system.state);
+            let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+            env.options.set(Portable, On);
+            let mut echo_builtin = echo_builtin();
+            echo_builtin.r#type = r#type;
+            env.builtins.insert("echo", echo_builtin);
+
+            let command: syntax::SimpleCommand = "echo hello".parse().unwrap();
+            _ = command.execute(&mut env).now_or_never().unwrap();
+            assert_eq!(env.exit_status, ExitStatus::NOEXEC);
+            assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+            assert_stderr(&state, |stderr| {
+                assert!(
+                    stderr.contains("cannot execute built-in utility \"echo\""),
+                    "type={type:?} stderr={stderr:?}"
+                );
+            });
+        }
+    }
+
+    #[test]
+    fn special_and_mandatory_builtins_are_not_rejected_under_portable_option() {
+        for r#type in [Special, Mandatory] {
+            let mut env = Env::new_virtual();
+            env.options.set(Portable, On);
+            let mut echo_builtin = echo_builtin();
+            echo_builtin.r#type = r#type;
+            env.builtins.insert("echo", echo_builtin);
+
+            let command: syntax::SimpleCommand = "echo hello".parse().unwrap();
+            _ = command.execute(&mut env).now_or_never().unwrap();
+            assert_eq!(env.exit_status, ExitStatus::SUCCESS, "type={type:?}");
         }
     }
 

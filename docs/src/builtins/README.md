@@ -66,6 +66,8 @@ POSIX.1-2024 defines these mandatory built-ins:
 
 Elective built-ins can be overridden by [functions] and are found in [command search](../language/commands/simple.md#command-search) regardless of `PATH`.
 
+When the [`portable` option](../environment/options.md#portable) is set, attempting to execute an elective built-in is **rejected** with an error, even though it is still found in command search.
+
 In yash-rs, the following elective built-in is implemented:
 
 - [`typeset`](typeset.md)
@@ -79,6 +81,8 @@ More may be added in the future.
 Like [elective built-ins](#elective-built-ins), they can be found in [command search](../language/commands/simple.md#command-search) without a corresponding executable in `PATH`, and they can be overridden by [functions].
 
 When the [`posixlycorrect` option](../environment/options.md#posixlycorrect) is set, extension built-ins are **ignored**: they are treated as non-existing during command search, so the shell falls through to searching for an external utility with the same name.
+
+When the [`portable` option](../environment/options.md#portable) is set, attempting to execute an extension built-in is **rejected** with an error, even though it is still found in command search.
 
 No extension built-ins are implemented in yash-rs yet.
 
