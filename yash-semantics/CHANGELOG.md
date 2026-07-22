@@ -17,6 +17,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- Executing an elective or extension built-in (`yash_env::builtin::Type::Elective` or `Extension`) now fails with an error (exit status 126) when the `portable` shell option is on. The built-in is still found in command search; only its execution is rejected.
 - Public dependency versions:
     - yash-env 0.15.4 → 0.15.5
 
