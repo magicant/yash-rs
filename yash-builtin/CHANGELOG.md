@@ -17,19 +17,23 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Fixed
 
-- `command::Invoke::execute` now reports that a substitutive built-in was
-  found but cannot be executed when the built-in has no corresponding
-  external utility in `$PATH`. It previously reported that the command was
-  not found, which was misleading because the command search did find the
-  built-in. The exit status is still 127.
+- The `command` built-in now explains why a built-in that the command search
+  found cannot be used, instead of reporting the command as not found, which
+  was misleading because the search did find the built-in. This covers a
+  substitutive built-in whose external counterpart is missing in `$PATH`
+  (`command::Invoke::execute`, exit status 127) and applies to the `-v` and
+  `-V` options as well (`command::identify::categorize`).
 
 ### Changed
 
+- `command::identify::NotFound` has been replaced with
+  `command::identify::SearchError`, which reports the `cause` of the failure
+  in addition to the command name. `command::identify::categorize` and
+  `command::Identify::result` produce this type, and it also provides the
+  exit status that `command::Invoke::execute` uses.
 - `command::Invoke::execute` now fails with an error and exit status 126 when
   the named command is an elective or extension built-in and the `Portable`
-  option is on. `command::identify::categorize` reports such a built-in as
-  not found, so the `command` built-in's `-v` and `-V` options do not
-  describe it.
+  option is on. The `-v` and `-V` options do not describe such a built-in.
 - Public dependency versions:
     - yash-env 0.15.5 → 0.16.0
     - yash-semantics (optional) 0.19.0 → 0.20.0

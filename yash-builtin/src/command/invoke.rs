@@ -17,7 +17,7 @@
 //! Command invoking semantics
 
 use super::Invoke;
-use super::identify::NotFound;
+use super::identify::SearchError;
 use super::search::SearchEnv;
 use crate::common::report::report_failure;
 use crate::exec::ExecFailure;
@@ -25,12 +25,10 @@ use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
 use yash_env::job::RunBlocking;
 use yash_env::job::RunUnblocking;
-use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::command::RunFunction;
 use yash_env::semantics::command::run_external_utility_in_subshell;
-use yash_env::semantics::command::search::{Error, Target, Unusable, search};
-use yash_env::source::pretty::{Report, ReportType, Snippet};
+use yash_env::semantics::command::search::{Target, search};
 use yash_env::subshell::BlockSignals;
 use yash_env::system::concurrency::{WaitForSignals, WriteAll};
 use yash_env::system::resource::SetRlimit;
@@ -76,15 +74,8 @@ impl Invoke {
         let search_env = &mut SearchEnv { env, params };
         let target = match search(search_env, &name.value) {
             Ok(target) => target,
-
-            Err(Error::NotFound) => {
-                let mut result = report_failure(env, &NotFound { name }).await;
-                result.set_exit_status(ExitStatus::NOT_FOUND);
-                return result;
-            }
-
-            Err(Error::Unusable(reason)) => {
-                let error = UnusableBuiltin { name, reason };
+            Err(cause) => {
+                let error = SearchError { name, cause };
                 let exit_status = error.exit_status();
                 let mut result = report_failure(env, &error).await;
                 result.set_exit_status(exit_status);
@@ -93,55 +84,6 @@ impl Invoke {
         };
 
         invoke_target(env, target, self.fields).await
-    }
-}
-
-/// Error object for a built-in that was found but cannot be executed
-///
-/// Unlike [`NotFound`], this error means the command search did find a built-in
-/// for the name. The shell must not fall back to an external utility in this
-/// case.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct UnusableBuiltin<'a> {
-    /// Command name that named the built-in
-    pub name: &'a Field,
-
-    /// Reason why the built-in cannot be executed
-    pub reason: Unusable,
-}
-
-impl UnusableBuiltin<'_> {
-    /// Returns the exit status that this error should produce.
-    #[must_use]
-    pub fn exit_status(&self) -> ExitStatus {
-        match self.reason {
-            Unusable::NotInPath => ExitStatus::NOT_FOUND,
-            Unusable::NotPortable => ExitStatus::NOEXEC,
-        }
-    }
-
-    /// Converts this error to a [`Report`].
-    #[must_use]
-    pub fn to_report(&self) -> Report<'_> {
-        let label = match self.reason {
-            Unusable::NotInPath => format!("{}: utility not found in $PATH", self.name.value),
-            Unusable::NotPortable => format!(
-                "{}: not a POSIX built-in, so it cannot be used when the `portable` option is on",
-                self.name.value,
-            ),
-        };
-        let mut report = Report::new();
-        report.r#type = ReportType::Error;
-        report.title = "cannot execute built-in utility".into();
-        report.snippets = Snippet::with_primary_span(&self.name.origin, label.into());
-        report
-    }
-}
-
-impl<'a> From<&'a UnusableBuiltin<'a>> for Report<'a> {
-    #[inline]
-    fn from(error: &'a UnusableBuiltin<'a>) -> Self {
-        error.to_report()
     }
 }
 
@@ -239,6 +181,7 @@ mod tests {
     use yash_env::function::{Function, FunctionBody, FunctionBodyObject};
     use yash_env::option::Portable;
     use yash_env::option::State::On;
+    use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
     use yash_env::semantics::command::search::Availability;
     use yash_env::source::Location;
@@ -318,7 +261,7 @@ mod tests {
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| {
             assert!(
-                stderr.contains("cannot execute built-in utility"),
+                stderr.contains("unusable built-in utility"),
                 "stderr: {stderr:?}"
             );
             assert!(stderr.contains("$PATH"), "stderr: {stderr:?}");
@@ -345,7 +288,7 @@ mod tests {
             assert_stdout(&state, |stdout| assert_eq!(stdout, "", "type={type:?}"));
             assert_stderr(&state, |stderr| {
                 assert!(
-                    stderr.contains("cannot execute built-in utility"),
+                    stderr.contains("unusable built-in utility"),
                     "type={type:?} stderr={stderr:?}"
                 );
                 assert!(
