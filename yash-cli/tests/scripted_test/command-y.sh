@@ -54,6 +54,13 @@ PATH=
 command false
 __IN__
 
+test_oE 'error message for substitutive built-in missing in $PATH names $PATH'
+(PATH=; command false) 2>result
+grep -Fq '$PATH' result && echo shown
+__IN__
+shown
+__OUT__
+
 test_O -d -e 126 'executing elective built-in under the portable option' -o portable
 command typeset
 __IN__
@@ -65,6 +72,13 @@ __IN__
 test_O -d -e 1 'describing elective built-in under the portable option (-V)' -o portable
 command -V typeset
 __IN__
+
+test_oE 'error message for elective built-in (-V) names the portable option' -o portable
+command -V typeset 2>result
+grep -Fq 'portable' result && echo shown
+__IN__
+shown
+__OUT__
 
 test_oE -e 0 'describing alias (-V)'
 alias a='foo'
