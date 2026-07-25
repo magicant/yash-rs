@@ -48,6 +48,7 @@ Review Rust code changes comprehensively from every angle, focusing on issues th
 - **Signal Safety**: Are signal handlers async-signal-safe?
 
 ### 5. Testing and Testability
+- **Test Conventions**: Do unit tests follow the [`unit-tests` skill](../../.agents/skills/unit-tests/SKILL.md)?
 - **Test Coverage**: Are new features and bug fixes covered by tests?
 - **Test Quality**: Are tests meaningful and not just checking trivial behavior?
 - **Test Scenarios**: Are both positive and negative test cases included?

@@ -36,7 +36,7 @@ This workspace contains `yash-*` crates.
 
 ## Testing expectations
 
-- Follow Kent Beck's Canon TDD when implementing a feature or fixing a bug.
+- Follow Kent Beck's Canon TDD when implementing a feature or fixing a bug. Use the [`unit-tests` skill](.agents/skills/unit-tests/SKILL.md) when writing the tests; it is the canonical guide to how unit tests are organized, named, and implemented in this workspace.
 - Put unit tests in the same file as the code they test, using `#[cfg(test)] mod tests { ... }`.
 - If shell-observable behavior changes, add/update scripted tests under [yash-cli/tests/scripted_test](yash-cli/tests/scripted_test/).
 - The scripted test harness entry point is [yash-cli/tests/scripted_test.rs](yash-cli/tests/scripted_test.rs).
