@@ -19,7 +19,7 @@
 use super::perform_assignments;
 use crate::Handle as _;
 use crate::Runtime;
-use crate::command::search::search_path;
+use crate::command::search::{Availability, Unusable, resolve_builtin};
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;
@@ -43,6 +43,7 @@ use yash_syntax::syntax::Redir;
 pub async fn execute_builtin<S: Runtime + 'static>(
     env: &mut Env<S>,
     builtin: Builtin<S>,
+    availability: Availability,
     assigns: &[Assign],
     mut fields: Vec<Field>,
     redirs: &[Redir],
@@ -62,8 +63,6 @@ pub async fn execute_builtin<S: Runtime + 'static>(
     };
 
     let result = 'result: {
-        // TODO Reject elective and extension built-ins in portable mode
-
         let is_special = builtin.r#type == Special;
         let (mut env, export) = if is_special {
             (Either::Left(&mut *env), false)
@@ -79,15 +78,26 @@ pub async fn execute_builtin<S: Runtime + 'static>(
         print(env, xtrace).await;
 
         let name = fields.remove(0);
-        if builtin.r#type == Substitutive && search_path(env, &name.value).is_none() {
+        if let Err(error) = resolve_builtin(env, &name.value, builtin.r#type, availability) {
+            let (label, exit_status) = match error {
+                Unusable::NotInPath => (
+                    "utility not found in $PATH, so the built-in is ignored",
+                    ExitStatus::NOT_FOUND,
+                ),
+                Unusable::NotPortable => (
+                    "this built-in is not POSIX, so it cannot be used when the `portable` option \
+                     is on",
+                    ExitStatus::NOEXEC,
+                ),
+            };
             print_error(
                 env,
                 format!("cannot execute built-in utility {:?}", name.value).into(),
-                "utility not found in $PATH, so the built-in is ignored".into(),
+                label.into(),
                 &name.origin,
             )
             .await;
-            break 'result ExitStatus::NOT_FOUND.into();
+            break 'result exit_status.into();
         }
 
         let env = &mut env.push_frame(FrameBuiltin { name, is_special }.into());
@@ -367,6 +377,36 @@ mod tests {
             _ = command.execute(&mut env).now_or_never().unwrap();
             assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         }
+    }
+
+    #[test]
+    fn unavailable_builtin_is_rejected_without_execution() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        let mut echo_builtin = echo_builtin();
+        echo_builtin.r#type = Elective;
+
+        let result = execute_builtin(
+            &mut env,
+            echo_builtin,
+            Availability::NotPortable,
+            &[],
+            Field::dummies(["echo", "hello"]),
+            &[],
+        )
+        .now_or_never()
+        .unwrap();
+
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::NOEXEC);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&state, |stderr| {
+            assert!(
+                stderr.contains("cannot execute built-in utility \"echo\""),
+                "stderr={stderr:?}"
+            );
+        });
     }
 
     #[test]

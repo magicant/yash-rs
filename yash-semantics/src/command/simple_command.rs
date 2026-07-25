@@ -173,9 +173,19 @@ impl<S: Runtime + 'static> Command<S> for syntax::SimpleCommand {
             match classify(env, &name.value) {
                 Builtin {
                     builtin,
-                    availability: _,
+                    availability,
                     path: _,
-                } => execute_builtin(env, builtin, &self.assigns, fields, &self.redirs).await,
+                } => {
+                    execute_builtin(
+                        env,
+                        builtin,
+                        availability,
+                        &self.assigns,
+                        fields,
+                        &self.redirs,
+                    )
+                    .await
+                }
                 Function(function) => {
                     execute_function(env, function, &self.assigns, fields, &self.redirs).await
                 }
