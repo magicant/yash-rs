@@ -24,7 +24,11 @@ Design unit tests as follows unless you are instructed otherwise:
 
 - Each unit test should be self-contained and independent of other tests.
 - Each unit test should follow the Arrange-Act-Assert pattern.
-- The values used to specify the pre- and post-conditions of the behavior being tested should be explicitly specified as literals or named constants directly in the unit test function, rather than in a helper function or constants defined outside of it.
+- The values used to specify the pre- and post-conditions of the behavior being tested should be explicitly specified as literals or named constants directly in the unit test function.
+  - Do not rely on a helper function to produce a value that is significant to the behavior being tested. Exceptions: the helper function is clearly named to indicate the value it produces, or the unit test function passes the value to the helper function as an argument.
+  - Do not compute the expected values in the unit test function; write the final expected values directly. A computed expectation duplicates the implementation's logic, so the test passes even when both are wrong.
+    - Prefer: `assert_eq!(result, "foobar")`
+    - Avoid: `assert_eq!(result, format!("{prefix}bar"))`
 
 ### Test doubles for `yash_env::system::*` traits
 
