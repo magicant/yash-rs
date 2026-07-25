@@ -49,6 +49,11 @@ test_O -d -e 127 -f 'external command is not found with -f option'
 command -f cat /dev/null
 __IN__
 
+test_O -d -e 127 'executing substitutive built-in missing in $PATH'
+PATH=
+command false
+__IN__
+
 test_oE -e 0 'describing alias (-V)'
 alias a='foo'
 command -V a

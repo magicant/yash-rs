@@ -15,6 +15,14 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.22.0] - Unreleased
 
+### Fixed
+
+- `command::Invoke::execute` now reports that a substitutive built-in was
+  found but cannot be executed when the built-in has no corresponding
+  external utility in `$PATH`. It previously reported that the command was
+  not found, which was misleading because the command search did find the
+  built-in. The exit status is still 127.
+
 ### Changed
 
 - Public dependency versions:
