@@ -174,6 +174,7 @@ mod tests {
     use yash_env::VirtualSystem;
     use yash_env::builtin::Type::{Elective, Extension, Mandatory, Special, Substitutive};
     use yash_env::option::Interactive;
+    use yash_env::option::Portable;
     use yash_env::option::State::On;
     use yash_env::semantics::ExitStatus;
     use yash_env::stack::Frame;
@@ -407,6 +408,47 @@ mod tests {
                 "stderr={stderr:?}"
             );
         });
+    }
+
+    #[test]
+    fn elective_and_extension_builtins_are_rejected_under_portable_option() {
+        for r#type in [Elective, Extension] {
+            let system = VirtualSystem::new();
+            let state = Rc::clone(&system.state);
+            let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+            env.options.set(Portable, On);
+            let mut echo_builtin = echo_builtin();
+            echo_builtin.r#type = r#type;
+            env.builtins.insert("echo", echo_builtin);
+
+            let command: syntax::SimpleCommand = "echo hello".parse().unwrap();
+            _ = command.execute(&mut env).now_or_never().unwrap();
+
+            assert_eq!(env.exit_status, ExitStatus::NOEXEC, "type={type:?}");
+            assert_stdout(&state, |stdout| assert_eq!(stdout, "", "type={type:?}"));
+            assert_stderr(&state, |stderr| {
+                assert!(
+                    stderr.contains("cannot execute built-in utility \"echo\""),
+                    "type={type:?} stderr={stderr:?}"
+                );
+            });
+        }
+    }
+
+    #[test]
+    fn posix_builtins_are_not_rejected_under_portable_option() {
+        for r#type in [Special, Mandatory] {
+            let mut env = Env::new_virtual();
+            env.options.set(Portable, On);
+            let mut echo_builtin = echo_builtin();
+            echo_builtin.r#type = r#type;
+            env.builtins.insert("echo", echo_builtin);
+
+            let command: syntax::SimpleCommand = "echo hello".parse().unwrap();
+            _ = command.execute(&mut env).now_or_never().unwrap();
+
+            assert_eq!(env.exit_status, ExitStatus::SUCCESS, "type={type:?}");
+        }
     }
 
     #[test]

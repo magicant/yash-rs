@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.3.4] - Unreleased
 
+### Changed
+
+- With `portable` enabled, executing an elective or extension built-in (for example, `typeset`) is now rejected with an error (exit status 126), even though the built-in is still found in command search. This applies to the `command` built-in as well, and `command -v` and `command -V` no longer describe such a built-in.
+
 ### Fixed
 
 - When the `command` built-in is asked to run a substitutive built-in (such

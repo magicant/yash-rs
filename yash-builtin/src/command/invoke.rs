@@ -235,8 +235,10 @@ mod tests {
     use std::rc::Rc;
     use yash_env::VirtualSystem;
     use yash_env::builtin::Builtin;
-    use yash_env::builtin::Type::{Special, Substitutive};
+    use yash_env::builtin::Type::{Elective, Extension, Special, Substitutive};
     use yash_env::function::{Function, FunctionBody, FunctionBodyObject};
+    use yash_env::option::Portable;
+    use yash_env::option::State::On;
     use yash_env::semantics::Field;
     use yash_env::semantics::command::search::Availability;
     use yash_env::source::Location;
@@ -321,6 +323,37 @@ mod tests {
             );
             assert!(stderr.contains("$PATH"), "stderr: {stderr:?}");
         });
+    }
+
+    #[test]
+    fn non_portable_builtin_under_portable_option() {
+        for r#type in [Elective, Extension] {
+            let system = VirtualSystem::new();
+            let state = Rc::clone(&system.state);
+            let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+            env.options.set(Portable, On);
+            env.builtins
+                .insert("foo", Builtin::new(r#type, |_, _| unreachable!()));
+            let invoke = Invoke {
+                fields: Field::dummies(["foo"]),
+                search: Search::default_for_invoke(),
+            };
+
+            let result = invoke.execute(&mut env).now_or_never().unwrap();
+
+            assert_eq!(result.exit_status(), ExitStatus::NOEXEC, "type={type:?}");
+            assert_stdout(&state, |stdout| assert_eq!(stdout, "", "type={type:?}"));
+            assert_stderr(&state, |stderr| {
+                assert!(
+                    stderr.contains("cannot execute built-in utility"),
+                    "type={type:?} stderr={stderr:?}"
+                );
+                assert!(
+                    stderr.contains("portable"),
+                    "type={type:?} stderr={stderr:?}"
+                );
+            });
+        }
     }
 
     #[test]

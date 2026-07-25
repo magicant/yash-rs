@@ -400,6 +400,8 @@ mod tests {
     use yash_env::alias::HashEntry;
     use yash_env::builtin::Builtin;
     use yash_env::function::Function;
+    use yash_env::option::Portable;
+    use yash_env::option::State::On;
     use yash_env::semantics::command::search::Availability;
     use yash_env::source::Location;
     use yash_env::system::Concurrent;
@@ -597,6 +599,27 @@ mod tests {
         let env = &mut SearchEnv { env, params };
 
         let result = categorize(name, env);
+        assert_eq!(result, Err(NotFound { name }));
+    }
+
+    #[test]
+    fn categorize_non_portable_builtin_under_portable_option() {
+        // The `portable` option rejects an elective built-in, so `command -v`
+        // and `command -V` report it as not found rather than describing it.
+        let name = &Field::dummy("foo");
+        let env = &mut Env::new_virtual();
+        env.options.set(Portable, On);
+        env.builtins
+            .insert("foo", Builtin::new(Type::Elective, |_, _| unreachable!()));
+        env.any
+            .insert(Box::new(IsKeyword::<Rc<Concurrent<VirtualSystem>>>(
+                |_, _| false,
+            )));
+        let params = &Search::default_for_identify();
+        let env = &mut SearchEnv { env, params };
+
+        let result = categorize(name, env);
+
         assert_eq!(result, Err(NotFound { name }));
     }
 

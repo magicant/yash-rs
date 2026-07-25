@@ -49,9 +49,9 @@
 use crate::Env;
 use crate::builtin::Builtin;
 use crate::builtin::Type;
-use crate::builtin::Type::{Extension, Special, Substitutive};
+use crate::builtin::Type::{Elective, Extension, Mandatory, Special, Substitutive};
 use crate::function::Function;
-use crate::option::{On, PosixlyCorrect};
+use crate::option::{On, Portable, PosixlyCorrect};
 use crate::path::PathBuf;
 use crate::system::IsExecutableFile;
 use crate::variable::Expansion;
@@ -72,7 +72,7 @@ pub enum Availability {
     Available,
 
     /// The built-in is not defined in POSIX, and the
-    /// [`Portable`](crate::option::Portable) option rejects it.
+    /// [`Portable`] option rejects it.
     NotPortable,
 }
 
@@ -274,8 +274,23 @@ impl<S: IsExecutableFile> PathEnv for Env<S> {
 impl<S> ClassifyEnv<S> for Env<S> {
     fn builtin(&self, name: &str) -> Option<(Builtin<S>, Availability)> {
         let builtin = self.builtins.get(name).copied()?;
+
+        // An extension built-in is ignored altogether when the shell must
+        // behave POSIXly, so the search falls through to an external utility.
         let found = builtin.r#type != Extension || self.options.get(PosixlyCorrect) != On;
-        found.then_some((builtin, Availability::Available))
+        if !found {
+            return None;
+        }
+
+        // A built-in that POSIX does not define is found but rejected when the
+        // shell must reject non-portable behavior. Unlike an ignored built-in,
+        // it still hides an external utility of the same name.
+        let availability = match builtin.r#type {
+            Elective | Extension if self.options.get(Portable) == On => Availability::NotPortable,
+            Special | Mandatory | Elective | Extension | Substitutive => Availability::Available,
+        };
+
+        Some((builtin, availability))
     }
 
     #[inline]
@@ -292,7 +307,7 @@ pub enum Unusable {
     NotInPath,
 
     /// The built-in is not defined in POSIX, and the
-    /// [`Portable`](crate::option::Portable) option rejects it.
+    /// [`Portable`] option rejects it.
     NotPortable,
 }
 
@@ -470,7 +485,6 @@ pub fn search_path<E: PathEnv>(env: &mut E, name: &str) -> Option<CString> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builtin::Type::{Elective, Extension, Mandatory};
     use crate::function::{FunctionBody, FunctionBodyObject, FunctionSet};
     use crate::option::Off;
     use crate::source::Location;
@@ -519,6 +533,45 @@ mod tests {
         let builtin = Builtin::new(Extension, |_, _| unreachable!());
         env.builtins.insert("foo", builtin);
         assert_eq!(env.builtin("foo"), None);
+    }
+
+    #[test]
+    fn env_builtin_rejects_elective_builtin_if_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, On);
+        let builtin = Builtin::new(Elective, |_, _| unreachable!());
+        env.builtins.insert("foo", builtin);
+        assert_eq!(
+            env.builtin("foo"),
+            Some((builtin, Availability::NotPortable))
+        );
+    }
+
+    #[test]
+    fn env_builtin_rejects_extension_builtin_if_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, On);
+        let builtin = Builtin::new(Extension, |_, _| unreachable!());
+        env.builtins.insert("foo", builtin);
+        assert_eq!(
+            env.builtin("foo"),
+            Some((builtin, Availability::NotPortable))
+        );
+    }
+
+    #[test]
+    fn env_builtin_accepts_posix_builtins_if_portable() {
+        for r#type in [Special, Mandatory, Substitutive] {
+            let mut env = Env::new_virtual();
+            env.options.set(Portable, On);
+            let builtin = Builtin::new(r#type, |_, _| unreachable!());
+            env.builtins.insert("foo", builtin);
+            assert_eq!(
+                env.builtin("foo"),
+                Some((builtin, Availability::Available)),
+                "type={type:?}"
+            );
+        }
     }
 
     #[test]

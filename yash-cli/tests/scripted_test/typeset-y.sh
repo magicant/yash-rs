@@ -442,19 +442,8 @@ PATH=$PWD:$PATH
 typeset --help
 __IN__
 
-test_OE -d -e 1 'typeset rejects non-portable variable name under the portable option' -o portable
-typeset foo-bar=1
-__IN__
-
-test_o 'typeset does not create variable with non-portable name under the portable option' -o portable
-typeset foo-bar=1
-typeset -p | grep foo-bar= || echo not created
-__IN__
-not created
-__OUT__
-
-test_O -d -e 1 'typeset rejects variable name starting with a digit under the portable option' -o portable
-typeset 1abc=1
+test_OE -d -e 126 'typeset itself is rejected as an elective built-in under the portable option' -o portable
+typeset a=1
 __IN__
 
 test_OE -e 0 'typeset accepts non-portable variable name without the portable option'

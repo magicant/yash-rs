@@ -54,6 +54,18 @@ PATH=
 command false
 __IN__
 
+test_O -d -e 126 'executing elective built-in under the portable option' -o portable
+command typeset
+__IN__
+
+test_OE -e 1 'describing elective built-in under the portable option (-v)' -o portable
+command -v typeset
+__IN__
+
+test_O -d -e 1 'describing elective built-in under the portable option (-V)' -o portable
+command -V typeset
+__IN__
+
 test_oE -e 0 'describing alias (-V)'
 alias a='foo'
 command -V a
