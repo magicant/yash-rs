@@ -180,6 +180,7 @@ fn normalize_target<E: NormalizeEnv, S>(env: &E, target: &mut Target<S>) -> Resu
                     ..
                 },
             path,
+            ..
         } => {
             if !env.is_executable_file(path) {
                 return Err(());
@@ -225,7 +226,7 @@ where
         return Ok((&alias.0).into());
     }
 
-    let mut target = search(env, &name.value).ok_or(NotFound { name })?;
+    let mut target = search(env, &name.value).map_err(|_| NotFound { name })?;
     normalize_target(env.env, &mut target).map_err(|()| NotFound { name })?;
     Ok(target.into())
 }
@@ -245,7 +246,7 @@ where
     W: std::fmt::Write,
 {
     match target {
-        Target::Builtin { builtin, path } => {
+        Target::Builtin { builtin, path, .. } => {
             let path = path.to_string_lossy();
             if verbose {
                 let desc = match builtin.r#type {
@@ -399,6 +400,7 @@ mod tests {
     use yash_env::alias::HashEntry;
     use yash_env::builtin::Builtin;
     use yash_env::function::Function;
+    use yash_env::semantics::command::search::Availability;
     use yash_env::source::Location;
     use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::VirtualSystem;
@@ -431,6 +433,7 @@ mod tests {
         let builtin = Builtin::<TestEnv>::new(Type::Substitutive, |_, _| unreachable!());
         let mut builtin_target = Target::Builtin {
             builtin,
+            availability: Availability::Available,
             path: c"/usr/bin/echo".to_owned(),
         };
         let result = normalize_target(&TestEnv, &mut builtin_target);
@@ -439,6 +442,7 @@ mod tests {
             builtin_target,
             Target::Builtin {
                 builtin,
+                availability: Availability::Available,
                 path: c"/usr/bin/echo".to_owned(),
             }
         );
@@ -601,6 +605,7 @@ mod tests {
         let name = &Field::dummy(":");
         let target = &Target::Builtin {
             builtin: Builtin::<()>::new(Type::Special, |_, _| unreachable!()),
+            availability: Availability::Available,
             path: CString::default(),
         };
 
@@ -618,6 +623,7 @@ mod tests {
         let name = &Field::dummy("echo");
         let target = &Target::Builtin {
             builtin: Builtin::<()>::new(Type::Substitutive, |_, _| unreachable!()),
+            availability: Availability::Available,
             path: c"/bin/echo".to_owned(),
         };
 

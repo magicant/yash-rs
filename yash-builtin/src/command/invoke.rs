@@ -73,7 +73,7 @@ impl Invoke {
 
         let params = &self.search;
         let search_env = &mut SearchEnv { env, params };
-        let Some(target) = search(search_env, &name.value) else {
+        let Ok(target) = search(search_env, &name.value) else {
             let mut result = report_failure(env, &NotFound { name }).await;
             result.set_exit_status(ExitStatus::NOT_FOUND);
             return result;
@@ -176,6 +176,7 @@ mod tests {
     use yash_env::builtin::Type::Special;
     use yash_env::function::{Function, FunctionBody, FunctionBodyObject};
     use yash_env::semantics::Field;
+    use yash_env::semantics::command::search::Availability;
     use yash_env::source::Location;
     use yash_env::system::Concurrent;
     use yash_env::test_helper::assert_stderr;
@@ -247,6 +248,7 @@ mod tests {
 
         let mut env = Env::new_virtual();
         let target = Target::Builtin {
+            availability: Availability::Available,
             builtin: Builtin::new(Special, |_, args| {
                 Box::pin(async move {
                     assert_eq!(args, Field::dummies(["bar", "baz"]));

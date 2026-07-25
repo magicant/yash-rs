@@ -37,11 +37,18 @@
 //! as non-existing) when the [`PosixlyCorrect`] option is on, so the search
 //! falls through to external utilities in that case.
 //!
+//! Note the difference between a built-in being *ignored* and *rejected*. An
+//! ignored built-in is treated as if it did not exist, so the search falls
+//! through to an external utility. A rejected built-in is still found, but it
+//! cannot be executed; the search fails with [`Unusable`] rather than falling
+//! through. See [`Availability`].
+//!
 //! [command search]: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_09_01_04
 //! [simple command]: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_09_01
 
 use crate::Env;
 use crate::builtin::Builtin;
+use crate::builtin::Type;
 use crate::builtin::Type::{Extension, Special, Substitutive};
 use crate::function::Function;
 use crate::option::{On, PosixlyCorrect};
@@ -52,6 +59,22 @@ use crate::variable::PATH;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::rc::Rc;
+
+/// Whether a built-in found in the command search may be executed
+///
+/// The command search may find a built-in that the current shell options do not
+/// allow to execute. Such a built-in is not ignored: the search does not fall
+/// through to an external utility. Instead, it is reported as unavailable so
+/// that the caller can tell the user why the built-in cannot be used.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum Availability {
+    /// The built-in may be executed.
+    Available,
+
+    /// The built-in is not defined in POSIX, and the
+    /// [`Portable`](crate::option::Portable) option rejects it.
+    NotPortable,
+}
 
 /// Target of a simple command execution
 ///
@@ -70,6 +93,15 @@ pub enum Target<S> {
     Builtin {
         /// Definition of the built-in
         builtin: Builtin<S>,
+
+        /// Whether the built-in may be executed
+        ///
+        /// [`search`] fails with [`Unusable::NotPortable`] instead of returning
+        /// an unavailable built-in, so this value is always
+        /// [`Available`](Availability::Available) in a target obtained from
+        /// `search`. A target obtained from [`classify`] may have any value
+        /// because `classify` does not reject anything by itself.
+        availability: Availability,
 
         /// Path to the external utility that is shadowed by the substitutive
         /// built-in
@@ -106,8 +138,13 @@ pub enum Target<S> {
 impl<S> Clone for Target<S> {
     fn clone(&self) -> Self {
         match self {
-            Self::Builtin { builtin, path } => Self::Builtin {
+            Self::Builtin {
+                builtin,
+                availability,
+                path,
+            } => Self::Builtin {
                 builtin: *builtin,
+                availability: *availability,
                 path: path.clone(),
             },
             Self::Function(f) => Self::Function(f.clone()),
@@ -122,13 +159,15 @@ impl<S> PartialEq for Target<S> {
             (
                 Self::Builtin {
                     builtin: l_builtin,
+                    availability: l_availability,
                     path: l_path,
                 },
                 Self::Builtin {
                     builtin: r_builtin,
+                    availability: r_availability,
                     path: r_path,
                 },
-            ) => l_builtin == r_builtin && l_path == r_path,
+            ) => l_builtin == r_builtin && l_availability == r_availability && l_path == r_path,
             (Self::Function(l), Self::Function(r)) => l == r,
             (Self::External { path: l_path }, Self::External { path: r_path }) => l_path == r_path,
             _ => false,
@@ -141,9 +180,14 @@ impl<S> Eq for Target<S> {}
 impl<S> std::fmt::Debug for Target<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Builtin { builtin, path } => f
+            Self::Builtin {
+                builtin,
+                availability,
+                path,
+            } => f
                 .debug_struct("Builtin")
                 .field("builtin", builtin)
+                .field("availability", availability)
                 .field("path", path)
                 .finish(),
             Self::Function(func) => f.debug_tuple("Function").field(func).finish(),
@@ -173,8 +217,18 @@ impl<S> From<Function<S>> for Target<S> {
 /// Collection of data used in [classifying](classify) command names
 pub trait ClassifyEnv<S> {
     /// Retrieves the built-in by name.
+    ///
+    /// This function returns `None` if there is no built-in with the given name
+    /// or if the current shell options make the shell ignore it. An ignored
+    /// built-in is treated as if it did not exist, so the command search falls
+    /// through to an external utility.
+    ///
+    /// If a built-in is found, this function also returns its
+    /// [`Availability`], which tells whether the shell options allow executing
+    /// it. Unlike an ignored built-in, an unavailable built-in still hides an
+    /// external utility of the same name.
     #[must_use]
-    fn builtin(&self, name: &str) -> Option<Builtin<S>>;
+    fn builtin(&self, name: &str) -> Option<(Builtin<S>, Availability)>;
 
     /// Retrieves the function by name.
     #[must_use]
@@ -218,10 +272,10 @@ impl<S: IsExecutableFile> PathEnv for Env<S> {
 }
 
 impl<S> ClassifyEnv<S> for Env<S> {
-    fn builtin(&self, name: &str) -> Option<Builtin<S>> {
+    fn builtin(&self, name: &str) -> Option<(Builtin<S>, Availability)> {
         let builtin = self.builtins.get(name).copied()?;
-        let available = builtin.r#type != Extension || self.options.get(PosixlyCorrect) != On;
-        available.then_some(builtin)
+        let found = builtin.r#type != Extension || self.options.get(PosixlyCorrect) != On;
+        found.then_some((builtin, Availability::Available))
     }
 
     #[inline]
@@ -230,48 +284,112 @@ impl<S> ClassifyEnv<S> for Env<S> {
     }
 }
 
+/// Reason why a built-in found in the command search cannot be executed
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum Unusable {
+    /// The built-in is [substitutive](Substitutive), but no corresponding
+    /// external utility was found in `$PATH`.
+    NotInPath,
+
+    /// The built-in is not defined in POSIX, and the
+    /// [`Portable`](crate::option::Portable) option rejects it.
+    NotPortable,
+}
+
+/// Reason why the [command search](search) did not yield a target
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum Error {
+    /// No command was found with the given name.
+    NotFound,
+
+    /// A built-in was found, but it cannot be executed.
+    ///
+    /// Note that the shell must not fall back to an external utility in this
+    /// case: the built-in was found, so the command search is over.
+    Unusable(Unusable),
+}
+
+impl From<Unusable> for Error {
+    #[inline]
+    fn from(unusable: Unusable) -> Self {
+        Self::Unusable(unusable)
+    }
+}
+
+/// Completes the command search for a built-in.
+///
+/// This function decides whether a built-in found by [`classify`] can actually
+/// be executed. On success, it returns the value to be stored in the `path`
+/// field of [`Target::Builtin`], that is, the path to the external utility
+/// shadowed by a [substitutive](Substitutive) built-in, or an empty string for
+/// other types of built-ins.
+///
+/// The `r#type` and `availability` arguments should be the properties of the
+/// built-in that was found for `name`.
+///
+/// [`search`] applies this function to a built-in target, but the caller may
+/// need to apply it separately if it obtained a target from [`classify`]. That
+/// is typically the case when the caller wants to postpone the check until
+/// immediately before executing the built-in.
+///
+/// See [`search_path`] for why this function requires a mutable reference to
+/// the environment.
+pub fn resolve_builtin<E: PathEnv>(
+    env: &mut E,
+    name: &str,
+    r#type: Type,
+    availability: Availability,
+) -> Result<CString, Unusable> {
+    match availability {
+        Availability::NotPortable => Err(Unusable::NotPortable),
+
+        // A substitutive built-in is executed only if its external counterpart
+        // is present in `$PATH`.
+        Availability::Available if r#type == Substitutive => {
+            search_path(env, name).ok_or(Unusable::NotInPath)
+        }
+
+        Availability::Available => Ok(CString::default()),
+    }
+}
+
 /// Performs command search.
 ///
-/// This function effectively combines the [`classify`] and [`search_path`]
-/// functions into a single operation performing full command search.
+/// This function effectively combines the [`classify`], [`resolve_builtin`],
+/// and [`search_path`] functions into a single operation performing full
+/// command search.
 ///
 /// See [`search_path`] for why this function requires a mutable reference to
 /// the environment.
 ///
 /// See the [module documentation](self) for details of the command search
 /// process.
-#[must_use]
-pub fn search<S, E: ClassifyEnv<S> + PathEnv>(env: &mut E, name: &str) -> Option<Target<S>> {
+pub fn search<S, E: ClassifyEnv<S> + PathEnv>(env: &mut E, name: &str) -> Result<Target<S>, Error> {
     let mut target = classify(env, name);
 
-    'fill_path: {
-        let path = match &mut target {
-            Target::Builtin { builtin, path } if builtin.r#type == Substitutive => {
-                // Must verify the external counterpart exists.
-                path
-            }
+    match &mut target {
+        Target::Builtin {
+            builtin,
+            availability,
+            path,
+        } => *path = resolve_builtin(env, name, builtin.r#type, *availability)?,
 
-            Target::External { path } => {
-                if name.contains('/') {
-                    // Just access the given path.
-                    *path = CString::new(name).ok()?;
-                    break 'fill_path;
-                } else {
-                    // Need to actually find it in PATH.
-                    path
-                }
-            }
+        Target::External { path } => {
+            *path = if name.contains('/') {
+                // Just access the given path.
+                CString::new(name).map_err(|_| Error::NotFound)?
+            } else {
+                // Need to actually find it in PATH.
+                search_path(env, name).ok_or(Error::NotFound)?
+            };
+        }
 
-            Target::Builtin { .. } | Target::Function(_) => {
-                // Nothing to do.
-                break 'fill_path;
-            }
-        };
-
-        *path = search_path(env, name)?;
+        Target::Function(_) => {
+            // Nothing to do.
+        }
     }
 
-    Some(target)
+    Ok(target)
 }
 
 /// Determines the type of command target without performing a full search.
@@ -284,6 +402,10 @@ pub fn search<S, E: ClassifyEnv<S> + PathEnv>(env: &mut E, name: &str) -> Option
 /// an external utility is the actual target. This function always assumes that
 /// searching for an external utility would succeed and returns a target with
 /// an empty path in such cases.
+///
+/// This function does not reject a built-in that the shell options disallow,
+/// either. It reports the [`Availability`] as part of the target so that the
+/// caller can reject it later with [`resolve_builtin`].
 #[must_use]
 pub fn classify<S, E: ClassifyEnv<S>>(env: &E, name: &str) -> Target<S> {
     if name.contains('/') {
@@ -293,20 +415,28 @@ pub fn classify<S, E: ClassifyEnv<S>>(env: &E, name: &str) -> Target<S> {
     }
 
     let builtin = env.builtin(name);
-    if let Some(builtin) = builtin
+    if let Some((builtin, availability)) = builtin
         && builtin.r#type == Special
     {
         let path = CString::default();
-        return Target::Builtin { builtin, path };
+        return Target::Builtin {
+            builtin,
+            availability,
+            path,
+        };
     }
 
     if let Some(function) = env.function(name) {
         return Rc::clone(function).into();
     }
 
-    if let Some(builtin) = builtin {
+    if let Some((builtin, availability)) = builtin {
         let path = CString::default();
-        return Target::Builtin { builtin, path };
+        return Target::Builtin {
+            builtin,
+            availability,
+            path,
+        };
     }
 
     Target::External {
@@ -354,7 +484,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let builtin = Builtin::new(Special, |_, _| unreachable!());
         env.builtins.insert("foo", builtin);
-        assert_eq!(env.builtin("foo"), Some(builtin));
+        assert_eq!(env.builtin("foo"), Some((builtin, Availability::Available)));
     }
 
     #[test]
@@ -362,7 +492,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let builtin = Builtin::new(Mandatory, |_, _| unreachable!());
         env.builtins.insert("foo", builtin);
-        assert_eq!(env.builtin("foo"), Some(builtin));
+        assert_eq!(env.builtin("foo"), Some((builtin, Availability::Available)));
     }
 
     #[test]
@@ -370,7 +500,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let builtin = Builtin::new(Elective, |_, _| unreachable!());
         env.builtins.insert("foo", builtin);
-        assert_eq!(env.builtin("foo"), Some(builtin));
+        assert_eq!(env.builtin("foo"), Some((builtin, Availability::Available)));
     }
 
     #[test]
@@ -379,7 +509,7 @@ mod tests {
         let builtin = Builtin::new(Extension, |_, _| unreachable!());
         env.builtins.insert("foo", builtin);
         assert_eq!(env.options.get(PosixlyCorrect), Off);
-        assert_eq!(env.builtin("foo"), Some(builtin));
+        assert_eq!(env.builtin("foo"), Some((builtin, Availability::Available)));
     }
 
     #[test]
@@ -398,12 +528,12 @@ mod tests {
         let mut env = Env::new_virtual();
         let builtin = Builtin::new(Substitutive, |_, _| unreachable!());
         env.builtins.insert("foo", builtin);
-        assert_eq!(env.builtin("foo"), Some(builtin));
+        assert_eq!(env.builtin("foo"), Some((builtin, Availability::Available)));
     }
 
     #[derive(Default)]
     struct DummyEnv {
-        builtins: HashMap<&'static str, Builtin<()>>,
+        builtins: HashMap<&'static str, (Builtin<()>, Availability)>,
         functions: FunctionSet<()>,
         path: Expansion<'static>,
         executables: HashSet<String>,
@@ -423,7 +553,7 @@ mod tests {
     }
 
     impl ClassifyEnv<()> for DummyEnv {
-        fn builtin(&self, name: &str) -> Option<Builtin<()>> {
+        fn builtin(&self, name: &str) -> Option<(Builtin<()>, Availability)> {
             self.builtins.get(name).copied()
         }
         fn function(&self, name: &str) -> Option<&Rc<Function<()>>> {
@@ -450,22 +580,69 @@ mod tests {
     }
 
     #[test]
+    fn resolve_builtin_returns_empty_path_for_non_substitutive_builtin() {
+        let mut env = DummyEnv::default();
+
+        let result = resolve_builtin(&mut env, "foo", Mandatory, Availability::Available);
+
+        assert_eq!(result, Ok(CString::default()));
+    }
+
+    #[test]
+    fn resolve_builtin_returns_external_path_for_substitutive_builtin() {
+        let mut env = DummyEnv::default();
+        env.path = Expansion::from("/bin");
+        env.executables.insert("/bin/foo".to_string());
+
+        let result = resolve_builtin(&mut env, "foo", Substitutive, Availability::Available);
+
+        assert_eq!(result, Ok(c"/bin/foo".to_owned()));
+    }
+
+    #[test]
+    fn resolve_builtin_rejects_substitutive_builtin_missing_in_path() {
+        let mut env = DummyEnv::default();
+
+        let result = resolve_builtin(&mut env, "foo", Substitutive, Availability::Available);
+
+        assert_eq!(result, Err(Unusable::NotInPath));
+    }
+
+    #[test]
+    fn resolve_builtin_rejects_unavailable_builtin() {
+        // The rejection takes precedence over the `$PATH` search, so a
+        // substitutive built-in present in `$PATH` is still rejected.
+        let mut env = DummyEnv::default();
+        env.path = Expansion::from("/bin");
+        env.executables.insert("/bin/foo".to_string());
+
+        let result = resolve_builtin(&mut env, "foo", Substitutive, Availability::NotPortable);
+
+        assert_eq!(result, Err(Unusable::NotPortable));
+    }
+
+    #[test]
     fn nothing_is_found_in_empty_env() {
         let mut env = DummyEnv::default();
         let target = search(&mut env, "foo");
-        assert!(target.is_none(), "target = {target:?}");
+        assert_eq!(target, Err(Error::NotFound));
     }
 
     #[test]
     fn nothing_is_found_with_name_unmatched() {
         let mut env = DummyEnv::default();
-        env.builtins
-            .insert("foo", Builtin::new(Special, |_, _| unreachable!()));
+        env.builtins.insert(
+            "foo",
+            (
+                Builtin::new(Special, |_, _| unreachable!()),
+                Availability::Available,
+            ),
+        );
         let function = Function::new("foo", function_body_stub(), Location::dummy(""));
         env.functions.define(function).unwrap();
 
         let target = search(&mut env, "bar");
-        assert!(target.is_none(), "target = {target:?}");
+        assert_eq!(target, Err(Error::NotFound));
     }
 
     #[test]
@@ -486,19 +663,22 @@ mod tests {
     fn special_builtin_is_found() {
         let mut env = DummyEnv::default();
         let builtin = Builtin::new(Special, |_, _| unreachable!());
-        env.builtins.insert("foo", builtin);
+        env.builtins
+            .insert("foo", (builtin, Availability::Available));
 
         assert_matches!(
             search(&mut env, "foo"),
-            Some(Target::Builtin { builtin: result, path }) => {
+            Ok(Target::Builtin { builtin: result, availability, path }) => {
                 assert_eq!(result.r#type, builtin.r#type);
+                assert_eq!(availability, Availability::Available);
                 assert_eq!(*path, *c"");
             }
         );
         assert_matches!(
             classify(&env, "foo"),
-            Target::Builtin { builtin: result, path } => {
+            Target::Builtin { builtin: result, availability, path } => {
                 assert_eq!(result.r#type, builtin.r#type);
+                assert_eq!(availability, Availability::Available);
                 assert_eq!(*path, *c"");
             }
         );
@@ -514,7 +694,7 @@ mod tests {
         ));
         env.functions.define(function.clone()).unwrap();
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
+        assert_matches!(search(&mut env, "foo"), Ok(Target::Function(result)) => {
             assert_eq!(result, function);
         });
         assert_matches!(classify(&env, "foo"), Target::Function(result) => {
@@ -526,21 +706,24 @@ mod tests {
     fn special_builtin_takes_priority_over_function() {
         let mut env = DummyEnv::default();
         let builtin = Builtin::new(Special, |_, _| unreachable!());
-        env.builtins.insert("foo", builtin);
+        env.builtins
+            .insert("foo", (builtin, Availability::Available));
         let function = Function::new("foo", function_body_stub(), Location::dummy("location"));
         env.functions.define(function).unwrap();
 
         assert_matches!(
             search(&mut env, "foo"),
-            Some(Target::Builtin { builtin: result, path }) => {
+            Ok(Target::Builtin { builtin: result, availability, path }) => {
                 assert_eq!(result.r#type, builtin.r#type);
+                assert_eq!(availability, Availability::Available);
                 assert_eq!(*path, *c"");
             }
         );
         assert_matches!(
             classify(&env, "foo"),
-            Target::Builtin { builtin: result, path } => {
+            Target::Builtin { builtin: result, availability, path } => {
                 assert_eq!(result.r#type, builtin.r#type);
+                assert_eq!(availability, Availability::Available);
                 assert_eq!(*path, *c"");
             }
         );
@@ -550,19 +733,22 @@ mod tests {
     fn mandatory_builtin_is_found_if_not_hidden_by_function() {
         let mut env = DummyEnv::default();
         let builtin = Builtin::new(Mandatory, |_, _| unreachable!());
-        env.builtins.insert("foo", builtin);
+        env.builtins
+            .insert("foo", (builtin, Availability::Available));
 
         assert_matches!(
             search(&mut env, "foo"),
-            Some(Target::Builtin { builtin: result, path }) => {
+            Ok(Target::Builtin { builtin: result, availability, path }) => {
                 assert_eq!(result.r#type, builtin.r#type);
+                assert_eq!(availability, Availability::Available);
                 assert_eq!(*path, *c"");
             }
         );
         assert_matches!(
             classify(&env, "foo"),
-            Target::Builtin { builtin: result, path } => {
+            Target::Builtin { builtin: result, availability, path } => {
                 assert_eq!(result.r#type, builtin.r#type);
+                assert_eq!(availability, Availability::Available);
                 assert_eq!(*path, *c"");
             }
         );
@@ -572,19 +758,22 @@ mod tests {
     fn elective_builtin_is_found_if_not_hidden_by_function() {
         let mut env = DummyEnv::default();
         let builtin = Builtin::new(Elective, |_, _| unreachable!());
-        env.builtins.insert("foo", builtin);
+        env.builtins
+            .insert("foo", (builtin, Availability::Available));
 
         assert_matches!(
             search(&mut env, "foo"),
-            Some(Target::Builtin { builtin: result, path }) => {
+            Ok(Target::Builtin { builtin: result, availability, path }) => {
                 assert_eq!(result.r#type, builtin.r#type);
+                assert_eq!(availability, Availability::Available);
                 assert_eq!(*path, *c"");
             }
         );
         assert_matches!(
             classify(&env, "foo"),
-            Target::Builtin { builtin: result, path } => {
+            Target::Builtin { builtin: result, availability, path } => {
                 assert_eq!(result.r#type, builtin.r#type);
+                assert_eq!(availability, Availability::Available);
                 assert_eq!(*path, *c"");
             }
         );
@@ -594,19 +783,22 @@ mod tests {
     fn extension_builtin_is_found_if_not_hidden_by_function_or_option() {
         let mut env = DummyEnv::default();
         let builtin = Builtin::new(Extension, |_, _| unreachable!());
-        env.builtins.insert("foo", builtin);
+        env.builtins
+            .insert("foo", (builtin, Availability::Available));
 
         assert_matches!(
             search(&mut env, "foo"),
-            Some(Target::Builtin { builtin: result, path }) => {
+            Ok(Target::Builtin { builtin: result, availability, path }) => {
                 assert_eq!(result.r#type, builtin.r#type);
+                assert_eq!(availability, Availability::Available);
                 assert_eq!(*path, *c"");
             }
         );
         assert_matches!(
             classify(&env, "foo"),
-            Target::Builtin { builtin: result, path } => {
+            Target::Builtin { builtin: result, availability, path } => {
                 assert_eq!(result.r#type, builtin.r#type);
+                assert_eq!(availability, Availability::Available);
                 assert_eq!(*path, *c"");
             }
         );
@@ -615,8 +807,13 @@ mod tests {
     #[test]
     fn function_takes_priority_over_mandatory_builtin() {
         let mut env = DummyEnv::default();
-        env.builtins
-            .insert("foo", Builtin::new(Mandatory, |_, _| unreachable!()));
+        env.builtins.insert(
+            "foo",
+            (
+                Builtin::new(Mandatory, |_, _| unreachable!()),
+                Availability::Available,
+            ),
+        );
 
         let function = Rc::new(Function::new(
             "foo",
@@ -625,7 +822,7 @@ mod tests {
         ));
         env.functions.define(function.clone()).unwrap();
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
+        assert_matches!(search(&mut env, "foo"), Ok(Target::Function(result)) => {
             assert_eq!(result, function);
         });
         assert_matches!(classify(&env, "foo"), Target::Function(result) => {
@@ -636,8 +833,13 @@ mod tests {
     #[test]
     fn function_takes_priority_over_elective_builtin() {
         let mut env = DummyEnv::default();
-        env.builtins
-            .insert("foo", Builtin::new(Elective, |_, _| unreachable!()));
+        env.builtins.insert(
+            "foo",
+            (
+                Builtin::new(Elective, |_, _| unreachable!()),
+                Availability::Available,
+            ),
+        );
 
         let function = Rc::new(Function::new(
             "foo",
@@ -646,7 +848,7 @@ mod tests {
         ));
         env.functions.define(function.clone()).unwrap();
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
+        assert_matches!(search(&mut env, "foo"), Ok(Target::Function(result)) => {
             assert_eq!(result, function);
         });
         assert_matches!(classify(&env, "foo"), Target::Function(result) => {
@@ -657,8 +859,13 @@ mod tests {
     #[test]
     fn function_takes_priority_over_extension_builtin() {
         let mut env = DummyEnv::default();
-        env.builtins
-            .insert("foo", Builtin::new(Extension, |_, _| unreachable!()));
+        env.builtins.insert(
+            "foo",
+            (
+                Builtin::new(Extension, |_, _| unreachable!()),
+                Availability::Available,
+            ),
+        );
 
         let function = Rc::new(Function::new(
             "foo",
@@ -667,7 +874,7 @@ mod tests {
         ));
         env.functions.define(function.clone()).unwrap();
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
+        assert_matches!(search(&mut env, "foo"), Ok(Target::Function(result)) => {
             assert_eq!(result, function);
         });
         assert_matches!(classify(&env, "foo"), Target::Function(result) => {
@@ -679,46 +886,82 @@ mod tests {
     fn substitutive_builtin_is_found_if_external_executable_exists() {
         let mut env = DummyEnv::default();
         let builtin = Builtin::new(Substitutive, |_, _| unreachable!());
-        env.builtins.insert("foo", builtin);
+        env.builtins
+            .insert("foo", (builtin, Availability::Available));
         env.path = Expansion::from("/bin");
         env.executables.insert("/bin/foo".to_string());
 
         assert_matches!(
             search(&mut env, "foo"),
-            Some(Target::Builtin { builtin: result, path }) => {
+            Ok(Target::Builtin { builtin: result, availability, path }) => {
                 assert_eq!(result.r#type, builtin.r#type);
+                assert_eq!(availability, Availability::Available);
                 assert_eq!(*path, *c"/bin/foo");
             }
         );
         assert_matches!(
             classify(&env, "foo"),
-            Target::Builtin { builtin: result, path } => {
+            Target::Builtin { builtin: result, availability, path } => {
                 assert_eq!(result.r#type, builtin.r#type);
+                assert_eq!(availability, Availability::Available);
                 assert_eq!(*path, *c"");
             }
         );
     }
 
     #[test]
-    fn substitutive_builtin_is_not_found_without_external_executable() {
+    fn substitutive_builtin_is_unusable_without_external_executable() {
         let mut env = DummyEnv::default();
         let builtin = Builtin::new(Substitutive, |_, _| unreachable!());
-        env.builtins.insert("foo", builtin);
+        env.builtins
+            .insert("foo", (builtin, Availability::Available));
 
         let target = search(&mut env, "foo");
-        assert!(target.is_none(), "target = {target:?}");
+        assert_eq!(target, Err(Error::Unusable(Unusable::NotInPath)));
+    }
+
+    #[test]
+    fn builtin_rejected_by_options_is_unusable() {
+        let mut env = DummyEnv::default();
+        let builtin = Builtin::new(Mandatory, |_, _| unreachable!());
+        env.builtins
+            .insert("foo", (builtin, Availability::NotPortable));
+
+        let target = search(&mut env, "foo");
+        assert_eq!(target, Err(Error::Unusable(Unusable::NotPortable)));
+    }
+
+    #[test]
+    fn builtin_rejected_by_options_is_still_classified() {
+        // `classify` does not reject anything by itself, so the caller can
+        // postpone the rejection until the built-in is about to be executed.
+        let mut env = DummyEnv::default();
+        let builtin = Builtin::new(Mandatory, |_, _| unreachable!());
+        env.builtins
+            .insert("foo", (builtin, Availability::NotPortable));
+
+        assert_matches!(
+            classify(&env, "foo"),
+            Target::Builtin { builtin: result, availability, path } => {
+                assert_eq!(result.r#type, builtin.r#type);
+                assert_eq!(availability, Availability::NotPortable);
+                assert_eq!(*path, *c"");
+            }
+        );
     }
 
     #[test]
     fn substitutive_builtin_is_classified_even_without_external_executable() {
         let mut env = DummyEnv::default();
         let builtin = Builtin::new(Substitutive, |_, _| unreachable!());
-        env.builtins.insert("foo", builtin);
+        env.builtins
+            .insert("foo", (builtin, Availability::Available));
 
         assert_matches!(
             classify(&env, "foo"),
-            Target::Builtin { builtin: result, path } => {
+            Target::Builtin { builtin: result, availability, path } => {
                 assert_eq!(result.r#type, builtin.r#type);
+                assert_eq!(availability, Availability::Available);
                 assert_eq!(*path, *c"");
             }
         );
@@ -728,7 +971,8 @@ mod tests {
     fn function_takes_priority_over_substitutive_builtin() {
         let mut env = DummyEnv::default();
         let builtin = Builtin::new(Substitutive, |_, _| unreachable!());
-        env.builtins.insert("foo", builtin);
+        env.builtins
+            .insert("foo", (builtin, Availability::Available));
         env.path = Expansion::from("/bin");
         env.executables.insert("/bin/foo".to_string());
 
@@ -739,7 +983,7 @@ mod tests {
         ));
         env.functions.define(function.clone()).unwrap();
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
+        assert_matches!(search(&mut env, "foo"), Ok(Target::Function(result)) => {
             assert_eq!(result, function);
         });
         assert_matches!(classify(&env, "foo"), Target::Function(result) => {
@@ -753,7 +997,7 @@ mod tests {
         env.path = Expansion::from("/bin");
         env.executables.insert("/bin/foo".to_string());
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
+        assert_matches!(search(&mut env, "foo"), Ok(Target::External { path }) => {
             assert_eq!(*path, *c"/bin/foo");
         });
         assert_matches!(classify(&env, "foo"), Target::External { path } => {
@@ -768,9 +1012,10 @@ mod tests {
         // The special built-in should be ignored because the command name
         // contains a slash.
         let builtin = Builtin::new(Special, |_, _| unreachable!());
-        env.builtins.insert("bar/baz", builtin);
+        env.builtins
+            .insert("bar/baz", (builtin, Availability::Available));
 
-        assert_matches!(search(&mut env, "bar/baz"), Some(Target::External { path }) => {
+        assert_matches!(search(&mut env, "bar/baz"), Ok(Target::External { path }) => {
             assert_eq!(*path, *c"bar/baz");
         });
         assert_matches!(classify(&env, "bar/baz"), Target::External { path } => {
@@ -785,13 +1030,13 @@ mod tests {
         env.executables.insert("/usr/bin/foo".to_string());
         env.executables.insert("/bin/foo".to_string());
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
+        assert_matches!(search(&mut env, "foo"), Ok(Target::External { path }) => {
             assert_eq!(*path, *c"/usr/bin/foo");
         });
 
         env.executables.insert("/usr/local/bin/foo".to_string());
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
+        assert_matches!(search(&mut env, "foo"), Ok(Target::External { path }) => {
             assert_eq!(*path, *c"/usr/local/bin/foo");
         });
     }
@@ -803,13 +1048,13 @@ mod tests {
         env.executables.insert("/usr/bin/foo".to_string());
         env.executables.insert("/bin/foo".to_string());
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
+        assert_matches!(search(&mut env, "foo"), Ok(Target::External { path }) => {
             assert_eq!(*path, *c"/usr/bin/foo");
         });
 
         env.executables.insert("/usr/local/bin/foo".to_string());
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
+        assert_matches!(search(&mut env, "foo"), Ok(Target::External { path }) => {
             assert_eq!(*path, *c"/usr/local/bin/foo");
         });
     }
@@ -820,7 +1065,7 @@ mod tests {
         env.path = Expansion::from("/x::/y");
         env.executables.insert("foo".to_string());
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
+        assert_matches!(search(&mut env, "foo"), Ok(Target::External { path }) => {
             assert_eq!(*path, *c"foo");
         });
     }

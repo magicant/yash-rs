@@ -171,9 +171,11 @@ impl<S: Runtime + 'static> Command<S> for syntax::SimpleCommand {
         use crate::command::search::Target::{Builtin, External, Function};
         if let Some(name) = fields.first() {
             match classify(env, &name.value) {
-                Builtin { builtin, path: _ } => {
-                    execute_builtin(env, builtin, &self.assigns, fields, &self.redirs).await
-                }
+                Builtin {
+                    builtin,
+                    availability: _,
+                    path: _,
+                } => execute_builtin(env, builtin, &self.assigns, fields, &self.redirs).await,
                 Function(function) => {
                     execute_function(env, function, &self.assigns, fields, &self.redirs).await
                 }
