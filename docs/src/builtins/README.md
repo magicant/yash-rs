@@ -66,7 +66,7 @@ POSIX.1-2024 defines these mandatory built-ins:
 
 Elective built-ins can be overridden by [functions] and are found in [command search](../language/commands/simple.md#command-search) regardless of `PATH`.
 
-When the [`portable` option](../environment/options.md#portable) is set, attempting to execute an elective built-in is **rejected** with an error, even though it is still found in command search.
+(Since 3.3.4) When the [`portable` option](../environment/options.md#portable) is set, attempting to execute an elective built-in is **rejected** with an error, even though it is still found in command search.
 
 In yash-rs, the following elective built-in is implemented:
 
