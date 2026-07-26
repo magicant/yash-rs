@@ -31,7 +31,7 @@ use yash_env::parser::IsKeyword;
 use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::semantics::command::search::{Target, search};
+use yash_env::semantics::command::search::{Error, Target, search};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::str::UnixStr;
 use yash_env::system::concurrency::WriteAll;
@@ -109,31 +109,57 @@ impl<S> From<Target<S>> for Categorization<S> {
     }
 }
 
-/// Error object for the command not found
+/// Error object for a command name that the command search did not resolve
+///
+/// The [`cause`](Self::cause) tells whether the name matched nothing at all or
+/// matched a built-in that cannot be used. Reporting the difference matters
+/// because a built-in that is found but rejected is not replaced by an external
+/// utility of the same name, so "not found" would misdescribe it.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct NotFound<'a> {
-    /// Command name that was not found
+#[non_exhaustive]
+pub struct SearchError<'a> {
+    /// Command name that was searched for
     pub name: &'a Field,
+
+    /// Why the command search did not yield a target
+    pub cause: Error,
 }
 
-impl NotFound<'_> {
+impl SearchError<'_> {
+    /// Returns the exit status that this error should produce when the command
+    /// was to be executed.
+    ///
+    /// This is the [exit status of the cause](Error::exit_status). Note that
+    /// the `-v` and `-V` options of the `command` built-in use their own exit
+    /// status instead of this one.
+    #[inline]
+    #[must_use]
+    pub fn exit_status(&self) -> ExitStatus {
+        self.cause.exit_status()
+    }
+
     /// Converts this error to a [`Report`].
+    ///
+    /// The title does not depend on the [`cause`](Self::cause); the label
+    /// describes it instead. This is because [`merge_reports`] keeps only the
+    /// first title when it combines the reports for several command names, so
+    /// a title that named the cause would misdescribe the other names.
     #[must_use]
     pub fn to_report(&self) -> Report<'_> {
         let mut report = Report::new();
         report.r#type = ReportType::Error;
-        report.title = "command not found".into();
+        report.title = "unusable command".into();
         report.snippets = Snippet::with_primary_span(
             &self.name.origin,
-            format!("{}: not found", self.name.value).into(),
+            format!("{}: {}", self.name.value, self.cause).into(),
         );
         report
     }
 }
 
-impl<'a> From<&'a NotFound<'a>> for Report<'a> {
+impl<'a> From<&'a SearchError<'a>> for Report<'a> {
     #[inline]
-    fn from(error: &'a NotFound<'a>) -> Self {
+    fn from(error: &'a SearchError<'a>) -> Self {
         error.to_report()
     }
 }
@@ -180,6 +206,7 @@ fn normalize_target<E: NormalizeEnv, S>(env: &E, target: &mut Target<S>) -> Resu
                     ..
                 },
             path,
+            ..
         } => {
             if !env.is_executable_file(path) {
                 return Err(());
@@ -204,7 +231,7 @@ fn normalize_target<E: NormalizeEnv, S>(env: &E, target: &mut Target<S>) -> Resu
 pub fn categorize<'f, S>(
     name: &'f Field,
     env: &mut SearchEnv<S>,
-) -> Result<Categorization<S>, NotFound<'f>>
+) -> Result<Categorization<S>, SearchError<'f>>
 where
     S: Fstat + GetCwd + IsExecutableFile + Sysconf + 'static,
 {
@@ -225,8 +252,11 @@ where
         return Ok((&alias.0).into());
     }
 
-    let mut target = search(env, &name.value).ok_or(NotFound { name })?;
-    normalize_target(env.env, &mut target).map_err(|()| NotFound { name })?;
+    let mut target = search(env, &name.value).map_err(|cause| SearchError { name, cause })?;
+    normalize_target(env.env, &mut target).map_err(|()| SearchError {
+        name,
+        cause: Error::NotFound,
+    })?;
     Ok(target.into())
 }
 
@@ -245,7 +275,7 @@ where
     W: std::fmt::Write,
 {
     match target {
-        Target::Builtin { builtin, path } => {
+        Target::Builtin { builtin, path, .. } => {
             let path = path.to_string_lossy();
             if verbose {
                 let desc = match builtin.r#type {
@@ -350,7 +380,7 @@ impl Identify {
     /// This function requires an instance of [`IsKeyword`] to be present in the
     /// environment's [`any`](Env::any) storage to check for keywords. If no
     /// such instance is found, this function will **panic**.
-    pub fn result<S>(&self, env: &mut Env<S>) -> (String, Vec<NotFound<'_>>)
+    pub fn result<S>(&self, env: &mut Env<S>) -> (String, Vec<SearchError<'_>>)
     where
         S: Fstat + GetCwd + IsExecutableFile + Sysconf + 'static,
     {
@@ -396,10 +426,15 @@ impl Identify {
 mod tests {
     use super::*;
     use crate::command::Search;
+    use assert_matches::assert_matches;
     use yash_env::alias::HashEntry;
     use yash_env::builtin::Builtin;
     use yash_env::function::Function;
+    use yash_env::option::Portable;
+    use yash_env::option::State::On;
+    use yash_env::semantics::command::search::{Availability, Unusable};
     use yash_env::source::Location;
+    use yash_env::source::pretty::SpanRole;
     use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::test_helper::function::FunctionBodyStub;
@@ -431,6 +466,7 @@ mod tests {
         let builtin = Builtin::<TestEnv>::new(Type::Substitutive, |_, _| unreachable!());
         let mut builtin_target = Target::Builtin {
             builtin,
+            availability: Availability::Available,
             path: c"/usr/bin/echo".to_owned(),
         };
         let result = normalize_target(&TestEnv, &mut builtin_target);
@@ -439,6 +475,7 @@ mod tests {
             builtin_target,
             Target::Builtin {
                 builtin,
+                availability: Availability::Available,
                 path: c"/usr/bin/echo".to_owned(),
             }
         );
@@ -521,7 +558,13 @@ mod tests {
         let env = &mut SearchEnv { env, params };
 
         let result = categorize(name, env);
-        assert_eq!(result, Err(NotFound { name }));
+        assert_eq!(
+            result,
+            Err(SearchError {
+                name,
+                cause: Error::NotFound
+            })
+        );
     }
 
     #[test]
@@ -533,7 +576,13 @@ mod tests {
         let env = &mut SearchEnv { env, params };
 
         let result = categorize(name, env);
-        assert_eq!(result, Err(NotFound { name }));
+        assert_eq!(
+            result,
+            Err(SearchError {
+                name,
+                cause: Error::NotFound
+            })
+        );
     }
 
     #[test]
@@ -571,7 +620,13 @@ mod tests {
         let env = &mut SearchEnv { env, params };
 
         let result = categorize(name, env);
-        assert_eq!(result, Err(NotFound { name }));
+        assert_eq!(
+            result,
+            Err(SearchError {
+                name,
+                cause: Error::NotFound
+            })
+        );
     }
 
     #[test]
@@ -593,7 +648,80 @@ mod tests {
         let env = &mut SearchEnv { env, params };
 
         let result = categorize(name, env);
-        assert_eq!(result, Err(NotFound { name }));
+        assert_eq!(
+            result,
+            Err(SearchError {
+                name,
+                cause: Error::NotFound
+            })
+        );
+    }
+
+    #[test]
+    fn categorize_non_portable_builtin_under_portable_option() {
+        // The `portable` option rejects an elective built-in, so it cannot be
+        // described. The cause says why, rather than claiming it was not found.
+        let name = &Field::dummy("foo");
+        let env = &mut Env::new_virtual();
+        env.options.set(Portable, On);
+        env.builtins
+            .insert("foo", Builtin::new(Type::Elective, |_, _| unreachable!()));
+        env.any
+            .insert(Box::new(IsKeyword::<Rc<Concurrent<VirtualSystem>>>(
+                |_, _| false,
+            )));
+        let params = &Search::default_for_identify();
+        let env = &mut SearchEnv { env, params };
+
+        let result = categorize(name, env);
+
+        assert_eq!(
+            result,
+            Err(SearchError {
+                name,
+                cause: Error::Unusable(Unusable::NotPortable),
+            })
+        );
+    }
+
+    #[test]
+    fn search_error_report_explains_cause() {
+        let name = &Field::dummy("foo");
+
+        let error = SearchError {
+            name,
+            cause: Error::NotFound,
+        };
+        let report = error.to_report();
+        assert_eq!(report.title, "unusable command");
+        assert_matches!(
+            &report.snippets[0].spans[0].role,
+            SpanRole::Primary { label } if label == "foo: no command with this name"
+        );
+
+        let error = SearchError {
+            name,
+            cause: Error::Unusable(Unusable::NotInPath),
+        };
+        let report = error.to_report();
+        assert_eq!(report.title, "unusable command");
+        assert_matches!(
+            &report.snippets[0].spans[0].role,
+            SpanRole::Primary { label } if label == "foo: a substitutive built-in, so it cannot \
+                be used unless $PATH has an external utility of the same name"
+        );
+
+        let error = SearchError {
+            name,
+            cause: Error::Unusable(Unusable::NotPortable),
+        };
+        let report = error.to_report();
+        assert_eq!(report.title, "unusable command");
+        assert_matches!(
+            &report.snippets[0].spans[0].role,
+            SpanRole::Primary { label } if label == "foo: not a POSIX built-in, so it cannot be \
+                used while the `portable` option is on"
+        );
     }
 
     #[test]
@@ -601,6 +729,7 @@ mod tests {
         let name = &Field::dummy(":");
         let target = &Target::Builtin {
             builtin: Builtin::<()>::new(Type::Special, |_, _| unreachable!()),
+            availability: Availability::Available,
             path: CString::default(),
         };
 
@@ -618,6 +747,7 @@ mod tests {
         let name = &Field::dummy("echo");
         let target = &Target::Builtin {
             builtin: Builtin::<()>::new(Type::Substitutive, |_, _| unreachable!()),
+            availability: Availability::Available,
             path: c"/bin/echo".to_owned(),
         };
 
@@ -762,11 +892,13 @@ mod tests {
         assert_eq!(
             errors,
             [
-                NotFound {
-                    name: &Field::dummy("oops")
+                SearchError {
+                    name: &Field::dummy("oops"),
+                    cause: Error::NotFound
                 },
-                NotFound {
-                    name: &Field::dummy("bar")
+                SearchError {
+                    name: &Field::dummy("bar"),
+                    cause: Error::NotFound
                 }
             ]
         );

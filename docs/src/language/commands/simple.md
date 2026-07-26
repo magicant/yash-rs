@@ -104,7 +104,7 @@ A simple command is executed by the shell in these steps:
 4. If there are any fields, the shell determines the target to execute based on the first field (the command name), as described in [Command search](#command-search) below. <!-- TODO: #530 - Since this step is performed after the assignments, the command search can be affected by the assignments in the previous step. -->
 5. The shell executes the target:
     - If the target is an external utility, it is executed in a [subshell](../../environment/index.html#subshells) with the fields as arguments. If the `execve` call used to execute the target fails with `ENOEXEC`, the shell tries to execute it as a script in a new shell process.
-    - If the target is a [built-in](../../builtins/index.html), it is executed in the current [shell environment] with the fields (except the first) as arguments.
+    - If the target is a [built-in](../../builtins/index.html), it is executed in the current [shell environment] with the fields (except the first) as arguments. However, if it is an [elective or extension built-in](../../builtins/index.html#elective-built-ins) and the [`portable` option](../../environment/options.md#portable) is on, the shell reports an error instead of executing it.
     - If the target is a [function], it is executed in the current [shell environment]. When entering a function, [positional parameters](../parameters/positional.md) are set to the fields (except the first), and restored when the function returns.
     - If no target is found, the shell reports an error.
     - If there was no command name (the first field), nothing is executed.
@@ -119,7 +119,7 @@ Redirections are canceled unless the target was the [`exec` special built-in](..
 1. If the command name contains a slash (`/`), it is treated as a pathname to an executable file target, regardless of whether the file exists or is executable.
 2. If the command name is a [special built-in] (like [`exec`](../../builtins/exec.md) or [`exit`](../../builtins/exit.md)), it is used as the target.
 3. If the command name is a [function], it is used as the target.
-4. If the command name is a [built-in] other than a [substitutive built-in], it is used as the target. [Extension built-ins] are excluded from this step when the [`posixlycorrect` option](../../environment/options.md#posixlycorrect) is on. <!-- TODO: reject elective and extension built-ins in portable mode -->
+4. If the command name is a [built-in] other than a [substitutive built-in], it is used as the target. [Extension built-ins] are excluded from this step when the [`posixlycorrect` option](../../environment/options.md#posixlycorrect) is on.
 5. The shell searches for the command name in the directories listed in the `PATH` [variable](../parameters/variables.md). The first matching executable regular file is a candidate target.
     - The value of `PATH` is treated as a sequence of pathnames separated by colons (`:`). An empty pathname in `PATH` refers to the current [working directory](../../environment/working_directory.md). For example, in the simple command `PATH=/bin:/usr/bin: ls`, the shell searches for `ls` in `/bin`, then `/usr/bin`, and finally the current directory.
     - If `PATH` is an array, each element is a pathname to search.

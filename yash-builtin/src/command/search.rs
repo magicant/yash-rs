@@ -27,6 +27,7 @@ use std::rc::Rc;
 use yash_env::Env;
 use yash_env::builtin::Builtin;
 use yash_env::function::Function;
+use yash_env::semantics::command::search::Availability;
 use yash_env::system::IsExecutableFile;
 use yash_env::system::Sysconf;
 use yash_env::variable::Expansion;
@@ -74,7 +75,7 @@ where
 }
 
 impl<S> yash_env::semantics::command::search::ClassifyEnv<S> for SearchEnv<'_, S> {
-    fn builtin(&self, name: &str) -> Option<Builtin<S>> {
+    fn builtin(&self, name: &str) -> Option<(Builtin<S>, Availability)> {
         if self.params.categories.contains(Category::Builtin) {
             self.env.builtin(name)
         } else {
@@ -205,7 +206,7 @@ mod tests {
         let search_env = SearchEnv { env, params };
 
         let result = search_env.builtin(":");
-        assert_eq!(result, Some(builtin));
+        assert_eq!(result, Some((builtin, Availability::Available)));
     }
 
     #[test]

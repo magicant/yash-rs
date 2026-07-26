@@ -49,6 +49,37 @@ test_O -d -e 127 -f 'external command is not found with -f option'
 command -f cat /dev/null
 __IN__
 
+test_O -d -e 127 'executing substitutive built-in missing in $PATH'
+PATH=
+command false
+__IN__
+
+test_oE 'error message for substitutive built-in missing in $PATH names $PATH'
+(PATH=; command false) 2>result
+grep -Fq '$PATH' result && echo shown
+__IN__
+shown
+__OUT__
+
+test_O -d -e 126 'executing elective built-in under the portable option' -o portable
+command typeset
+__IN__
+
+test_OE -e 1 'describing elective built-in under the portable option (-v)' -o portable
+command -v typeset
+__IN__
+
+test_O -d -e 1 'describing elective built-in under the portable option (-V)' -o portable
+command -V typeset
+__IN__
+
+test_oE 'error message for elective built-in (-V) names the portable option' -o portable
+command -V typeset 2>result
+grep -Fq 'portable' result && echo shown
+__IN__
+shown
+__OUT__
+
 test_oE -e 0 'describing alias (-V)'
 alias a='foo'
 command -V a

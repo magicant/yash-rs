@@ -37,18 +37,25 @@ __IN__
 shown
 __OUT__
 
-test_oE 'typeset -r rejects PWD under the portable option' -o portable
-typeset -r PWD 2>/dev/null
-echo $?
+# The readonly built-in is a special built-in, so its error would terminate
+# the shell. The command built-in is used to keep the shell running and
+# observe what the rejected readonly built-in did.
+
+test_oE 'rejected readonly still assigns the value to PWD' -o portable
+command readonly PWD=/somewhere 2>/dev/null
+echo "status=$?"
+echo "PWD=$PWD"
 __IN__
-1
+status=1
+PWD=/somewhere
 __OUT__
 
-test_oE 'value is still assigned when making PWD read-only fails' -o portable
-typeset -r PWD=/somewhere 2>/dev/null
-echo "$PWD"
+test_oE 'rejected readonly leaves PWD writable' -o portable
+command readonly PWD=/somewhere 2>/dev/null
+PWD=/elsewhere
+echo "PWD=$PWD"
 __IN__
-/somewhere
+PWD=/elsewhere
 __OUT__
 
 test_OE -e 0 'readonly can make PWD read-only without the portable option'

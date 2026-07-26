@@ -13,6 +13,31 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.22.0] - Unreleased
+
+### Fixed
+
+- The `command` built-in now explains why a built-in that the command search
+  found cannot be used, instead of reporting the command as not found, which
+  was misleading because the search did find the built-in. This covers a
+  substitutive built-in whose external counterpart is missing in `$PATH`
+  (`command::Invoke::execute`, exit status 127) and applies to the `-v` and
+  `-V` options as well (`command::identify::categorize`).
+
+### Changed
+
+- `command::identify::NotFound` has been replaced with
+  `command::identify::SearchError`, which reports the `cause` of the failure
+  in addition to the command name. `command::identify::categorize` and
+  `command::Identify::result` produce this type, and it also provides the
+  exit status that `command::Invoke::execute` uses.
+- `command::Invoke::execute` now fails with an error and exit status 126 when
+  the named command is an elective or extension built-in and the `Portable`
+  option is on. The `-v` and `-V` options do not describe such a built-in.
+- Public dependency versions:
+    - yash-env 0.15.5 → 0.16.0
+    - yash-semantics (optional) 0.19.0 → 0.20.0
+
 ## [0.21.1] - 2026-07-22
 
 ### Added
@@ -933,6 +958,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
+[0.22.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.22.0
 [0.21.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.21.1
 [0.21.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.21.0
 [0.20.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.20.0

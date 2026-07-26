@@ -17,7 +17,7 @@
 //! Command invoking semantics
 
 use super::Invoke;
-use super::identify::NotFound;
+use super::identify::SearchError;
 use super::search::SearchEnv;
 use crate::common::report::report_failure;
 use crate::exec::ExecFailure;
@@ -25,7 +25,6 @@ use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
 use yash_env::job::RunBlocking;
 use yash_env::job::RunUnblocking;
-use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::command::RunFunction;
 use yash_env::semantics::command::run_external_utility_in_subshell;
@@ -73,10 +72,15 @@ impl Invoke {
 
         let params = &self.search;
         let search_env = &mut SearchEnv { env, params };
-        let Some(target) = search(search_env, &name.value) else {
-            let mut result = report_failure(env, &NotFound { name }).await;
-            result.set_exit_status(ExitStatus::NOT_FOUND);
-            return result;
+        let target = match search(search_env, &name.value) {
+            Ok(target) => target,
+            Err(cause) => {
+                let error = SearchError { name, cause };
+                let exit_status = error.exit_status();
+                let mut result = report_failure(env, &error).await;
+                result.set_exit_status(exit_status);
+                return result;
+            }
         };
 
         invoke_target(env, target, self.fields).await
@@ -173,9 +177,13 @@ mod tests {
     use std::rc::Rc;
     use yash_env::VirtualSystem;
     use yash_env::builtin::Builtin;
-    use yash_env::builtin::Type::Special;
+    use yash_env::builtin::Type::{Elective, Extension, Special, Substitutive};
     use yash_env::function::{Function, FunctionBody, FunctionBodyObject};
+    use yash_env::option::Portable;
+    use yash_env::option::State::On;
+    use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
+    use yash_env::semantics::command::search::Availability;
     use yash_env::source::Location;
     use yash_env::system::Concurrent;
     use yash_env::test_helper::assert_stderr;
@@ -231,8 +239,67 @@ mod tests {
         assert_eq!(result.exit_status(), ExitStatus::NOT_FOUND);
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| {
-            assert!(stderr.contains("not found"), "stderr: {stderr:?}");
+            assert!(
+                stderr.contains("no command with this name"),
+                "stderr: {stderr:?}"
+            );
         });
+    }
+
+    #[test]
+    fn substitutive_builtin_missing_in_path() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.builtins
+            .insert("foo", Builtin::new(Substitutive, |_, _| unreachable!()));
+        let invoke = Invoke {
+            fields: Field::dummies(["foo"]),
+            search: Search::default_for_invoke(),
+        };
+
+        let result = invoke.execute(&mut env).now_or_never().unwrap();
+
+        assert_eq!(result.exit_status(), ExitStatus::NOT_FOUND);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&state, |stderr| {
+            assert!(
+                stderr.contains("substitutive built-in"),
+                "stderr: {stderr:?}"
+            );
+            assert!(stderr.contains("$PATH"), "stderr: {stderr:?}");
+        });
+    }
+
+    #[test]
+    fn non_portable_builtin_under_portable_option() {
+        for r#type in [Elective, Extension] {
+            let system = VirtualSystem::new();
+            let state = Rc::clone(&system.state);
+            let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+            env.options.set(Portable, On);
+            env.builtins
+                .insert("foo", Builtin::new(r#type, |_, _| unreachable!()));
+            let invoke = Invoke {
+                fields: Field::dummies(["foo"]),
+                search: Search::default_for_invoke(),
+            };
+
+            let result = invoke.execute(&mut env).now_or_never().unwrap();
+
+            assert_eq!(result.exit_status(), ExitStatus::NOEXEC, "type={type:?}");
+            assert_stdout(&state, |stdout| assert_eq!(stdout, "", "type={type:?}"));
+            assert_stderr(&state, |stderr| {
+                assert!(
+                    stderr.contains("not a POSIX built-in"),
+                    "type={type:?} stderr={stderr:?}"
+                );
+                assert!(
+                    stderr.contains("`portable` option"),
+                    "type={type:?} stderr={stderr:?}"
+                );
+            });
+        }
     }
 
     #[test]
@@ -247,6 +314,7 @@ mod tests {
 
         let mut env = Env::new_virtual();
         let target = Target::Builtin {
+            availability: Availability::Available,
             builtin: Builtin::new(Special, |_, args| {
                 Box::pin(async move {
                     assert_eq!(args, Field::dummies(["bar", "baz"]));

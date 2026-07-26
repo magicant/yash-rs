@@ -13,6 +13,40 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.16.0] - Unreleased
+
+### Added
+
+- `semantics::command::search::Availability`, which tells whether a built-in
+  found in the command search may be executed under the current shell options.
+- `semantics::command::search::Unusable`, which tells why a built-in found in
+  the command search cannot be executed.
+- `semantics::command::search::Error`, which tells why the command search did
+  not yield a target.
+- `semantics::command::search::resolve_builtin`, which decides whether a
+  built-in found by `classify` can be executed and returns the path to the
+  external utility shadowed by a substitutive built-in. This allows a caller
+  that uses `classify` to postpone the check until immediately before executing
+  the built-in, sharing the decision with `search`.
+
+### Changed
+
+- `semantics::command::search::search` now returns `Result<Target<S>, Error>`
+  instead of `Option<Target<S>>` so that the caller can tell a command that was
+  not found from a built-in that was found but cannot be executed.
+- `semantics::command::search::ClassifyEnv::builtin` now returns
+  `Option<(Builtin<S>, Availability)>` instead of `Option<Builtin<S>>`.
+  Returning `None` still means the built-in is ignored and the search falls
+  through to an external utility, while an unavailable built-in is still found
+  and hides an external utility of the same name.
+- `semantics::command::search::Target::Builtin` now has an `availability`
+  field.
+- `<Env<S> as semantics::command::search::ClassifyEnv<S>>::builtin` now
+  reports `Availability::NotPortable` for an elective or extension built-in
+  when the `Portable` option is on. The built-in is still found, so the
+  command search does not fall through to an external utility of the same
+  name.
+
 ## [0.15.5] - 2026-07-22
 
 ### Added
@@ -1443,6 +1477,7 @@ This version has been yanked due to an issue that prevents the crate from buildi
 
 - Initial implementation of the `yash-env` crate
 
+[0.16.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.16.0
 [0.15.5]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.15.5
 [0.15.4]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.15.4
 [0.15.3]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.15.3
