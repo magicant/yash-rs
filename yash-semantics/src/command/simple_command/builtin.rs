@@ -19,7 +19,7 @@
 use super::perform_assignments;
 use crate::Handle as _;
 use crate::Runtime;
-use crate::command::search::{Availability, Unusable, resolve_builtin};
+use crate::command::search::{Availability, resolve_builtin};
 use crate::redir::RedirGuard;
 use crate::xtrace::XTrace;
 use crate::xtrace::print;
@@ -79,25 +79,14 @@ pub async fn execute_builtin<S: Runtime + 'static>(
 
         let name = fields.remove(0);
         if let Err(error) = resolve_builtin(env, &name.value, builtin.r#type, availability) {
-            let (label, exit_status) = match error {
-                Unusable::NotInPath => (
-                    "utility not found in $PATH, so the built-in is ignored",
-                    ExitStatus::NOT_FOUND,
-                ),
-                Unusable::NotPortable => (
-                    "this built-in is not POSIX, so it cannot be used when the `portable` option \
-                     is on",
-                    ExitStatus::NOEXEC,
-                ),
-            };
             print_error(
                 env,
                 format!("cannot execute built-in utility {:?}", name.value).into(),
-                label.into(),
+                error.to_string().into(),
                 &name.origin,
             )
             .await;
-            break 'result exit_status.into();
+            break 'result error.exit_status().into();
         }
 
         let env = &mut env.push_frame(FrameBuiltin { name, is_special }.into());

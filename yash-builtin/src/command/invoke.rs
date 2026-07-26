@@ -239,7 +239,10 @@ mod tests {
         assert_eq!(result.exit_status(), ExitStatus::NOT_FOUND);
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| {
-            assert!(stderr.contains("not found"), "stderr: {stderr:?}");
+            assert!(
+                stderr.contains("no command with this name"),
+                "stderr: {stderr:?}"
+            );
         });
     }
 
@@ -261,7 +264,7 @@ mod tests {
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| {
             assert!(
-                stderr.contains("unusable built-in utility"),
+                stderr.contains("substitutive built-in"),
                 "stderr: {stderr:?}"
             );
             assert!(stderr.contains("$PATH"), "stderr: {stderr:?}");
@@ -288,11 +291,11 @@ mod tests {
             assert_stdout(&state, |stdout| assert_eq!(stdout, "", "type={type:?}"));
             assert_stderr(&state, |stderr| {
                 assert!(
-                    stderr.contains("unusable built-in utility"),
+                    stderr.contains("not a POSIX built-in"),
                     "type={type:?} stderr={stderr:?}"
                 );
                 assert!(
-                    stderr.contains("portable"),
+                    stderr.contains("`portable` option"),
                     "type={type:?} stderr={stderr:?}"
                 );
             });

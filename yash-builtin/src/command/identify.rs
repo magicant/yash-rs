@@ -31,7 +31,7 @@ use yash_env::parser::IsKeyword;
 use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::semantics::command::search::{Error, Target, Unusable, search};
+use yash_env::semantics::command::search::{Error, Target, search};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::str::UnixStr;
 use yash_env::system::concurrency::WriteAll;
@@ -116,6 +116,7 @@ impl<S> From<Target<S>> for Categorization<S> {
 /// because a built-in that is found but rejected is not replaced by an external
 /// utility of the same name, so "not found" would misdescribe it.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct SearchError<'a> {
     /// Command name that was searched for
     pub name: &'a Field,
@@ -128,43 +129,30 @@ impl SearchError<'_> {
     /// Returns the exit status that this error should produce when the command
     /// was to be executed.
     ///
-    /// This is 127 if no command was found and 126 if a built-in was found but
-    /// cannot be executed. Note that the `-v` and `-V` options of the `command`
-    /// built-in use their own exit status instead of this one.
+    /// This is the [exit status of the cause](Error::exit_status). Note that
+    /// the `-v` and `-V` options of the `command` built-in use their own exit
+    /// status instead of this one.
+    #[inline]
     #[must_use]
     pub fn exit_status(&self) -> ExitStatus {
-        match self.cause {
-            Error::NotFound | Error::Unusable(Unusable::NotInPath) => ExitStatus::NOT_FOUND,
-            Error::Unusable(Unusable::NotPortable) => ExitStatus::NOEXEC,
-        }
+        self.cause.exit_status()
     }
 
     /// Converts this error to a [`Report`].
+    ///
+    /// The title does not depend on the [`cause`](Self::cause); the label
+    /// describes it instead. This is because [`merge_reports`] keeps only the
+    /// first title when it combines the reports for several command names, so
+    /// a title that named the cause would misdescribe the other names.
     #[must_use]
     pub fn to_report(&self) -> Report<'_> {
-        let (title, label) = match self.cause {
-            Error::NotFound => (
-                "command not found",
-                format!("{}: not found", self.name.value),
-            ),
-            Error::Unusable(Unusable::NotInPath) => (
-                "unusable built-in utility",
-                format!("{}: utility not found in $PATH", self.name.value),
-            ),
-            Error::Unusable(Unusable::NotPortable) => (
-                "unusable built-in utility",
-                format!(
-                    "{}: not a POSIX built-in, so it cannot be used when the `portable` option \
-                     is on",
-                    self.name.value,
-                ),
-            ),
-        };
-
         let mut report = Report::new();
         report.r#type = ReportType::Error;
-        report.title = title.into();
-        report.snippets = Snippet::with_primary_span(&self.name.origin, label.into());
+        report.title = "unusable command".into();
+        report.snippets = Snippet::with_primary_span(
+            &self.name.origin,
+            format!("{}: {}", self.name.value, self.cause).into(),
+        );
         report
     }
 }
@@ -438,13 +426,15 @@ impl Identify {
 mod tests {
     use super::*;
     use crate::command::Search;
+    use assert_matches::assert_matches;
     use yash_env::alias::HashEntry;
     use yash_env::builtin::Builtin;
     use yash_env::function::Function;
     use yash_env::option::Portable;
     use yash_env::option::State::On;
-    use yash_env::semantics::command::search::Availability;
+    use yash_env::semantics::command::search::{Availability, Unusable};
     use yash_env::source::Location;
+    use yash_env::source::pretty::SpanRole;
     use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::test_helper::function::FunctionBodyStub;
@@ -702,19 +692,36 @@ mod tests {
             name,
             cause: Error::NotFound,
         };
-        assert_eq!(error.to_report().title, "command not found");
+        let report = error.to_report();
+        assert_eq!(report.title, "unusable command");
+        assert_matches!(
+            &report.snippets[0].spans[0].role,
+            SpanRole::Primary { label } if label == "foo: no command with this name"
+        );
 
         let error = SearchError {
             name,
             cause: Error::Unusable(Unusable::NotInPath),
         };
-        assert_eq!(error.to_report().title, "unusable built-in utility");
+        let report = error.to_report();
+        assert_eq!(report.title, "unusable command");
+        assert_matches!(
+            &report.snippets[0].spans[0].role,
+            SpanRole::Primary { label } if label == "foo: a substitutive built-in, so it cannot \
+                be used unless $PATH has an external utility of the same name"
+        );
 
         let error = SearchError {
             name,
             cause: Error::Unusable(Unusable::NotPortable),
         };
-        assert_eq!(error.to_report().title, "unusable built-in utility");
+        let report = error.to_report();
+        assert_eq!(report.title, "unusable command");
+        assert_matches!(
+            &report.snippets[0].spans[0].role,
+            SpanRole::Primary { label } if label == "foo: not a POSIX built-in, so it cannot be \
+                used while the `portable` option is on"
+        );
     }
 
     #[test]

@@ -53,6 +53,7 @@ use crate::builtin::Type::{Elective, Extension, Mandatory, Special, Substitutive
 use crate::function::Function;
 use crate::option::{On, Portable, PosixlyCorrect};
 use crate::path::PathBuf;
+use crate::semantics::ExitStatus;
 use crate::system::IsExecutableFile;
 use crate::variable::Expansion;
 use crate::variable::PATH;
@@ -67,6 +68,7 @@ use std::rc::Rc;
 /// through to an external utility. Instead, it is reported as unavailable so
 /// that the caller can tell the user why the built-in cannot be used.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum Availability {
     /// The built-in may be executed.
     Available,
@@ -301,6 +303,7 @@ impl<S> ClassifyEnv<S> for Env<S> {
 
 /// Reason why a built-in found in the command search cannot be executed
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum Unusable {
     /// The built-in is [substitutive](Substitutive), but no corresponding
     /// external utility was found in `$PATH`.
@@ -311,8 +314,43 @@ pub enum Unusable {
     NotPortable,
 }
 
+impl Unusable {
+    /// Returns the exit status the shell should produce for this reason.
+    ///
+    /// This is 126 if the built-in was rejected, and 127 if it effectively does
+    /// not exist as a runnable command.
+    #[must_use]
+    pub const fn exit_status(self) -> ExitStatus {
+        match self {
+            Self::NotInPath => ExitStatus::NOT_FOUND,
+            Self::NotPortable => ExitStatus::NOEXEC,
+        }
+    }
+}
+
+/// Describes the reason without naming the built-in.
+///
+/// The result is a sentence fragment meant to be embedded in an error message
+/// that identifies the built-in, so it does not mention the name itself. It
+/// states what the built-in is and why that makes it unusable, so the message
+/// stands on its own without a title telling the two reasons apart.
+impl std::fmt::Display for Unusable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotInPath => "a substitutive built-in, so it cannot be used unless $PATH has \
+                                an external utility of the same name"
+                .fmt(f),
+            Self::NotPortable => {
+                "not a POSIX built-in, so it cannot be used while the `portable` option is on"
+                    .fmt(f)
+            }
+        }
+    }
+}
+
 /// Reason why the [command search](search) did not yield a target
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum Error {
     /// No command was found with the given name.
     NotFound,
@@ -322,6 +360,34 @@ pub enum Error {
     /// Note that the shell must not fall back to an external utility in this
     /// case: the built-in was found, so the command search is over.
     Unusable(Unusable),
+}
+
+impl Error {
+    /// Returns the exit status the shell should produce for this error.
+    ///
+    /// This is 127 if no command was found, and the
+    /// [`Unusable::exit_status`] if a built-in was found but cannot be
+    /// executed.
+    #[must_use]
+    pub const fn exit_status(self) -> ExitStatus {
+        match self {
+            Self::NotFound => ExitStatus::NOT_FOUND,
+            Self::Unusable(cause) => cause.exit_status(),
+        }
+    }
+}
+
+/// Describes the reason without naming the command.
+///
+/// The result is a sentence fragment meant to be embedded in an error message
+/// that identifies the command, so it does not mention the name itself.
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotFound => "no command with this name".fmt(f),
+            Self::Unusable(cause) => cause.fmt(f),
+        }
+    }
 }
 
 impl From<Unusable> for Error {
@@ -582,6 +648,47 @@ mod tests {
         let builtin = Builtin::new(Substitutive, |_, _| unreachable!());
         env.builtins.insert("foo", builtin);
         assert_eq!(env.builtin("foo"), Some((builtin, Availability::Available)));
+    }
+
+    #[test]
+    fn unusable_exit_status() {
+        assert_eq!(Unusable::NotInPath.exit_status(), ExitStatus(127));
+        assert_eq!(Unusable::NotPortable.exit_status(), ExitStatus(126));
+    }
+
+    #[test]
+    fn unusable_display() {
+        assert_eq!(
+            Unusable::NotInPath.to_string(),
+            "a substitutive built-in, so it cannot be used unless $PATH has an external utility \
+             of the same name",
+        );
+        assert_eq!(
+            Unusable::NotPortable.to_string(),
+            "not a POSIX built-in, so it cannot be used while the `portable` option is on",
+        );
+    }
+
+    #[test]
+    fn error_exit_status() {
+        assert_eq!(Error::NotFound.exit_status(), ExitStatus(127));
+        assert_eq!(
+            Error::Unusable(Unusable::NotInPath).exit_status(),
+            ExitStatus(127),
+        );
+        assert_eq!(
+            Error::Unusable(Unusable::NotPortable).exit_status(),
+            ExitStatus(126),
+        );
+    }
+
+    #[test]
+    fn error_display() {
+        assert_eq!(Error::NotFound.to_string(), "no command with this name");
+        assert_eq!(
+            Error::Unusable(Unusable::NotPortable).to_string(),
+            "not a POSIX built-in, so it cannot be used while the `portable` option is on",
+        );
     }
 
     #[derive(Default)]
