@@ -50,6 +50,7 @@ use crate::Env;
 use crate::builtin::Builtin;
 use crate::builtin::Type;
 use crate::builtin::Type::{Elective, Extension, Mandatory, Special, Substitutive};
+use crate::builtin::is_posix_special_builtin_name;
 use crate::function::Function;
 use crate::option::{On, Portable, PosixlyCorrect};
 use crate::path::PathBuf;
@@ -73,8 +74,8 @@ pub enum Availability {
     /// The built-in may be executed.
     Available,
 
-    /// The built-in is not defined in POSIX, and the
-    /// [`Portable`] option rejects it.
+    /// The built-in, or the name under which it was found, is not defined in
+    /// POSIX, and the [`Portable`] option rejects it.
     NotPortable,
 }
 
@@ -286,9 +287,14 @@ impl<S> ClassifyEnv<S> for Env<S> {
 
         // A built-in that POSIX does not define is found but rejected when the
         // shell must reject non-portable behavior. Unlike an ignored built-in,
-        // it still hides an external utility of the same name.
+        // it still hides an external utility of the same name. This also
+        // applies to a special built-in found under a non-POSIX alias name
+        // (e.g. `source`, an alias for `.`).
         let availability = match builtin.r#type {
             Elective | Extension if self.options.get(Portable) == On => Availability::NotPortable,
+            Special if self.options.get(Portable) == On && !is_posix_special_builtin_name(name) => {
+                Availability::NotPortable
+            }
             Special | Mandatory | Elective | Extension | Substitutive => Availability::Available,
         };
 
@@ -309,8 +315,8 @@ pub enum Unusable {
     /// external utility was found in `$PATH`.
     NotInPath,
 
-    /// The built-in is not defined in POSIX, and the
-    /// [`Portable`] option rejects it.
+    /// The built-in, or the name under which it was found, is not defined in
+    /// POSIX, and the [`Portable`] option rejects it.
     NotPortable,
 }
 
@@ -627,7 +633,7 @@ mod tests {
 
     #[test]
     fn env_builtin_accepts_posix_builtins_if_portable() {
-        for r#type in [Special, Mandatory, Substitutive] {
+        for r#type in [Mandatory, Substitutive] {
             let mut env = Env::new_virtual();
             env.options.set(Portable, On);
             let builtin = Builtin::new(r#type, |_, _| unreachable!());
@@ -638,6 +644,27 @@ mod tests {
                 "type={type:?}"
             );
         }
+    }
+
+    #[test]
+    fn env_builtin_accepts_special_builtin_with_posix_name_if_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, On);
+        let builtin = Builtin::new(Special, |_, _| unreachable!());
+        env.builtins.insert(".", builtin);
+        assert_eq!(env.builtin("."), Some((builtin, Availability::Available)));
+    }
+
+    #[test]
+    fn env_builtin_rejects_special_builtin_with_non_posix_name_if_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, On);
+        let builtin = Builtin::new(Special, |_, _| unreachable!());
+        env.builtins.insert("source", builtin);
+        assert_eq!(
+            env.builtin("source"),
+            Some((builtin, Availability::NotPortable))
+        );
     }
 
     #[test]

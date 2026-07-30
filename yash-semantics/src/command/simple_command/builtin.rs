@@ -426,14 +426,14 @@ mod tests {
 
     #[test]
     fn posix_builtins_are_not_rejected_under_portable_option() {
-        for r#type in [Special, Mandatory] {
+        for (r#type, name) in [(Special, "."), (Mandatory, "alias")] {
             let mut env = Env::new_virtual();
             env.options.set(Portable, On);
             let mut echo_builtin = echo_builtin();
             echo_builtin.r#type = r#type;
-            env.builtins.insert("echo", echo_builtin);
+            env.builtins.insert(name, echo_builtin);
 
-            let command: syntax::SimpleCommand = "echo hello".parse().unwrap();
+            let command: syntax::SimpleCommand = name.parse().unwrap();
             _ = command.execute(&mut env).now_or_never().unwrap();
 
             assert_eq!(env.exit_status, ExitStatus::SUCCESS, "type={type:?}");

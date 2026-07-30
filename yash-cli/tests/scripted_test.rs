@@ -483,6 +483,11 @@ fn source_builtin() {
 }
 
 #[test]
+fn source_builtin_ex() {
+    run("source-y.sh")
+}
+
+#[test]
 fn startup() {
     run("startup-p.sh")
 }
