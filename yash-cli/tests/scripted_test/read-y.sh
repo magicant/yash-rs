@@ -261,3 +261,11 @@ __IN__
 test_O -d -e 4 'invalid option'
 read --no-such-option foo
 __IN__
+
+test_O -d -e 4 'long option name rejected under the portable option' -o portable
+echo value | read --raw-mode foo
+__IN__
+
+test_OE -e 0 'short option name still accepted under the portable option' -o portable
+echo value | read -r foo
+__IN__
