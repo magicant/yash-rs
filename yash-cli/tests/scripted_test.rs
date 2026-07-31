@@ -473,6 +473,11 @@ fn return_builtin() {
 }
 
 #[test]
+fn return_builtin_ex() {
+    run("return-y.sh")
+}
+
+#[test]
 fn set_builtin() {
     run("set-p.sh")
 }
