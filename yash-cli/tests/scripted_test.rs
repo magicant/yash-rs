@@ -247,6 +247,11 @@ fn exit_builtin() {
 }
 
 #[test]
+fn exit_builtin_ex() {
+    run("exit-y.sh")
+}
+
+#[test]
 fn export_builtin() {
     run("export-p.sh")
 }

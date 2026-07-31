@@ -89,3 +89,7 @@ behavior may change in the future.
 
 The `-f`/`--force` option and the suspended-jobs protection are
 non-portable extensions.
+
+(Since 3.3.5) When the [`portable` option](../environment/options.md#portable)
+is set, using the `--force` long option name is rejected with an error.
+Use `-f` instead.
