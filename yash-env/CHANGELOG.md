@@ -42,8 +42,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `semantics::command::search::Target::Builtin` now has an `availability`
   field.
 - `<Env<S> as semantics::command::search::ClassifyEnv<S>>::builtin` now
-  reports `Availability::NotPortable` for an elective or extension built-in
-  when the `Portable` option is on. The built-in is still found, so the
+  reports `Availability::NotPortable` for an elective or extension built-in,
+  or for a special built-in found under a name POSIX does not define as a
+  special built-in name (for example, `source`, a non-standard alias for
+  `.`), when the `Portable` option is on. The built-in is still found, so the
   command search does not fall through to an external utility of the same
   name.
 

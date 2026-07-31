@@ -32,8 +32,11 @@ A _private dependency_ is used internally and not visible to downstream users.
   `command::Identify::result` produce this type, and it also provides the
   exit status that `command::Invoke::execute` uses.
 - `command::Invoke::execute` now fails with an error and exit status 126 when
-  the named command is an elective or extension built-in and the `Portable`
-  option is on. The `-v` and `-V` options do not describe such a built-in.
+  the named command is an elective or extension built-in, or a special
+  built-in found under a name POSIX does not define as a special built-in
+  name (for example, `source`, a non-standard alias for `.`), and the
+  `Portable` option is on. The `-v` and `-V` options do not describe such a
+  built-in.
 - Public dependency versions:
     - yash-env 0.15.5 → 0.16.0
     - yash-semantics (optional) 0.19.0 → 0.20.0

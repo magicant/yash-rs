@@ -20,7 +20,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 - Executing an elective or extension built-in in a simple command now fails
   with an error and exit status 126 when the `Portable` option is on. The
   redirections and assignments in the simple command are still performed
-  before the error is reported.
+  before the error is reported. This also applies to a special built-in
+  invoked under a name POSIX does not define as a special built-in name (for
+  example, `source`, a non-standard alias for the `.` built-in); `.` itself is
+  unaffected.
 - Public dependency versions:
     - yash-env 0.15.4 → 0.16.0
     - yash-syntax 0.23.0 → 0.24.0

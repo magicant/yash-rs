@@ -80,6 +80,18 @@ __IN__
 shown
 __OUT__
 
+test_O -d -e 126 'executing source (non-portable alias for the dot built-in) under the portable option' -o portable
+command source /dev/null
+__IN__
+
+test_OE -e 1 'describing source under the portable option (-v)' -o portable
+command -v source
+__IN__
+
+test_O -d -e 1 'describing source under the portable option (-V)' -o portable
+command -V source
+__IN__
+
 test_oE -e 0 'describing alias (-V)'
 alias a='foo'
 command -V a

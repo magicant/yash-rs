@@ -33,7 +33,7 @@ POSIX.1-2024 defines these special built-ins:
 - [`trap`](trap.md)
 - [`unset`](unset.md)
 
-As an extension, yash-rs also supports [`source`](source.md) as an alias for `.` (dot).
+As an extension, yash-rs also supports [`source`](source.md) as an alias for `.` (dot). (Since 3.3.4) When the [`portable` option](../environment/options.md#portable) is set, invoking the built-in under the name `source` is rejected the same way as an elective or extension built-in below; only `.` may be used.
 
 ### Mandatory built-ins
 
