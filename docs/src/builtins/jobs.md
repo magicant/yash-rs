@@ -89,6 +89,10 @@ $ jobs -p %2
 
 ## Compatibility
 
+The long option names (`--verbose`, `--pgid-only`) are a non-standard extension.
+
+(Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using a long option name is rejected with an error. Use the corresponding short option instead.
+
 The output format may differ between shells. Specifically:
 
 - For a job stopped by `SIGTSTP`, other shells may omit the signal name and simply print `Stopped`.

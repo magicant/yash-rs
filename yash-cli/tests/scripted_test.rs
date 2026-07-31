@@ -347,6 +347,11 @@ fn job_control_ex() {
 }
 
 #[test]
+fn jobs_builtin_ex() {
+    run("jobs-y.sh")
+}
+
+#[test]
 fn kill_builtin_1() {
     run("kill1-p.sh")
 }
