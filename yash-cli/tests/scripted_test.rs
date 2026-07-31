@@ -423,6 +423,11 @@ fn ppid_variable() {
 }
 
 #[test]
+fn pwd_builtin_ex() {
+    run("pwd-y.sh")
+}
+
+#[test]
 fn quotation() {
     run("quote-p.sh")
 }

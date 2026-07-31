@@ -40,6 +40,10 @@ Zero if the path was successfully printed; non-zero otherwise.
 
 POSIX-1.2024 defines the `pwd` utility with the `-L` and `-P` options.
 
+The long option names (`--logical`, `--physical`) are a non-standard extension.
+
+(Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using a long option name is rejected with an error. Use the corresponding short option instead.
+
 POSIX allows `pwd` to apply the `-P` option if the `-L` option is specified and `PWD` is longer than `PATH_MAX`.
 
 The shell sets `PWD` on the [startup](../startup.md) and modifies it in the [`cd` built-in](cd.md). If `PWD` is modified or unset otherwise, the behavior of `cd` and `pwd` is unspecified.
