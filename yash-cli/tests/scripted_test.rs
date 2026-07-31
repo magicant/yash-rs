@@ -569,6 +569,11 @@ fn unset_builtin() {
 }
 
 #[test]
+fn unset_builtin_ex() {
+    run("unset-y.sh")
+}
+
+#[test]
 fn until_loop() {
     run("until-p.sh")
 }
