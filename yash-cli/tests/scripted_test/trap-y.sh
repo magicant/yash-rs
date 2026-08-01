@@ -166,6 +166,14 @@ test_O -d -e 2 'invalid option'
 trap --no-such-option
 __IN__
 
+test_O -d -e 2 'long option name rejected under the portable option' -o portable
+trap --print
+__IN__
+
+test_OE -e 0 'short option name still accepted under the portable option' -o portable
+trap -p >/dev/null
+__IN__
+
 test_O -d -e 2 'missing operand'
 trap -
 __IN__

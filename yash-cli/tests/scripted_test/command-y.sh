@@ -345,6 +345,18 @@ test_O -d -e n 'invalid option'
 command --no-such-option
 __IN__
 
+test_OE -e 0 'long option name accepted as an extension'
+command --path :
+__IN__
+
+test_O -d -e n 'long option name rejected under the portable option' -o portable
+command --path :
+__IN__
+
+test_OE -e 0 'short option name still accepted under the portable option' -o portable
+command -p :
+__IN__
+
 test_OE -e 0 'missing operand (non-POSIX)'
 command
 __IN__

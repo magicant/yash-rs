@@ -175,6 +175,18 @@ test_O -d -e 5 -- '-e without -P'
 cd -e
 __IN__
 
+test_O -e 0 'long option name accepted as an extension'
+cd --physical .
+__IN__
+
+test_O -d -e 5 'long option name rejected under the portable option' -o portable
+cd --physical .
+__IN__
+
+test_O -e 0 'short option name still accepted under the portable option' -o portable
+cd -P .
+__IN__
+
 test_O -e 0 'printing to closed stream'
 OLDPWD=/ cd - >&-
 __IN__

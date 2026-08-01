@@ -45,6 +45,10 @@ See [Removing variables](../language/parameters/variables.md#removing-variables)
 
 The `unset` built-in is specified by POSIX.1-2024.
 
+The long option names (`--functions`, `--variables`) are a non-standard extension.
+
+(Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using a long option name is rejected with an error. Use the corresponding short option instead.
+
 The behavior is not portable when both `-f` and `-v` are specified. Earlier versions of yash used to honor the last specified option, but this version errors out.
 
 If neither `-f` nor `-v` is specified and the variable named by an operand is not set, POSIX allows the built-in to unset the same-named function if it exists. Yash does not do this.

@@ -247,6 +247,11 @@ fn exit_builtin() {
 }
 
 #[test]
+fn exit_builtin_ex() {
+    run("exit-y.sh")
+}
+
+#[test]
 fn export_builtin() {
     run("export-p.sh")
 }
@@ -342,6 +347,11 @@ fn job_control_ex() {
 }
 
 #[test]
+fn jobs_builtin_ex() {
+    run("jobs-y.sh")
+}
+
+#[test]
 fn kill_builtin_1() {
     run("kill1-p.sh")
 }
@@ -413,6 +423,11 @@ fn ppid_variable() {
 }
 
 #[test]
+fn pwd_builtin_ex() {
+    run("pwd-y.sh")
+}
+
+#[test]
 fn quotation() {
     run("quote-p.sh")
 }
@@ -455,6 +470,11 @@ fn redirection_ex() {
 #[test]
 fn return_builtin() {
     run("return-p.sh")
+}
+
+#[test]
+fn return_builtin_ex() {
+    run("return-y.sh")
 }
 
 #[test]
@@ -546,6 +566,11 @@ fn umask_builtin() {
 #[test]
 fn unset_builtin() {
     run("unset-p.sh")
+}
+
+#[test]
+fn unset_builtin_ex() {
+    run("unset-y.sh")
 }
 
 #[test]

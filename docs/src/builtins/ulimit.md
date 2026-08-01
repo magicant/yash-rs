@@ -187,6 +187,10 @@ The `ulimit` built-in is specified by POSIX.1-2024, but some behaviors are imple
 
 Only these options are required by POSIX: `-H`, `-S`, `-a`, `-c`, `-d`, `-f`, `-n`, `-s`, `-t`, and `-v`. Other options are extensions.
 
+The long option names (such as `--hard` and `--soft`) are a non-standard extension.
+
+(Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using a long option name is rejected with an error. Use the corresponding short option instead.
+
 Some shells do not allow combining options (e.g., `ulimit -fH`). For portability, specify options separately (e.g., `ulimit -f -H`).
 
 Shells differ in behavior when both `-H` and `-S` are given. Yash-rs sets or displays both limits; older versions of yash only honored the last one.

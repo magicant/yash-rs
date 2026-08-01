@@ -74,6 +74,10 @@ See [Replacing existing utilities](../language/functions.md#replacing-existing-u
 
 ## Compatibility
 
+The long option names (`--path`, `--identify`, `--verbose-identify`) are a non-standard extension.
+
+(Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using a long option name is rejected with an error. Use the corresponding short option instead.
+
 POSIX requires that the *name* operand be specified, but many
 implementations allow it to be omitted, in which case the built-in does
 nothing.

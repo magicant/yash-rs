@@ -13,6 +13,19 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.23.0] - Unreleased
+
+### Changed
+
+- `common::syntax::Mode::with_env` now enables non-portable option names
+  (currently, long options) based on the `Portable` shell option instead of
+  `PosixlyCorrect`.
+- `common::syntax::Mode::accepts_long_options` and `accept_long_options` have
+  been renamed to `accepts_non_portable_option_names` and
+  `accept_non_portable_option_names`.
+- `common::syntax::ParseError::UnsupportedLongOption` has been renamed to
+  `NonPortableOptionName`.
+
 ## [0.22.0] - 2026-07-31
 
 ### Fixed
@@ -961,6 +974,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
+[0.23.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.23.0
 [0.22.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.22.0
 [0.21.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.21.1
 [0.21.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.21.0

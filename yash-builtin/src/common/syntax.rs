@@ -64,7 +64,7 @@
 
 use std::iter::Peekable;
 use thiserror::Error;
-use yash_env::source::pretty::{Report, ReportType, Snippet};
+use yash_env::source::pretty::{Footnote, FootnoteType, Report, ReportType, Snippet};
 use yash_env::source::{
     Location,
     pretty::{Span, SpanRole, add_span},
@@ -228,7 +228,7 @@ impl OptionSpec<'_> {
 /// ```
 /// # use yash_builtin::common::syntax::Mode;
 /// let mode = Mode::default();
-/// assert!(!mode.accepts_long_options());
+/// assert!(!mode.accepts_non_portable_option_names());
 /// # // TODO other properties
 /// ```
 ///
@@ -238,13 +238,12 @@ impl OptionSpec<'_> {
 /// ```
 /// # use yash_builtin::common::syntax::Mode;
 /// let mode = Mode::with_extensions();
-/// assert!(mode.accepts_long_options());
+/// assert!(mode.accepts_non_portable_option_names());
 /// # // TODO other properties
 /// ```
 #[derive(Clone, Copy, Default, Debug, Eq, PartialEq)]
 pub struct Mode {
-    long_options: bool,
-    // TODO Change long_options to non_portable_option_names
+    non_portable_option_names: bool,
     // TODO options_after_operands
     // TODO negative_integer_operands
 }
@@ -252,29 +251,35 @@ pub struct Mode {
 impl Mode {
     /// Returns a new `Mode` with non-portable extensions enabled.
     pub const fn with_extensions() -> Self {
-        Mode { long_options: true }
+        Mode {
+            non_portable_option_names: true,
+        }
     }
 
     /// Convenience initializer
     ///
     /// This function returns `Self::default()` or `Self::with_extensions()`
-    /// depending on `env.options.get(PosixlyCorrect)`.
+    /// depending on `env.options.get(Portable)`.
     pub fn with_env<S>(env: &yash_env::Env<S>) -> Self {
-        use yash_env::option::{Off, On, PosixlyCorrect};
-        match env.options.get(PosixlyCorrect) {
+        use yash_env::option::{Off, On, Portable};
+        match env.options.get(Portable) {
             On => Self::default(),
             Off => Self::with_extensions(),
         }
     }
 
-    /// Whether the parser accepts long options or not
-    pub const fn accepts_long_options(&self) -> bool {
-        self.long_options
+    /// Whether the parser accepts long option names or not
+    ///
+    /// A long option name (like `--foo`) is a non-portable extension to the
+    /// POSIX Utility Syntax Guidelines, so it is disabled when the `portable`
+    /// shell option is on.
+    pub const fn accepts_non_portable_option_names(&self) -> bool {
+        self.non_portable_option_names
     }
 
-    /// Sets whether the parser accepts long options or not.
-    pub fn accept_long_options(&mut self, accept: bool) -> &mut Self {
-        self.long_options = accept;
+    /// Sets whether the parser accepts long option names or not.
+    pub fn accept_non_portable_option_names(&mut self, accept: bool) -> &mut Self {
+        self.non_portable_option_names = accept;
         self
     }
 }
@@ -312,11 +317,10 @@ pub enum ParseError<'a> {
     #[error("unknown option {:?}", long_option_name(.0))]
     UnknownLongOption(Field),
 
-    // TODO Change this to NonPortableOptionName
-    /// Long option that is defined in an option spec but disabled by
-    /// configuration ([`Mode`]).
-    #[error("unsupported option {:?}", .0.value)]
-    UnsupportedLongOption(Field, &'a OptionSpec<'a>),
+    /// Long option that is defined in an option spec but disabled because
+    /// the `portable` shell option is on (see [`Mode`])
+    #[error("non-portable option {:?}", .0.value)]
+    NonPortableOptionName(Field, &'a OptionSpec<'a>),
 
     /// Long option that matches more than one option spec
     ///
@@ -347,7 +351,7 @@ impl ParseError<'_> {
         match self {
             UnknownShortOption(_char, field) => field,
             UnknownLongOption(field) => field,
-            UnsupportedLongOption(field, _spec) => field,
+            NonPortableOptionName(field, _spec) => field,
             AmbiguousLongOption(field, _specs) => field,
             MissingOptionArgument(field, _spec) => field,
             UnexpectedOptionArgument(field, _spec) => field,
@@ -363,6 +367,13 @@ impl ParseError<'_> {
         report.title = self.to_string().into();
         report.snippets = Snippet::with_primary_span(&field.origin, field.value.as_str().into());
         // TODO provide more info about the erroneous option
+        if let Self::NonPortableOptionName(..) = self {
+            report.footnotes.push(Footnote {
+                r#type: FootnoteType::Note,
+                label: "this error is reported because the `portable` shell option is enabled"
+                    .into(),
+            });
+        }
         report
     }
 }
@@ -495,8 +506,8 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
     };
 
     let spec = match long_match(option_specs, name) {
-        Ok(spec) if mode.accepts_long_options() => spec,
-        Ok(spec) => return Err(ParseError::UnsupportedLongOption(field, spec)),
+        Ok(spec) if mode.accepts_non_portable_option_names() => spec,
+        Ok(spec) => return Err(ParseError::NonPortableOptionName(field, spec)),
         Err(matched_specs) => {
             return Err(if matched_specs.is_empty() {
                 ParseError::UnknownLongOption(field)
@@ -1242,17 +1253,33 @@ mod tests {
     }
 
     #[test]
-    fn disabled_long_option() {
+    fn non_portable_option_name() {
         let specs = &[OptionSpec::new().long("option")];
 
-        let mode = *Mode::with_extensions().accept_long_options(false);
+        let mode = *Mode::with_extensions().accept_non_portable_option_names(false);
         let arguments = Field::dummies(["--option"]);
         let error = parse_arguments(specs, mode, arguments).unwrap_err();
-        assert_matches!(&error, &ParseError::UnsupportedLongOption(ref field, spec) => {
+        assert_matches!(&error, &ParseError::NonPortableOptionName(ref field, spec) => {
             assert_eq!(field.value, "--option");
             assert_eq!(spec, &specs[0]);
         });
-        assert_eq!(error.to_string(), "unsupported option \"--option\"");
+        assert_eq!(error.to_string(), "non-portable option \"--option\"");
+    }
+
+    #[test]
+    fn mode_with_env_accepts_non_portable_option_names_by_default() {
+        let env = yash_env::Env::new_virtual();
+        let mode = Mode::with_env(&env);
+        assert!(mode.accepts_non_portable_option_names());
+    }
+
+    #[test]
+    fn mode_with_env_rejects_non_portable_option_names_if_portable() {
+        use yash_env::option::{Portable, State::On};
+        let mut env = yash_env::Env::new_virtual();
+        env.options.set(Portable, On);
+        let mode = Mode::with_env(&env);
+        assert!(!mode.accepts_non_portable_option_names());
     }
 
     #[test]

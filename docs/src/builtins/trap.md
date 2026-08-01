@@ -97,6 +97,10 @@ trap -- '' INT
 
 The `trap` built-in is specified by POSIX.1-2024.
 
+The `--print` long option name is a non-standard extension.
+
+(Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using it is rejected with an error. Use `-p` instead.
+
 Portable scripts should specify signals in uppercase letters without the `SIG` prefix. Specifying signals by numbers is discouraged as signal numbers vary among systems.
 
 The result of setting a trap to `SIGKILL` or `SIGSTOP` is undefined by POSIX.
