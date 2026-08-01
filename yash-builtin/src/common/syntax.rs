@@ -101,6 +101,7 @@ pub struct OptionSpec<'a> {
     short: Option<char>,
     long: Option<&'a str>,
     argument: OptionArgumentSpec,
+    extension: bool,
 }
 
 impl OptionSpec<'static> {
@@ -110,6 +111,7 @@ impl OptionSpec<'static> {
             short: None,
             long: None,
             argument: OptionArgumentSpec::None,
+            extension: false,
         }
     }
 }
@@ -173,6 +175,34 @@ impl OptionSpec<'_> {
     /// Chained version of [`set_argument`](Self::set_argument)
     pub const fn argument(mut self, argument: OptionArgumentSpec) -> Self {
         self.argument = argument;
+        self
+    }
+}
+
+impl OptionSpec<'_> {
+    /// Returns whether this option is a non-portable extension.
+    ///
+    /// An option marked as an extension does not exist in the POSIX
+    /// specification of the built-in it belongs to, regardless of whether it
+    /// is given a short or long name. When
+    /// [`Mode::accepts_non_portable_option_names`] returns `false`, an
+    /// extension option is rejected even when spelled as a short option.
+    /// This is unlike a long option name, which is always rejected under the
+    /// same condition regardless of whether its underlying option is marked
+    /// as an extension, because POSIX does not define long option names at
+    /// all.
+    pub const fn is_extension(&self) -> bool {
+        self.extension
+    }
+
+    /// Specifies whether this option is a non-portable extension.
+    pub fn set_extension(&mut self, extension: bool) {
+        self.extension = extension;
+    }
+
+    /// Chained version of [`set_extension`](Self::set_extension)
+    pub const fn extension(mut self, extension: bool) -> Self {
+        self.extension = extension;
         self
     }
 }
@@ -268,16 +298,23 @@ impl Mode {
         }
     }
 
-    /// Whether the parser accepts long option names or not
+    /// Whether the parser accepts non-portable option names or not
     ///
-    /// A long option name (like `--foo`) is a non-portable extension to the
-    /// POSIX Utility Syntax Guidelines, so it is disabled when the `portable`
-    /// shell option is on.
+    /// This governs two kinds of options:
+    ///
+    /// - Any long option name (like `--foo`), which is itself a non-portable
+    ///   extension to the POSIX Utility Syntax Guidelines regardless of the
+    ///   underlying option.
+    /// - Any short option whose [`OptionSpec`] is marked as an extension
+    ///   (see [`OptionSpec::is_extension`]), because such an option does not
+    ///   exist in POSIX at all.
     pub const fn accepts_non_portable_option_names(&self) -> bool {
         self.non_portable_option_names
     }
 
-    /// Sets whether the parser accepts long option names or not.
+    /// Sets whether the parser accepts non-portable option names or not.
+    ///
+    /// The default value is `false`.
     pub fn accept_non_portable_option_names(&mut self, accept: bool) -> &mut Self {
         self.non_portable_option_names = accept;
         self
@@ -317,6 +354,12 @@ pub enum ParseError<'a> {
     #[error("unknown option {:?}", long_option_name(.0))]
     UnknownLongOption(Field),
 
+    /// Short option whose spec is marked as a non-portable extension
+    /// ([`OptionSpec::is_extension`]) and is disabled because the
+    /// `portable` shell option is on (see [`Mode`])
+    #[error("non-portable option {0:?}")]
+    NonPortableShortOption(char, Field, &'a OptionSpec<'a>),
+
     /// Long option that is defined in an option spec but disabled because
     /// the `portable` shell option is on (see [`Mode`])
     #[error("non-portable option {:?}", .0.value)]
@@ -351,6 +394,7 @@ impl ParseError<'_> {
         match self {
             UnknownShortOption(_char, field) => field,
             UnknownLongOption(field) => field,
+            NonPortableShortOption(_char, field, _spec) => field,
             NonPortableLongOption(field, _spec) => field,
             AmbiguousLongOption(field, _specs) => field,
             MissingOptionArgument(field, _spec) => field,
@@ -367,7 +411,7 @@ impl ParseError<'_> {
         report.title = self.to_string().into();
         report.snippets = Snippet::with_primary_span(&field.origin, field.value.as_str().into());
         // TODO provide more info about the erroneous option
-        if let Self::NonPortableLongOption(..) = self {
+        if let Self::NonPortableShortOption(..) | Self::NonPortableLongOption(..) = self {
             report.footnotes.push(Footnote {
                 r#type: FootnoteType::Note,
                 label: "this error is reported because the `portable` shell option is enabled"
@@ -395,6 +439,7 @@ impl<'a> From<&'a ParseError<'a>> for Report<'a> {
 /// This function returns `Ok(true)` if consumed one or more fields.
 fn parse_short_options<'a, I: Iterator<Item = Field>>(
     option_specs: &'a [OptionSpec<'a>],
+    mode: Mode,
     arguments: &mut Peekable<I>,
     option_occurrences: &mut Vec<OptionOccurrence<'a>>,
 ) -> Result<bool, ParseError<'a>> {
@@ -416,6 +461,9 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
             None => return Err(ParseError::UnknownShortOption(c, field)),
             Some(spec) => spec,
         };
+        if spec.is_extension() && !mode.accepts_non_portable_option_names() {
+            return Err(ParseError::NonPortableShortOption(c, field, spec));
+        }
         match spec.get_argument() {
             OptionArgumentSpec::None => {
                 option_occurrences.push(OptionOccurrence {
@@ -559,7 +607,7 @@ pub fn parse_arguments<'a>(
 
     let mut option_occurrences = vec![];
     loop {
-        if parse_short_options(option_specs, &mut arguments, &mut option_occurrences)? {
+        if parse_short_options(option_specs, mode, &mut arguments, &mut option_occurrences)? {
             continue;
         }
         if let Some(occurrence) = parse_long_option(option_specs, mode, &mut arguments)? {
@@ -1212,7 +1260,6 @@ mod tests {
 
     // TODO options_are_recognized_after_operand (depending mode)
     // TODO digit_options_are_recognized (depending mode)
-    // TODO rejecting_non_portable_options (depending mode)
 
     #[test]
     fn unknown_short_option() {
@@ -1264,6 +1311,48 @@ mod tests {
             assert_eq!(spec, &specs[0]);
         });
         assert_eq!(error.to_string(), "non-portable option \"--option\"");
+    }
+
+    #[test]
+    fn non_portable_short_option() {
+        let specs = &[OptionSpec::new().short('f').extension(true)];
+
+        let arguments = Field::dummies(["-f"]);
+        let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
+        assert_matches!(&error, &ParseError::NonPortableShortOption(c, ref field, spec) => {
+            assert_eq!(c, 'f');
+            assert_eq!(field.value, "-f");
+            assert_eq!(spec, &specs[0]);
+        });
+        assert_eq!(error.to_string(), "non-portable option 'f'");
+    }
+
+    #[test]
+    fn non_portable_short_option_within_cluster() {
+        let specs = &[
+            OptionSpec::new().short('a'),
+            OptionSpec::new().short('f').extension(true),
+        ];
+
+        let arguments = Field::dummies(["-af"]);
+        let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
+        assert_matches!(&error, &ParseError::NonPortableShortOption(c, ref field, spec) => {
+            assert_eq!(c, 'f');
+            assert_eq!(field.value, "-af");
+            assert_eq!(spec, &specs[1]);
+        });
+    }
+
+    #[test]
+    fn extension_short_option_allowed_with_extensions() {
+        let specs = &[OptionSpec::new().short('f').extension(true)];
+
+        let arguments = Field::dummies(["-f"]);
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
+        assert_eq!(options.len(), 1, "options = {options:?}");
+        assert_eq!(options[0].spec.get_short(), Some('f'));
+        assert_eq!(operands, []);
     }
 
     #[test]

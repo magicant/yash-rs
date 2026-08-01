@@ -15,6 +15,16 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.23.0] - Unreleased
 
+### Added
+
+- `common::syntax::OptionSpec::extension` and `is_extension` for marking an
+  option as a non-portable extension that does not exist in the POSIX
+  specification of the built-in it belongs to, regardless of whether it is
+  given a short or long name.
+- `common::syntax::ParseError::NonPortableShortOption`, returned when a short
+  option marked with `OptionSpec::extension` is used while the `portable`
+  shell option is on.
+
 ### Changed
 
 - `common::syntax::Mode::with_env` now enables non-portable option names
