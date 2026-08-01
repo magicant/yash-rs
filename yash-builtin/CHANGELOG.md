@@ -24,7 +24,7 @@ A _private dependency_ is used internally and not visible to downstream users.
   been renamed to `accepts_non_portable_option_names` and
   `accept_non_portable_option_names`.
 - `common::syntax::ParseError::UnsupportedLongOption` has been renamed to
-  `NonPortableOptionName`.
+  `NonPortableLongOption`.
 
 ## [0.22.0] - 2026-07-31
 

@@ -320,7 +320,7 @@ pub enum ParseError<'a> {
     /// Long option that is defined in an option spec but disabled because
     /// the `portable` shell option is on (see [`Mode`])
     #[error("non-portable option {:?}", .0.value)]
-    NonPortableOptionName(Field, &'a OptionSpec<'a>),
+    NonPortableLongOption(Field, &'a OptionSpec<'a>),
 
     /// Long option that matches more than one option spec
     ///
@@ -351,7 +351,7 @@ impl ParseError<'_> {
         match self {
             UnknownShortOption(_char, field) => field,
             UnknownLongOption(field) => field,
-            NonPortableOptionName(field, _spec) => field,
+            NonPortableLongOption(field, _spec) => field,
             AmbiguousLongOption(field, _specs) => field,
             MissingOptionArgument(field, _spec) => field,
             UnexpectedOptionArgument(field, _spec) => field,
@@ -367,7 +367,7 @@ impl ParseError<'_> {
         report.title = self.to_string().into();
         report.snippets = Snippet::with_primary_span(&field.origin, field.value.as_str().into());
         // TODO provide more info about the erroneous option
-        if let Self::NonPortableOptionName(..) = self {
+        if let Self::NonPortableLongOption(..) = self {
             report.footnotes.push(Footnote {
                 r#type: FootnoteType::Note,
                 label: "this error is reported because the `portable` shell option is enabled"
@@ -507,7 +507,7 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
 
     let spec = match long_match(option_specs, name) {
         Ok(spec) if mode.accepts_non_portable_option_names() => spec,
-        Ok(spec) => return Err(ParseError::NonPortableOptionName(field, spec)),
+        Ok(spec) => return Err(ParseError::NonPortableLongOption(field, spec)),
         Err(matched_specs) => {
             return Err(if matched_specs.is_empty() {
                 ParseError::UnknownLongOption(field)
@@ -1253,13 +1253,13 @@ mod tests {
     }
 
     #[test]
-    fn non_portable_option_name() {
+    fn non_portable_long_option() {
         let specs = &[OptionSpec::new().long("option")];
 
         let mode = *Mode::with_extensions().accept_non_portable_option_names(false);
         let arguments = Field::dummies(["--option"]);
         let error = parse_arguments(specs, mode, arguments).unwrap_err();
-        assert_matches!(&error, &ParseError::NonPortableOptionName(ref field, spec) => {
+        assert_matches!(&error, &ParseError::NonPortableLongOption(ref field, spec) => {
             assert_eq!(field.value, "--option");
             assert_eq!(spec, &specs[0]);
         });
