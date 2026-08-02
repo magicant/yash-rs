@@ -52,7 +52,10 @@ use yash_env::system::concurrency::WriteAll;
 
 // TODO Split into syntax and semantics submodules
 
-const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('n').long("no-return")];
+const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new()
+    .short('n')
+    .long("no-return")
+    .extension(true)];
 
 async fn operand_parse_error<S>(
     env: &mut Env<S>,

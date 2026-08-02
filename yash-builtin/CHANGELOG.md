@@ -37,6 +37,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   `NonPortableLongOption`.
 - The `exit` built-in (`exit::main`) now rejects its `-f` option, in addition
   to `--force`, when the `portable` shell option is on.
+- The `return` built-in (`return::main`) now rejects its `-n` option, in
+  addition to `--no-return`, when the `portable` shell option is on.
 
 ## [0.22.0] - 2026-07-31
 
