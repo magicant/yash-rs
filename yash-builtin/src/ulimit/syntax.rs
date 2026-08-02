@@ -123,20 +123,26 @@ const OPTION_SPECS: &[OptionSpec] = &[
     OptionSpec::new().short('t').long("cpu"),
     OptionSpec::new().short('d').long("data"),
     OptionSpec::new().short('f').long("fsize"),
-    OptionSpec::new().short('k').long("kqueues"),
-    OptionSpec::new().short('x').long("locks"),
-    OptionSpec::new().short('l').long("memlock"),
-    OptionSpec::new().short('q').long("msgqueue"),
-    OptionSpec::new().short('e').long("nice"),
+    OptionSpec::new().short('k').long("kqueues").extension(true),
+    OptionSpec::new().short('x').long("locks").extension(true),
+    OptionSpec::new().short('l').long("memlock").extension(true),
+    OptionSpec::new()
+        .short('q')
+        .long("msgqueue")
+        .extension(true),
+    OptionSpec::new().short('e').long("nice").extension(true),
     OptionSpec::new().short('n').long("nofile"),
-    OptionSpec::new().short('u').long("nproc"),
-    OptionSpec::new().short('m').long("rss"),
-    OptionSpec::new().short('r').long("rtprio"),
-    OptionSpec::new().short('R').long("rttime"),
-    OptionSpec::new().short('b').long("sbsize"),
-    OptionSpec::new().short('i').long("sigpending"),
+    OptionSpec::new().short('u').long("nproc").extension(true),
+    OptionSpec::new().short('m').long("rss").extension(true),
+    OptionSpec::new().short('r').long("rtprio").extension(true),
+    OptionSpec::new().short('R').long("rttime").extension(true),
+    OptionSpec::new().short('b').long("sbsize").extension(true),
+    OptionSpec::new()
+        .short('i')
+        .long("sigpending")
+        .extension(true),
     OptionSpec::new().short('s').long("stack"),
-    OptionSpec::new().short('w').long("swap"),
+    OptionSpec::new().short('w').long("swap").extension(true),
 ];
 
 /// Parses command line arguments.

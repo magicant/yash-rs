@@ -24,6 +24,54 @@ test_OE -e 0 'short option name still accepted under the portable option' -o por
 ulimit -H >/dev/null
 __IN__
 
+test_O -d -e 2 'resource option -b (sbsize) rejected under the portable option' -o portable
+ulimit -b
+__IN__
+
+test_O -d -e 2 'resource option -e (nice) rejected under the portable option' -o portable
+ulimit -e
+__IN__
+
+test_O -d -e 2 'resource option -i (sigpending) rejected under the portable option' -o portable
+ulimit -i
+__IN__
+
+test_O -d -e 2 'resource option -k (kqueues) rejected under the portable option' -o portable
+ulimit -k
+__IN__
+
+test_O -d -e 2 'resource option -l (memlock) rejected under the portable option' -o portable
+ulimit -l
+__IN__
+
+test_O -d -e 2 'resource option -m (rss) rejected under the portable option' -o portable
+ulimit -m
+__IN__
+
+test_O -d -e 2 'resource option -q (msgqueue) rejected under the portable option' -o portable
+ulimit -q
+__IN__
+
+test_O -d -e 2 'resource option -r (rtprio) rejected under the portable option' -o portable
+ulimit -r
+__IN__
+
+test_O -d -e 2 'resource option -R (rttime) rejected under the portable option' -o portable
+ulimit -R
+__IN__
+
+test_O -d -e 2 'resource option -u (nproc) rejected under the portable option' -o portable
+ulimit -u
+__IN__
+
+test_O -d -e 2 'resource option -w (swap) rejected under the portable option' -o portable
+ulimit -w
+__IN__
+
+test_O -d -e 2 'resource option -x (locks) rejected under the portable option' -o portable
+ulimit -x
+__IN__
+
 test_O -d -e 2 'specifying -a and -f at once'
 ulimit -a -f
 __IN__

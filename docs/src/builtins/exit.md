@@ -91,5 +91,5 @@ The `-f`/`--force` option and the suspended-jobs protection are
 non-portable extensions.
 
 (Since 3.3.5) When the [`portable` option](../environment/options.md#portable)
-is set, using the `--force` long option name is rejected with an error.
-Use `-f` instead.
+is set, using the `-f`/`--force` option, in either spelling, is rejected with
+an error, because the option itself is not defined by POSIX.

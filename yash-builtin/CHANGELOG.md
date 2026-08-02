@@ -15,16 +15,34 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.23.0] - Unreleased
 
+### Added
+
+- `common::syntax::OptionSpec::extension` and `is_extension` for marking an
+  option as a non-portable extension that does not exist in the POSIX
+  specification of the built-in it belongs to, regardless of whether it is
+  given a short or long name.
+- `common::syntax::ParseError::NonPortableShortOption`, returned when a short
+  option marked with `OptionSpec::extension` is used while the `portable`
+  shell option is on.
+
 ### Changed
 
-- `common::syntax::Mode::with_env` now enables non-portable option names
-  (currently, long options) based on the `Portable` shell option instead of
-  `PosixlyCorrect`.
+- `common::syntax::Mode::with_env` now enables non-portable option names,
+  including long options and extension-marked short options, based on the
+  `Portable` shell option instead of `PosixlyCorrect`.
 - `common::syntax::Mode::accepts_long_options` and `accept_long_options` have
-  been renamed to `accepts_non_portable_option_names` and
-  `accept_non_portable_option_names`.
+  been removed. The option is now controlled directly through the public
+  `non_portable_option_names` field of `Mode`.
 - `common::syntax::ParseError::UnsupportedLongOption` has been renamed to
-  `NonPortableOptionName`.
+  `NonPortableLongOption`.
+- The `exit` built-in (`exit::main`) now rejects its `-f` option, in addition
+  to `--force`, when the `portable` shell option is on.
+- The `return` built-in (`return::main`) now rejects its `-n` option, in
+  addition to `--no-return`, when the `portable` shell option is on.
+- The `ulimit` built-in (`ulimit::main`) now rejects its `-b`, `-e`, `-i`,
+  `-k`, `-l`, `-m`, `-q`, `-r`, `-R`, `-u`, `-w`, and `-x` options, in
+  addition to their long spellings, when the `portable` shell option is on.
+  These options are not required by POSIX.
 
 ## [0.22.0] - 2026-07-31
 

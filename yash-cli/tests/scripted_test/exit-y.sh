@@ -8,6 +8,6 @@ test_O -d -e 2 'long option name rejected under the portable option' -o portable
 exit --force 3
 __IN__
 
-test_OE -e 3 'short option name still accepted under the portable option' -o portable
+test_O -d -e 2 'short option name also rejected under the portable option' -o portable
 exit -f 3
 __IN__

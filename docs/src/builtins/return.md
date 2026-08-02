@@ -58,8 +58,8 @@ In some shells, the `return` built-in lacks support for the [`--` separator](ind
 The `-n` (`--no-return`) option is a non-standard extension.
 
 (Since 3.3.5) When the [`portable` option](../environment/options.md#portable)
-is set, using the `--no-return` long option name is rejected with an error.
-Use `-n` instead.
+is set, using the `-n`/`--no-return` option, in either spelling, is rejected
+with an error, because the option itself is not defined by POSIX.
 
 The behavior is unspecified in POSIX if *exit_status* is greater than 255.
 The current implementation passes such a value as is in the result, but this

@@ -189,7 +189,7 @@ Only these options are required by POSIX: `-H`, `-S`, `-a`, `-c`, `-d`, `-f`, `-
 
 The long option names (such as `--hard` and `--soft`) are a non-standard extension.
 
-(Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using a long option name is rejected with an error. Use the corresponding short option instead.
+(Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using a long option name is rejected with an error; use the corresponding short option instead. However, the options that are themselves extensions (`-b`, `-e`, `-i`, `-k`, `-l`, `-m`, `-q`, `-r`, `-R`, `-u`, `-w`, and `-x`) are rejected under `portable` regardless of whether they are spelled as a short or long option, because POSIX does not define them at all.
 
 Some shells do not allow combining options (e.g., `ulimit -fH`). For portability, specify options separately (e.g., `ulimit -f -H`).
 
