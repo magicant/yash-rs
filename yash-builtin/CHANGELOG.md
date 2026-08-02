@@ -27,9 +27,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
-- `common::syntax::Mode::with_env` now enables non-portable option names
-  (currently, long options) based on the `Portable` shell option instead of
-  `PosixlyCorrect`.
+- `common::syntax::Mode::with_env` now enables non-portable option names,
+  including long options and extension-marked short options, based on the
+  `Portable` shell option instead of `PosixlyCorrect`.
 - `common::syntax::Mode::accepts_long_options` and `accept_long_options` have
   been removed. The option is now controlled directly through the public
   `non_portable_option_names` field of `Mode`.
