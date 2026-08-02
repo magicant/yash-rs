@@ -31,8 +31,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   (currently, long options) based on the `Portable` shell option instead of
   `PosixlyCorrect`.
 - `common::syntax::Mode::accepts_long_options` and `accept_long_options` have
-  been renamed to `accepts_non_portable_option_names` and
-  `accept_non_portable_option_names`.
+  been removed. The option is now controlled directly through the public
+  `non_portable_option_names` field of `Mode`.
 - `common::syntax::ParseError::UnsupportedLongOption` has been renamed to
   `NonPortableLongOption`.
 
