@@ -27,10 +27,10 @@ for package do
 done
 
 # Ensure that all required updates are included in the release
-# (For example, if yash-env is included in $@, yash-env depends on yash-syntax,
-# and the version of yash-syntax specified in the Cargo.toml of yash-env is not
-# yet released, we need to release yash-syntax first. If yash-syntax is not
-# included in $@, we bail out.)
+# (For example, if yash-semantics is included in $@, yash-semantics depends on
+# yash-env, and the version of yash-env specified in the Cargo.toml is not yet
+# released, we need to release yash-env first. If yash-env is not included in
+# $@, we bail out.)
 ## List all the direct dependencies of the packages being released
 for package do
     cargo metadata --format-version=1 --no-deps --all-features |
