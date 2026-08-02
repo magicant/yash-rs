@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - With `portable` enabled, a long option (for example, `--physical` for the `cd` built-in) passed to a built-in that defines one is now rejected as an error, instead of being accepted as an extension.
 - With `portable` enabled, the `exit` built-in's `-f` option is now rejected as an error, instead of being accepted as an extension.
 - With `portable` enabled, the `return` built-in's `-n` option is now rejected as an error, instead of being accepted as an extension.
+- With `portable` enabled, the `ulimit` built-in's non-POSIX resource options (`-b`, `-e`, `-i`, `-k`, `-l`, `-m`, `-q`, `-r`, `-R`, `-u`, `-w`, and `-x`) are now rejected as errors, instead of being accepted as extensions.
 
 ## [3.3.4] - 2026-07-31
 

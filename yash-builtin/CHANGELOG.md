@@ -39,6 +39,10 @@ A _private dependency_ is used internally and not visible to downstream users.
   to `--force`, when the `portable` shell option is on.
 - The `return` built-in (`return::main`) now rejects its `-n` option, in
   addition to `--no-return`, when the `portable` shell option is on.
+- The `ulimit` built-in (`ulimit::main`) now rejects its `-b`, `-e`, `-i`,
+  `-k`, `-l`, `-m`, `-q`, `-r`, `-R`, `-u`, `-w`, and `-x` options, in
+  addition to their long spellings, when the `portable` shell option is on.
+  These options are not required by POSIX.
 
 ## [0.22.0] - 2026-07-31
 
