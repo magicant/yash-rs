@@ -74,7 +74,7 @@ use yash_env::source::Location;
 use yash_env::system::Isatty;
 use yash_env::system::concurrency::WriteAll;
 
-const OPTIONS: &[OptionSpec] = &[OptionSpec::new().short('f').long("force")];
+const OPTIONS: &[OptionSpec] = &[OptionSpec::new().short('f').long("force").extension(true)];
 
 // TODO Split into syntax and semantics submodules
 

@@ -35,6 +35,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   `non_portable_option_names` field of `Mode`.
 - `common::syntax::ParseError::UnsupportedLongOption` has been renamed to
   `NonPortableLongOption`.
+- The `exit` built-in (`exit::main`) now rejects its `-f` option, in addition
+  to `--force`, when the `portable` shell option is on.
 
 ## [0.22.0] - 2026-07-31
 
