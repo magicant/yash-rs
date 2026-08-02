@@ -39,28 +39,35 @@ done |
 ## Remove duplicates
 sort -u |
 ## Check each dependency
-while read -r dependency version; do
-    ## If we're releasing the dependency as well, that's fine
-    case " $* " in
-        (*" $dependency "*)
+{
+    missing_dependency=false
+    while read -r dependency version; do
+        ## If we're releasing the dependency as well, that's fine
+        case " $* " in
+            (*" $dependency "*)
+                continue
+                ;;
+        esac
+
+        ## Trim the '^' from the version specification
+        version=${version#^}
+
+        ## Check if the dependency is already released
+        ## (This cargo command must be run outside this workspace,
+        ## otherwise it will always find the dependency in the workspace.)
+        if (cd / && cargo info --quiet "$dependency@$version" >/dev/null); then
             continue
-            ;;
-    esac
+        fi
 
-    ## Trim the '^' from the version specification
-    version=${version#^}
-    
-    ## Check if the dependency is already released
-    ## (This cargo command must be run outside this workspace,
-    ## otherwise it will always find the dependency in the workspace.)
-    if (cd / && cargo info --quiet "$dependency@$version" >/dev/null); then
-        continue
+        printf 'error: %s %s is not released yet\n' "$dependency" "$version" >&2
+        missing_dependency=true
+    done
+
+    if "$missing_dependency"; then
+        printf 'add the missing packages to the operands and try again\n' >&2
+        exit 1
     fi
-
-    printf 'error: %s %s is not released yet\n' "$dependency" "$version" >&2
-    printf 'add it to the list of packages to release and try again\n' >&2
-    exit 1
-done
+}
 
 # Write the current date in CHANGELOG.md
 today=$(date +%Y-%m-%d)
