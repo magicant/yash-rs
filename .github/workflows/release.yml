@@ -52,6 +52,6 @@ jobs:
           bin: yash3
           target: ${{ matrix.target }}
           token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/attest@v4.2.0
+      - uses: actions/attest@v4.2.2
         with:
           subject-path: ${{ github.workspace }}/${{ steps.build.outputs.archive }}.*
