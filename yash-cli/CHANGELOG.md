@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - With `portable` enabled, the `exit` built-in's `-f` option is now rejected as an error, instead of being accepted as an extension.
 - With `portable` enabled, the `return` built-in's `-n` option is now rejected as an error, instead of being accepted as an extension.
 - With `portable` enabled, the `ulimit` built-in's non-POSIX resource options (`-b`, `-e`, `-i`, `-k`, `-l`, `-m`, `-q`, `-r`, `-R`, `-u`, `-w`, and `-x`) are now rejected as errors, instead of being accepted as extensions.
+- With `portable` enabled, the `set` built-in now accepts only the option spellings POSIX specifies. The `--name` and `++name` forms, abbreviated and case-insensitive `-o` names, `no`-prefixed names, and names POSIX spells in the opposite state (such as `set -o clobber`, which POSIX spells `set +o noclobber`) are rejected as errors. The `set -o portable` and `set +o portable` spellings remain accepted so that the option can be turned off again, and the arguments are examined in order, so options written before `-o portable` are not checked.
 
 ## [3.3.4] - 2026-07-31
 

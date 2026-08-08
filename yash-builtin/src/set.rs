@@ -156,7 +156,7 @@ where
 {
     use std::fmt::Write as _;
 
-    match syntax::parse(args) {
+    match syntax::parse(args, env.options.get(yash_env::option::Option::Portable)) {
         Ok(Command::PrintVariables) => {
             let IsName(is_name) = env.any.get().expect("`IsName` should be in `env.any`");
             let mut vars: Vec<_> = env

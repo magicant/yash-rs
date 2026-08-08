@@ -99,6 +99,8 @@ $ echo $#
 
 The `set` built-in is specified by POSIX.1-2024. See [Compatibility](../environment/options.md#compatibility) for the compatibility of the option syntax and available options.
 
+(Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, the built-in accepts only the option spellings POSIX specifies and rejects the rest with an error.
+
 The output format of `set -o` and `set +o` depends on the shell.
 
 The semantics of `-` as an option-operand separator is unspecified in POSIX. You should prefer `--`. Older versions of yash treated `-` simply as an operand.

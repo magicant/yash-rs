@@ -483,6 +483,11 @@ fn set_builtin() {
 }
 
 #[test]
+fn set_builtin_ex() {
+    run("set-y.sh")
+}
+
+#[test]
 fn shift_builtin() {
     run("shift-p.sh")
 }

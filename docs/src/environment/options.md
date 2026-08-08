@@ -248,6 +248,8 @@ Below is a list of all shell options in yash-rs, with their long and short names
 
 The syntax and options specified in POSIX.1-2024 are much more limited than those in yash-rs. For portable scripts, use only POSIX-specified syntax and options.
 
+(Since 3.3.5) The [`portable` option](#portable) makes the [`set` built-in](../builtins/set.md) reject anything outside the lists below, so you can check a script for accidental use of an extension.
+
 POSIX.1-2024 syntax:
 
 - Enable a long option: `set -o optionname` (no `--` prefix).
