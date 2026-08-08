@@ -36,6 +36,10 @@ test_O -d -e 2 'shell invocation rejects abbreviated -o name under the portable 
 echo not reached
 __IN__
 
+test_O -d -e 2 'shell invocation rejects -o argument attached to the option name' -o portable -oerrexit
+echo not reached
+__IN__
+
 test_O -d -e 2 'shell invocation rejects short option POSIX does not specify' -o portable -l
 echo not reached
 __IN__

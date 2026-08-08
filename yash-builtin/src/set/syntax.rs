@@ -80,6 +80,15 @@ pub enum Error {
         Field,
         std::option::Option<(yash_env::option::Option, State)>,
     ),
+
+    /// `-o` or `+o` whose argument is not a separate field
+    ///
+    /// POSIX requires conforming applications to specify an option argument as
+    /// a separate argument, so this error occurs only while the `portable`
+    /// shell option is on. The second item is the separated spelling of the
+    /// field.
+    #[error("option argument not separated from the option name in {:?}", .0.value)]
+    UnseparatedOptionArgument(Field, String),
 }
 
 /// Returns whether the given `-o` option name is one POSIX specifies.
@@ -131,6 +140,7 @@ impl Error {
             Error::UnmodifiableLongOption(field) => field,
             Error::NonPortableShortOption(_char, field) => field,
             Error::NonPortableLongOption(field, _option) => field,
+            Error::UnseparatedOptionArgument(field, _spelling) => field,
         }
     }
 
@@ -144,7 +154,10 @@ impl Error {
         let field = self.field();
         report.snippets = Snippet::with_primary_span(&field.origin, field.value.as_str().into());
 
-        if let Error::NonPortableShortOption(..) | Error::NonPortableLongOption(..) = self {
+        if let Error::NonPortableShortOption(..)
+        | Error::NonPortableLongOption(..)
+        | Error::UnseparatedOptionArgument(..) = self
+        {
             report.footnotes.push(Footnote {
                 r#type: FootnoteType::Note,
                 label: "this error is reported because the `portable` shell option is enabled"
@@ -152,9 +165,14 @@ impl Error {
             });
         }
 
-        if let Error::NonPortableLongOption(_field, Some((option, state))) = self
-            && let Some(spelling) = portable_spelling(*option, *state)
-        {
+        let spelling = match self {
+            Error::NonPortableLongOption(_field, Some((option, state))) => {
+                portable_spelling(*option, *state)
+            }
+            Error::UnseparatedOptionArgument(_field, spelling) => Some(spelling.clone()),
+            _ => None,
+        };
+        if let Some(spelling) = spelling {
             report.footnotes.push(Footnote {
                 r#type: FootnoteType::Suggestion,
                 label: format!("use `{spelling}` instead").into(),
@@ -209,24 +227,35 @@ fn try_parse_short<I: Iterator<Item = Field>>(
     while let Some(c) = chars.next() {
         if c == 'o' {
             let attached = chars.as_str();
-            let raw_name = if attached.is_empty() {
+            // Byte index where the attached option argument starts,
+            // or `None` if the option argument is a separate field
+            let attached_index = if attached.is_empty() {
                 let prev = field;
                 field = args.next().ok_or(Error::MissingOptionArgument(prev))?;
-                field.value.clone()
+                None
             } else {
-                attached.to_owned()
+                Some(field.value.len() - attached.len())
             };
-            let name = canonicalize(&raw_name);
+            let raw_name = &field.value[attached_index.unwrap_or(0)..];
+            let name = canonicalize(raw_name);
             match parse_long(&name) {
                 Ok((option, name_state)) if option.is_modifiable() => {
                     let new_state = if negate { !name_state } else { name_state };
                     if *portable == State::On
-                        && !is_portable_long_name(&raw_name, option, name_state)
+                        && !is_portable_long_name(raw_name, option, name_state)
                     {
                         return Err(Error::NonPortableLongOption(
                             field,
                             Some((option, new_state)),
                         ));
+                    }
+                    if *portable == State::On
+                        && let Some(index) = attached_index
+                    {
+                        // How this field would read with the option argument separated
+                        let spelling =
+                            format!("{} {}", &field.value[..index], &field.value[index..]);
+                        return Err(Error::UnseparatedOptionArgument(field, spelling));
                     }
                     if option == Portable {
                         *portable = new_state;
@@ -1183,6 +1212,45 @@ mod tests {
         assert_eq!(suggestion(&["-o", "hashondefinition"]), "use `-h` instead");
         assert_eq!(suggestion(&["--portable"]), "use `-o portable` instead");
         assert_eq!(suggestion(&["++portable"]), "use `+o portable` instead");
+    }
+
+    #[test]
+    fn portable_rejects_option_argument_attached_to_the_option_name() {
+        for (args, spelling) in [
+            (["-oerrexit"], "-o errexit"),
+            (["-aoerrexit"], "-ao errexit"),
+            (["+onoclobber"], "+o noclobber"),
+            (["-oportable"], "-o portable"),
+        ] {
+            assert_matches!(
+                parse(Field::dummies(args), On),
+                Err(Error::UnseparatedOptionArgument(field, suggested)) => {
+                    assert_eq!(field.value, args[0]);
+                    assert_eq!(suggested, spelling);
+                },
+                "{args:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn non_portable_option_name_is_reported_before_the_attached_argument() {
+        assert_matches!(
+            parse(Field::dummies(["-oclobber"]), On),
+            Err(Error::NonPortableLongOption(_field, _option))
+        );
+    }
+
+    #[test]
+    fn unseparated_option_argument_error_reports_the_reason_and_spelling() {
+        let error = parse(Field::dummies(["-oerrexit"]), On).unwrap_err();
+        let footnotes = error.to_report().footnotes;
+        assert_eq!(footnotes.len(), 2);
+        assert_eq!(
+            footnotes[0].label,
+            "this error is reported because the `portable` shell option is enabled"
+        );
+        assert_eq!(footnotes[1].label, "use `-o errexit` instead");
     }
 
     #[test]

@@ -28,6 +28,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   `set::syntax::Error::NonPortableLongOption`, returned when the `set` built-in
   is given an option name that POSIX does not specify while the `portable`
   shell option is on.
+- `set::syntax::Error::UnseparatedOptionArgument`, returned when the argument
+  to `-o` or `+o` is not a separate field while the `portable` shell option is
+  on.
 
 ### Changed
 

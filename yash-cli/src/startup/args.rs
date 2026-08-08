@@ -154,6 +154,21 @@ pub enum Error {
     /// effect, if there is one.
     #[error("non-portable option name `{}`{}", .0, suggestion(.1))]
     NonPortableLongOption(String, Option<String>),
+
+    /// `-o` or `+o` whose argument is not a separate argument
+    ///
+    /// POSIX requires conforming applications to specify an option argument as
+    /// a separate argument, so this error occurs only while the `portable`
+    /// shell option is on.
+    #[error(
+        "option argument not separated from the option name in `{argument}`; use `{separated_spelling}` instead"
+    )]
+    UnseparatedOptionArgument {
+        /// The offending command line argument
+        argument: String,
+        /// The same argument with the option argument separated
+        separated_spelling: String,
+    },
 }
 
 /// Formats the trailing clause of [`Error::NonPortableLongOption`].
@@ -373,24 +388,37 @@ fn try_parse_short<I: Iterator<Item = String>>(
         }
         if c == 'o' {
             let attached = chars.as_str();
-            let raw_name = if attached.is_empty() {
+            // Byte index where the attached option argument starts,
+            // or `None` if the option argument is a separate argument
+            let attached_index = if attached.is_empty() {
                 let prev = arg;
                 arg = args.next().ok_or(Error::MissingOptionArgument(prev))?;
-                arg.clone()
+                None
             } else {
-                attached.to_owned()
+                Some(arg.len() - attached.len())
             };
-            let name = canonicalize(&raw_name);
+            let raw_name = &arg[attached_index.unwrap_or(0)..];
+            let name = canonicalize(raw_name);
             match parse_long(&name) {
                 Ok((option, name_state)) => {
                     let new_state = if negate { !name_state } else { name_state };
                     if *portable == State::On
-                        && !is_portable_long_name(&raw_name, option, name_state)
+                        && !is_portable_long_name(raw_name, option, name_state)
                     {
                         return Err(Error::NonPortableLongOption(
-                            raw_name,
+                            raw_name.to_owned(),
                             portable_spelling(option, new_state),
                         ));
+                    }
+                    if *portable == State::On
+                        && let Some(index) = attached_index
+                    {
+                        // How this argument would read with the option argument separated
+                        let separated_spelling = format!("{} {}", &arg[..index], &arg[index..]);
+                        return Err(Error::UnseparatedOptionArgument {
+                            argument: arg,
+                            separated_spelling,
+                        });
                     }
                     if option == ShellOption::Portable {
                         *portable = new_state;
@@ -1537,6 +1565,33 @@ mod tests {
         assert_eq!(
             parse(["yash", "-o", "portable", "-Z"]),
             Err(Error::UnknownShortOption('Z')),
+        );
+    }
+
+    #[test]
+    fn portable_rejects_option_argument_attached_to_the_option_name() {
+        for (arg, separated) in [
+            ("-oerrexit", "-o errexit"),
+            ("-aoerrexit", "-ao errexit"),
+            ("+onoclobber", "+o noclobber"),
+            ("-oportable", "-o portable"),
+        ] {
+            assert_eq!(
+                parse(["yash", "-o", "portable", arg]),
+                Err(Error::UnseparatedOptionArgument {
+                    argument: arg.to_string(),
+                    separated_spelling: separated.to_string()
+                }),
+                "{arg}"
+            );
+        }
+    }
+
+    #[test]
+    fn non_portable_option_name_is_reported_before_the_attached_argument() {
+        assert_matches!(
+            parse(["yash", "-o", "portable", "-oclobber"]),
+            Err(Error::NonPortableLongOption(..))
         );
     }
 

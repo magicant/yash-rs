@@ -20,6 +20,10 @@ test_O -d -e 2 'set built-in rejects -o name in wrong case under the portable op
 set -o ERREXIT
 __IN__
 
+test_O -d -e 2 'set built-in rejects -o argument attached to the option name' -o portable
+set -oerrexit
+__IN__
+
 test_O -d -e 2 'set built-in rejects -o name POSIX does not specify' -o portable
 set -o posixlycorrect
 __IN__
