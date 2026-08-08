@@ -187,6 +187,44 @@ impl Option {
         }
     }
 
+    /// Returns the single-character option name specified by POSIX.
+    ///
+    /// This function is like [`short_name`](Self::short_name), but returns
+    /// `None` for an option whose short name is not specified by POSIX. The
+    /// result is otherwise the same as `short_name`.
+    ///
+    /// ```
+    /// # use yash_env::option::*;
+    /// assert_eq!(ErrExit.portable_short_name(), Some(('e', On)));
+    /// assert_eq!(Clobber.portable_short_name(), Some(('C', Off)));
+    /// assert_eq!(Login.portable_short_name(), None);
+    /// ```
+    ///
+    /// Note that the names returned by this function are the ones POSIX
+    /// specifies for the shell invocation. The `set` built-in accepts a subset
+    /// of them: POSIX does not allow `-c`, `-i`, and `-s` for the built-in.
+    /// Use [`is_modifiable`](Self::is_modifiable) to exclude those.
+    #[must_use]
+    pub const fn portable_short_name(self) -> std::option::Option<(char, State)> {
+        match self {
+            AllExport => Some(('a', On)),
+            Clobber => Some(('C', Off)),
+            CmdLine => Some(('c', On)),
+            ErrExit => Some(('e', On)),
+            Exec => Some(('n', Off)),
+            Glob => Some(('f', Off)),
+            HashOnDefinition => Some(('h', On)),
+            Interactive => Some(('i', On)),
+            Monitor => Some(('m', On)),
+            Notify => Some(('b', On)),
+            Stdin => Some(('s', On)),
+            Unset => Some(('u', Off)),
+            Verbose => Some(('v', On)),
+            XTrace => Some(('x', On)),
+            IgnoreEof | Log | Login | PipeFail | Portable | PosixlyCorrect | Vi => None,
+        }
+    }
+
     /// Returns the option name, all in lower case without punctuations.
     ///
     /// This function returns a string like `"allexport"` and `"exec"`.
@@ -215,6 +253,46 @@ impl Option {
             Verbose => "verbose",
             Vi => "vi",
             XTrace => "xtrace",
+        }
+    }
+
+    /// Returns the option name specified by POSIX for the `-o` option.
+    ///
+    /// This function returns the name POSIX defines for the option and the
+    /// state rendered by the name, or `None` if POSIX defines no name for the
+    /// option. Unlike [`long_name`](Self::long_name), which always names the
+    /// enabled state, POSIX names some options in their disabled state, so the
+    /// returned name may differ from the one `long_name` returns.
+    ///
+    /// ```
+    /// # use yash_env::option::*;
+    /// assert_eq!(ErrExit.portable_long_name(), Some(("errexit", On)));
+    /// assert_eq!(Clobber.long_name(), "clobber");
+    /// assert_eq!(Clobber.portable_long_name(), Some(("noclobber", Off)));
+    /// assert_eq!(Login.portable_long_name(), None);
+    /// ```
+    ///
+    /// The name can be converted back to `Option` with [`parse_long`], which
+    /// yields the same state as this function returns.
+    #[must_use]
+    pub const fn portable_long_name(self) -> std::option::Option<(&'static str, State)> {
+        match self {
+            AllExport => Some(("allexport", On)),
+            Clobber => Some(("noclobber", Off)),
+            ErrExit => Some(("errexit", On)),
+            Exec => Some(("noexec", Off)),
+            Glob => Some(("noglob", Off)),
+            IgnoreEof => Some(("ignoreeof", On)),
+            Log => Some(("nolog", Off)),
+            Monitor => Some(("monitor", On)),
+            Notify => Some(("notify", On)),
+            PipeFail => Some(("pipefail", On)),
+            Unset => Some(("nounset", Off)),
+            Verbose => Some(("verbose", On)),
+            Vi => Some(("vi", On)),
+            XTrace => Some(("xtrace", On)),
+            CmdLine | HashOnDefinition | Interactive | Login | Portable | PosixlyCorrect
+            | Stdin => None,
         }
     }
 }
@@ -519,6 +597,74 @@ mod tests {
         for name in 'A'..='z' {
             if let Some((option, state)) = parse_short(name) {
                 assert_eq!(option.short_name(), Some((name, state)));
+            }
+        }
+    }
+
+    #[test]
+    fn portable_short_names() {
+        assert_eq!(AllExport.portable_short_name(), Some(('a', On)));
+        assert_eq!(Clobber.portable_short_name(), Some(('C', Off)));
+        assert_eq!(CmdLine.portable_short_name(), Some(('c', On)));
+        assert_eq!(ErrExit.portable_short_name(), Some(('e', On)));
+        assert_eq!(Exec.portable_short_name(), Some(('n', Off)));
+        assert_eq!(Glob.portable_short_name(), Some(('f', Off)));
+        assert_eq!(HashOnDefinition.portable_short_name(), Some(('h', On)));
+        assert_eq!(IgnoreEof.portable_short_name(), None);
+        assert_eq!(Interactive.portable_short_name(), Some(('i', On)));
+        assert_eq!(Log.portable_short_name(), None);
+        assert_eq!(Login.portable_short_name(), None);
+        assert_eq!(Monitor.portable_short_name(), Some(('m', On)));
+        assert_eq!(Notify.portable_short_name(), Some(('b', On)));
+        assert_eq!(PipeFail.portable_short_name(), None);
+        assert_eq!(Portable.portable_short_name(), None);
+        assert_eq!(PosixlyCorrect.portable_short_name(), None);
+        assert_eq!(Stdin.portable_short_name(), Some(('s', On)));
+        assert_eq!(Unset.portable_short_name(), Some(('u', Off)));
+        assert_eq!(Verbose.portable_short_name(), Some(('v', On)));
+        assert_eq!(Vi.portable_short_name(), None);
+        assert_eq!(XTrace.portable_short_name(), Some(('x', On)));
+    }
+
+    #[test]
+    fn portable_short_name_agrees_with_short_name() {
+        for option in EnumSet::<Option>::all() {
+            if let Some(name) = option.portable_short_name() {
+                assert_eq!(option.short_name(), Some(name), "{option}");
+            }
+        }
+    }
+
+    #[test]
+    fn portable_long_names() {
+        assert_eq!(AllExport.portable_long_name(), Some(("allexport", On)));
+        assert_eq!(Clobber.portable_long_name(), Some(("noclobber", Off)));
+        assert_eq!(CmdLine.portable_long_name(), None);
+        assert_eq!(ErrExit.portable_long_name(), Some(("errexit", On)));
+        assert_eq!(Exec.portable_long_name(), Some(("noexec", Off)));
+        assert_eq!(Glob.portable_long_name(), Some(("noglob", Off)));
+        assert_eq!(HashOnDefinition.portable_long_name(), None);
+        assert_eq!(IgnoreEof.portable_long_name(), Some(("ignoreeof", On)));
+        assert_eq!(Interactive.portable_long_name(), None);
+        assert_eq!(Log.portable_long_name(), Some(("nolog", Off)));
+        assert_eq!(Login.portable_long_name(), None);
+        assert_eq!(Monitor.portable_long_name(), Some(("monitor", On)));
+        assert_eq!(Notify.portable_long_name(), Some(("notify", On)));
+        assert_eq!(PipeFail.portable_long_name(), Some(("pipefail", On)));
+        assert_eq!(Portable.portable_long_name(), None);
+        assert_eq!(PosixlyCorrect.portable_long_name(), None);
+        assert_eq!(Stdin.portable_long_name(), None);
+        assert_eq!(Unset.portable_long_name(), Some(("nounset", Off)));
+        assert_eq!(Verbose.portable_long_name(), Some(("verbose", On)));
+        assert_eq!(Vi.portable_long_name(), Some(("vi", On)));
+        assert_eq!(XTrace.portable_long_name(), Some(("xtrace", On)));
+    }
+
+    #[test]
+    fn portable_long_name_parses_back_to_the_option() {
+        for option in EnumSet::<Option>::all() {
+            if let Some((name, state)) = option.portable_long_name() {
+                assert_eq!(parse_long(name), Ok((option, state)), "{option}");
             }
         }
     }
