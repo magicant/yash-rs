@@ -97,3 +97,27 @@ __IN__
 test_O -d -e 2 'option after enabling the portable option is checked'
 set -o portable --xtrace
 __IN__
+
+test_OE -e 0 'set +o output restores options under the portable option' -o portable
+set -o > expected
+saveset=$(set +o)
+set +o portable
+set -a -o posixlycorrect
+eval "$saveset"
+set -o | diff expected -
+__IN__
+
+test_OE -e 0 'set +o output restores options without the portable option'
+set -o login -o ignoreeof
+set -o > expected
+saveset=$(set +o)
+set +o login +o ignoreeof -o posixlycorrect
+eval "$saveset"
+set -o | diff expected -
+__IN__
+
+test_OE -e 0 'set +o output is executable while the portable option is on'
+saveset=$(set +o)
+set -o portable
+eval "$saveset"
+__IN__

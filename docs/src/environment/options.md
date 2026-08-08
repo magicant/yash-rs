@@ -119,6 +119,7 @@ xtrace           off
 
 ```shell
 $ set +o
+set +o portable
 set +o allexport
 set -o clobber
 #set +o cmdline
@@ -133,7 +134,6 @@ set +o login
 set +o monitor
 set +o notify
 set +o pipefail
-set +o portable
 set +o posixlycorrect
 #set -o stdin
 set -o unset

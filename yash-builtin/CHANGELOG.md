@@ -40,6 +40,12 @@ A _private dependency_ is used internally and not visible to downstream users.
   that turns `Portable` on or off affects only the options that follow it.
   `-o portable` and `+o portable` are accepted regardless, so that the option
   can be turned off again.
+- The `set` built-in (`set::main`) now starts the output of `set +o` with
+  `set +o portable` and omits the option from its alphabetical position,
+  appending `set -o portable` at the end if the option is on. The names in
+  between are the ones this crate uses rather than the ones POSIX specifies,
+  so the leading command keeps the output executable while the `Portable`
+  option is on.
 - `common::syntax::Mode::with_env` now enables non-portable option names,
   including long options and extension-marked short options, based on the
   `Portable` shell option instead of `PosixlyCorrect`.

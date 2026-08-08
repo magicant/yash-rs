@@ -42,6 +42,7 @@ would restore the current option settings if executed:
 
 ```shell,no_run
 $ set +o
+set +o portable
 set +o allexport
 set -o clobber
 #set +o cmdline
@@ -49,6 +50,8 @@ set +o errexit
 set -o exec
 ...
 ```
+
+(Since 3.3.5) The listing always begins with `set +o portable`, which disables the [`portable` option](../environment/options.md#portable). The option names that follow are yash's own rather than the ones POSIX specifies, so without this leading command the output would be rejected when executed while `portable` is set. The option is not listed in its alphabetical position; instead, if it is currently on, a final `set -o portable` restores it. See [Compatibility](../environment/options.md#compatibility).
 
 ### Modifying shell options
 
