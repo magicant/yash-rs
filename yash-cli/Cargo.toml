@@ -29,6 +29,7 @@ thiserror = { workspace = true }
 yash-builtin = { workspace = true }
 yash-env = { workspace = true }
 yash-prompt = { workspace = true }
+yash-quote = { workspace = true }
 yash-semantics = { workspace = true }
 yash-syntax = { workspace = true }
 

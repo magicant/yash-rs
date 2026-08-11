@@ -26,6 +26,7 @@ use yash_env::option::State;
 use yash_env::option::canonicalize;
 use yash_env::option::parse_long;
 use yash_env::option::parse_short;
+use yash_quote::quoted;
 
 /// Input to the main read-eval loop
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
@@ -414,7 +415,8 @@ fn try_parse_short<I: Iterator<Item = String>>(
                         && let Some(index) = attached_index
                     {
                         // How this argument would read with the option argument separated
-                        let separated_spelling = format!("{} {}", &arg[..index], &arg[index..]);
+                        let separated_spelling =
+                            format!("{} {}", quoted(&arg[..index]), quoted(&arg[index..]));
                         return Err(Error::UnseparatedOptionArgument {
                             argument: arg,
                             separated_spelling,

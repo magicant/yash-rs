@@ -145,6 +145,8 @@ The long option names (`--delimiter`, `--raw-mode`) are a non-standard extension
 
 (Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using a long option name is rejected with an error. Use the corresponding short option instead.
 
+(Since 3.3.5) When the `portable` option is set, the argument to `-d` must be a separate argument. For example, use `read -d :`, not `read -d:`.
+
 In this implementation, a line continuation is always a backslash followed by a newline. Other implementations may allow a backslash followed by a delimiter to be a line continuation if the delimiter is not a newline.
 
 When a backslash is specified as the delimiter, no escape sequences are recognized. Other implementations may recognize escape sequences in the input line, effectively never recognizing the delimiter.

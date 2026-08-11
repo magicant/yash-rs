@@ -269,3 +269,15 @@ __IN__
 test_OE -e 0 'short option name still accepted under the portable option' -o portable
 echo value | read -r foo
 __IN__
+
+test_O -d -e 4 'attached short option argument rejected under the portable option' -o portable
+echo value | read -d: foo
+__IN__
+
+test_OE -e 0 'separate short option argument accepted under the portable option' -o portable
+printf 'value:rest\n' | read -d : foo
+__IN__
+
+test_OE -e 0 'attached short option argument accepted without the portable option'
+printf 'value:rest\n' | read -d: foo
+__IN__

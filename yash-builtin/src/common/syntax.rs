@@ -72,6 +72,7 @@ use yash_env::source::{
 
 #[doc(no_inline)]
 pub use yash_env::semantics::Field;
+use yash_quote::quoted;
 
 /// Specification for an options's argument
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -259,6 +260,7 @@ impl OptionSpec<'_> {
 /// # use yash_builtin::common::syntax::Mode;
 /// let mode = Mode::default();
 /// assert!(!mode.non_portable_option_names);
+/// assert!(!mode.option_arguments_in_same_field);
 /// # // TODO other properties
 /// ```
 ///
@@ -269,6 +271,7 @@ impl OptionSpec<'_> {
 /// # use yash_builtin::common::syntax::Mode;
 /// let mode = Mode::with_extensions();
 /// assert!(mode.non_portable_option_names);
+/// assert!(mode.option_arguments_in_same_field);
 /// # // TODO other properties
 /// ```
 #[derive(Clone, Copy, Default, Debug, Eq, PartialEq)]
@@ -286,6 +289,14 @@ pub struct Mode {
     ///
     /// The default value is `false`.
     pub non_portable_option_names: bool,
+
+    /// Whether an option argument may occur in the same field as a short option
+    ///
+    /// For example, if `-d` takes an argument, this field controls whether
+    /// `-d:` is accepted in addition to `-d :`.
+    ///
+    /// The default value is `false`.
+    pub option_arguments_in_same_field: bool,
     // TODO options_after_operands
     // TODO negative_integer_operands
 }
@@ -295,6 +306,7 @@ impl Mode {
     pub const fn with_extensions() -> Self {
         Mode {
             non_portable_option_names: true,
+            option_arguments_in_same_field: true,
         }
     }
 
@@ -344,14 +356,15 @@ pub enum ParseError<'a> {
     #[error("unknown option {:?}", long_option_name(.0))]
     UnknownLongOption(Field),
 
-    /// Short option whose spec is marked as a non-portable extension
-    /// ([`OptionSpec::is_extension`]) and is disabled because the
-    /// `portable` shell option is on (see [`Mode`])
+    /// Short option whose spec is marked as a [non-portable extension](`OptionSpec::is_extension`)
+    ///
+    /// This error occurs only when [`Mode::non_portable_option_names`] is `false`.
     #[error("non-portable option {0:?}")]
     NonPortableShortOption(char, Field, &'a OptionSpec<'a>),
 
-    /// Long option that is defined in an option spec but disabled because
-    /// the `portable` shell option is on (see [`Mode`])
+    /// Long option that is defined in an option spec but disabled
+    ///
+    /// This error occurs only when [`Mode::non_portable_option_names`] is `false`.
     #[error("non-portable option {:?}", .0.value)]
     NonPortableLongOption(Field, &'a OptionSpec<'a>),
 
@@ -364,6 +377,13 @@ pub enum ParseError<'a> {
     /// Option missing its required argument
     #[error("option {:?} missing an argument", .0.value)]
     MissingOptionArgument(Field, &'a OptionSpec<'a>),
+
+    /// Short option whose required argument is not in a separate field
+    ///
+    /// For example, if `-d` takes an argument, this error occurs for `-d:` when
+    /// [`Mode::option_arguments_in_same_field`] is `false`.
+    #[error("option argument not separated from the option name in {:?}", .0.value)]
+    UnseparatedOptionArgument(Field, &'a OptionSpec<'a>),
 
     /// Long option having an unexpected argument
     #[error("option {:?} with an unexpected argument", .0.value)]
@@ -388,6 +408,7 @@ impl ParseError<'_> {
             NonPortableLongOption(field, _spec) => field,
             AmbiguousLongOption(field, _specs) => field,
             MissingOptionArgument(field, _spec) => field,
+            UnseparatedOptionArgument(field, _spec) => field,
             UnexpectedOptionArgument(field, _spec) => field,
         }
     }
@@ -401,11 +422,29 @@ impl ParseError<'_> {
         report.title = self.to_string().into();
         report.snippets = Snippet::with_primary_span(&field.origin, field.value.as_str().into());
         // TODO provide more info about the erroneous option
-        if let Self::NonPortableShortOption(..) | Self::NonPortableLongOption(..) = self {
+        if let Self::NonPortableShortOption(..)
+        | Self::NonPortableLongOption(..)
+        | Self::UnseparatedOptionArgument(..) = self
+        {
             report.footnotes.push(Footnote {
                 r#type: FootnoteType::Note,
                 label: "this error is reported because the `portable` shell option is enabled"
                     .into(),
+            });
+        }
+        if let Self::UnseparatedOptionArgument(field, spec) = self
+            && let Some(short) = spec.get_short()
+            && let Some(index) = field.value.find(short)
+        {
+            let argument_index = index + short.len_utf8();
+            report.footnotes.push(Footnote {
+                r#type: FootnoteType::Suggestion,
+                label: format!(
+                    "use `{} {}` instead",
+                    quoted(&field.value[..argument_index]),
+                    quoted(&field.value[argument_index..])
+                )
+                .into(),
             });
         }
         report
@@ -472,6 +511,10 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
                         .ok_or(ParseError::MissingOptionArgument(field, spec))?
                 } else {
                     // The option argument is the rest of the current command-line argument.
+                    if !mode.option_arguments_in_same_field {
+                        return Err(ParseError::UnseparatedOptionArgument(field, spec));
+                    }
+                    // Remove the option name and the hyphen from the field value
                     let prefix = field.value.len() - remainder_len;
                     let mut field = field;
                     field.value.drain(..prefix);
@@ -924,7 +967,8 @@ mod tests {
             .argument(OptionArgumentSpec::Required)];
 
         let arguments = Field::dummies(["-afoo"]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 1, "options = {options:?}");
         assert_eq!(options[0].spec.get_short(), Some('a'));
         assert_eq!(options[0].location, Location::dummy("-afoo"));
@@ -935,7 +979,8 @@ mod tests {
         assert_eq!(operands, []);
 
         let arguments = Field::dummies(["-a1", "-a2", "3"]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 2, "options = {options:?}");
         assert_eq!(options[0].spec.get_short(), Some('a'));
         assert_matches!(options[0].argument, Some(ref field) => {
@@ -997,7 +1042,8 @@ mod tests {
         ];
 
         let arguments = Field::dummies(["-abcdef"]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 3, "options = {options:?}");
         assert_eq!(options[0].spec.get_short(), Some('a'));
         assert_eq!(options[0].argument, None);
@@ -1346,19 +1392,21 @@ mod tests {
     }
 
     #[test]
-    fn mode_with_env_accepts_non_portable_option_names_by_default() {
+    fn mode_with_env_enables_extensions_by_default() {
         let env = yash_env::Env::new_virtual();
         let mode = Mode::with_env(&env);
         assert!(mode.non_portable_option_names);
+        assert!(mode.option_arguments_in_same_field);
     }
 
     #[test]
-    fn mode_with_env_rejects_non_portable_option_names_if_portable() {
+    fn mode_with_env_disables_extensions_if_portable() {
         use yash_env::option::{Portable, State::On};
         let mut env = yash_env::Env::new_virtual();
         env.options.set(Portable, On);
         let mode = Mode::with_env(&env);
         assert!(!mode.non_portable_option_names);
+        assert!(!mode.option_arguments_in_same_field);
     }
 
     #[test]
@@ -1401,6 +1449,44 @@ mod tests {
             assert_eq!(spec, &specs[0]);
         });
         assert_eq!(error.to_string(), "option \"-ba\" missing an argument");
+    }
+
+    #[test]
+    fn unseparated_argument_to_short_option() {
+        use OptionArgumentSpec::Required;
+        let specs = &[
+            OptionSpec::new().short('a'),
+            OptionSpec::new().short('b').argument(Required),
+        ];
+
+        let arguments = Field::dummies(["-barg"]);
+        let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
+        assert_matches!(&error, &ParseError::UnseparatedOptionArgument(ref field, spec) => {
+            assert_eq!(field.value, "-barg");
+            assert_eq!(spec, &specs[1]);
+        });
+        assert_eq!(
+            error.to_string(),
+            "option argument not separated from the option name in \"-barg\""
+        );
+        let report = error.to_report();
+        assert_eq!(report.footnotes.len(), 2);
+        assert_eq!(
+            report.footnotes[0].label,
+            "this error is reported because the `portable` shell option is enabled"
+        );
+        assert_eq!(report.footnotes[1].label, "use `-b arg` instead");
+
+        let arguments = Field::dummies(["-abarg"]);
+        let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
+        assert_matches!(&error, &ParseError::UnseparatedOptionArgument(ref field, spec) => {
+            assert_eq!(field.value, "-abarg");
+            assert_eq!(spec, &specs[1]);
+        });
+        assert_eq!(
+            error.to_report().footnotes[1].label,
+            "use `-ab arg` instead"
+        );
     }
 
     #[test]
