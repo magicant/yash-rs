@@ -72,6 +72,7 @@ use yash_env::source::{
 
 #[doc(no_inline)]
 pub use yash_env::semantics::Field;
+use yash_quote::quoted;
 
 /// Specification for an options's argument
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -440,8 +441,8 @@ impl ParseError<'_> {
                 r#type: FootnoteType::Suggestion,
                 label: format!(
                     "use `{} {}` instead",
-                    &field.value[..argument_index],
-                    &field.value[argument_index..]
+                    quoted(&field.value[..argument_index]),
+                    quoted(&field.value[argument_index..])
                 )
                 .into(),
             });

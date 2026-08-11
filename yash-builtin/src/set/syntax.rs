@@ -29,6 +29,7 @@ use yash_env::semantics::Field;
 use yash_env::source::pretty::Snippet;
 use yash_env::source::pretty::{Footnote, FootnoteType};
 use yash_env::source::pretty::{Report, ReportType};
+use yash_quote::quoted;
 
 /// Error in command line parsing
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -253,8 +254,11 @@ fn try_parse_short<I: Iterator<Item = Field>>(
                         && let Some(index) = attached_index
                     {
                         // How this field would read with the option argument separated
-                        let spelling =
-                            format!("{} {}", &field.value[..index], &field.value[index..]);
+                        let spelling = format!(
+                            "{} {}",
+                            quoted(&field.value[..index]),
+                            quoted(&field.value[index..])
+                        );
                         return Err(Error::UnseparatedOptionArgument(field, spelling));
                     }
                     if option == Portable {
