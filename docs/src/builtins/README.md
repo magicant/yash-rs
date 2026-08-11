@@ -212,8 +212,6 @@ $ cd --p /dev
 
 However, future additions may make abbreviations ambiguous, so use the full name in scripts.
 
-POSIX.1-2024 only specifies short option syntax. Long options are a yash-rs extension.
-
 ### Option arguments
 
 Some options require an argument. For short options, the argument can follow immediately or as a separate argument. For example, `-d` in [`read`](read.md) takes a delimiter argument:
@@ -286,5 +284,14 @@ error: unexpected operand
 ```
 
 Specifying options after operands may be supported in the future.
+
+### Compatibility
+
+POSIX.1-2024 only specifies short option syntax. Long options are a yash-rs extension.
+
+(Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, non-portable syntax is rejected. Specifically:
+
+- Long option names are unavailable. Use the corresponding short option instead.
+- An option argument must be separate from its short option name. For example, use `read -d :`, not `read -d:`.
 
 [functions]: ../language/functions.md
