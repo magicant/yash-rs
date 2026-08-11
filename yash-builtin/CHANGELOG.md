@@ -24,9 +24,31 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `common::syntax::ParseError::NonPortableShortOption`, returned when a short
   option marked with `OptionSpec::extension` is used while the `portable`
   shell option is on.
+- `set::syntax::Error::NonPortableShortOption` and
+  `set::syntax::Error::NonPortableLongOption`, returned when the `set` built-in
+  is given an option name that POSIX does not specify while the `portable`
+  shell option is on.
+- `set::syntax::Error::UnseparatedOptionArgument`, returned when the argument
+  to `-o` or `+o` is not a separate field while the `portable` shell option is
+  on.
 
 ### Changed
 
+- `set::syntax::parse` now takes the state of the `Portable` shell option as a
+  second parameter. While it is on, the parser accepts only the option syntax
+  POSIX specifies: the short options POSIX defines and `-o`/`+o` names spelled
+  out in full in lower case. The `--name` and `++name` forms, abbreviated
+  names, and names POSIX spells in the opposite state (such as `clobber` for
+  `noclobber`) are rejected. The arguments are examined in order, so an option
+  that turns `Portable` on or off affects only the options that follow it.
+  `-o portable` and `+o portable` are accepted regardless, so that the option
+  can be turned off again.
+- The `set` built-in (`set::main`) now starts the output of `set +o` with
+  `set +o portable` and omits the option from its alphabetical position,
+  appending `set -o portable` at the end if the option is on. The names in
+  between are the ones this crate uses rather than the ones POSIX specifies,
+  so the leading command keeps the output executable while the `Portable`
+  option is on.
 - `common::syntax::Mode::with_env` now enables non-portable option names,
   including long options and extension-marked short options, based on the
   `Portable` shell option instead of `PosixlyCorrect`.
@@ -43,6 +65,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   `-k`, `-l`, `-m`, `-q`, `-r`, `-R`, `-u`, `-w`, and `-x` options, in
   addition to their long spellings, when the `portable` shell option is on.
   These options are not required by POSIX.
+- Public dependency versions:
+    - yash-env 0.16.0 → 0.16.1
 
 ## [0.22.0] - 2026-07-31
 

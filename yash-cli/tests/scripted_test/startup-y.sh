@@ -20,6 +20,112 @@ __IN__
 non-portable=value
 __OUT__
 
+test_O -d -e 2 'shell invocation rejects long option under the portable option' -o portable --allexport
+echo not reached
+__IN__
+
+test_O -d -e 2 'shell invocation rejects ++ long option under the portable option' -o portable ++allexport
+echo not reached
+__IN__
+
+test_O -d -e 2 'shell invocation rejects -o name POSIX spells negatively' -o portable -o clobber
+echo not reached
+__IN__
+
+test_O -d -e 2 'shell invocation rejects abbreviated -o name under the portable option' -o portable -o allex
+echo not reached
+__IN__
+
+test_O -d -e 2 'shell invocation rejects -o argument attached to the option name' -o portable -oerrexit
+echo not reached
+__IN__
+
+test_O -d -e 2 'shell invocation rejects short option POSIX does not specify' -o portable -l
+echo not reached
+__IN__
+
+test_O -d -e 2 'shell invocation rejects +c under the portable option' -o portable +c
+echo not reached
+__IN__
+
+test_O -d -e 2 'shell invocation rejects +s under the portable option' -o portable +s
+echo not reached
+__IN__
+
+test_x -e 0 'shell invocation accepts +i under the portable option' -o portable +i
+echo "$-" | grep -qv i
+__IN__
+
+test_O -d -e 2 'shell invocation rejects --help under the portable option' -o portable --help
+echo not reached
+__IN__
+
+test_O -d -e 2 'shell invocation rejects --norcfile under the portable option' -o portable --norcfile
+echo not reached
+__IN__
+
+test_x -e 0 'shell invocation accepts long option without the portable option' --allexport
+echo "$-" | grep -q a
+__IN__
+
+test_x -e 0 'shell invocation accepts ++ long option without the portable option' -a ++allexport
+echo "$-" | grep -qv a
+__IN__
+
+test_oE -e 0 'shell invocation accepts -o clobber without the portable option' -o clobber
+set +o | grep clobber
+__IN__
+set -o clobber
+__OUT__
+
+test_x -e 0 'shell invocation accepts abbreviated -o name without the portable option' -o allex
+echo "$-" | grep -q a
+__IN__
+
+test_x -e 0 'shell invocation accepts -o argument attached to the option name without the portable option' -oerrexit
+echo "$-" | grep -q e
+__IN__
+
+test_x -e 0 'shell invocation accepts non-POSIX short option without the portable option' -l
+echo "$-" | grep -q l
+__IN__
+
+test_oE -e 0 'shell invocation accepts +c without the portable option' +c
+echo ok
+__IN__
+ok
+__OUT__
+
+test_oE -e 0 'shell invocation accepts +s without the portable option' +s
+echo ok
+__IN__
+ok
+__OUT__
+
+test_oE -e 0 'shell invocation accepts +i without the portable option' +i
+echo ok
+__IN__
+ok
+__OUT__
+
+test_oE -e 0 'shell invocation accepts --norcfile without the portable option' --norcfile
+echo ok
+__IN__
+ok
+__OUT__
+
+test_x -e 0 'shell invocation accepts POSIX option names under the portable option' -o portable -a -o noclobber
+echo "$-" | grep -q a
+__IN__
+
+test_x -e 0 'option before enabling the portable option is not checked' --allexport -o portable
+echo "$-" | grep -q a
+__IN__
+
+test_x -e 0 'shell invocation can turn the portable option off again' -o portable +o portable --allexport
+echo "$-" | grep -q a
+__IN__
+
 # TODO not working as expected
 test_oE -e 0 -f 'negating -c and enabling -s' -c +c -s
 echo ok

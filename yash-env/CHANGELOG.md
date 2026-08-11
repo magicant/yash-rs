@@ -13,6 +13,20 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.16.1] - Unreleased
+
+### Added
+
+- `option::Option::portable_short_name`, which returns the single-character
+  option name POSIX specifies for the option, or `None` if POSIX specifies
+  none. The names are the ones POSIX defines for the shell invocation; the
+  `set` built-in accepts a subset of them.
+- `option::Option::portable_long_name`, which returns the name POSIX specifies
+  for the option in the `-o` option's argument and the state the name renders,
+  or `None` if POSIX specifies none. POSIX names some options in their disabled
+  state, so the name may differ from the one `long_name` returns; for example,
+  `Clobber` yields `("noclobber", Off)`.
+
 ## [0.16.0] - 2026-07-31
 
 ### Added
@@ -1479,6 +1493,7 @@ This version has been yanked due to an issue that prevents the crate from buildi
 
 - Initial implementation of the `yash-env` crate
 
+[0.16.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.16.1
 [0.16.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.16.0
 [0.15.5]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.15.5
 [0.15.4]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.15.4

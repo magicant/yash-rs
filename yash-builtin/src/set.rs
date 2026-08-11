@@ -40,7 +40,7 @@ use yash_env::option::canonicalize;
 use yash_env::option::parse_long;
 #[cfg(doc)]
 use yash_env::option::parse_short;
-use yash_env::option::{Interactive, Monitor};
+use yash_env::option::{Interactive, Monitor, Portable};
 use yash_env::parser::IsName;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -156,7 +156,7 @@ where
 {
     use std::fmt::Write as _;
 
-    match syntax::parse(args) {
+    match syntax::parse(args, env.options.get(Portable)) {
         Ok(Command::PrintVariables) => {
             let IsName(is_name) = env.any.get().expect("`IsName` should be in `env.any`");
             let mut vars: Vec<_> = env
@@ -187,13 +187,21 @@ where
 
         Ok(Command::PrintOptionsMachineReadable) => {
             let mut print = String::new();
-            for option in yash_env::option::Option::iter() {
+            // The commands below name options the way yash does rather than
+            // the way POSIX does, so the `portable` option would reject them.
+            // Turn it off first and restore it last, so that the output can be
+            // executed whatever state the shell running it is in.
+            writeln!(print, "set +o {Portable}").unwrap();
+            for option in yash_env::option::Option::iter().filter(|o| *o != Portable) {
                 let skip = if option.is_modifiable() { "" } else { "#" };
                 let flag = match env.options.get(option) {
                     State::On => '-',
                     State::Off => '+',
                 };
                 writeln!(print, "{skip}set {flag}o {option}").unwrap();
+            }
+            if env.options.get(Portable) == State::On {
+                writeln!(print, "set -o {Portable}").unwrap();
             }
             output(env, &print).await
         }
@@ -329,6 +337,47 @@ xtrace           off
 
         // And there should be no errors doing that
         assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
+    }
+
+    /// Asserts that the output of `set +o` restores the options it was
+    /// produced from, even when the shell that executes it has the `Portable`
+    /// option on.
+    fn assert_machine_readable_output_round_trips(printed_portable: State) {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Clobber, Off);
+        env.options.set(Verbose, On);
+        env.options.set(PosixlyCorrect, On);
+        env.options.set(Portable, printed_portable);
+        let options = env.options;
+
+        let args = Field::dummies(["+o"]);
+        let result = main(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
+
+        let commands: List = assert_stdout(&state, |stdout| stdout.parse().unwrap());
+
+        env.builtins.insert(
+            "set",
+            Builtin::new(Special, |env, args| Box::pin(main(env, args))),
+        );
+        // The shell that restores the options has `Portable` on, which would
+        // reject the option names the output uses if it were not disabled.
+        env.options = Default::default();
+        env.options.set(Portable, On);
+
+        let result = commands.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_eq!(env.options, options);
+        assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
+    }
+
+    #[test]
+    fn printing_options_machine_readable_restores_options_under_portable() {
+        assert_machine_readable_output_round_trips(On);
+        assert_machine_readable_output_round_trips(Off);
     }
 
     #[test]

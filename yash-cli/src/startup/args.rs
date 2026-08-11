@@ -130,6 +130,87 @@ pub enum Error {
     /// The `-c` option without a command string
     #[error("missing command string for `-c`")]
     MissingCommandString,
+
+    /// Short option that POSIX does not specify
+    ///
+    /// This error occurs only while the `portable` shell option is on.
+    #[error("non-portable option `{0}`")]
+    NonPortableShortOption(char),
+
+    /// Negated `-c` or `-s` option
+    ///
+    /// POSIX specifies `-c` and `-s` but not their negations, so this error
+    /// occurs only while the `portable` shell option is on.
+    #[error("non-portable option `+{0}`")]
+    NonPortableShortOptionNegation(char),
+
+    /// Option name that POSIX does not specify, or that POSIX spells
+    /// differently
+    ///
+    /// This error occurs only while the `portable` shell option is on. It
+    /// covers the `--name` and `++name` forms, which POSIX does not define at
+    /// all, as well as an `-o` or `+o` argument that is not an exact POSIX
+    /// option name. The second item is a portable spelling with the same
+    /// effect, if there is one.
+    #[error("non-portable option name `{}`{}", .0, suggestion(.1))]
+    NonPortableLongOption(String, Option<String>),
+
+    /// `-o` or `+o` whose argument is not a separate argument
+    ///
+    /// POSIX requires conforming applications to specify an option argument as
+    /// a separate argument, so this error occurs only while the `portable`
+    /// shell option is on.
+    #[error(
+        "option argument not separated from the option name in `{argument}`; use `{separated_spelling}` instead"
+    )]
+    UnseparatedOptionArgument {
+        /// The offending command line argument
+        argument: String,
+        /// The same argument with the option argument separated
+        separated_spelling: String,
+    },
+}
+
+/// Formats the trailing clause of [`Error::NonPortableLongOption`].
+fn suggestion(spelling: &Option<String>) -> String {
+    match spelling {
+        Some(spelling) => format!("; use `{spelling}` instead"),
+        None => String::new(),
+    }
+}
+
+/// Returns whether the given `-o` option name is one POSIX specifies.
+///
+/// `name` is the name as written by the user, before [canonicalization](canonicalize),
+/// and `state` is the state the name renders, before any negation by `+o`.
+fn is_portable_long_name(name: &str, option: ShellOption, state: State) -> bool {
+    if option == ShellOption::Portable {
+        // POSIX does not specify the `portable` option, but it must remain
+        // possible to turn it off again once it is on. Accept its canonical
+        // spelling only.
+        name == "portable"
+    } else {
+        option.portable_long_name() == Some((name, state))
+    }
+}
+
+/// Returns a portable spelling that would set the option to the given state.
+///
+/// The result is `None` if POSIX specifies no name for the option.
+fn portable_spelling(option: ShellOption, state: State) -> Option<String> {
+    fn flag(state: State, name_state: State) -> char {
+        if state == name_state { '-' } else { '+' }
+    }
+
+    if option == ShellOption::Portable {
+        // See `is_portable_long_name` for why this spelling is accepted.
+        return Some(format!("{}o portable", flag(state, State::On)));
+    }
+    if let Some((name, name_state)) = option.portable_long_name() {
+        return Some(format!("{}o {name}", flag(state, name_state)));
+    }
+    let (name, name_state) = option.portable_short_name()?;
+    Some(format!("{}{name}", flag(state, name_state)))
 }
 
 /// Result of parsing short options
@@ -188,6 +269,10 @@ where
 {
     let mut args = args.into_iter().map(Into::into).peekable();
     let mut result = Run::default();
+    // State of the `Portable` option in effect for the argument being parsed.
+    // The arguments are examined in order, so an argument that turns the
+    // option on or off affects only the arguments that follow it.
+    let mut portable = State::Off;
 
     // Below, we use `args.next_if(|_| true)` instead of `args.next()` to avoid
     // consuming the `None` value that needs to be seen again.
@@ -200,14 +285,14 @@ where
 
     // Parse options
     loop {
-        if let Some(option) = try_parse_short(&mut args, &mut result.options)? {
+        if let Some(option) = try_parse_short(&mut args, &mut result.options, &mut portable)? {
             match option {
                 ShortOption::Shell => continue,
                 ShortOption::Version => return Ok(Parse::Version),
             }
         }
 
-        let Some(option) = try_parse_long(&mut args)? else {
+        let Some(option) = try_parse_long(&mut args, &mut portable)? else {
             break;
         };
         match option {
@@ -271,9 +356,14 @@ fn parse_arg0(arg0: &str, options: &mut Vec<(ShellOption, State)>) {
 /// If the next argument is a short option, consumes it and returns `Ok(Some(_))`.
 /// The parsed options are added to `option_occurrences`.
 /// If the `-V` option is included, returns `Ok(Some(ShortOption::Version))`.
+///
+/// `portable` is the state of the [`Portable`](ShellOption::Portable) option in
+/// effect for this argument. It is updated when the argument modifies the
+/// option, so that the options that follow are parsed under the new state.
 fn try_parse_short<I: Iterator<Item = String>>(
     args: &mut Peekable<I>,
     option_occurrences: &mut Vec<(ShellOption, State)>,
+    portable: &mut State,
 ) -> Result<Option<ShortOption>, Error> {
     let Some(mut arg) = args.next_if(|arg| is_short_option(arg)) else {
         return Ok(None);
@@ -290,22 +380,50 @@ fn try_parse_short<I: Iterator<Item = String>>(
         if c == 'V' {
             return if negate {
                 Err(Error::UnnegatableShortOption('V'))
+            } else if *portable == State::On {
+                Err(Error::NonPortableShortOption('V'))
             } else {
                 Ok(Some(ShortOption::Version))
             };
         }
         if c == 'o' {
-            let name = chars.as_str();
-            let name = if !name.is_empty() {
-                canonicalize(name)
-            } else {
+            let attached = chars.as_str();
+            // Byte index where the attached option argument starts,
+            // or `None` if the option argument is a separate argument
+            let attached_index = if attached.is_empty() {
                 let prev = arg;
                 arg = args.next().ok_or(Error::MissingOptionArgument(prev))?;
-                canonicalize(&arg)
+                None
+            } else {
+                Some(arg.len() - attached.len())
             };
+            let raw_name = &arg[attached_index.unwrap_or(0)..];
+            let name = canonicalize(raw_name);
             match parse_long(&name) {
-                Ok((option, state)) => {
-                    option_occurrences.push((option, if negate { !state } else { state }));
+                Ok((option, name_state)) => {
+                    let new_state = if negate { !name_state } else { name_state };
+                    if *portable == State::On
+                        && !is_portable_long_name(raw_name, option, name_state)
+                    {
+                        return Err(Error::NonPortableLongOption(
+                            raw_name.to_owned(),
+                            portable_spelling(option, new_state),
+                        ));
+                    }
+                    if *portable == State::On
+                        && let Some(index) = attached_index
+                    {
+                        // How this argument would read with the option argument separated
+                        let separated_spelling = format!("{} {}", &arg[..index], &arg[index..]);
+                        return Err(Error::UnseparatedOptionArgument {
+                            argument: arg,
+                            separated_spelling,
+                        });
+                    }
+                    if option == ShellOption::Portable {
+                        *portable = new_state;
+                    }
+                    option_occurrences.push((option, new_state));
                     break;
                 }
                 Err(NoSuchOption) => return Err(Error::UnknownLongOption(name.into_owned())),
@@ -314,6 +432,17 @@ fn try_parse_short<I: Iterator<Item = String>>(
         }
 
         let (option, state) = parse_short(c).ok_or(Error::UnknownShortOption(c))?;
+        if *portable == State::On {
+            if option.portable_short_name() != Some((c, state)) {
+                return Err(Error::NonPortableShortOption(c));
+            }
+            // POSIX's shell invocation synopsis lists `-c` and `-s` apart from
+            // the option letters that may also be written with `+`, so their
+            // negations are not portable.
+            if negate && matches!(option, ShellOption::CmdLine | ShellOption::Stdin) {
+                return Err(Error::NonPortableShortOptionNegation(c));
+            }
+        }
         option_occurrences.push((option, if negate { !state } else { state }));
     }
 
@@ -337,8 +466,16 @@ fn is_short_option(arg: &str) -> bool {
 }
 
 /// Tries to parse and consume the next argument in `args` as a long option.
+///
+/// `portable` is the state of the [`Portable`](ShellOption::Portable) option in
+/// effect for this argument. It is updated when the argument modifies the
+/// option, so that the options that follow are parsed under the new state.
+/// POSIX defines neither the `--name` and `++name` forms nor any of the
+/// initialization-file options, so all of them are rejected while `portable`
+/// is on.
 fn try_parse_long<I: Iterator<Item = String>>(
     args: &mut Peekable<I>,
+    portable: &mut State,
 ) -> Result<Option<LongOption>, Error> {
     let Some(arg) = args.next_if(|arg| is_long_option(arg)) else {
         return Ok(None);
@@ -375,7 +512,9 @@ fn try_parse_long<I: Iterator<Item = String>>(
         (Some(_), Err(NoSuchOption)) if negate => Err(Error::UnnegatableLongOption(arg)),
 
         (Some(NonShellOptionConstructor::WithoutArgument(option)), Err(NoSuchOption)) => {
-            if value.is_none() {
+            if *portable == State::On {
+                Err(Error::NonPortableLongOption(arg, None))
+            } else if value.is_none() {
                 Ok(Some(option))
             } else {
                 Err(Error::UnexpectedOptionArgument(arg))
@@ -383,6 +522,9 @@ fn try_parse_long<I: Iterator<Item = String>>(
         }
 
         (Some(NonShellOptionConstructor::WithArgument(ctor)), Err(NoSuchOption)) => {
+            if *portable == State::On {
+                return Err(Error::NonPortableLongOption(arg, None));
+            }
             let value = match value {
                 Some(value) => value.to_owned(),
                 None => match args.next() {
@@ -393,8 +535,19 @@ fn try_parse_long<I: Iterator<Item = String>>(
             Ok(Some(ctor(value)))
         }
 
-        (None, Ok((option, state))) if negate => Ok(Some(LongOption::Shell(option, !state))),
-        (None, Ok((option, state))) => Ok(Some(LongOption::Shell(option, state))),
+        (None, Ok((option, name_state))) => {
+            let new_state = if negate { !name_state } else { name_state };
+            if *portable == State::On {
+                return Err(Error::NonPortableLongOption(
+                    arg,
+                    portable_spelling(option, new_state),
+                ));
+            }
+            if option == ShellOption::Portable {
+                *portable = new_state;
+            }
+            Ok(Some(LongOption::Shell(option, new_state)))
+        }
     }
 }
 
@@ -1214,6 +1367,258 @@ mod tests {
         assert_eq!(
             parse(["yash", "++vers=ion"]),
             Err(Error::UnnegatableLongOption("++vers=ion".to_string())),
+        );
+    }
+
+    /// Asserts that the arguments, prefixed with `-o portable`, are accepted
+    /// and yield the given shell options in addition to `Portable`.
+    fn assert_portable_options(args: &[&str], expected: &[(ShellOption, State)]) {
+        let mut all_args = vec!["yash", "-o", "portable"];
+        all_args.extend_from_slice(args);
+        let mut all_expected = vec![(ShellOption::Portable, State::On)];
+        all_expected.extend_from_slice(expected);
+        assert_matches!(parse(all_args.clone()), Ok(Parse::Run(run)) => {
+            assert_eq!(run.options, all_expected, "{all_args:?}");
+        }, "{all_args:?}");
+    }
+
+    #[test]
+    fn portable_accepts_posix_short_options() {
+        assert_portable_options(&["-a"], &[(ShellOption::AllExport, State::On)]);
+        assert_portable_options(&["-C"], &[(ShellOption::Clobber, State::Off)]);
+        assert_portable_options(&["-i"], &[(ShellOption::Interactive, State::On)]);
+        assert_portable_options(&["-s"], &[(ShellOption::Stdin, State::On)]);
+        assert_portable_options(&["+e"], &[(ShellOption::ErrExit, State::Off)]);
+        assert_portable_options(
+            &["-ex"],
+            &[
+                (ShellOption::ErrExit, State::On),
+                (ShellOption::XTrace, State::On),
+            ],
+        );
+    }
+
+    #[test]
+    fn portable_accepts_posix_o_names() {
+        assert_portable_options(&["-o", "errexit"], &[(ShellOption::ErrExit, State::On)]);
+        assert_portable_options(&["-o", "noclobber"], &[(ShellOption::Clobber, State::Off)]);
+        assert_portable_options(&["+o", "noclobber"], &[(ShellOption::Clobber, State::On)]);
+        assert_portable_options(&["-o", "nolog"], &[(ShellOption::Log, State::Off)]);
+        assert_portable_options(&["-o", "vi"], &[(ShellOption::Vi, State::On)]);
+    }
+
+    #[test]
+    fn portable_rejects_short_option_posix_does_not_specify() {
+        assert_eq!(
+            parse(["yash", "-o", "portable", "-l"]),
+            Err(Error::NonPortableShortOption('l')),
+        );
+        assert_eq!(
+            parse(["yash", "-o", "portable", "-V"]),
+            Err(Error::NonPortableShortOption('V')),
+        );
+    }
+
+    #[test]
+    fn portable_rejects_negated_c_and_s_options() {
+        assert_eq!(
+            parse(["yash", "-o", "portable", "+c"]),
+            Err(Error::NonPortableShortOptionNegation('c')),
+        );
+        assert_eq!(
+            parse(["yash", "-o", "portable", "+s"]),
+            Err(Error::NonPortableShortOptionNegation('s')),
+        );
+        assert_eq!(
+            parse(["yash", "-o", "portable", "+es"]),
+            Err(Error::NonPortableShortOptionNegation('s')),
+        );
+    }
+
+    #[test]
+    fn portable_accepts_negated_i_option() {
+        assert_portable_options(&["+i"], &[(ShellOption::Interactive, State::Off)]);
+    }
+
+    #[test]
+    fn negated_c_and_s_options_are_accepted_without_the_portable_option() {
+        assert_matches!(parse(["yash", "+c", "+s"]), Ok(Parse::Run(run)) => {
+            assert_eq!(run.options, [
+                (ShellOption::CmdLine, State::Off),
+                (ShellOption::Stdin, State::Off),
+            ]);
+        });
+    }
+
+    #[test]
+    fn portable_rejects_o_name_that_is_not_a_posix_spelling() {
+        for name in ["clobber", "ERREXIT", "errex", "noerrexit", "login"] {
+            assert_matches!(
+                parse(["yash", "-o", "portable", "-o", name]),
+                Err(Error::NonPortableLongOption(reported, _)) => {
+                    assert_eq!(reported, name);
+                },
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn portable_rejects_long_options() {
+        for arg in ["--errexit", "++errexit", "--noclobber"] {
+            assert_matches!(
+                parse(["yash", "-o", "portable", arg]),
+                Err(Error::NonPortableLongOption(reported, _)) => {
+                    assert_eq!(reported, arg);
+                },
+                "{arg}"
+            );
+        }
+    }
+
+    #[test]
+    fn portable_rejects_options_posix_does_not_define() {
+        for arg in ["--help", "--version", "--noprofile", "--norcfile"] {
+            assert_eq!(
+                parse(["yash", "-o", "portable", arg]),
+                Err(Error::NonPortableLongOption(arg.to_string(), None)),
+                "{arg}"
+            );
+        }
+        assert_eq!(
+            parse(["yash", "-o", "portable", "--profile", "f"]),
+            Err(Error::NonPortableLongOption("--profile".to_string(), None)),
+        );
+        assert_eq!(
+            parse(["yash", "-o", "portable", "--rcfile=f"]),
+            Err(Error::NonPortableLongOption("--rcfile=f".to_string(), None)),
+        );
+    }
+
+    #[test]
+    fn portable_accepts_canonical_spelling_of_portable_option() {
+        assert_portable_options(&["+o", "portable"], &[(ShellOption::Portable, State::Off)]);
+        assert_portable_options(&["-o", "portable"], &[(ShellOption::Portable, State::On)]);
+    }
+
+    #[test]
+    fn portable_rejects_other_spellings_of_portable_option() {
+        for arg in ["--portable", "++portable"] {
+            assert_matches!(
+                parse(["yash", "-o", "portable", arg]),
+                Err(Error::NonPortableLongOption(reported, _)) => {
+                    assert_eq!(reported, arg);
+                },
+                "{arg}"
+            );
+        }
+        assert_matches!(
+            parse(["yash", "-o", "portable", "-o", "PORTABLE"]),
+            Err(Error::NonPortableLongOption(..))
+        );
+    }
+
+    #[test]
+    fn enabling_portable_affects_only_following_options() {
+        assert_matches!(parse(["yash", "--errexit", "-o", "portable"]), Ok(Parse::Run(run)) => {
+            assert_eq!(run.options, [
+                (ShellOption::ErrExit, State::On),
+                (ShellOption::Portable, State::On),
+            ]);
+        });
+
+        assert_matches!(parse(["yash", "--rcfile", "f", "--portable"]), Ok(Parse::Run(run)) => {
+            assert_eq!(run.options, [(ShellOption::Portable, State::On)]);
+            assert_eq!(run.work.rcfile, InitFile::File { path: "f".to_string() });
+        });
+
+        assert_eq!(
+            parse(["yash", "--version", "-o", "portable"]),
+            Ok(Parse::Version)
+        );
+    }
+
+    #[test]
+    fn disabling_portable_affects_only_following_options() {
+        assert_matches!(
+            parse(["yash", "-o", "portable", "+o", "portable", "--errexit"]),
+            Ok(Parse::Run(run)) => {
+                assert_eq!(run.options, [
+                    (ShellOption::Portable, State::On),
+                    (ShellOption::Portable, State::Off),
+                    (ShellOption::ErrExit, State::On),
+                ]);
+            }
+        );
+    }
+
+    #[test]
+    fn unrecognized_option_name_is_reported_rather_than_non_portable() {
+        assert_eq!(
+            parse(["yash", "-o", "portable", "-o", "foo"]),
+            Err(Error::UnknownLongOption("foo".to_string())),
+        );
+        assert_eq!(
+            parse(["yash", "-o", "portable", "--foo"]),
+            Err(Error::UnknownLongOption("--foo".to_string())),
+        );
+        assert_eq!(
+            parse(["yash", "-o", "portable", "-Z"]),
+            Err(Error::UnknownShortOption('Z')),
+        );
+    }
+
+    #[test]
+    fn portable_rejects_option_argument_attached_to_the_option_name() {
+        for (arg, separated) in [
+            ("-oerrexit", "-o errexit"),
+            ("-aoerrexit", "-ao errexit"),
+            ("+onoclobber", "+o noclobber"),
+            ("-oportable", "-o portable"),
+        ] {
+            assert_eq!(
+                parse(["yash", "-o", "portable", arg]),
+                Err(Error::UnseparatedOptionArgument {
+                    argument: arg.to_string(),
+                    separated_spelling: separated.to_string()
+                }),
+                "{arg}"
+            );
+        }
+    }
+
+    #[test]
+    fn non_portable_option_name_is_reported_before_the_attached_argument() {
+        assert_matches!(
+            parse(["yash", "-o", "portable", "-oclobber"]),
+            Err(Error::NonPortableLongOption(..))
+        );
+    }
+
+    #[test]
+    fn non_portable_error_suggests_portable_spelling() {
+        fn message(args: &[&str]) -> String {
+            let mut all_args = vec!["yash", "-o", "portable"];
+            all_args.extend_from_slice(args);
+            parse(all_args).unwrap_err().to_string()
+        }
+
+        assert_eq!(
+            message(&["--errexit"]),
+            "non-portable option name `--errexit`; use `-o errexit` instead",
+        );
+        assert_eq!(
+            message(&["-o", "clobber"]),
+            "non-portable option name `clobber`; use `+o noclobber` instead",
+        );
+        assert_eq!(
+            message(&["++portable"]),
+            "non-portable option name `++portable`; use `+o portable` instead",
+        );
+        assert_eq!(message(&["--help"]), "non-portable option name `--help`",);
+        assert_eq!(
+            message(&["-o", "login"]),
+            "non-portable option name `login`",
         );
     }
 }

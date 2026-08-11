@@ -83,6 +83,13 @@ The rcfile is only executed if:
 
 Options for initialization files (`--profile`, `--noprofile`, `--rcfile`, `--norcfile`) are not part of POSIX.1-2024 and may not be available in other shells. See [Compatibility](environment/options.md#compatibility) in the options documentation for portable shell options.
 
+(Since 3.3.5) When the [`portable` option](environment/options.md#portable) is enabled on the command line, the options that follow it must be spelled the way POSIX specifies. This rejects the `--name` and `++name` forms, abbreviated and case-insensitive `-o` names, the `-l` option, the `+c` and `+s` negations (POSIX specifies `-c` and `-s`, but not their negated forms), and the yash-specific `-V`, `--help`, `--version`, `--profile`, `--rcfile`, `--noprofile`, and `--norcfile` options. Write those before `-o portable` if you need both.
+
+```sh
+yash3 --rcfile myrc -o portable myscript   # accepted
+yash3 -o portable --rcfile myrc myscript   # rejected
+```
+
 POSIX.1-2024 does not specify login shells or profile files. The behavior described here is specific to yash-rs and may differ from other shells.
 
 Using the `ENV` [environment variable] for initialization files is POSIX-specified. In the future, yash-rs may support a different default rcfile location depending on the command name and shell options.
