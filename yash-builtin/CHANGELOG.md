@@ -38,6 +38,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `kill::syntax::Error::NonPortableOption`,
   `kill::syntax::Error::UnseparatedSignalArgument`,
   `kill::syntax::Error::NonPortableSignalNumber`,
+  `kill::syntax::Error::NonPortableSignalPrefix`,
   `kill::syntax::Error::MultipleListOperands`, and
   `kill::syntax::Error::NonPortableListOperand`, returned by
   `kill::syntax::parse` when the command line uses syntax POSIX does not
@@ -85,6 +86,10 @@ A _private dependency_ is used internally and not visible to downstream users.
   argument, which POSIX prescribes for applications even though conforming
   implementations accept it attached to the option name as well. The `-SIGNAL`
   and `-signal_number` forms are still accepted, since POSIX specifies them.
+- The `kill` built-in (`kill::syntax::parse`) now accepts a signal name with
+  the `SIG` prefix, as in `-s SIGINT` and `-SIGINT`, unless the `portable`
+  shell option is on. Operands to the `-l` and `-v` options are unaffected;
+  they still must not have the prefix.
 - Public dependency versions:
     - yash-env 0.16.0 → 0.16.1
 

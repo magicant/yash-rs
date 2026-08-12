@@ -1,5 +1,23 @@
 # kill-y.sh: yash-specific test of the kill built-in
 
+test_OE -e 0 'SIG prefix accepted in the argument to -s'
+kill -s SIGCONT $$
+kill -s sigcont $$
+__IN__
+
+test_O -d -e 2 'SIG prefix in the argument to -s rejected under the portable option' -o portable
+kill -s SIGCONT $$
+__IN__
+
+test_OE -e 0 'SIG prefix accepted in the obsolete syntax'
+kill -SIGCONT $$
+kill -sigcont $$
+__IN__
+
+test_O -d -e 2 'SIG prefix in the obsolete syntax rejected under the portable option' -o portable
+kill -SIGCONT $$
+__IN__
+
 test_OE -e 0 'option -n accepted without the portable option'
 kill -n CONT $$
 __IN__

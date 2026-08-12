@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.3.5] - Unreleased
 
+### Added
+
+- The `kill` built-in now accepts a signal name with the `SIG` prefix, as in `kill -s SIGINT` and `kill -SIGINT`. The prefix is case-insensitive like the rest of the name. With `portable` enabled, the prefix is rejected, since POSIX requires the name to be specified without it. Operands to the `-l` and `-v` options still must not have the prefix.
+
 ### Changed
 
 - With `portable` enabled, a long option (for example, `--physical` for the `cd` built-in) passed to a built-in that defines one is now rejected as an error, instead of being accepted as an extension.

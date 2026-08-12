@@ -21,7 +21,9 @@ descriptions.
 
 ## Options
 
-The **`-s`** or **`-n`** option specifies the signal to send. The signal name is case-insensitive, but must be specified without the `SIG` prefix. The default signal is `SIGTERM`. (Specifying a signal name with the `SIG` prefix may be allowed in the future.)
+The **`-s`** or **`-n`** option specifies the signal to send. The signal name is case-insensitive. The default signal is `SIGTERM`.
+
+(Since 3.3.5) The signal name may be specified with or without the `SIG` prefix; for example, `INT`, `int`, and `SIGINT` all denote the same signal.
 
 The signal may be specified as a number instead of a name. If the number
 is zero, the built-in does not send a signal, but instead checks whether
@@ -135,6 +137,10 @@ Exit status 399 corresponds to SIGTERM
 
 The `kill` built-in is specified by POSIX.1-2024.
 
+POSIX requires the signal name to be specified without the `SIG` prefix, so
+accepting the prefix is a non-standard extension. The operands to the `-l` and
+`-v` options never accept the prefix.
+
 Specifying a signal number other than `0` to the `-s` option is a
 non-standard extension.
 
@@ -177,9 +183,9 @@ The `-v` option is a non-standard extension.
 is set, all the non-standard extensions above are rejected with an error, and
 the argument to the `-s` option must be a separate argument as POSIX prescribes
 for applications. Where POSIX specifies an equivalent, use it instead: `kill
--9` rather than `kill -s 9`, and `kill -s TERM` rather than `kill -n TERM` or
-`kill -sTERM`. The obsolete syntax is unaffected, so `kill -stop` still sends
-`SIGSTOP`.
+-9` rather than `kill -s 9`, `kill -s TERM` rather than `kill -n TERM` or `kill
+-sTERM`, and `TERM` rather than `SIGTERM`. The obsolete syntax is unaffected,
+so `kill -stop` still sends `SIGSTOP`.
 
 Some implementations print `0` or `EXIT` for `kill -l 0` or `kill -l EXIT`
 while this implementation regards them as invalid operands.

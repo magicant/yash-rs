@@ -98,6 +98,23 @@ pub enum Error {
         number: RawNumber,
     },
 
+    /// A signal name with the `SIG` prefix is specified.
+    ///
+    /// This error occurs only when the [`Portable`] shell option is on. POSIX
+    /// requires a signal name to be specified without the `SIG` prefix, so
+    /// `-s INT` must be used instead of `-s SIGINT`.
+    #[error("non-portable signal name {:?}", &.field.value[*.name_index..])]
+    NonPortableSignalPrefix {
+        /// Field containing the signal name
+        field: Field,
+        /// Byte index of the signal name in the field value
+        ///
+        /// The signal name may be preceded by the option name as in `-sSIGINT`
+        /// or by a single hyphen as in `-SIGINT`, in which case this index
+        /// points to the signal name after them.
+        name_index: usize,
+    },
+
     /// More than one signal to send is specified.
     #[error("multiple signals specified")]
     MultipleSignals(Field, Field),
@@ -189,6 +206,11 @@ impl Error {
                 "POSIX requires a signal name or `0` here".into(),
             ),
 
+            Self::NonPortableSignalPrefix { field, .. } => Snippet::with_primary_span(
+                &field.origin,
+                "POSIX does not allow the `SIG` prefix in a signal name".into(),
+            ),
+
             Self::MultipleSignals(field1, field2) => {
                 let mut snippets = Snippet::with_primary_span(
                     &field1.origin,
@@ -241,6 +263,7 @@ impl Error {
         if let Self::NonPortableOption(..)
         | Self::UnseparatedSignalArgument { .. }
         | Self::NonPortableSignalNumber { .. }
+        | Self::NonPortableSignalPrefix { .. }
         | Self::MultipleListOperands(..)
         | Self::NonPortableListOperand(..) = self
         {
@@ -271,6 +294,18 @@ impl Error {
                 report.footnotes.push(Footnote {
                     r#type: FootnoteType::Suggestion,
                     label: format!("use `-{number}` instead").into(),
+                })
+            }
+
+            Self::NonPortableSignalPrefix { field, name_index } => {
+                // The `-s NAME` form is portable wherever the offending name
+                // appeared, so it is suggested regardless of the form used. It
+                // also resolves the attachment of `-sSIGINT`, which is not
+                // portable either.
+                let name = portable_signal_name(&field.value[*name_index..]);
+                report.footnotes.push(Footnote {
+                    r#type: FootnoteType::Suggestion,
+                    label: format!("use `-s {}` instead", quoted(&name)).into(),
                 })
             }
 
@@ -352,6 +387,42 @@ fn non_portable_signal_number(signal_spec: &str) -> Option<RawNumber> {
     }
 }
 
+/// Returns the portable form of a signal name that has the `SIG` prefix.
+///
+/// The name is uppercased and the `SIG` prefix is removed.
+#[must_use]
+fn portable_signal_name(signal_spec: &str) -> String {
+    let mut uppercase = signal_spec.to_ascii_uppercase();
+    if uppercase.starts_with("SIG") {
+        uppercase.drain(..3);
+    }
+    uppercase
+}
+
+/// Checks that a signal specification does not have the non-portable `SIG`
+/// prefix.
+///
+/// `name_index` is the byte index at which the signal specification starts in
+/// `field.value`. This function returns [`Error::NonPortableSignalPrefix`] if
+/// the specification is a valid signal name only when the `SIG` prefix is
+/// allowed.
+fn check_portable_signal_prefix<S: Signals>(
+    system: &S,
+    field: &Field,
+    name_index: usize,
+) -> Result<(), Error> {
+    let signal_spec = &field.value[name_index..];
+    if parse_signal(system, signal_spec, false).is_none()
+        && parse_signal(system, signal_spec, true).is_some()
+    {
+        return Err(Error::NonPortableSignalPrefix {
+            field: field.clone(),
+            name_index,
+        });
+    }
+    Ok(())
+}
+
 /// Checks that the operands to the `-l` or `-v` option are portable.
 ///
 /// POSIX allows at most one operand, which must be an exit status or a signal
@@ -431,7 +502,8 @@ fn parse_list_case<I: Iterator<Item = Field>>(
 /// Parses command line arguments.
 pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
     let portable = env.options.get(Portable) == On;
-    let allow_sig_prefix = false; // TODO true depending on the shell option
+    // POSIX requires the signal name to be specified without the SIG prefix.
+    let allow_sig_prefix = !portable;
     let mut args = args.into_iter().peekable();
     let mut signal = S::SIGTERM.as_raw();
     let mut signal_origin = None;
@@ -463,14 +535,16 @@ pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Erro
                                 signal_option_location: arg.origin,
                             });
                         };
-                        if portable
-                            && let Some(number) =
+                        if portable {
+                            if let Some(number) =
                                 non_portable_signal_number(&current_signal_arg.value)
-                        {
-                            return Err(Error::NonPortableSignalNumber {
-                                field: current_signal_arg,
-                                number,
-                            });
+                            {
+                                return Err(Error::NonPortableSignalNumber {
+                                    field: current_signal_arg,
+                                    number,
+                                });
+                            }
+                            check_portable_signal_prefix(&env.system, &current_signal_arg, 0)?;
                         }
                         set_signal(
                             &mut signal,
@@ -497,6 +571,13 @@ pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Erro
                                     argument_index,
                                 });
                             }
+                            // The remainder may be a signal name that is valid
+                            // only with the `SIG` prefix, as in `-sSIGINT`. If
+                            // it is not, the whole cluster may still be such a
+                            // name, as in `-sigstop`.
+                            let name_index = arg.value.len() - remainder.len();
+                            check_portable_signal_prefix(&env.system, &arg, name_index)?;
+                            check_portable_signal_prefix(&env.system, &arg, 1)?;
                         }
                         set_signal(
                             &mut signal,
@@ -515,6 +596,12 @@ pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Erro
                     verbose = Some(arg.origin.clone());
                 }
                 _ => {
+                    if portable {
+                        // Without this check, a signal name that is valid only
+                        // with the `SIG` prefix would be reported as an unknown
+                        // option, which would not explain the real cause.
+                        check_portable_signal_prefix(&env.system, &arg, 1)?;
+                    }
                     set_signal(
                         &mut signal,
                         &mut signal_origin,
@@ -1273,6 +1360,117 @@ mod tests {
                 verbose: false,
             })
         );
+    }
+
+    #[test]
+    fn sig_prefix_accepted_without_portable() {
+        let env = Env::new_virtual();
+
+        let result = parse(&env, Field::dummies(["-s", "SIGINT", "123"]));
+        assert_eq!(
+            result,
+            Ok(Command::Send {
+                signal: VirtualSystem::SIGINT.as_raw(),
+                signal_origin: Some(Field::dummy("SIGINT")),
+                targets: Field::dummies(["123"]),
+            })
+        );
+
+        let result = parse(&env, Field::dummies(["-SIGINT", "123"]));
+        assert_eq!(
+            result,
+            Ok(Command::Send {
+                signal: VirtualSystem::SIGINT.as_raw(),
+                signal_origin: Some(Field::dummy("-SIGINT")),
+                targets: Field::dummies(["123"]),
+            })
+        );
+    }
+
+    #[test]
+    fn sig_prefix_rejected_under_portable() {
+        let env = portable_env();
+
+        let result = parse(&env, Field::dummies(["-s", "SIGINT", "123"]));
+        assert_eq!(
+            result,
+            Err(Error::NonPortableSignalPrefix {
+                field: Field::dummy("SIGINT"),
+                name_index: 0,
+            })
+        );
+
+        let result = parse(&env, Field::dummies(["-SIGINT", "123"]));
+        assert_eq!(
+            result,
+            Err(Error::NonPortableSignalPrefix {
+                field: Field::dummy("-SIGINT"),
+                name_index: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn unseparated_sig_prefix_rejected_as_prefix_under_portable() {
+        // The `SIG` prefix is diagnosed rather than the attachment, so that the
+        // suggested replacement resolves both at once.
+        let env = portable_env();
+
+        let result = parse(&env, Field::dummies(["-sSIGINT", "123"]));
+        assert_eq!(
+            result,
+            Err(Error::NonPortableSignalPrefix {
+                field: Field::dummy("-sSIGINT"),
+                name_index: 2,
+            })
+        );
+
+        // Here the whole cluster, rather than the remainder, is the signal name.
+        let result = parse(&env, Field::dummies(["-sigstop", "123"]));
+        assert_eq!(
+            result,
+            Err(Error::NonPortableSignalPrefix {
+                field: Field::dummy("-sigstop"),
+                name_index: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn non_portable_signal_prefix_report() {
+        let error = Error::NonPortableSignalPrefix {
+            field: Field::dummy("SIGINT"),
+            name_index: 0,
+        };
+        assert_eq!(error.to_string(), "non-portable signal name \"SIGINT\"");
+        let report = error.to_report();
+        assert_eq!(report.footnotes.len(), 2);
+        assert_eq!(
+            report.footnotes[0].label,
+            "this error is reported because the `portable` shell option is enabled"
+        );
+        assert_eq!(report.footnotes[1].label, "use `-s INT` instead");
+    }
+
+    #[test]
+    fn non_portable_signal_prefix_report_suggestions() {
+        // Whatever form the signal name was given in, the suggestion is the
+        // portable `-s NAME` form.
+        let error = Error::NonPortableSignalPrefix {
+            field: Field::dummy("-SIGINT"),
+            name_index: 1,
+        };
+        let report = error.to_report();
+        assert_eq!(report.footnotes[1].label, "use `-s INT` instead");
+
+        let error = Error::NonPortableSignalPrefix {
+            field: Field::dummy("-ssigstop"),
+            name_index: 2,
+        };
+        // The title names the signal, not the whole field containing it.
+        assert_eq!(error.to_string(), "non-portable signal name \"sigstop\"");
+        let report = error.to_report();
+        assert_eq!(report.footnotes[1].label, "use `-s STOP` instead");
     }
 
     #[test]
