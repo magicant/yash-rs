@@ -372,6 +372,11 @@ fn kill_builtin_4() {
 }
 
 #[test]
+fn kill_builtin_ex() {
+    run("kill-y.sh")
+}
+
+#[test]
 fn lineno() {
     run("lineno-p.sh")
 }

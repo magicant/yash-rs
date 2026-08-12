@@ -35,6 +35,13 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `set::syntax::Error::UnseparatedOptionArgument`, returned when the argument
   to `-o` or `+o` is not a separate field while the `portable` shell option is
   on.
+- `kill::syntax::Error::NonPortableOption`,
+  `kill::syntax::Error::UnseparatedSignalArgument`,
+  `kill::syntax::Error::NonPortableSignalNumber`,
+  `kill::syntax::Error::MultipleListOperands`, and
+  `kill::syntax::Error::NonPortableListOperand`, returned by
+  `kill::syntax::parse` when the command line uses syntax POSIX does not
+  specify while the `portable` shell option is on.
 
 ### Changed
 
@@ -70,6 +77,14 @@ A _private dependency_ is used internally and not visible to downstream users.
   `-k`, `-l`, `-m`, `-q`, `-r`, `-R`, `-u`, `-w`, and `-x` options, in
   addition to their long spellings, when the `portable` shell option is on.
   These options are not required by POSIX.
+- The `kill` built-in (`kill::syntax::parse`) now rejects the command line
+  syntax POSIX does not specify when the `portable` shell option is on: the
+  `-n` and `-v` options, a signal number other than `0` given to the `-s`
+  option, and more than one operand or a signal name operand given with the
+  `-l` option. The argument to the `-s` option must also be a separate
+  argument, which POSIX prescribes for applications even though conforming
+  implementations accept it attached to the option name as well. The `-SIGNAL`
+  and `-signal_number` forms are still accepted, since POSIX specifies them.
 - Public dependency versions:
     - yash-env 0.16.0 → 0.16.1
 

@@ -25,11 +25,15 @@ use super::Command;
 use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::Env;
+use yash_env::option::{Portable, State::On};
 use yash_env::semantics::Field;
 use yash_env::signal::{Number, RawNumber};
 use yash_env::source::Location;
-use yash_env::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
+use yash_env::source::pretty::{
+    Footnote, FootnoteType, Report, ReportType, Snippet, Span, SpanRole, add_span,
+};
 use yash_env::system::Signals;
+use yash_quote::quoted;
 
 /// Error that may occur during parsing
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -38,6 +42,14 @@ pub enum Error {
     /// An argument starts with a hyphen (`-`) but is not a valid option.
     #[error("unknown option")]
     UnknownOption(Field),
+
+    /// An option that POSIX does not define is used.
+    ///
+    /// This error occurs only when the [`Portable`] shell option is on. The
+    /// options in question are `-n` and `-v`. The `char` is the name of the
+    /// offending option, and the `Field` is the argument containing it.
+    #[error("non-portable option {0:?}")]
+    NonPortableOption(char, Field),
 
     /// The signal to send is specified and the `-l` or `-v` option is also
     /// specified.
@@ -60,6 +72,32 @@ pub enum Error {
         signal_option_location: Location,
     },
 
+    /// The argument to the `-s` option is in the same field as the option.
+    ///
+    /// This error occurs only when the [`Portable`] shell option is on. POSIX
+    /// requires an option argument to be a separate argument, so `-s INT` must
+    /// be used instead of `-sINT`.
+    #[error("option argument not separated from the option name in {:?}", .field.value)]
+    UnseparatedSignalArgument {
+        /// Field containing the option and its argument
+        field: Field,
+        /// Byte index of the argument in the field value
+        argument_index: usize,
+    },
+
+    /// A signal number other than `0` is specified as the argument to the `-s`
+    /// option.
+    ///
+    /// This error occurs only when the [`Portable`] shell option is on. POSIX
+    /// requires the argument to the `-s` option to be a signal name or `0`.
+    #[error("non-portable signal number {number}")]
+    NonPortableSignalNumber {
+        /// Field containing the signal number
+        field: Field,
+        /// Signal number specified in the field
+        number: RawNumber,
+    },
+
     /// More than one signal to send is specified.
     #[error("multiple signals specified")]
     MultipleSignals(Field, Field),
@@ -72,6 +110,21 @@ pub enum Error {
     /// signal number, or exit status.
     #[error("invalid signal")]
     InvalidSignal(Field),
+
+    /// More than one operand is specified with the `-l` option.
+    ///
+    /// This error occurs only when the [`Portable`] shell option is on. POSIX
+    /// allows at most one operand for the `-l` option.
+    #[error("multiple operands specified")]
+    MultipleListOperands(Field, Field),
+
+    /// A signal name is specified as an operand to the `-l` option.
+    ///
+    /// This error occurs only when the [`Portable`] shell option is on. POSIX
+    /// requires the operand for the `-l` option to be an exit status or a
+    /// signal number.
+    #[error("non-portable operand {:?}", .0.value)]
+    NonPortableListOperand(Field),
 
     /// No target is specified and the `-l` or `-v` option is not specified.
     #[error("no target process specified")]
@@ -89,6 +142,11 @@ impl Error {
             Self::UnknownOption(field) => Snippet::with_primary_span(
                 &field.origin,
                 format!("{:?} is not a valid option", field.value).into(),
+            ),
+
+            Self::NonPortableOption(option, field) => Snippet::with_primary_span(
+                &field.origin,
+                format!("option `{option}` is not defined in POSIX").into(),
             ),
 
             Self::ConflictingOptions {
@@ -121,6 +179,16 @@ impl Error {
                 format!("option `{signal_option_name}` requires a signal name or number").into(),
             ),
 
+            Self::UnseparatedSignalArgument { field, .. } => Snippet::with_primary_span(
+                &field.origin,
+                "the option argument must be a separate argument".into(),
+            ),
+
+            Self::NonPortableSignalNumber { field, .. } => Snippet::with_primary_span(
+                &field.origin,
+                "POSIX requires a signal name or `0` here".into(),
+            ),
+
             Self::MultipleSignals(field1, field2) => {
                 let mut snippets = Snippet::with_primary_span(
                     &field1.origin,
@@ -144,8 +212,71 @@ impl Error {
                 format!("{:?} is not a valid signal name or number", field.value).into(),
             ),
 
+            Self::MultipleListOperands(field1, field2) => {
+                let mut snippets = Snippet::with_primary_span(
+                    &field1.origin,
+                    format!("first operand {:?}", field1.value).into(),
+                );
+                add_span(
+                    &field2.origin.code,
+                    Span {
+                        range: field2.origin.byte_range(),
+                        role: SpanRole::Primary {
+                            label: format!("second operand {:?}", field2.value).into(),
+                        },
+                    },
+                    &mut snippets,
+                );
+                snippets
+            }
+
+            Self::NonPortableListOperand(field) => Snippet::with_primary_span(
+                &field.origin,
+                "POSIX requires an exit status or signal number here".into(),
+            ),
+
             Self::MissingTarget => vec![],
         };
+
+        if let Self::NonPortableOption(..)
+        | Self::UnseparatedSignalArgument { .. }
+        | Self::NonPortableSignalNumber { .. }
+        | Self::MultipleListOperands(..)
+        | Self::NonPortableListOperand(..) = self
+        {
+            report.footnotes.push(Footnote {
+                r#type: FootnoteType::Note,
+                label: "this error is reported because the `portable` shell option is enabled"
+                    .into(),
+            });
+        }
+
+        match self {
+            Self::UnseparatedSignalArgument {
+                field,
+                argument_index,
+            } => report.footnotes.push(Footnote {
+                r#type: FootnoteType::Suggestion,
+                label: format!(
+                    "use `{} {}` instead",
+                    quoted(&field.value[..*argument_index]),
+                    quoted(&field.value[*argument_index..]),
+                )
+                .into(),
+            }),
+
+            // A negative number would yield a suggestion like `--1`, which does
+            // not specify a signal at all, so no suggestion is made for it.
+            Self::NonPortableSignalNumber { number, .. } if *number > 0 => {
+                report.footnotes.push(Footnote {
+                    r#type: FootnoteType::Suggestion,
+                    label: format!("use `-{number}` instead").into(),
+                })
+            }
+
+            _ => {}
+        }
+
         report
     }
 }
@@ -196,6 +327,49 @@ pub fn parse_signal<S: Signals>(
 
     // Parse as a signal name
     system.str2sig(signal_name).map(Number::as_raw)
+}
+
+/// Tests whether a signal specification is a signal name rather than a number.
+///
+/// This function returns `true` if the string is not a decimal integer but is a
+/// valid signal name as per [`parse_signal`].
+#[must_use]
+fn is_signal_name<S: Signals>(system: &S, signal_spec: &str, allow_sig_prefix: bool) -> bool {
+    signal_spec.parse::<RawNumber>().is_err()
+        && parse_signal(system, signal_spec, allow_sig_prefix).is_some()
+}
+
+/// Returns the signal number if the string specifies a signal number that POSIX
+/// does not allow as the argument to the `-s` option.
+///
+/// POSIX requires the argument to be a signal name or `0`, so any other number
+/// is non-portable.
+#[must_use]
+fn non_portable_signal_number(signal_spec: &str) -> Option<RawNumber> {
+    match signal_spec.parse() {
+        Ok(0) | Err(_) => None,
+        Ok(number) => Some(number),
+    }
+}
+
+/// Checks that the operands to the `-l` or `-v` option are portable.
+///
+/// POSIX allows at most one operand, which must be an exit status or a signal
+/// number.
+fn check_portable_list_operands<S: Signals>(
+    system: &S,
+    operands: &[Field],
+    allow_sig_prefix: bool,
+) -> Result<(), Error> {
+    if let Some(first) = operands.first()
+        && is_signal_name(system, &first.value, allow_sig_prefix)
+    {
+        return Err(Error::NonPortableListOperand(first.clone()));
+    }
+    if let [first, second, ..] = operands {
+        return Err(Error::MultipleListOperands(first.clone(), second.clone()));
+    }
+    Ok(())
 }
 
 /// Updates a signal and its origin.
@@ -256,6 +430,7 @@ fn parse_list_case<I: Iterator<Item = Field>>(
 
 /// Parses command line arguments.
 pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
+    let portable = env.options.get(Portable) == On;
     let allow_sig_prefix = false; // TODO true depending on the shell option
     let mut args = args.into_iter().peekable();
     let mut signal = S::SIGTERM.as_raw();
@@ -276,6 +451,9 @@ pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Erro
         let mut chars = options.chars();
         while let Some(option) = chars.next() {
             match option {
+                // POSIX defines neither the `-n` nor the `-v` option.
+                'n' | 'v' if portable => return Err(Error::NonPortableOption(option, arg)),
+
                 's' | 'n' => {
                     let remainder = chars.as_str();
                     if remainder.is_empty() {
@@ -285,6 +463,15 @@ pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Erro
                                 signal_option_location: arg.origin,
                             });
                         };
+                        if portable
+                            && let Some(number) =
+                                non_portable_signal_number(&current_signal_arg.value)
+                        {
+                            return Err(Error::NonPortableSignalNumber {
+                                field: current_signal_arg,
+                                number,
+                            });
+                        }
                         set_signal(
                             &mut signal,
                             &mut signal_origin,
@@ -292,6 +479,25 @@ pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Erro
                             current_signal_arg,
                         )?;
                     } else {
+                        if portable {
+                            // The form of the argument is examined before its
+                            // attachment so that the suggested replacement is
+                            // itself portable.
+                            if let Some(number) = non_portable_signal_number(remainder) {
+                                return Err(Error::NonPortableSignalNumber { field: arg, number });
+                            }
+                            // If the remainder is a valid signal specification,
+                            // it is an option argument attached to the option
+                            // name. Otherwise, the whole cluster may still be a
+                            // signal name as in `-stop`, which POSIX allows.
+                            if parse_signal(&env.system, remainder, allow_sig_prefix).is_some() {
+                                let argument_index = arg.value.len() - remainder.len();
+                                return Err(Error::UnseparatedSignalArgument {
+                                    field: arg,
+                                    argument_index,
+                                });
+                            }
+                        }
                         set_signal(
                             &mut signal,
                             &mut signal_origin,
@@ -323,7 +529,7 @@ pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Erro
     }
 
     // Parse operands and compute the result
-    if let Some(option_location) = verbose {
+    let command = if let Some(option_location) = verbose {
         parse_list_case(args, signal_origin, 'v', option_location, true)
     } else if let Some(option_location) = list {
         parse_list_case(args, signal_origin, 'l', option_location, false)
@@ -339,7 +545,13 @@ pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Erro
                 targets,
             })
         }
+    }?;
+
+    if portable && let Command::Print { signals, .. } = &command {
+        check_portable_list_operands(&env.system, signals, allow_sig_prefix)?;
     }
+
+    Ok(command)
 }
 
 #[cfg(test)]
@@ -798,5 +1010,287 @@ mod tests {
         let env = Env::new_virtual();
         let result = parse(&env, vec![]);
         assert_eq!(result, Err(Error::MissingTarget));
+    }
+
+    fn portable_env() -> Env<impl Signals> {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, On);
+        env
+    }
+
+    #[test]
+    fn option_n_rejected_under_portable() {
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-n", "TERM", "123"]));
+        assert_eq!(
+            result,
+            Err(Error::NonPortableOption('n', Field::dummy("-n")))
+        );
+    }
+
+    #[test]
+    fn option_v_rejected_under_portable() {
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-v"]));
+        assert_eq!(
+            result,
+            Err(Error::NonPortableOption('v', Field::dummy("-v")))
+        );
+    }
+
+    #[test]
+    fn non_portable_option_report() {
+        let error = Error::NonPortableOption('n', Field::dummy("-n"));
+        assert_eq!(error.to_string(), "non-portable option 'n'");
+        let report = error.to_report();
+        assert_eq!(report.footnotes.len(), 1);
+        assert_eq!(
+            report.footnotes[0].label,
+            "this error is reported because the `portable` shell option is enabled"
+        );
+    }
+
+    #[test]
+    fn option_l_still_accepted_under_portable() {
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-l"]));
+        assert_eq!(
+            result,
+            Ok(Command::Print {
+                signals: vec![],
+                verbose: false,
+            })
+        );
+    }
+
+    #[test]
+    fn unseparated_signal_argument_rejected_under_portable() {
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-sINT", "123"]));
+        assert_eq!(
+            result,
+            Err(Error::UnseparatedSignalArgument {
+                field: Field::dummy("-sINT"),
+                argument_index: 2,
+            })
+        );
+    }
+
+    #[test]
+    fn unseparated_signal_argument_report() {
+        let error = Error::UnseparatedSignalArgument {
+            field: Field::dummy("-sINT"),
+            argument_index: 2,
+        };
+        assert_eq!(
+            error.to_string(),
+            "option argument not separated from the option name in \"-sINT\""
+        );
+        let report = error.to_report();
+        assert_eq!(report.footnotes.len(), 2);
+        assert_eq!(
+            report.footnotes[0].label,
+            "this error is reported because the `portable` shell option is enabled"
+        );
+        assert_eq!(report.footnotes[1].label, "use `-s INT` instead");
+    }
+
+    #[test]
+    fn separate_signal_argument_accepted_under_portable() {
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-s", "INT", "123"]));
+        assert_eq!(
+            result,
+            Ok(Command::Send {
+                signal: VirtualSystem::SIGINT.as_raw(),
+                signal_origin: Some(Field::dummy("INT")),
+                targets: Field::dummies(["123"]),
+            })
+        );
+    }
+
+    #[test]
+    fn bare_signal_name_starting_with_s_accepted_under_portable() {
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-stop", "123"]));
+        assert_eq!(
+            result,
+            Ok(Command::Send {
+                signal: VirtualSystem::SIGSTOP.as_raw(),
+                signal_origin: Some(Field::dummy("-stop")),
+                targets: Field::dummies(["123"]),
+            })
+        );
+    }
+
+    #[test]
+    fn bare_signal_name_accepted_under_portable() {
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-KILL", "123"]));
+        assert_eq!(
+            result,
+            Ok(Command::Send {
+                signal: VirtualSystem::SIGKILL.as_raw(),
+                signal_origin: Some(Field::dummy("-KILL")),
+                targets: Field::dummies(["123"]),
+            })
+        );
+    }
+
+    #[test]
+    fn bare_signal_number_accepted_under_portable() {
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-9", "123"]));
+        assert_eq!(
+            result,
+            Ok(Command::Send {
+                signal: 9,
+                signal_origin: Some(Field::dummy("-9")),
+                targets: Field::dummies(["123"]),
+            })
+        );
+    }
+
+    #[test]
+    fn separate_signal_number_argument_rejected_under_portable() {
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-s", "9", "123"]));
+        assert_eq!(
+            result,
+            Err(Error::NonPortableSignalNumber {
+                field: Field::dummy("9"),
+                number: 9,
+            })
+        );
+    }
+
+    #[test]
+    fn unseparated_signal_number_argument_rejected_as_number_under_portable() {
+        // The number is diagnosed rather than the attachment, so that the
+        // suggested replacement is portable itself.
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-s9", "123"]));
+        assert_eq!(
+            result,
+            Err(Error::NonPortableSignalNumber {
+                field: Field::dummy("-s9"),
+                number: 9,
+            })
+        );
+    }
+
+    #[test]
+    fn non_portable_signal_number_report() {
+        let error = Error::NonPortableSignalNumber {
+            field: Field::dummy("9"),
+            number: 9,
+        };
+        assert_eq!(error.to_string(), "non-portable signal number 9");
+        let report = error.to_report();
+        assert_eq!(report.footnotes.len(), 2);
+        assert_eq!(
+            report.footnotes[0].label,
+            "this error is reported because the `portable` shell option is enabled"
+        );
+        assert_eq!(report.footnotes[1].label, "use `-9` instead");
+    }
+
+    #[test]
+    fn negative_signal_number_report_has_no_suggestion() {
+        let error = Error::NonPortableSignalNumber {
+            field: Field::dummy("-5"),
+            number: -5,
+        };
+        let report = error.to_report();
+        assert_eq!(report.footnotes.len(), 1);
+        assert_eq!(
+            report.footnotes[0].label,
+            "this error is reported because the `portable` shell option is enabled"
+        );
+    }
+
+    #[test]
+    fn signal_number_zero_argument_accepted_under_portable() {
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-s", "0", "123"]));
+        assert_eq!(
+            result,
+            Ok(Command::Send {
+                signal: 0,
+                signal_origin: Some(Field::dummy("0")),
+                targets: Field::dummies(["123"]),
+            })
+        );
+    }
+
+    #[test]
+    fn multiple_list_operands_rejected_under_portable() {
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-l", "9", "15"]));
+        assert_eq!(
+            result,
+            Err(Error::MultipleListOperands(
+                Field::dummy("9"),
+                Field::dummy("15"),
+            ))
+        );
+    }
+
+    #[test]
+    fn signal_name_list_operand_rejected_under_portable() {
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-l", "TERM"]));
+        assert_eq!(
+            result,
+            Err(Error::NonPortableListOperand(Field::dummy("TERM")))
+        );
+    }
+
+    #[test]
+    fn invalid_list_operand_not_blamed_on_portable() {
+        // An operand that is neither a number nor a signal name is invalid
+        // regardless of the option, so it is left to the later validation in
+        // the print module rather than reported as a portability violation.
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-l", "TERM1"]));
+        assert_eq!(
+            result,
+            Ok(Command::Print {
+                signals: Field::dummies(["TERM1"]),
+                verbose: false,
+            })
+        );
+    }
+
+    #[test]
+    fn single_numeric_list_operand_accepted_under_portable() {
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-l", "9"]));
+        assert_eq!(
+            result,
+            Ok(Command::Print {
+                signals: Field::dummies(["9"]),
+                verbose: false,
+            })
+        );
+    }
+
+    #[test]
+    fn leftmost_non_portable_field_is_reported() {
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-n", "TERM", "-sINT", "123"]));
+        assert_eq!(
+            result,
+            Err(Error::NonPortableOption('n', Field::dummy("-n")))
+        );
+
+        let result = parse(&env, Field::dummies(["-sINT", "-n", "TERM", "123"]));
+        assert_eq!(
+            result,
+            Err(Error::UnseparatedSignalArgument {
+                field: Field::dummy("-sINT"),
+                argument_index: 2,
+            })
+        );
     }
 }

@@ -27,6 +27,9 @@ The signal may be specified as a number instead of a name. If the number
 is zero, the built-in does not send a signal, but instead checks whether
 the shell can send the signal to the target processes.
 
+The argument to the `-s` or `-n` option may be written in the same argument
+as the option name, as in `-sTERM`, instead of a separate argument.
+
 The obsolete syntax allows the signal name or number to be specified
 directly after the hyphen like `-TERM` and `-15` instead of `-s TERM` and
 `-n 15`.
@@ -138,6 +141,13 @@ non-standard extension.
 Specifying a signal number to the `-n` option is a ksh extension. This
 implementation also supports the `-n` option with a signal name.
 
+[POSIX Utility Argument Syntax](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_01)
+requires a conforming application to write an option argument as a separate
+argument, though a conforming implementation must accept it in the same
+argument as the option name as well. Writing `kill -sTERM` rather than `kill -s
+TERM` is therefore portable to other implementations, but is not the syntax
+POSIX prescribes for applications.
+
 The `kill -SIGNAL target…` form may not be parsed as expected by other
 implementations when the signal name starts with an `s`. For example, `kill
 -stop 123` may try to send the `SIGTOP` signal instead of the `SIGSTOP`
@@ -162,6 +172,14 @@ extension. Specifying a signal name operand to the `-l` option is a
 non-standard extension.
 
 The `-v` option is a non-standard extension.
+
+(Since 3.3.5) When the [`portable` option](../environment/options.md#portable)
+is set, all the non-standard extensions above are rejected with an error, and
+the argument to the `-s` option must be a separate argument as POSIX prescribes
+for applications. Where POSIX specifies an equivalent, use it instead: `kill
+-9` rather than `kill -s 9`, and `kill -s TERM` rather than `kill -n TERM` or
+`kill -sTERM`. The obsolete syntax is unaffected, so `kill -stop` still sends
+`SIGSTOP`.
 
 Some implementations print `0` or `EXIT` for `kill -l 0` or `kill -l EXIT`
 while this implementation regards them as invalid operands.
