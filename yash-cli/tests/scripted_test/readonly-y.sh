@@ -136,3 +136,34 @@ readonly -p foo
 __IN__
 readonly foo=bar
 __OUT__
+
+test_O -d -e n 'readonly rejects long option name' -o portable
+readonly --print
+echo not reached
+__IN__
+
+test_O -d -e n 'readonly rejects abbreviated long option name' -o portable
+readonly --p
+echo not reached
+__IN__
+
+test_oE 'readonly long option error message mentions the portable option' -o portable
+(readonly --print) 2>result
+grep -Fq portable result && echo shown
+__IN__
+shown
+__OUT__
+
+test_oE -e 0 'readonly accepts long option name without the portable option'
+readonly foo=bar
+readonly --print foo
+__IN__
+readonly foo=bar
+__OUT__
+
+test_oE 'readonly ++print error message does not blame the portable option' -o portable
+(readonly ++print) 2>result
+grep -Fq portable result || echo not shown
+__IN__
+not shown
+__OUT__

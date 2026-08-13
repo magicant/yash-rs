@@ -67,3 +67,34 @@ export -p foo
 __IN__
 export foo=bar
 __OUT__
+
+test_O -d -e n 'export rejects long option name' -o portable
+export --print
+echo not reached
+__IN__
+
+test_O -d -e n 'export rejects abbreviated long option name' -o portable
+export --p
+echo not reached
+__IN__
+
+test_oE 'export long option error message mentions the portable option' -o portable
+(export --print) 2>result
+grep -Fq portable result && echo shown
+__IN__
+shown
+__OUT__
+
+test_oE -e 0 'export accepts long option name without the portable option'
+export foo=bar
+export --print foo
+__IN__
+export foo=bar
+__OUT__
+
+test_oE 'export ++print error message does not blame the portable option' -o portable
+(export ++print) 2>result
+grep -Fq portable result || echo not shown
+__IN__
+not shown
+__OUT__

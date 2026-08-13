@@ -32,6 +32,7 @@
 
 use crate::common::output;
 use crate::common::report::{merge_reports, report_error, report_failure};
+use crate::common::syntax::Mode;
 use crate::typeset::Command;
 use crate::typeset::FunctionAttr;
 use crate::typeset::PrintContext;
@@ -66,7 +67,7 @@ pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
     S: Isatty + WriteAll,
 {
-    match parse(PORTABLE_OPTIONS, args) {
+    match parse(PORTABLE_OPTIONS, Mode::with_env(env), args) {
         Ok((options, operands)) => match interpret(options, operands, env.options.get(Portable)) {
             Ok(mut command) => {
                 match &mut command {

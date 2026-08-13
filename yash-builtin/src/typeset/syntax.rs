@@ -21,6 +21,7 @@
 //! operands, and the latter interprets them into a [`Command`].
 
 use super::*;
+use crate::common::syntax::Mode;
 use std::iter::Peekable;
 use thiserror::Error;
 use yash_env::option::State;
@@ -156,6 +157,18 @@ pub enum ParseError {
     #[error("ambiguous option name {:?}", .0.value)]
     AmbiguousLongOption(Field),
 
+    /// Long option used while POSIX portability is required
+    ///
+    /// POSIX does not specify long options at all, so any `--name` or `++name`
+    /// form is rejected while [`Mode::non_portable_option_names`] is `false`.
+    /// This error applies to the `--` and `++` prefixes only; the `--`
+    /// separator and short options remain acceptable. An option that cannot be
+    /// canceled is still reported as
+    /// [`UncancelableLongOption`](Self::UncancelableLongOption), since that
+    /// error stands regardless of the mode.
+    #[error("non-portable option {:?}", .0.value)]
+    NonPortableLongOption(Field),
+
     /// Negated short option that is not an attribute
     #[error("option {0:?} cannot be canceled with '+'")]
     UncancelableShortOption(char, Field),
@@ -173,6 +186,7 @@ impl ParseError {
             ParseError::UnknownShortOption(_, field)
             | ParseError::UnknownLongOption(field)
             | ParseError::AmbiguousLongOption(field)
+            | ParseError::NonPortableLongOption(field)
             | ParseError::UncancelableShortOption(_, field)
             | ParseError::UncancelableLongOption(field) => field,
         }
@@ -186,6 +200,13 @@ impl ParseError {
         report.title = self.to_string().into();
         report.snippets =
             Snippet::with_primary_span(&self.field().origin, self.field().value.as_str().into());
+        if let ParseError::NonPortableLongOption(_) = self {
+            report.footnotes.push(Footnote {
+                r#type: FootnoteType::Note,
+                label: "this error is reported because the `portable` shell option is enabled"
+                    .into(),
+            });
+        }
         report
     }
 }
@@ -244,6 +265,7 @@ fn try_parse_short<'a, I: Iterator<Item = Field>>(
 /// Tries to parse and consume the next field in `args`.
 fn try_parse_long<'a, I: Iterator<Item = Field>>(
     option_specs: &'a [OptionSpec<'a>],
+    mode: Mode,
     args: &mut Peekable<I>,
 ) -> Result<Option<OptionOccurrence<'a>>, ParseError> {
     let field = match args.peek() {
@@ -268,8 +290,15 @@ fn try_parse_long<'a, I: Iterator<Item = Field>>(
     match spec {
         None => Err(ParseError::UnknownLongOption(field)),
         Some(_spec) if spec2.is_some() => Err(ParseError::AmbiguousLongOption(field)),
+        // The uncancelable check comes first: an option that cannot be canceled
+        // cannot be canceled regardless of the `Portable` option, so reporting
+        // non-portability here would suggest that turning the option off makes
+        // the command work.
         Some(spec) if negate && spec.attr.is_none() => {
             Err(ParseError::UncancelableLongOption(field))
+        }
+        Some(_spec) if !mode.non_portable_option_names => {
+            Err(ParseError::NonPortableLongOption(field))
         }
         Some(spec) => Ok(Some(OptionOccurrence {
             spec,
@@ -282,14 +311,27 @@ fn try_parse_long<'a, I: Iterator<Item = Field>>(
 /// Parses command line arguments.
 ///
 /// The first argument is a list of option specifications that should be
-/// recognized by the parser. The second argument is a list of command line
-/// arguments to be parsed.
+/// recognized by the parser.
+///
+/// The second argument selects the syntax this parser accepts. This parser
+/// honors only [`Mode::non_portable_option_names`], which governs whether long
+/// options are accepted; while it is `false`, a long option is rejected with
+/// [`ParseError::NonPortableLongOption`]. The other fields of [`Mode`] describe
+/// syntax this parser cannot produce: no option of the typeset built-in family
+/// takes an argument, and its operands are never numbers. A future version is
+/// expected to honor `options_after_operands` as well.
+///
+/// The third argument is a list of command line arguments to be parsed.
+///
+/// Note that the mode does not cover the operand forms POSIX specifies for the
+/// `export` and `readonly` built-ins. Those are checked by [`interpret`], which
+/// takes the state of the `Portable` shell option separately.
 ///
 /// Returns a pair of option occurrences and operands, which can be passed to
 /// [`interpret`] to get a [`Command`].
 pub fn parse<'a>(
     option_specs: &'a [OptionSpec<'a>],
-    // TODO: mode: Mode, (disabling long options & options after operands)
+    mode: Mode,
     args: Vec<Field>,
 ) -> Result<(Vec<OptionOccurrence<'a>>, Vec<Field>), ParseError> {
     let mut args = args.into_iter().peekable();
@@ -301,7 +343,7 @@ pub fn parse<'a>(
         if try_parse_short(option_specs, &mut args, &mut options)? {
             continue;
         }
-        if let Some(result) = try_parse_long(option_specs, &mut args)? {
+        if let Some(result) = try_parse_long(option_specs, mode, &mut args)? {
             options.push(result);
         } else {
             break; // TODO option after operand
@@ -518,20 +560,20 @@ mod tests {
 
     #[test]
     fn parse_empty_arguments() {
-        let result = parse(&[], vec![]).unwrap();
+        let result = parse(&[], Mode::with_extensions(), vec![]).unwrap();
         assert_eq!(result, (vec![], vec![]));
     }
 
     #[test]
     fn parse_some_operands_without_options() {
         let vars = Field::dummies(["foo", "bar"]);
-        let result = parse(&[], vars.clone()).unwrap();
+        let result = parse(&[], Mode::with_extensions(), vars.clone()).unwrap();
         assert_eq!(result, (vec![], vars));
     }
 
     #[test]
     fn parse_short_print_option_without_operands() {
-        let result = parse(ALL_OPTIONS, Field::dummies(["-p"])).unwrap();
+        let result = parse(ALL_OPTIONS, Mode::with_extensions(), Field::dummies(["-p"])).unwrap();
         assert_matches!(&result.0[..], [option] => {
             assert_eq!(option.spec, &PRINT_OPTION);
             assert_eq!(option.state, State::On);
@@ -543,7 +585,7 @@ mod tests {
     #[test]
     fn parse_many_short_options() {
         let args = Field::dummies(["-p", "+xr"]);
-        let result = parse(ALL_OPTIONS, args.clone()).unwrap();
+        let result = parse(ALL_OPTIONS, Mode::with_extensions(), args.clone()).unwrap();
         assert_matches!(&result.0[..], [option1, option2, option3] => {
             assert_eq!(option1.spec, &PRINT_OPTION);
             assert_eq!(option1.state, State::On);
@@ -560,7 +602,12 @@ mod tests {
 
     #[test]
     fn parse_long_print_option_without_operands() {
-        let result = parse(ALL_OPTIONS, Field::dummies(["--print"])).unwrap();
+        let result = parse(
+            ALL_OPTIONS,
+            Mode::with_extensions(),
+            Field::dummies(["--print"]),
+        )
+        .unwrap();
         assert_matches!(&result.0[..], [option] => {
             assert_eq!(option.spec, &PRINT_OPTION);
             assert_eq!(option.state, State::On);
@@ -574,7 +621,7 @@ mod tests {
         let vars = Field::dummies(["foo", "var"]);
         let mut args = Field::dummies(["-p"]);
         args.extend(vars.iter().cloned());
-        let result = parse(ALL_OPTIONS, args).unwrap();
+        let result = parse(ALL_OPTIONS, Mode::with_extensions(), args).unwrap();
         assert_matches!(&result.0[..], [option] => {
             assert_eq!(option.spec, &PRINT_OPTION);
             assert_eq!(option.state, State::On);
@@ -585,7 +632,12 @@ mod tests {
 
     #[test]
     fn parse_abbreviated_long_option() {
-        let result = parse(ALL_OPTIONS, Field::dummies(["--pri"])).unwrap();
+        let result = parse(
+            ALL_OPTIONS,
+            Mode::with_extensions(),
+            Field::dummies(["--pri"]),
+        )
+        .unwrap();
         assert_matches!(&result.0[..], [option] => {
             assert_eq!(option.spec, &PRINT_OPTION);
             assert_eq!(option.state, State::On);
@@ -596,7 +648,7 @@ mod tests {
 
     #[test]
     fn parse_negated_short_export_option() {
-        let result = parse(ALL_OPTIONS, Field::dummies(["+x"])).unwrap();
+        let result = parse(ALL_OPTIONS, Mode::with_extensions(), Field::dummies(["+x"])).unwrap();
         assert_matches!(&result.0[..], [option] => {
             assert_eq!(option.spec, &EXPORT_OPTION);
             assert_eq!(option.state, State::Off);
@@ -607,7 +659,12 @@ mod tests {
 
     #[test]
     fn parse_negated_long_export_option() {
-        let result = parse(ALL_OPTIONS, Field::dummies(["++export"])).unwrap();
+        let result = parse(
+            ALL_OPTIONS,
+            Mode::with_extensions(),
+            Field::dummies(["++export"]),
+        )
+        .unwrap();
         assert_matches!(&result.0[..], [option] => {
             assert_eq!(option.spec, &EXPORT_OPTION);
             assert_eq!(option.state, State::Off);
@@ -619,7 +676,7 @@ mod tests {
     #[test]
     fn parse_separator() {
         let args = Field::dummies(["-p", "--", "-x"]);
-        let result = parse(ALL_OPTIONS, args.clone()).unwrap();
+        let result = parse(ALL_OPTIONS, Mode::with_extensions(), args.clone()).unwrap();
         assert_matches!(&result.0[..], [option] => {
             assert_eq!(option.spec, &PRINT_OPTION);
             assert_eq!(option.state, State::On);
@@ -631,7 +688,7 @@ mod tests {
     #[test]
     fn parse_unknown_short_option() {
         assert_eq!(
-            parse(&[], Field::dummies(["-p"])),
+            parse(&[], Mode::with_extensions(), Field::dummies(["-p"])),
             Err(ParseError::UnknownShortOption('p', Field::dummy("-p"))),
         );
     }
@@ -639,7 +696,7 @@ mod tests {
     #[test]
     fn parse_unknown_long_option() {
         assert_eq!(
-            parse(&[], Field::dummies(["--print"])),
+            parse(&[], Mode::with_extensions(), Field::dummies(["--print"])),
             Err(ParseError::UnknownLongOption(Field::dummy("--print"))),
         );
     }
@@ -647,7 +704,7 @@ mod tests {
     #[test]
     fn parse_negated_short_print_option() {
         assert_eq!(
-            parse(ALL_OPTIONS, Field::dummies(["+p"])),
+            parse(ALL_OPTIONS, Mode::with_extensions(), Field::dummies(["+p"])),
             Err(ParseError::UncancelableShortOption('p', Field::dummy("+p"))),
         );
     }
@@ -655,7 +712,11 @@ mod tests {
     #[test]
     fn parse_negated_long_print_option() {
         assert_eq!(
-            parse(ALL_OPTIONS, Field::dummies(["++print"])),
+            parse(
+                ALL_OPTIONS,
+                Mode::with_extensions(),
+                Field::dummies(["++print"]),
+            ),
             Err(ParseError::UncancelableLongOption(Field::dummy("++print"))),
         );
     }
@@ -668,9 +729,86 @@ mod tests {
             attr: None,
         };
         assert_eq!(
-            parse(&[EXPORT_OPTION, EXPAND_OPTION], Field::dummies(["++exp"])),
+            parse(
+                &[EXPORT_OPTION, EXPAND_OPTION],
+                Mode::with_extensions(),
+                Field::dummies(["++exp"]),
+            ),
             Err(ParseError::AmbiguousLongOption(Field::dummy("++exp"))),
         );
+    }
+
+    #[test]
+    fn parse_long_option_rejected_under_portable() {
+        assert_eq!(
+            parse(ALL_OPTIONS, Mode::default(), Field::dummies(["--print"])),
+            Err(ParseError::NonPortableLongOption(Field::dummy("--print"))),
+        );
+    }
+
+    #[test]
+    fn parse_abbreviated_long_option_rejected_under_portable() {
+        assert_eq!(
+            parse(ALL_OPTIONS, Mode::default(), Field::dummies(["--pri"])),
+            Err(ParseError::NonPortableLongOption(Field::dummy("--pri"))),
+        );
+    }
+
+    #[test]
+    fn parse_negated_long_option_rejected_under_portable() {
+        assert_eq!(
+            parse(ALL_OPTIONS, Mode::default(), Field::dummies(["++export"])),
+            Err(ParseError::NonPortableLongOption(Field::dummy("++export"))),
+        );
+    }
+
+    #[test]
+    fn parse_negated_uncancelable_long_option_under_portable() {
+        assert_eq!(
+            parse(ALL_OPTIONS, Mode::default(), Field::dummies(["++print"])),
+            Err(ParseError::UncancelableLongOption(Field::dummy("++print"))),
+        );
+    }
+
+    #[test]
+    fn parse_unknown_long_option_under_portable() {
+        assert_eq!(
+            parse(ALL_OPTIONS, Mode::default(), Field::dummies(["--foo"])),
+            Err(ParseError::UnknownLongOption(Field::dummy("--foo"))),
+        );
+    }
+
+    #[test]
+    fn parse_short_option_accepted_under_portable() {
+        let result = parse(ALL_OPTIONS, Mode::default(), Field::dummies(["-p"])).unwrap();
+        assert_matches!(&result.0[..], [option] => {
+            assert_eq!(option.spec, &PRINT_OPTION);
+            assert_eq!(option.state, State::On);
+            assert_eq!(option.location, Location::dummy("-p"));
+        });
+        assert_eq!(result.1, []);
+    }
+
+    #[test]
+    fn parse_operand_starting_with_double_hyphen_under_portable() {
+        let args = Field::dummies(["--", "--print"]);
+        let result = parse(ALL_OPTIONS, Mode::default(), args).unwrap();
+        assert_eq!(result.0, []);
+        assert_eq!(result.1, Field::dummies(["--print"]));
+    }
+
+    #[test]
+    fn non_portable_long_option_report_mentions_portable_option() {
+        let error = ParseError::NonPortableLongOption(Field::dummy("--print"));
+        let report = error.to_report();
+        assert_matches!(&report.footnotes[..], [footnote] => {
+            assert_eq!(footnote.r#type, FootnoteType::Note);
+            assert!(
+                footnote.label.contains("portable"),
+                "unexpected footnote: {:?}",
+                footnote.label,
+            );
+        });
     }
 
     #[test]
