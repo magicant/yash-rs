@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.3.5] - Unreleased
 
+### Added
+
+- The `kill` built-in now accepts a signal name with the `SIG` prefix, as in `kill -s SIGINT` and `kill -SIGINT`. The prefix is case-insensitive like the rest of the name. With `portable` enabled, the prefix is rejected, since POSIX requires the name to be specified without it. Operands to the `-l` and `-v` options still must not have the prefix.
+
 ### Changed
 
 - With `portable` enabled, a long option (for example, `--physical` for the `cd` built-in) passed to a built-in that defines one is now rejected as an error, instead of being accepted as an extension.
@@ -21,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - With `portable` enabled, the `set` built-in and the shell command line now accept only the option spellings POSIX specifies. The `--name` and `++name` forms, abbreviated and case-insensitive `-o` names, `no`-prefixed names, and names POSIX spells in the opposite state (such as `set -o clobber`, which POSIX spells `set +o noclobber`) are rejected as errors. On the command line, the `-l`, `-V`, `--help`, `--version`, `--profile`, `--rcfile`, `--noprofile`, and `--norcfile` options and the `+c` and `+s` negations are rejected as well. The `-o portable` and `+o portable` spellings remain accepted so that the option can be turned off again, and the arguments are examined in order, so options written before `-o portable` are not checked.
 - With `portable` enabled, an argument to `-o` or `+o` written in the same argument as the option itself (for example, `set -oerrexit`) is now rejected as an error by the `set` built-in and by the shell command line. POSIX Utility Syntax Guideline 6 requires an option argument to be a separate argument.
 - With `portable` enabled, the argument to the `read` built-in's `-d` option must now be a separate argument (for example, `read -d :`, not `read -d:`).
+- With `portable` enabled, the `kill` built-in now rejects the syntax POSIX does not specify: the `-n` and `-v` options, a signal number other than `0` given to the `-s` option (for example, `kill -s 9`), and more than one operand or a signal name operand given with the `-l` option (for example, `kill -l 9 15` and `kill -l TERM`). The argument to the `-s` option must also be a separate argument (`kill -s INT`, not `kill -sINT`), which POSIX prescribes for applications even though conforming implementations accept the attached form as well. The `kill -SIGNAL` and `kill -signal_number` forms remain accepted, as does `kill -stop`, since POSIX specifies them.
 
 ## [3.3.4] - 2026-07-31
 
