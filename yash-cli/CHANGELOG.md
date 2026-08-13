@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - With `portable` enabled, an argument to `-o` or `+o` written in the same argument as the option itself (for example, `set -oerrexit`) is now rejected as an error by the `set` built-in and by the shell command line. POSIX Utility Syntax Guideline 6 requires an option argument to be a separate argument.
 - With `portable` enabled, the argument to the `read` built-in's `-d` option must now be a separate argument (for example, `read -d :`, not `read -d:`).
 - With `portable` enabled, the `kill` built-in now rejects the syntax POSIX does not specify: the `-n` and `-v` options, a signal number other than `0` given to the `-s` option (for example, `kill -s 9`), and more than one operand or a signal name operand given with the `-l` option (for example, `kill -l 9 15` and `kill -l TERM`). The argument to the `-s` option must also be a separate argument (`kill -s INT`, not `kill -sINT`), which POSIX prescribes for applications even though conforming implementations accept the attached form as well. The `kill -SIGNAL` and `kill -signal_number` forms remain accepted, as does `kill -stop`, since POSIX specifies them.
+- With `portable` enabled, the `export` and `readonly` built-ins now reject an invocation that has neither operands nor the `-p` option (for example, `export`), as well as one that has both (for example, `export -p FOO`). POSIX specifies only the `export name…` and `export -p` forms.
 
 ## [3.3.4] - 2026-07-31
 

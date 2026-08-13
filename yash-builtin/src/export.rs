@@ -41,6 +41,7 @@ use crate::typeset::syntax::PRINT_OPTION;
 use crate::typeset::syntax::interpret;
 use crate::typeset::syntax::parse;
 use yash_env::Env;
+use yash_env::option::Option::Portable;
 use yash_env::option::State::On;
 use yash_env::semantics::Field;
 use yash_env::system::Isatty;
@@ -62,7 +63,7 @@ where
     S: Isatty + WriteAll,
 {
     match parse(PORTABLE_OPTIONS, args) {
-        Ok((options, operands)) => match interpret(options, operands) {
+        Ok((options, operands)) => match interpret(options, operands, env.options.get(Portable)) {
             Ok(mut command) => {
                 match &mut command {
                     Command::SetVariables(sv) => {
