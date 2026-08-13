@@ -34,6 +34,7 @@
 use self::syntax::OptionSpec;
 use crate::common::output;
 use crate::common::report::{merge_reports, report_error, report_failure};
+use crate::common::syntax::Mode;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::function::Function;
@@ -486,7 +487,7 @@ pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> yash_env::builtin::R
 where
     S: Isatty + WriteAll,
 {
-    match syntax::parse(syntax::ALL_OPTIONS, args) {
+    match syntax::parse(syntax::ALL_OPTIONS, Mode::with_env(env), args) {
         Ok((options, operands)) => {
             match syntax::interpret(options, operands, env.options.get(Portable)) {
                 Ok(command) => match command.execute(env, &PRINT_CONTEXT) {

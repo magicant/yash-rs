@@ -48,6 +48,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   `typeset::syntax::interpret` for an invocation of the `export` or `readonly`
   built-in that has neither operands nor the `-p` option, or that has both,
   while the `portable` shell option is on.
+- `typeset::syntax::ParseError::NonPortableLongOption`, returned by
+  `typeset::syntax::parse` for a valid long option given to the `typeset`,
+  `export`, or `readonly` built-in while the `portable` shell option is on.
 
 ### Changed
 
@@ -103,6 +106,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   one that has the `-p` option and one or more operands, when the `portable`
   shell option is on. POSIX specifies only the `name…` and `-p` forms for these
   built-ins.
+- `typeset::syntax::parse` now takes a `common::syntax::Mode` as a second
+  parameter, allowing the caller to control whether non-portable option syntax
+  is accepted.
 - Public dependency versions:
     - yash-env 0.16.0 → 0.16.1
 
