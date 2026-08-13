@@ -82,3 +82,57 @@ __OUT__
 test_OE -e 0 'readonly accepts non-portable variable name without the portable option'
 readonly foo-bar=1
 __IN__
+
+test_O -d -e n 'readonly rejects missing operand' -o portable
+readonly
+echo not reached
+__IN__
+
+test_O -d -e n 'readonly rejects operand with the -p option' -o portable
+readonly foo=bar
+readonly -p foo
+echo not reached
+__IN__
+
+test_oE 'readonly error message mentions the portable option' -o portable
+(readonly) 2>result
+grep -Fq portable result && echo shown
+__IN__
+shown
+__OUT__
+
+test_oE 'readonly error message names the unexpected operand' -o portable
+readonly foo=bar
+(readonly -p foo) 2>result
+grep -Fq foo result && echo shown
+__IN__
+shown
+__OUT__
+
+test_oE -e 0 'readonly accepts the -p option without operands' -o portable
+readonly foo=bar
+readonly -p | grep -Fx 'readonly foo=bar'
+__IN__
+readonly foo=bar
+__OUT__
+
+test_oE -e 0 'readonly accepts operands without the -p option' -o portable
+readonly foo=bar
+echo "$foo"
+__IN__
+bar
+__OUT__
+
+test_oE -e 0 'readonly accepts missing operand without the portable option'
+readonly foo=bar
+readonly | grep -Fx 'readonly foo=bar'
+__IN__
+readonly foo=bar
+__OUT__
+
+test_oE -e 0 'readonly accepts operand with the -p option without the portable option'
+readonly foo=bar
+readonly -p foo
+__IN__
+readonly foo=bar
+__OUT__

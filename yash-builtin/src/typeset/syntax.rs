@@ -323,30 +323,81 @@ pub enum InterpretError<'a> {
         /// Occurrence of the `-f` option
         function: OptionOccurrence<'a>,
     },
+
+    /// No operand is given without the `-p` option while POSIX portability is
+    /// required.
+    #[error("missing operand")]
+    MissingOperand,
+
+    /// One or more operands are given with the `-p` option while POSIX
+    /// portability is required.
+    #[error("unexpected operand")]
+    UnexpectedOperands {
+        /// Location of the field containing the `-p` option
+        print: Location,
+        /// Operands that cannot be used with the `-p` option
+        ///
+        /// This vector is never empty.
+        operands: Vec<Field>,
+    },
 }
 
 impl InterpretError<'_> {
     /// Converts the error to a report.
     #[must_use]
     pub fn to_report(&self) -> Report<'_> {
-        let Self::OptionInapplicableForFunction { clashing, function } = self;
         let mut report = Report::new();
         report.r#type = ReportType::Error;
         report.title = self.to_string().into();
-        report.snippets = Snippet::with_primary_span(
-            &clashing.location,
-            format!("the {} option ...", clashing.spec).into(),
-        );
-        add_span(
-            &function.location.code,
-            Span {
-                range: function.location.byte_range(),
-                role: SpanRole::Primary {
-                    label: "... cannot be used for -f/--functions".into(),
-                },
-            },
-            &mut report.snippets,
-        );
+
+        match self {
+            Self::OptionInapplicableForFunction { clashing, function } => {
+                report.snippets = Snippet::with_primary_span(
+                    &clashing.location,
+                    format!("the {} option ...", clashing.spec).into(),
+                );
+                add_span(
+                    &function.location.code,
+                    Span {
+                        range: function.location.byte_range(),
+                        role: SpanRole::Primary {
+                            label: "... cannot be used for -f/--functions".into(),
+                        },
+                    },
+                    &mut report.snippets,
+                );
+            }
+
+            // There is no operand to annotate, so the report has no snippet of
+            // its own. The built-in name is annotated by the caller.
+            Self::MissingOperand => {}
+
+            Self::UnexpectedOperands { print, operands } => {
+                report.snippets = Snippet::with_primary_span(
+                    &operands[0].origin,
+                    format!("{}: unexpected operand", operands[0].value).into(),
+                );
+                add_span(
+                    &print.code,
+                    Span {
+                        range: print.byte_range(),
+                        role: SpanRole::Supplementary {
+                            label: "the -p option expects no operands".into(),
+                        },
+                    },
+                    &mut report.snippets,
+                );
+            }
+        }
+
+        if let Self::MissingOperand | Self::UnexpectedOperands { .. } = self {
+            report.footnotes.push(Footnote {
+                r#type: FootnoteType::Note,
+                label: "this error is reported because the `portable` shell option is enabled"
+                    .into(),
+            });
+        }
+
         report
     }
 }
@@ -362,23 +413,48 @@ impl<'a> From<&'a InterpretError<'a>> for Report<'a> {
 ///
 /// You can pass the result of [`parse`] to this function to get a command.
 ///
+/// `portable` should be the state of the `Portable` shell option. While it is
+/// `On`, the operands must follow the syntax POSIX specifies for the export and
+/// readonly built-ins, which is either `name…` or `-p`; an invocation that has
+/// neither, or that has both, is rejected with
+/// [`InterpretError::MissingOperand`] or
+/// [`InterpretError::UnexpectedOperands`].
+///
 /// If `options` contain an `OptionSpec` that is not contained in
 /// [`ALL_OPTIONS`], this function will panic.
 pub fn interpret(
     options: Vec<OptionOccurrence>,
     operands: Vec<Field>,
+    portable: State,
 ) -> Result<Command, InterpretError> {
     let mut functions_option_index = None;
     let mut global_option_index = None;
+    let mut print_option_index = None;
     let mut print = operands.is_empty();
     let mut attrs = Vec::new();
     for (index, option) in options.iter().enumerate() {
         match option.spec.short {
             'f' => functions_option_index = Some(index),
             'g' => global_option_index = Some(index),
-            'p' => print = true,
+            'p' => {
+                print_option_index = Some(index);
+                print = true;
+            }
             'X' => attrs.push((index, Attr::Export, !option.state)),
             _ => attrs.push((index, option.spec.attr.unwrap(), option.state)),
+        }
+    }
+
+    if portable == State::On {
+        match print_option_index {
+            None if operands.is_empty() => return Err(InterpretError::MissingOperand),
+
+            Some(index) if !operands.is_empty() => {
+                let print = { options }.swap_remove(index).location;
+                return Err(InterpretError::UnexpectedOperands { print, operands });
+            }
+
+            _ => {}
         }
     }
 
@@ -599,7 +675,7 @@ mod tests {
 
     #[test]
     fn interpret_empty_arguments() {
-        let result = interpret(vec![], vec![]).unwrap();
+        let result = interpret(vec![], vec![], State::Off).unwrap();
         assert_matches!(result, Command::PrintVariables(pv) => {
             assert_eq!(pv.variables, []);
             assert_eq!(pv.attrs, []);
@@ -610,7 +686,7 @@ mod tests {
     #[test]
     fn interpret_some_operands_without_options() {
         let vars = Field::dummies(["foo", "bar"]);
-        let result = interpret(vec![], vars.clone()).unwrap();
+        let result = interpret(vec![], vars.clone(), State::Off).unwrap();
         assert_matches!(result, Command::SetVariables(sv) => {
             assert_eq!(sv.variables, vars);
             assert_eq!(sv.attrs, []);
@@ -631,6 +707,7 @@ mod tests {
         let result = interpret(
             vec![dummy_option_occurrence(&FUNCTIONS_OPTION, State::On)],
             vec![],
+            State::Off,
         );
         assert_matches!(result, Ok(Command::PrintFunctions(pf)) => {
             assert_eq!(pf.functions, []);
@@ -644,6 +721,7 @@ mod tests {
         let result = interpret(
             vec![dummy_option_occurrence(&FUNCTIONS_OPTION, State::On)],
             functions.clone(),
+            State::Off,
         );
         assert_matches!(result, Ok(Command::SetFunctions(sf)) => {
             assert_eq!(sf.functions, functions);
@@ -656,6 +734,7 @@ mod tests {
         let result = interpret(
             vec![dummy_option_occurrence(&GLOBAL_OPTION, State::On)],
             vec![],
+            State::Off,
         );
         assert_matches!(result, Ok(Command::PrintVariables(pv)) => {
             assert_eq!(pv.variables, []);
@@ -670,6 +749,7 @@ mod tests {
         let result = interpret(
             vec![dummy_option_occurrence(&GLOBAL_OPTION, State::On)],
             vars.clone(),
+            State::Off,
         );
         assert_matches!(result, Ok(Command::SetVariables(sv)) => {
             assert_eq!(sv.variables, vars);
@@ -683,6 +763,7 @@ mod tests {
         let result = interpret(
             vec![dummy_option_occurrence(&PRINT_OPTION, State::On)],
             vec![],
+            State::Off,
         );
         assert_matches!(result, Ok(Command::PrintVariables(pv)) => {
             assert_eq!(pv.variables, []);
@@ -697,6 +778,7 @@ mod tests {
         let result = interpret(
             vec![dummy_option_occurrence(&PRINT_OPTION, State::On)],
             vars.clone(),
+            State::Off,
         );
         assert_matches!(result, Ok(Command::PrintVariables(pv)) => {
             assert_eq!(pv.variables, vars);
@@ -710,6 +792,7 @@ mod tests {
         let result = interpret(
             vec![dummy_option_occurrence(&EXPORT_OPTION, State::Off)],
             vec![],
+            State::Off,
         );
         assert_matches!(result, Ok(Command::PrintVariables(pv)) => {
             assert_eq!(pv.variables, []);
@@ -724,6 +807,7 @@ mod tests {
         let result = interpret(
             vec![dummy_option_occurrence(&EXPORT_OPTION, State::Off)],
             vars.clone(),
+            State::Off,
         );
         assert_matches!(result, Ok(Command::SetVariables(sv)) => {
             assert_eq!(sv.variables, vars);
@@ -741,6 +825,7 @@ mod tests {
                 dummy_option_occurrence(&PRINT_OPTION, State::On),
             ],
             functions.clone(),
+            State::Off,
         );
         assert_matches!(result, Ok(Command::PrintFunctions(pf)) => {
             assert_eq!(pf.functions, functions);
@@ -757,6 +842,7 @@ mod tests {
                 dummy_option_occurrence(&READONLY_OPTION, State::Off),
             ],
             vec![],
+            State::Off,
         );
         assert_matches!(result, Ok(Command::PrintFunctions(pf)) => {
             assert_eq!(pf.functions, vec![]);
@@ -773,6 +859,7 @@ mod tests {
                 dummy_option_occurrence(&READONLY_OPTION, State::On),
             ],
             functions.clone(),
+            State::Off,
         );
         assert_matches!(result, Ok(Command::SetFunctions(sf)) => {
             assert_eq!(sf.functions, functions);
@@ -784,7 +871,7 @@ mod tests {
     fn interpret_inapplicable_attribute_option_for_functions() {
         let f_option = dummy_option_occurrence(&FUNCTIONS_OPTION, State::On);
         let x_option = dummy_option_occurrence(&EXPORT_OPTION, State::On);
-        let result = interpret(vec![f_option.clone(), x_option.clone()], vec![]);
+        let result = interpret(vec![f_option.clone(), x_option.clone()], vec![], State::Off);
         assert_eq!(
             result,
             Err(InterpretError::OptionInapplicableForFunction {
@@ -798,7 +885,7 @@ mod tests {
     fn interpret_global_option_with_functions_option() {
         let f_option = dummy_option_occurrence(&FUNCTIONS_OPTION, State::On);
         let g_option = dummy_option_occurrence(&GLOBAL_OPTION, State::On);
-        let result = interpret(vec![f_option.clone(), g_option.clone()], vec![]);
+        let result = interpret(vec![f_option.clone(), g_option.clone()], vec![], State::Off);
         assert_eq!(
             result,
             Err(InterpretError::OptionInapplicableForFunction {
@@ -809,10 +896,57 @@ mod tests {
     }
 
     #[test]
+    fn interpret_portable_operands_without_print_option() {
+        let result = interpret(vec![], vec![], State::On);
+        assert_eq!(result, Err(InterpretError::MissingOperand));
+
+        let operands = Field::dummies(["foo", "bar"]);
+        let result = interpret(vec![], operands.clone(), State::On);
+        assert_matches!(result, Ok(Command::SetVariables(sv)) => {
+            assert_eq!(sv.variables, operands);
+        });
+    }
+
+    #[test]
+    fn interpret_portable_operands_with_print_option() {
+        let print = dummy_option_occurrence(&PRINT_OPTION, State::On);
+        let result = interpret(vec![print.clone()], vec![], State::On);
+        assert_matches!(result, Ok(Command::PrintVariables(pv)) => {
+            assert_eq!(pv.variables, []);
+        });
+
+        let operands = Field::dummies(["foo", "bar"]);
+        let result = interpret(vec![print.clone()], operands.clone(), State::On);
+        assert_eq!(
+            result,
+            Err(InterpretError::UnexpectedOperands {
+                print: print.location,
+                operands,
+            }),
+        );
+    }
+
+    #[test]
+    fn interpret_non_portable_operands_are_accepted_while_portable_is_off() {
+        let result = interpret(vec![], vec![], State::Off);
+        assert_matches!(result, Ok(Command::PrintVariables(pv)) => {
+            assert_eq!(pv.variables, []);
+        });
+
+        let print = dummy_option_occurrence(&PRINT_OPTION, State::On);
+        let operands = Field::dummies(["foo"]);
+        let result = interpret(vec![print], operands.clone(), State::Off);
+        assert_matches!(result, Ok(Command::PrintVariables(pv)) => {
+            assert_eq!(pv.variables, operands);
+        });
+    }
+
+    #[test]
     fn interpret_unexport_option_for_variables() {
         let result = interpret(
             vec![dummy_option_occurrence(&UNEXPORT_OPTION, State::On)],
             vec![],
+            State::Off,
         );
         assert_matches!(result, Ok(Command::PrintVariables(pv)) => {
             assert_eq!(pv.variables, vec![]);

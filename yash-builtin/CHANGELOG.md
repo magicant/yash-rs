@@ -43,6 +43,11 @@ A _private dependency_ is used internally and not visible to downstream users.
   `kill::syntax::Error::NonPortableListOperand`, returned by
   `kill::syntax::parse` when the command line uses syntax POSIX does not
   specify while the `portable` shell option is on.
+- `typeset::syntax::InterpretError::MissingOperand` and
+  `typeset::syntax::InterpretError::UnexpectedOperands`, returned by
+  `typeset::syntax::interpret` for an invocation of the `export` or `readonly`
+  built-in that has neither operands nor the `-p` option, or that has both,
+  while the `portable` shell option is on.
 
 ### Changed
 
@@ -90,6 +95,14 @@ A _private dependency_ is used internally and not visible to downstream users.
   the `SIG` prefix, as in `-s SIGINT` and `-SIGINT`, unless the `portable`
   shell option is on. Operands to the `-l` and `-v` options are unaffected;
   they still must not have the prefix.
+- `typeset::syntax::interpret` now takes the state of the `Portable` shell
+  option as a third parameter. While it is on, the operands must follow the
+  syntax POSIX specifies for the `export` and `readonly` built-ins.
+- The `export` and `readonly` built-ins (`export::main` and `readonly::main`)
+  now reject an invocation that has no operands and no `-p` option, as well as
+  one that has the `-p` option and one or more operands, when the `portable`
+  shell option is on. POSIX specifies only the `name…` and `-p` forms for these
+  built-ins.
 - Public dependency versions:
     - yash-env 0.16.0 → 0.16.1
 

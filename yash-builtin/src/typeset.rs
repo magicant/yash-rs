@@ -487,13 +487,15 @@ where
     S: Isatty + WriteAll,
 {
     match syntax::parse(syntax::ALL_OPTIONS, args) {
-        Ok((options, operands)) => match syntax::interpret(options, operands) {
-            Ok(command) => match command.execute(env, &PRINT_CONTEXT) {
-                Ok(result) => output(env, &result).await,
-                Err(errors) => report_failure(env, merge_reports(&errors).unwrap()).await,
-            },
-            Err(error) => report_error(env, &error).await,
-        },
+        Ok((options, operands)) => {
+            match syntax::interpret(options, operands, env.options.get(Portable)) {
+                Ok(command) => match command.execute(env, &PRINT_CONTEXT) {
+                    Ok(result) => output(env, &result).await,
+                    Err(errors) => report_failure(env, merge_reports(&errors).unwrap()).await,
+                },
+                Err(error) => report_error(env, &error).await,
+            }
+        }
         Err(error) => report_error(env, &error).await,
     }
 }

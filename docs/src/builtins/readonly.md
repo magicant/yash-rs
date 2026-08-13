@@ -124,6 +124,8 @@ When making a variable read-only with a value, it is an error if the variable is
 
 (Since 3.3.3) When the [`portable` option](../environment/options.md#portable) is set, it is an error to make a variable read-only if its name contains a character other than ASCII letters, digits, and underscores, or starts with a digit.
 
+(Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, it is an error to invoke the built-in without operands and without the `-p` option, or with the `-p` option and one or more operands. POSIX specifies only the `readonly name…` and `readonly -p` forms.
+
 <!-- TODO: It is an error to specify a non-existing function for making it read-only. -->
 
 When printing variables<!-- TODO: or functions -->, it is an error if an operand names a non-existing variable<!-- TODO: or function -->.
@@ -155,6 +157,6 @@ error: error assigning to variable
 
 ## Compatibility
 
-This built-in is part of the POSIX standard. Printing variables is portable only when the `-p` option is used without operands. <!-- TODO: Operations on functions with the `-f` option are non-portable extensions. -->
+This built-in is part of the POSIX standard. Printing variables is portable only when the `-p` option is used without operands; the [`portable` option](../environment/options.md#portable) rejects the other forms (see [Errors](#errors)). <!-- TODO: Operations on functions with the `-f` option are non-portable extensions. -->
 
 [variables]: ../language/parameters/variables.md
