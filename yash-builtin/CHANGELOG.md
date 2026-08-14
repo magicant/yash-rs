@@ -24,6 +24,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `common::syntax::ParseError::NonPortableShortOption`, returned when a short
   option marked with `OptionSpec::extension` is used while the `portable`
   shell option is on.
+- The public `common::syntax::Mode::long_option_names` field for controlling
+  whether the parser accepts long option names, and the separate
+  `common::syntax::Mode::extension_options` field for controlling whether it
+  accepts options marked with `OptionSpec::extension`.
 - `common::syntax::Mode::option_arguments_in_same_field` for controlling
   whether a short option's argument may be attached to the option name, and
   `common::syntax::ParseError::UnseparatedOptionArgument` for reporting an
@@ -71,11 +75,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   option is on.
 - `common::syntax::Mode::with_env` now enables non-portable option syntax based
   on the `Portable` shell option instead of `PosixlyCorrect`. This includes long
-  options, extension-marked short options, and short-option arguments occurring
-  in the same field as the option name.
-- `common::syntax::Mode::accepts_long_options` and `accept_long_options` have
-  been removed. The option is now controlled directly through the public
-  `non_portable_option_names` field of `Mode`.
+  options, extension-marked options, and short-option arguments occurring in
+  the same field as the option name.
 - `common::syntax::ParseError::UnsupportedLongOption` has been renamed to
   `NonPortableLongOption`.
 - The `exit` built-in (`exit::main`) now rejects its `-f` option, in addition
@@ -111,6 +112,12 @@ A _private dependency_ is used internally and not visible to downstream users.
   is accepted.
 - Public dependency versions:
     - yash-env 0.16.0 → 0.16.1
+
+### Removed
+
+- `common::syntax::Mode::accepts_long_options` and
+  `common::syntax::Mode::accept_long_options`. Use the `long_option_names` and
+  `extension_options` fields of `Mode` instead.
 
 ## [0.22.0] - 2026-07-31
 
