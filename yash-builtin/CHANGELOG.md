@@ -55,6 +55,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `typeset::syntax::ParseError::NonPortableLongOption`, returned by
   `typeset::syntax::parse` for a valid long option given to the `typeset`,
   `export`, or `readonly` built-in while the `portable` shell option is on.
+- `unset::syntax::Error::MissingOperand`, returned by `unset::syntax::parse`
+  for an invocation of the `unset` built-in that has no operands while the
+  `portable` shell option is on.
 
 ### Changed
 
@@ -107,6 +110,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   one that has the `-p` option and one or more operands, when the `portable`
   shell option is on. POSIX specifies only the `name…` and `-p` forms for these
   built-ins.
+- The `unset` built-in (`unset::syntax::parse`) now rejects an invocation that
+  has no operands when the `portable` shell option is on. POSIX specifies the
+  syntax as `unset [-fv] name…`, which requires at least one operand.
 - `typeset::syntax::parse` now takes a `common::syntax::Mode` as a second
   parameter, allowing the caller to control whether non-portable option syntax
   is accepted.
